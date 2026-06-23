@@ -7,7 +7,7 @@ import { buildSearchClause } from '@/lib/search'
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'review_forms')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const search = searchParams.get('search') || ''
@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'review_forms')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await request.json()
   const { title, slug, description, template_type, google_review_url, coupon_id, is_active, custom_fields } = body

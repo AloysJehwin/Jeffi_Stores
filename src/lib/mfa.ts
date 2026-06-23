@@ -21,7 +21,7 @@ export interface MfaTicketPayload {
 }
 
 export async function issueMfaTicket(payload: MfaTicketPayload): Promise<string> {
-  return new SignJWT(payload)
+  return new SignJWT({ ...payload, type: 'mfa_ticket' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(TICKET_TTL)
@@ -31,10 +31,12 @@ export async function issueMfaTicket(payload: MfaTicketPayload): Promise<string>
 export async function verifyMfaTicket(token: string, expectedPurpose: MfaPurpose): Promise<MfaTicketPayload | null> {
   try {
     const { payload } = await jwtVerify(token, TICKET_SECRET)
+    if (payload.type !== 'mfa_ticket') return null
     if (payload.purpose !== expectedPurpose) return null
     if (!payload.adminId || typeof payload.adminId !== 'string') return null
     return payload as MfaTicketPayload
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -77,7 +79,8 @@ export async function verifyTotp(secret: string, code: string): Promise<boolean>
   try {
     const result = await verify({ token: code.trim(), secret, epochTolerance: 30 })
     return !!result.valid
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return false
   }
 }
@@ -87,12 +90,13 @@ export function generateRecoveryCodes(count = 10): { plain: string; hash: string
   for (let i = 0; i < count; i++) {
     const raw = crypto.randomBytes(5).toString('hex').toUpperCase()
     const plain = `${raw.slice(0, 5)}-${raw.slice(5, 10)}`
-    const hash = crypto.createHash('sha256').update(plain).digest('hex')
+    const hash = hashRecoveryCode(plain)
     out.push({ plain, hash })
   }
   return out
 }
 
 export function hashRecoveryCode(plain: string): string {
-  return crypto.createHash('sha256').update(plain.trim().toUpperCase()).digest('hex')
+  const pepper = process.env.RECOVERY_CODE_PEPPER || process.env.JWT_SECRET || ''
+  return crypto.createHmac('sha256', pepper).update(plain.trim().toUpperCase()).digest('hex')
 }

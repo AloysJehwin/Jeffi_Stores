@@ -291,7 +291,11 @@ export default function QuotationDetailClient({ id }: { id: string }) {
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">{item.hsn_code || '—'}</td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.unit || 'PCS'}</td>
-                  <td className="px-4 py-3 text-center text-foreground">{item.quantity}</td>
+                  <td className="px-4 py-3 text-center text-foreground">
+                    {parseFloat(item.quantity)}{item.sell_unit_dimension === 'count' && Number(item.sell_unit_factor) > 1 && (
+                      <span className="text-xs text-foreground-secondary ml-1">× {parseFloat(item.sell_unit_factor)} = <span className="font-semibold text-foreground">{Math.round(Number(item.quantity) * Number(item.sell_unit_factor))} pcs</span></span>
+                    )}
+                  </td>
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.rate))}</td>
                   <td className="px-4 py-3 text-right text-foreground-secondary">{item.discount_pct ? `${item.discount_pct}%` : '—'}</td>
                   <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(item.amount))}</td>

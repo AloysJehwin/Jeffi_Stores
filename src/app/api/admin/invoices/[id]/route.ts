@@ -11,16 +11,17 @@ export const dynamic = 'force-dynamic'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(
       `SELECT id, source, invoice_number, status FROM orders WHERE id = $1`,
-      [params.id]
+      [id]
     )
     if (!order) return NextResponse.json({ error: 'Invoice not found' }, { status: 404 })
     if (order.source !== 'offline') return NextResponse.json({ error: 'Only offline invoices can be edited' }, { status: 400 })
@@ -69,6 +70,7 @@ export async function PATCH(
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
+        buy_unit: item.buy_unit || null,
         unit_price: unitPrice,
         total_price: lineTotal,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
@@ -87,7 +89,7 @@ export async function PATCH(
     const result = await withTransaction(async (client) => {
       const existingResult = await client.query<{ product_id: string | null; variant_id: string | null; sub_variant_id: string | null; quantity: string }>(
         `SELECT product_id, variant_id, sub_variant_id, quantity FROM order_items WHERE order_id = $1`,
-        [params.id]
+        [id]
       )
 
       const existingQtyMap = new Map<string, number>()
@@ -102,8 +104,27 @@ export async function PATCH(
         if (!item.product_id) continue
         const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
         const previousQty = existingQtyMap.get(key) ?? 0
-        const extraQty = item.quantity - previousQty
-        if (extraQty <= 0) continue
+        const rawExtra = item.quantity - previousQty
+        if (rawExtra <= 0) continue
+
+        // Resolve unit factor: variant-scoped buy_unit → product-level buy_unit → sell_unit_id via variant → sell_unit_id via product
+        const unitRow = await client.query<{ factor: string; dimension: string }>(
+          `SELECT COALESCE(puv.factor, pup.factor, pu_sv.factor, pu_sp.factor)::text AS factor,
+                  COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension
+           FROM (SELECT 1) x
+           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3 AND $1 IS NOT NULL
+           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL AND $1 IS NOT NULL
+             AND ($3 IS NULL OR puv.id IS NULL)
+           LEFT JOIN product_variants pvar ON pvar.id = $3
+           LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL
+           LEFT JOIN products prod ON prod.id = $2 AND $3 IS NULL
+           LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL`,
+          [item.buy_unit || null, item.product_id, item.variant_id || null]
+        )
+        const u = unitRow.rows[0]
+        const extraQty = (u?.dimension === 'count' && u?.factor)
+          ? rawExtra * parseFloat(u.factor)
+          : rawExtra
 
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: string }>(
@@ -161,12 +182,12 @@ export async function PATCH(
           effectiveDate, notes || null,
           moveToDraft ? 'draft' : order.status,
           moveToDraft ? null : order.invoice_number,
-          params.id,
+          id,
         ]
       )
 
       if (moveToDraft && order.invoice_number) {
-        await client.query(`DELETE FROM invoices WHERE order_id = $1`, [params.id])
+        await client.query(`DELETE FROM invoices WHERE order_id = $1`, [id])
       }
 
       if (addressLine1) {
@@ -175,23 +196,23 @@ export async function PATCH(
             full_name = $1, address_line1 = $2, address_line2 = $3,
             city = $4, state = $5, postal_code = $6
           WHERE id = (SELECT shipping_address_id FROM orders WHERE id = $7)`,
-          [customerName, addressLine1, addressLine2 || null, city || '', state || '', postalCode || '', params.id]
+          [customerName, addressLine1, addressLine2 || null, city || '', state || '', postalCode || '', id]
         )
       }
 
-      await client.query(`DELETE FROM order_items WHERE order_id = $1`, [params.id])
+      await client.query(`DELETE FROM order_items WHERE order_id = $1`, [id])
 
       for (const item of processedItems) {
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, total_price,
+            hsn_code, gst_rate, quantity, buy_unit, unit_price, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
           [
-            params.id, item.product_id, item.product_name, item.product_sku,
+            id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
-            item.quantity, item.unit_price, item.total_price,
+            item.quantity, item.buy_unit, item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
           ]
         )
@@ -202,8 +223,27 @@ export async function PATCH(
           if (!item.product_id) continue
           const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
           const previousQty = existingQtyMap.get(key) ?? 0
-          const extraQty = item.quantity - previousQty
-          if (extraQty <= 0) continue
+          const rawExtra = item.quantity - previousQty
+          if (rawExtra <= 0) continue
+
+          // Resolve unit factor: variant-scoped buy_unit → product-level buy_unit → sell_unit_id via variant → sell_unit_id via product
+          const unitRow2 = await client.query<{ factor: string; dimension: string }>(
+            `SELECT COALESCE(puv.factor, pup.factor, pu_sv.factor, pu_sp.factor)::text AS factor,
+                    COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension
+             FROM (SELECT 1) x
+             LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3 AND $1 IS NOT NULL
+             LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL AND $1 IS NOT NULL
+               AND ($3 IS NULL OR puv.id IS NULL)
+             LEFT JOIN product_variants pvar ON pvar.id = $3
+             LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL
+             LEFT JOIN products prod ON prod.id = $2 AND $3 IS NULL
+             LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL`,
+            [item.buy_unit || null, item.product_id, item.variant_id || null]
+          )
+          const u2 = unitRow2.rows[0]
+          const extraQty = (u2?.dimension === 'count' && u2?.factor)
+            ? rawExtra * parseFloat(u2.factor)
+            : rawExtra
 
           let stockBefore = 0
           if (item.sub_variant_id) {
@@ -244,7 +284,7 @@ export async function PATCH(
             transactionType: 'sale',
             quantityChange: -extraQty,
             referenceType: 'order',
-            referenceId: params.id,
+            referenceId: id,
             currentStock: stockBefore,
           })
         }

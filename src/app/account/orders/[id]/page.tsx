@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter, usePathname } from 'next/navigation'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { use, useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import { navItems } from '@/components/visitor/AccountSidebar'
@@ -44,6 +44,7 @@ interface OrderDetails {
   id: string
   orderNumber: string
   invoiceNumber: string | null
+  viewToken: string | null
   totalAmount: number
   subtotal: number
   taxAmount: number
@@ -71,6 +72,13 @@ interface OrderDetails {
     phone: string
   } | null
   items: OrderItem[]
+}
+
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
 }
 
 function getStatusColor(status: string) {
@@ -121,7 +129,8 @@ function getPaymentStatusColor(status: string) {
   }
 }
 
-export default function OrderDetailPage({ params }: { params: { id: string } }) {
+export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const pathname = usePathname()
@@ -170,14 +179,14 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
 
   const fetchOrder = async () => {
     try {
-      const response = await fetch(`/api/orders/${params.id}`, { credentials: 'include' })
+      const response = await fetch(`/api/orders/${id}`, { credentials: 'include' })
       if (!response.ok) {
         throw new Error('Failed to fetch order details')
       }
       const data = await response.json()
       setOrder(data.order)
 
-      const retRes = await fetch(`/api/orders/${params.id}/return`, { credentials: 'include' })
+      const retRes = await fetch(`/api/orders/${id}/return`, { credentials: 'include' })
       if (retRes.ok) {
         const retData = await retRes.json()
         setReturnRequest(retData.returnRequest || null)
@@ -195,7 +204,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     autoCancelTriggeredRef.current = true
     setIsAutoCancelling(true)
     try {
-      const response = await fetch(`/api/orders/${params.id}/cancel`, {
+      const response = await fetch(`/api/orders/${id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -212,7 +221,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
     } finally {
       setIsAutoCancelling(false)
     }
-  }, [params.id])
+  }, [id])
 
   useEffect(() => {
     if (!order) return
@@ -240,7 +249,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
   const handleCancelOrder = async () => {
     setIsCancelling(true)
     try {
-      const response = await fetch(`/api/orders/${params.id}/cancel`, {
+      const response = await fetch(`/api/orders/${id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -269,7 +278,7 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
       return
     }
     try {
-      const response = await fetch(`/api/orders/${params.id}/return`, {
+      const response = await fetch(`/api/orders/${id}/return`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -567,17 +576,18 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                       Monthly return limit reached
                     </span>
                   )}
-                  {order.invoiceNumber && !order.originalOrderId && (
+                  {order.invoiceNumber && !order.originalOrderId && order.viewToken && (
                     <a
-                      href={`/api/orders/${order.id}/invoice`}
+                      href={`/invoice/${order.viewToken}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white shadow-sm transition-colors"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                       </svg>
-                      Download Invoice
+                      View Invoice
                     </a>
                   )}
                 </div>
@@ -866,10 +876,23 @@ export default function OrderDetailPage({ params }: { params: { id: string } }) 
                             {item.subVariantName}
                           </span>
                         )}
-                        <p className="text-sm text-foreground-secondary mt-1">Quantity: {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))}</p>
-                        <p className="text-sm font-semibold text-foreground mt-1">
-                          {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })} x {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-                        </p>
+                        {(() => {
+                          const isFractional = (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
+                          const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : (item.buyMode && item.buyMode !== 'unit' ? item.buyMode : null)
+                          const qtyDisplay = isFractional
+                            ? Number(Number(item.quantity).toFixed(6)).toString()
+                            : String(Math.round(Number(item.quantity)))
+                          return (
+                            <>
+                              <p className="text-sm text-foreground-secondary mt-1">
+                                Quantity: {qtyDisplay}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}
+                              </p>
+                              <p className="text-sm font-semibold text-foreground mt-1">
+                                {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}{unitLabel ? <> / <UnitLabel label={unitLabel} /></> : ''} x {qtyDisplay}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                              </p>
+                            </>
+                          )
+                        })()}
                       </div>
                     </div>
                   )

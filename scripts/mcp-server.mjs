@@ -184,7 +184,7 @@ const TOOLS = [
     },
     handler: async ({ productId }) => {
       const r = await appPool.query(
-        `SELECT id::text, variant_name, sku, price::text, mrp::text, stock_quantity AS stock, is_active
+        `SELECT id::text, variant_name, sku, price::text, mrp::text, stock_status AS stock, is_active
          FROM product_variants WHERE product_id = $1::uuid ORDER BY variant_name`,
         [productId]
       )

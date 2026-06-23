@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateBusiness } from '@/lib/jwt'
 import { queryOne, queryMany, query } from '@/lib/db'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   try {
     const rfq = await queryOne<any>(
       `SELECT id, status FROM business_rfqs WHERE id = $1 AND user_id = $2`,
-      [params.id, user.userId]
+      [id, user.userId]
     )
     if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     if (!['negotiating', 'reviewed', 'pending'].includes(rfq.status)) {
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         const ids = counter_items.map((c: any) => c.rfq_item_id)
         const rows = await queryMany<{ id: string }>(
           `SELECT id FROM business_rfq_items WHERE rfq_id = $1 AND id = ANY($2::uuid[])`,
-          [params.id, ids]
+          [id, ids]
         )
         if (rows.length !== ids.length) {
           return NextResponse.json({ error: 'One or more counter items do not belong to this RFQ' }, { status: 400 })
@@ -54,12 +55,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     await query(
       `INSERT INTO rfq_messages (rfq_id, sender, message, counter_items)
        VALUES ($1, 'customer', $2, $3)`,
-      [params.id, systemMessage, validatedCounter ? JSON.stringify(validatedCounter) : null]
+      [id, systemMessage, validatedCounter ? JSON.stringify(validatedCounter) : null]
     )
 
     await query(
       `UPDATE business_rfqs SET status = $1 WHERE id = $2`,
-      [action === 'accept' ? 'offer_accepted' : 'negotiating', params.id]
+      [action === 'accept' ? 'offer_accepted' : 'negotiating', id]
     )
 
     // When customer accepts, stamp the agreed prices onto the RFQ items
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         `SELECT counter_items FROM rfq_messages
          WHERE rfq_id = $1 AND sender = 'admin' AND counter_items IS NOT NULL
          ORDER BY created_at DESC LIMIT 1`,
-        [params.id]
+        [id]
       )
       if (latestOffer?.counter_items) {
         const ci = Array.isArray(latestOffer.counter_items)
@@ -78,7 +79,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           if (entry.rfq_item_id && entry.offered_price != null) {
             await query(
               `UPDATE business_rfq_items SET requested_price = $1 WHERE id = $2 AND rfq_id = $3`,
-              [Number(entry.offered_price), entry.rfq_item_id, params.id]
+              [Number(entry.offered_price), entry.rfq_item_id, id]
             )
           }
         }

@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { getAllCategories } from '@/lib/queries'
 import { query, queryOne } from '@/lib/db'
 import CategoryForm from '@/components/admin/CategoryForm'
+import CategoryHeroImages from '@/components/admin/CategoryHeroImages'
 import { suggestIcon } from '@/lib/iconSuggest'
 import { ChevronLeft } from 'lucide-react'
 
@@ -50,13 +51,14 @@ async function updateCategory(categoryId: string, formData: FormData) {
   revalidatePath('/admin/products/add')
   revalidatePath('/admin/products/edit/[id]', 'page')
 
-  const { headers: getHeaders } = await import('next/headers')
-  const host = (await getHeaders()).get('host') ?? ''
+  
+  const host = (await headers()).get('host') ?? ''
   redirect(ap('/admin/categories', host))
 }
 
-export default async function EditCategoryPage({ params }: { params: { id: string } }) {
-  const category = await getCategory(params.id).catch(() => null)
+export default async function EditCategoryPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const category = await getCategory(id).catch(() => null)
 
   if (!category) {
     notFound()
@@ -83,8 +85,19 @@ export default async function EditCategoryPage({ params }: { params: { id: strin
       <CategoryForm
         categories={categories || []}
         category={category}
-        action={updateCategory.bind(null, params.id)}
+        action={updateCategory.bind(null, id)}
       />
+
+      {/* Hero image management — only shown for parent categories */}
+      {!category.parent_category_id && (
+        <div className="mt-6">
+          <CategoryHeroImages
+            categoryId={id}
+            mobileImage={(category as any).hero_image_mobile ?? null}
+            desktopImage={(category as any).hero_image_desktop ?? null}
+          />
+        </div>
+      )}
     </div>
   )
 }

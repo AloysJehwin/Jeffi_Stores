@@ -30,7 +30,8 @@ async function verifyGoogleToken(idToken: string): Promise<GoogleTokenPayload | 
       if (!aud.includes(GOOGLE_CLIENT_ID)) return null
     }
     return data as GoogleTokenPayload
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -51,7 +52,8 @@ async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleToken
       name: data.name,
       picture: data.picture,
     }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

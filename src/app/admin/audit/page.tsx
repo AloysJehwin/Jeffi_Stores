@@ -5,7 +5,7 @@ import AdminAuditClient from './AdminAuditClient'
 import AccessDenied from '@/components/admin/AccessDenied'
 
 export default async function AdminAuditPage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   let role = ''
   let scopes: string[] = []
@@ -17,11 +17,11 @@ export default async function AdminAuditPage() {
     }
   } catch {}
 
-  if (!hasScope(role, scopes, 'audit')) {
+  if (!hasScope(role, scopes, 'audit:read')) {
     return <AccessDenied scopeKey="audit" scopeLabel="Audit Log" />
   }
 
-  const canViewReplication = hasScope(role, scopes, 'replication')
+  const canViewReplication = hasScope(role, scopes, 'replication:read')
 
   return <AdminAuditClient canViewReplication={canViewReplication} />
 }

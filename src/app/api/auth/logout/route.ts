@@ -38,7 +38,8 @@ export async function POST(request: NextRequest) {
       res.headers.append('Set-Cookie', `auth_token=; Domain=.jeffistores.in; ${flags}`)
     }
     return res
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Logout failed' }, { status: 500 })
   }
 }

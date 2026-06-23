@@ -61,15 +61,16 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
   return { coupons, total }
 }
 
-export default async function CouponsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+export default async function CouponsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedSearchParams = await searchParams
   const host = (await headers()).get('host') ?? ''
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
-  const sort = searchParams.sort
-  const dir = searchParams.dir as 'asc' | 'desc' | undefined
-  const campaign = searchParams.campaign
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const sort = resolvedSearchParams.sort
+  const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
+  const campaign = resolvedSearchParams.campaign
 
   const [{ coupons, total }, allStats] = await Promise.all([
-    getFilteredCoupons({ is_active: searchParams.is_active, search: searchParams.search, campaign, page, sort, dir }),
+    getFilteredCoupons({ is_active: resolvedSearchParams.is_active, search: resolvedSearchParams.search, campaign, page, sort, dir }),
     getFilteredCoupons({}),
   ])
 
@@ -80,8 +81,8 @@ export default async function CouponsPage({ searchParams }: { searchParams: { [k
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
-    if (searchParams.is_active) params.set('is_active', searchParams.is_active)
-    if (searchParams.search) params.set('search', searchParams.search)
+    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (campaign) params.set('campaign', campaign)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)

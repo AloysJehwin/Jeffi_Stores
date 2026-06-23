@@ -392,9 +392,9 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
       if (dup) return { result: null, error: `SKU "${sku}" already exists` }
       const created = await queryOne<{ id: string; name: string; sku: string }>(
         `INSERT INTO products (name, slug, sku, base_price, mrp, gst_percentage, short_description,
-                               brand_id, category_id, weight_grams, inventory_quantity, low_stock_threshold,
+                               brand_id, category_id, weight_grams, inventory_quantity,
                                is_active, is_featured, has_variants)
-         VALUES ($1, $2, $3, $4, $4, $5, $6, $7::uuid, $8::uuid, $9, 0, 10, TRUE, FALSE, FALSE)
+         VALUES ($1, $2, $3, $4, $4, $5, $6, $7::uuid, $8::uuid, $9, 0, TRUE, FALSE, FALSE)
          RETURNING id::text, name, sku`,
         [name, slug, sku, basePrice, gstPercentage, shortDescription, brandId, categoryId, weightGrams]
       )
@@ -665,17 +665,18 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
   }
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'agent')) {
+  if (!hasScope(admin.role, admin.scopes, 'agent:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
   const action = await queryOne<AgentAction>(
     `SELECT id::text, admin_id::text, conversation_id::text, kind, payload, status
      FROM admin_agent_actions WHERE id = $1::uuid LIMIT 1`,
-    [params.id]
+    [id]
   )
   if (!action) return NextResponse.json({ error: 'Action not found' }, { status: 404 })
   if (action.admin_id !== admin.adminId) return NextResponse.json({ error: 'Not your action' }, { status: 403 })
@@ -686,7 +687,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   await query(
     `UPDATE admin_agent_actions SET status = 'approved', decided_at = NOW(), decided_by_admin_id = $1
      WHERE id = $2::uuid`,
-    [admin.adminId, params.id]
+    [admin.adminId, id]
   )
 
   const cookieHeader = req.headers.get('cookie') || ''
@@ -696,7 +697,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     `UPDATE admin_agent_actions
      SET status = $1, executed_at = NOW(), result = $2::jsonb, error = $3
      WHERE id = $4::uuid`,
-    [error ? 'failed' : 'executed', JSON.stringify(result || {}), error, params.id]
+    [error ? 'failed' : 'executed', JSON.stringify(result || {}), error, id]
   )
 
   if (error) return NextResponse.json({ ok: false, error, status: 'failed' }, { status: 500 })

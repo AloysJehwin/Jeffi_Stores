@@ -82,13 +82,15 @@ export default async function CustomerDetailPage({
   params,
   searchParams,
 }: {
-  params: { id: string }
-  searchParams: { chat?: string }
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ chat?: string }>
 }) {
+  const { id } = await params
+  const resolvedSearchParams = await searchParams
   const host = (await headers()).get('host') ?? ''
   let customer: any
   try {
-    customer = await getCustomerById(params.id)
+    customer = await getCustomerById(id)
   } catch {
     notFound()
   }
@@ -367,7 +369,7 @@ export default async function CustomerDetailPage({
           )}
 
           {/* Support chat */}
-          <AdminSupportChat customerId={customer.id} autoOpen={searchParams.chat === 'true'} />
+          <AdminSupportChat customerId={customer.id} autoOpen={resolvedSearchParams.chat === 'true'} />
         </div>
 
         {/* Right column: Timeline + Orders table (spans 2 cols) */}

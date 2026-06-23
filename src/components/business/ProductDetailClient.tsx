@@ -3,12 +3,19 @@
 import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import ProductImageGallery from '@/components/visitor/ProductImageGallery'
-
 import ProductActions from '@/components/business/ProductActions'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
+import RazorpayOffers from '@/components/visitor/RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
+
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
 
 interface ProductImage {
   id: string
@@ -24,7 +31,8 @@ interface SubVariant {
   sku?: string | null
   price: number | null
   mrp: number | null
-  stock_quantity: number
+  price_ex_gst: number | null
+  stock_status: string
   is_active: boolean
 }
 
@@ -34,17 +42,14 @@ interface Variant {
   sku: string
   price: number | null
   mrp: number | null
+  mrp_ex_gst: number | null
   price_ex_gst: number | null
-  wholeprice_ex_gst: number | null
-  stock_quantity: number
+  stock_status: string
   pricing_type?: string
   unit?: string
   numeric_value?: number | null
-  weight_rate?: number | null
-  weight_unit?: string | null
-  length_rate?: number | null
-  length_unit?: string | null
   sub_variant_type?: string | null
+  sell_unit_id?: string | null
   variant_images?: ProductImage[]
   sub_variants?: SubVariant[]
 }
@@ -59,15 +64,11 @@ interface ProductDetailClientProps {
     base_price: number
     mrp?: number | null
     price_ex_gst?: number | null
-    wholeprice_ex_gst?: number | null
     gst_percentage?: number | null
-    stock_quantity: number
+    stock_status: string
     has_variants: boolean
     variant_type?: string | null
-    weight_rate?: number | null
-    weight_unit?: string | null
-    length_rate?: number | null
-    length_unit?: string | null
+    discount_pct?: number | null
     weight?: number | null
     dimensions?: string | null
     brands?: {
@@ -90,6 +91,21 @@ interface ProductDetailClientProps {
     } | null
     product_images: ProductImage[]
     product_variants: Variant[]
+    product_units?: Array<{
+      id: string
+      variant_id: string | null
+      sub_variant_id: string | null
+      unit: string
+      factor: number
+      is_base: boolean
+      is_purchase_default: boolean
+      display_label: string | null
+      dimension: string
+      min_qty?: number | null
+      max_qty?: number | null
+      qty_step?: number | null
+    }>
+    sell_unit_id?: string | null
   }
   initialSkuParam?: string
 }
@@ -193,6 +209,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
+  const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null; min: number; max: number | null; step: number; factor: number; dimension: string }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
   const { user } = useAuth()
   const { showToast } = useToast()
 
@@ -260,11 +277,18 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
     <>
       {/* Image column — order-1 on mobile, natural on desktop */}
       <div className="order-1 lg:order-none">
-        <ProductImageGallery
-          images={product.product_images || []}
-          productName={product.name}
-          variantImages={variantImages}
-        />
+        <div className="relative overflow-hidden rounded-xl">
+          <ProductImageGallery
+            images={product.product_images || []}
+            productName={product.name}
+            variantImages={variantImages}
+          />
+          {businessDiscountPct > 0 && (
+            <div className="absolute top-6 right-[-36px] w-44 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[11px] font-bold text-center py-1.5 shadow-md pointer-events-none select-none z-10">
+              Business offer
+            </div>
+          )}
+        </div>
 
         <div className="hidden lg:block mt-4">
           <DeliveryInfo {...policy} />
@@ -272,9 +296,9 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
       </div>
 
       {/* Product info column — order-2 on mobile, natural on desktop */}
-      <div className="order-2 lg:order-none">
+      <div className="order-2 lg:order-none lg:pl-4 min-w-0">
         <div className="flex items-start justify-between gap-3 mb-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1 min-w-0">
             {product.name}
           </h1>
           <div className="flex items-center gap-2 shrink-0 mt-1">
@@ -304,35 +328,42 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             <div className="bg-surface rounded-lg p-4 sm:p-6 mb-6">
               {businessDiscountPct > 0 ? (
                 <>
-                  <div className="flex items-baseline justify-between gap-2 mb-3">
-                    <span className="text-sm text-foreground-secondary shrink-0">Regular price</span>
-                    <div className="flex items-center gap-2 flex-wrap justify-end">
-                      <span className="text-base text-foreground-muted line-through tabular-nums">
-                        Rs.&nbsp;{baseDisplayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+                    <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                      Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-sm text-foreground-secondary">
+                      / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
+                    </span>
+                    {mrp && mrp > displayPrice && (
+                      <span className="text-xl text-foreground-muted line-through tabular-nums">
+                        Rs.&nbsp;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
-                      {mrp && mrp > baseDisplayPrice && (
-                        <span className="text-sm text-foreground-muted line-through tabular-nums">
-                          MRP Rs.&nbsp;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    )}
+                  </div>
+                  {mrp && mrp > displayPrice && (
+                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                      <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
+                        {mrpDiscount}% off
+                      </span>
+                      <span className="text-sm text-foreground-secondary">
+                        You save Rs.&nbsp;{(mrp - displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                      {mrp > baseDisplayPrice && (
+                        <span className="text-xs text-foreground-muted">
+                          ({Math.round(((mrp - baseDisplayPrice) / mrp) * 100)}% MRP discount + {businessDiscountPct}% business discount)
                         </span>
                       )}
                     </div>
-                  </div>
-                  <div className="mb-1">
-                    <p className="text-sm font-semibold text-accent-600 dark:text-accent-400 mb-1">Your business price</p>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                        Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                      <span className="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/40 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 whitespace-nowrap shrink-0">
-                        ✦ {businessDiscountPct}% off
-                      </span>
-                    </div>
-                  </div>
+                  )}
                 </>
               ) : (
                 <div className="flex items-baseline gap-3 mb-2 flex-wrap">
                   <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-sm text-foreground-secondary">
+                    / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
                   </span>
                   {mrp && mrp > displayPrice && (
                     <span className="text-lg text-foreground-muted line-through tabular-nums">
@@ -341,13 +372,13 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                   )}
                 </div>
               )}
-              {mrpDiscount > 0 && (
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
-                    {mrpDiscount}% off
+              {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 && (
+                <div className="mb-2">
+                  <span className="text-base font-semibold text-foreground">
+                    Rs.&nbsp;{(displayPrice * selectedUnit.factor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />
                   </span>
-                  <span className="text-sm text-foreground-secondary">
-                    You save Rs. {(mrp! - displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  <span className="text-xs text-foreground-muted ml-2">
+                    (1 <UnitLabel label={selectedUnit.label ?? selectedUnit.key} /> = {selectedUnit.factor} pc × Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                   </span>
                 </div>
               )}
@@ -355,23 +386,16 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                 Inclusive of all taxes
                 {product.gst_percentage ? ` (${parseFloat(String(product.gst_percentage))}% GST)` : ''}
               </p>
-              {product.wholeprice_ex_gst && (
-                <div className="mt-3 pt-3 border-t border-border-default">
-                  <span className="text-sm text-foreground-secondary">
-                    Wholesale Price: <span className="font-semibold text-foreground">Rs. {(Number(product.wholeprice_ex_gst) * (1 + (parseFloat(String(product.gst_percentage)) || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </span>
-                </div>
-              )}
             </div>
 
             <div className="mb-6">
-              {product.stock_quantity > 0 ? (
+              {product.stock_status !== 'Out of Stock' ? (
                 <div className="flex items-center gap-2">
                   <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                   </svg>
                   <span className="text-green-700 dark:text-green-400 font-semibold">
-                    In Stock{product.stock_quantity < 10 ? ` (${product.stock_quantity} left)` : ''}
+                    In Stock
                   </span>
                 </div>
               ) : (
@@ -390,29 +414,28 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           productId={product.id}
           productName={product.name}
           sku={product.sku}
-          stockQuantity={product.stock_quantity}
+          stockStatus={product.stock_status}
           basePrice={displayPrice}
           salePrice={null}
           mrp={mrp}
           gstPercentage={product.gst_percentage ? Number(product.gst_percentage) : null}
-          wholesalePrice={product.wholeprice_ex_gst ? Number(product.wholeprice_ex_gst) : null}
           variants={hasVariants ? product.product_variants : []}
           variantType={product.variant_type || 'Variant'}
           initialSkuParam={initialSkuParam}
-          weightRate={product.weight_rate ? Number(product.weight_rate) : null}
-          weightUnit={product.weight_unit || null}
-          lengthRate={product.length_rate ? Number(product.length_rate) : null}
-          lengthUnit={product.length_unit || null}
+          discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           onVariantChange={handleVariantChange}
           onSelectionChange={(vId, svId) => { setSelectedVariantId(vId); setSelectedSubVariantId(svId) }}
+          onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
           categoryId={categoryId ?? null}
+          productUnits={product.product_units ?? []}
+          sellUnitId={product.sell_unit_id ?? null}
         />
 
         {(() => {
           const primaryImage = product.product_images?.find(img => img.is_primary) || product.product_images?.[0]
           const overallStockQty = hasVariants
-            ? product.product_variants?.reduce((sum: number, v: any) => sum + Number(v.stock_quantity ?? 0), 0) ?? 0
-            : Number(product.stock_quantity ?? 0)
+            ? product.product_variants?.reduce((sum: number, v: any) => sum + (v.stock_status !== 'Out of Stock' ? 1 : 0), 0) ?? 0
+            : (product.stock_status !== 'Out of Stock' ? 1 : 0)
           return (
             <RequestQuoteButton
               items={[{
@@ -421,7 +444,12 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                 subVariantId: selectedSubVariantId || undefined,
                 description: product.name,
                 quantity: 1,
-                unit: 'Nos',
+                unit: selectedUnit.key,
+                unitMin: selectedUnit.min,
+                unitMax: selectedUnit.max ?? undefined,
+                unitStep: selectedUnit.step,
+                unitFactor: selectedUnit.factor,
+                unitDimension: selectedUnit.dimension,
                 currentPrice: hasVariants ? null : displayPrice,
                 imageUrl: primaryImage?.image_url ?? null,
                 brandName: product.brands?.name ?? null,
@@ -432,9 +460,13 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                 businessDiscountPct: businessDiscountPct > 0 ? businessDiscountPct : undefined,
               }]}
               className="mt-3 w-full flex items-center justify-center gap-2 px-6 py-3 rounded-lg border-2 border-accent-500 text-accent-600 dark:text-accent-400 font-semibold text-sm hover:bg-accent-50 dark:hover:bg-accent-900/20 transition-colors disabled:opacity-60"
+              unitMeta={selectedUnit}
+              productUnits={product.product_units ?? []}
             />
           )
         })()}
+
+        <RazorpayOffers />
 
         {/* Product Specifications */}
         <div className="mt-6 pt-6 border-t border-border-default">

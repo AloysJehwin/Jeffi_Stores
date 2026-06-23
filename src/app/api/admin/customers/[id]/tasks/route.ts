@@ -6,14 +6,15 @@ import { logActivity } from '@/lib/activity'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const status = req.nextUrl.searchParams.get('status')
   const wheres = ['ct.user_id = $1']
-  const vals: any[] = [params.id]
+  const vals: any[] = [id]
   if (status === 'open') {
     wheres.push(`ct.status IN ('pending', 'in_progress')`)
   } else if (status === 'completed') {
@@ -47,10 +48,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   return NextResponse.json({ tasks })
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { title, description, due_date, priority, assigned_to } = await req.json()
   const trimmedTitle = String(title || '').trim().slice(0, 255)
@@ -64,7 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
      VALUES ($1, $2, $3, $4, $5, $6, $7)
      RETURNING id`,
     [
-      params.id,
+      id,
       admin.adminId,
       assigned_to || admin.adminId,
       trimmedTitle,
@@ -75,7 +77,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   )
 
   logActivity({
-    userId: params.id,
+    userId: id,
     actorId: admin.adminId,
     kind: 'task_created',
     referenceId: result.rows[0]?.id,

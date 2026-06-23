@@ -32,14 +32,16 @@ function toDatetimeLocal(val: string | null) {
   return new Date(val).toISOString().slice(0, 16)
 }
 
-export default async function EditCouponPage({ params, searchParams }: { params: { id: string }; searchParams: { [key: string]: string | undefined } }) {
-  const coupon = await queryOne<Coupon>('SELECT * FROM coupons WHERE id = $1', [params.id])
+export default async function EditCouponPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const { id } = await params
+  const resolvedSearchParams = await searchParams
+  const coupon = await queryOne<Coupon>('SELECT * FROM coupons WHERE id = $1', [id])
   if (!coupon) notFound()
 
   const host = (await headers()).get('host') ?? ''
 
   const USERS_PAGE_SIZE = 10
-  const usersPage = Math.max(1, parseInt(searchParams.usersPage || '1', 10))
+  const usersPage = Math.max(1, parseInt(resolvedSearchParams.usersPage || '1', 10))
   const usersOffset = (usersPage - 1) * USERS_PAGE_SIZE
 
   const isPersonal = coupon.auto_generated && coupon.generated_for_user_id
@@ -127,15 +129,15 @@ export default async function EditCouponPage({ params, searchParams }: { params:
     try {
       await query(
         `UPDATE coupons SET code=$1, description=$2, discount_type=$3, discount_value=$4, min_purchase_amount=$5, max_discount_amount=$6, usage_limit=$7, usage_limit_per_user=$8, valid_from=$9, valid_until=$10, is_active=$11 WHERE id=$12`,
-        [code, description || null, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active, params.id]
+        [code, description || null, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active, id]
       )
     } catch (err) {
       if ((err as { digest?: string }).digest?.startsWith('NEXT_REDIRECT')) throw err
       throw new Error('Failed to update coupon')
     }
     revalidatePath('/admin/coupons')
-    const { headers: getHeaders } = await import('next/headers')
-    const host = (await getHeaders()).get('host') ?? ''
+    
+    const host = (await headers()).get('host') ?? ''
     redirect(ap('/admin/coupons', host))
   }
 
@@ -240,7 +242,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
               buildUrl={(p) => {
                 const sp = new URLSearchParams()
                 if (p > 1) sp.set('usersPage', String(p))
-                return ap(`/admin/coupons/edit/${params.id}${sp.toString() ? `?${sp.toString()}` : ''}`, host)
+                return ap(`/admin/coupons/edit/${id}${sp.toString() ? `?${sp.toString()}` : ''}`, host)
               }}
             />
           </div>

@@ -7,15 +7,16 @@ import { logActivity } from '@/lib/activity'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
 
     const order = await queryOne(`
       SELECT o.id, o.order_number, o.status, o.payment_status, o.total_amount,

@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import ProductCard from '@/components/visitor/ProductCard'
 import Pagination from '@/components/ui/Pagination'
 
@@ -32,7 +32,7 @@ async function getBrandProducts(brandId: string, page: number) {
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
@@ -49,21 +49,23 @@ export default async function BrandDetailPage({
   params,
   searchParams,
 }: {
-  params: { slug: string }
-  searchParams: { page?: string }
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ page?: string }>
 }) {
-  const brand = await getBrandBySlug(params.slug)
+  const { slug } = await params
+  const resolvedSearchParams = await searchParams
+  const brand = await getBrandBySlug(slug)
 
   if (!brand) {
     notFound()
   }
 
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const { products, total } = await getBrandProducts(brand.id, page)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   function buildPageUrl(p: number) {
-    return p > 1 ? `/brands/${params.slug}?page=${p}` : `/brands/${params.slug}`
+    return p > 1 ? `/brands/${slug}?page=${p}` : `/brands/${slug}`
   }
 
   return (
@@ -127,7 +129,7 @@ export default async function BrandDetailPage({
                   const displayPrice = hasVariants && product.variant_min_price
                     ? product.variant_min_price
                     : (product.price_ex_gst || product.base_price)
-                  const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                  const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
                   const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
                   const inclPrice = hasVariants && product.variant_min_price
                     ? Number(product.variant_min_price)
@@ -150,6 +152,7 @@ export default async function BrandDetailPage({
                       primaryImage={primaryImage || null}
                       brandName={product.brands?.name || null}
                       categoryName={product.categories?.name || null}
+                      discountPct={Number(product.discount_pct ?? 0)}
                     />
                   )
                 })}

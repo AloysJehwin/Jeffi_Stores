@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const defs = await queryMany(
     `SELECT id, tag, color, sort_order FROM customer_tag_definitions ORDER BY sort_order ASC, tag ASC`

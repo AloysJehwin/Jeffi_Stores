@@ -71,13 +71,21 @@ function fmtDate(s: string) {
 
 function calcTotals(items: LineItem[]) {
   let subtotal = 0
+  let totalTax = 0
   items.forEach(it => {
-    subtotal += parseFloat(String(it.unit_price || 0)) * parseFloat(String(it.quantity || 0))
+    const unitPrice = parseFloat(String(it.unit_price || 0))
+    const rawQty = parseFloat(String(it.quantity || 0))
+    const gstRate = parseFloat(String(it.gst_rate || 18))
+    const discPct = parseFloat(String(it.discount_pct || 0))
+    const factor = (it.sell_unit_dimension === 'count' && it.sell_unit_factor > 1) ? it.sell_unit_factor : 1
+    const effectiveQty = rawQty * factor
+    const mrpEx = unitPrice / (1 + gstRate / 100)
+    const lineEx = effectiveQty * mrpEx * (1 - discPct / 100)
+    const lineTax = lineEx * gstRate / 100
+    subtotal += lineEx + lineTax
+    totalTax += lineTax
   })
-  const taxRate = 0.18
-  const taxable = subtotal / (1 + taxRate)
-  const tax = subtotal - taxable
-  return { subtotal, tax: Math.round(tax * 100) / 100 }
+  return { subtotal: Math.round(subtotal * 100) / 100, tax: Math.round(totalTax * 100) / 100 }
 }
 
 export default function CashSaleClient() {
@@ -210,7 +218,7 @@ export default function CashSaleClient() {
       setFormError('All items must be selected from inventory — free-typed names are not allowed')
       return
     }
-    const overstock = items.find(it => it.inventory_quantity !== null && Number(it.quantity) > it.inventory_quantity)
+    const overstock = items.find(it => it.inventory_quantity !== null && Number(it.quantity) * (it.sell_unit_factor || 1) > it.inventory_quantity)
     if (overstock) {
       setFormError(`Insufficient stock for "${overstock.product_name}" — available: ${overstock.inventory_quantity}, required: ${overstock.quantity}`)
       return
@@ -235,6 +243,7 @@ export default function CashSaleClient() {
             hsn_code: it.hsn_code,
             gst_rate: it.gst_rate,
             quantity: it.quantity,
+            buy_unit: it.buy_unit || null,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
           })),
@@ -550,6 +559,7 @@ export default function CashSaleClient() {
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <AdminSelect
+            sm
             value={paymentFilter}
             onChange={v => { setPaymentFilter(v); syncUrl({ payment: v }) }}
             placeholder="All Payments"

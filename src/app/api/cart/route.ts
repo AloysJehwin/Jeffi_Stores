@@ -14,7 +14,7 @@ const AddCartSchema = z
     variantId: zUuid.nullish(),
     subVariantId: zUuid.nullish(),
     quantity: z.number().positive().optional(),
-    buyMode: z.enum(['unit', 'weight', 'length']).nullish(),
+    buyMode: z.string().max(40).nullish(),
     buyUnit: z.string().nullish(),
   })
   .refine(
@@ -24,7 +24,7 @@ const AddCartSchema = z
 
 const UpdateCartSchema = z.object({
   cartItemId: zUuid,
-  quantity: z.number().int().min(0).optional(),
+  quantity: z.number().min(0).optional(),
   savedForLater: z.boolean().optional(),
 })
 
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
           'id', p.id, 'name', p.name, 'slug', p.slug, 'sku', p.sku,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst, 'mrp', p.mrp,
           'gst_percentage', p.gst_percentage,
-          'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
+          'stock_status', p.stock_status,
           'brand_name', b.name, 'category_id', p.category_id,
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'image_url', pi.image_url, 'is_primary', pi.is_primary))
@@ -67,20 +67,49 @@ export async function GET(request: NextRequest) {
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'mrp', pv.mrp, 'price_ex_gst', pv.price_ex_gst,
-            'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'stock_quantity', pv.stock_quantity,
-            'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value,
-            'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
-            'length_rate', pv.length_rate, 'length_unit', pv.length_unit
+            'stock_status', pv.stock_status,
+            'pricing_type', pv.pricing_type, 'unit', pv.unit, 'numeric_value', pv.numeric_value
           )
         ELSE NULL END AS variant,
         CASE WHEN ci.sub_variant_id IS NOT NULL THEN
           json_build_object(
             'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
             'price', psv.price, 'mrp', psv.mrp, 'price_ex_gst', psv.price_ex_gst,
-            'mrp_ex_gst', psv.mrp_ex_gst, 'wholeprice_ex_gst', psv.wholeprice_ex_gst,
-            'stock_quantity', psv.stock_quantity, 'inventory_quantity', psv.inventory_quantity
+            'mrp_ex_gst', psv.mrp_ex_gst,
+            'stock_status', psv.stock_status, 'inventory_quantity', psv.inventory_quantity
           )
-        ELSE NULL END AS sub_variant
+        ELSE NULL END AS sub_variant,
+        COALESCE(
+          (SELECT json_build_object(
+             'unit', pu.unit,
+             'display_label', pu.display_label,
+             'factor', pu.factor,
+             'is_base', pu.is_base,
+             'dimension', pu.dimension
+           )
+           FROM product_units pu
+           WHERE pu.product_id = ci.product_id
+             AND pu.unit = ci.buy_unit
+             AND (
+               (ci.sub_variant_id IS NOT NULL AND pu.sub_variant_id = ci.sub_variant_id)
+               OR (pu.sub_variant_id IS NULL AND pu.variant_id = ci.variant_id AND NOT EXISTS (
+                 SELECT 1 FROM product_units pu2
+                 WHERE pu2.product_id = ci.product_id
+                   AND pu2.unit = ci.buy_unit
+                   AND pu2.sub_variant_id = ci.sub_variant_id
+               ))
+               OR (pu.sub_variant_id IS NULL AND pu.variant_id IS NULL AND NOT EXISTS (
+                 SELECT 1 FROM product_units pu2
+                 WHERE pu2.product_id = ci.product_id
+                   AND pu2.unit = ci.buy_unit
+                   AND (pu2.sub_variant_id = ci.sub_variant_id OR pu2.variant_id = ci.variant_id)
+               ))
+             )
+           ORDER BY pu.sub_variant_id NULLS LAST, pu.variant_id NULLS LAST
+           LIMIT 1
+          ),
+          NULL
+        ) AS cart_item_unit
       FROM cart_items ci
       LEFT JOIN products p ON ci.product_id = p.id
       LEFT JOIN brands b ON p.brand_id = b.id
@@ -90,7 +119,8 @@ export async function GET(request: NextRequest) {
     `, [userId])
 
     return NextResponse.json({ items: cartItems || [] })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to fetch cart' }, { status: 500 })
   }
 }
@@ -105,7 +135,7 @@ export async function POST(request: NextRequest) {
     const { userId } = await resolveUserId(request)
 
     const product = await queryOne(
-      'SELECT id, name, base_price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM products WHERE id = $1',
+      'SELECT id, name, base_price, price_ex_gst FROM products WHERE id = $1',
       [productId]
     )
     if (!productId || !product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -130,57 +160,61 @@ export async function POST(request: NextRequest) {
       }
     } else if (variantId) {
       const variant = await queryOne(
-        'SELECT id, price, price_ex_gst, weight_rate, weight_unit, length_rate, length_unit FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
+        'SELECT id, price, price_ex_gst FROM product_variants WHERE id = $1 AND product_id = $2 AND is_active = true',
         [variantId, productId]
       )
       if (!variant) return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
-      if (buyMode === 'weight') {
-        priceAtAddition = variant.weight_rate ?? product.weight_rate ?? 0
-      } else if (buyMode === 'length') {
-        priceAtAddition = variant.length_rate ?? product.length_rate ?? 0
-      } else {
-        priceAtAddition = variant.price ?? product.base_price
-      }
+      priceAtAddition = variant.price ?? product.base_price
     } else {
-      if (buyMode === 'weight') {
-        priceAtAddition = product.weight_rate ?? 0
-      } else if (buyMode === 'length') {
-        priceAtAddition = product.length_rate ?? 0
-      } else {
-        priceAtAddition = product.price_ex_gst || product.base_price
+      priceAtAddition = product.price_ex_gst || product.base_price
+    }
+
+    // Apply unit factor: if buying by a non-base unit (e.g. 'm' when base is 'pc'),
+    // multiply price by the unit's factor so the stored price is per-selected-unit.
+    if (buyMode && buyMode !== 'unit') {
+      const effectiveVariantId = variantId || null
+      const effectiveSubVariantId = subVariantId || null
+      // Prefer sub-variant-level unit, then variant-level, then product-level
+      const unitRow = await queryOne<{ factor: string | number; is_base: boolean }>(
+        `SELECT factor, is_base FROM product_units
+         WHERE product_id = $1 AND unit = $2
+           AND (
+             ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
+             OR (sub_variant_id IS NULL AND variant_id = $3 AND NOT EXISTS (
+               SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2 AND pu2.sub_variant_id = $4::uuid
+             ))
+             OR (sub_variant_id IS NULL AND variant_id IS NULL AND NOT EXISTS (
+               SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2
+                 AND (pu2.sub_variant_id = $4::uuid OR pu2.variant_id = $3)
+             ))
+           )
+         ORDER BY sub_variant_id NULLS LAST, variant_id NULLS LAST
+         LIMIT 1`,
+        [productId, buyMode, effectiveVariantId, effectiveSubVariantId]
+      )
+      if (unitRow) {
+        priceAtAddition = Math.round(priceAtAddition * Number(unitRow.factor) * 100) / 100
       }
     }
 
-    const existingItem = await queryOne(
-      'SELECT * FROM cart_items WHERE user_id = $1 AND product_id = $2 AND variant_id IS NOT DISTINCT FROM $3 AND sub_variant_id IS NOT DISTINCT FROM $4 AND buy_mode = $5',
-      [userId, productId, variantId || null, subVariantId || null, buyMode]
-    )
-
-    if (existingItem) {
-      const newQuantity = Number(existingItem.quantity) + Number(quantity)
-      await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [newQuantity, existingItem.id])
-      recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
-      const authResult1 = await authenticateUser(request)
-      const realUserId1 = authResult1?.userId
-      if (realUserId1) {
-        logActivity({
-          userId: realUserId1,
-          kind: 'cart_item_added',
-          referenceId: productId,
-          referenceType: 'products',
-          summary: `Added "${product.name}" to cart${quantity > 1 ? ` (×${quantity})` : ''}`,
-          metadata: { productId, quantity, variantId: variantId || null, buyMode },
-        }).catch(() => {})
-      }
-      return NextResponse.json({ message: 'Cart updated', quantity: newQuantity })
-    }
-
-    await query(
-      'INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
+    const upsertResult = await query(
+      `INSERT INTO cart_items (user_id, product_id, variant_id, sub_variant_id, quantity, price_at_addition, buy_mode, buy_unit)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+       ON CONFLICT (
+         user_id,
+         product_id,
+         COALESCE(variant_id,     '00000000-0000-0000-0000-000000000000'::uuid),
+         COALESCE(sub_variant_id, '00000000-0000-0000-0000-000000000000'::uuid),
+         buy_mode
+       )
+       DO UPDATE SET quantity = cart_items.quantity + EXCLUDED.quantity, updated_at = NOW()
+       RETURNING quantity, (xmax = 0) AS inserted`,
       [userId, productId, variantId || null, subVariantId || null, quantity, priceAtAddition, buyMode, buyUnit || null]
     )
-    recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
+    const newQuantity = upsertResult.rows[0]?.quantity
+    const wasInserted = upsertResult.rows[0]?.inserted
 
+    recordImplicitSignal(userId, productId, 'added_to_cart').catch(() => {})
     const authResult2 = await authenticateUser(request)
     const realUserId2 = authResult2?.userId
     if (realUserId2) {
@@ -194,8 +228,12 @@ export async function POST(request: NextRequest) {
       }).catch(() => {})
     }
 
-    return NextResponse.json({ message: 'Item added to cart' })
-  } catch {
+    return NextResponse.json({
+      message: wasInserted ? 'Item added to cart' : 'Cart updated',
+      quantity: newQuantity,
+    })
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to add to cart' }, { status: 500 })
   }
 }
@@ -232,7 +270,8 @@ export async function PATCH(request: NextRequest) {
     }
 
     return NextResponse.json({ error: 'No valid update fields provided' }, { status: 400 })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to update cart' }, { status: 500 })
   }
 }
@@ -265,7 +304,8 @@ export async function DELETE(request: NextRequest) {
     }
 
     return NextResponse.json({ message: 'Item removed from cart' })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to remove from cart' }, { status: 500 })
   }
 }

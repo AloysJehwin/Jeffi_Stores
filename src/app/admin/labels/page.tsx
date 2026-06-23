@@ -12,7 +12,7 @@ export const metadata = {
 }
 
 export default async function LabelsPage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))
@@ -24,7 +24,7 @@ export default async function LabelsPage() {
     redirect(ap('/admin/login', host))
   }
 
-  if (!hasScope(session?.role || '', session?.scopes || [], 'labels')) {
+  if (!hasScope(session?.role || '', session?.scopes || [], 'labels:read')) {
     redirect(ap('/admin/dashboard', host))
   }
 

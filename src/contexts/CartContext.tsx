@@ -12,6 +12,13 @@ interface CartItem {
   price_at_addition: number
   buy_mode: string
   buy_unit: string | null
+  cart_item_unit?: {
+    unit: string
+    display_label: string | null
+    factor: number
+    is_base: boolean
+    dimension: string | null
+  } | null
   products: {
     id: string
     name: string
@@ -21,8 +28,7 @@ interface CartItem {
     price_ex_gst: number | null
     mrp: number | null
     gst_percentage: number | null
-    stock_quantity: number
-    is_in_stock: boolean
+    stock_status: string
     brand_name: string | null
     category_id: string | null
     product_images: Array<{
@@ -38,15 +44,10 @@ interface CartItem {
     price: number | null
     mrp: number | null
     price_ex_gst: number | null
-    wholeprice_ex_gst: number | null
-    stock_quantity: number
+    stock_status: string
     pricing_type?: string
     unit?: string | null
     numeric_value?: number | null
-    weight_rate?: number | null
-    weight_unit?: string | null
-    length_rate?: number | null
-    length_unit?: string | null
   } | null
   sub_variant: {
     id: string
@@ -56,8 +57,7 @@ interface CartItem {
     mrp: number | null
     price_ex_gst: number | null
     mrp_ex_gst: number | null
-    wholeprice_ex_gst: number | null
-    stock_quantity: number
+    stock_status: string
     inventory_quantity: number
   } | null
 }
@@ -229,34 +229,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getCartTotal = () => {
     return cartItems.reduce((total, item) => {
-      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
-        return total + item.price_at_addition * item.quantity
-      }
-      const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
-      const categoryId = item.products.category_id
-      const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-        ? (user.businessDiscountMap?.[categoryId] ?? 0)
-        : 0
-      const effectivePrice = discountPct > 0 ? price * (1 - discountPct / 100) : price
-      return total + effectivePrice * item.quantity
+      const price = item.price_at_addition > 0
+        ? item.price_at_addition
+        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+      return total + price * item.quantity
     }, 0)
   }
 
   const getCartTax = () => {
     return cartItems.reduce((tax, item) => {
-      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
-        const gstRate = item.products.gst_percentage || 0
-        const itemTotal = item.price_at_addition * item.quantity
-        return tax + (itemTotal - itemTotal / (1 + gstRate / 100))
-      }
-      const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
-      const categoryId = item.products.category_id
-      const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-        ? (user.businessDiscountMap?.[categoryId] ?? 0)
-        : 0
-      const effectivePrice = discountPct > 0 ? price * (1 - discountPct / 100) : price
+      const price = item.price_at_addition > 0
+        ? item.price_at_addition
+        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
       const gstRate = item.products.gst_percentage || 0
-      const itemTotal = effectivePrice * item.quantity
+      const itemTotal = price * item.quantity
       const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))
       return tax + itemTax
     }, 0)

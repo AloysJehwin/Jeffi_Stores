@@ -1,14 +1,22 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
 
 import ProductActions from './ProductActions'
 import BusinessPriceBadge from './BusinessPriceBadge'
+import RazorpayOffers from './RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
+
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
 
 interface ProductImage {
   id: string
@@ -24,7 +32,8 @@ interface SubVariant {
   sku?: string | null
   price: number | null
   mrp: number | null
-  stock_quantity: number
+  price_ex_gst: number | null
+  stock_status: string
   is_active: boolean
 }
 
@@ -34,17 +43,14 @@ interface Variant {
   sku: string
   price: number | null
   mrp: number | null
+  mrp_ex_gst: number | null
   price_ex_gst: number | null
-  wholeprice_ex_gst: number | null
-  stock_quantity: number
+  stock_status: string
   pricing_type?: string
   unit?: string
   numeric_value?: number | null
-  weight_rate?: number | null
-  weight_unit?: string | null
-  length_rate?: number | null
-  length_unit?: string | null
   sub_variant_type?: string | null
+  sell_unit_id?: string | null
   variant_images?: ProductImage[]
   sub_variants?: SubVariant[]
 }
@@ -59,17 +65,24 @@ interface ProductDetailClientProps {
     base_price: number
     mrp?: number | null
     price_ex_gst?: number | null
-    wholeprice_ex_gst?: number | null
     gst_percentage?: number | null
-    stock_quantity: number
+    stock_status: string
     has_variants: boolean
     variant_type?: string | null
-    weight_rate?: number | null
-    weight_unit?: string | null
-    length_rate?: number | null
-    length_unit?: string | null
+    discount_pct?: number | null
     weight?: number | null
     dimensions?: string | null
+    material?: string | null
+    finish?: string | null
+    size?: string | null
+    hsn_code?: string | null
+    mpn?: string | null
+    gtin?: string | null
+    weight_grams?: number | null
+    length_cm?: number | null
+    breadth_cm?: number | null
+    height_cm?: number | null
+    package_type?: string | null
     brands?: {
       id: string
       name: string
@@ -90,6 +103,21 @@ interface ProductDetailClientProps {
     } | null
     product_images: ProductImage[]
     product_variants: Variant[]
+    product_units?: Array<{
+      id: string
+      variant_id: string | null
+      sub_variant_id: string | null
+      unit: string
+      factor: number
+      is_base: boolean
+      is_purchase_default: boolean
+      display_label: string | null
+      dimension: string
+      min_qty?: number | null
+      max_qty?: number | null
+      qty_step?: number | null
+    }>
+    sell_unit_id?: string | null
   }
   initialSkuParam?: string
 }
@@ -189,13 +217,103 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
   )
 }
 
+interface PincodeCheckerProps {
+  pincode: string
+  setPincode: (v: string) => void
+  pincodeResult: { ok: boolean; message: string } | null
+  setPincodeResult: (v: { ok: boolean; message: string } | null) => void
+  pincodeChecking: boolean
+  checkPincode: () => void
+  pincodeRef: React.RefObject<HTMLInputElement>
+}
+
+const PincodeChecker = ({ pincode, setPincode, pincodeResult, setPincodeResult, pincodeChecking, checkPincode, pincodeRef }: PincodeCheckerProps) => (
+  <div className="mt-3 p-3 rounded-xl border border-border-default bg-surface-elevated">
+    <p className="text-xs font-semibold text-foreground-secondary mb-2 uppercase tracking-wide">Check Delivery</p>
+    <div className="flex gap-2">
+      <input
+        ref={pincodeRef}
+        type="text"
+        inputMode="numeric"
+        maxLength={6}
+        value={pincode}
+        onChange={e => { setPincode(e.target.value.replace(/\D/g, '')); setPincodeResult(null) }}
+        onKeyDown={e => e.key === 'Enter' && checkPincode()}
+        placeholder="Enter pincode"
+        className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+      />
+      <button
+        onClick={checkPincode}
+        disabled={pincodeChecking}
+        className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-60"
+      >
+        {pincodeChecking ? 'Checking…' : 'Check'}
+      </button>
+    </div>
+    {pincodeResult && (
+      <p className={`text-xs mt-2 font-medium ${pincodeResult.ok ? 'text-green-700 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+        {pincodeResult.ok ? '✓ ' : '✗ '}{pincodeResult.message}
+      </p>
+    )}
+  </div>
+)
+
 export default function ProductDetailClient({ product, initialSkuParam }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
+  const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null; min: number; max: number | null; step: number; factor: number; dimension: string }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
+  const [pincode, setPincode] = useState('')
+  const [pincodeResult, setPincodeResult] = useState<{ ok: boolean; message: string } | null>(null)
+  const [pincodeChecking, setPincodeChecking] = useState(false)
+  const [notifyEmail, setNotifyEmail] = useState('')
+  const [notifySubmitted, setNotifySubmitted] = useState(false)
+  const pincodeRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
   const router = useRouter()
+
+  useEffect(() => {
+    if (user?.email) setNotifyEmail(user.email)
+  }, [user])
+
+  const checkPincode = useCallback(async () => {
+    const p = pincode.trim()
+    if (!/^\d{6}$/.test(p)) {
+      setPincodeResult({ ok: false, message: 'Enter a valid 6-digit pincode' })
+      return
+    }
+    setPincodeChecking(true)
+    setPincodeResult(null)
+    try {
+      const res = await fetch(`/api/delivery-check?pincode=${p}`)
+      const data = await res.json()
+      setPincodeResult({ ok: data.serviceable, message: data.message })
+    } catch {
+      setPincodeResult({ ok: false, message: 'Could not check delivery. Try again.' })
+    } finally {
+      setPincodeChecking(false)
+    }
+  }, [pincode])
+
+  const handleNotifyMe = useCallback(async () => {
+    const email = notifyEmail.trim()
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showToast('Enter a valid email address', 'error')
+      return
+    }
+    try {
+      await fetch('/api/notify-back-in-stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId: product.id, email }),
+        credentials: 'include',
+      })
+      setNotifySubmitted(true)
+    } catch {
+      showToast('Failed to save. Try again.', 'error')
+    }
+  }, [notifyEmail, product.id])
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -289,6 +407,12 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
 
         <div className="hidden lg:block mt-4">
           <DeliveryInfo {...policy} />
+          <PincodeChecker
+            pincode={pincode} setPincode={setPincode}
+            pincodeResult={pincodeResult} setPincodeResult={setPincodeResult}
+            pincodeChecking={pincodeChecking} checkPincode={checkPincode}
+            pincodeRef={pincodeRef}
+          />
         </div>
       </div>
 
@@ -321,21 +445,18 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           </div>
         </div>
 
-        {product.brands && (
-          <div className="flex items-center gap-4 mb-4 text-sm">
-            <span className="text-foreground-secondary">
-              Brand: <span className="font-medium text-foreground">{product.brands.name}</span>
-            </span>
-          </div>
-        )}
 
         {/* Price & Stock — inline for non-variant products */}
         {!hasVariants && (
           <>
             <div className="bg-surface rounded-lg p-4 sm:p-6 mb-6">
-              <div className="flex items-baseline gap-3 mb-2">
+              {/* Per-base-unit price (e.g. Rs. 424.80 / pc) */}
+              <div className="flex items-baseline gap-3 flex-wrap mb-1">
                 <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
                   Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+                <span className="text-sm text-foreground-secondary">
+                  / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
                 </span>
                 {mrp && mrp > displayPrice && (
                   <span className="text-xl text-foreground-muted line-through">
@@ -343,6 +464,17 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                   </span>
                 )}
               </div>
+              {/* Per-sell-unit price when factor > 1 (e.g. Rs. 31,860 / pack) */}
+              {selectedUnit.dimension === 'count' && selectedUnit.factor !== 1 && (
+                <div className="mb-1">
+                  <span className="text-base font-semibold text-foreground">
+                    Rs. {(displayPrice * selectedUnit.factor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />
+                  </span>
+                  <span className="text-xs text-foreground-muted ml-2">
+                    (1 <UnitLabel label={selectedUnit.label ?? selectedUnit.key} /> = {selectedUnit.factor} pc × Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  </span>
+                </div>
+              )}
               {mrpDiscount > 0 && (
                 <div className="flex items-center gap-2 mb-2">
                   <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
@@ -357,93 +489,79 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                 Inclusive of all taxes
                 {product.gst_percentage ? ` (${parseFloat(String(product.gst_percentage))}% GST)` : ''}
               </p>
-              {product.wholeprice_ex_gst && (
-                <div className="mt-3 pt-3 border-t border-border-default">
-                  <span className="text-sm text-foreground-secondary">
-                    Wholesale Price: <span className="font-semibold text-foreground">Rs. {(Number(product.wholeprice_ex_gst) * (1 + (parseFloat(String(product.gst_percentage)) || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </span>
-                </div>
-              )}
               <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />
             </div>
 
-            <div className="mb-6">
-              {product.stock_quantity > 0 ? (
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-green-700 dark:text-green-400 font-semibold">
-                    In Stock{product.stock_quantity < 10 ? ` (${product.stock_quantity} left)` : ''}
-                  </span>
+          </>
+        )}
+
+        {/* Low stock urgency + notify me for out-of-stock */}
+        <div className="mb-4">
+          {product.stock_status === 'Low Stock' && (
+            <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700 px-2 py-0.5 rounded-full">
+              Only a few left — order soon
+            </span>
+          )}
+          {product.stock_status === 'Out of Stock' && (
+            <div className="space-y-3">
+              {notifySubmitted ? (
+                <div className="flex items-center gap-2 text-sm text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700 px-3 py-2 rounded-lg">
+                  <svg className="w-4 h-4 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                  We&apos;ll email you when this is back in stock.
                 </div>
               ) : (
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
+                <div className="flex gap-2">
+                  <input
+                    type="email"
+                    value={notifyEmail}
+                    onChange={e => setNotifyEmail(e.target.value)}
+                    placeholder="Enter your email"
+                    className="flex-1 min-w-0 text-sm px-3 py-2 rounded-lg border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                  />
+                  <button
+                    onClick={handleNotifyMe}
+                    className="shrink-0 text-sm font-semibold px-4 py-2 rounded-lg bg-primary-500 hover:bg-primary-600 text-white transition-colors"
+                  >
+                    Notify Me
+                  </button>
                 </div>
               )}
             </div>
-          </>
-        )}
+          )}
+        </div>
 
         <ProductActions
           productId={product.id}
           productName={product.name}
           sku={product.sku}
-          stockQuantity={product.stock_quantity}
+          stockStatus={product.stock_status}
           basePrice={displayPrice}
           salePrice={null}
           mrp={mrp}
           gstPercentage={product.gst_percentage ? Number(product.gst_percentage) : null}
-          wholesalePrice={product.wholeprice_ex_gst ? Number(product.wholeprice_ex_gst) : null}
           variants={hasVariants ? product.product_variants : []}
           variantType={product.variant_type || 'Variant'}
           initialSkuParam={initialSkuParam}
-          weightRate={product.weight_rate ? Number(product.weight_rate) : null}
-          weightUnit={product.weight_unit || null}
-          lengthRate={product.length_rate ? Number(product.length_rate) : null}
-          lengthUnit={product.length_unit || null}
+          discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           onVariantChange={handleVariantChange}
+          onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
+          productUnits={product.product_units ?? []}
+          sellUnitId={product.sell_unit_id ?? null}
         />
 
+        <RazorpayOffers />
 
         {/* Product Specifications */}
-        <div className="mt-6 pt-6 border-t border-border-default">
-          <h3 className="font-semibold text-foreground mb-3">Product Specifications</h3>
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            {product.weight && (
-              <>
-                <dt className="text-foreground-secondary">Weight:</dt>
-                <dd className="font-medium text-foreground">{product.weight} kg</dd>
-              </>
-            )}
-            {product.dimensions && (
-              <>
-                <dt className="text-foreground-secondary">Dimensions:</dt>
-                <dd className="font-medium text-foreground">{product.dimensions} cm</dd>
-              </>
-            )}
-            {product.categories && (
-              <>
-                <dt className="text-foreground-secondary">Category:</dt>
-                <dd className="font-medium text-foreground">{product.categories.name}</dd>
-              </>
-            )}
-            {product.brands && (
-              <>
-                <dt className="text-foreground-secondary">Brand:</dt>
-                <dd className="font-medium text-foreground">{product.brands.name}</dd>
-              </>
-            )}
-          </dl>
-        </div>
       </div>
 
       <div className="order-3 lg:hidden">
         <DeliveryInfo {...policy} />
+        <PincodeChecker
+          pincode={pincode} setPincode={setPincode}
+          pincodeResult={pincodeResult} setPincodeResult={setPincodeResult}
+          pincodeChecking={pincodeChecking} checkPincode={checkPincode}
+          pincodeRef={pincodeRef}
+        />
       </div>
     </>
   )

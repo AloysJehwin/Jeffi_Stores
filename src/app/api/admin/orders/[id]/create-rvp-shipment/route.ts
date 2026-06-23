@@ -4,11 +4,12 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 import { createRVPShipment } from '@/lib/delhivery'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     if (!process.env.DELHIVERY_API_KEY) {
       return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
@@ -24,7 +25,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
       LEFT JOIN users u ON u.id = o.user_id
       WHERE o.id = $1
-    `, [params.id])
+    `, [id])
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       `SELECT id, type, rvp_awb_number FROM return_requests
        WHERE order_id = $1 AND status NOT IN ('rejected', 'completed')
        ORDER BY created_at DESC LIMIT 1`,
-      [params.id]
+      [id]
     )
 
     if (!returnRequest) {
@@ -68,7 +69,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       LEFT JOIN products p ON p.id = oi.product_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
       WHERE oi.order_id = $1
-    `, [params.id])
+    `, [id])
 
     const weightKg = Math.max(0.1, Math.round((orderItems?.total_weight || 500) / 10) / 100)
     const quantity = Math.max(1, Math.round(orderItems?.total_qty || 1))

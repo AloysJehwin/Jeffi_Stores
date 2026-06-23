@@ -6,10 +6,11 @@ import { logActivity } from '@/lib/activity'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const notes = await queryMany(`
     SELECT n.id, n.body, n.created_at,
@@ -20,14 +21,15 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     WHERE n.user_id = $1
     ORDER BY n.created_at DESC
     LIMIT 100
-  `, [params.id])
+  `, [id])
   return NextResponse.json({ notes })
 }
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { body } = await req.json()
   const trimmed = String(body || '').trim()
@@ -36,10 +38,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   await query(
     `INSERT INTO customer_notes (user_id, body, admin_id) VALUES ($1, $2, $3)`,
-    [params.id, trimmed, admin.adminId]
+    [id, trimmed, admin.adminId]
   )
   await logActivity({
-    userId: params.id,
+    userId: id,
     actorId: admin.adminId,
     kind: 'note_added',
     summary: trimmed.length > 120 ? trimmed.slice(0, 120) + '…' : trimmed,
@@ -47,14 +49,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   return NextResponse.json({ success: true })
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const noteId = req.nextUrl.searchParams.get('noteId')
   if (!noteId) return NextResponse.json({ error: 'noteId query param required' }, { status: 400 })
 
-  await query(`DELETE FROM customer_notes WHERE id = $1 AND user_id = $2`, [noteId, params.id])
+  await query(`DELETE FROM customer_notes WHERE id = $1 AND user_id = $2`, [noteId, id])
   return NextResponse.json({ success: true })
 }

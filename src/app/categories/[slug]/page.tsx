@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/visitor/ProductCard'
@@ -42,7 +42,7 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[],
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
@@ -59,16 +59,18 @@ export default async function CategoryDetailPage({
   params,
   searchParams,
 }: {
-  params: { slug: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const category = await getCategoryBySlug(params.slug)
+  const { slug } = await params
+  const resolvedSearchParams = await searchParams
+  const category = await getCategoryBySlug(slug)
 
   if (!category) {
     notFound()
   }
 
-  const pageParam = typeof searchParams.page === 'string' ? searchParams.page : '1'
+  const pageParam = typeof resolvedSearchParams.page === 'string' ? resolvedSearchParams.page : '1'
   const page = Math.max(1, parseInt(pageParam, 10) || 1)
 
   const subcategories = await getSubcategories(category.id)
@@ -152,7 +154,7 @@ export default async function CategoryDetailPage({
                 const displayPrice = hasVariants && product.variant_min_price
                   ? Number(product.variant_min_price)
                   : Number(product.base_price)
-                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
                 const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
                 const mrpDiscount = mrp && mrp > displayPrice
                   ? Math.round(((mrp - displayPrice) / mrp) * 100)
@@ -172,6 +174,7 @@ export default async function CategoryDetailPage({
                     primaryImage={primaryImage || null}
                     brandName={product.brands?.name || null}
                     categoryName={product.categories?.name || null}
+                    discountPct={Number(product.discount_pct ?? 0)}
                   />
                 )
               })}
@@ -179,7 +182,7 @@ export default async function CategoryDetailPage({
             <Pagination
               page={page}
               totalPages={totalPages}
-              buildHref={(p) => p > 1 ? `/categories/${params.slug}?page=${p}` : `/categories/${params.slug}`}
+              buildHref={(p) => p > 1 ? `/categories/${slug}?page=${p}` : `/categories/${slug}`}
             />
             </>
           ) : (

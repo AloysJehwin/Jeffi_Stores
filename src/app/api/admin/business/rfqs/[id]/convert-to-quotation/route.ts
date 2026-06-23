@@ -27,7 +27,8 @@ function parseAddress(raw: string | null): { addr1: string; addr2: string | null
   return { addr1, addr2, city, state, pincode }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await requireAdminScope(request, 'business_rfqs')
   if (admin instanceof NextResponse) return admin
 
@@ -37,7 +38,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
      JOIN users u ON u.id = r.user_id
      LEFT JOIN business_profiles bp ON bp.user_id = r.user_id
      WHERE r.id = $1`,
-    [params.id]
+    [id]
   )
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (rfq.converted_quotation_id) return NextResponse.json({ error: 'Already converted' }, { status: 409 })
@@ -61,14 +62,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
        pv.variant_name, pv.price_ex_gst AS variant_price, pv.mrp AS variant_mrp, pv.sku AS variant_sku,
        pv.discount_pct AS variant_discount_pct,
        psv.sub_variant_name, psv.price_ex_gst AS sv_price, psv.mrp AS sv_mrp, psv.sku AS sv_sku,
-       psv.discount_pct AS sv_discount_pct
+       psv.discount_pct AS sv_discount_pct,
+       pu.factor AS unit_factor, pu.display_label AS unit_display_label
      FROM business_rfq_items ri
      LEFT JOIN products p ON p.id = ri.product_id
      LEFT JOIN product_variants pv ON pv.id = ri.variant_id
      LEFT JOIN product_sub_variants psv ON psv.id = ri.sub_variant_id
+     LEFT JOIN product_units pu ON pu.product_id = ri.product_id AND pu.unit = ri.unit
      WHERE ri.rfq_id = $1
      ORDER BY ri.position, ri.created_at`,
-    [params.id]
+    [id]
   )
   if (items.length === 0) return NextResponse.json({ error: 'RFQ has no items' }, { status: 400 })
 
@@ -79,7 +82,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     `SELECT counter_items FROM rfq_messages
      WHERE rfq_id = $1 AND counter_items IS NOT NULL
      ORDER BY created_at DESC LIMIT 1`,
-    [params.id]
+    [id]
   )
   // Map rfq_item_id → offered_price (incl-GST, same format as requested_price)
   const negotiatedPriceMap: Record<string, number> = {}
@@ -141,8 +144,11 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           : 0
     // If mrp equals price_ex_gst (within 1 rupee), it's already ex-GST — use as-is
     const mrpIsAlreadyExGst = rawMrp > 0 && rawPriceExGst > 0 && Math.abs(rawMrp - rawPriceExGst) < 1
+    // If the selling unit has a factor (e.g. box=50 pieces), the DB price is
+    // per base unit — scale up so the rate shown on the quotation is per selling unit.
+    const unitFactor = item.unit_factor != null ? Number(item.unit_factor) : 1
     baseRateExGst = rawMrp > 0
-      ? (mrpIsAlreadyExGst ? rawMrp : rawMrp / (1 + gstRate / 100))
+      ? (mrpIsAlreadyExGst ? rawMrp : rawMrp / (1 + gstRate / 100)) * unitFactor
       : 0
 
     // Business price ex-GST: product discount + B2B category discount stacked
@@ -159,10 +165,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const effectiveExGst = effectivePriceInclGst / (1 + gstRate / 100)
 
       if (baseRateExGst > 0 && effectiveExGst < baseRateExGst) {
+        // Negotiated price is below MRP — back-calculate the discount %
         discountPct = Math.round((1 - effectiveExGst / baseRateExGst) * 100 * 100) / 100
+      } else if (baseRateExGst > 0) {
+        // Negotiated price is at or above MRP — use MRP as rate, show business discount
+        discountPct = businessDiscPct
       } else {
+        // No MRP on file — use effective price as rate, show business discount
         baseRateExGst = effectiveExGst
-        discountPct = 0
+        discountPct = businessDiscPct
       }
     } else {
       discountPct = businessDiscPct
@@ -189,7 +200,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       hsn_code: item.product_hsn || null,
       gst_rate: gstRate,
       quantity: qty,
-      unit: item.unit || 'Nos',
+      unit: item.unit_display_label || item.unit || 'Nos',
+      buy_unit: item.unit || null,
+      sold_unit_factor: unitFactor !== 1 ? unitFactor : null,
       rate: baseRateExGst,       // pre-discount rate, so admin can see original and adjust
       discount_pct: discountPct,  // business discount shown separately on the quotation
       amount,
@@ -236,15 +249,15 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const li = lineItems[idx]
     await query(
       `INSERT INTO quotation_items
-         (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-      [qt!.id, idx, li.description, li.hsn_code, li.gst_rate, li.quantity, li.unit, li.rate, li.discount_pct, li.amount, li.product_id, li.variant_id, li.sub_variant_id]
+         (quotation_id, position, description, hsn_code, gst_rate, quantity, unit, buy_unit, sold_unit_factor, rate, discount_pct, amount, product_id, variant_id, sub_variant_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+      [qt!.id, idx, li.description, li.hsn_code, li.gst_rate, li.quantity, li.unit, li.buy_unit, li.sold_unit_factor, li.rate, li.discount_pct, li.amount, li.product_id, li.variant_id, li.sub_variant_id]
     )
   }
 
   await query(
     `UPDATE business_rfqs SET status='converted', converted_quotation_id=$1, updated_at=NOW() WHERE id=$2`,
-    [qt!.id, params.id]
+    [qt!.id, id]
   )
 
   // Notify business user

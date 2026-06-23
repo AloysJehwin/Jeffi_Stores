@@ -296,7 +296,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                     onChange={e => setNewDiscountPct(e.target.value)}
                     placeholder="e.g. 10"
                     min={0} max={100} step={0.5}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 text-right"
+                    className="w-full px-3 py-2.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 text-right"
                   />
                 </div>
                 <button
@@ -334,7 +334,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                   <div className="space-y-2">
                     <textarea value={rejectionNote} onChange={e => setRejectionNote(e.target.value)}
                       placeholder="Rejection reason (optional)" rows={3}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none" />
+                      className="w-full px-3 py-2.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none" />
                     <div className="flex gap-2">
                       <button onClick={handleReject} disabled={actionLoading}
                         className="flex-1 px-3 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">
@@ -364,7 +364,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                   <div className="space-y-2">
                     <textarea value={rejectionNote} onChange={e => setRejectionNote(e.target.value)}
                       placeholder="Rejection reason (optional)" rows={3}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none" />
+                      className="w-full px-3 py-2.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 resize-none" />
                     <div className="flex gap-2">
                       <button onClick={handleReject} disabled={actionLoading}
                         className="flex-1 px-3 py-2 bg-red-600 text-white text-sm font-semibold rounded-lg hover:bg-red-700 transition-colors disabled:opacity-60">

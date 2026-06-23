@@ -19,12 +19,13 @@ const patchSchema = z
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(`
       SELECT o.*,
@@ -32,7 +33,7 @@ export async function GET(
       FROM orders o
       LEFT JOIN addresses a ON a.id = o.shipping_address_id
       WHERE o.id = $1
-    `, [params.id])
+    `, [id])
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
@@ -40,6 +41,7 @@ export async function GET(
       SELECT oi.id, oi.product_id, oi.product_name, oi.product_sku, oi.variant_id, oi.variant_name,
              oi.sub_variant_id, oi.hsn_code, oi.gst_rate, oi.quantity, oi.unit_price, oi.total_price,
              oi.taxable_amount, oi.cgst_amount, oi.sgst_amount, oi.igst_amount, oi.tax_amount,
+             oi.buy_mode, oi.buy_unit,
              CASE WHEN psv.id IS NOT NULL THEN json_build_object(
                'id', psv.id,
                'sub_variant_name', psv.sub_variant_name,
@@ -51,12 +53,14 @@ export async function GET(
                'variant_name', pv.variant_name,
                'sku', pv.sku,
                'inventory_quantity', pv.inventory_quantity
-             ) ELSE NULL END AS variant
+             ) ELSE NULL END AS variant,
+             CASE WHEN psv.id IS NULL AND pv.id IS NULL AND p.id IS NOT NULL THEN p.inventory_quantity ELSE NULL END AS inventory_quantity
       FROM order_items oi
       LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
+      LEFT JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = $1
-    `, [params.id])
+    `, [id])
 
     return NextResponse.json({ order, items: items || [] })
   } catch (err: any) {
@@ -66,12 +70,12 @@ export async function GET(
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const raw = await request.json()
     const parsed = parseBody(patchSchema, raw)

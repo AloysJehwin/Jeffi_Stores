@@ -5,8 +5,9 @@ import { logActivity } from '@/lib/activity'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const productId = params.id
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const productId = id
   const sessionId = req.cookies.get('session_id')?.value || req.headers.get('x-session-id') || null
   const userAgent = req.headers.get('user-agent') || null
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null
@@ -15,7 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     const user = await authenticateUser(req)
     userId = user?.userId || null
-  } catch {}
+  } catch (err) { console.error("[route]", err) }
 
   try {
     await query(
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
        VALUES ($1, $2, $3, $4::inet, $5)`,
       [productId, userId, sessionId, ip, userAgent]
     )
-  } catch {}
+  } catch (err) { console.error("[route]", err) }
 
   if (userId) {
     try {
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
           }).catch(() => {})
         }
       }
-    } catch {}
+    } catch (err) { console.error("[route]", err) }
   }
 
   return NextResponse.json({ ok: true })

@@ -13,10 +13,11 @@ const Schema = z.object({
   isHtml: z.boolean().optional(),
 })
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const raw = await request.json().catch(() => null)
   if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
      FROM orders o
      LEFT JOIN users u ON u.id = o.user_id
      WHERE o.id = $1`,
-    [params.id]
+    [id]
   )
 
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })

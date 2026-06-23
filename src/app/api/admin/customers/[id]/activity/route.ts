@@ -5,16 +5,17 @@ import { queryMany } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const limit = Math.min(200, Math.max(1, parseInt(req.nextUrl.searchParams.get('limit') || '50', 10)))
   const before = req.nextUrl.searchParams.get('before')
 
   const wheres = ['cal.user_id = $1']
-  const vals: any[] = [params.id]
+  const vals: any[] = [id]
   if (before) {
     wheres.push(`cal.created_at < $${vals.length + 1}`)
     vals.push(before)

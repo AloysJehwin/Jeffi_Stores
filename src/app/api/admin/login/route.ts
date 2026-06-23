@@ -15,7 +15,8 @@ function serialToHex(serial: string): string {
       n = n / 16n
     }
     return hex || '0'
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return serial.toLowerCase()
   }
 }
@@ -155,7 +156,8 @@ export async function POST(request: Request) {
       certCN: certCN || undefined,
     })
     return NextResponse.json({ enroll_required: true, ticket })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }

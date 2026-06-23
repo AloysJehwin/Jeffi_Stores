@@ -7,15 +7,16 @@ import { logActivity } from '@/lib/activity'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authUser = await authenticateUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
     const body = await request.json().catch(() => ({}))
     const errorDescription = body?.errorDescription || ''
 
@@ -85,7 +86,8 @@ export async function POST(
     }).catch(() => {})
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to record payment failure' }, { status: 500 })
   }
 }

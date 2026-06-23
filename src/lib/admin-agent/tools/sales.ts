@@ -261,7 +261,7 @@ const match_quotation_items: ToolDef = {
       const raw = typeof lines === 'string' ? JSON.parse(lines) : lines
       if (!Array.isArray(raw)) throw new Error('not an array')
       parsed = raw
-    } catch {
+    } catch (_parseErr) {
       return err('Invalid lines payload', 'lines must be a JSON array of {requestedText, qty}')
     }
     if (parsed.length === 0) return err('No lines provided')

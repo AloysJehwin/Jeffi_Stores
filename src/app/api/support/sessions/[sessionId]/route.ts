@@ -4,8 +4,9 @@ import { query, queryOne } from '@/lib/db'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { sessionId: string } }
+  { params }: { params: Promise<{ sessionId: string }> }
 ) {
+  const { sessionId } = await params
   try {
     const authUser = await authenticateAnyUser(request)
     if (!authUser) {
@@ -14,7 +15,7 @@ export async function PATCH(
 
     const session = await queryOne(
       `SELECT id FROM support_sessions WHERE id = $1 AND user_id = $2`,
-      [params.sessionId, authUser.userId]
+      [sessionId, authUser.userId]
     )
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
@@ -22,16 +23,17 @@ export async function PATCH(
 
     await query(
       `UPDATE support_sessions SET status = 'closed', closed_at = NOW() WHERE id = $1`,
-      [params.sessionId]
+      [sessionId]
     )
 
     await query(
       `DELETE FROM websocket_connections WHERE session_id = $1`,
-      [params.sessionId]
+      [sessionId]
     )
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

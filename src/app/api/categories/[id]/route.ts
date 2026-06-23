@@ -4,15 +4,16 @@ import { authenticateAdmin } from '@/lib/jwt'
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const categoryId = params.id
+    const categoryId = id
 
     const productCount = await queryCount(
       'SELECT COUNT(*) FROM products WHERE category_id = $1',

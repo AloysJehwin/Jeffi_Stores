@@ -11,7 +11,7 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     // For each draft, count how many of its line items are short on stock.
     // A line is "short" when the chosen sub_variant / variant / product has
@@ -21,25 +21,65 @@ export async function GET(request: NextRequest) {
       `WITH item_stock AS (
          SELECT
            oi.order_id,
-           oi.quantity::numeric                                    AS req_qty,
-           COALESCE(
-             psv.inventory_quantity,
-             pv.inventory_quantity,
-             p.inventory_quantity,
-             0
-           )::numeric                                              AS avail_qty,
+           oi.product_name,
+           oi.variant_name,
+           oi.buy_unit,
+           oi.quantity::numeric                                     AS raw_qty,
+           -- Resolve factor via 5-level fallback so RFQ-converted items (buy_unit NULL)
+           -- still get the correct factor from oi.unit, sell_unit_id, or sold_unit_factor.
+           (oi.quantity::numeric * COALESCE(
+             CASE WHEN COALESCE(puv.dimension, pup.dimension,
+                                puuv.dimension, puup.dimension,
+                                pu_sv.dimension, pu_sp.dimension) = 'count'
+                  THEN COALESCE(puv.factor, pup.factor,
+                                puuv.factor, puup.factor,
+                                pu_sv.factor, pu_sp.factor)
+                  ELSE 1 END,
+             CASE WHEN oi.sold_unit_factor IS NOT NULL THEN oi.sold_unit_factor ELSE 1 END
+           ))                                                      AS req_qty,
+           -- Target the most-specific stock level; do NOT fall through to a broader
+           -- level — a sub-variant with 0 stock must not inherit variant/product stock.
+           CASE
+             WHEN oi.sub_variant_id IS NOT NULL THEN COALESCE(psv.inventory_quantity, 0)
+             WHEN oi.variant_id     IS NOT NULL THEN COALESCE(pv.inventory_quantity,  0)
+             ELSE                                    COALESCE(p.inventory_quantity,   0)
+           END::numeric                                            AS avail_qty,
            oi.product_id IS NOT NULL                               AS tracked
          FROM order_items oi
-         LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
-         LEFT JOIN product_variants     pv  ON pv.id  = oi.variant_id
-         LEFT JOIN products             p   ON p.id   = oi.product_id
+         LEFT JOIN product_sub_variants psv  ON psv.id  = oi.sub_variant_id
+         LEFT JOIN product_variants     pv   ON pv.id   = oi.variant_id
+         LEFT JOIN products             p    ON p.id    = oi.product_id
+         LEFT JOIN product_variants     pvar ON pvar.id = oi.variant_id
+         -- buy_unit path (manually created invoices)
+         LEFT JOIN product_units puv  ON puv.unit  = oi.buy_unit AND puv.product_id = oi.product_id AND puv.variant_id = oi.variant_id AND oi.buy_unit IS NOT NULL
+         LEFT JOIN product_units pup  ON pup.unit  = oi.buy_unit AND pup.product_id = oi.product_id AND pup.variant_id IS NULL         AND oi.buy_unit IS NOT NULL
+         -- oi.sold_unit fallback (RFQ-converted items where buy_unit is NULL)
+         LEFT JOIN product_units puuv ON puuv.unit = oi.sold_unit AND puuv.product_id = oi.product_id AND puuv.variant_id = oi.variant_id AND oi.buy_unit IS NULL AND oi.sold_unit_factor IS NULL
+         LEFT JOIN product_units puup ON puup.unit = oi.sold_unit AND puup.product_id = oi.product_id AND puup.variant_id IS NULL         AND oi.buy_unit IS NULL AND oi.sold_unit_factor IS NULL
+         -- sell_unit_id fallback (default selling unit from variant/product); reuse p alias for products
+         LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
+         LEFT JOIN product_units pu_sp ON pu_sp.id = p.sell_unit_id    AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
        ),
        draft_stock AS (
          SELECT
            order_id,
            COUNT(*) FILTER (WHERE tracked)                         AS total_tracked_items,
            COUNT(*) FILTER (WHERE tracked AND avail_qty < req_qty) AS short_items,
-           COUNT(*) FILTER (WHERE tracked AND avail_qty <= 0)      AS out_of_stock_items
+           COUNT(*) FILTER (WHERE tracked AND avail_qty <= 0)      AS out_of_stock_items,
+           COALESCE(
+             json_agg(
+               json_build_object(
+                 'product_name', product_name,
+                 'variant_name', variant_name,
+                 'buy_unit',     buy_unit,
+                 'raw_qty',      raw_qty,
+                 'req_qty',      req_qty,
+                 'avail_qty',    avail_qty,
+                 'ok',           avail_qty >= req_qty
+               ) ORDER BY product_name, variant_name
+             ) FILTER (WHERE tracked),
+             '[]'
+           )                                                       AS stock_lines
          FROM item_stock
          GROUP BY order_id
        )
@@ -48,10 +88,15 @@ export async function GET(request: NextRequest) {
          o.total_amount, o.source, o.created_at, o.updated_at,
          COALESCE(ds.total_tracked_items, 0)::int  AS total_items,
          COALESCE(ds.short_items, 0)::int          AS short_items,
-         COALESCE(ds.out_of_stock_items, 0)::int   AS out_of_stock_items
+         COALESCE(ds.out_of_stock_items, 0)::int   AS out_of_stock_items,
+         COALESCE(ds.stock_lines, '[]'::json)      AS stock_lines
        FROM orders o
        LEFT JOIN draft_stock ds ON ds.order_id = o.id
-       WHERE o.status = 'draft' AND o.source != 'cash_sale'
+       WHERE (o.status = 'draft' AND o.source != 'cash_sale')
+          OR (o.status = 'confirmed' AND EXISTS (
+               SELECT 1 FROM invoices i WHERE i.order_id = o.id AND i.status = 'draft'
+             ))
+          OR (o.status = 'processing' AND o.source = 'business' AND o.invoice_number IS NULL)
        ORDER BY o.updated_at DESC
        LIMIT 100`
     )
@@ -66,7 +111,7 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const {
@@ -112,7 +157,9 @@ export async function POST(request: NextRequest) {
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
+        buy_unit: item.buy_unit || null,
         unit_price: unitPrice,
+        mrp: unitPrice,
         total_price: lineTotal,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
         cgst_amount: Math.round(gst.cgst * 100) / 100,
@@ -172,13 +219,13 @@ export async function POST(request: NextRequest) {
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
+            hsn_code, gst_rate, quantity, buy_unit, unit_price, mrp, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14,$15,$16,$17)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,0,$14,$15,$16,$17,$18,$19)`,
           [
             orderId, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name,
-            item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
+            item.hsn_code, item.gst_rate, item.quantity, item.buy_unit, item.unit_price, item.mrp,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
           ]

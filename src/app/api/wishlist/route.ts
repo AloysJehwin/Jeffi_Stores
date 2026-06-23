@@ -4,7 +4,7 @@ import { query, queryMany, queryOne } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { cookies } from 'next/headers'
 import { getUserIdForSession } from '@/lib/guest-user'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import { logActivity } from '@/lib/activity'
 import { parseBody, zUuid } from '@/lib/validate'
 
@@ -36,9 +36,9 @@ export async function GET(request: NextRequest) {
           'id', p.id, 'name', p.name, 'slug', p.slug,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'mrp', p.mrp, 'has_variants', p.has_variants,
-          'stock_quantity', p.stock_quantity, 'is_in_stock', p.is_in_stock,
+          'stock_status', p.stock_status,
           'variant_stock_total', ${VARIANT_STOCK_TOTAL_SQL},
-          'variant_min_price', ${VARIANT_MIN_PRICE_SQL},
+          'variant_min_price', ${VARIANT_MIN_PRICE_INCL_GST_SQL},
           'variant_min_mrp', ${VARIANT_MIN_MRP_SQL},
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))

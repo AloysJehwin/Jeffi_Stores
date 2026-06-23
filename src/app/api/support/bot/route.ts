@@ -73,7 +73,8 @@ export async function GET(request: NextRequest) {
     )
     const { reply } = getBotReply(msg, orders)
     return NextResponse.json({ reply })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ reply: "I'm having trouble fetching your data right now. Please try again or connect to a support agent." })
   }
 }

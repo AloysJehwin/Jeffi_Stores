@@ -45,18 +45,19 @@ const STATUS_LABELS: Record<string, string> = {
 export default async function BusinessRFQsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | undefined }
+  searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
-  const cookieStore = cookies()
+  const resolvedSearchParams = await searchParams
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
-  if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs')) redirect(ap('/admin/dashboard', host))
+  if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs:read')) redirect(ap('/admin/dashboard', host))
 
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
-  const status = searchParams.status
-  const search = searchParams.search
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const status = resolvedSearchParams.status
+  const search = resolvedSearchParams.search
 
   const conditions: string[] = []
   const values: unknown[] = []
@@ -127,7 +128,7 @@ export default async function BusinessRFQsPage({
           name="search"
           defaultValue={search}
           placeholder="Search by RFQ number, company, email…"
-          className="flex-1 px-3 py-2 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+          className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
         <button type="submit" className="px-4 py-2 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors">
           Search

@@ -10,7 +10,7 @@ export function getRedisClient(): Redis {
   const redisUrl = process.env.REDIS_URL || process.env.UPSTASH_REDIS_URL
 
   if (!redisUrl) {
-    return createInMemoryRedis()
+    return (redisClient = createInMemoryRedis())
   }
 
   try {
@@ -28,7 +28,8 @@ export function getRedisClient(): Redis {
     redisClient.on('connect', () => {})
 
     return redisClient
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return createInMemoryRedis()
   }
 }

@@ -35,20 +35,26 @@ function getPool(): Pool {
       config.port = port
       config.user = user
       config.database = dbName
-      config.ssl = { rejectUnauthorized: false }
+      config.ssl = { rejectUnauthorized: true }
       config.password = makeRdsSigner(host, port, user, region)
     } else {
       config.connectionString = dbUrl
       if (dbUrl.includes('rds.amazonaws.com')) {
         const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
-        config.ssl = fs.existsSync(certPath)
-          ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
-          : { rejectUnauthorized: false }
+        if (!fs.existsSync(certPath)) {
+          throw new Error(`RDS TLS certificate not found at ${certPath}. Download from https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`)
+        }
+        config.ssl = { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
       }
     }
 
     pool = new Pool(config)
-    pool.on('error', () => {})
+    pool.on('error', (err) => {
+      pool!.query(
+        `INSERT INTO _debug_log (source, payload) VALUES ($1, $2)`,
+        ['pool.error', JSON.stringify({ msg: (err as any)?.message, code: (err as any)?.code })]
+      ).catch(() => {})
+    })
   }
   return pool
 }
@@ -66,10 +72,13 @@ async function getRequestAdminId(): Promise<string | null> {
     const token = (await cookies()).get('admin_token')?.value
     if (!token) return null
     const { jwtVerify } = await import('jose')
-    const secret = new TextEncoder().encode(process.env.JWT_SECRET || '')
+    const jwtSecret = process.env.JWT_SECRET
+    if (!jwtSecret) return null
+    const secret = new TextEncoder().encode(jwtSecret)
     const { payload } = await jwtVerify(token, secret)
     return typeof payload.adminId === 'string' ? payload.adminId : null
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

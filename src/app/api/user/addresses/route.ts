@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
     )
 
     return NextResponse.json({ addresses: addresses || [] })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -104,7 +105,8 @@ export async function POST(request: NextRequest) {
     }).catch(() => {})
 
     return NextResponse.json({ address })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

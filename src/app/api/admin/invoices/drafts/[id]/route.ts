@@ -7,18 +7,19 @@ import { lineItemFromMrpIncl } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<any>(
       `SELECT o.*, a.address_line1, a.address_line2, a.city, a.state, a.postal_code
        FROM orders o
        LEFT JOIN addresses a ON a.id = o.shipping_address_id
        WHERE o.id = $1 AND o.status = 'draft'`,
-      [params.id]
+      [id]
     )
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       LEFT JOIN products p ON p.id = oi.product_id AND oi.variant_id IS NULL AND oi.sub_variant_id IS NULL
       WHERE oi.order_id = $1
       ORDER BY oi.created_at ASC
-    `, [params.id])
+    `, [id])
 
     return NextResponse.json({ order, items })
   } catch (err: any) {
@@ -39,13 +40,14 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const order = await queryOne<any>(`SELECT id, status FROM orders WHERE id = $1`, [params.id])
+    const order = await queryOne<any>(`SELECT id, status FROM orders WHERE id = $1`, [id])
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     if (order.status !== 'draft') return NextResponse.json({ error: 'Only drafts can be updated this way' }, { status: 400 })
 
@@ -94,6 +96,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
         gst_rate: gstRate,
         quantity: qty,
         unit_price: unitPrice,
+        mrp: unitPrice,
         total_price: lineTotal,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
         cgst_amount: Math.round(gst.cgst * 100) / 100,
@@ -122,7 +125,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           subtotal, taxAmount, Math.round(totalTaxable * 100) / 100,
           Math.round(totalCgst * 100) / 100, Math.round(totalSgst * 100) / 100, Math.round(totalIgst * 100) / 100,
           totalAmount, paymentMode === 'credit' ? 'unpaid' : 'paid',
-          notes || null, params.id,
+          notes || null, id,
         ]
       )
 
@@ -131,22 +134,22 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
           full_name = $1, address_line1 = $2, address_line2 = $3,
           city = $4, state = $5, postal_code = $6
         WHERE id = (SELECT shipping_address_id FROM orders WHERE id = $7)`,
-        [customerName, addressLine1 || '', addressLine2 || null, city || '', state || '', postalCode || '', params.id]
+        [customerName, addressLine1 || '', addressLine2 || null, city || '', state || '', postalCode || '', id]
       )
 
-      await client.query(`DELETE FROM order_items WHERE order_id = $1`, [params.id])
+      await client.query(`DELETE FROM order_items WHERE order_id = $1`, [id])
 
       for (const item of processedItems) {
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
+            hsn_code, gst_rate, quantity, unit_price, mrp, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14,$15,$16,$17)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,0,$13,$14,$15,$16,$17,$18)`,
           [
-            params.id, item.product_id, item.product_name, item.product_sku,
+            id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name,
-            item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
+            item.hsn_code, item.gst_rate, item.quantity, item.unit_price, item.mrp,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
           ]
@@ -160,20 +163,21 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const order = await queryOne<any>(`SELECT id, status FROM orders WHERE id = $1`, [params.id])
+    const order = await queryOne<any>(`SELECT id, status FROM orders WHERE id = $1`, [id])
     if (!order) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     if (order.status !== 'draft') return NextResponse.json({ error: 'Only drafts can be deleted' }, { status: 400 })
 
     await withTransaction(async (client) => {
-      await client.query(`DELETE FROM order_items WHERE order_id = $1`, [params.id])
-      await client.query(`DELETE FROM addresses WHERE id = (SELECT shipping_address_id FROM orders WHERE id = $1)`, [params.id])
-      await client.query(`DELETE FROM orders WHERE id = $1`, [params.id])
+      await client.query(`DELETE FROM order_items WHERE order_id = $1`, [id])
+      await client.query(`DELETE FROM addresses WHERE id = (SELECT shipping_address_id FROM orders WHERE id = $1)`, [id])
+      await client.query(`DELETE FROM orders WHERE id = $1`, [id])
     })
 
     return NextResponse.json({ success: true })

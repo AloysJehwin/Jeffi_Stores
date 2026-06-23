@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'labels')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'labels:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { product_ids, size, copies, sheet } = await request.json()
 

@@ -13,9 +13,9 @@ function httpsGet(url: string): Promise<string> {
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { pin: string } }
+  { params }: { params: Promise<{ pin: string }> }
 ) {
-  const { pin } = params
+  const { pin } = await params
 
   if (!/^\d{6}$/.test(pin)) {
     return NextResponse.json({ error: 'Invalid PIN code' }, { status: 400 })
@@ -38,7 +38,8 @@ export async function GET(
       state: first.State as string,
       postOffices,
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Lookup failed' }, { status: 502 })
   }
 }

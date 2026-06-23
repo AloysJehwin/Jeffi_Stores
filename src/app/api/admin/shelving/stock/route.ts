@@ -4,6 +4,43 @@ import { hasScope } from '@/lib/scopes'
 import { getStockAtLocation, getStockForProduct, adjustStock, moveStock } from '@/lib/shelf'
 import { queryOne } from '@/lib/db'
 
+async function getInventoryQuantity(productId: string, variantId: string | null, subVariantId: string | null): Promise<number> {
+  if (subVariantId) {
+    // sub_variants don't track inventory_quantity — they share the variant's quantity
+    const row = await queryOne<{ q: string }>(
+      `SELECT COALESCE(pv.inventory_quantity, 0)::text AS q
+       FROM product_sub_variants ps
+       JOIN product_variants pv ON pv.id = ps.variant_id
+       WHERE ps.id = $1`,
+      [subVariantId]
+    )
+    return Number(row?.q ?? 0)
+  }
+  if (variantId) {
+    const row = await queryOne<{ q: string }>(
+      `SELECT COALESCE(inventory_quantity, 0)::text AS q FROM product_variants WHERE id = $1`,
+      [variantId]
+    )
+    return Number(row?.q ?? 0)
+  }
+  const row = await queryOne<{ q: string }>(
+    `SELECT COALESCE(inventory_quantity, 0)::text AS q FROM products WHERE id = $1`,
+    [productId]
+  )
+  return Number(row?.q ?? 0)
+}
+
+async function getTotalShelfStock(productId: string, variantId: string | null, subVariantId: string | null): Promise<number> {
+  const row = await queryOne<{ total: string }>(
+    `SELECT COALESCE(SUM(quantity), 0)::text AS total FROM shelf_stock
+     WHERE product_id = $1
+       AND ($2::uuid IS NULL OR variant_id = $2)
+       AND ($3::uuid IS NULL OR sub_variant_id = $3)`,
+    [productId, variantId, subVariantId]
+  )
+  return Number(row?.total ?? 0)
+}
+
 export const dynamic = 'force-dynamic'
 
 async function resolveProductId(productId: string, variantId: string | null, subVariantId: string | null): Promise<string> {
@@ -33,7 +70,7 @@ async function resolveProductId(productId: string, variantId: string | null, sub
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:read')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     const locationId = request.nextUrl.searchParams.get('location_id')
@@ -56,7 +93,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   try {
     const body = await request.json()
@@ -83,6 +120,18 @@ export async function POST(request: NextRequest) {
     if (isNaN(change)) return NextResponse.json({ error: 'quantity_change must be a number' }, { status: 400 })
 
     const resolvedProductId = await resolveProductId(product_id || '', variant_id || null, sub_variant_id || null)
+
+    if (change > 0) {
+      const inventoryQty = await getInventoryQuantity(resolvedProductId, variant_id || null, sub_variant_id || null)
+      const currentShelfTotal = await getTotalShelfStock(resolvedProductId, variant_id || null, sub_variant_id || null)
+      if (currentShelfTotal + change > inventoryQty) {
+        const available = Math.max(0, inventoryQty - currentShelfTotal)
+        return NextResponse.json({
+          error: `Cannot assign ${change} unit(s) — only ${available} unallocated unit(s) available (inventory: ${inventoryQty}, already on shelves: ${currentShelfTotal})`
+        }, { status: 409 })
+      }
+    }
+
     const stock = await adjustStock(
       location_id, resolvedProductId,
       variant_id || null, sub_variant_id || null,

@@ -5,22 +5,24 @@ import { queryOne } from '@/lib/db'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { userId: string } }
+  { params }: { params: Promise<{ userId: string }> }
 ) {
   try {
+    const { userId } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const session = await queryOne(
       `SELECT id, status, created_at, admin_name FROM support_sessions
        WHERE user_id = $1 AND status = 'open'
        ORDER BY created_at DESC LIMIT 1`,
-      [params.userId]
+      [userId]
     )
 
     return NextResponse.json({ session: session || null })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

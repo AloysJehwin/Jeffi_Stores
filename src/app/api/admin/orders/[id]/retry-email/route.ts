@@ -4,10 +4,11 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 import { sendPaymentRetryEmail } from '@/lib/email'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const order = await queryOne<{
     id: string
@@ -19,7 +20,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     created_at: string
   }>(
     'SELECT id, order_number, customer_email, customer_name, payment_status, total_amount, created_at FROM orders WHERE id = $1',
-    [params.id]
+    [id]
   )
 
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })

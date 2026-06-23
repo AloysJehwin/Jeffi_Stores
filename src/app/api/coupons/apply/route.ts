@@ -121,7 +121,8 @@ export async function POST(request: NextRequest) {
       discountAmount,
       maxDiscountAmount: coupon.max_discount_amount ? Number(coupon.max_discount_amount) : null,
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

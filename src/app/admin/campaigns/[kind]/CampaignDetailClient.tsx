@@ -69,6 +69,7 @@ interface RecentSend {
   bounced_at: string | null
   user_email: string | null
   user_name: string | null
+  send_count: number
 }
 
 interface CouponOption {
@@ -398,7 +399,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             onChange={e => setAiPrompt(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && generateWithAI()}
             placeholder="Describe changes you want to the email…"
-            className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="flex-1 px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           />
           <button
             type="button"
@@ -441,7 +442,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               max={720}
               value={form.delay_hours}
               onChange={e => setForm({ ...form, delay_hours: parseInt(e.target.value || '0', 10) })}
-              className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="w-full px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <p className="text-[10px] text-foreground-muted mt-1">Hours after the trigger before sending</p>
           </div>
@@ -455,7 +456,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               max={100}
               value={form.discount_percent}
               onChange={e => setForm({ ...form, discount_percent: parseInt(e.target.value || '0', 10) })}
-              className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="w-full px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <p className="text-[10px] text-foreground-muted mt-1">Auto-generates a unique per-user coupon if no coupon is assigned below</p>
           </div>
@@ -492,7 +493,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               type="text"
               value={form.subject_template}
               onChange={e => setForm({ ...form, subject_template: e.target.value })}
-              className="w-full px-3 py-2 pr-8 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="w-full px-3 py-2.5 pr-8 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </AIEnrichButton>
         </div>
@@ -505,7 +506,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             value={form.body_template}
             onChange={e => setForm({ ...form, body_template: e.target.value })}
             rows={10}
-            className="w-full px-3 py-2 text-xs font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="w-full px-3 py-2.5 text-xs font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           />
           <p className="text-[10px] text-foreground-muted mt-1">
             Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
@@ -526,7 +527,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             value={testEmail}
             onChange={e => setTestEmail(e.target.value)}
             placeholder="your@email.com for test send"
-            className="flex-1 max-w-xs px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="flex-1 max-w-xs px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           />
           <button
             type="button"
@@ -626,21 +627,20 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                         )}
                       </label>
                       {def.type === 'boolean' ? (
-                        <select
+                        <AdminSelect
                           value={isOverridden ? String(overrideVal) : ''}
-                          onChange={e => {
-                            const v = e.target.value
+                          onChange={v => {
                             const next = { ...form.parameters }
                             if (v === '') delete next[key]
                             else next[key] = v === 'true'
                             setForm({ ...form, parameters: next })
                           }}
-                          className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-                        >
-                          <option value="">Default ({String(defaultVal)})</option>
-                          <option value="true">true</option>
-                          <option value="false">false</option>
-                        </select>
+                          options={[
+                            { value: '', label: `Default (${String(defaultVal)})` },
+                            { value: 'true', label: 'true' },
+                            { value: 'false', label: 'false' },
+                          ]}
+                        />
                       ) : (
                         <input
                           type="number"
@@ -661,7 +661,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                             }
                             setForm({ ...form, parameters: next })
                           }}
-                          className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                          className="w-full px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                         />
                       )}
                       {def.description && (
@@ -787,16 +787,26 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           <p className="p-8 text-sm text-foreground-muted text-center">No sends yet</p>
         ) : (
           <>
+            <div className="grid grid-cols-[1fr_140px_80px_80px] px-5 py-2 border-b border-border-default bg-surface-secondary/40">
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Customer</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Sent at</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-center">Total sends</span>
+              <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-right">Status</span>
+            </div>
             <div className="divide-y divide-border-default">
               {recentSends.map(s => {
                 const st = status(s)
                 return (
-                  <div key={s.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-surface-secondary/50">
-                    <div className="min-w-0 flex-1">
+                  <div key={s.id} className="grid grid-cols-[1fr_140px_80px_80px] items-center px-5 py-3 hover:bg-surface-secondary/50">
+                    <div className="min-w-0">
                       <p className="text-sm text-foreground truncate">{s.user_name || s.user_email}</p>
-                      <p className="text-[10px] text-foreground-muted">{new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                      <p className="text-[10px] text-foreground-muted truncate">{s.user_email}</p>
                     </div>
-                    <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
+                    <p className="text-xs text-foreground-muted">{new Date(s.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                    <p className="text-sm font-semibold text-foreground text-center">{Number(s.send_count)}</p>
+                    <div className="flex justify-end">
+                      <span className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${st.color}`}>{st.label}</span>
+                    </div>
                   </div>
                 )
               })}

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle, XCircle, Loader2, Code, Mail, Sparkles } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 interface ProposedTool {
   id: string
@@ -91,16 +92,17 @@ export default function ProposedToolsPage() {
           <Sparkles className="w-5 h-5 text-accent-500" />
           <h1 className="text-xl font-bold text-foreground">Proposed Tools</h1>
         </div>
-        <select
+        <AdminSelect
           value={statusFilter}
-          onChange={e => setStatusFilter(e.target.value as any)}
-          className="px-3 py-1.5 text-sm bg-surface border border-border-default rounded-lg text-foreground"
-        >
-          <option value="proposed">Proposed</option>
-          <option value="approved">Approved</option>
-          <option value="rejected">Rejected</option>
-          <option value="all">All</option>
-        </select>
+          onChange={v => setStatusFilter(v as any)}
+          sm
+          options={[
+            { value: 'proposed', label: 'Proposed' },
+            { value: 'approved', label: 'Approved' },
+            { value: 'rejected', label: 'Rejected' },
+            { value: 'all', label: 'All' },
+          ]}
+        />
       </div>
 
       <p className="text-xs text-foreground-muted mb-4">

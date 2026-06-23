@@ -5,10 +5,10 @@ import { verifyToken } from '@/lib/jwt'
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const token = cookieStore.get('admin_token')
 
-    const hostname = request.headers.get('host') || ''
+    const hostname = request.nextUrl.hostname || request.headers.get('host') || ''
     const isAdminSubdomain = hostname.startsWith('admin.')
     const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:')
     const certStatus = isAdminSubdomain ? 'valid' : (isLocalhost ? 'development' : 'missing')

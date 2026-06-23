@@ -13,7 +13,7 @@ export const metadata = {
 }
 
 async function getAdminSession() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   if (!token) return null
   try {
@@ -28,9 +28,9 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const headersList = headers()
+  const headersList = await headers()
   const pathname = headersList.get('x-pathname') || ''
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
 
   const session = await getAdminSession()
 
@@ -43,40 +43,41 @@ export default async function AdminLayout({
   const scopes: string[] = session?.scopes || []
 
   const navLinks = [
-    { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard' },
-    { href: '/admin/products', label: 'Products', scope: 'products', group: 'Catalogue' },
-    { href: '/admin/categories', label: 'Categories', scope: 'categories', group: 'Catalogue' },
-    { href: '/admin/brands', label: 'Brands', scope: 'brands', group: 'Catalogue' },
-    { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'catalog_enrichment', group: 'Catalogue' },
-    { href: '/admin/orders', label: 'Orders', scope: 'orders', group: 'Sales' },
-    { href: '/admin/quotations', label: 'Quotations', scope: 'quotations', group: 'Sales' },
-    { href: '/admin/invoices', label: 'Invoices', scope: 'invoices', group: 'Sales' },
-    { href: '/admin/cash-sale', label: 'Cash Sale', scope: 'invoices', group: 'Sales' },
-    { href: '/admin/customers', label: 'Customers', scope: 'customers', group: 'Sales' },
-    { href: '/admin/crm', label: 'CRM', scope: 'customers', group: 'Sales' },
-    { href: '/admin/tasks', label: 'Tasks', scope: 'customers', group: 'Sales' },
-    { href: '/admin/delhivery', label: 'Pickup Request', scope: 'orders', group: 'Fulfilment' },
-    { href: '/admin/packing-slips', label: 'Packing Slips', scope: 'packing_slips', group: 'Fulfilment' },
-    { href: '/admin/labels', label: 'Labels', scope: 'labels', group: 'Fulfilment' },
-    { href: '/admin/scan', label: 'QuickScan', scope: 'quick_scan', group: 'Fulfilment', mobileOnly: true },
-    { href: '/admin/financial', label: 'Financial', scope: 'financial', group: 'Finance' },
-    { href: '/admin/inventory', label: 'Inventory', scope: 'inventory', group: 'Finance' },
-    { href: '/admin/shelving', label: 'Shelving', scope: 'inventory', group: 'Finance' },
-    { href: '/admin/gst', label: 'GST Compliance', scope: 'gst', group: 'Finance' },
-    { href: '/admin/traffic', label: 'Traffic', scope: 'dashboard', group: 'Marketing' },
-    { href: '/admin/coupons', label: 'Coupons', scope: 'coupons', group: 'Marketing' },
-    { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms', group: 'Marketing' },
-    { href: '/admin/mailer', label: 'Mailer', scope: 'mailer', group: 'Marketing' },
-    { href: '/admin/campaigns', label: 'Campaigns', scope: 'mailer', group: 'Marketing' },
-    { href: '/admin/reviews', label: 'Reviews', scope: 'reviews', group: 'Marketing' },
-    { href: '/admin/agent', label: 'AI Agent', scope: 'agent', group: 'AI', exactMatch: true },
-    { href: '/admin/agent/logs', label: 'Agent Logs', scope: 'agent', group: 'AI' },
-    { href: '/admin/business/customers', label: 'Business Customers', scope: 'business_customers', group: 'Business' },
-    { href: '/admin/business/rfqs', label: 'Business RFQs', scope: 'business_rfqs', group: 'Business' },
-    { href: '/admin/inflation', label: 'Inflation', scope: 'inflation', group: 'Settings' },
-    { href: '/admin/audit', label: 'Audit Log', scope: 'audit', group: 'Settings', superAdminOnly: true },
-    { href: '/admin/team', label: 'Team Members', scope: 'settings', group: 'Settings', superAdminOnly: true },
-    { href: '/admin/settings', label: 'Settings', scope: 'settings', group: 'Settings' },
+    { href: '/admin/dashboard', label: 'Dashboard', scope: 'dashboard:read' },
+    { href: '/admin/products', label: 'Products', scope: 'products:read', group: 'Catalogue' },
+    { href: '/admin/categories', label: 'Categories', scope: 'categories:read', group: 'Catalogue' },
+    { href: '/admin/brands', label: 'Brands', scope: 'brands:read', group: 'Catalogue' },
+    { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'catalog_enrichment:read', group: 'Catalogue' },
+    { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },
+    { href: '/admin/quotations', label: 'Quotations', scope: 'quotations:read', group: 'Sales' },
+    { href: '/admin/invoices', label: 'Invoices', scope: 'invoices:read', group: 'Sales' },
+    { href: '/admin/cash-sale', label: 'Cash Sale', scope: 'invoices:read', group: 'Sales' },
+    { href: '/admin/customers', label: 'Customers', scope: 'customers:read', group: 'Sales' },
+    { href: '/admin/crm', label: 'CRM', scope: 'customers:read', group: 'Sales' },
+    { href: '/admin/tasks', label: 'Tasks', scope: 'customers:read', group: 'Sales' },
+    { href: '/admin/delhivery', label: 'Pickup Request', scope: 'orders:read', group: 'Fulfilment' },
+    { href: '/admin/packing-slips', label: 'Packing Slips', scope: 'packing_slips:read', group: 'Fulfilment' },
+    { href: '/admin/labels', label: 'Labels', scope: 'labels:read', group: 'Fulfilment' },
+    { href: '/admin/scan', label: 'QuickScan', scope: 'quick_scan:read', group: 'Fulfilment', mobileOnly: true },
+    { href: '/admin/financial', label: 'Financial', scope: 'financial:read', group: 'Finance' },
+    { href: '/admin/inventory', label: 'Inventory', scope: 'inventory:read', group: 'Finance' },
+    { href: '/admin/shelving', label: 'Shelving', scope: 'inventory:read', group: 'Finance' },
+    { href: '/admin/gst', label: 'GST Compliance', scope: 'gst:read', group: 'Finance' },
+    { href: '/admin/traffic', label: 'Traffic', scope: 'dashboard:read', group: 'Marketing' },
+    { href: '/admin/coupons', label: 'Coupons', scope: 'coupons:read', group: 'Marketing' },
+    { href: '/admin/review-forms', label: 'Review Forms', scope: 'review_forms:read', group: 'Marketing' },
+    { href: '/admin/mailer', label: 'Mailer', scope: 'mailer:read', group: 'Marketing' },
+    { href: '/admin/campaigns', label: 'Campaigns', scope: 'mailer:read', group: 'Marketing' },
+    { href: '/admin/reviews', label: 'Reviews', scope: 'reviews:read', group: 'Marketing' },
+    { href: '/admin/agent', label: 'AI Agent', scope: 'agent:read', group: 'AI', exactMatch: true },
+    { href: '/admin/agent/logs', label: 'Agent Logs', scope: 'agent:read', group: 'AI' },
+    { href: '/admin/business/customers', label: 'Business Customers', scope: 'business_customers:read', group: 'Business' },
+    { href: '/admin/business/rfqs', label: 'Business RFQs', scope: 'business_rfqs:read', group: 'Business' },
+    { href: '/admin/inflation', label: 'Inflation', scope: 'inflation:read', group: 'Settings' },
+    { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings', superAdminOnly: true },
+    { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings', superAdminOnly: true },
+    { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', superAdminOnly: true },
+    { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings' },
   ]
 
   const filteredNavLinks = navLinks.filter(link => {
@@ -110,7 +111,7 @@ export default async function AdminLayout({
       displayName={displayName}
       usernameInitial={usernameInitial}
       role={role}
-      canUseAgent={role === 'super_admin' || scopes.includes('agent')}
+      canUseAgent={hasScope(role, scopes, 'agent:read')}
       logoutForm={logoutForm}
       initialCollapsed={sidebarCollapsed}
     >

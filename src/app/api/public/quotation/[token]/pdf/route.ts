@@ -4,9 +4,10 @@ import { generateQuotationPDF, QuotationBusiness } from '@/lib/quotation-pdf'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   try {
-    const qt = await queryOne<any>(`SELECT * FROM quotations WHERE view_token = $1`, [params.token])
+    const qt = await queryOne<any>(`SELECT * FROM quotations WHERE view_token = $1`, [token])
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
     const items = await queryMany(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [qt.id])

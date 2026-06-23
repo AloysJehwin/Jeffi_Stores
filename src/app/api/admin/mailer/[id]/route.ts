@@ -4,14 +4,15 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, queryCount, query } from '@/lib/db'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const campaign = await queryOne(
     'SELECT * FROM email_campaigns WHERE id = $1',
-    [params.id]
+    [id]
   )
   if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -21,20 +22,21 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const [logs, logTotal] = await Promise.all([
     queryMany(
       'SELECT email, status, error, sent_at FROM email_campaign_logs WHERE campaign_id = $1 ORDER BY sent_at DESC LIMIT $2 OFFSET $3',
-      [params.id, logPageSize, (logPage - 1) * logPageSize]
+      [id, logPageSize, (logPage - 1) * logPageSize]
     ),
-    queryCount('SELECT COUNT(*) FROM email_campaign_logs WHERE campaign_id = $1', [params.id]),
+    queryCount('SELECT COUNT(*) FROM email_campaign_logs WHERE campaign_id = $1', [id]),
   ])
 
   return NextResponse.json({ campaign, logs, logTotal, logPage, logPageSize })
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const campaign = await queryOne<{ status: string }>('SELECT status FROM email_campaigns WHERE id = $1', [params.id])
+  const campaign = await queryOne<{ status: string }>('SELECT status FROM email_campaigns WHERE id = $1', [id])
   if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (campaign.status === 'sent' || campaign.status === 'sending') {
     return NextResponse.json({ error: 'Cannot edit a campaign that has been sent or is sending' }, { status: 400 })
@@ -53,23 +55,24 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       audience_filter = COALESCE($6, audience_filter),
       scheduled_at = $7
      WHERE id = $8`,
-    [title, template_key, subject, template_data ? JSON.stringify(template_data) : null, audience_type, audience_filter ? JSON.stringify(audience_filter) : null, scheduled_at || null, params.id]
+    [title, template_key, subject, template_data ? JSON.stringify(template_data) : null, audience_type, audience_filter ? JSON.stringify(audience_filter) : null, scheduled_at || null, id]
   )
 
   return NextResponse.json({ success: true })
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const campaign = await queryOne<{ status: string }>('SELECT status FROM email_campaigns WHERE id = $1', [params.id])
+  const campaign = await queryOne<{ status: string }>('SELECT status FROM email_campaigns WHERE id = $1', [id])
   if (!campaign) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (campaign.status === 'sending') {
     return NextResponse.json({ error: 'Cannot delete a campaign while it is sending' }, { status: 400 })
   }
 
-  await query('DELETE FROM email_campaigns WHERE id = $1', [params.id])
+  await query('DELETE FROM email_campaigns WHERE id = $1', [id])
   return NextResponse.json({ success: true })
 }

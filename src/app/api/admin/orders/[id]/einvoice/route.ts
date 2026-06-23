@@ -6,11 +6,12 @@ import { generateIRN, cancelIRN, isEInvoiceConfigured, EInvoicePayload, EInvoice
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne(`
       SELECT o.*,
@@ -20,7 +21,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       LEFT JOIN addresses a ON o.shipping_address_id = a.id
       LEFT JOIN invoices i ON i.order_id = o.id
       WHERE o.id = $1
-    `, [params.id])
+    `, [id])
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.invoice_number) return NextResponse.json({ error: 'Invoice not generated yet' }, { status: 422 })
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     const items = await queryMany(
       'SELECT * FROM order_items WHERE order_id = $1 ORDER BY created_at',
-      [params.id]
+      [id]
     )
 
     const settingsRows = await queryMany(
@@ -100,7 +101,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         irn = $1, irn_ack_no = $2, irn_ack_dt = $3,
         signed_qr = $4, irn_status = $5
        WHERE id = $6`,
-      [result.irn, result.ackNo, new Date(), result.signedQRCode, result.status, params.id]
+      [result.irn, result.ackNo, new Date(), result.signedQRCode, result.status, id]
     )
 
     return NextResponse.json({
@@ -116,13 +117,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const order = await queryOne('SELECT irn, irn_status FROM orders WHERE id = $1', [params.id])
+    const order = await queryOne('SELECT irn, irn_status FROM orders WHERE id = $1', [id])
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.irn) return NextResponse.json({ error: 'No IRN on this order' }, { status: 422 })
     if (order.irn_status === 'cancelled') return NextResponse.json({ error: 'IRN already cancelled' }, { status: 409 })
@@ -137,7 +139,7 @@ export async function DELETE(request: NextRequest, { params }: { params: { id: s
 
     await queryOne(
       `UPDATE orders SET irn_status = 'cancelled', irn_cancelled_at = NOW() WHERE id = $1`,
-      [params.id]
+      [id]
     )
 
     return NextResponse.json({ success: true })

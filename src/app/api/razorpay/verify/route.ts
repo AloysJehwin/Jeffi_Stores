@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
-import { generateOrderInvoice } from '@/lib/invoice'
+import { createDraftInvoice } from '@/lib/invoice'
 import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
 import {
   loadActiveCart,
@@ -108,15 +108,15 @@ async function commitDraft(args: {
     taxAmount = cartTaxAmount(cartItems)
   } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
     const product = await queryOne<any>(
-      `SELECT id, name, sku, gst_percentage, hsn_code FROM products WHERE id = $1`,
+      `SELECT id, name, sku, gst_percentage, hsn_code, mrp FROM products WHERE id = $1`,
       [draft.buyNowItem.productId]
     )
     if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     const variant = draft.buyNowItem.variantId
-      ? await queryOne<any>(`SELECT id, variant_name, sku FROM product_variants WHERE id = $1`, [draft.buyNowItem.variantId])
+      ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [draft.buyNowItem.variantId])
       : null
     const subVariant = draft.buyNowItem.subVariantId
-      ? await queryOne<any>(`SELECT id, sub_variant_name, sku FROM product_sub_variants WHERE id = $1`, [draft.buyNowItem.subVariantId])
+      ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [draft.buyNowItem.subVariantId])
       : null
     buyNowSnapshot = { product, variant, subVariant }
     subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
@@ -132,7 +132,7 @@ async function commitDraft(args: {
     if (r.ok) appliedDiscount = r.appliedDiscount
   }
 
-  const expectedAmountPaise = Math.round((Math.max(0, subtotal - appliedDiscount + draft.shippingAmount)) * 100)
+  const expectedAmountPaise = Math.round((Math.max(0, subtotal - appliedDiscount - draft.businessDiscountAmount + draft.shippingAmount)) * 100)
 
   const created = draft.mode === 'cart'
     ? await commitOrder({
@@ -147,6 +147,7 @@ async function commitDraft(args: {
         subtotal,
         taxAmount,
         appliedDiscount,
+        businessDiscountAmount: draft.businessDiscountAmount,
         paymentRecord: {
           gatewayOrderId: args.razorpay_order_id,
           paymentId: args.razorpay_payment_id,
@@ -169,6 +170,7 @@ async function commitDraft(args: {
         subtotal,
         taxAmount,
         appliedDiscount,
+        businessDiscountAmount: draft.businessDiscountAmount,
         paymentRecord: {
           gatewayOrderId: args.razorpay_order_id,
           paymentId: args.razorpay_payment_id,
@@ -180,12 +182,11 @@ async function commitDraft(args: {
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
 
   const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
-  let invoicePdfBuffer: Buffer | null = null
-  try { invoicePdfBuffer = await generateOrderInvoice(created.id) } catch {}
+  createDraftInvoice(created.id).catch(() => {})
 
   const fullOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [created.id])
 
-  sendOrderConfirmationEmail(user.email, fullOrder, orderItems || [], invoicePdfBuffer).catch(() => {})
+  sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
   sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
   sendPaymentStatusUpdate(user.email, userName, created.order_number, created.id, 'paid', parseFloat(created.total_amount)).catch(() => {})
 
@@ -308,13 +309,12 @@ async function markLegacyOrderPaid(args: {
     queryMany('SELECT * FROM order_items WHERE order_id = $1', [args.orderId]),
   ])
 
-  let invoicePdfBuffer: Buffer | null = null
-  try { invoicePdfBuffer = await generateOrderInvoice(args.orderId) } catch {}
+  createDraftInvoice(args.orderId).catch(() => {})
 
   if (user) {
     const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
     const updatedOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [args.orderId])
-    sendOrderConfirmationEmail(user.email, updatedOrder || order, orderItems || [], invoicePdfBuffer).catch(() => {})
+    sendOrderConfirmationEmail(user.email, updatedOrder || order, orderItems || []).catch(() => {})
     sendNewOrderNotification(updatedOrder || order, orderItems || [], user).catch(() => {})
     sendPaymentStatusUpdate(user.email, userName, order.order_number, args.orderId, 'paid', parseFloat(order.total_amount)).catch(() => {})
 

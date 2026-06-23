@@ -51,25 +51,27 @@ export default async function CampaignDetailPage({
   params,
   searchParams,
 }: {
-  params: { id: string }
-  searchParams: { logPage?: string }
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ logPage?: string }>
 }) {
+  const { id } = await params
+  const resolvedSearchParams = await searchParams
   const host = (await headers()).get('host') ?? ''
-  const campaign = await queryOne<Campaign>('SELECT * FROM email_campaigns WHERE id = $1', [params.id])
+  const campaign = await queryOne<Campaign>('SELECT * FROM email_campaigns WHERE id = $1', [id])
   if (!campaign) notFound()
 
-  const logPage = Math.max(1, parseInt(searchParams.logPage || '1', 10))
+  const logPage = Math.max(1, parseInt(resolvedSearchParams.logPage || '1', 10))
   const logPageSize = 50
 
   const [logs, logTotal] = await Promise.all([
     queryMany<LogRow>(
       'SELECT email, status, error, sent_at FROM email_campaign_logs WHERE campaign_id = $1 ORDER BY sent_at DESC LIMIT $2 OFFSET $3',
-      [params.id, logPageSize, (logPage - 1) * logPageSize]
+      [id, logPageSize, (logPage - 1) * logPageSize]
     ),
-    queryCount('SELECT COUNT(*) FROM email_campaign_logs WHERE campaign_id = $1', [params.id]),
+    queryCount('SELECT COUNT(*) FROM email_campaign_logs WHERE campaign_id = $1', [id]),
   ])
 
-  const buildUrl = (p: number) => ap(`/admin/mailer/${params.id}${p > 1 ? `?logPage=${p}` : ''}`, host)
+  const buildUrl = (p: number) => ap(`/admin/mailer/${id}${p > 1 ? `?logPage=${p}` : ''}`, host)
 
   const sentCount = logs.filter(l => l.status === 'sent').length
   const failedCount = logs.filter(l => l.status === 'failed').length

@@ -22,6 +22,8 @@ const orderItemSchema = z.object({
   gst_rate: z.coerce.number().min(0).default(18),
   unit_price: z.coerce.number().min(0),
   quantity: z.coerce.number().positive(),
+  buy_unit: z.string().nullish(),
+  buy_mode: z.string().nullish(),
 })
 
 const createOrderSchema = z.object({
@@ -43,7 +45,7 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'invoices')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
 
@@ -98,6 +100,8 @@ export async function POST(request: NextRequest) {
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
         quantity: qty,
+        buy_unit: item.buy_unit || null,
+        buy_mode: item.buy_mode || 'unit',
         unit_price: unitPrice,
         total_price: lineTotal,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
@@ -127,15 +131,29 @@ export async function POST(request: NextRequest) {
       const insufficientItems: string[] = []
       for (const item of processedItems) {
         if (!item.product_id) continue
+        // Resolve unit factor to get base-unit quantity for stock checks
+        const unitRow = await client.query<{ factor: string; dimension: string }>(
+          `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                  COALESCE(puv.dimension, pup.dimension) AS dimension
+           FROM (SELECT 1) x
+           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+          [item.buy_unit, item.product_id, item.variant_id || null]
+        )
+        const u = unitRow.rows[0]
+        const baseQty = (u?.dimension === 'count' && u?.factor)
+          ? item.quantity * parseFloat(u.factor)
+          : item.quantity
+
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: string }>(
             `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
             [item.sub_variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock < item.quantity) {
+          if (stock < baseQty) {
             insufficientItems.push(
-              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${item.quantity})`
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`
             )
           }
         } else if (item.variant_id) {
@@ -144,9 +162,9 @@ export async function POST(request: NextRequest) {
             [item.variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock < item.quantity) {
+          if (stock < baseQty) {
             insufficientItems.push(
-              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${item.quantity})`
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`
             )
           }
         } else {
@@ -155,8 +173,8 @@ export async function POST(request: NextRequest) {
             [item.product_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock < item.quantity) {
-            insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${item.quantity})`)
+          if (stock < baseQty) {
+            insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
           }
         }
       }
@@ -201,13 +219,14 @@ export async function POST(request: NextRequest) {
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
+            hsn_code, gst_rate, quantity, buy_unit, buy_mode, unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14,$15,$16,$17)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,0,$14,$15,$16,$17,$18,$19)`,
           [
             orderId, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name,
-            item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
+            item.hsn_code, item.gst_rate, item.quantity, item.buy_unit, item.buy_mode,
+            item.unit_price,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
           ]
@@ -219,6 +238,20 @@ export async function POST(request: NextRequest) {
       if (!saveAsDraft) {
         for (const item of processedItems) {
           if (!item.product_id) continue
+          // Resolve unit factor for base-unit stock deduction
+          const unitRow = await client.query<{ factor: string; dimension: string }>(
+            `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                    COALESCE(puv.dimension, pup.dimension) AS dimension
+             FROM (SELECT 1) x
+             LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+             LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+            [item.buy_unit, item.product_id, item.variant_id || null]
+          )
+          const u = unitRow.rows[0]
+          const qty = (u?.dimension === 'count' && u?.factor)
+            ? item.quantity * parseFloat(u.factor)
+            : item.quantity
+
           let stockBefore = 0
           if (item.sub_variant_id) {
             const row = await client.query<{ inventory_quantity: string }>(
@@ -228,7 +261,7 @@ export async function POST(request: NextRequest) {
             stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
               `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-              [item.quantity, item.sub_variant_id]
+              [qty, item.sub_variant_id]
             )
           } else if (item.variant_id) {
             const row = await client.query<{ inventory_quantity: string }>(
@@ -238,7 +271,7 @@ export async function POST(request: NextRequest) {
             stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
               `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-              [item.quantity, item.variant_id]
+              [qty, item.variant_id]
             )
           } else {
             const row = await client.query<{ inventory_quantity: string }>(
@@ -248,7 +281,7 @@ export async function POST(request: NextRequest) {
             stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
             await client.query(
               `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-              [item.quantity, item.product_id]
+              [qty, item.product_id]
             )
           }
           await logStockMovement(client, {
@@ -256,7 +289,7 @@ export async function POST(request: NextRequest) {
             variantId: item.variant_id || null,
             subVariantId: item.sub_variant_id || null,
             transactionType: 'sale',
-            quantityChange: -item.quantity,
+            quantityChange: -qty,
             referenceType: 'order',
             referenceId: orderId,
             currentStock: stockBefore,

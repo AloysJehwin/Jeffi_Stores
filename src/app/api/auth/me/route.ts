@@ -29,7 +29,8 @@ export async function GET(request: NextRequest) {
         policyVersion: POLICY_VERSION,
       },
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ user: null })
   }
 }

@@ -12,11 +12,12 @@ const SELLER_NAME = process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores'
 const SELLER_ADD = process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
 const SELLER_PHONE = process.env.DELHIVERY_SELLER_PHONE || '07713585374'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
 
@@ -30,7 +31,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
       LEFT JOIN users u ON u.id = o.user_id
       WHERE o.id = $1
-    `, [params.id])
+    `, [id])
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (order.awb_number) return NextResponse.json({ error: 'Shipment already created', awb: order.awb_number }, { status: 409 })
@@ -66,7 +67,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       LEFT JOIN products p ON p.id = oi.product_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
       WHERE oi.order_id = $1
-    `, [params.id])
+    `, [id])
 
     const shipmentItems: ShipmentItem[] = (orderItemRows || []).map((row: any) => ({
       packageType: (row.package_type as PackageType) || null,
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     await query(
       `UPDATE orders SET awb_number = $1, status = 'processing', updated_at = NOW() WHERE id = $2`,
-      [awb, params.id]
+      [awb, id]
     )
 
     return NextResponse.json({

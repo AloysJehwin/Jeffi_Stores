@@ -296,6 +296,11 @@ export default function QuotationsClient() {
           discount_pct: discPct,
           mrp,
           inventory_quantity: i.inventory_quantity ?? null,
+          buy_unit: i.buy_unit || null,
+          buy_mode: i.buy_mode || null,
+          sell_unit_factor: Number(i.sell_unit_factor) || 1,
+          sell_unit_dimension: i.sell_unit_dimension || null,
+          available_units: [],
         }
       })
       setItems(loadedItems.length ? loadedItems : [newLineItem()])
@@ -380,15 +385,20 @@ export default function QuotationsClient() {
           // rate = MRP ex-GST (anchor); fall back to unit_price ex-GST if no MRP set
           const mrpInclGst = Number(i.mrp) || unitPrice
           const rateExGst = mrpInclGst / (1 + gstRate / 100)
+          // apply sell unit factor for count-dimension units (rate is per-piece)
+          const su = i.available_units[0] ?? null
+          const factor = (su && su.dimension === 'count' && su.factor > 1) ? su.factor : 1
+          const effectiveQty = (Number(i.quantity) || 0) * factor
           return {
             description: i.product_name,
             hsn_code: i.hsn_code || null,
             gst_rate: gstRate,
             quantity: i.quantity,
             unit: i.unit,
+            buy_unit: i.buy_unit || null,
             rate: rateExGst,
             discount_pct: discPct,
-            amount: lineItemExGst(Number(i.quantity) || 0, rateExGst, discPct),
+            amount: lineItemExGst(effectiveQty, rateExGst, discPct),
             product_id: i.product_id || null,
             variant_id: i.variant_id || null,
             sub_variant_id: i.sub_variant_id || null,
@@ -731,10 +741,15 @@ export default function QuotationsClient() {
                                 const res = await fetch(`/api/admin/quotations/${q.id}`)
                                 const data = await res.json()
                                 const qItems: any[] = data.items || []
-                                const stockIssue = qItems.some(item =>
-                                  item.product_id && item.inventory_quantity !== null && item.inventory_quantity !== undefined &&
-                                  parseFloat(item.inventory_quantity) < parseFloat(item.quantity)
-                                )
+                                const stockIssue = qItems.some(item => {
+                                  if (!item.product_id || item.inventory_quantity === null || item.inventory_quantity === undefined) return false
+                                  const rawQty = parseFloat(item.quantity)
+                                  const factor = parseFloat(item.sell_unit_factor)
+                                  const baseQty = (item.sell_unit_dimension === 'count' && factor > 1)
+                                    ? rawQty * factor
+                                    : rawQty
+                                  return parseFloat(item.inventory_quantity) < baseQty
+                                })
                                 setConvertHasStockIssue(stockIssue)
                                 if (stockIssue) setConvertPaymentMode('credit')
                               } catch (_) {
@@ -970,10 +985,15 @@ export default function QuotationsClient() {
                 setConvertQrImageUrl(null)
                 setConvertSavedAsDraft(false)
                 setConvertInsufficientItems([])
-                const stockIssue = items.some(item =>
-                  item.product_id && item.inventory_quantity !== null && item.inventory_quantity !== undefined &&
-                  parseFloat(String(item.inventory_quantity)) < parseFloat(String(item.quantity))
-                )
+                const stockIssue = items.some(item => {
+                  if (!item.product_id || item.inventory_quantity === null || item.inventory_quantity === undefined) return false
+                  const rawQty = parseFloat(String(item.quantity))
+                  const factor = parseFloat(String(item.sell_unit_factor))
+                  const baseQty = (item.sell_unit_dimension === 'count' && factor > 1)
+                    ? rawQty * factor
+                    : rawQty
+                  return parseFloat(String(item.inventory_quantity)) < baseQty
+                })
                 setConvertHasStockIssue(stockIssue)
                 if (stockIssue) setConvertPaymentMode('credit')
                 setConvertQrTotal(items.reduce((sum, i) => {

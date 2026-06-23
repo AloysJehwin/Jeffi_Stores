@@ -25,6 +25,8 @@ export interface InvoiceOrderItem {
   quantity: number
   unit_price: number
   total_price: number
+  discount_amount?: number
+  mrp?: number | null
   taxable_amount: number
   cgst_amount: number
   sgst_amount: number
@@ -42,6 +44,7 @@ export interface InvoiceOrder {
   tax_amount: number
   total_amount: number
   discount_amount: number
+  business_discount_amount?: number
   shipping_amount: number
   taxable_amount: number
   cgst_amount: number
@@ -317,12 +320,11 @@ export async function generateInvoicePDF(
 
     const itemCols = [
       { label: 'Sl\nNo.', w: 22, align: 'center' as const },
-      { label: 'Description of Goods', w: 140, align: 'left' as const },
+      { label: 'Description of Goods', w: 192, align: 'left' as const },
       { label: 'HSN/SAC', w: 52, align: 'center' as const },
       { label: 'GST\nRate', w: 36, align: 'center' as const },
       { label: 'Quantity', w: 52, align: 'center' as const },
       { label: 'Rate\n(Incl. of Tax)', w: 62, align: 'right' as const },
-      { label: 'Rate', w: 52, align: 'right' as const },
       { label: 'per', w: 30, align: 'center' as const },
       { label: 'Disc. %', w: 38, align: 'center' as const },
       { label: 'Amount', w: 62, align: 'right' as const },
@@ -377,14 +379,35 @@ export async function generateInvoicePDF(
 
     drawTableHeader()
 
+    const bizDiscount = order.business_discount_amount || 0
+    const itemsSubtotal = items.reduce((s, it) => s + it.total_price, 0)
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
-      const unitExcl = item.taxable_amount / item.quantity
-      const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-      const qtyLabel = isCustomQty && item.buy_unit
-        ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit}`
-        : `${item.quantity} NOS`
-      const perLabel = isCustomQty && item.buy_unit ? item.buy_unit : 'NOS'
+      const isMeasured = item.buy_mode === 'weight' || item.buy_mode === 'length'
+      const unitLabel = item.buy_unit ? item.buy_unit.toUpperCase() : 'NOS'
+      const qtyLabel = isMeasured
+        ? `${Number(item.quantity).toFixed(3)} ${unitLabel}`
+        : `${parseFloat(String(item.quantity))} ${unitLabel}`
+      const perLabel = unitLabel
+
+      // Prorate order-level business discount to this line by its share of subtotal
+      const itemBizDiscount = itemsSubtotal > 0 ? bizDiscount * (item.total_price / itemsSubtotal) : 0
+      const netSellingTotal = item.total_price - itemBizDiscount
+
+      let discPct = 0
+      if (item.mrp != null && item.mrp > 0 && item.quantity > 0) {
+        const mrpTotal = item.mrp * item.quantity
+        discPct = mrpTotal > netSellingTotal ? ((mrpTotal - netSellingTotal) / mrpTotal) * 100 : 0
+      } else {
+        const totalDisc = (item.discount_amount || 0) + itemBizDiscount
+        const grossTotal = netSellingTotal + totalDisc
+        discPct = grossTotal > 0 && totalDisc > 0 ? (totalDisc / grossTotal) * 100 : 0
+      }
+      const discLabel = discPct >= 0.01 ? `${discPct.toFixed(2)}%` : ''
+
+      // Rate (Incl. of Tax) = MRP when available, else unit_price
+      const rateInclTax = item.mrp != null && item.mrp > 0 ? item.mrp : item.unit_price
 
       const rowData = [
         String(i + 1),
@@ -392,10 +415,9 @@ export async function generateInvoicePDF(
         item.hsn_code || '',
         `${item.gst_rate} %`,
         qtyLabel,
-        fmt(item.unit_price),
-        fmt(unitExcl),
+        fmt(rateInclTax),
         perLabel,
-        '',
+        discLabel,
         fmt(item.taxable_amount),
       ]
 
@@ -445,12 +467,19 @@ export async function generateInvoicePDF(
       y += rowH
     }
 
-    const roundOff = order.total_amount - (order.taxable_amount + order.cgst_amount + order.sgst_amount + order.igst_amount + (order.shipping_amount || 0) - (order.discount_amount || 0))
+    const roundOff = order.total_amount - (order.taxable_amount + order.cgst_amount + order.sgst_amount + order.igst_amount + (order.shipping_amount || 0) - (order.discount_amount || 0) - (order.business_discount_amount || 0))
     if (order.discount_amount > 0) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
       doc.font(FBI).fontSize(8).text('DISCOUNT', descLabelX, y + 2, { width: itemCols[1].w - 12 })
       doc.font(F).fontSize(7).text(`-${fmt(order.discount_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      y += rowH
+    }
+    if ((order.business_discount_amount || 0) > 0) {
+      checkPageBreak(rowH)
+      drawHLine(doc, LM, R, y)
+      doc.font(FBI).fontSize(8).text('BUSINESS DISCOUNT', descLabelX, y + 2, { width: itemCols[1].w - 12 })
+      doc.font(F).fontSize(7).text(`-${fmt(order.business_discount_amount!)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
       y += rowH
     }
 
@@ -470,13 +499,24 @@ export async function generateInvoicePDF(
       y += rowH
     }
 
-    checkPageBreak(22)
+    checkPageBreak(26)
     const totalRowY = y
     drawHLine(doc, LM, R, y)
     y += 3
     doc.font(FB).fontSize(7).text('Total', LM + itemCols[0].w + 2, y + 3, { width: 40, align: 'right' })
-    doc.font(FB).fontSize(9).text(`Rs. ${fmt(order.total_amount)}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
-    y += 18
+    const totalStr = fmt(order.total_amount)
+    // Check if "Rs. X" fits on one line; if not, draw Rs. + amount stacked
+    doc.font(FB).fontSize(9)
+    const rsPrefix = 'Rs. '
+    const combinedW = doc.widthOfString(rsPrefix + totalStr)
+    if (combinedW <= amountColW - 6) {
+      doc.text(`Rs. ${totalStr}`, amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+      y += 22
+    } else {
+      doc.text('Rs.', amountColX + 2, y + 1, { width: amountColW - 4, align: 'right' })
+      doc.text(totalStr, amountColX + 2, y + 10, { width: amountColW - 4, align: 'right' })
+      y += 24
+    }
 
     drawRect(doc, LM, tableTop, pw, y - tableTop)
     let gridCx = LM

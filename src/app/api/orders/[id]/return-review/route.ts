@@ -9,15 +9,16 @@ import { logActivity } from '@/lib/activity'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
     const body = await request.json()
     const { action, adminNotes, returnTrackingNumber, restock } = body
 
@@ -289,7 +290,8 @@ export async function POST(
               }
 
               return NextResponse.json({ success: true, newStatus: 'returned', refundFailed: false })
-            } catch {
+            } catch (err) {
+              console.error('[route]', err)
               refundFailed = true
             }
           }

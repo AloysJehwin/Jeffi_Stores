@@ -178,7 +178,8 @@ export async function POST(request: NextRequest) {
           zone = r.zone || zone
           cartonBreakdown.push({ weightGrams: c.chargedWeightGrams, charge: r.charge, zone: r.zone })
         }
-      } catch {
+      } catch (err) {
+        console.error('[route]', err)
         source = 'fallback'
         totalCharge = 0
         totalChargedWeight = 0
@@ -232,7 +233,8 @@ export async function POST(request: NextRequest) {
     if (deliverySettings.freeThreshold > 0) result.freeShippingThreshold = deliverySettings.freeThreshold
 
     return NextResponse.json(result)
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

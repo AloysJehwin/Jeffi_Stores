@@ -266,8 +266,7 @@ CREATE TABLE public.product_sub_variants (
     mrp numeric(12,2),
     price_ex_gst numeric(12,2),
     mrp_ex_gst numeric(12,2),
-    wholeprice_ex_gst numeric(12,2),
-    stock_quantity integer DEFAULT 0,
+    stock_status character varying(20) DEFAULT 'In Stock'::character varying,
     attributes jsonb,
     is_active boolean DEFAULT true,
     created_at timestamp with time zone DEFAULT now(),
@@ -285,22 +284,17 @@ CREATE TABLE public.product_variants (
     sku character varying(100) NOT NULL,
     variant_name character varying(255) NOT NULL,
     price numeric(12,2),
-    stock_quantity integer DEFAULT 0,
+    stock_status character varying(20) DEFAULT 'In Stock'::character varying,
     attributes jsonb,
     is_active boolean DEFAULT true,
     created_at timestamp with time zone DEFAULT now(),
     mrp numeric(12,2),
     price_ex_gst numeric(12,2),
-    wholeprice_ex_gst numeric(12,2),
     mpn character varying(100),
     gtin character varying(50),
     pricing_type character varying(20) DEFAULT 'unit'::character varying NOT NULL,
     unit character varying(20),
     numeric_value numeric(10,3),
-    weight_rate numeric(12,2),
-    weight_unit character varying(10),
-    length_rate numeric(12,2),
-    length_unit character varying(10),
     updated_at timestamp with time zone DEFAULT now(),
     weight_grams integer DEFAULT 500,
     length_cm numeric(6,2) DEFAULT 10,
@@ -313,8 +307,6 @@ CREATE TABLE public.product_variants (
     variant_type character varying(100),
     sub_variant_type text,
     sub_variant_type_on boolean DEFAULT false NOT NULL,
-    weight_rate_on boolean DEFAULT false NOT NULL,
-    length_rate_on boolean DEFAULT false NOT NULL,
     use_own_images boolean DEFAULT false NOT NULL
 );
 
@@ -334,11 +326,8 @@ CREATE TABLE public.products (
     short_description character varying(500),
     base_price numeric(12,2) NOT NULL,
     price_ex_gst numeric(12,2),
-    wholeprice_ex_gst numeric(12,2),
     currency character varying(10) DEFAULT 'INR'::character varying,
-    stock_quantity integer DEFAULT 0,
-    low_stock_threshold integer DEFAULT 10,
-    is_in_stock boolean DEFAULT true,
+    stock_status character varying(20) DEFAULT 'In Stock'::character varying,
     weight numeric(10,2),
     dimensions character varying(100),
     material character varying(100),
@@ -358,10 +347,6 @@ CREATE TABLE public.products (
     variant_type character varying(50),
     mpn character varying(100),
     gtin character varying(50),
-    weight_rate numeric(12,2),
-    weight_unit character varying(10),
-    length_rate numeric(12,2),
-    length_unit character varying(10),
     weight_grams integer DEFAULT 500,
     length_cm numeric(6,2) DEFAULT 10,
     breadth_cm numeric(6,2) DEFAULT 10,
@@ -2117,7 +2102,7 @@ CREATE FUNCTION public.update_product_stock_status() RETURNS trigger
     LANGUAGE plpgsql
     AS $$
 BEGIN
-    NEW.is_in_stock := NEW.stock_quantity > 0;
+    NEW.stock_status := COALESCE(NEW.stock_status, 'In Stock');
     RETURN NEW;
 END;
 $$;
@@ -2253,7 +2238,7 @@ CREATE TRIGGER update_products_search_vector BEFORE INSERT OR UPDATE ON public.p
 -- Name: products update_products_stock_status; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER update_products_stock_status BEFORE INSERT OR UPDATE OF stock_quantity ON public.products FOR EACH ROW EXECUTE FUNCTION public.update_product_stock_status();
+CREATE TRIGGER update_products_stock_status BEFORE INSERT OR UPDATE OF stock_status ON public.products FOR EACH ROW EXECUTE FUNCTION public.update_product_stock_status();
 
 
 --
@@ -2353,11 +2338,11 @@ ALTER TABLE ONLY public.cart_items
 
 
 --
--- Name: cart_items cart_items_user_id_product_id_variant_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: cart_items cart_items_user_product_variant_subvariant_mode_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.cart_items
-    ADD CONSTRAINT cart_items_user_id_product_id_variant_id_key UNIQUE (user_id, product_id, variant_id);
+    ADD CONSTRAINT cart_items_user_product_variant_subvariant_mode_key UNIQUE NULLS NOT DISTINCT (user_id, product_id, variant_id, sub_variant_id, buy_mode);
 
 
 --

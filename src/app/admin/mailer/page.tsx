@@ -41,10 +41,11 @@ interface Campaign {
   created_at: string
 }
 
-export default async function MailerPage({ searchParams }: { searchParams: { page?: string; search?: string } }) {
+export default async function MailerPage({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
   const host = (await headers()).get('host') ?? ''
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
-  const search = searchParams.search?.trim() || ''
+  const resolvedSearchParams = await searchParams
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const search = resolvedSearchParams.search?.trim() || ''
   const offset = (page - 1) * PAGE_SIZE
 
   const conditions: string[] = []

@@ -12,7 +12,7 @@ export type Policy = {
 // the privacy policy or T&C changes in a way that requires re-acceptance.
 // Users whose users.policies_accepted_version != POLICY_VERSION will be asked
 // to re-accept on next sign-in or first page load.
-export const POLICY_VERSION = '2026-06-14'
+export const POLICY_VERSION = '2026-06-23'
 
 // Slugs whose acceptance is gated by POLICY_VERSION.
 export const CONSENT_POLICIES = ['privacy-policy', 'terms-and-conditions'] as const
@@ -130,7 +130,7 @@ export const policies: Policy[] = [
     slug: 'terms-and-conditions',
     title: 'Terms & Conditions',
     description: 'The rules of using Jeffi Stores — accounts, orders, payments, returns, and what we expect from each other.',
-    lastUpdated: '14 Jun 2026',
+    lastUpdated: '23 Jun 2026',
     sections: [
       {
         heading: '1. Accepting these terms',
@@ -167,6 +167,16 @@ export const policies: Policy[] = [
           'We accept Razorpay (cards/UPI/netbanking), UPI QR, bank transfer, and approved-business credit terms.',
           'Tax invoices are emailed and available in your account. Provide a valid GSTIN at checkout if you want input tax credit on the invoice.',
           'For business RFQs: a quoted price is valid for the period stated on the quotation; after that we may revise it based on stock and input cost.',
+        ],
+      },
+      {
+        heading: '5a. Bank Offers & Cashback',
+        body: [
+          'We display bank-specific offers (cashback, instant discounts, no-cost EMI) on product pages as a convenience to you. These offers are sourced from Razorpay\'s partner banks and are subject to each bank\'s terms and conditions.',
+          'Jeffi Stores does not guarantee the availability, accuracy, or continued validity of any bank offer shown. Offer eligibility (minimum purchase, card type, issuing bank) is determined solely by the respective bank.',
+          'Cashback and instant discounts are applied by your bank at the time of transaction settlement — they do not reduce the amount you pay at checkout. Jeffi Stores is not a party to the cashback arrangement between you and your bank.',
+          'No-cost EMI is facilitated by the card-issuing bank. The interest component is subvented by the bank; Jeffi Stores does not subsidise or guarantee this.',
+          'For any dispute or non-credit of a bank offer, contact your card-issuing bank directly using the number on the back of your card.',
         ],
       },
       {

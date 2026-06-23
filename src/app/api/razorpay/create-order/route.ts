@@ -74,7 +74,7 @@ async function handleDraftToken(token: string, userId: string) {
     if (r.ok) appliedDiscount = r.appliedDiscount
   }
 
-  const total = Math.max(0, subtotal - appliedDiscount + (draft.shippingAmount || 0))
+  const total = Math.max(0, subtotal - appliedDiscount - (draft.businessDiscountAmount || 0) + (draft.shippingAmount || 0))
   const amountInPaise = Math.round(total * 100)
   if (amountInPaise <= 0) {
     return NextResponse.json({ error: 'Order total must be greater than zero' }, { status: 400 })

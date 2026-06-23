@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { queryOne, queryMany } from '@/lib/db'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await requireAdminScope(request, 'business_customers')
   if (admin instanceof NextResponse) return admin
 
@@ -13,7 +14,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
      FROM users u
      JOIN business_profiles bp ON bp.user_id = u.id
      WHERE u.id = $1`,
-    [params.id]
+    [id]
   )
   if (!customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -23,7 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
      JOIN categories c ON c.id = bd.category_id
      WHERE bd.user_id = $1
      ORDER BY c.name`,
-    [params.id]
+    [id]
   )
 
   return NextResponse.json({ customer, discounts })

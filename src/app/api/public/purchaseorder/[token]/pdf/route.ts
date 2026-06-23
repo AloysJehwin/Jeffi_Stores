@@ -4,7 +4,8 @@ import { generatePurchaseOrderPDF, POItem, POBusinessSettings } from '@/lib/po-p
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   try {
     const po = await queryOne<any>(
       `SELECT po.*, s.name AS supplier_name, s.contact_name, s.email AS supplier_email,
@@ -12,7 +13,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        WHERE po.view_token = $1`,
-      [params.token]
+      [token]
     )
     if (!po) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 

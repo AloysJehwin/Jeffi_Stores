@@ -126,8 +126,8 @@ function box(doc: any, x: number, y: number, w: number, h: number, fill: string)
 async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSettings): Promise<void> {
   let qrBuf: Buffer | null = null
   let barBuf: Buffer | null = null
-  try { qrBuf = await generateQRBuffer(order.order_number) } catch {}
-  try { barBuf = await generateBarcodeBuffer(order.order_number) } catch {}
+  try { qrBuf = await generateQRBuffer(order.order_number) } catch (err) { console.error("[route]", err) }
+  try { barBuf = await generateBarcodeBuffer(order.order_number) } catch (err) { console.error("[route]", err) }
 
   const QR_SIZE = 66
   const HEADER_H = 90
@@ -139,7 +139,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
   const textZoneW = CW - LOGO_SIZE - QR_SIZE - 24
 
-  try { doc.image(LOGO_PATH, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE }) } catch {}
+  try { doc.image(LOGO_PATH, ML, Math.floor((HEADER_H - LOGO_SIZE) / 2), { width: LOGO_SIZE, height: LOGO_SIZE }) } catch (err) { console.error("[route]", err) }
 
   const textX = ML + LOGO_SIZE + 12
   doc.font('Helvetica-Bold').fontSize(20).fillColor('#ffffff')
@@ -161,7 +161,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   doc.text('PACKING SLIP', textX, hy, { width: textZoneW, lineBreak: false })
 
   if (qrBuf) {
-    try { doc.image(qrBuf, PAGE_W - MR - QR_SIZE, Math.floor((HEADER_H - QR_SIZE) / 2), { width: QR_SIZE, height: QR_SIZE }) } catch {}
+    try { doc.image(qrBuf, PAGE_W - MR - QR_SIZE, Math.floor((HEADER_H - QR_SIZE) / 2), { width: QR_SIZE, height: QR_SIZE }) } catch (err) { console.error("[route]", err) }
   }
 
   let y = HEADER_H + 8
@@ -364,7 +364,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     const barH = 38
     try {
       doc.image(barBuf, Math.floor((PAGE_W - barW) / 2), barZoneY + 7, { width: barW, height: barH })
-    } catch {}
+    } catch (err) { console.error("[route]", err) }
   }
 
   box(doc, 0, footerY, PAGE_W, FOOTER_H, GREEN_DARK)

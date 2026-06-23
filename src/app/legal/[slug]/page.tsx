@@ -54,10 +54,10 @@ export default async function PolicyPage({ params }: { params: Promise<{ slug: s
       </div>
 
       <div className="container mx-auto px-4 py-8 md:py-12">
-        <div className="max-w-4xl mx-auto space-y-4">
+        <div className="max-w-6xl mx-auto space-y-4">
 
           {policy.sections.map((section, i) => (
-            <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-6">
+            <div key={i} id={section.heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')} className="bg-surface-elevated rounded-xl border border-border-default p-6 scroll-mt-6">
               <h2 className="text-base md:text-lg font-bold text-foreground mb-3">{section.heading}</h2>
               {Array.isArray(section.body) ? (
                 <ul className="space-y-2">

@@ -19,16 +19,18 @@ const postSchema = z.object({
         sub_variant_id: zUuid.nullish(),
         quantity_received: z.coerce.number().positive(),
         unit_cost: z.coerce.number().min(0),
+        purchase_unit_factor: z.coerce.number().positive().default(1),
       })
     )
     .min(1, 'At least one item is required'),
 })
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { received_date, notes } = body
@@ -42,7 +44,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
        FROM purchase_orders po
        JOIN suppliers s ON s.id = po.supplier_id
        WHERE po.id = $1`,
-      [params.id]
+      [id]
     )
     if (!po) return NextResponse.json({ error: 'PO not found' }, { status: 404 })
     if (po.status === 'cancelled') {
@@ -59,7 +61,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
     let receivedAmount = 0
     for (const item of items) {
-      const qty = item.quantity_received
+      const factor = item.purchase_unit_factor ?? 1
+      const qty = item.quantity_received * factor
       const cost = item.unit_cost
       if (qty > 0) receivedAmount += qty * cost
     }
@@ -71,14 +74,16 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
       const grnRow = await client.query<{ id: string }>(
         `INSERT INTO grns (grn_number, po_id, supplier_id, received_date, notes)
          VALUES ($1,$2,$3,$4,$5) RETURNING id`,
-        [grnNumber, params.id, po.supplier_id,
+        [grnNumber, id, po.supplier_id,
          received_date || new Date().toISOString().slice(0, 10),
          notes || null]
       )
       const grnId = grnRow.rows[0].id
 
       for (const item of items) {
-        const qtyReceived = item.quantity_received
+        const factor = item.purchase_unit_factor ?? 1
+        // quantity_received is in purchase units; convert to base units for stock
+        const qtyReceived = item.quantity_received * factor
         if (qtyReceived <= 0) continue
 
         const unitCost = item.unit_cost
@@ -88,9 +93,9 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
         const subVariantId = item.sub_variant_id || null
 
         await client.query(
-          `INSERT INTO grn_items (grn_id, po_item_id, product_id, variant_id, quantity_received, unit_cost)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
-          [grnId, poItemId, productId, variantId, qtyReceived, unitCost]
+          `INSERT INTO grn_items (grn_id, po_item_id, product_id, variant_id, quantity_received, unit_cost, purchase_unit_factor)
+           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
+          [grnId, poItemId, productId, variantId, qtyReceived, unitCost, factor]
         )
 
         await updateWeightedAvgCost(client, { productId, variantId, qtyReceived, unitCost })
@@ -149,7 +154,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
       const poItems = await client.query<{ quantity: string; quantity_received: string }>(
         `SELECT quantity, quantity_received FROM purchase_order_items WHERE po_id = $1`,
-        [params.id]
+        [id]
       )
       const allReceived = poItems.rows.every(
         r => parseFloat(r.quantity_received) >= parseFloat(r.quantity)
@@ -159,7 +164,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
       await client.query(
         `UPDATE purchase_orders SET status = $1, updated_at = NOW() WHERE id = $2`,
-        [newStatus, params.id]
+        [newStatus, id]
       )
 
       await client.query('COMMIT')
@@ -192,12 +197,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
               Math.round(receivedTax * 100) / 100,
               Math.round((receivedAmount + receivedTax) * 100) / 100,
               receiveDate,
-              params.id,
+              id,
               grnId,
             ]
           )
           await expClient.query('COMMIT')
-        } catch {
+        } catch (err) {
           await expClient.query('ROLLBACK')
         } finally {
           expClient.release()

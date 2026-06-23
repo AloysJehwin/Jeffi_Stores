@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Toggle from '@/components/ui/Toggle'
@@ -21,7 +21,7 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'stock', label: 'Stock Ledger' },
 ]
 
-const inputCls = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
+const inputCls = 'w-full px-3 py-2.5 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const btnPrimary = 'px-4 py-2.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
 const btnSecondary = 'px-4 py-2.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors'
@@ -161,7 +161,7 @@ function SuppliersTab() {
             value={search}
             onChange={handleSearchChange}
             placeholder="Name, GSTIN, contact..."
-            inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+            inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
           />
         </div>
         <div className="flex flex-col">
@@ -255,6 +255,14 @@ type POItem = {
   id: string; product_id: string; variant_id: string | null
   product_name: string; variant_name: string | null; sku: string | null
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
+  purchase_unit: string | null; purchase_unit_factor: string | null
+  sell_unit_label: string | null; sell_unit_dimension: string | null
+}
+
+/** For count-dimension products stock is always in pc; for others use sell_unit_label */
+function poBaseUnitLabel(it: Pick<POItem, 'sell_unit_label' | 'sell_unit_dimension'>): string {
+  if (!it.sell_unit_dimension || it.sell_unit_dimension === 'count') return 'pc'
+  return it.sell_unit_label || 'units'
 }
 
 function POTab({ initialPO }: { initialPO?: string }) {
@@ -347,11 +355,16 @@ function POTab({ initialPO }: { initialPO?: string }) {
   async function openReceive(id: string) {
     const res = await fetch(`/api/admin/inventory/po/${id}`)
     const json = await res.json()
-    const items = (json.items || []).map((it: POItem) => ({
-      ...it,
-      receive_qty: String(Math.max(0, parseFloat(it.quantity) - parseFloat(it.quantity_received || '0'))),
-      receive_cost: it.unit_cost,
-    }))
+    const items = (json.items || []).map((it: POItem) => {
+      const factor = parseFloat(it.purchase_unit_factor || '1')
+      const remaining = Math.max(0, parseFloat(it.quantity) - parseFloat(it.quantity_received || '0'))
+      return {
+        ...it,
+        receive_qty: String(factor > 1 ? Math.round((remaining / factor) * 1000) / 1000 : remaining),
+        receive_cost: it.unit_cost,
+        purchase_unit_factor: factor,
+      }
+    })
     setReceiveMode({ po: json.purchase_order })
     setReceiveItems(items)
     setReceiveNotes('')
@@ -363,6 +376,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
     const items = receiveItems.filter(it => parseFloat(it.receive_qty) > 0).map(it => ({
       po_item_id: it.id, product_id: it.product_id, variant_id: it.variant_id || null,
       quantity_received: parseFloat(it.receive_qty), unit_cost: parseFloat(it.receive_cost),
+      purchase_unit_factor: parseFloat(it.purchase_unit_factor || '1'),
     }))
     const res = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -434,24 +448,48 @@ function POTab({ initialPO }: { initialPO?: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
-                {receiveItems.map((it, idx) => (
+                {receiveItems.map((it, idx) => {
+                  const factor = parseFloat(it.purchase_unit_factor || '1')
+                  const baseLabel = poBaseUnitLabel(it)
+                  const puLabel = it.purchase_unit || baseLabel
+                  const orderedInPu = factor > 1 ? Math.round((parseFloat(it.quantity) / factor) * 1000) / 1000 : parseFloat(it.quantity)
+                  const prevInPu = factor > 1 ? Math.round((parseFloat(it.quantity_received || '0') / factor) * 1000) / 1000 : parseFloat(it.quantity_received || '0')
+                  return (
                   <tr key={it.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 text-foreground">
                       <p className="font-medium">{it.product_name}{it.variant_name && <span className="text-foreground-secondary font-normal"> / {it.variant_name}</span>}</p>
                       {it.sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{it.sku}</p>}
+                      {it.purchase_unit && factor > 1 && (
+                        <p className="text-xs text-foreground-muted mt-0.5">1 {it.purchase_unit} = {factor} {baseLabel}</p>
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right text-foreground-secondary">{parseFloat(it.quantity)}</td>
-                    <td className="px-4 py-3 text-right text-foreground-secondary">{parseFloat(it.quantity_received || '0')}</td>
-                    <td className="px-4 py-3 text-right">
-                      <input type="number" min="0" step="0.001" className="w-24 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
-                        onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_qty: e.target.value } : r))} />
+                    <td className="px-4 py-3 text-right text-foreground-secondary">
+                      {orderedInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-4 py-3 text-right text-foreground-secondary">
+                      {prevInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
+                      <div className="inline-flex flex-col items-end gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <input type="number" min="0" step="0.001" className="w-24 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
+                            onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_qty: e.target.value } : r))} />
+                          {puLabel && <span className="text-xs text-foreground-muted">{puLabel}</span>}
+                        </div>
+                        {factor > 1 && parseFloat(it.receive_qty) > 0 && (
+                          <span className="text-xs text-foreground-muted">
+                            = {Math.round(parseFloat(it.receive_qty) * factor * 1000) / 1000} {baseLabel}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right align-top">
                       <input type="number" min="0" step="0.01" className="w-28 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_cost}
                         onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_cost: e.target.value } : r))} />
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -506,23 +544,39 @@ function POTab({ initialPO }: { initialPO?: string }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
-                {viewPO.items.map(it => (
+                {viewPO.items.map(it => {
+                  const factor = parseFloat(it.purchase_unit_factor || '1')
+                  const baseLabel = poBaseUnitLabel(it)
+                  const puLabel = it.purchase_unit || baseLabel
+                  const qtyInPu = factor > 1 ? Math.round((parseFloat(it.quantity) / factor) * 1000) / 1000 : parseFloat(it.quantity)
+                  const recvInPu = factor > 1 ? Math.round((parseFloat(it.quantity_received || '0') / factor) * 1000) / 1000 : parseFloat(it.quantity_received || '0')
+                  const recvFull = recvInPu >= qtyInPu
+                  const recvPartial = recvInPu > 0 && !recvFull
+                  return (
                   <tr key={it.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 text-foreground">
                       <p className="font-medium">{it.product_name}{it.variant_name && <span className="text-foreground-secondary font-normal"> / {it.variant_name}</span>}</p>
+                      {it.purchase_unit && (
+                        <p className="text-xs text-foreground-muted mt-0.5">
+                          {factor > 1 ? `1 ${it.purchase_unit} = ${factor} ${baseLabel}` : it.purchase_unit}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">{it.sku || '—'}</td>
-                    <td className="px-4 py-3 text-right text-foreground-secondary">{parseFloat(it.quantity)}</td>
+                    <td className="px-4 py-3 text-right text-foreground-secondary">
+                      {qtyInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
+                    </td>
                     <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(it.unit_cost))}</td>
                     <td className="px-4 py-3 text-right text-foreground-secondary hidden sm:table-cell">{it.tax_rate}%</td>
                     <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(it.total_cost))}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`text-xs font-medium ${parseFloat(it.quantity_received || '0') >= parseFloat(it.quantity) ? 'text-green-600 dark:text-green-400' : parseFloat(it.quantity_received || '0') > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-foreground-secondary'}`}>
-                        {parseFloat(it.quantity_received || '0')} / {parseFloat(it.quantity)}
+                      <span className={`text-xs font-medium ${recvFull ? 'text-green-600 dark:text-green-400' : recvPartial ? 'text-yellow-600 dark:text-yellow-400' : 'text-foreground-secondary'}`}>
+                        {recvInPu} / {qtyInPu}{puLabel && <span className="font-normal opacity-70 ml-1">{puLabel}</span>}
                       </span>
                     </td>
                   </tr>
-                ))}
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -557,12 +611,13 @@ function POTab({ initialPO }: { initialPO?: string }) {
             value={search}
             onChange={v => { setSearch(v); setPage(1) }}
             placeholder="PO number, supplier..."
-            inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+            inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
           />
         </div>
         <div className="w-44">
           <label className={labelCls}>Status</label>
           <AdminSelect
+            sm
             value={statusFilter}
             onChange={v => { setStatusFilter(v); setPage(1) }}
             placeholder="All statuses"
@@ -686,6 +741,8 @@ type StockTransaction = {
   id: string; created_at: string; transaction_type: string
   quantity_change: number; quantity_after: number
   reference_type: string; reference_id: string; notes: string | null
+  unit_id: string | null; unit_label: string | null
+  unit_factor: number | null; quantity_in_unit: number | null
   product_id: string; product_name: string; product_sku: string | null
   variant_id: string | null; variant_name: string | null
   sub_variant_id: string | null; sub_variant_name: string | null
@@ -699,7 +756,7 @@ function StockTab() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
-  const [valuation, setValuation] = useState<{ products: any[]; totalValue: number } | null>(null)
+  const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number } | null>(null)
   const [valPage, setValPage] = useState(1)
   const [valSearch, setValSearch] = useState(searchParams.get('val_search') || '')
   const [valCategory, setValCategory] = useState(searchParams.get('val_category') || '')
@@ -714,6 +771,8 @@ function StockTab() {
   const [editQty, setEditQty] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  const [editUnits, setEditUnits] = useState<{ id: string; unit: string; display_label: string | null; factor: number; dimension: string }[]>([])
+  const [editUnitId, setEditUnitId] = useState<string>('')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
   function toggleGroup(refId: string) {
@@ -773,78 +832,129 @@ function StockTab() {
     setLoading(false)
   }, [search, from, to, txPage])
 
-  const loadValuation = useCallback(async () => {
+  const loadValuation = useCallback(async (pg = valPage) => {
     setLoading(true)
-    const res = await fetch('/api/admin/inventory/stock?view=valuation')
+    const params = new URLSearchParams({
+      view: 'valuation',
+      page: String(pg),
+      limit: String(VALUATION_PAGE_SIZE),
+    })
+    if (valSearch) params.set('search', valSearch)
+    if (valCategory) params.set('category', valCategory)
+    if (valBrand) params.set('brand', valBrand)
+    if (valStockStatus) params.set('stock_status', valStockStatus)
+    const res = await fetch(`/api/admin/inventory/stock?${params}`)
     const json = await res.json()
     setValuation(json)
     setLoading(false)
-  }, [])
+  }, [valSearch, valCategory, valBrand, valStockStatus, valPage])
 
   useEffect(() => {
     if (view === 'ledger') loadLedger(txPage)
-    else loadValuation()
-  }, [view, loadLedger, loadValuation, txPage])
+    else loadValuation(valPage)
+  }, [view, loadLedger, loadValuation, txPage, valPage])
 
   const allValRows = valuation?.products || []
-  const filteredValRows = allValRows.filter(p => {
-    if (valSearch.trim()) {
-      const q = valSearch.toLowerCase()
-      if (!(p.name || '').toLowerCase().includes(q) && !(p.sku || '').toLowerCase().includes(q) && !(p.row_sku || '').toLowerCase().includes(q) && !(p.variant_name || '').toLowerCase().includes(q) && !(p.sub_variant_name || '').toLowerCase().includes(q)) return false
-    }
-    if (valCategory && p.category_name !== valCategory) return false
-    if (valBrand && p.brand_name !== valBrand) return false
-    if (valStockStatus === 'in_stock' && parseFloat(p.inventory_quantity || '0') <= 0) return false
-    if (valStockStatus === 'out_of_stock' && parseFloat(p.inventory_quantity || '0') > 0) return false
-    if (valStockStatus === 'low_stock' && (parseFloat(p.inventory_quantity || '0') <= 0 || parseFloat(p.inventory_quantity || '0') > 5)) return false
-    return true
-  })
+  const valTotal = valuation?.total || 0
 
   const valCategories = [...new Set(allValRows.map(p => p.category_name).filter(Boolean))].sort() as string[]
   const valBrands = [...new Set(allValRows.map(p => p.brand_name).filter(Boolean))].sort() as string[]
-  const valTotalPages = Math.ceil(filteredValRows.length / VALUATION_PAGE_SIZE)
+
   const VAL_SORT_KEYS: Record<string, string> = {
     product: 'name', variant: 'variant_name', sku: 'sku',
     stock: 'inventory_quantity', price: 'cost_price', value: 'stock_value',
   }
   const sortedValRows = valSortCol && VAL_SORT_KEYS[valSortCol]
-    ? [...filteredValRows].sort((a, b) => {
+    ? [...allValRows].sort((a, b) => {
         const k = VAL_SORT_KEYS[valSortCol]
         const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
         return valSortDir === 'asc' ? cmp : -cmp
       })
-    : filteredValRows
-  const valSlice = sortedValRows.slice((valPage - 1) * VALUATION_PAGE_SIZE, valPage * VALUATION_PAGE_SIZE)
+    : allValRows
 
   function startEdit(p: any) {
     const rowId = p.sub_variant_id || p.variant_id || p.id
     setEditingId(rowId)
-    setEditQty(String(parseFloat(p.inventory_quantity || '0')))
     setEditNotes('')
+
+    // Build unit options from the valuation row data
+    const sellFactor = parseFloat(p.sell_unit_factor || '1') || 1
+    const units: { id: string; unit: string; display_label: string | null; factor: number; dimension: string }[] = []
+
+    // We don't have unit IDs in the valuation row — fetch them from the units API
+    const apiPath = p.variant_id
+      ? `/api/admin/products/${p.id}/variants/${p.variant_id}/units`
+      : `/api/admin/products/${p.id}/units`
+
+    // Default: show base-unit qty while units load
+    const currentBase = parseFloat(p.inventory_quantity || '0')
+    setEditQty(String(currentBase))
+    setEditUnits([])
+    setEditUnitId('')
+
+    fetch(apiPath)
+      .then(r => r.json())
+      .then(json => {
+        const fetched = (json?.units || []).map((u: any) => ({
+          id: u.id,
+          unit: u.unit,
+          display_label: u.display_label,
+          factor: parseFloat(u.factor) || 1,
+          dimension: u.dimension,
+        }))
+        // For sub-variants, also try sub-variant-specific units if present; fall back to variant/product
+        setEditUnits(fetched)
+        // For count-dimension, always pre-select the base (pc, factor=1) unit so
+        // the operator enters raw piece count — no unwanted multiplication.
+        // For other dimensions, match by factor to the valuation row's sell unit.
+        const isCount = p.sell_unit_dimension === 'count'
+        const match = isCount
+          ? (fetched.find((u: any) => u.factor === 1 && u.dimension === 'count') || fetched.find((u: any) => u.dimension === 'count') || fetched[0])
+          : (fetched.find((u: any) => Math.abs(u.factor - sellFactor) < 0.0001) || fetched[0])
+        if (match) {
+          setEditUnitId(match.id)
+          // Pre-fill qty as sell-unit qty only for non-count units with factor > 1
+          if (!isCount && match.factor > 1) {
+            setEditQty(String(Math.round(currentBase / match.factor * 1000) / 1000))
+          }
+        }
+      })
+      .catch(() => {})
   }
 
   async function saveEdit(p: any) {
     setEditSaving(true)
+    const selectedUnit = editUnits.find(u => u.id === editUnitId)
+    const body: Record<string, any> = {
+      product_id: p.id,
+      variant_id: p.variant_id || null,
+      sub_variant_id: p.sub_variant_id || null,
+      notes: editNotes || undefined,
+    }
+    // Count-dimension units are always stored as raw pcs — never multiply via unit_id path
+    const isCountUnit = !selectedUnit || selectedUnit.dimension === 'count' || selectedUnit.factor === 1
+    if (!isCountUnit) {
+      body.unit_id = selectedUnit!.id
+      body.quantity_in_unit = parseFloat(editQty)
+    } else {
+      body.new_quantity = parseFloat(editQty)
+    }
     await fetch('/api/admin/inventory/stock', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        product_id: p.id,
-        variant_id: p.variant_id || null,
-        sub_variant_id: p.sub_variant_id || null,
-        new_quantity: parseFloat(editQty),
-        notes: editNotes || undefined,
-      }),
+      body: JSON.stringify(body),
     })
     setEditSaving(false)
     setEditingId(null)
-    loadValuation()
+    loadValuation(valPage)
   }
 
   function cancelEdit() {
     setEditingId(null)
     setEditQty('')
     setEditNotes('')
+    setEditUnits([])
+    setEditUnitId('')
   }
 
   return (
@@ -866,7 +976,7 @@ function StockTab() {
               <AdminTypeahead type="products" value={search}
                 onChange={v => { setSearch(v); setTxPage(1); syncUrl({ ledger_search: v }) }}
                 placeholder="Name, SKU..."
-                inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted" />
+                inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted" />
             </div>
             <div>
               <label className={labelCls}>From</label>
@@ -908,7 +1018,7 @@ function StockTab() {
                     {ledgerGroups.map(group => {
                       const multi = group.txs.length > 1
                       const expanded = expandedGroups.has(group.refId)
-                      const totalChange = group.txs.reduce((s, t) => s + t.quantity_change, 0)
+                      const totalChange = Math.round(group.txs.reduce((s, t) => s + Number(t.quantity_change), 0) * 1000) / 1000
                       const txType = group.txs[0].transaction_type
 
                       const refLink = group.refType === 'order' ? (
@@ -924,11 +1034,17 @@ function StockTab() {
                           {group.refLabel || group.refId.slice(0, 8) + '…'}
                         </Link>
                       ) : (
-                        <span className="font-mono text-foreground-secondary">{group.refType}/{group.refId.slice(0, 8)}…</span>
+                        <span className="font-mono text-foreground-secondary">{group.refType} / {group.refId.slice(0, 8)}…</span>
                       )
+
+                      function fmtChange(n: number) {
+                        const sign = n > 0 ? '+' : n < 0 ? '−' : ''
+                        return `${sign}${Math.abs(n)}`
+                      }
 
                       if (!multi) {
                         const tx = group.txs[0]
+                        const chg = Number(tx.quantity_change)
                         return (
                           <tr key={tx.id} className="hover:bg-surface-secondary/50 transition-colors">
                             <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap text-xs">
@@ -954,13 +1070,13 @@ function StockTab() {
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Change</span>
-                                      <span className={`font-mono font-semibold ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                        {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
+                                      <span className={`font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                                        {fmtChange(chg)}
                                       </span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Balance after</span>
-                                      <span className="font-mono font-medium text-foreground">{tx.quantity_after}</span>
+                                      <span className="font-mono font-medium text-foreground">{Number(tx.quantity_after)}</span>
                                     </div>
                                     {tx.notes && <div className="pt-1 border-t border-border-default"><p className="text-foreground-secondary leading-snug">{tx.notes}</p></div>}
                                   </div>
@@ -969,23 +1085,27 @@ function StockTab() {
                               {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
                             </td>
                             <td className="px-4 py-3">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
                             </td>
-                            <td className={`px-4 py-3 text-right font-mono font-semibold ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
+                            <td className={`px-4 py-3 text-right font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                              {fmtChange(chg)}
+                              {tx.quantity_in_unit != null && tx.unit_label && (
+                                <span className="block text-xs font-normal text-foreground-muted">
+                                  ({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})
+                                </span>
+                              )}
                             </td>
-                            <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{tx.quantity_after}</td>
+                            <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{Number(tx.quantity_after)}</td>
                             <td className="px-4 py-3 text-xs hidden md:table-cell">{refLink}</td>
                           </tr>
                         )
                       }
 
                       return (
-                        <>
+                        <React.Fragment key={`group-${group.refId}`}>
                           {/* Group header row */}
                           <tr
-                            key={`group-${group.refId}`}
-                            className="bg-surface-secondary/60 hover:bg-surface-secondary cursor-pointer transition-colors"
+                            className="bg-surface-secondary/60 hover:bg-surface-secondary cursor-pointer transition-colors select-none"
                             onClick={() => toggleGroup(group.refId)}
                           >
                             <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs">
@@ -1000,46 +1120,51 @@ function StockTab() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                                 <span className="text-sm font-medium text-foreground">
-                                  {group.txs.length} products
+                                  {group.txs.length} items
                                 </span>
                                 <span className="text-xs text-foreground-muted">
-                                  {expanded ? 'click to collapse' : 'click to expand'}
+                                  {expanded ? '(collapse)' : '(expand)'}
                                 </span>
                               </div>
                             </td>
                             <td className="px-4 py-2.5">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[txType] || ''}`}>{txType}</span>
+                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[txType] || ''}`}>{txType}</span>
                             </td>
-                            <td className={`px-4 py-2.5 text-right font-mono font-semibold ${totalChange > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                              {totalChange > 0 ? '+' : ''}{totalChange}
+                            <td className={`px-4 py-2.5 text-right font-mono font-semibold ${totalChange > 0 ? 'text-green-600 dark:text-green-400' : totalChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                              {fmtChange(totalChange)}
+                              <span className="block text-xs font-normal text-foreground-muted">net total</span>
                             </td>
                             <td className="px-4 py-2.5 text-right text-foreground-muted text-xs font-mono">—</td>
                             <td className="px-4 py-2.5 text-xs hidden md:table-cell">{refLink}</td>
                           </tr>
 
                           {/* Expanded product rows */}
-                          {expanded && group.txs.map(tx => (
-                            <tr key={tx.id} className="bg-surface/40 hover:bg-surface-secondary/30 transition-colors border-l-2 border-accent-500/30">
-                              <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8">
-                                {new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                              </td>
-                              <td className="px-4 py-2.5 pl-8 text-foreground">
-                                <Link href={ap(`/admin/products/${tx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2">
-                                  {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
-                                </Link>
-                                {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
-                              </td>
-                              <td className="px-4 py-2.5">
-                                <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
-                              </td>
-                              <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${tx.quantity_change > 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                                {tx.quantity_change > 0 ? '+' : ''}{tx.quantity_change}
-                              </td>
-                              <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">{tx.quantity_after}</td>
-                              <td className="px-4 py-2.5 text-xs hidden md:table-cell text-foreground-muted font-mono">↳</td>
-                            </tr>
-                          ))}
-                        </>
+                          {expanded && group.txs.map(tx => {
+                            const chg = Number(tx.quantity_change)
+                            return (
+                              <tr key={tx.id} className="bg-surface/40 hover:bg-surface-secondary/30 transition-colors border-l-2 border-accent-500/30">
+                                <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8" />
+                                <td className="px-4 py-2.5 pl-8 text-foreground">
+                                  <Link href={ap(`/admin/products/${tx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2">
+                                    {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
+                                  </Link>
+                                  {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
+                                </td>
+                                <td className="px-4 py-2.5" />
+                                <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                                  {fmtChange(chg)}
+                                  {tx.quantity_in_unit != null && tx.unit_label && (
+                                    <span className="block text-xs font-normal text-foreground-muted">
+                                      ({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">{Number(tx.quantity_after)}</td>
+                                <td className="px-4 py-2.5 text-xs hidden md:table-cell" />
+                              </tr>
+                            )
+                          })}
+                        </React.Fragment>
                       )
                     })}
                   </tbody>
@@ -1061,12 +1186,13 @@ function StockTab() {
                 value={valSearch}
                 onChange={v => { setValSearch(v); setValPage(1); syncUrl({ val_search: v }) }}
                 placeholder="Name, SKU, variant..."
-                inputClassName="w-full px-3 py-2.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+                inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
               />
             </div>
             <div className="w-44">
               <label className={labelCls}>Category</label>
               <AdminSelect
+                sm
                 value={valCategory}
                 onChange={v => { setValCategory(v); setValPage(1); syncUrl({ val_category: v }) }}
                 placeholder="All categories"
@@ -1079,6 +1205,7 @@ function StockTab() {
             <div className="w-40">
               <label className={labelCls}>Brand</label>
               <AdminSelect
+                sm
                 value={valBrand}
                 onChange={v => { setValBrand(v); setValPage(1); syncUrl({ val_brand: v }) }}
                 placeholder="All brands"
@@ -1091,6 +1218,7 @@ function StockTab() {
             <div className="w-40">
               <label className={labelCls}>Stock status</label>
               <AdminSelect
+                sm
                 value={valStockStatus}
                 onChange={v => { setValStockStatus(v); setValPage(1); syncUrl({ val_stock: v }) }}
                 placeholder="All"
@@ -1107,7 +1235,7 @@ function StockTab() {
                 <span className={labelCls}>&nbsp;</span>
                 <button
                   onClick={() => { setValSearch(''); setValCategory(''); setValBrand(''); setValStockStatus(''); setValPage(1); syncUrl({ val_search: '', val_category: '', val_brand: '', val_stock: '' }) }}
-                  className="px-3 py-2.5 rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
+                  className="px-3 py-1.5 rounded-lg text-sm text-foreground-secondary hover:text-foreground border border-border-default hover:bg-surface-secondary transition-colors"
                 >
                   Clear filters
                 </button>
@@ -1125,10 +1253,10 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.stock_value || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'All products'} />
-                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(filteredValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub={filteredValRows.length !== allValRows.length ? `${filteredValRows.length} SKUs shown` : 'All products'} />
-                <SummaryCard label="Total SKUs" value={String(filteredValRows.length)} sub={filteredValRows.length !== allValRows.length ? `of ${allValRows.length} total` : 'across all products'} />
-                <SummaryCard label="In Stock" value={String(filteredValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="SKUs with stock > 0" />
+                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(valuation?.totalValue || 0)} accent sub={`${valTotal} SKUs`} />
+                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub="this page" />
+                <SummaryCard label="Total SKUs" value={String(valTotal)} sub="across all products" />
+                <SummaryCard label="In Stock" value={String(allValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="on this page" />
               </div>
               <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
                 <div className="overflow-x-auto">
@@ -1139,6 +1267,7 @@ function StockTab() {
                         <SortableHeader label="Variant" column="variant" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden sm:table-cell" />
                         <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} className="hidden md:table-cell" />
                         <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
+                        <th className="px-4 py-3 text-center text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Sell Unit</th>
                         <SortableHeader label="Price ex-GST" column="price" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
                         <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">GST %</th>
                         <SortableHeader label="Stock Value (ex-GST)" column="value" options={sortOptions('number')} currentSort={valSortCol} currentDir={valSortDir} onSort={handleValSort} align="right" />
@@ -1147,12 +1276,12 @@ function StockTab() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">
-                      {valSlice.length === 0 && (
-                        <tr><td colSpan={9} className="py-12 text-center text-foreground-secondary text-sm">
+                      {sortedValRows.length === 0 && (
+                        <tr><td colSpan={10} className="py-12 text-center text-foreground-secondary text-sm">
                           {valSearch ? `No products match "${valSearch}"` : 'No products in stock'}
                         </td></tr>
                       )}
-                      {valSlice.map((p) => {
+                      {sortedValRows.map((p) => {
                         const rowId = p.sub_variant_id || p.variant_id || p.id
                         const isEditing = editingId === rowId
                         return (
@@ -1197,21 +1326,51 @@ function StockTab() {
                             <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell">{p.row_sku || p.sku || '—'}</td>
                             <td className="px-4 py-3 text-right">
                               {isEditing ? (
-                                <input
-                                  type="number"
-                                  min="0"
-                                  step="0.001"
-                                  autoFocus
-                                  value={editQty}
-                                  onChange={e => setEditQty(e.target.value)}
-                                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
-                                  className="w-20 px-2 py-1 rounded border border-secondary-500 bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 text-right"
-                                />
+                                <div className="flex flex-col items-end gap-1">
+                                  {editUnits.length > 1 && (
+                                    <AdminSelect
+                                      value={editUnitId}
+                                      onChange={v => setEditUnitId(v)}
+                                      compact
+                                      className="w-28"
+                                      options={editUnits.map(u => ({
+                                        value: u.id,
+                                        label: `${u.display_label || u.unit}${u.factor !== 1 ? ` (×${u.factor})` : ''}`,
+                                      }))}
+                                    />
+                                  )}
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    step="0.001"
+                                    autoFocus
+                                    value={editQty}
+                                    onChange={e => setEditQty(e.target.value)}
+                                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
+                                    className="w-20 px-2 py-1 rounded border border-secondary-500 bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 text-right"
+                                  />
+                                  {(() => {
+                                    const u = editUnits.find(u => u.id === editUnitId)
+                                    if (!u || u.factor === 1 || u.dimension === 'count') return null
+                                    const base = Math.round(parseFloat(editQty || '0') * u.factor * 1000) / 1000
+                                    return <span className="text-xs text-foreground-muted">= {base} {u.dimension === 'count' ? 'pcs' : 'base units'}</span>
+                                  })()}
+                                </div>
                               ) : (
                                 <span className={`font-medium ${parseFloat(p.inventory_quantity || '0') === 0 ? 'text-red-600 dark:text-red-400' : parseFloat(p.inventory_quantity || '0') <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
                                   {parseFloat(p.inventory_quantity || '0')}
                                 </span>
                               )}
+                            </td>
+                            <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium whitespace-nowrap">
+                                {p.sell_unit_dimension === 'count'
+                                  ? <>Pc{(p.sell_unit_label || p.sell_unit) && (p.sell_unit_label || p.sell_unit) !== 'pc' ? <span className="text-foreground-muted font-normal">/ {p.sell_unit_label || p.sell_unit}</span> : null}</>
+                                  : (p.sell_unit_label || p.sell_unit || 'Pc')}
+                                {parseFloat(p.sell_unit_factor || '1') > 1 && p.base_unit_label && (
+                                  <span className="text-foreground-muted font-normal">({parseFloat(p.sell_unit_factor)} {p.base_unit_label})</span>
+                                )}
+                              </span>
                             </td>
                             <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
                             <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
@@ -1274,7 +1433,7 @@ function StockTab() {
                   </table>
                 </div>
                 <div className="px-4 pb-4">
-                  <ClientPagination page={valPage} total={filteredValRows.length} pageSize={VALUATION_PAGE_SIZE} onChange={p => { setValPage(p); cancelEdit() }} />
+                  <ClientPagination page={valPage} total={valTotal} pageSize={VALUATION_PAGE_SIZE} onChange={p => { setValPage(p); cancelEdit() }} />
                 </div>
               </div>
             </>

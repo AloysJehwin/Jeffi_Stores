@@ -3,10 +3,11 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryCount, queryOne } from '@/lib/db'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'review_forms')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(request.url)
   const page = Math.max(1, parseInt(searchParams.get('page') || '1', 10))
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const offset = (page - 1) * limit
 
   const conditions = ['rfs.form_id = $1']
-  const params2: unknown[] = [params.id]
+  const params2: unknown[] = [id]
   let i = 2
 
   if (status && ['pending', 'approved', 'rejected'].includes(status)) {
@@ -36,10 +37,11 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   return NextResponse.json({ submissions, total })
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'review_forms')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'review_forms:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { submissionId, status } = await request.json()
   if (!submissionId || !['pending', 'approved', 'rejected'].includes(status)) {
@@ -48,7 +50,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   const result = await queryOne(
     `UPDATE review_form_submissions SET status = $1 WHERE id = $2 AND form_id = $3 RETURNING *`,
-    [status, submissionId, params.id]
+    [status, submissionId, id]
   )
   if (!result) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   return NextResponse.json({ submission: result })

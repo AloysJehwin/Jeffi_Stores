@@ -9,9 +9,10 @@ import { generateOrderInvoice } from '@/lib/invoice'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const userAuth = await authenticateUser(request)
     const adminAuth = await authenticateAdmin(request)
 
@@ -19,7 +20,7 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
 
     const order = await queryOne(
       `SELECT o.*,
@@ -118,10 +119,14 @@ export async function GET(
       quantity: item.quantity,
       unit_price: parseFloat(item.unit_price),
       total_price: parseFloat(item.total_price),
+      discount_amount: parseFloat(item.discount_amount || '0'),
+      mrp: item.mrp != null ? parseFloat(item.mrp) : null,
       taxable_amount: parseFloat(item.taxable_amount || '0'),
       cgst_amount: parseFloat(item.cgst_amount || '0'),
       sgst_amount: parseFloat(item.sgst_amount || '0'),
       igst_amount: parseFloat(item.igst_amount || '0'),
+      buy_mode: item.buy_mode || 'unit',
+      buy_unit: item.buy_unit || null,
     }))
 
     const buyerAddress: InvoiceBuyerAddress = {
@@ -228,22 +233,23 @@ export async function GET(
         'Content-Length': String(pdfBuffer.length),
       },
     })
-  } catch {
+  } catch (err) {
     return NextResponse.json({ error: 'Failed to generate invoice' }, { status: 500 })
   }
 }
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const orderId = params.id
+    const orderId = id
 
     const order = await queryOne('SELECT id, invoice_number, payment_status, status FROM orders WHERE id = $1', [orderId])
     if (!order) {
@@ -271,7 +277,7 @@ export async function POST(
     const updated = await queryOne('SELECT invoice_number FROM orders WHERE id = $1', [orderId])
 
     return NextResponse.json({ success: true, invoiceNumber: updated?.invoice_number || null })
-  } catch {
+  } catch (err) {
     return NextResponse.json({ error: 'Failed to generate invoice' }, { status: 500 })
   }
 }

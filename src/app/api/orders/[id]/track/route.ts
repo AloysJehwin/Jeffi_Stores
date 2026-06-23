@@ -6,15 +6,16 @@ const TOKEN = process.env.DELHIVERY_API_KEY
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const order = await queryOne<{ awb_number: string | null; status: string }>(
       `SELECT awb_number, status FROM orders WHERE id = $1 AND user_id = $2`,
-      [params.id, authUser.userId]
+      [id, authUser.userId]
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -56,7 +57,8 @@ export async function GET(
         })),
       },
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

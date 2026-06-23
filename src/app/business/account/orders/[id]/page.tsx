@@ -3,7 +3,7 @@
 import { useAuth } from '@/contexts/AuthContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef, useCallback } from 'react'
+import { use, useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
@@ -37,10 +37,12 @@ interface OrderDetails {
   id: string
   orderNumber: string
   invoiceNumber: string | null
+  viewToken: string | null
   totalAmount: number
   subtotal: number
   taxAmount: number
   discountAmount: number
+  businessDiscountAmount: number
   shippingAmount: number
   status: string
   paymentStatus: string
@@ -112,7 +114,8 @@ function statusLabel(status: string) {
   }
 }
 
-export default function BusinessOrderDetailPage({ params }: { params: { id: string } }) {
+export default function BusinessOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const { user, isLoading: authLoading } = useAuth()
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetails | null>(null)
@@ -143,7 +146,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
 
   const fetchOrder = async () => {
     try {
-      const res = await fetch(`/api/orders/${params.id}`, { credentials: 'include', headers: PH })
+      const res = await fetch(`/api/orders/${id}`, { credentials: 'include', headers: PH })
       if (!res.ok) throw new Error('Failed to fetch order details')
       const data = await res.json()
       setOrder(data.order)
@@ -159,7 +162,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     autoCancelTriggeredRef.current = true
     setIsAutoCancelling(true)
     try {
-      const res = await fetch(`/api/orders/${params.id}/cancel`, {
+      const res = await fetch(`/api/orders/${id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...PH },
         credentials: 'include',
@@ -170,7 +173,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     } finally {
       setIsAutoCancelling(false)
     }
-  }, [params.id])
+  }, [id])
 
   useEffect(() => {
     if (!order || order.status === 'cancelled' || order.status === 'cancel_requested') return
@@ -195,7 +198,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     if (order.status === 'cancelled' || order.status === 'cancel_requested') return
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/orders/${params.id}`, { credentials: 'include', headers: PH })
+        const res = await fetch(`/api/orders/${id}`, { credentials: 'include', headers: PH })
         if (!res.ok) return
         const data = await res.json()
         if (data.order?.paymentStatus === 'paid') {
@@ -205,7 +208,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
       } catch { /* ignore */ }
     }, 5000)
     return () => clearInterval(interval)
-  }, [params.id, order?.paymentMode, order?.paymentStatus, order?.status])
+  }, [id, order?.paymentMode, order?.paymentStatus, order?.status])
 
   const handleCancelOrder = async () => {
     const isImmediate = order?.status === 'pending' && order?.paymentStatus === 'unpaid'
@@ -221,7 +224,7 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
     if (!ok) return
     setIsCancelling(true)
     try {
-      const res = await fetch(`/api/orders/${params.id}/cancel`, {
+      const res = await fetch(`/api/orders/${id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...PH },
         credentials: 'include',
@@ -386,17 +389,18 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
                       {order.status === 'pending' && order.paymentStatus === 'unpaid' ? 'Cancel Order' : 'Request Cancellation'}
                     </button>
                   )}
-                  {order.invoiceNumber && !order.originalOrderId && (
+                  {order.invoiceNumber && !order.originalOrderId && order.viewToken && (
                     <a
-                      href={`/api/orders/${order.id}/invoice`}
+                      href={`/invoice/${order.viewToken}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white shadow-sm transition-colors"
                     >
                       <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                       </svg>
-                      Download Invoice
+                      View Invoice
                     </a>
                   )}
                 </div>
@@ -469,12 +473,21 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
                             {item.subVariantName}
                           </span>
                         )}
-                        <p className="text-sm text-foreground-secondary mt-1">
-                          Quantity: {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))}
-                        </p>
-                        <p className="text-sm font-semibold text-foreground mt-1">
-                          {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })} × {item.buyMode === 'weight' || item.buyMode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buyUnit ?? ''}` : Math.round(Number(item.quantity))} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
-                        </p>
+                        {(() => {
+                          const isFractional = item.buyMode === 'weight' || item.buyMode === 'length'
+                          const qtyDisplay = isFractional
+                            ? `${Number(item.quantity).toFixed(3)}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
+                            : `${Math.round(Number(item.quantity))}${item.buyUnit && item.buyUnit !== 'unit' ? ` ${item.buyUnit}` : ''}`
+                          const priceUnitSuffix = item.buyUnit && item.buyUnit !== 'unit' ? ` / ${item.buyUnit}` : ''
+                          return (
+                            <>
+                              <p className="text-sm text-foreground-secondary mt-1">Quantity: {qtyDisplay}</p>
+                              <p className="text-sm font-semibold text-foreground mt-1">
+                                {item.unitPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}{priceUnitSuffix} × {qtyDisplay} = {item.totalPrice.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
+                              </p>
+                            </>
+                          )
+                        })()}
                       </div>
                     </div>
                   )
@@ -497,6 +510,12 @@ export default function BusinessOrderDetailPage({ params }: { params: { id: stri
                   <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-medium">
                     <span>Discount</span>
                     <span>−{order.discountAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
+                  </div>
+                )}
+                {order.businessDiscountAmount > 0 && (
+                  <div className="flex justify-between text-sm text-green-600 dark:text-green-400 font-medium">
+                    <span>Business Discount</span>
+                    <span>−{order.businessDiscountAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
                   </div>
                 )}
                 {order.shippingAmount > 0 && (

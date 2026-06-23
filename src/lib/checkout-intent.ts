@@ -13,7 +13,7 @@ export interface BuyNowIntentPayload {
   variantId: string | null
   subVariantId: string | null
   qty: number
-  buyMode: 'unit' | 'weight' | 'length'
+  buyMode: string
   buyUnit: string | null
 }
 
@@ -46,10 +46,11 @@ export async function verifyIntent(token: string): Promise<CheckoutIntentPayload
       variantId: (payload.variantId as string) || null,
       subVariantId: (payload.subVariantId as string) || null,
       qty: Number(payload.qty),
-      buyMode: ((payload.buyMode as string) === 'weight' || (payload.buyMode as string) === 'length' ? payload.buyMode : 'unit') as 'unit' | 'weight' | 'length',
+      buyMode: (payload.buyMode as string) || 'unit',
       buyUnit: (payload.buyUnit as string) || null,
     }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

@@ -1,0 +1,2 @@
+ALTER TABLE orders
+  ADD COLUMN IF NOT EXISTS business_discount_amount NUMERIC(12,2) NOT NULL DEFAULT 0;

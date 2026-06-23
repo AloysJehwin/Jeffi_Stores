@@ -109,15 +109,13 @@ async function updateProduct(productId: string, formData: FormData) {
   const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
   const mrpExGst = formData.get('mrp_ex_gst') ? Math.round(parseFloat(formData.get('mrp_ex_gst') as string) * 100) / 100 : null
   const salePrice = formData.get('price_ex_gst') ? Math.round(parseFloat(formData.get('price_ex_gst') as string) * 100) / 100 : null
-  const wholesalePrice = formData.get('wholeprice_ex_gst') ? Math.round(parseFloat(formData.get('wholeprice_ex_gst') as string) * 100) / 100 : null
   const costPrice = formData.get('cost_price') ? Math.round(parseFloat(formData.get('cost_price') as string) * 100) / 100 : 0
   const discountPct = formData.get('discount_pct') ? Math.round(parseFloat(formData.get('discount_pct') as string) * 100) / 100 : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
   const mpn = formData.get('mpn') as string || null
   const gtin = formData.get('gtin') as string || null
-  const stockQuantity = hasVariants ? 0 : parseInt(formData.get('stock_quantity') as string)
-  const lowStockThreshold = hasVariants ? 0 : parseInt(formData.get('low_stock_threshold') as string)
+  const stockStatus = hasVariants ? 'In Stock' : formData.get('stock_status') as string
   const weight = formData.get('weight') ? parseFloat(formData.get('weight') as string) : null
   const dimensions = formData.get('dimensions') as string || null
   const weightGrams = formData.get('weight_grams') ? parseInt(formData.get('weight_grams') as string) : null
@@ -128,10 +126,6 @@ async function updateProduct(productId: string, formData: FormData) {
   const intent = formData.get('intent') as string | null
   const isActive = intent === 'draft' ? false : (intent === 'publish' ? true : formData.get('is_active') === 'true')
   const isFeatured = formData.get('is_featured') === 'true'
-  const weightRate = formData.get('weight_rate') ? Math.round(parseFloat(formData.get('weight_rate') as string) * 100) / 100 : null
-  const weightUnit = formData.get('weight_unit') as string || null
-  const lengthRate = formData.get('length_rate') ? Math.round(parseFloat(formData.get('length_rate') as string) * 100) / 100 : null
-  const lengthUnit = formData.get('length_unit') as string || null
   const imageCount = parseInt(formData.get('image_count') as string || '0')
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
   const existingImagesToKeep = existingImagesToKeepJson ? JSON.parse(existingImagesToKeepJson) : []
@@ -149,21 +143,21 @@ async function updateProduct(productId: string, formData: FormData) {
     const setClauses: string[] = [
       'name = $1', 'slug = $2', 'description = $3', 'category_id = $4',
       'brand_id = $5', 'base_price = $6', 'mrp = $7', 'mrp_ex_gst = $8',
-      'price_ex_gst = $9', 'wholeprice_ex_gst = $10',
-      'gst_percentage = $11', 'hsn_code = $12',
-      'stock_quantity = $13', 'low_stock_threshold = $14', 'weight = $15',
-      'dimensions = $16', 'is_active = $17', 'is_featured = $18', 'has_variants = $19', 'variant_type = $20',
-      'sub_variant_type = $21', 'weight_rate = $22', 'weight_unit = $23', 'length_rate = $24', 'length_unit = $25',
-      'weight_grams = $26', 'package_type = $27', 'length_cm = $28', 'breadth_cm = $29', 'height_cm = $30',
-      'cost_price = $31', 'discount_pct = $32', 'updated_at = $33',
+      'price_ex_gst = $9',
+      'gst_percentage = $10', 'hsn_code = $11',
+      'stock_status = $12', 'weight = $13',
+      'dimensions = $14', 'is_active = $15', 'is_featured = $16', 'has_variants = $17', 'variant_type = $18',
+      'sub_variant_type = $19',
+      'weight_grams = $20', 'package_type = $21', 'length_cm = $22', 'breadth_cm = $23', 'height_cm = $24',
+      'cost_price = $25', 'discount_pct = $26', 'updated_at = $27',
     ]
     const params: any[] = [
       name, slug, description, categoryId,
-      brandId || null, basePrice, mrp, mrpExGst, salePrice, wholesalePrice,
+      brandId || null, basePrice, mrp, mrpExGst, salePrice,
       gstPercentage, hsnCode,
-      stockQuantity, lowStockThreshold, weight,
+      stockStatus, weight,
       dimensions, isActive, isFeatured, hasVariants, variantType,
-      subVariantType, weightRate, weightUnit, lengthRate, lengthUnit,
+      subVariantType,
       weightGrams, packageType, lengthCm, breadthCm, heightCm,
       costPrice, discountPct,
       new Date().toISOString(),
@@ -321,15 +315,14 @@ async function updateProduct(productId: string, formData: FormData) {
         const variants = JSON.parse(variantsJson)
 
         for (const variant of variants) {
-          const isWeightOrLength = variant.pricing_type === 'weight' || variant.pricing_type === 'length'
           const isPersisted = variant.id && !String(variant.id).startsWith('temp-')
           if (variant._isDeleted && isPersisted) {
             await query('DELETE FROM product_variants WHERE id = $1 AND product_id = $2', [variant.id, productId])
           } else if (isPersisted && !variant._isDeleted) {
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, wholeprice_ex_gst = $7, stock_quantity = $8, mpn = $9, gtin = $10, pricing_type = $11, unit = $12, numeric_value = $13, weight_rate = $14, weight_unit = $15, length_rate = $16, length_unit = $17, weight_grams = $18, package_type = $19, length_cm = $20, breadth_cm = $21, height_cm = $22, sub_variant_type = $23, variant_type = $24, discount_pct = $25
-               WHERE id = $26 AND product_id = $27`,
+              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, stock_status = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_grams = $13, package_type = $14, length_cm = $15, breadth_cm = $16, height_cm = $17, sub_variant_type = $18, variant_type = $19, discount_pct = $20
+               WHERE id = $21 AND product_id = $22`,
               [
                 variantSku, variant.variant_name,
                 variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
@@ -337,17 +330,12 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.mrp_ex_gst ? Math.round(parseFloat(variant.mrp_ex_gst) * 100) / 100 : null,
                 variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100
                   : variant.price ? Math.round(parseFloat(variant.price) / (1 + gstPercentage / 100) * 100) / 100 : null,
-                variant.wholeprice_ex_gst ? Math.round(parseFloat(variant.wholeprice_ex_gst) * 100) / 100 : null,
-                parseInt(variant.stock_quantity) || 0,
+                variant.stock_status || 'In Stock',
                 variant.mpn || null,
                 variant.gtin || null,
                 variant.pricing_type || 'unit',
                 variant.unit || null,
                 variant.numeric_value ? parseFloat(variant.numeric_value) : null,
-                variant.weight_rate ? Math.round(parseFloat(variant.weight_rate) * 100) / 100 : null,
-                variant.weight_rate ? (variant.weight_unit || null) : null,
-                variant.length_rate ? Math.round(parseFloat(variant.length_rate) * 100) / 100 : null,
-                variant.length_rate ? (variant.length_unit || null) : null,
                 variant.weight_grams ? parseInt(variant.weight_grams) : null,
                 variant.package_type || null,
                 variant.length_cm ? parseFloat(variant.length_cm) : null,
@@ -372,12 +360,11 @@ async function updateProduct(productId: string, formData: FormData) {
               )
             }
           } else if (!isPersisted && !variant._isDeleted) {
-            if (isWeightOrLength && !variant.numeric_value) continue
-            if (!isWeightOrLength && !variant.variant_name) continue
+            if (!variant.variant_name) continue
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, wholeprice_ex_gst, stock_quantity, mpn, gtin, pricing_type, unit, numeric_value, weight_rate, weight_unit, length_rate, length_unit, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, is_active)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, true)`,
+              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, is_active)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, true)`,
               [
                 productId, variantSku, variant.variant_name,
                 variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
@@ -385,17 +372,12 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.mrp_ex_gst ? Math.round(parseFloat(variant.mrp_ex_gst) * 100) / 100 : null,
                 variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100
                   : variant.price ? Math.round(parseFloat(variant.price) / (1 + gstPercentage / 100) * 100) / 100 : null,
-                variant.wholeprice_ex_gst ? Math.round(parseFloat(variant.wholeprice_ex_gst) * 100) / 100 : null,
-                parseInt(variant.stock_quantity) || 0,
+                variant.stock_status || 'In Stock',
                 variant.mpn || null,
                 variant.gtin || null,
                 variant.pricing_type || 'unit',
                 variant.unit || null,
                 variant.numeric_value ? parseFloat(variant.numeric_value) : null,
-                variant.weight_rate ? Math.round(parseFloat(variant.weight_rate) * 100) / 100 : null,
-                variant.weight_rate ? (variant.weight_unit || null) : null,
-                variant.length_rate ? Math.round(parseFloat(variant.length_rate) * 100) / 100 : null,
-                variant.length_rate ? (variant.length_unit || null) : null,
                 variant.weight_grams ? parseInt(variant.weight_grams) : null,
                 variant.package_type || null,
                 variant.length_cm ? parseFloat(variant.length_cm) : null,
@@ -421,8 +403,7 @@ async function updateProduct(productId: string, formData: FormData) {
 
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
-    const { headers: getHeaders } = await import('next/headers')
-    const host = (await getHeaders()).get('host') ?? ''
+    const host = (await headers()).get('host') ?? ''
     redirect(ap('/admin/products', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
@@ -430,9 +411,10 @@ async function updateProduct(productId: string, formData: FormData) {
   }
 }
 
-export default async function EditProductPage({ params }: { params: { id: string } }) {
+export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const host = (await headers()).get('host') ?? ''
-  const product = await getProduct(params.id).catch(() => null)
+  const product = await getProduct(id).catch(() => null)
 
   if (!product) {
     notFound()
@@ -461,8 +443,8 @@ export default async function EditProductPage({ params }: { params: { id: string
         categories={categories || []}
         brands={brands || []}
         product={product}
-        productId={params.id}
-        action={updateProduct.bind(null, params.id)}
+        productId={id}
+        action={updateProduct.bind(null, id)}
       />
     </div>
   )

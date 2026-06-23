@@ -32,14 +32,16 @@ const SQL_DML_RE = /\b(insert|update|delete|drop|truncate|alter|create|grant|rev
 let _readonlyPool: Pool | null = null
 function getReadonlyPool(): Pool {
   if (!_readonlyPool) {
-    const conn = process.env.DATABASE_URL
-    if (!conn) throw new Error('DATABASE_URL not configured')
+    const password = process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
     _readonlyPool = new Pool({
-      connectionString: conn,
+      host: process.env.RAG_PG_HOST || '100.82.208.8',
+      port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
+      user: process.env.RAG_PG_USER || 'postgres',
+      password,
+      database: process.env.RAG_PG_DB || 'jeffi_replica',
       max: 2,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
-      ssl: /amazonaws|sslmode=require/.test(conn) ? { rejectUnauthorized: false } : undefined,
     })
     _readonlyPool.on('error', () => {})
   }
@@ -155,7 +157,7 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ productId }) => {
       const rows = await queryMany(
         `SELECT id::text, variant_name, sku, price::text, mrp::text,
-                stock_quantity, inventory_quantity, is_active
+                stock_status, inventory_quantity, is_active
          FROM product_variants WHERE product_id = $1::uuid ORDER BY variant_name`,
         [productId]
       )
@@ -388,8 +390,12 @@ export const TOOLS: ToolDef[] = [
     mutating: true,
     handler: async ({ campaignKind, toEmail }) => {
       if (!campaignKind || !toEmail || !String(toEmail).includes('@')) throw new Error('Invalid args')
+      const PRODUCT_ANNOUNCEMENT_KINDS = ['featured_products', 'product_announcement', 'featured', 'products']
+      if (PRODUCT_ANNOUNCEMENT_KINDS.includes(String(campaignKind).toLowerCase())) {
+        throw new Error('send_test_email is for automated campaign templates only. To send a featured products email to one address, call list_featured_products to get productIds, then propose_product_announcement_email with audience="test_only" and testEmail set.')
+      }
       const c = await queryOne(`SELECT kind, name FROM campaigns WHERE kind = $1`, [campaignKind])
-      if (!c) throw new Error(`Unknown campaign: ${campaignKind}`)
+      if (!c) throw new Error(`Unknown campaign kind "${campaignKind}". Valid kinds: abandoned_cart, abandoned_checkout, post_purchase, price_drop, restock, review_reminder, thank_you_for_your_purchase, winback_90, winback_180`)
       return {
         proposed: true,
         kind: 'send_test_email',
@@ -653,34 +659,6 @@ export const TOOLS: ToolDef[] = [
            LEFT JOIN categories c ON c.id = p.category_id
           WHERE p.is_active = TRUE
           ORDER BY p.created_at DESC
-          LIMIT $1`,
-        [lim]
-      )
-      return { products: rows, count: rows.length }
-    },
-  },
-  {
-    name: 'get_featured_products',
-    description: 'Active products curated as featured (is_featured=true), ordered by sales_count DESC. Use when the user asks for "featured products" / "showcase products".',
-    inputSchema: {
-      type: 'object',
-      properties: {
-        limit: { type: 'integer', default: 5, minimum: 1, maximum: 20 },
-      },
-    },
-    mutating: false,
-    handler: async ({ limit }) => {
-      const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 20)
-      const rows = await queryMany(
-        `SELECT p.id::text, p.name, p.slug, p.sku,
-                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.short_description, p.inventory_quantity AS stock,
-                b.name AS brand, c.name AS category, p.sales_count
-           FROM products p
-           LEFT JOIN brands b ON b.id = p.brand_id
-           LEFT JOIN categories c ON c.id = p.category_id
-          WHERE p.is_active = TRUE AND p.is_featured = TRUE
-          ORDER BY p.sales_count DESC NULLS LAST, p.created_at DESC
           LIMIT $1`,
         [lim]
       )
