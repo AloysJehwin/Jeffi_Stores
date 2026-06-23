@@ -117,21 +117,27 @@ async function suggestPoLineItems(q: string): Promise<SuggestItem[]> {
   const rows = await queryMany<{
     product_id: string; variant_id: string | null; name: string; variant_name: string | null
     sku: string; base_price: number | null; mrp: number | null; gst_percentage: number; hsn_code: string | null
+    sell_unit_label: string | null
   }>(
-    `SELECT product_id, variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code FROM (
+    `SELECT product_id, variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code, sell_unit_label FROM (
        SELECT p.id AS product_id, NULL::uuid AS variant_id, p.name, NULL AS variant_name,
               p.sku, p.base_price, p.mrp, COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
-              p.search_vector
+              p.search_vector,
+              COALESCE(pu.display_label, pu.unit) AS sell_unit_label
        FROM products p
+       LEFT JOIN product_units pu ON pu.id = p.sell_unit_id
        WHERE p.has_variants = false AND ${sc.clause}
        UNION ALL
        SELECT p.id AS product_id, pv.id AS variant_id, p.name, pv.variant_name,
               pv.sku, COALESCE(pv.price, p.base_price) AS base_price,
               COALESCE(pv.mrp, p.mrp) AS mrp,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
-              p.search_vector
+              p.search_vector,
+              COALESCE(vpu.display_label, vpu.unit, ppu.display_label, ppu.unit) AS sell_unit_label
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
+       LEFT JOIN product_units vpu ON vpu.id = pv.sell_unit_id
+       LEFT JOIN product_units ppu ON ppu.id = p.sell_unit_id
        WHERE ${sc2.clause}
      ) r
      ORDER BY ${rk.rank}, name ASC, variant_name ASC NULLS FIRST
@@ -147,6 +153,7 @@ async function suggestPoLineItems(q: string): Promise<SuggestItem[]> {
       String(r.gst_percentage),
       r.hsn_code ?? '',
       r.mrp != null ? String(r.mrp) : '',
+      r.sell_unit_label ?? '',
     ].join('|')
     const priceStr = r.base_price != null ? ` · ₹${r.base_price}` : ''
     return { id: encoded, label: displayName, sublabel: `${r.sku}${priceStr}` }
@@ -300,13 +307,14 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
     id: string; name: string; variant_name: string | null; sku: string; slug: string
     mrp: number | null; price_ex_gst: number | null; base_price: number | null
     gst_percentage: number; brand_name: string | null; gtin: string | null
-    inventory_quantity: number | null
+    inventory_quantity: number | null; product_id: string; sell_unit_id: string | null
   }>(
-    `SELECT id, name, variant_name, sku, slug, mrp, price_ex_gst, base_price, gst_percentage, brand_name, gtin, inventory_quantity, search_vector FROM (
+    `SELECT id, name, variant_name, sku, slug, mrp, price_ex_gst, base_price, gst_percentage, brand_name, gtin, inventory_quantity, product_id, sell_unit_id, search_vector FROM (
        SELECT 'product:' || p.id AS id, p.name, NULL AS variant_name, p.sku, p.slug,
               COALESCE(p.mrp,0)::numeric AS mrp, p.price_ex_gst, p.base_price,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
-              b.name AS brand_name, p.gtin, COALESCE(p.inventory_quantity,0) AS inventory_quantity, p.search_vector
+              b.name AS brand_name, p.gtin, COALESCE(p.inventory_quantity,0) AS inventory_quantity,
+              p.id AS product_id, p.sell_unit_id, p.search_vector
        FROM products p LEFT JOIN brands b ON b.id = p.brand_id
        WHERE p.is_active = true AND p.has_variants = false AND ${sc.clause}
        UNION ALL
@@ -314,7 +322,8 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
               COALESCE(pv.mrp,0)::numeric AS mrp, pv.price_ex_gst,
               COALESCE(pv.price, p.base_price) AS base_price,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
-              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(pv.inventory_quantity,0) AS inventory_quantity, p.search_vector
+              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(pv.inventory_quantity,0) AS inventory_quantity,
+              p.id AS product_id, COALESCE(pv.sell_unit_id, p.sell_unit_id) AS sell_unit_id, p.search_vector
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id
        WHERE pv.is_active = true AND p.is_active = true AND ${sc2.clause}
@@ -326,7 +335,8 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
               COALESCE(ps.mrp,0)::numeric AS mrp, ps.price_ex_gst,
               COALESCE(ps.price,0) AS base_price,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
-              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(ps.inventory_quantity,0) AS inventory_quantity, p.search_vector
+              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(ps.inventory_quantity,0) AS inventory_quantity,
+              p.id AS product_id, COALESCE(pv.sell_unit_id, p.sell_unit_id) AS sell_unit_id, p.search_vector
        FROM product_sub_variants ps
        JOIN product_variants pv ON pv.id = ps.variant_id
        JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id
@@ -351,6 +361,8 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
       r.brand_name ?? '',
       r.gtin ?? '',
       r.inventory_quantity != null ? String(r.inventory_quantity) : '0',
+      r.product_id ?? '',
+      r.sell_unit_id ?? '',
     ].join('\x1f')
     return { id: encoded, label: displayName, sublabel: r.sku + (r.brand_name ? ` · ${r.brand_name}` : '') }
   })
