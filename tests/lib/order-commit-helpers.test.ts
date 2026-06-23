@@ -100,7 +100,7 @@ describe('cartLineUnitPrice', () => {
   it('prefers variant.price_ex_gst over product price when sub_variant is absent', () => {
     const line = makeCartLine({
       price_at_addition: 0,
-      variant: { id: 'v1', variant_name: 'Blue', sku: 'V1', price: 1050, price_ex_gst: 889.83 },
+      variant: { id: 'v1', variant_name: 'Blue', sku: 'V1', price: 1050, price_ex_gst: 889.83, mrp: null },
       sub_variant: null,
       products: makeProduct({ price_ex_gst: 847.46 }),
     })
@@ -110,7 +110,7 @@ describe('cartLineUnitPrice', () => {
   it('falls back to sub_variant.price when sub_variant.price_ex_gst is null', () => {
     const line = makeCartLine({
       price_at_addition: 0,
-      sub_variant: { id: 'sv1', sub_variant_name: 'M', sku: null, price: 1300, price_ex_gst: null },
+      sub_variant: { id: 'sv1', sub_variant_name: 'M', sku: null, price: 1300, price_ex_gst: null, mrp: null },
       products: makeProduct({ price_ex_gst: null }),
     })
     expect(cartLineUnitPrice(line)).toBe(1300)
@@ -119,7 +119,7 @@ describe('cartLineUnitPrice', () => {
   it('falls back to variant.price when variant.price_ex_gst is null', () => {
     const line = makeCartLine({
       price_at_addition: 0,
-      variant: { id: 'v1', variant_name: 'Green', sku: 'V1', price: 1150, price_ex_gst: null },
+      variant: { id: 'v1', variant_name: 'Green', sku: 'V1', price: 1150, price_ex_gst: null, mrp: null },
       sub_variant: null,
       products: makeProduct({ price_ex_gst: null }),
     })
