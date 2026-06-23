@@ -96,6 +96,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         gst_rate: gstRate,
         quantity: qty,
         unit_price: unitPrice,
+        mrp: unitPrice,
         total_price: lineTotal,
         taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
         cgst_amount: Math.round(gst.cgst * 100) / 100,
@@ -142,13 +143,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, discount_amount, tax_amount,
+            hsn_code, gst_rate, quantity, unit_price, mrp, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,0,$12,$13,$14,$15,$16,$17)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,0,$13,$14,$15,$16,$17,$18)`,
           [
             id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name,
-            item.hsn_code, item.gst_rate, item.quantity, item.unit_price,
+            item.hsn_code, item.gst_rate, item.quantity, item.unit_price, item.mrp,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
           ]
