@@ -97,8 +97,8 @@ const variantProduct = {
 }
 
 describe('feed/google — module-level export', () => {
-  it('exports revalidate = 3600', () => {
-    expect((feedModule as any).revalidate).toBe(3600)
+  it('exports dynamic = force-dynamic', () => {
+    expect((feedModule as any).dynamic).toBe('force-dynamic')
   })
 })
 
