@@ -8,7 +8,7 @@ import {
   buildCustomLabels,
 } from '@/lib/google-merchant-helpers'
 
-export const revalidate = 3600
+export const dynamic = 'force-dynamic'
 
 function escapeXml(str: string): string {
   return str
