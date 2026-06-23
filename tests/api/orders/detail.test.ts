@@ -295,6 +295,7 @@ describe('PATCH /api/orders/[id] (extended)', () => {
       status: 'confirmed',
       users: { email: 'test@example.com', first_name: 'Test', last_name: 'User' },
     })
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null) // unit row
     vi.mocked(db.queryMany).mockResolvedValueOnce([
       { product_id: 'prod-1', variant_id: null, quantity: '10', inventory_quantity: '5' },
     ])
@@ -313,6 +314,7 @@ describe('PATCH /api/orders/[id] (extended)', () => {
       status: 'confirmed',
       users: { email: 'test@example.com', first_name: 'Test', last_name: 'User' },
     })
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null) // unit row
     // Stock check pass (sufficient)
     vi.mocked(db.queryMany)
       .mockResolvedValueOnce([
@@ -342,6 +344,7 @@ describe('PATCH /api/orders/[id] (extended)', () => {
       status: 'confirmed',
       users: { email: 'test@example.com', first_name: 'Test', last_name: 'User' },
     })
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null) // unit row
     vi.mocked(db.queryMany)
       .mockResolvedValueOnce([
         { product_id: 'prod-1', variant_id: null, quantity: '2', inventory_quantity: '10' },

@@ -166,17 +166,34 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               </div>
             )}
             {!order.original_order_id && (order.invoice_number ? (
-              <a
-                href={`/api/orders/${order.id}/invoice`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-2 text-sm font-semibold rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 border border-accent-300 dark:border-accent-700 transition-colors inline-flex items-center gap-1.5"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Invoice {order.invoice_number}
-              </a>
+              <div className="inline-flex rounded-full overflow-hidden border border-accent-300 dark:border-accent-700 text-sm font-semibold">
+                {order.view_token && (
+                  <a
+                    href={`/invoice/${order.view_token}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="View Invoice"
+                    className="px-3 py-2 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center gap-1.5 border-r border-accent-300 dark:border-accent-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    Invoice {order.invoice_number}
+                  </a>
+                )}
+                <a
+                  href={`/api/orders/${order.id}/invoice`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Download PDF"
+                  className="px-3 py-2 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </a>
+              </div>
             ) : (order.payment_status === 'paid' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'out_for_delivery' || order.status === 'delivered') && (
               <GenerateInvoiceButton orderId={order.id} />
             ))}
@@ -261,6 +278,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
             </div>
           </div>
 
+          {!['processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'return_requested', 'return_approved', 'return_received', 'returned', 'return_rejected'].includes(order.status) && (
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Inventory Status</h2>
@@ -321,6 +339,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               )}
             </div>
           </div>
+          )}
 
           {order.status === 'cancel_requested' && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-orange-300 dark:border-orange-800">

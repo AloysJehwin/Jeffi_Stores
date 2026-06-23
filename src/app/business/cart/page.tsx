@@ -121,7 +121,15 @@ export default function CartPage() {
     )
   }
 
-  const total = getCartTotal()
+  const total = cartItems.reduce((sum, item) => {
+    const price = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+    const categoryId = item.products.category_id
+    const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
+      ? (user.businessDiscountMap?.[categoryId] ?? 0)
+      : 0
+    const effectivePrice = discountPct > 0 ? price * (1 - discountPct / 100) : price
+    return sum + effectivePrice * Number(item.quantity)
+  }, 0)
   const tax = getCartTax()
   const discount = appliedCoupon?.discountAmount ?? 0
   const finalTotal = Math.max(0, total - discount)
@@ -178,6 +186,7 @@ export default function CartPage() {
               {cartItems.map((item) => {
                 const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
                 const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                const unitFactor = !isCustomQty && item.cart_item_unit?.factor ? Number(item.cart_item_unit.factor) : 1
                 const price = isCustomQty
                   ? item.price_at_addition
                   : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
@@ -188,12 +197,15 @@ export default function CartPage() {
                   ? (user.businessDiscountMap?.[categoryId] ?? 0)
                   : 0
                 const discountedPrice = itemDiscountPct > 0 ? applyDiscount(Number(price), itemDiscountPct) : Number(price)
+                // Apply unit factor for display (e.g. box = 10 pcs → show price per box)
+                const displayUnitPrice = discountedPrice * unitFactor
+                const displayMrp = mrp ? Number(mrp) * unitFactor : null
                 const itemTotal = isCustomQty
                   ? item.price_at_addition * item.quantity
-                  : discountedPrice * item.quantity
+                  : displayUnitPrice * item.quantity
                 const isUpdating = updatingItems.has(item.id)
-                const showMrp = !isCustomQty && mrp !== null && Number(mrp) > discountedPrice
-                const discountPct = showMrp ? mrpDiscountPct(Number(mrp), discountedPrice) : 0
+                const showMrp = !isCustomQty && displayMrp !== null && displayMrp > displayUnitPrice
+                const discountPct = showMrp ? mrpDiscountPct(displayMrp!, displayUnitPrice) : 0
                 const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
                 const unitLabel = item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? null
                 const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
@@ -254,13 +266,13 @@ export default function CartPage() {
                               <div className="flex items-center gap-2">
                                 <span className="text-xs text-foreground-muted">Regular:</span>
                                 <span className="text-sm text-foreground-muted line-through">
-                                  ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
+                                  ₹{(Number(price) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
                                 </span>
                               </div>
                               <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-xs font-semibold text-accent-600 dark:text-accent-400">Business price:</span>
                                 <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                                  ₹{discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{showUnitLabel ? `/${unitLabel}` : ''}
+                                  ₹{displayUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{showUnitLabel ? `/${unitLabel}` : ''}
                                 </span>
                                 <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 whitespace-nowrap">
                                   ✦ {itemDiscountPct}% extra off
@@ -270,12 +282,12 @@ export default function CartPage() {
                           ) : (
                             <div className="flex items-center gap-3 flex-wrap">
                               <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                                ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
+                                ₹{displayUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${unitLabel ?? item.buy_unit}` : (showUnitLabel ? `/${unitLabel}` : '')}
                               </span>
                               {showMrp && (
                                 <>
                                   <span className="text-sm text-foreground-muted line-through">
-                                    ₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    ₹{displayMrp!.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                   </span>
                                   <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">
                                     {discountPct}% off
@@ -392,7 +404,7 @@ export default function CartPage() {
                           </span>
                           {itemDiscountPct > 0 && (
                             <span className="text-xs text-foreground-muted ml-2">
-                              ({item.quantity}{unitLabel ? ` ${unitLabel}` : ''} × ₹{discountedPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                              ({Math.round(Number(item.quantity))}{unitLabel ? ` ${unitLabel}` : ''} × ₹{displayUnitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                             </span>
                           )}
                         </div>
@@ -614,6 +626,7 @@ export default function CartPage() {
               <RequestQuoteButton
                 items={cartItems.map(item => {
                   const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                  const qItemFactor = !isCustomQty && item.cart_item_unit?.factor ? Number(item.cart_item_unit.factor) : 1
                   const price = isCustomQty
                     ? item.price_at_addition
                     : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
@@ -632,7 +645,8 @@ export default function CartPage() {
                     subVariantId: item.sub_variant?.id,
                     description: descriptionParts.join(' — '),
                     quantity: Math.round(Number(item.quantity)) || 1,
-                    unit: item.buy_unit || 'Nos',
+                    unit: item.cart_item_unit?.display_label ?? item.cart_item_unit?.unit ?? item.buy_unit ?? 'Nos',
+                    unitFactor: qItemFactor,
                     currentPrice,
                     imageUrl: primaryImage ? (primaryImage.thumbnail_url || primaryImage.image_url) : null,
                     brandName: item.products?.brand_name ?? null,

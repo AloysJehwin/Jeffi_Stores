@@ -588,7 +588,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
               placeholder="Search by recipient or subject..."
               value={mailQuery}
               onChange={e => setMailQuery(e.target.value)}
-              className="text-sm px-3 py-2 rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+              className="text-sm px-3 py-1.5 rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
             />
             <AdminSelect
               value={mailKind}
@@ -609,6 +609,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                 { value: 'support', label: 'Support' },
                 { value: 'other', label: 'Other' },
               ]}
+              sm
             />
             <AdminSelect
               value={mailStatus}
@@ -618,6 +619,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                 { value: 'sent', label: 'Sent' },
                 { value: 'failed', label: 'Failed' },
               ]}
+              sm
             />
           </div>
 

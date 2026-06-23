@@ -34,13 +34,13 @@ describe('ADMIN_SCOPES', () => {
 
   it('includes known scopes', () => {
     const keys = ADMIN_SCOPES.map(s => s.key)
-    expect(keys).toContain('products')
-    expect(keys).toContain('orders')
-    expect(keys).toContain('invoices')
-    expect(keys).toContain('settings')
-    expect(keys).toContain('dashboard')
-    expect(keys).toContain('agent')
-    expect(keys).toContain('audit')
+    expect(keys).toContain('products:read')
+    expect(keys).toContain('orders:read')
+    expect(keys).toContain('invoices:read')
+    expect(keys).toContain('settings:read')
+    expect(keys).toContain('dashboard:read')
+    expect(keys).toContain('agent:read')
+    expect(keys).toContain('audit:read')
   })
 })
 
@@ -67,163 +67,163 @@ describe('getScopeForPath', () => {
   })
 
   it('returns dashboard for /admin', () => {
-    expect(getScopeForPath('/admin')).toBe('dashboard')
+    expect(getScopeForPath('/admin')).toBe('dashboard:read')
   })
 
   // --- UI routes (iterating ADMIN_SCOPES) ---
   it('returns products for /admin/products', () => {
-    expect(getScopeForPath('/admin/products')).toBe('products')
+    expect(getScopeForPath('/admin/products')).toBe('products:read')
   })
 
   it('returns products for a deep product path', () => {
-    expect(getScopeForPath('/admin/products/123/edit')).toBe('products')
+    expect(getScopeForPath('/admin/products/123/edit')).toBe('products:read')
   })
 
   it('returns orders for /admin/orders', () => {
-    expect(getScopeForPath('/admin/orders')).toBe('orders')
+    expect(getScopeForPath('/admin/orders')).toBe('orders:read')
   })
 
   it('returns invoices for /admin/invoices', () => {
-    expect(getScopeForPath('/admin/invoices')).toBe('invoices')
+    expect(getScopeForPath('/admin/invoices')).toBe('invoices:read')
   })
 
   it('returns orders for /admin/orders/new (orders scope prefix wins in loop)', () => {
     // /admin/orders appears in the orders scope, and startsWith('/admin/orders/') matches
     // before the invoices scope's exact '/admin/orders/new' entry is reached.
-    expect(getScopeForPath('/admin/orders/new')).toBe('orders')
+    expect(getScopeForPath('/admin/orders/new')).toBe('orders:read')
   })
 
   it('returns settings for /admin/settings', () => {
-    expect(getScopeForPath('/admin/settings')).toBe('settings')
+    expect(getScopeForPath('/admin/settings')).toBe('settings:read')
   })
 
   it('returns agent for /admin/agent', () => {
-    expect(getScopeForPath('/admin/agent')).toBe('agent')
+    expect(getScopeForPath('/admin/agent')).toBe('agent:read')
   })
 
   // --- API routes ---
   it('maps /api/admin/products/... to products', () => {
-    expect(getScopeForPath('/api/admin/products/abc')).toBe('products')
+    expect(getScopeForPath('/api/admin/products/abc')).toBe('products:read')
   })
 
   it('maps /api/admin/orders/create/... to invoices', () => {
-    expect(getScopeForPath('/api/admin/orders/create/new')).toBe('invoices')
+    expect(getScopeForPath('/api/admin/orders/create/new')).toBe('invoices:read')
   })
 
   it('maps /api/admin/orders/... to orders', () => {
-    expect(getScopeForPath('/api/admin/orders/123')).toBe('orders')
+    expect(getScopeForPath('/api/admin/orders/123')).toBe('orders:read')
   })
 
   it('maps /api/admin/invoices/... to invoices', () => {
-    expect(getScopeForPath('/api/admin/invoices/drafts')).toBe('invoices')
+    expect(getScopeForPath('/api/admin/invoices/drafts')).toBe('invoices:read')
   })
 
   it('maps /api/admin/labels/... to labels', () => {
-    expect(getScopeForPath('/api/admin/labels/products')).toBe('labels')
+    expect(getScopeForPath('/api/admin/labels/products')).toBe('labels:read')
   })
 
   it('maps /api/admin/financial/... to financial', () => {
-    expect(getScopeForPath('/api/admin/financial/summary')).toBe('financial')
+    expect(getScopeForPath('/api/admin/financial/summary')).toBe('financial:read')
   })
 
   it('maps /api/admin/inventory/... to inventory', () => {
-    expect(getScopeForPath('/api/admin/inventory/stock')).toBe('inventory')
+    expect(getScopeForPath('/api/admin/inventory/stock')).toBe('inventory:read')
   })
 
   it('maps /api/admin/gst/... to gst', () => {
-    expect(getScopeForPath('/api/admin/gst/reports')).toBe('gst')
+    expect(getScopeForPath('/api/admin/gst/reports')).toBe('gst:read')
   })
 
   it('maps /api/admin/customers/... to customers', () => {
-    expect(getScopeForPath('/api/admin/customers/list')).toBe('customers')
+    expect(getScopeForPath('/api/admin/customers/list')).toBe('customers:read')
   })
 
   it('maps /api/admin/users/... to settings', () => {
-    expect(getScopeForPath('/api/admin/users/create')).toBe('settings')
+    expect(getScopeForPath('/api/admin/users/create')).toBe('settings:read')
   })
 
   it('maps /api/admin/reviews/... to reviews', () => {
-    expect(getScopeForPath('/api/admin/reviews/pending')).toBe('reviews')
+    expect(getScopeForPath('/api/admin/reviews/pending')).toBe('reviews:read')
   })
 
   it('maps /api/admin/coupons/... to coupons', () => {
-    expect(getScopeForPath('/api/admin/coupons/create')).toBe('coupons')
+    expect(getScopeForPath('/api/admin/coupons/create')).toBe('coupons:read')
   })
 
   it('maps /api/admin/mailer/... to mailer', () => {
-    expect(getScopeForPath('/api/admin/mailer/send')).toBe('mailer')
+    expect(getScopeForPath('/api/admin/mailer/send')).toBe('mailer:read')
   })
 
   it('maps /api/admin/agent/... to agent', () => {
-    expect(getScopeForPath('/api/admin/agent/chat')).toBe('agent')
+    expect(getScopeForPath('/api/admin/agent/chat')).toBe('agent:read')
   })
 
   it('maps /api/admin/audit/... to audit', () => {
-    expect(getScopeForPath('/api/admin/audit/list')).toBe('audit')
+    expect(getScopeForPath('/api/admin/audit/list')).toBe('audit:read')
   })
 
   it('maps /api/admin/cron/... to audit', () => {
-    expect(getScopeForPath('/api/admin/cron/history')).toBe('audit')
+    expect(getScopeForPath('/api/admin/cron/history')).toBe('audit:read')
   })
 
   it('maps /api/admin/traffic/... to dashboard', () => {
-    expect(getScopeForPath('/api/admin/traffic/stats')).toBe('dashboard')
+    expect(getScopeForPath('/api/admin/traffic/stats')).toBe('dashboard:read')
   })
 
   it('maps /api/admin/packing-slips/... to packing_slips', () => {
-    expect(getScopeForPath('/api/admin/packing-slips/generate')).toBe('packing_slips')
+    expect(getScopeForPath('/api/admin/packing-slips/generate')).toBe('packing_slips:read')
   })
 
   it('maps /api/admin/inflation/... to inflation', () => {
-    expect(getScopeForPath('/api/admin/inflation/bulk')).toBe('inflation')
+    expect(getScopeForPath('/api/admin/inflation/bulk')).toBe('inflation:read')
   })
 
   it('maps /api/admin/suppliers/... to inventory', () => {
-    expect(getScopeForPath('/api/admin/suppliers/list')).toBe('inventory')
+    expect(getScopeForPath('/api/admin/suppliers/list')).toBe('inventory:read')
   })
 
   it('maps /api/admin/delhivery/... to orders', () => {
-    expect(getScopeForPath('/api/admin/delhivery/track')).toBe('orders')
+    expect(getScopeForPath('/api/admin/delhivery/track')).toBe('orders:read')
   })
 
   it('maps /api/admin/support/... to customers', () => {
-    expect(getScopeForPath('/api/admin/support/tickets')).toBe('customers')
+    expect(getScopeForPath('/api/admin/support/tickets')).toBe('customers:read')
   })
 
   it('maps /api/admin/certificates/... to settings', () => {
-    expect(getScopeForPath('/api/admin/certificates/upload')).toBe('settings')
+    expect(getScopeForPath('/api/admin/certificates/upload')).toBe('settings:read')
   })
 
   it('maps /api/admin/cash-sale/... to invoices', () => {
-    expect(getScopeForPath('/api/admin/cash-sale/create')).toBe('invoices')
+    expect(getScopeForPath('/api/admin/cash-sale/create')).toBe('invoices:read')
   })
 
   it('maps /api/admin/catalog-enrichment/... to catalog_enrichment', () => {
-    expect(getScopeForPath('/api/admin/catalog-enrichment/run')).toBe('catalog_enrichment')
+    expect(getScopeForPath('/api/admin/catalog-enrichment/run')).toBe('catalog_enrichment:read')
   })
 
   it('maps /api/admin/replication/... to replication', () => {
-    expect(getScopeForPath('/api/admin/replication/status')).toBe('replication')
+    expect(getScopeForPath('/api/admin/replication/status')).toBe('replication:read')
   })
 
   it('maps /api/admin/business/customers/... to business_customers', () => {
-    expect(getScopeForPath('/api/admin/business/customers/list')).toBe('business_customers')
+    expect(getScopeForPath('/api/admin/business/customers/list')).toBe('business_customers:read')
   })
 
   it('maps /api/admin/business/rfqs/... to business_rfqs', () => {
-    expect(getScopeForPath('/api/admin/business/rfqs/all')).toBe('business_rfqs')
+    expect(getScopeForPath('/api/admin/business/rfqs/all')).toBe('business_rfqs:read')
   })
 
   it('maps /api/admin/business/discounts/... to business_customers', () => {
-    expect(getScopeForPath('/api/admin/business/discounts/apply')).toBe('business_customers')
+    expect(getScopeForPath('/api/admin/business/discounts/apply')).toBe('business_customers:read')
   })
 
   it('maps /api/admin/review-forms/... to review_forms', () => {
-    expect(getScopeForPath('/api/admin/review-forms/create')).toBe('review_forms')
+    expect(getScopeForPath('/api/admin/review-forms/create')).toBe('review_forms:read')
   })
 
   it('maps /api/admin/quotations/... to quotations', () => {
-    expect(getScopeForPath('/api/admin/quotations/generate')).toBe('quotations')
+    expect(getScopeForPath('/api/admin/quotations/generate')).toBe('quotations:read')
   })
 
   it('returns null for /api/admin/suggest/...', () => {
@@ -235,11 +235,11 @@ describe('getScopeForPath', () => {
   })
 
   it('maps /api/brands/... to brands', () => {
-    expect(getScopeForPath('/api/brands/list')).toBe('brands')
+    expect(getScopeForPath('/api/brands/list')).toBe('brands:read')
   })
 
   it('maps /api/customers/... to customers', () => {
-    expect(getScopeForPath('/api/customers/profile')).toBe('customers')
+    expect(getScopeForPath('/api/customers/profile')).toBe('customers:read')
   })
 
   it('returns null for unrecognised path', () => {
@@ -254,27 +254,32 @@ describe('getScopeForPath', () => {
 // ---------------------------------------------------------------------------
 describe('hasScope', () => {
   it('super_admin always has access regardless of scopes array', () => {
-    expect(hasScope('super_admin', [], 'products')).toBe(true)
-    expect(hasScope('super_admin', [], 'settings')).toBe(true)
-    expect(hasScope('super_admin', ['orders'], 'products')).toBe(true)
+    expect(hasScope('super_admin', [], 'products:read')).toBe(true)
+    expect(hasScope('super_admin', [], 'settings:read')).toBe(true)
+    expect(hasScope('super_admin', ['orders:read'], 'products:read')).toBe(true)
   })
 
   it('non-super_admin grants access when scope is in the list', () => {
-    expect(hasScope('admin', ['products', 'orders'], 'products')).toBe(true)
-    expect(hasScope('admin', ['products', 'orders'], 'orders')).toBe(true)
+    expect(hasScope('admin', ['products:read', 'orders:read'], 'products:read')).toBe(true)
+    expect(hasScope('admin', ['products:read', 'orders:read'], 'orders:read')).toBe(true)
   })
 
   it('non-super_admin denies access when scope is not in the list', () => {
-    expect(hasScope('admin', ['products'], 'orders')).toBe(false)
-    expect(hasScope('admin', [], 'products')).toBe(false)
+    expect(hasScope('admin', ['products:read'], 'orders:read')).toBe(false)
+    expect(hasScope('admin', [], 'products:read')).toBe(false)
+  })
+
+  it('write scope implies read access', () => {
+    expect(hasScope('admin', ['products:write'], 'products:read')).toBe(true)
+    expect(hasScope('admin', ['orders:write'], 'orders:read')).toBe(true)
   })
 
   it('is case-sensitive for scope matching', () => {
-    expect(hasScope('admin', ['Products'], 'products')).toBe(false)
+    expect(hasScope('admin', ['Products:read'], 'products:read')).toBe(false)
   })
 
   it('handles empty role string (not super_admin)', () => {
-    expect(hasScope('', ['products'], 'products')).toBe(true)
-    expect(hasScope('', ['orders'], 'products')).toBe(false)
+    expect(hasScope('', ['products:read'], 'products:read')).toBe(true)
+    expect(hasScope('', ['orders:read'], 'products:read')).toBe(false)
   })
 })

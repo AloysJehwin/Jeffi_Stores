@@ -120,7 +120,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         `UPDATE product_units SET ${updates.join(', ')} WHERE id = $${i} RETURNING *`,
         vals
       )
-      return res.rows[0]
+      const row = res.rows[0]
+      if (setBase) {
+        await client.query(
+          `UPDATE product_variants SET sell_unit_id = $1 WHERE id = $2`,
+          [unitId, variantId]
+        )
+      }
+      return row
     })
     return NextResponse.json({ unit: updated })
   } catch (err: unknown) {
@@ -159,5 +166,8 @@ export async function DELETE(_request: NextRequest, { params }: Params) {
   }
 
   await queryOne(`DELETE FROM product_units WHERE id = $1`, [unitId])
+  if (existing.is_base) {
+    await queryOne(`UPDATE product_variants SET sell_unit_id = NULL WHERE id = $1`, [variantId])
+  }
   return NextResponse.json({ ok: true })
 }

@@ -764,9 +764,9 @@ export default function InvoicesClient() {
           )}
         </div>
         <div className="flex flex-wrap gap-2 items-center">
-          <AdminSelect value={sourceFilter} onChange={v => { setSourceFilter(v); syncUrl({ source: v }) }} placeholder="All Sources"
+          <AdminSelect sm value={sourceFilter} onChange={v => { setSourceFilter(v); syncUrl({ source: v }) }} placeholder="All Sources"
             options={[{ value: 'online', label: 'Online' }, { value: 'offline', label: 'Offline' }, { value: 'cash_sale', label: 'Offline (Cash Sale)' }]} />
-          <AdminSelect value={paymentFilter} onChange={v => { setPaymentFilter(v); syncUrl({ payment: v }) }} placeholder="All Payments"
+          <AdminSelect sm value={paymentFilter} onChange={v => { setPaymentFilter(v); syncUrl({ payment: v }) }} placeholder="All Payments"
             options={[
               { value: 'paid', label: 'Paid' }, { value: 'unpaid', label: 'Unpaid' },
               { value: 'refunded', label: 'Refunded' }, { value: 'failed', label: 'Failed' },

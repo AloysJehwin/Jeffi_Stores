@@ -208,6 +208,8 @@ describe('POST /api/admin/shelving/stock', () => {
 
     it('adjusts stock successfully', async () => {
       const updatedStock = { quantity: 15 }
+      mockQueryOne.mockResolvedValueOnce({ q: '100' } as any)
+      mockQueryOne.mockResolvedValueOnce({ total: '0' } as any)
       mockAdjustStock.mockResolvedValueOnce(updatedStock as any)
       const res = await POST(makePostReq({ location_id: 'loc-1', product_id: 'prod-1', quantity_change: 5 }))
       expect(res.status).toBe(200)
@@ -231,6 +233,8 @@ describe('POST /api/admin/shelving/stock', () => {
     })
 
     it('returns 500 on other errors', async () => {
+      mockQueryOne.mockResolvedValueOnce({ q: '100' } as any)
+      mockQueryOne.mockResolvedValueOnce({ total: '0' } as any)
       mockAdjustStock.mockRejectedValueOnce(new Error('Connection refused'))
       const res = await POST(makePostReq({ location_id: 'loc-1', product_id: 'prod-1', quantity_change: 5 }))
       expect(res.status).toBe(500)

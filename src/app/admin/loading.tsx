@@ -2,7 +2,7 @@ import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
 export default function AdminLoading() {
   return (
-    <div className="h-screen flex flex-row bg-surface-secondary">
+    <div className="fixed inset-0 flex flex-row bg-surface-secondary z-50">
       {/* Sidebar placeholder — matches collapsed sidebar width */}
       <div className="hidden md:flex flex-col w-14 shrink-0 bg-secondary-600 dark:bg-secondary-800 border-r border-white/10" />
 

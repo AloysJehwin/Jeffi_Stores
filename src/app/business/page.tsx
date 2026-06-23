@@ -30,49 +30,74 @@ export default async function BusinessLandingPage() {
       <BusinessPublicHeader authState={authState} />
 
       <main className="pt-16 lg:pt-20">
-        <section className="relative bg-gradient-to-br from-secondary-700 via-secondary-600 to-secondary-800 overflow-hidden min-h-[calc(100svh-4rem)] flex items-center md:min-h-[calc(100vh-5rem)]">
-          <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 md:py-16 relative z-10 w-full">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-20 items-center">
+        {/* Hero — carousel-card style */}
+        <div className="px-3 sm:px-6 md:px-8 pt-3 pb-0 md:pt-6">
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl min-h-[420px] sm:min-h-[500px] md:min-h-[560px]" style={{ background: '#0d0d0d' }}>
+            {/* Background image — right portion only */}
+            <div className="absolute inset-0">
+              <img
+                src="/images/business-hero.webp"
+                alt=""
+                className="absolute right-0 top-0 h-full w-[70%] sm:w-[65%] object-cover object-center"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] from-35% via-[#0d0d0d]/80 via-60% to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/30" />
+            </div>
 
-              <div className="md:order-1">
-                <span className="inline-block bg-white/15 backdrop-blur-sm text-white font-bold uppercase tracking-widest rounded-full border border-white/30 text-[10px] sm:text-xs px-3 py-1.5 mb-4 md:mb-6">
-                  For Procurement Teams
-                </span>
-                <h1 className="font-extrabold text-white leading-[1.05] tracking-tight mb-3 sm:mb-5 md:mb-6 text-[clamp(2.25rem,8vw,5rem)] md:text-[clamp(3rem,6vw,5.5rem)]">
-                  Industrial supplies <span className="text-accent-400">at business prices</span>
-                </h1>
-                <p className="text-white/85 leading-relaxed mb-6 sm:mb-8 max-w-md md:max-w-none text-[clamp(0.875rem,2.5vw,1.25rem)] md:text-[clamp(1rem,2vw,1.4rem)]">
-                  Open a Jeffi Stores Business account and get category-tier discounts, GST-compliant invoicing,
-                  custom quotes for large orders, and a dedicated buying experience.
-                </p>
-                <div className="flex flex-wrap gap-3 mb-4 sm:mb-6">
-                  <Link
-                    href={bp('/business/signup', host)}
-                    className="bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-all px-5 py-2.5 text-sm sm:px-7 sm:py-3 sm:text-base md:px-8 md:py-4 md:text-lg"
-                  >
-                    Register Your Business
-                  </Link>
-                  <Link
-                    href={bp('/business/signin', host)}
-                    className="bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-all px-5 py-2.5 text-sm sm:px-7 sm:py-3 sm:text-base md:px-8 md:py-4 md:text-lg"
-                  >
-                    Sign In
-                  </Link>
-                </div>
-                <p className="text-white/60 text-xs sm:text-sm">Approval typically takes 1 business day after document verification.</p>
+            {/* Text */}
+            <div className="relative z-10 flex flex-col justify-start pt-10 sm:pt-14 md:pt-16 px-6 sm:px-12 md:px-16 pb-16 max-w-[75%] sm:max-w-[56%] md:max-w-[52%] space-y-4 sm:space-y-5">
+              <span className="inline-flex items-center gap-2 self-start bg-accent-500/20 border border-accent-500/40 text-accent-400 text-[10px] font-black uppercase tracking-[0.18em] px-3 py-1.5 rounded-full whitespace-nowrap">
+                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                </svg>
+                For Procurement Teams
+              </span>
+
+              <h1 className="font-black text-white leading-[0.95] tracking-tight text-[clamp(2rem,5vw,4rem)]">
+                Industrial supplies<br /><span className="text-accent-400">at business prices</span>
+              </h1>
+
+              <p className="text-white/60 text-xs sm:text-sm leading-relaxed max-w-[260px] sm:max-w-xs">
+                Tiered discounts, GST-compliant invoicing, custom quotes, and a dedicated buying experience.
+              </p>
+
+              <div className="flex flex-col gap-2">
+                {[
+                  { icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', label: 'Tiered bulk pricing' },
+                  { icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', label: 'GST-compliant invoices' },
+                  { icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', label: '24h RFQ turnaround' },
+                ].map((item) => (
+                  <div key={item.label} className="flex items-center gap-2.5">
+                    <svg className="w-3.5 h-3.5 text-accent-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                    </svg>
+                    <span className="text-white/70 text-xs font-semibold">{item.label}</span>
+                  </div>
+                ))}
               </div>
 
-              <div className="flex md:order-2 justify-center md:justify-end mt-4 md:mt-0">
-                <img
-                  src="/images/business-hero.png"
-                  alt="B2B procurement dashboard"
-                  className="w-80 sm:w-96 md:w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
-                  style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.3))' }}
-                />
+              <div className="flex flex-wrap gap-3 pt-1">
+                <Link
+                  href={bp('/business/signup', host)}
+                  className="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-400 text-white font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-accent-500/25"
+                >
+                  Register Your Business
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+                <Link
+                  href={bp('/business/signin', host)}
+                  className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl border border-white/15 transition-all"
+                >
+                  Sign In
+                </Link>
               </div>
+
+              <p className="text-white/40 text-[10px]">Approval typically takes 1 business day.</p>
             </div>
           </div>
-        </section>
+        </div>
 
         <section id="advantages" className="py-16 sm:py-20 border-b border-border-default">
           <div className="container mx-auto px-4 sm:px-6">
@@ -178,20 +203,29 @@ export default async function BusinessLandingPage() {
           </div>
         </section>
 
-        <section className="py-16 sm:py-20 bg-secondary-600">
-          <div className="container mx-auto px-4 sm:px-6 text-center">
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-3">Ready to start procuring?</h2>
-            <p className="text-white/85 mb-8 max-w-xl mx-auto">Register in minutes. Approval is fast, and you only see business prices once verified.</p>
-            <div className="flex flex-wrap gap-3 justify-center">
-              <Link href={bp('/business/signup', host)} className="px-7 py-3.5 bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-colors">
-                Register Your Business
-              </Link>
-              <Link href={bp('/business/signin', host)} className="px-7 py-3.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-colors">
-                Sign In
-              </Link>
+        <div className="px-3 sm:px-6 md:px-8 py-3 md:py-6">
+          <div className="relative rounded-2xl overflow-hidden shadow-2xl py-16 sm:py-20 text-center" style={{ background: '#0d0d0d' }}>
+            <div className="absolute inset-0">
+              <img src="/images/business-hero.webp" alt="" className="absolute right-0 top-0 h-full w-[70%] sm:w-[65%] object-cover object-center opacity-40" />
+              <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] via-[#0d0d0d]/90 to-[#0d0d0d]/60" />
+            </div>
+            <div className="relative z-10 container mx-auto px-4 sm:px-6">
+              <h2 className="text-3xl sm:text-4xl font-black text-white mb-3">Ready to start procuring?</h2>
+              <p className="text-white/60 mb-8 max-w-xl mx-auto text-sm">Register in minutes. Approval is fast, and you only see business prices once verified.</p>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <Link href={bp('/business/signup', host)} className="inline-flex items-center gap-2 px-7 py-3.5 bg-accent-500 hover:bg-accent-400 text-white font-black rounded-xl shadow-lg shadow-accent-500/25 transition-all text-sm">
+                  Register Your Business
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+                <Link href={bp('/business/signin', host)} className="px-7 py-3.5 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl border border-white/15 transition-all text-sm">
+                  Sign In
+                </Link>
+              </div>
             </div>
           </div>
-        </section>
+        </div>
       </main>
     </div>
   )

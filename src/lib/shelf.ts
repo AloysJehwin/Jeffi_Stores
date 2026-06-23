@@ -36,6 +36,9 @@ export interface ShelfStock {
   product_name?: string
   variant_name?: string | null
   sku?: string
+  unit_label?: string | null
+  unit_factor?: number | null
+  unit_dimension?: string | null
 }
 
 function buildDisplayCode(warehouseCode: string, aisle: string, rack: string, shelf: string, bin?: string | null): string {
@@ -189,11 +192,15 @@ export async function getStockAtLocation(locationId: string): Promise<ShelfStock
             ss.quantity, ss.updated_at,
             p.name AS product_name,
             COALESCE(ps.sub_variant_name || ' (' || pv.variant_name || ')', pv.variant_name) AS variant_name,
-            COALESCE(ps.sku, pv.sku, p.sku) AS sku
+            COALESCE(ps.sku, pv.sku, p.sku) AS sku,
+            COALESCE(pu.display_label, pu.unit) AS unit_label,
+            pu.factor AS unit_factor,
+            pu.dimension AS unit_dimension
      FROM shelf_stock ss
      JOIN products p ON p.id = ss.product_id
      LEFT JOIN product_variants pv ON pv.id = ss.variant_id
      LEFT JOIN product_sub_variants ps ON ps.id = ss.sub_variant_id
+     LEFT JOIN product_units pu ON pu.id = COALESCE(pv.sell_unit_id, p.sell_unit_id)
      WHERE ss.location_id = $1
      ORDER BY p.name, variant_name NULLS FIRST`,
     [locationId]

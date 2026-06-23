@@ -8,6 +8,8 @@ vi.mock('@/lib/db', () => ({
 }))
 vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_PRICE_SQL: '0',
+  VARIANT_MIN_PRICE_INCL_GST_SQL: '0',
+  VARIANT_MIN_MRP_SQL: '0',
   VARIANT_STOCK_TOTAL_SQL: '0',
 }))
 

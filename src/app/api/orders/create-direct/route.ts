@@ -222,14 +222,23 @@ export async function POST(request: NextRequest) {
       }
       const itemTaxAmount = isGSTEnabled && gstForItem ? gstForItem.totalTax : taxAmount
 
+      // Product-level discount: discount_pct is on the product, shared across all variants
+      const productDiscPct = Number(product.discount_pct ?? 0)
+      const mrpUnitPrice = productDiscPct > 0 ? unitPrice / (1 - productDiscPct / 100) : unitPrice
+      const itemProductDiscount = productDiscPct > 0 ? Math.round((mrpUnitPrice - unitPrice) * qty * 100) / 100 : 0
+      const totalItemDiscount = Math.round((businessDiscountAmount + itemProductDiscount) * 100) / 100
+
+      const itemMrp = variant?.mrp != null ? Number(variant.mrp) : (product.mrp != null ? Number(product.mrp) : null)
+
       await client.query(
-        `INSERT INTO order_items (order_id, product_id, variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)`,
+        `INSERT INTO order_items (order_id, product_id, variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
         [createdOrder.id, item.productId, item.variantId || null,
          variant ? `${product.name} - ${variant.variant_name}` : product.name,
          variant?.sku || product.sku,
          variant?.variant_name || null,
-         qty, unitPrice, itemTotal, Math.round(itemTaxAmount * 100) / 100,
+         qty, unitPrice, itemTotal, totalItemDiscount,
+         Math.round(itemTaxAmount * 100) / 100,
          isGSTEnabled ? (product.hsn_code || null) : null,
          isGSTEnabled ? gstRate : null,
          isGSTEnabled && gstForItem ? gstForItem.taxableAmount : 0,
@@ -237,7 +246,8 @@ export async function POST(request: NextRequest) {
          isGSTEnabled && gstForItem ? gstForItem.sgst : 0,
          isGSTEnabled && gstForItem ? gstForItem.igst : 0,
          item.buyMode || 'unit',
-         item.buyUnit || null]
+         item.buyUnit || null,
+         itemMrp]
       )
 
       if (couponId && appliedDiscount > 0) {

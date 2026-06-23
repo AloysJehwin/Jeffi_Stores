@@ -206,7 +206,7 @@ export default function AdminReviewsPage() {
               value={search}
               onChange={e => handleSearchChange(e.target.value)}
               placeholder="Search by product or reviewer…"
-              className="w-full pl-9 pr-3 py-2 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
+              className="w-full pl-9 pr-3 py-1.5 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
             />
           </div>
         </div>

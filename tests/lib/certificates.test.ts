@@ -7,12 +7,14 @@ const {
   mockReadFileSync,
   mockRmSync,
   mockExecSync,
+  mockExecFileSync,
 } = vi.hoisted(() => ({
   mockMkdtempSync: vi.fn().mockReturnValue('/tmp/cert-abc123'),
   mockWriteFileSync: vi.fn(),
   mockReadFileSync: vi.fn().mockReturnValue(Buffer.from('mock-p12-data')),
   mockRmSync: vi.fn(),
   mockExecSync: vi.fn().mockReturnValue(Buffer.from('')),
+  mockExecFileSync: vi.fn().mockReturnValue(Buffer.from('')),
 }))
 
 vi.mock('fs', () => ({
@@ -29,8 +31,9 @@ vi.mock('fs', () => ({
 }))
 
 vi.mock('child_process', () => ({
-  default: { execSync: mockExecSync },
+  default: { execSync: mockExecSync, execFileSync: mockExecFileSync },
   execSync: mockExecSync,
+  execFileSync: mockExecFileSync,
 }))
 
 vi.mock('os', () => ({
@@ -66,6 +69,7 @@ beforeEach(() => {
   mockMkdtempSync.mockReturnValue('/tmp/cert-abc123')
   mockReadFileSync.mockReturnValue(Buffer.from('mock-p12-data'))
   mockExecSync.mockReturnValue(Buffer.from(''))
+  mockExecFileSync.mockReturnValue(Buffer.from(''))
 })
 
 describe('generateClientCertificate', () => {
@@ -114,26 +118,26 @@ describe('generateClientCertificate', () => {
 
   it('runs openssl genrsa command', async () => {
     await generateClientCertificate('testadmin', 'aid1')
-    const calls = mockExecSync.mock.calls.map((c: any) => String(c[0]))
-    expect(calls.some(cmd => cmd.includes('openssl genrsa'))).toBe(true)
+    const calls = mockExecFileSync.mock.calls
+    expect(calls.some((c: any) => c[0] === 'openssl' && c[1][0] === 'genrsa')).toBe(true)
   })
 
   it('runs openssl req command to create CSR with subject', async () => {
     await generateClientCertificate('testadmin', 'aid1')
-    const calls = mockExecSync.mock.calls.map((c: any) => String(c[0]))
-    expect(calls.some(cmd => cmd.includes('openssl req') && cmd.includes('testadmin'))).toBe(true)
+    const calls = mockExecFileSync.mock.calls
+    expect(calls.some((c: any) => c[0] === 'openssl' && c[1][0] === 'req' && c[1].some((a: string) => a.includes('testadmin')))).toBe(true)
   })
 
   it('runs openssl x509 to sign the cert', async () => {
     await generateClientCertificate('testadmin', 'aid1')
-    const calls = mockExecSync.mock.calls.map((c: any) => String(c[0]))
-    expect(calls.some(cmd => cmd.includes('openssl x509'))).toBe(true)
+    const calls = mockExecFileSync.mock.calls
+    expect(calls.some((c: any) => c[0] === 'openssl' && c[1][0] === 'x509')).toBe(true)
   })
 
   it('runs openssl pkcs12 to export the p12', async () => {
     await generateClientCertificate('testadmin', 'aid1')
-    const calls = mockExecSync.mock.calls.map((c: any) => String(c[0]))
-    expect(calls.some(cmd => cmd.includes('openssl pkcs12'))).toBe(true)
+    const calls = mockExecFileSync.mock.calls
+    expect(calls.some((c: any) => c[0] === 'openssl' && c[1][0] === 'pkcs12')).toBe(true)
   })
 
   it('writes ext.cnf file with required extensions', async () => {
@@ -151,7 +155,7 @@ describe('generateClientCertificate', () => {
   })
 
   it('cleans up temp directory even if execSync throws', async () => {
-    mockExecSync.mockImplementationOnce(() => { throw new Error('openssl not found') })
+    mockExecFileSync.mockImplementationOnce(() => { throw new Error('openssl not found') })
     await expect(generateClientCertificate('testadmin', 'aid1')).rejects.toThrow('openssl not found')
     expect(mockRmSync).toHaveBeenCalledWith('/tmp/cert-abc123', { recursive: true, force: true })
   })
@@ -166,6 +170,6 @@ describe('generateClientCertificate', () => {
 
   it('executes exactly 4 openssl commands', async () => {
     await generateClientCertificate('admin_user', 'aid1')
-    expect(mockExecSync).toHaveBeenCalledTimes(4)
+    expect(mockExecFileSync).toHaveBeenCalledTimes(4)
   })
 })

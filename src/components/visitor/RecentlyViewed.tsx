@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@/contexts/AuthContext'
+import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
 
 interface RecentProduct {
   id: string
@@ -12,6 +14,7 @@ interface RecentProduct {
   brand?: string | null
   inStock?: boolean
   image: string | null
+  categoryId?: string | null
 }
 
 const STORAGE_KEY = 'jeffi_recently_viewed'
@@ -27,6 +30,7 @@ export function trackRecentlyViewed(product: RecentProduct) {
 }
 
 export default function RecentlyViewed({ excludeId, basePath = '/products' }: { excludeId?: string; basePath?: string }) {
+  const { user } = useAuth()
   const [products, setProducts] = useState<RecentProduct[]>([])
   const [quickView, setQuickView] = useState<RecentProduct | null>(null)
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -67,8 +71,11 @@ export default function RecentlyViewed({ excludeId, basePath = '/products' }: { 
       <h2 className="text-2xl font-bold text-foreground mb-6">Recently Viewed</h2>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
         {products.map(product => {
-          const discount = product.mrp && product.mrp > product.price
-            ? Math.round(((product.mrp - product.price) / product.mrp) * 100)
+          const discountPct = product.categoryId ? (user?.businessDiscountMap?.[product.categoryId] ?? 0) : 0
+          const businessPrice = discountPct > 0 ? applyDiscount(product.price, discountPct) : null
+          const shownPrice = businessPrice ?? product.price
+          const discount = product.mrp && product.mrp > shownPrice
+            ? mrpDiscountPct(product.mrp, shownPrice)
             : 0
 
           return (
@@ -97,6 +104,11 @@ export default function RecentlyViewed({ excludeId, basePath = '/products' }: { 
                       </svg>
                     </div>
                   )}
+                  {discountPct > 0 && (
+                    <div className="absolute top-5 right-[-28px] w-28 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[9px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10">
+                      Business offer
+                    </div>
+                  )}
                   {discount > 0 && (
                     <div className="absolute top-1.5 right-1.5 bg-accent-500 text-white px-1.5 py-0.5 rounded-full text-xs font-bold leading-none shadow">
                       {discount}% off
@@ -110,13 +122,17 @@ export default function RecentlyViewed({ excludeId, basePath = '/products' }: { 
                   <p className="text-xs text-foreground font-medium line-clamp-2 group-hover:text-accent-600 transition-colors flex-1 leading-snug">{product.name}</p>
                   <div className="flex items-baseline gap-1 mt-0.5">
                     <span className="text-xs font-bold text-primary-600 dark:text-primary-400">
-                      ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      ₹{shownPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                    {product.mrp && product.mrp > product.price && (
+                    {businessPrice ? (
+                      <span className="text-xs text-foreground-muted line-through leading-none">
+                        ₹{product.price.toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                      </span>
+                    ) : product.mrp && product.mrp > product.price ? (
                       <span className="text-xs text-foreground-muted line-through leading-none">
                         ₹{product.mrp.toLocaleString('en-IN', { minimumFractionDigits: 0 })}
                       </span>
-                    )}
+                    ) : null}
                   </div>
                 </div>
               </div>

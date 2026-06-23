@@ -14,6 +14,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_PRICE_SQL: '(SELECT NULL)',
+  VARIANT_MIN_PRICE_INCL_GST_SQL: '(SELECT NULL)',
   VARIANT_MIN_MRP_SQL: '(SELECT NULL)',
   VARIANT_STOCK_TOTAL_SQL: '0',
 }))

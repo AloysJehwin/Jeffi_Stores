@@ -117,13 +117,14 @@ async function suggestPoLineItems(q: string): Promise<SuggestItem[]> {
   const rows = await queryMany<{
     product_id: string; variant_id: string | null; name: string; variant_name: string | null
     sku: string; base_price: number | null; mrp: number | null; gst_percentage: number; hsn_code: string | null
-    sell_unit_label: string | null
+    sell_unit_label: string | null; sell_unit_dimension: string | null
   }>(
-    `SELECT product_id, variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code, sell_unit_label FROM (
+    `SELECT product_id, variant_id, name, variant_name, sku, base_price, mrp, gst_percentage, hsn_code, sell_unit_label, sell_unit_dimension FROM (
        SELECT p.id AS product_id, NULL::uuid AS variant_id, p.name, NULL AS variant_name,
               p.sku, p.base_price, p.mrp, COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
               p.search_vector,
-              COALESCE(pu.display_label, pu.unit) AS sell_unit_label
+              COALESCE(pu.display_label, pu.unit) AS sell_unit_label,
+              pu.dimension AS sell_unit_dimension
        FROM products p
        LEFT JOIN product_units pu ON pu.id = p.sell_unit_id
        WHERE p.has_variants = false AND ${sc.clause}
@@ -133,7 +134,8 @@ async function suggestPoLineItems(q: string): Promise<SuggestItem[]> {
               COALESCE(pv.mrp, p.mrp) AS mrp,
               COALESCE(p.gst_percentage,0)::numeric AS gst_percentage, p.hsn_code,
               p.search_vector,
-              COALESCE(vpu.display_label, vpu.unit, ppu.display_label, ppu.unit) AS sell_unit_label
+              COALESCE(vpu.display_label, vpu.unit, ppu.display_label, ppu.unit) AS sell_unit_label,
+              COALESCE(vpu.dimension, ppu.dimension) AS sell_unit_dimension
        FROM product_variants pv
        JOIN products p ON p.id = pv.product_id
        LEFT JOIN product_units vpu ON vpu.id = pv.sell_unit_id
@@ -154,6 +156,7 @@ async function suggestPoLineItems(q: string): Promise<SuggestItem[]> {
       r.hsn_code ?? '',
       r.mrp != null ? String(r.mrp) : '',
       r.sell_unit_label ?? '',
+      r.sell_unit_dimension ?? '',
     ].join('|')
     const priceStr = r.base_price != null ? ` · ₹${r.base_price}` : ''
     return { id: encoded, label: displayName, sublabel: `${r.sku}${priceStr}` }

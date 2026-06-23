@@ -107,14 +107,23 @@ export async function PATCH(
         const rawExtra = item.quantity - previousQty
         if (rawExtra <= 0) continue
 
-        // Resolve unit factor for count-dimension selling units (box, set, etc.)
-        const unitRow = await client.query<{ factor: number; dimension: string }>(
-          `SELECT factor, dimension FROM product_units WHERE unit = $2 AND product_id = $1 LIMIT 1`,
-          [item.product_id, item.buy_unit]
+        // Resolve unit factor: variant-scoped buy_unit → product-level buy_unit → sell_unit_id via variant → sell_unit_id via product
+        const unitRow = await client.query<{ factor: string; dimension: string }>(
+          `SELECT COALESCE(puv.factor, pup.factor, pu_sv.factor, pu_sp.factor)::text AS factor,
+                  COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension
+           FROM (SELECT 1) x
+           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3 AND $1 IS NOT NULL
+           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL AND $1 IS NOT NULL
+             AND ($3 IS NULL OR puv.id IS NULL)
+           LEFT JOIN product_variants pvar ON pvar.id = $3
+           LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL
+           LEFT JOIN products prod ON prod.id = $2 AND $3 IS NULL
+           LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL`,
+          [item.buy_unit || null, item.product_id, item.variant_id || null]
         )
         const u = unitRow.rows[0]
         const extraQty = (u?.dimension === 'count' && u?.factor)
-          ? rawExtra * parseFloat(u.factor as any)
+          ? rawExtra * parseFloat(u.factor)
           : rawExtra
 
         if (item.sub_variant_id) {
@@ -217,14 +226,23 @@ export async function PATCH(
           const rawExtra = item.quantity - previousQty
           if (rawExtra <= 0) continue
 
-          // Resolve unit factor for count-dimension selling units (box, set, etc.)
-          const unitRow2 = await client.query<{ factor: number; dimension: string }>(
-            `SELECT factor, dimension FROM product_units WHERE unit = $2 AND product_id = $1 LIMIT 1`,
-            [item.product_id, item.buy_unit]
+          // Resolve unit factor: variant-scoped buy_unit → product-level buy_unit → sell_unit_id via variant → sell_unit_id via product
+          const unitRow2 = await client.query<{ factor: string; dimension: string }>(
+            `SELECT COALESCE(puv.factor, pup.factor, pu_sv.factor, pu_sp.factor)::text AS factor,
+                    COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension
+             FROM (SELECT 1) x
+             LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3 AND $1 IS NOT NULL
+             LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL AND $1 IS NOT NULL
+               AND ($3 IS NULL OR puv.id IS NULL)
+             LEFT JOIN product_variants pvar ON pvar.id = $3
+             LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL
+             LEFT JOIN products prod ON prod.id = $2 AND $3 IS NULL
+             LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL`,
+            [item.buy_unit || null, item.product_id, item.variant_id || null]
           )
           const u2 = unitRow2.rows[0]
           const extraQty = (u2?.dimension === 'count' && u2?.factor)
-            ? rawExtra * parseFloat(u2.factor as any)
+            ? rawExtra * parseFloat(u2.factor)
             : rawExtra
 
           let stockBefore = 0

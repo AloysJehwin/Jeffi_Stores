@@ -69,6 +69,7 @@ function makeCartLine(overrides: Partial<CartLine> = {}): CartLine {
       gst_percentage: '18',
       hsn_code: '8501',
       category_id: null,
+      mrp: null,
     },
     variant: null,
     sub_variant: null,
@@ -134,7 +135,7 @@ describe('cartLineUnitPrice', () => {
   it('uses sub_variant price_ex_gst first in fallback chain', () => {
     const item = makeCartLine({
       price_at_addition: 0,
-      sub_variant: { id: 'sv-1', sub_variant_name: 'S', sku: null, price: 80, price_ex_gst: 70 },
+      sub_variant: { id: 'sv-1', sub_variant_name: 'S', sku: null, price: 80, price_ex_gst: 70, mrp: null },
     })
     // price_at_addition is 0 → falls back to basePrice = sub_variant.price_ex_gst = 70
     expect(cartLineUnitPrice(item)).toBe(70)
@@ -143,7 +144,7 @@ describe('cartLineUnitPrice', () => {
   it('uses variant price_ex_gst when sub_variant is absent', () => {
     const item = makeCartLine({
       price_at_addition: 0,
-      variant: { id: 'v-1', variant_name: 'Red', sku: 'RED', price: 90, price_ex_gst: 85 },
+      variant: { id: 'v-1', variant_name: 'Red', sku: 'RED', price: 90, price_ex_gst: 85, mrp: null },
     })
     expect(cartLineUnitPrice(item)).toBe(85)
   })
@@ -159,7 +160,7 @@ describe('cartLineUnitPrice', () => {
   it('falls back to sub_variant.price when price_ex_gst is null', () => {
     const item = makeCartLine({
       price_at_addition: 0,
-      sub_variant: { id: 'sv-1', sub_variant_name: 'S', sku: null, price: 80, price_ex_gst: null },
+      sub_variant: { id: 'sv-1', sub_variant_name: 'S', sku: null, price: 80, price_ex_gst: null, mrp: null },
       products: { ...makeCartLine().products, price_ex_gst: null },
     })
     expect(cartLineUnitPrice(item)).toBe(80)
@@ -168,7 +169,7 @@ describe('cartLineUnitPrice', () => {
   it('falls back to variant.price when price_ex_gst fields are null', () => {
     const item = makeCartLine({
       price_at_addition: 0,
-      variant: { id: 'v-1', variant_name: 'Blue', sku: 'BLU', price: 75, price_ex_gst: null },
+      variant: { id: 'v-1', variant_name: 'Blue', sku: 'BLU', price: 75, price_ex_gst: null, mrp: null },
       products: { ...makeCartLine().products, price_ex_gst: null },
     })
     expect(cartLineUnitPrice(item)).toBe(75)
@@ -791,8 +792,8 @@ describe('commitOrder — cart mode', () => {
 
     const orderInsertCall = client.query.mock.calls[1]
     const params = orderInsertCall[1] as any[]
-    // total_amount is at index 11
-    expect(params[11]).toBe(275)
+    // total_amount is at index 12 (business_discount_amount was inserted at index 9)
+    expect(params[12]).toBe(275)
   })
 
   it('handles cart item with variant and sub_variant for product name', async () => {
@@ -800,8 +801,8 @@ describe('commitOrder — cart mode', () => {
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
 
     const cartItem = makeCartLine({
-      variant: { id: 'v1', variant_name: 'Large', sku: 'V1', price: 100, price_ex_gst: null },
-      sub_variant: { id: 'sv1', sub_variant_name: 'Red', sku: 'SV1', price: 90, price_ex_gst: null },
+      variant: { id: 'v1', variant_name: 'Large', sku: 'V1', price: 100, price_ex_gst: null, mrp: null },
+      sub_variant: { id: 'sv1', sub_variant_name: 'Red', sku: 'SV1', price: 90, price_ex_gst: null, mrp: null },
     })
     await commitOrder(makeCartCommitInput({ cartItems: [cartItem] }))
 
@@ -841,7 +842,7 @@ describe('commitOrder — buyNow mode', () => {
         buyUnit: null,
         price: 500,
       },
-      product: { id: 'prod-1', name: 'Gadget', sku: 'GAD-001', gst_percentage: '12', hsn_code: '8502' },
+      product: { id: 'prod-1', name: 'Gadget', sku: 'GAD-001', gst_percentage: '12', hsn_code: '8502', mrp: null },
       variant: null,
       subVariant: null,
       subtotal: 500,

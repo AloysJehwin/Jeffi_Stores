@@ -3,6 +3,12 @@
 import { useState, useCallback, useEffect } from 'react'
 import Link from 'next/link'
 import ProductImageGallery from '@/components/visitor/ProductImageGallery'
+import ProductActions from '@/components/business/ProductActions'
+import RequestQuoteButton from '@/components/business/RequestQuoteButton'
+import RazorpayOffers from '@/components/visitor/RazorpayOffers'
+import { useAuth } from '@/contexts/AuthContext'
+import { useToast } from '@/contexts/ToastContext'
+import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -10,12 +16,6 @@ function UnitLabel({ label }: { label: string | null | undefined }) {
   if (match) return <>{match[1]}<sup>2</sup></>
   return <>{label}</>
 }
-
-import ProductActions from '@/components/business/ProductActions'
-import RequestQuoteButton from '@/components/business/RequestQuoteButton'
-import { useAuth } from '@/contexts/AuthContext'
-import { useToast } from '@/contexts/ToastContext'
-import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
 
 interface ProductImage {
   id: string
@@ -285,7 +285,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           />
           {businessDiscountPct > 0 && (
             <div className="absolute top-6 right-[-36px] w-44 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[11px] font-bold text-center py-1.5 shadow-md pointer-events-none select-none z-10">
-              {businessDiscountPct}% off
+              Business offer
             </div>
           )}
         </div>
@@ -296,9 +296,9 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
       </div>
 
       {/* Product info column — order-2 on mobile, natural on desktop */}
-      <div className="order-2 lg:order-none">
+      <div className="order-2 lg:order-none lg:pl-4 min-w-0">
         <div className="flex items-start justify-between gap-3 mb-4">
-          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1 min-w-0">
             {product.name}
           </h1>
           <div className="flex items-center gap-2 shrink-0 mt-1">
@@ -465,6 +465,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             />
           )
         })()}
+
+        <RazorpayOffers />
 
         {/* Product Specifications */}
         <div className="mt-6 pt-6 border-t border-border-default">

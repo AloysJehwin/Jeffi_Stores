@@ -7,19 +7,20 @@ import { NextRequest } from 'next/server'
 vi.mock('next/headers', () => ({
   cookies: vi.fn(),
 }))
-vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn(), verifyToken: vi.fn() }))
+vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn(), verifyToken: vi.fn(), authenticateServiceAccount: vi.fn().mockResolvedValue(null) }))
 vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/db', () => ({ query: vi.fn(), queryMany: vi.fn(), queryOne: vi.fn() }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST, GET } from '@/app/api/admin/replication/log/route'
-import { verifyToken } from '@/lib/jwt'
+import { verifyToken, authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryMany } from '@/lib/db'
 import { cookies } from 'next/headers'
 
 const mockVerifyToken = vi.mocked(verifyToken)
+const mockAuthenticateAdmin = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
 const mockQuery = vi.mocked(query)
 const mockQueryMany = vi.mocked(queryMany)
@@ -165,25 +166,23 @@ describe('GET /api/admin/replication/log', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('returns 403 when no admin_token cookie', async () => {
-    mockCookies.mockReturnValue({ get: vi.fn().mockReturnValue(undefined) } as any)
+    mockAuthenticateAdmin.mockResolvedValue(null as any)
     mockHasScope.mockReturnValue(false)
 
     const res = await GET(makeGet())
-    expect(res.status).toBe(403)
+    expect(res.status).toBe(401)
   })
 
   it('returns 403 when token is invalid', async () => {
-    mockCookies.mockReturnValue({ get: vi.fn().mockReturnValue({ value: 'bad-token' }) } as any)
-    mockVerifyToken.mockRejectedValue(new Error('invalid signature'))
+    mockAuthenticateAdmin.mockResolvedValue(null as any)
     mockHasScope.mockReturnValue(false)
 
     const res = await GET(makeGet())
-    expect(res.status).toBe(403)
+    expect(res.status).toBe(401)
   })
 
   it('returns 403 when scope is insufficient', async () => {
-    mockCookies.mockReturnValue({ get: vi.fn().mockReturnValue({ value: 'valid-token' }) } as any)
-    mockVerifyToken.mockResolvedValue({ role: 'viewer', scopes: [] } as any)
+    mockAuthenticateAdmin.mockResolvedValue({ role: 'viewer', scopes: [] } as any)
     mockHasScope.mockReturnValue(false)
 
     const res = await GET(makeGet())
@@ -191,8 +190,7 @@ describe('GET /api/admin/replication/log', () => {
   })
 
   it('returns run list on happy path', async () => {
-    mockCookies.mockReturnValue({ get: vi.fn().mockReturnValue({ value: 'valid-token' }) } as any)
-    mockVerifyToken.mockResolvedValue({ role: 'super_admin', scopes: ['replication'] } as any)
+    mockAuthenticateAdmin.mockResolvedValue({ role: 'super_admin', scopes: ['replication'] } as any)
     mockHasScope.mockReturnValue(true)
 
     const sampleRuns = [
@@ -209,8 +207,7 @@ describe('GET /api/admin/replication/log', () => {
   })
 
   it('respects limit and offset query params', async () => {
-    mockCookies.mockReturnValue({ get: vi.fn().mockReturnValue({ value: 'valid-token' }) } as any)
-    mockVerifyToken.mockResolvedValue({ role: 'super_admin', scopes: ['replication'] } as any)
+    mockAuthenticateAdmin.mockResolvedValue({ role: 'super_admin', scopes: ['replication'] } as any)
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
 
@@ -225,8 +222,7 @@ describe('GET /api/admin/replication/log', () => {
   })
 
   it('caps limit at 200', async () => {
-    mockCookies.mockReturnValue({ get: vi.fn().mockReturnValue({ value: 'valid-token' }) } as any)
-    mockVerifyToken.mockResolvedValue({ role: 'super_admin', scopes: ['replication'] } as any)
+    mockAuthenticateAdmin.mockResolvedValue({ role: 'super_admin', scopes: ['replication'] } as any)
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
 
@@ -236,8 +232,7 @@ describe('GET /api/admin/replication/log', () => {
   })
 
   it('clamps offset to 0 minimum', async () => {
-    mockCookies.mockReturnValue({ get: vi.fn().mockReturnValue({ value: 'valid-token' }) } as any)
-    mockVerifyToken.mockResolvedValue({ role: 'super_admin', scopes: ['replication'] } as any)
+    mockAuthenticateAdmin.mockResolvedValue({ role: 'super_admin', scopes: ['replication'] } as any)
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
 

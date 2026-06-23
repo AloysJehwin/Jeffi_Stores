@@ -772,7 +772,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
   }
 
-  const inputCls = 'w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
+  const inputCls = 'field-normal w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
@@ -805,7 +805,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               required
               value={productName}
               onChange={e => setProductName(e.target.value)}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Enter product name"
             />
           </div>
@@ -821,7 +821,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 name="sku"
                 value={sku}
                 onChange={e => { setSku(e.target.value.toUpperCase()); setSkuManuallyEdited(true) }}
-                className="flex-1 px-4 py-2 border border-border-default rounded-lg bg-surface text-foreground font-mono text-sm uppercase focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                className="flex-1 field-normal border border-border-default bg-surface text-foreground font-mono text-sm uppercase focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 placeholder="Auto-generated"
               />
               <button
@@ -855,7 +855,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               id="hsn_code"
               name="hsn_code"
               defaultValue={product?.hsn_code}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="e.g., 8531"
             />
             <p className="text-xs text-foreground-muted mt-1">Required for GST invoices</p>
@@ -872,7 +872,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               id="mpn"
               name="mpn"
               defaultValue={product?.mpn}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="e.g., TVS-M6X30"
             />
             <p className="text-xs text-foreground-muted mt-1">Used in Google Shopping feed</p>
@@ -890,7 +890,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               id="gtin"
               name="gtin"
               defaultValue={product?.gtin}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="EAN/UPC barcode number"
             />
             <p className="text-xs text-foreground-muted mt-1">Used in Google Shopping feed</p>
@@ -1063,7 +1063,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     setDiscountPct('')
                   }
                 }}
-                className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 placeholder="0.00"
               />
               <p className="text-xs text-foreground-muted mt-1">Enter MRP (Ex. GST) + Discount % → selling price auto-fills for all variants.</p>
@@ -1081,7 +1081,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               min="0"
               value={costPrice}
               onChange={e => setCostPrice(e.target.value)}
-              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="Your purchase / landed cost"
             />
             <p className="text-xs text-foreground-muted mt-1">Used for P&amp;L gross margin — not shown to customers</p>
@@ -1165,7 +1165,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               step="1"
               min="0"
               defaultValue={product?.weight_grams ?? ''}
-              className="w-full px-4 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="e.g., 500"
             />
           </div>
@@ -1196,15 +1196,15 @@ export default function ProductForm({ categories, brands, action, product, produ
             {['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube'].includes(productPackageType) && (
               <div className="grid grid-cols-3 gap-2 mt-2">
                 <div>
-                  <input type="number" id="length_cm" name="length_cm" step="0.1" min="0" defaultValue={product?.length_cm ?? ''} className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="L" />
+                  <input type="number" id="length_cm" name="length_cm" step="0.1" min="0" defaultValue={product?.length_cm ?? ''} className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="L" />
                   <p className="text-xs text-foreground-muted mt-1 text-center">Length</p>
                 </div>
                 <div>
-                  <input type="number" id="breadth_cm" name="breadth_cm" step="0.1" min="0" defaultValue={product?.breadth_cm ?? ''} className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="B" />
+                  <input type="number" id="breadth_cm" name="breadth_cm" step="0.1" min="0" defaultValue={product?.breadth_cm ?? ''} className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="B" />
                   <p className="text-xs text-foreground-muted mt-1 text-center">Breadth</p>
                 </div>
                 <div>
-                  <input type="number" id="height_cm" name="height_cm" step="0.1" min="0" defaultValue={product?.height_cm ?? ''} className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="H" />
+                  <input type="number" id="height_cm" name="height_cm" step="0.1" min="0" defaultValue={product?.height_cm ?? ''} className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="H" />
                   <p className="text-xs text-foreground-muted mt-1 text-center">Height</p>
                 </div>
               </div>
@@ -1230,7 +1230,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 rows={4}
                 value={description}
                 onChange={e => setDescription(e.target.value)}
-                className="w-full px-4 py-2 pr-8 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                className="w-full field-normal pr-8 border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                 placeholder="Enter product description"
               />
             </AIEnrichButton>
@@ -1298,7 +1298,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                               type="text"
                               value={group.variant_type}
                               onChange={(e) => updateGroupVariantType(group.pricing_type, e.target.value)}
-                              className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 focus:border-transparent w-36"
+                              className="field-compact border border-border-secondary bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 focus:border-transparent w-36"
                               placeholder="e.g. Size, Pack, Colour"
                             />
                           </div>
@@ -1485,7 +1485,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       type="text"
                                       value={variant.sub_variant_type}
                                       onChange={(e) => updateVariant(index, 'sub_variant_type', e.target.value)}
-                                      className="w-32 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs"
+                                      className="w-32 field-xs border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent text-xs"
                                       placeholder="e.g. Colour, Finish"
                                     />
                                   </div>
@@ -1537,7 +1537,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <React.Fragment key={variant.id || index}>
                                 <tr className={`border-b border-border-default ${isExpanded ? 'bg-surface-secondary' : 'hover:bg-surface-secondary/40'}`}>
                                   <td className="py-2 px-3">
-                                    <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
+                                    <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
                                   </td>
                                   {variant.sub_variant_type_on ? (
                                     <td className="py-2 px-3" colSpan={4}>
@@ -1564,32 +1564,32 @@ export default function ProductForm({ categories, brands, action, product, produ
                                         updated[index].price_ex_gst = ''; updated[index].price = ''
                                       }
                                       setVariants(updated)
-                                    }} className="w-28 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="From catalog" />
+                                    }} className="w-28 field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="From catalog" />
                                   </td>
                                   {/* Discount % — product-level read-only */}
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" max="100" readOnly value={discountPct || '0'} className="w-20 px-2 py-1 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" />
+                                    <input type="number" step="0.01" min="0" max="100" readOnly value={discountPct || '0'} className="w-20 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" />
                                   </td>
                                   {/* MRP (incl. GST) — locked */}
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.mrp} readOnly className="w-28 px-2 py-1 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" />
+                                    <input type="number" step="0.01" min="0" value={variant.mrp} readOnly className="w-28 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" />
                                   </td>
                                   {/* Selling Price (incl. GST) — locked */}
                                   <td className="py-2 px-3">
                                     <div>
-                                      <input type="number" step="0.01" min="0" value={variant.price} readOnly className="w-28 px-2 py-1 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" required />
+                                      <input type="number" step="0.01" min="0" value={variant.price} readOnly className="w-28 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" required />
                                       {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
                                     </div>
                                   </td>
                                   {/* Selling Price (Ex. GST) — locked */}
                                   <td className="py-2 px-3">
-                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly className="w-28 px-2 py-1 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" />
+                                    <input type="number" step="0.01" min="0" value={variant.price_ex_gst} readOnly className="w-28 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" />
                                   </td>
                                     </>
                                   )}
                                   <td className="py-2 px-3">
                                     {variant.sub_variant_type_on ? (
-                                      <input type="text" value={sumSubVariantStock(subVariantsMap[variant.id || '']) > 0 ? 'In Stock' : 'Out of Stock'} readOnly className="w-28 px-2 py-1 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" title="Derived from sub-variants" />
+                                      <input type="text" value={sumSubVariantStock(subVariantsMap[variant.id || '']) > 0 ? 'In Stock' : 'Out of Stock'} readOnly className="w-28 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" title="Derived from sub-variants" />
                                     ) : (
                                       <AdminSelect
                                         value={variant.stock_status}
@@ -1766,11 +1766,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
-                          <input type="text" value={popupVariant.mpn} onChange={(e) => updateVariant(popupIndex, 'mpn', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Part No." />
+                          <input type="text" value={popupVariant.mpn} onChange={(e) => updateVariant(popupIndex, 'mpn', e.target.value)} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Part No." />
                         </div>
                         <div>
                           <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
-                          <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
+                          <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
                         </div>
                       </div>
                     </div>
@@ -1796,35 +1796,35 @@ export default function ProductForm({ categories, brands, action, product, produ
                           updated[popupIndex].price_ex_gst = ''; updated[popupIndex].price = ''
                         }
                         setVariants(updated)
-                      }} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="From catalog" />
+                      }} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="From catalog" />
                     </div>
                     {/* Discount % — product-level read-only */}
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Discount %</label>
-                      <input type="number" step="0.01" min="0" max="100" readOnly value={discountPct || '0'} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" />
+                      <input type="number" step="0.01" min="0" max="100" readOnly value={discountPct || '0'} className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed" />
                     </div>
                     {/* MRP (incl. GST) — locked */}
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">MRP (incl. GST)</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.mrp} readOnly className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto-calculated" />
+                      <input type="number" step="0.01" min="0" value={popupVariant.mrp} readOnly className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed" placeholder="Auto-calculated" />
                     </div>
                     {/* Selling Price (incl. GST) — locked */}
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Price (incl. GST)</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.price} readOnly className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto-calculated" />
+                      <input type="number" step="0.01" min="0" value={popupVariant.price} readOnly className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed" placeholder="Auto-calculated" />
                     </div>
                     {/* Selling Price (Ex. GST) — locked */}
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Price (Ex. GST)</label>
-                      <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} readOnly className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto-calculated" />
+                      <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} readOnly className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed" placeholder="Auto-calculated" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
-                      <input type="text" value={popupVariant.mpn} onChange={(e) => updateVariant(popupIndex, 'mpn', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Part No." />
+                      <input type="text" value={popupVariant.mpn} onChange={(e) => updateVariant(popupIndex, 'mpn', e.target.value)} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Part No." />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
-                      <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
+                      <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
                     </div>
                   </div>
                   )}
@@ -1839,7 +1839,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     {popupVariant.sub_variant_type_on && (
                       <div className="flex items-center gap-2 pl-11">
                         <span className="text-xs text-foreground-muted">Label</span>
-                        <input type="text" value={popupVariant.sub_variant_type} onChange={(e) => updateVariant(popupIndex, 'sub_variant_type', e.target.value)} className="w-40 px-2 py-1 border border-border-secondary rounded-lg bg-surface text-foreground text-xs focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. Colour, Finish" />
+                        <input type="text" value={popupVariant.sub_variant_type} onChange={(e) => updateVariant(popupIndex, 'sub_variant_type', e.target.value)} className="w-40 field-xs border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. Colour, Finish" />
                       </div>
                     )}
                   </div>
@@ -1866,9 +1866,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                     <div className="mt-3">
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Dimensions (L × B × H cm)</label>
                       <div className="grid grid-cols-3 gap-1.5">
-                        <input type="number" step="0.1" min="0" value={popupVariant.length_cm} onChange={(e) => updateVariant(popupIndex, 'length_cm', e.target.value)} className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="L" />
-                        <input type="number" step="0.1" min="0" value={popupVariant.breadth_cm} onChange={(e) => updateVariant(popupIndex, 'breadth_cm', e.target.value)} className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="B" />
-                        <input type="number" step="0.1" min="0" value={popupVariant.height_cm} onChange={(e) => updateVariant(popupIndex, 'height_cm', e.target.value)} className="px-2 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="H" />
+                        <input type="number" step="0.1" min="0" value={popupVariant.length_cm} onChange={(e) => updateVariant(popupIndex, 'length_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="L" />
+                        <input type="number" step="0.1" min="0" value={popupVariant.breadth_cm} onChange={(e) => updateVariant(popupIndex, 'breadth_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="B" />
+                        <input type="number" step="0.1" min="0" value={popupVariant.height_cm} onChange={(e) => updateVariant(popupIndex, 'height_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="H" />
                       </div>
                     </div>
                   )}
@@ -2004,7 +2004,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           placeholder="Search by name..."
                           value={variantGallerySearch}
                           onChange={e => setVariantGallerySearch(e.target.value)}
-                          className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                          className="flex-1 field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                         />
                         <div className="w-48 shrink-0">
                           <AdminSelect
@@ -2137,7 +2137,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           {(subVariantsMap[variantPopupId] || []).map((sv: any) => {
                             const isEditingSv = subVariantEditId === sv.id
                             const ed = subVariantEditDraft
-                            const svInputCls = "px-1.5 py-1 h-[26px] border border-accent-500 rounded bg-surface text-foreground text-xs leading-none focus:ring-1 focus:ring-accent-500 w-16"
+                            const svInputCls = "field-xs border border-accent-500 bg-surface text-foreground focus:ring-1 focus:ring-accent-500 w-16"
                             return (
                               <React.Fragment key={sv.id}>
                               <tr className="border-b border-border-default last:border-0">
@@ -2232,7 +2232,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     {(() => {
                       const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'' }
                       const setD = (field: string, val: string) => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, [field]: val } }))
-                      const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-xs focus:ring-1 focus:ring-accent-500"
+                      const inputCls = "field-xs border border-border-secondary bg-surface text-foreground focus:ring-1 focus:ring-accent-500"
                       const lockedCls = `${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`
                       return (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">

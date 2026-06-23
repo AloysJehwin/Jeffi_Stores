@@ -39,6 +39,9 @@ export interface ShelfStock {
   product_name: string
   variant_name: string | null
   sku: string
+  unit_label?: string | null
+  unit_factor?: number | null
+  unit_dimension?: string | null
 }
 
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -163,16 +166,29 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
   siblingLocations: ShelfLocation[]
   onRefresh: () => void
 }) {
+  const factor = Number(row.unit_factor) || 1
+  const isContinuous = ['length', 'weight', 'area', 'volume'].includes(row.unit_dimension ?? '')
+  const unitLabel = row.unit_label || 'unit'
+
+  function toSell(baseQty: number): string {
+    const v = baseQty / factor
+    return isContinuous ? v.toFixed(3) : String(Math.floor(v))
+  }
+  function toBase(sellQty: number): number {
+    return Math.round(sellQty * factor)
+  }
+
   const [editing, setEditing] = useState(false)
-  const [newQty, setNewQty] = useState(String(row.quantity))
+  const [newQty, setNewQty] = useState(toSell(row.quantity))
   const [moving, setMoving] = useState(false)
   const [destId, setDestId] = useState('')
-  const [moveQty, setMoveQty] = useState('1')
+  const [moveQty, setMoveQty] = useState(toSell(Math.min(factor, row.quantity)))
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
 
   async function saveQty() {
-    const diff = parseInt(newQty) - row.quantity
+    const newBase = toBase(isContinuous ? parseFloat(newQty) : parseInt(newQty))
+    const diff = newBase - row.quantity
     if (diff === 0) { setEditing(false); return }
     setSaving(true); setErr('')
     try {
@@ -188,8 +204,10 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
 
   async function doMove() {
     if (!destId) { setErr('Select destination'); return }
-    const qty = parseInt(moveQty)
-    if (!qty || qty <= 0) { setErr('Enter valid quantity'); return }
+    const sellVal = isContinuous ? parseFloat(moveQty) : parseInt(moveQty)
+    if (!sellVal || sellVal <= 0) { setErr('Enter valid quantity'); return }
+    const qty = toBase(sellVal)
+    if (qty <= 0) { setErr('Enter valid quantity'); return }
     setSaving(true); setErr('')
     try {
       const res = await fetch('/api/admin/shelving/stock', {
@@ -201,6 +219,10 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
       setMoving(false); onRefresh()
     } catch (e: any) { setErr(e.message) } finally { setSaving(false) }
   }
+
+  const displayQty = toSell(row.quantity)
+  const maxSellQty = toSell(row.quantity)
+  const unitStep = isContinuous ? (factor < 1 ? factor : 0.001) : 1
 
   return (
     <div className="px-4 py-3">
@@ -217,17 +239,21 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
                 type="number"
                 value={newQty}
                 onChange={e => setNewQty(e.target.value)}
-                className="w-16 px-2 py-1 rounded-lg border border-border-default bg-surface text-foreground text-sm text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                min={unitStep}
+                step={unitStep}
+                max={undefined}
+                className="w-20 px-2 py-1 rounded-lg border border-border-default bg-surface text-foreground text-sm text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
               />
+              <span className="text-xs text-foreground-muted">{unitLabel}</span>
               <button onClick={saveQty} disabled={saving} aria-label="Save" className="w-7 h-7 flex items-center justify-center rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>
               <button onClick={() => setEditing(false)} aria-label="Cancel" className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-default hover:bg-surface-secondary text-foreground-secondary transition-colors"><X className="w-3.5 h-3.5" /></button>
             </div>
           ) : (
             <button
-              onClick={() => { setNewQty(String(row.quantity)); setEditing(true) }}
+              onClick={() => { setNewQty(displayQty); setEditing(true) }}
               className="text-sm font-bold tabular-nums text-foreground hover:text-secondary-500 dark:hover:text-secondary-400 transition-colors min-w-[2rem] text-right"
             >
-              {row.quantity}
+              {displayQty} <span className="text-xs font-normal text-foreground-muted">{unitLabel}</span>
             </button>
           )}
           <button
@@ -258,15 +284,16 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
               sm
             />
           </div>
-          <div className="w-20">
-            <label className={labelCls}>Qty</label>
+          <div className="w-24">
+            <label className={labelCls}>Qty ({unitLabel})</label>
             <input
               type="number"
               value={moveQty}
               onChange={e => setMoveQty(e.target.value)}
               className="w-full px-2 py-2 rounded-lg border border-border-default bg-surface text-foreground text-xs text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors"
-              min={1}
-              max={row.quantity}
+              min={unitStep}
+              step={unitStep}
+              max={Number(maxSellQty)}
             />
           </div>
           <button
@@ -294,28 +321,90 @@ export function AssignStockForm({ location, onSave, onCancel }: {
   onCancel: () => void
 }) {
   const [query, setQuery] = useState('')
-  const [selected, setSelected] = useState<{ productId: string; variantId: string | null; subVariantId: string | null; label: string; availableQty: number } | null>(null)
+  const [selected, setSelected] = useState<{
+    productId: string; variantId: string | null; subVariantId: string | null
+    label: string
+    inventoryQty: number    // in base units
+    unallocatedQty: number | null  // in base units
+    unitLabel: string; unitFactor: number; unitStep: number; isContinuous: boolean
+  } | null>(null)
   const [qty, setQty] = useState('1')
   const [saving, setSaving] = useState(false)
+  const [loadingAvail, setLoadingAvail] = useState(false)
   const [err, setErr] = useState('')
 
-  function handleSelect(item: { id: string; label: string }) {
+  async function handleSelect(item: { id: string; label: string }) {
     const parts = item.id.split('\x1f')
     const rawId = parts[0]
     let productId = '', variantId: string | null = null, subVariantId: string | null = null
     if (rawId.startsWith('product:')) productId = rawId.slice(8)
     else if (rawId.startsWith('variant:')) { variantId = rawId.slice(8); productId = '' }
     else if (rawId.startsWith('subvariant:')) { subVariantId = rawId.slice(11); productId = '' }
-    const availableQty = parseInt(parts[11] || '0') || 0
-    setSelected({ productId, variantId, subVariantId, label: item.label, availableQty })
+    const inventoryQty = parseInt(parts[11] || '0') || 0  // base units
+    const resolvedProductId = parts[12] || productId
+
+    setSelected({
+      productId, variantId, subVariantId, label: item.label,
+      inventoryQty, unallocatedQty: null,
+      unitLabel: 'unit', unitFactor: 1, unitStep: 1, isContinuous: false
+    })
     setQuery(item.label)
+    setErr('')
+    setQty('1')
+
+    setLoadingAvail(true)
+    try {
+      const [shelfRes, unitRes] = await Promise.all([
+        fetch(`/api/admin/shelving/stock?${new URLSearchParams({
+          ...(productId ? { product_id: productId } : {}),
+          ...(variantId ? { variant_id: variantId } : {}),
+          ...(subVariantId ? { sub_variant_id: subVariantId } : {}),
+        })}`),
+        resolvedProductId
+          ? fetch(`/api/admin/products/${resolvedProductId}/units${variantId ? `?variant_id=${variantId}` : ''}`)
+          : null,
+      ])
+
+      let shelfTotal = 0  // base units
+      if (shelfRes.ok) {
+        const data = await shelfRes.json()
+        shelfTotal = (data.locations || []).reduce((s: number, l: { quantity: number }) => s + (l.quantity || 0), 0)
+      }
+
+      let unitLabel = 'unit', unitFactor = 1, unitStep = 1, isContinuous = false
+      if (unitRes?.ok) {
+        const udata = await unitRes.json()
+        const units: { unit: string; display_label: string | null; factor: number; dimension: string; is_base: boolean; id: string }[] = udata.units || []
+        const sellUnitId = parts[13]
+        const sellUnit = sellUnitId ? units.find(u => u.id === sellUnitId) : units.find(u => u.is_base)
+        if (sellUnit) {
+          unitLabel = sellUnit.display_label || sellUnit.unit
+          unitFactor = Number(sellUnit.factor) || 1
+          isContinuous = ['length', 'weight', 'area', 'volume'].includes(sellUnit.dimension)
+          unitStep = isContinuous ? (unitFactor < 1 ? unitFactor : 0.001) : 1
+        }
+      }
+
+      const unallocatedBase = Math.max(0, inventoryQty - shelfTotal)
+      setSelected(s => s ? { ...s, unallocatedQty: unallocatedBase, unitLabel, unitFactor, unitStep, isContinuous } : s)
+      // Default qty = 1 sell unit
+      setQty(isContinuous ? unitStep.toFixed(3) : '1')
+    } catch { /* non-critical */ } finally {
+      setLoadingAvail(false)
+    }
   }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!selected) { setErr('Select a product first'); return }
-    const qtyNum = parseInt(qty)
-    if (!qtyNum || qtyNum <= 0) { setErr('Enter valid quantity'); return }
+    // qty entered in sell units — convert to base units for API
+    const qtyInSellUnits = selected.isContinuous ? parseFloat(qty) : parseInt(qty)
+    if (!qtyInSellUnits || qtyInSellUnits <= 0) { setErr('Enter valid quantity'); return }
+    const qtyInBaseUnits = Math.round(qtyInSellUnits * selected.unitFactor)
+    if (selected.unallocatedQty !== null && qtyInBaseUnits > selected.unallocatedQty) {
+      const maxSellUnits = toSellUnits(selected.unallocatedQty, selected.unitFactor, selected.isContinuous)
+      setErr(`Only ${maxSellUnits} ${selected.unitLabel}(s) unallocated`); return
+    }
     setSaving(true); setErr('')
     try {
       const res = await fetch('/api/admin/shelving/stock', {
@@ -326,14 +415,34 @@ export function AssignStockForm({ location, onSave, onCancel }: {
           product_id: selected.productId || '',
           variant_id: selected.variantId,
           sub_variant_id: selected.subVariantId,
-          quantity_change: qtyNum,
-          reason: 'receive',
+          quantity_change: qtyInBaseUnits,
+          reason: 'assign',
         }),
       })
       if (!res.ok) throw new Error((await res.json()).error)
       onSave()
     } catch (e: any) { setErr(e.message) } finally { setSaving(false) }
   }
+
+  function toSellUnits(baseQty: number, factor: number, continuous: boolean): number | string {
+    const v = baseQty / factor
+    return continuous ? v.toFixed(3) : Math.floor(v)
+  }
+
+  const unallocatedBase = selected?.unallocatedQty ?? null
+  const factor = selected?.unitFactor ?? 1
+  const isContinuous = selected?.isContinuous ?? false
+  const inventoryBase = selected?.inventoryQty ?? 0
+  const allocatedBase = unallocatedBase !== null ? inventoryBase - unallocatedBase : null
+
+  // Display values in sell units
+  const inventoryDisplay = toSellUnits(inventoryBase, factor, isContinuous)
+  const allocatedDisplay = allocatedBase !== null ? toSellUnits(allocatedBase, factor, isContinuous) : null
+  const unallocatedDisplay = unallocatedBase !== null ? toSellUnits(unallocatedBase, factor, isContinuous) : null
+  const maxQtyInSellUnits = unallocatedBase !== null ? Number(toSellUnits(unallocatedBase, factor, isContinuous)) : undefined
+
+  const unitLabel = selected?.unitLabel ?? 'unit'
+  const fillPct = inventoryBase > 0 && allocatedBase !== null ? Math.round((allocatedBase / inventoryBase) * 100) : 0
 
   return (
     <form onSubmit={submit} className="space-y-3 p-4 bg-surface-secondary rounded-xl border border-border-default">
@@ -351,28 +460,72 @@ export function AssignStockForm({ location, onSave, onCancel }: {
         <AdminTypeahead
           type="label_products"
           value={query}
-          onChange={setQuery}
+          onChange={v => { setQuery(v); if (!v) setSelected(null) }}
           onSelect={handleSelect}
           placeholder="Search product or SKU…"
         />
       </div>
-      <div>
-        <label className={labelCls}>Quantity</label>
-        <div className="flex items-center gap-2">
-          <input type="number" value={qty} onChange={e => setQty(e.target.value)} className={inputCls} min={1} />
-          {selected && selected.availableQty > 0 && (
-            <button
-              type="button"
-              onClick={() => setQty(String(selected.availableQty))}
-              className="shrink-0 px-3 py-2 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors whitespace-nowrap"
-            >
-              Use all ({selected.availableQty})
-            </button>
-          )}
+
+      {selected && (
+        <div className="rounded-lg border border-border-default bg-surface p-3 space-y-2">
+          {loadingAvail ? (
+            <p className="text-xs text-foreground-muted">Loading inventory…</p>
+          ) : unallocatedBase !== null ? (
+            <>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-foreground-muted">Total inventory</span>
+                <span className="font-medium text-foreground">{inventoryDisplay} {unitLabel}</span>
+              </div>
+              <div className="relative h-2 rounded-full bg-surface-secondary overflow-hidden">
+                <div
+                  className="absolute inset-y-0 left-0 rounded-full bg-secondary-400 dark:bg-secondary-500 transition-all"
+                  style={{ width: `${fillPct}%` }}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-foreground-muted">
+                  On shelves: <span className="font-medium text-foreground">{allocatedDisplay} {unitLabel}</span>
+                </span>
+                {unallocatedBase > 0 ? (
+                  <span className="text-green-600 dark:text-green-400 font-medium">{unallocatedDisplay} available</span>
+                ) : (
+                  <span className="text-amber-600 dark:text-amber-400 font-medium">All allocated</span>
+                )}
+              </div>
+            </>
+          ) : null}
         </div>
-      </div>
+      )}
+
+      {selected && (
+        <div>
+          <label className={labelCls}>Quantity to assign ({unitLabel})</label>
+          <div className="flex items-center gap-2">
+            <input
+              type="number"
+              value={qty}
+              onChange={e => setQty(e.target.value)}
+              className={inputCls}
+              min={selected.unitStep}
+              step={selected.unitStep}
+              max={maxQtyInSellUnits}
+              disabled={loadingAvail || unallocatedBase === 0}
+            />
+            {unallocatedBase !== null && unallocatedBase > 0 && (
+              <button
+                type="button"
+                onClick={() => setQty(String(unallocatedDisplay))}
+                className="shrink-0 px-3 py-2 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors whitespace-nowrap"
+              >
+                All ({unallocatedDisplay})
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       <div className="flex gap-2">
-        <button type="submit" disabled={saving || !selected} className={btnPrimary}>
+        <button type="submit" disabled={saving || !selected || loadingAvail || unallocatedBase === 0} className={btnPrimary}>
           {saving ? 'Saving…' : 'Assign'}
         </button>
         <button type="button" onClick={onCancel} className={btnSecondary}>Cancel</button>

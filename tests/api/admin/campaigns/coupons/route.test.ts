@@ -63,6 +63,6 @@ describe('GET /api/admin/campaigns/coupons', () => {
     mockHasScope.mockReturnValue(true)
     mockQueryMany.mockResolvedValue([])
     await GET(makeReq())
-    expect(mockHasScope).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'mailer')
+    expect(mockHasScope).toHaveBeenCalledWith(expect.anything(), expect.anything(), 'mailer:read')
   })
 })

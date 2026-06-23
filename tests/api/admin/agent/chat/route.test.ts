@@ -19,6 +19,10 @@ vi.mock('@/lib/ai-client', () => ({
     }
   },
 }))
+vi.mock('@/lib/rag', () => ({
+  findSimilar: vi.fn().mockResolvedValue([]),
+}))
+
 vi.mock('@/lib/admin-agent/tools', () => ({
   TOOLS: [
     {
