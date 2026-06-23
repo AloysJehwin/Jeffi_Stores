@@ -205,4 +205,115 @@ describe('GET /api/public/invoice/[token]/pdf', () => {
     const callArgs = mockGenerateInvoice.mock.calls[0]
     expect(callArgs[6]).toBe('RETURNED')
   })
+
+  it('uses created_at when invoice_date is null (hits || fallback)', async () => {
+    const orderNoDate = { ...baseOrder, invoice_date: null }
+    const pdfBuffer = Buffer.from('pdf')
+    mockQueryOne.mockResolvedValueOnce(orderNoDate)
+    mockQueryMany.mockResolvedValueOnce(mockItems).mockResolvedValueOnce(mockSettings)
+    mockGenerateInvoice.mockResolvedValueOnce(pdfBuffer as any)
+
+    const res = await GET(makeRequest() as any, params as any)
+    expect(res.status).toBe(200)
+    const callArgs = mockGenerateInvoice.mock.calls[0]
+    expect((callArgs[0] as any).invoice_date).toBe(baseOrder.created_at)
+  })
+
+  it('falls back to customer_phone when address_phone is null', async () => {
+    const orderNoAddrPhone = { ...baseOrder, address_phone: null, customer_phone: '1111111111' }
+    const pdfBuffer = Buffer.from('pdf')
+    mockQueryOne.mockResolvedValueOnce(orderNoAddrPhone)
+    mockQueryMany.mockResolvedValueOnce(mockItems).mockResolvedValueOnce(mockSettings)
+    mockGenerateInvoice.mockResolvedValueOnce(pdfBuffer as any)
+
+    const res = await GET(makeRequest() as any, params as any)
+    expect(res.status).toBe(200)
+    const callArgs = mockGenerateInvoice.mock.calls[0]
+    expect((callArgs[3] as any).phone).toBe('1111111111')
+  })
+
+  it('uses empty settings fallbacks when settings rows are absent', async () => {
+    const pdfBuffer = Buffer.from('pdf')
+    mockQueryOne.mockResolvedValueOnce(baseOrder)
+    mockQueryMany.mockResolvedValueOnce(mockItems).mockResolvedValueOnce([]) // no settings
+    mockGenerateInvoice.mockResolvedValueOnce(pdfBuffer as any)
+
+    const res = await GET(makeRequest() as any, params as any)
+    expect(res.status).toBe(200)
+    const callArgs = mockGenerateInvoice.mock.calls[0]
+    expect((callArgs[2] as any).gstin).toBe('')
+    expect((callArgs[2] as any).bankName).toBe('')
+  })
+
+  it('handles item with null optional fields (hits || fallbacks in item mapping)', async () => {
+    const sparseItem = {
+      product_name: 'Widget',
+      hsn_code: null,
+      gst_rate: null,
+      quantity: 1,
+      unit_price: '100',
+      total_price: '100',
+      taxable_amount: null,
+      cgst_amount: null,
+      sgst_amount: null,
+      igst_amount: null,
+      buy_mode: null,
+      buy_unit: null,
+      discount_amount: null,
+      mrp: null,
+    }
+    const pdfBuffer = Buffer.from('pdf')
+    mockQueryOne.mockResolvedValueOnce(baseOrder)
+    mockQueryMany.mockResolvedValueOnce([sparseItem]).mockResolvedValueOnce(mockSettings)
+    mockGenerateInvoice.mockResolvedValueOnce(pdfBuffer as any)
+
+    const res = await GET(makeRequest() as any, params as any)
+    expect(res.status).toBe(200)
+    const callArgs = mockGenerateInvoice.mock.calls[0]
+    const item = (callArgs[1] as any[])[0]
+    expect(item.hsn_code).toBeNull()
+    expect(item.buy_mode).toBe('unit')
+  })
+
+  it('handles cash_sale with null optional fields (hits || fallbacks in receiptOrder)', async () => {
+    const cashOrder = {
+      ...baseOrder,
+      source: 'cash_sale',
+      invoice_date: null,
+      payment_mode: null,
+      notes: null,
+      taxable_amount: null,
+      cgst_amount: null,
+      sgst_amount: null,
+      igst_amount: null,
+      is_igst: null,
+    }
+    const pdfBuffer = Buffer.from('receipt-pdf')
+    mockQueryOne.mockResolvedValueOnce(cashOrder)
+    mockQueryMany.mockResolvedValueOnce(mockItems).mockResolvedValueOnce(mockSettings)
+    mockGenerateReceipt.mockResolvedValueOnce(pdfBuffer as any)
+
+    const res = await GET(makeRequest() as any, params as any)
+    expect(res.status).toBe(200)
+    expect(mockGenerateReceipt).toHaveBeenCalledTimes(1)
+    const callArgs = mockGenerateReceipt.mock.calls[0]
+    expect((callArgs[0] as any).payment_mode).toBe('Cash')
+    expect((callArgs[0] as any).notes).toBe('')
+    expect((callArgs[0] as any).is_igst).toBe(false)
+  })
+
+  it('skips billingAddress when billing_address_id lookup returns null', async () => {
+    const orderWithBilling = { ...baseOrder, billing_address_id: 'addr2', shipping_address_id: 'addr1' }
+    const pdfBuffer = Buffer.from('pdf')
+    mockQueryOne
+      .mockResolvedValueOnce(orderWithBilling)
+      .mockResolvedValueOnce(null) // billing address not found
+    mockQueryMany.mockResolvedValueOnce(mockItems).mockResolvedValueOnce(mockSettings)
+    mockGenerateInvoice.mockResolvedValueOnce(pdfBuffer as any)
+
+    const res = await GET(makeRequest() as any, params as any)
+    expect(res.status).toBe(200)
+    const callArgs = mockGenerateInvoice.mock.calls[0]
+    expect(callArgs[4]).toBeUndefined()
+  })
 })
