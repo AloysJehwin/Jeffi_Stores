@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 
 export async function requireAuth() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')
   const host = (await headers()).get('host') ?? ''
 

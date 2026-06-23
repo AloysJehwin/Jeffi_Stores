@@ -33,14 +33,15 @@ Schema: {"html":"<email body html>"}`
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer')) {
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
   let body: { scenario?: string; subject?: string }
   try {
     body = await request.json()
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
@@ -83,7 +84,8 @@ export async function POST(request: NextRequest) {
     let obj: { html?: string }
     try {
       obj = JSON.parse(raw)
-    } catch {
+    } catch (err) {
+      console.error('[route]', err)
       const m = raw.match(/\{[\s\S]*\}/)
       if (!m) return NextResponse.json({ error: 'AI returned unparseable response' }, { status: 502 })
       obj = JSON.parse(m[0])

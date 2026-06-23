@@ -53,25 +53,47 @@ export interface PayablesSummary {
 export interface PLMonth {
   month: string
   revenue: number
+  refunds: number
+  net_revenue: number
   cogs: number
   gross_profit: number
   gross_margin_pct: number
+  operating_expenses: number
+  operating_profit: number
   tax_collected: number
   order_count: number
+  revenue_online: number
+  revenue_business: number
+  revenue_cash_sale: number
+  revenue_offline: number
 }
 
 export interface PLTotals {
   revenue: number
+  refunds: number
+  net_revenue: number
   cogs: number
   gross_profit: number
   gross_margin_pct: number
+  operating_expenses: number
+  operating_profit: number
   tax_collected: number
   order_count: number
+  revenue_online: number
+  revenue_business: number
+  revenue_cash_sale: number
+  revenue_offline: number
 }
 
 export interface CashflowMonth {
   month: string
   cash_in: number
+  cash_in_online: number
+  cash_in_business: number
+  cash_in_cash_sale: number
+  cash_in_offline: number
+  po_payments: number
+  refunds_out: number
   cash_out: number
   net: number
   running_balance: number
@@ -242,121 +264,250 @@ export async function getPayables(filters: {
 }
 
 export async function getPLReport(from: string, to: string): Promise<{ monthly: PLMonth[]; totals: PLTotals }> {
-  const rows = await queryMany<any>(`
-    SELECT
-      TO_CHAR(DATE_TRUNC('month', src.created_at), 'YYYY-MM') AS month,
-      COALESCE(SUM(src.total_amount), 0) AS revenue,
-      COALESCE(SUM(src.tax_amount), 0) AS tax_collected,
-      COUNT(*)::int AS order_count,
-      COALESCE(SUM(src.cogs), 0) AS cogs
-    FROM (
+  const toTs = to + ' 23:59:59'
+
+  const [revenueRows, refundRows, opexRows] = await Promise.all([
+    // Revenue: paid active orders, grouped by month + source
+    queryMany<any>(`
       SELECT
-        o.created_at,
-        o.total_amount,
-        o.tax_amount,
-        (SELECT COALESCE(SUM(oi.quantity * COALESCE(pv.cost_price, p.cost_price, 0)), 0)
-         FROM order_items oi
-         JOIN products p ON p.id = oi.product_id
-         LEFT JOIN product_variants pv ON pv.id = oi.variant_id
-         WHERE oi.order_id = o.id) AS cogs
+        TO_CHAR(DATE_TRUNC('month', COALESCE(o.invoice_date, o.created_at)), 'YYYY-MM') AS month,
+        o.source,
+        COALESCE(SUM(o.total_amount), 0)  AS revenue,
+        COALESCE(SUM(o.tax_amount), 0)    AS tax_collected,
+        COUNT(*)::int                      AS order_count,
+        COALESCE(SUM(cogs.line_cogs), 0)  AS cogs
       FROM orders o
+      LEFT JOIN LATERAL (
+        SELECT COALESCE(SUM(oi.quantity * COALESCE(pv.cost_price, p.cost_price, 0)), 0) AS line_cogs
+        FROM order_items oi
+        JOIN products p ON p.id = oi.product_id
+        LEFT JOIN product_variants pv ON pv.id = oi.variant_id
+        WHERE oi.order_id = o.id
+      ) cogs ON TRUE
       WHERE o.payment_status = 'paid'
-        AND o.created_at >= $1
-        AND o.created_at <= $2
+        AND o.status NOT IN ('cancelled', 'returned', 'draft', 'cancel_rejected')
+        AND COALESCE(o.invoice_date, o.created_at) >= $1
+        AND COALESCE(o.invoice_date, o.created_at) <= $2
+      GROUP BY 1, 2
 
       UNION ALL
 
       SELECT
-        cs.created_at,
-        cs.total_amount,
-        cs.tax_amount,
-        0 AS cogs
+        TO_CHAR(DATE_TRUNC('month', cs.created_at), 'YYYY-MM') AS month,
+        'cash_sale' AS source,
+        COALESCE(SUM(cs.total_amount), 0),
+        COALESCE(SUM(cs.tax_amount), 0),
+        COUNT(*)::int,
+        0
       FROM cash_sales cs
       WHERE cs.payment_status = 'paid'
         AND cs.created_at >= $1
         AND cs.created_at <= $2
-    ) src
-    GROUP BY DATE_TRUNC('month', src.created_at)
-    ORDER BY DATE_TRUNC('month', src.created_at)
-  `, [from, to + ' 23:59:59'])
+      GROUP BY 1, 2
+    `, [from, toTs]),
 
-  const monthly: PLMonth[] = (rows || []).map(r => {
-    const revenue = parseFloat(r.revenue)
-    const cogs = parseFloat(r.cogs)
-    const gross_profit = revenue - cogs
-    return {
-      month: r.month,
-      revenue,
-      cogs,
-      gross_profit,
-      gross_margin_pct: revenue > 0 ? Math.round((gross_profit / revenue) * 10000) / 100 : 0,
-      tax_collected: parseFloat(r.tax_collected),
-      order_count: r.order_count,
+    // Refunds: cancelled/returned orders that had been paid
+    queryMany<any>(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', COALESCE(o.invoice_date, o.created_at)), 'YYYY-MM') AS month,
+        COALESCE(SUM(o.total_amount), 0) AS refunds
+      FROM orders o
+      WHERE o.status IN ('cancelled', 'returned')
+        AND o.payment_status = 'paid'
+        AND COALESCE(o.invoice_date, o.created_at) >= $1
+        AND COALESCE(o.invoice_date, o.created_at) <= $2
+      GROUP BY 1
+    `, [from, toTs]),
+
+    // Operating expenses: actual supplier/PO payments made
+    queryMany<any>(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', ep.payment_date::timestamp), 'YYYY-MM') AS month,
+        COALESCE(SUM(ep.amount), 0) AS operating_expenses
+      FROM expense_payments ep
+      WHERE ep.payment_date >= $1::date
+        AND ep.payment_date <= $2::date
+      GROUP BY 1
+    `, [from, to]),
+  ])
+
+  // Merge by month
+  const monthMap: Record<string, PLMonth> = {}
+
+  const ensureMonth = (m: string) => {
+    if (!monthMap[m]) {
+      monthMap[m] = {
+        month: m,
+        revenue: 0, refunds: 0, net_revenue: 0,
+        cogs: 0, gross_profit: 0, gross_margin_pct: 0,
+        operating_expenses: 0, operating_profit: 0,
+        tax_collected: 0, order_count: 0,
+        revenue_online: 0, revenue_business: 0,
+        revenue_cash_sale: 0, revenue_offline: 0,
+      }
     }
-  })
+    return monthMap[m]
+  }
 
+  for (const r of (revenueRows || [])) {
+    const row = ensureMonth(r.month)
+    const rev = parseFloat(r.revenue)
+    row.revenue += rev
+    row.tax_collected += parseFloat(r.tax_collected)
+    row.order_count += r.order_count
+    row.cogs += parseFloat(r.cogs)
+    if (r.source === 'online')     row.revenue_online    += rev
+    else if (r.source === 'business') row.revenue_business  += rev
+    else if (r.source === 'cash_sale') row.revenue_cash_sale += rev
+    else                            row.revenue_offline   += rev
+  }
+
+  for (const r of (refundRows || [])) {
+    const row = ensureMonth(r.month)
+    row.refunds += parseFloat(r.refunds)
+  }
+
+  for (const r of (opexRows || [])) {
+    const row = ensureMonth(r.month)
+    row.operating_expenses += parseFloat(r.operating_expenses)
+  }
+
+  // Compute derived fields
+  for (const row of Object.values(monthMap)) {
+    row.net_revenue = row.revenue - row.refunds
+    row.gross_profit = row.net_revenue - row.cogs
+    row.gross_margin_pct = row.net_revenue > 0
+      ? Math.round((row.gross_profit / row.net_revenue) * 10000) / 100
+      : 0
+    row.operating_profit = row.gross_profit - row.operating_expenses
+  }
+
+  const monthly = Object.values(monthMap).sort((a, b) => a.month.localeCompare(b.month))
+
+  const zero: PLTotals = {
+    revenue: 0, refunds: 0, net_revenue: 0, cogs: 0,
+    gross_profit: 0, gross_margin_pct: 0, operating_expenses: 0,
+    operating_profit: 0, tax_collected: 0, order_count: 0,
+    revenue_online: 0, revenue_business: 0, revenue_cash_sale: 0, revenue_offline: 0,
+  }
   const totals = monthly.reduce<PLTotals>((acc, m) => ({
-    revenue: acc.revenue + m.revenue,
-    cogs: acc.cogs + m.cogs,
-    gross_profit: acc.gross_profit + m.gross_profit,
-    gross_margin_pct: 0,
-    tax_collected: acc.tax_collected + m.tax_collected,
-    order_count: acc.order_count + m.order_count,
-  }), { revenue: 0, cogs: 0, gross_profit: 0, gross_margin_pct: 0, tax_collected: 0, order_count: 0 })
-  totals.gross_margin_pct = totals.revenue > 0
-    ? Math.round((totals.gross_profit / totals.revenue) * 10000) / 100
+    revenue:              acc.revenue + m.revenue,
+    refunds:              acc.refunds + m.refunds,
+    net_revenue:          acc.net_revenue + m.net_revenue,
+    cogs:                 acc.cogs + m.cogs,
+    gross_profit:         acc.gross_profit + m.gross_profit,
+    gross_margin_pct:     0,
+    operating_expenses:   acc.operating_expenses + m.operating_expenses,
+    operating_profit:     acc.operating_profit + m.operating_profit,
+    tax_collected:        acc.tax_collected + m.tax_collected,
+    order_count:          acc.order_count + m.order_count,
+    revenue_online:       acc.revenue_online + m.revenue_online,
+    revenue_business:     acc.revenue_business + m.revenue_business,
+    revenue_cash_sale:    acc.revenue_cash_sale + m.revenue_cash_sale,
+    revenue_offline:      acc.revenue_offline + m.revenue_offline,
+  }), zero)
+  totals.gross_margin_pct = totals.net_revenue > 0
+    ? Math.round((totals.gross_profit / totals.net_revenue) * 10000) / 100
     : 0
 
   return { monthly, totals }
 }
 
 export async function getCashflow(from: string, to: string): Promise<{ monthly: CashflowMonth[] }> {
-  const [inRows, outRows] = await Promise.all([
-    queryMany<{ month: string; cash_in: string }>(`
+  const toTs = to + ' 23:59:59'
+
+  const [inRows, poRows, refundRows] = await Promise.all([
+    // Cash in: paid active orders + cash sales, by source
+    queryMany<any>(`
       SELECT
-        TO_CHAR(DATE_TRUNC('month', created_at), 'YYYY-MM') AS month,
-        COALESCE(SUM(total_amount), 0) AS cash_in
-      FROM (
-        SELECT created_at, total_amount FROM orders
-        WHERE payment_status = 'paid'
-          AND created_at >= $1 AND created_at <= $2
-        UNION ALL
-        SELECT created_at, total_amount FROM cash_sales
-        WHERE payment_status = 'paid'
-          AND created_at >= $1 AND created_at <= $2
-      ) src
-      GROUP BY DATE_TRUNC('month', created_at)
-      ORDER BY DATE_TRUNC('month', created_at)
-    `, [from, to + ' 23:59:59']),
-    queryMany<{ month: string; cash_out: string }>(`
+        TO_CHAR(DATE_TRUNC('month', COALESCE(o.invoice_date, o.created_at)), 'YYYY-MM') AS month,
+        o.source,
+        COALESCE(SUM(o.total_amount), 0) AS amount
+      FROM orders o
+      WHERE o.payment_status = 'paid'
+        AND o.status NOT IN ('cancelled', 'returned', 'draft', 'cancel_rejected')
+        AND COALESCE(o.invoice_date, o.created_at) >= $1
+        AND COALESCE(o.invoice_date, o.created_at) <= $2
+      GROUP BY 1, 2
+
+      UNION ALL
+
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', cs.created_at), 'YYYY-MM') AS month,
+        'cash_sale' AS source,
+        COALESCE(SUM(cs.total_amount), 0)
+      FROM cash_sales cs
+      WHERE cs.payment_status = 'paid'
+        AND cs.created_at >= $1 AND cs.created_at <= $2
+      GROUP BY 1, 2
+    `, [from, toTs]),
+
+    // Cash out: PO / supplier bill payments
+    queryMany<any>(`
       SELECT
         TO_CHAR(DATE_TRUNC('month', ep.payment_date::timestamp), 'YYYY-MM') AS month,
-        COALESCE(SUM(ep.amount), 0) AS cash_out
+        COALESCE(SUM(ep.amount), 0) AS po_payments
       FROM expense_payments ep
       WHERE ep.payment_date >= $1::date AND ep.payment_date <= $2::date
-      GROUP BY DATE_TRUNC('month', ep.payment_date::timestamp)
-      ORDER BY DATE_TRUNC('month', ep.payment_date::timestamp)
+      GROUP BY 1
     `, [from, to]),
+
+    // Cash out: refunds for cancelled/returned paid orders
+    queryMany<any>(`
+      SELECT
+        TO_CHAR(DATE_TRUNC('month', o.updated_at), 'YYYY-MM') AS month,
+        COALESCE(SUM(o.total_amount), 0) AS refunds_out
+      FROM orders o
+      WHERE o.status IN ('cancelled', 'returned')
+        AND o.payment_status = 'paid'
+        AND o.updated_at >= $1 AND o.updated_at <= $2
+      GROUP BY 1
+    `, [from, toTs]),
   ])
 
-  const monthSet = new Set<string>()
-  ;(inRows || []).forEach(r => monthSet.add(r.month))
-  ;(outRows || []).forEach(r => monthSet.add(r.month))
+  const monthMap: Record<string, CashflowMonth> = {}
+  const ensure = (m: string) => {
+    if (!monthMap[m]) {
+      monthMap[m] = {
+        month: m,
+        cash_in: 0,
+        cash_in_online: 0, cash_in_business: 0,
+        cash_in_cash_sale: 0, cash_in_offline: 0,
+        po_payments: 0, refunds_out: 0,
+        cash_out: 0, net: 0, running_balance: 0,
+      }
+    }
+    return monthMap[m]
+  }
 
-  const inMap: Record<string, number> = {}
-  ;(inRows || []).forEach(r => { inMap[r.month] = parseFloat(r.cash_in) })
-  const outMap: Record<string, number> = {}
-  ;(outRows || []).forEach(r => { outMap[r.month] = parseFloat(r.cash_out) })
+  for (const r of (inRows || [])) {
+    const row = ensure(r.month)
+    const amt = parseFloat(r.amount)
+    row.cash_in += amt
+    if (r.source === 'online')      row.cash_in_online    += amt
+    else if (r.source === 'business') row.cash_in_business  += amt
+    else if (r.source === 'cash_sale') row.cash_in_cash_sale += amt
+    else                             row.cash_in_offline   += amt
+  }
 
-  const sortedMonths = Array.from(monthSet).sort()
+  for (const r of (poRows || [])) {
+    ensure(r.month).po_payments += parseFloat(r.po_payments)
+  }
+
+  for (const r of (refundRows || [])) {
+    ensure(r.month).refunds_out += parseFloat(r.refunds_out)
+  }
+
   let running = 0
-  const monthly: CashflowMonth[] = sortedMonths.map(month => {
-    const cash_in = inMap[month] || 0
-    const cash_out = outMap[month] || 0
-    const net = cash_in - cash_out
-    running += net
-    return { month, cash_in, cash_out, net, running_balance: Math.round(running * 100) / 100 }
-  })
+  const monthly = Object.values(monthMap)
+    .sort((a, b) => a.month.localeCompare(b.month))
+    .map(row => {
+      row.cash_out = row.po_payments + row.refunds_out
+      row.net = row.cash_in - row.cash_out
+      running += row.net
+      row.running_balance = Math.round(running * 100) / 100
+      return row
+    })
 
   return { monthly }
 }

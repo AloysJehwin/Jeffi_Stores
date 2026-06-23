@@ -3,7 +3,8 @@ import { requireAdminScope } from '@/lib/jwt'
 import { queryOne, query } from '@/lib/db'
 import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } from '@/lib/email-business'
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await requireAdminScope(request, 'business_customers')
   if (admin instanceof NextResponse) return admin
 
@@ -14,7 +15,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   const profile = await queryOne<{ id: string }>(
     'SELECT id FROM business_profiles WHERE user_id = $1',
-    [params.id]
+    [id]
   )
   if (!profile) return NextResponse.json({ error: 'Business profile not found' }, { status: 404 })
 
@@ -23,13 +24,13 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     `SELECT u.email, u.first_name, u.last_name, bp.company_name
      FROM users u JOIN business_profiles bp ON bp.user_id = u.id
      WHERE u.id = $1`,
-    [params.id]
+    [id]
   )
 
   if (action === 'approve') {
     await query(
       `UPDATE business_profiles SET approval_status='approved', approved_by=$1, approved_at=NOW(), rejection_note=NULL, updated_at=NOW() WHERE user_id=$2`,
-      [admin.adminId, params.id]
+      [admin.adminId, id]
     )
     if (userInfo?.email) {
       const name = [userInfo.first_name, userInfo.last_name].filter(Boolean).join(' ') || userInfo.email
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   } else {
     await query(
       `UPDATE business_profiles SET approval_status='rejected', approved_by=$1, approved_at=NOW(), rejection_note=$2, updated_at=NOW() WHERE user_id=$3`,
-      [admin.adminId, rejectionNote || null, params.id]
+      [admin.adminId, rejectionNote || null, id]
     )
     if (userInfo?.email) {
       const name = [userInfo.first_name, userInfo.last_name].filter(Boolean).join(' ') || userInfo.email

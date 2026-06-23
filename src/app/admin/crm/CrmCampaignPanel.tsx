@@ -147,7 +147,7 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
     }
   }
 
-  const inputCls = 'w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
+  const inputCls = 'w-full px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
 
   const previewSubject = form ? renderTemplate(form.subject_template, SAMPLE_VARS) : ''
   const previewBody = form ? renderTemplate(form.body_template, SAMPLE_VARS) : ''

@@ -3,13 +3,16 @@ import { DashboardStats } from '@/types'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
 
 export const VARIANT_STOCK_TOTAL_SQL = `
-  COALESCE((SELECT SUM(
-    CASE
-      WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
-      THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
-      ELSE pv.stock_quantity
-    END
-  ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0)
+  COALESCE((SELECT COUNT(*) FROM product_variants pv
+    WHERE pv.product_id = p.id AND pv.is_active = true
+    AND (
+      (EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+       AND EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.stock_status != 'Out of Stock'))
+      OR
+      (NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+       AND pv.stock_status != 'Out of Stock')
+    )
+  ), 0)
 `
 
 export const VARIANT_INVENTORY_TOTAL_SQL = `
@@ -23,6 +26,20 @@ export const VARIANT_INVENTORY_TOTAL_SQL = `
 `
 
 export const VARIANT_MIN_PRICE_SQL = `
+  (SELECT MIN(price) FROM (
+    SELECT pv.price
+    FROM product_variants pv
+    WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+    UNION ALL
+    SELECT sv.price
+    FROM product_sub_variants sv
+    JOIN product_variants pv ON pv.id = sv.variant_id
+    WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
+  ) AS combined_prices)
+`
+
+export const VARIANT_MIN_PRICE_INCL_GST_SQL = `
   (SELECT MIN(price) FROM (
     SELECT pv.price
     FROM product_variants pv
@@ -80,7 +97,7 @@ export async function getDashboardStats(): Promise<DashboardStats> {
         FROM orders WHERE payment_status = $1
       `, ['paid']),
       queryCount('SELECT COUNT(*) FROM users WHERE is_active = $1 AND is_guest = $2', [true, false]),
-      queryCount('SELECT COUNT(*) FROM products WHERE stock_quantity <= low_stock_threshold'),
+      queryCount("SELECT COUNT(*) FROM products WHERE stock_status = 'Low Stock'"),
       queryCount('SELECT COUNT(*) FROM orders WHERE status = $1', ['pending']),
       queryCount("SELECT COUNT(*) FROM users WHERE is_active = TRUE AND is_guest = FALSE AND created_at >= date_trunc('month', NOW())"),
     ])
@@ -132,13 +149,16 @@ export async function getAllProducts() {
         '[]'::json
       ) AS product_images,
       COALESCE(
-        (SELECT SUM(
-          CASE
-            WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
-            THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
-            ELSE pv.stock_quantity
-          END
-        ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+        (SELECT COUNT(*) FROM product_variants pv
+          WHERE pv.product_id = p.id AND pv.is_active = true
+          AND (
+            (EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+             AND EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.stock_status != 'Out of Stock'))
+            OR
+            (NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+             AND pv.stock_status != 'Out of Stock')
+          )
+        ),
         0
       ) AS variant_stock_total,
       COALESCE(
@@ -187,11 +207,9 @@ export async function getProduct(id: string) {
           jsonb_build_object(
             'id', pv.id, 'sku', pv.sku, 'variant_name', pv.variant_name,
             'price', pv.price, 'mrp', pv.mrp, 'mrp_ex_gst', pv.mrp_ex_gst, 'price_ex_gst', pv.price_ex_gst,
-            'wholeprice_ex_gst', pv.wholeprice_ex_gst, 'stock_quantity', pv.stock_quantity, 'inventory_quantity', pv.inventory_quantity,
+            'stock_status', pv.stock_status, 'inventory_quantity', pv.inventory_quantity,
             'mpn', pv.mpn, 'gtin', pv.gtin, 'pricing_type', pv.pricing_type,
             'unit', pv.unit, 'numeric_value', pv.numeric_value,
-            'weight_rate', pv.weight_rate, 'weight_unit', pv.weight_unit,
-            'length_rate', pv.length_rate, 'length_unit', pv.length_unit,
             'weight_grams', pv.weight_grams, 'package_type', pv.package_type,
             'length_cm', pv.length_cm, 'breadth_cm', pv.breadth_cm, 'height_cm', pv.height_cm,
             'sub_variant_type', pv.sub_variant_type, 'variant_type', pv.variant_type,
@@ -206,8 +224,8 @@ export async function getProduct(id: string) {
                 jsonb_build_object(
                   'id', sv.id, 'sub_variant_name', sv.sub_variant_name, 'sku', sv.sku,
                   'price', sv.price, 'mrp', sv.mrp, 'mrp_ex_gst', sv.mrp_ex_gst,
-                  'price_ex_gst', sv.price_ex_gst, 'wholeprice_ex_gst', sv.wholeprice_ex_gst,
-                  'stock_quantity', sv.stock_quantity, 'inventory_quantity', sv.inventory_quantity,
+                  'price_ex_gst', sv.price_ex_gst,
+                  'stock_status', sv.stock_status, 'inventory_quantity', sv.inventory_quantity,
                   'is_active', sv.is_active
                 )
                 ORDER BY sv.sub_variant_name
@@ -216,7 +234,7 @@ export async function getProduct(id: string) {
               '[]'::json
             ),
             'sub_variant_min_price', (SELECT MIN(sv.price) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.price IS NOT NULL),
-            'sub_variant_stock_total', COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0),
+            'sub_variant_stock_total', COALESCE((SELECT COUNT(*) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.stock_status != 'Out of Stock'), 0),
             'sub_variant_inventory_total', COALESCE((SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
           )
           ORDER BY pv.variant_name
@@ -225,13 +243,16 @@ export async function getProduct(id: string) {
         '[]'::json
       ) AS product_variants,
       COALESCE(
-        (SELECT SUM(
-          CASE
-            WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
-            THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
-            ELSE pv.stock_quantity
-          END
-        ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+        (SELECT COUNT(*) FROM product_variants pv
+          WHERE pv.product_id = p.id AND pv.is_active = true
+          AND (
+            (EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+             AND EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.stock_status != 'Out of Stock'))
+            OR
+            (NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+             AND pv.stock_status != 'Out of Stock')
+          )
+        ),
         0
       ) AS variant_stock_total,
       COALESCE(
@@ -379,7 +400,7 @@ const PRODUCT_SORT_COLS: Record<string, string> = {
   name: 'p.name',
   sku: 'p.sku',
   price: 'p.price',
-  stock: 'p.stock_quantity',
+  stock: 'p.stock_status',
   created_at: 'p.created_at',
   category: 'c.name',
   brand: 'b.name',
@@ -422,16 +443,9 @@ export async function getFilteredProducts(filters: {
     params.push(filters.is_active === 'true')
   }
   if (filters.stock === 'low') {
-    conditions.push(`(
-      (p.has_variants = false AND p.stock_quantity <= p.low_stock_threshold AND p.stock_quantity > 0)
-      OR (p.has_variants = true AND COALESCE((SELECT SUM(pv2.stock_quantity) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true), 0) > 0
-        AND COALESCE((SELECT SUM(pv2.stock_quantity) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true), 0) <= p.low_stock_threshold)
-    )`)
+    conditions.push(`p.stock_status = 'Low Stock'`)
   } else if (filters.stock === 'out') {
-    conditions.push(`(
-      (p.has_variants = false AND p.stock_quantity = 0)
-      OR (p.has_variants = true AND COALESCE((SELECT SUM(pv2.stock_quantity) FROM product_variants pv2 WHERE pv2.product_id = p.id AND pv2.is_active = true), 0) = 0)
-    )`)
+    conditions.push(`p.stock_status = 'Out of Stock'`)
   }
   let rankExpr = '0::int'
   if (filters.search) {
@@ -472,13 +486,16 @@ export async function getFilteredProducts(filters: {
           '[]'::json
         ) AS product_images,
         COALESCE(
-          (SELECT SUM(
-            CASE
-              WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
-              THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
-              ELSE pv.stock_quantity
-            END
-          ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+          (SELECT COUNT(*) FROM product_variants pv
+            WHERE pv.product_id = p.id AND pv.is_active = true
+            AND (
+              (EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+               AND EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.stock_status != 'Out of Stock'))
+              OR
+              (NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+               AND pv.stock_status != 'Out of Stock')
+            )
+          ),
           0
         ) AS variant_stock_total,
         COALESCE(
@@ -974,6 +991,8 @@ export async function getOrder(id: string) {
             'created_at', oi.created_at,
             'variant_id', oi.variant_id,
             'sub_variant_id', oi.sub_variant_id,
+            'sell_unit_factor', (SELECT pu.factor FROM product_units pu WHERE pu.unit = oi.buy_unit AND pu.product_id = oi.product_id LIMIT 1),
+            'sell_unit_dimension', (SELECT pu.dimension FROM product_units pu WHERE pu.unit = oi.buy_unit AND pu.product_id = oi.product_id LIMIT 1),
             'products', json_build_object(
               'id', pr.id, 'name', pr.name, 'sku', pr.sku,
               'inventory_quantity', pr.inventory_quantity

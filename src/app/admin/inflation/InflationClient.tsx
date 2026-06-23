@@ -15,7 +15,6 @@ interface PriceSnapshot {
   mrp: number | null
   price_ex_gst: number | null
   base_price: number | null
-  wholeprice_ex_gst: number | null
 }
 
 interface PreviewVariant {
@@ -69,7 +68,6 @@ const PREVIEW_COLS: { key: keyof PriceSnapshot; label: string }[] = [
   { key: 'mrp', label: 'MRP (incl. GST)' },
   { key: 'price_ex_gst', label: 'Selling Price (Ex. GST)' },
   { key: 'base_price', label: 'Selling Price (incl. GST)' },
-  { key: 'wholeprice_ex_gst', label: 'Wholesale (Ex. GST)' },
 ]
 
 function fmt(val: number | null): string {

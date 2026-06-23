@@ -256,6 +256,7 @@ export default function PackingSlipsClient({ initialOrders }: { initialOrders: O
         </div>
         <div className="flex flex-wrap gap-2 items-center">
           <AdminSelect
+            sm
             value={statusFilter}
             options={STATUS_OPTIONS}
             onChange={v => { setStatusFilter(v); syncUrl({ status: v }) }}

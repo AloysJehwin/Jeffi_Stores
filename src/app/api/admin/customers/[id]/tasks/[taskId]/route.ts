@@ -8,18 +8,19 @@ export const dynamic = 'force-dynamic'
 
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string; taskId: string } }
+  { params }: { params: Promise<{ id: string; taskId: string }> }
 ) {
+  const { id, taskId } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const body = await req.json()
   const { title, description, due_date, priority, status, assigned_to } = body
 
   const current = await queryOne<{ status: string; title: string }>(
     `SELECT status, title FROM customer_tasks WHERE id = $1 AND user_id = $2`,
-    [params.taskId, params.id]
+    [taskId, id]
   )
   if (!current) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
 
@@ -58,7 +59,7 @@ export async function PATCH(
     }
   }
 
-  vals.push(params.taskId, params.id)
+  vals.push(taskId, id)
   await query(
     `UPDATE customer_tasks SET ${updates.join(', ')} WHERE id = $${i++} AND user_id = $${i++}`,
     vals
@@ -66,10 +67,10 @@ export async function PATCH(
 
   if (status === 'completed' && current.status !== 'completed') {
     logActivity({
-      userId: params.id,
+      userId: id,
       actorId: admin.adminId,
       kind: 'task_completed',
-      referenceId: params.taskId,
+      referenceId: taskId,
       referenceType: 'customer_tasks',
       summary: `Task completed: ${current.title}`,
     }).catch(() => {})
@@ -80,12 +81,13 @@ export async function PATCH(
 
 export async function DELETE(
   req: NextRequest,
-  { params }: { params: { id: string; taskId: string } }
+  { params }: { params: Promise<{ id: string; taskId: string }> }
 ) {
+  const { id, taskId } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'customers')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  await query(`DELETE FROM customer_tasks WHERE id = $1 AND user_id = $2`, [params.taskId, params.id])
+  await query(`DELETE FROM customer_tasks WHERE id = $1 AND user_id = $2`, [taskId, id])
   return NextResponse.json({ success: true })
 }

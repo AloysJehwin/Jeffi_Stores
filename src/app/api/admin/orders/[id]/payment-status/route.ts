@@ -5,11 +5,12 @@ import { query, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
     const { payment_status } = body
@@ -19,12 +20,12 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       return NextResponse.json({ error: 'Invalid payment_status' }, { status: 400 })
     }
 
-    const order = await queryOne<{ id: string }>('SELECT id FROM orders WHERE id = $1', [params.id])
+    const order = await queryOne<{ id: string }>('SELECT id FROM orders WHERE id = $1', [id])
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
     await query(
       'UPDATE orders SET payment_status = $1, updated_at = NOW() WHERE id = $2',
-      [payment_status, params.id]
+      [payment_status, id]
     )
 
     return NextResponse.json({ success: true, payment_status })

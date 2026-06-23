@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/admin-path'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 interface ParamDef {
   type: 'integer' | 'number' | 'boolean'
@@ -225,19 +226,18 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                               {isOverridden && <span className="ml-2 px-1.5 py-0.5 text-[9px] font-bold rounded bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">OVERRIDDEN</span>}
                             </label>
                             {def.type === 'boolean' ? (
-                              <select
+                              <AdminSelect
                                 value={isOverridden ? String(overrideVal) : ''}
-                                onChange={e => {
-                                  const v = e.target.value
+                                onChange={v => {
                                   if (v === '') setOverrideValue(c.kind, key, null)
                                   else setOverrideValue(c.kind, key, v === 'true')
                                 }}
-                                className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-                              >
-                                <option value="">Default ({String(defaultVal)})</option>
-                                <option value="true">true</option>
-                                <option value="false">false</option>
-                              </select>
+                                options={[
+                                  { value: '', label: `Default (${String(defaultVal)})` },
+                                  { value: 'true', label: 'true' },
+                                  { value: 'false', label: 'false' },
+                                ]}
+                              />
                             ) : (
                               <input
                                 type="number"
@@ -250,7 +250,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                                   if (raw === '') setOverrideValue(c.kind, key, null)
                                   else setOverrideValue(c.kind, key, def.type === 'integer' ? parseInt(raw, 10) : parseFloat(raw))
                                 }}
-                                className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                                className="w-full px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                               />
                             )}
                             {def.description && <p className="text-[10px] text-foreground-muted mt-1">{def.description}</p>}

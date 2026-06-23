@@ -70,8 +70,8 @@ export async function canSendMarketing(userId: string, campaignKind: CampaignKin
 
   const recent = await queryOne<{ cnt: string }>(
     `SELECT COUNT(*)::text AS cnt FROM email_campaigns_sent
-     WHERE user_id = $1 AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`,
-    [userId]
+     WHERE user_id = $1 AND campaign_kind = $2 AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`,
+    [userId, campaignKind]
   )
   if (recent && parseInt(recent.cnt, 10) >= 1) {
     return { ok: false, reason: 'frequency_cap' }
@@ -85,11 +85,15 @@ export async function alreadySentForReference(
   userId: string,
   referenceId: string | null
 ): Promise<boolean> {
+  const timeFilter = referenceId === null
+    ? `AND sent_at > NOW() - INTERVAL '${FREQUENCY_CAP_HOURS} hours'`
+    : ''
   const row = await queryOne<{ id: string }>(
     `SELECT id FROM email_campaigns_sent
      WHERE campaign_kind = $1 AND user_id = $2
        AND COALESCE(reference_id, '') = COALESCE($3, '')
        AND unsubscribed_at IS NULL AND bounced_at IS NULL AND complained_at IS NULL
+       ${timeFilter}
      LIMIT 1`,
     [campaignKind, userId, referenceId]
   )
@@ -117,7 +121,18 @@ export async function recordSent(params: {
         JSON.stringify(params.metadata ?? {}),
       ]
     )
-    return result.rows[0]?.id ?? null
+    const sentId = result.rows[0]?.id ?? null
+    if (sentId) {
+      await query(
+        `INSERT INTO campaign_send_counts (campaign_kind, user_id, send_count, last_sent_at)
+         VALUES ($1, $2, 1, NOW())
+         ON CONFLICT (campaign_kind, user_id) DO UPDATE
+           SET send_count   = campaign_send_counts.send_count + 1,
+               last_sent_at = NOW()`,
+        [params.campaignKind, params.userId]
+      )
+    }
+    return sentId
   } catch {
     return null
   }

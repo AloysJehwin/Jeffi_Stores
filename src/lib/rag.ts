@@ -25,7 +25,7 @@ function getPool(): Pool {
       port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
       user: process.env.RAG_PG_USER || 'postgres',
       password,
-      database: process.env.RAG_PG_DB || 'jeffi_dev',
+      database: process.env.RAG_PG_DB || 'jeffi_replica',
       max: 4,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,

@@ -1,6 +1,7 @@
 import type { PoolClient } from 'pg'
 import { queryMany, queryOne, withTransaction } from './db'
 import { isInterState, calculateGST } from './gst'
+import { createDraftInvoice } from './invoice'
 import type { DraftBuyNowItem, DraftCartItem } from './order-draft'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
@@ -21,9 +22,11 @@ export interface CartLine {
     price_ex_gst: number | null
     gst_percentage: string | number | null
     hsn_code: string | null
+    category_id: string | null
+    mrp: number | null
   }
-  variant: { id: string; variant_name: string; sku: string; price: number | null; price_ex_gst: number | null } | null
-  sub_variant: { id: string; sub_variant_name: string; sku: string | null; price: number | null; price_ex_gst: number | null } | null
+  variant: { id: string; variant_name: string; sku: string; price: number | null; price_ex_gst: number | null; mrp: number | null } | null
+  sub_variant: { id: string; sub_variant_name: string; sku: string | null; price: number | null; price_ex_gst: number | null; mrp: number | null } | null
 }
 
 export async function loadActiveCart(userId: string): Promise<CartLine[]> {
@@ -34,18 +37,19 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
       json_build_object(
         'id', p.id, 'name', p.name, 'sku', p.sku,
         'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
-        'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code
+        'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
+        'category_id', p.category_id, 'mrp', p.mrp
       ) AS products,
       CASE WHEN ci.variant_id IS NOT NULL THEN
         json_build_object(
           'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
-          'price', pv.price, 'price_ex_gst', pv.price_ex_gst
+          'price', pv.price, 'price_ex_gst', pv.price_ex_gst, 'mrp', pv.mrp
         )
       ELSE NULL END AS variant,
       CASE WHEN ci.sub_variant_id IS NOT NULL THEN
         json_build_object(
           'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
-          'price', psv.price, 'price_ex_gst', psv.price_ex_gst
+          'price', psv.price, 'price_ex_gst', psv.price_ex_gst, 'mrp', psv.mrp
         )
       ELSE NULL END AS sub_variant
     FROM cart_items ci
@@ -57,9 +61,13 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
 }
 
 export function cartLineUnitPrice(item: CartLine): number {
-  const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-  if (isCustomQty) return Number(item.price_at_addition)
-  return Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+  const basePrice = Number(item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst ?? item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+  // If the cart item was stored with a unit factor already applied in price_at_addition, use that directly.
+  // Otherwise fall back to raw variant price.
+  if (item.price_at_addition && Number(item.price_at_addition) > 0) {
+    return Number(item.price_at_addition)
+  }
+  return basePrice
 }
 
 export function cartItemsForHash(items: CartLine[]): DraftCartItem[] {
@@ -100,24 +108,22 @@ export async function resolveBuyNowItem(input: {
   if (!input.productId) return { ok: false, error: 'productId required' }
   const qty = Number(input.qty)
   if (!Number.isFinite(qty) || qty <= 0 || qty > 10_000) return { ok: false, error: 'Invalid qty' }
-  const buyMode = ['unit', 'weight', 'length'].includes(String(input.buyMode || 'unit')) ? String(input.buyMode || 'unit') : 'unit'
+  const buyMode = input.buyMode || 'unit'
 
   const product = await queryOne<{
     id: string
     is_active: boolean
     base_price: string | number | null
-    weight_rate: string | number | null
-    length_rate: string | number | null
   }>(
-    `SELECT id, is_active, base_price, weight_rate, length_rate FROM products WHERE id = $1`,
+    `SELECT id, is_active, base_price FROM products WHERE id = $1`,
     [input.productId]
   )
   if (!product || !product.is_active) return { ok: false, error: 'Product not found or inactive' }
 
-  let variant: { id: string; price: string | number | null; weight_rate: string | number | null; length_rate: string | number | null } | null = null
+  let variant: { id: string; price: string | number | null } | null = null
   if (input.variantId) {
     variant = await queryOne(
-      `SELECT id, price, weight_rate, length_rate
+      `SELECT id, price
          FROM product_variants
         WHERE id = $1 AND product_id = $2 AND is_active = TRUE`,
       [input.variantId, input.productId]
@@ -136,13 +142,32 @@ export async function resolveBuyNowItem(input: {
     if (!subVariant) return { ok: false, error: 'Sub-variant not found' }
   }
 
-  let price: number
-  if (buyMode === 'weight') {
-    price = Number(variant?.weight_rate ?? product.weight_rate ?? 0)
-  } else if (buyMode === 'length') {
-    price = Number(variant?.length_rate ?? product.length_rate ?? 0)
-  } else {
-    price = Number(subVariant?.price ?? variant?.price ?? product.base_price ?? 0)
+  let price: number = Number(subVariant?.price ?? variant?.price ?? product.base_price ?? 0)
+  // Apply unit factor if buyMode is a real unit key (not 'unit')
+  if (buyMode && buyMode !== 'unit') {
+    const effectiveVariantId = input.variantId || null
+    const effectiveSubVariantId = input.subVariantId || null
+    // Prefer sub-variant-level unit, then variant-level, then product-level
+    const unitRow = await queryOne<{ factor: string | number }>(
+      `SELECT factor FROM product_units
+       WHERE product_id = $1 AND unit = $2
+         AND (
+           ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
+           OR (sub_variant_id IS NULL AND variant_id = $3 AND NOT EXISTS (
+             SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2 AND pu2.sub_variant_id = $4::uuid
+           ))
+           OR (sub_variant_id IS NULL AND variant_id IS NULL AND NOT EXISTS (
+             SELECT 1 FROM product_units pu2 WHERE pu2.product_id = $1 AND pu2.unit = $2
+               AND (pu2.sub_variant_id = $4::uuid OR pu2.variant_id = $3)
+           ))
+         )
+       ORDER BY sub_variant_id NULLS LAST, variant_id NULLS LAST
+       LIMIT 1`,
+      [input.productId, buyMode, effectiveVariantId, effectiveSubVariantId]
+    )
+    if (unitRow) {
+      price = Math.round(price * Number(unitRow.factor) * 100) / 100
+    }
   }
   if (!Number.isFinite(price) || price <= 0) return { ok: false, error: 'Could not resolve price for this product' }
   price = Math.round(price * 100) / 100
@@ -267,6 +292,7 @@ export async function quoteShipping(input: {
   try {
     const res = await fetch(new URL('/api/shipping/rate', origin).toString(), {
       method: 'POST',
+      signal: AbortSignal.timeout(4000),
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         destinationPin: input.destinationPin,
@@ -314,17 +340,19 @@ export interface CartCommitInput extends CommitInput {
   subtotal: number
   taxAmount: number
   appliedDiscount: number
+  businessDiscountAmount: number
 }
 
 export interface BuyNowCommitInput extends CommitInput {
   mode: 'buyNow'
   item: DraftBuyNowItem
-  product: { id: string; name: string; sku: string | null; gst_percentage: string | number | null; hsn_code: string | null }
-  variant: { id: string; variant_name: string; sku: string } | null
-  subVariant: { id: string; sub_variant_name: string; sku: string | null } | null
+  product: { id: string; name: string; sku: string | null; gst_percentage: string | number | null; hsn_code: string | null; mrp: number | null }
+  variant: { id: string; variant_name: string; sku: string; mrp: number | null } | null
+  subVariant: { id: string; sub_variant_name: string; sku: string | null; mrp: number | null } | null
   subtotal: number
   taxAmount: number
   appliedDiscount: number
+  businessDiscountAmount: number
 }
 
 interface InsertedOrder {
@@ -344,7 +372,7 @@ async function ensureAddressOnOrder(client: PoolClient, userId: string, addressI
 
 export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): Promise<InsertedOrder> {
   const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-  const total = Math.max(0, input.subtotal - input.appliedDiscount + input.shippingAmount)
+  const total = Math.max(0, input.subtotal - input.appliedDiscount - input.businessDiscountAmount + input.shippingAmount)
 
   return withTransaction(async (client) => {
     const address = await ensureAddressOnOrder(client, input.userId, input.addressId)
@@ -374,15 +402,14 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
       gst: ReturnType<typeof calculateGST> | null
       buyMode: string
       buyUnit: string | null
+      mrp: number | null
     }> = []
 
     if (input.mode === 'cart') {
       itemRows = input.cartItems.map(item => {
-        const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-        const unitPrice = isCustomQty
-          ? Number(item.price_at_addition)
-          : Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-        const qty = Number(item.quantity)
+        const isFractional = item.buy_mode && item.buy_mode !== 'unit'
+        const unitPrice = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        const qty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
         const gstRate = parseFloat(String(item.products.gst_percentage || '0'))
         const itemTotal = unitPrice * qty
         const gst = isGSTEnabled ? calculateGST(itemTotal, gstRate, isIGST) : null
@@ -413,11 +440,16 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           gst,
           buyMode: item.buy_mode || 'unit',
           buyUnit: item.buy_unit || null,
+          mrp: item.sub_variant?.mrp != null ? Number(item.sub_variant.mrp)
+            : item.variant?.mrp != null ? Number(item.variant.mrp)
+            : item.products?.mrp != null ? Number(item.products.mrp)
+            : null,
         }
       })
     } else {
       const i = input.item
-      const qty = Number(i.qty)
+      const isBuyNowFractional = i.buyMode && i.buyMode !== 'unit'
+      const qty = isBuyNowFractional ? Number(i.qty) : Math.round(Number(i.qty))
       const unitPrice = Number(i.price)
       const itemTotal = unitPrice * qty
       const gstRate = parseFloat(String(input.product.gst_percentage || '0'))
@@ -447,6 +479,10 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         gst,
         buyMode: i.buyMode || 'unit',
         buyUnit: i.buyUnit || null,
+        mrp: input.subVariant?.mrp != null ? Number(input.subVariant.mrp)
+          : input.variant?.mrp != null ? Number(input.variant.mrp)
+          : input.product?.mrp != null ? Number(input.product.mrp)
+          : null,
       }]
     }
 
@@ -473,17 +509,20 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     const orderResult = await client.query(
       `INSERT INTO orders (
         order_number, user_id, customer_email, customer_phone, customer_name,
-        status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount,
+        status, payment_status, subtotal, discount_amount, business_discount_amount,
+        tax_amount, shipping_amount, total_amount,
         shipping_address_id, billing_address_id, notes,
         taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst,
         order_type, shipping_address_snapshot, billing_address_snapshot
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
       RETURNING id, order_number, total_amount, status`,
       [
         orderNumber, input.userId, input.user.email, input.user.phone, customerName,
         orderStatus, paymentStatus,
-        input.subtotal, Math.round(input.appliedDiscount * 100) / 100,
+        input.subtotal,
+        Math.round(input.appliedDiscount * 100) / 100,
+        Math.round(input.businessDiscountAmount * 100) / 100,
         Math.round(input.taxAmount * 100) / 100, input.shippingAmount, total,
         input.addressId, input.addressId, input.notes,
         isGSTEnabled ? orderTaxableAmount : 0,
@@ -500,8 +539,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         `INSERT INTO order_items (
           order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name,
           quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate,
-          taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+          taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
         [
           created.id, r.productId, r.variantId, r.subVariantId, r.productName, r.productSku, r.variantName,
           r.qty, r.unitPrice, r.itemTotal, Math.round(taxAmt * 100) / 100,
@@ -510,7 +549,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           r.gst ? r.gst.cgst : 0,
           r.gst ? r.gst.sgst : 0,
           r.gst ? r.gst.igst : 0,
-          r.buyMode, r.buyUnit,
+          r.buyMode, r.buyUnit, r.mrp ?? null,
         ]
       )
     }

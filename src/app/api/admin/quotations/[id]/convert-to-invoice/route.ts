@@ -14,14 +14,19 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
+  const { id } = await params
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const quotation = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [params.id])
+    const quotation = await queryOne<any>(
+      `SELECT q.*, EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = q.id) AS from_rfq
+       FROM quotations q WHERE q.id = $1`,
+      [id]
+    )
     if (!quotation) return NextResponse.json({ error: 'Quotation not found' }, { status: 404 })
     if (quotation.status !== 'final') {
       return NextResponse.json({ error: 'Only finalised quotations can be converted to an invoice' }, { status: 400 })
@@ -32,7 +37,7 @@ export async function POST(
 
     const qItems = await queryMany<any>(
       `SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`,
-      [params.id]
+      [id]
     )
     if (!qItems.length) {
       return NextResponse.json({ error: 'Quotation has no line items' }, { status: 400 })
@@ -59,6 +64,54 @@ export async function POST(
       ? (quotation.consignee_email || quotation.buyer_email || null)
       : (quotation.buyer_email || quotation.consignee_email || null)
 
+    // Fetch unit factor for every quotation item (needed to compute effectiveQty = qty × factor for count-dimension units)
+    // Uses sold_unit_factor when pre-computed (RFQ→quotation path), otherwise resolves from product_units by
+    // buy_unit (manually created quotations) or unit (RFQ-converted items where buy_unit may be NULL).
+    const unitFactorRows = await queryMany<any>(
+      `SELECT
+         qi.id AS item_id,
+         CASE
+           WHEN qi.sold_unit_factor IS NOT NULL THEN qi.sold_unit_factor
+           ELSE COALESCE(
+             puv.factor,
+             pup.factor,
+             puuv.factor,
+             puup.factor,
+             pu_sv.factor,
+             pu_sp.factor,
+             1
+           )
+         END::numeric AS factor,
+         CASE
+           WHEN qi.sold_unit_factor IS NOT NULL THEN 'count'
+           ELSE COALESCE(
+             puv.dimension,
+             pup.dimension,
+             puuv.dimension,
+             puup.dimension,
+             pu_sv.dimension,
+             pu_sp.dimension,
+             'count'
+           )
+         END AS dimension
+       FROM quotation_items qi
+       LEFT JOIN product_units puv  ON puv.unit  = qi.buy_unit AND puv.product_id = qi.product_id AND puv.variant_id = qi.variant_id AND qi.buy_unit IS NOT NULL
+       LEFT JOIN product_units pup  ON pup.unit  = qi.buy_unit AND pup.product_id = qi.product_id AND pup.variant_id IS NULL         AND qi.buy_unit IS NOT NULL
+         AND (qi.variant_id IS NULL OR puv.id IS NULL)
+       LEFT JOIN product_units puuv ON puuv.unit = qi.unit     AND puuv.product_id = qi.product_id AND puuv.variant_id = qi.variant_id AND qi.buy_unit IS NULL AND qi.sold_unit_factor IS NULL
+       LEFT JOIN product_units puup ON puup.unit = qi.unit     AND puup.product_id = qi.product_id AND puup.variant_id IS NULL         AND qi.buy_unit IS NULL AND qi.sold_unit_factor IS NULL
+         AND (qi.variant_id IS NULL OR puuv.id IS NULL)
+       LEFT JOIN product_variants pvar ON pvar.id = qi.variant_id
+       LEFT JOIN product_units pu_sv ON pu_sv.id = pvar.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
+       LEFT JOIN products prod ON prod.id = qi.product_id AND qi.variant_id IS NULL
+       LEFT JOIN product_units pu_sp ON pu_sp.id = prod.sell_unit_id AND puv.id IS NULL AND pup.id IS NULL AND puuv.id IS NULL AND puup.id IS NULL
+       WHERE qi.quotation_id = $1`,
+      [id]
+    )
+    const unitFactorMap = new Map<string, { factor: number; dimension: string }>(
+      (unitFactorRows || []).map((r: any) => [r.item_id, { factor: parseFloat(r.factor) || 1, dimension: r.dimension }])
+    )
+
     let subtotal = 0
     let totalTaxable = 0
     let totalCgst = 0
@@ -66,9 +119,15 @@ export async function POST(
     let totalIgst = 0
 
     const processedItems = qItems.map((item: any) => {
-      const qty = parseFloat(item.quantity)
+      const rawQty = parseFloat(item.quantity)
+      const unitInfo = unitFactorMap.get(item.id)
+      const factor = unitInfo?.factor ?? 1
+      const isCountWithFactor = unitInfo?.dimension === 'count' && factor > 1
+      // base_quantity is rawQty × factor (for stock deduction); line amount uses rawQty at the
+      // per-selling-unit rate (rate already incorporates the factor from the quotation)
+      const baseQty = isCountWithFactor ? rawQty * factor : rawQty
       const rate = parseFloat(item.rate)
-      const exGstLineTotal = lineItemExGst(qty, rate, parseFloat(item.discount_pct) || 0)
+      const exGstLineTotal = lineItemExGst(rawQty, rate, parseFloat(item.discount_pct) || 0)
       const gstRate = parseFloat(item.gst_rate || '18')
 
       let cgst = 0, sgst = 0, igst = 0
@@ -92,6 +151,7 @@ export async function POST(
 
       const discountPct = parseFloat(item.discount_pct) || 0
       const discountedRate = rate * (1 - discountPct / 100)
+      const sellUnit = item.buy_unit || item.unit || null
 
       return {
         product_id: item.product_id || null,
@@ -102,7 +162,13 @@ export async function POST(
         variant_name: null,
         hsn_code: item.hsn_code || null,
         gst_rate: gstRate,
-        quantity: qty,
+        quantity: rawQty,
+        base_qty: baseQty,
+        sell_unit: sellUnit,
+        unit_factor: isCountWithFactor ? factor : null,
+        buy_unit: item.buy_unit || null,
+        buy_mode: 'unit',
+        mrp: rate,
         unit_price: Math.round(discountedRate * (1 + gstRate / 100) * 100) / 100,
         total_price: Math.round(incGstLineTotal * 100) / 100,
         taxable_amount: Math.round(exGstLineTotal * 100) / 100,
@@ -140,28 +206,29 @@ export async function POST(
       const insufficientItems: string[] = []
       for (const item of processedItems) {
         if (!item.product_id) continue
-        const qty = item.quantity
+        // base_qty already resolved from unitFactorMap in processedItems (handles NULL buy_unit)
+        const baseQty = item.base_qty
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE',
             [item.sub_variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < qty) insufficientItems.push(`${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${qty})`)
+          if (stock < baseQty) insufficientItems.push(`${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`)
         } else if (item.variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE',
             [item.variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < qty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${qty})`)
+          if (stock < baseQty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
         } else {
           const inv = await client.query<{ inventory_quantity: number }>(
             'SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE',
             [item.product_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
-          if (stock < qty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${qty})`)
+          if (stock < baseQty) insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
         }
       }
 
@@ -180,16 +247,17 @@ export async function POST(
           cgst_amount, sgst_amount, igst_amount, total_amount,
           needs_delivery, notes
         ) VALUES (
-          $1, $2, $3, $4, 'business',
-          $5, $6, $7, $8, $9, $10,
-          $11, $12, $13, $14, $15, $16, $17,
-          $18, $19
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9, $10, $11,
+          $12, $13, $14, $15, $16, $17, $18,
+          $19, $20
         ) RETURNING id, order_number`,
         [
           'OFF-' + Date.now(),
           orderStatus,
           isPaid ? 'paid' : 'unpaid',
           paymentMode,
+          quotation.from_rfq ? 'business' : 'offline',
           customerName,
           customerPhone,
           customerEmail,
@@ -231,14 +299,17 @@ export async function POST(
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, unit_price, total_price,
-            taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`,
+            hsn_code, gst_rate, quantity, buy_unit, buy_mode, mrp, unit_price, total_price,
+            taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount,
+            sold_unit, sold_unit_factor, base_quantity
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
           [
             newOrder.id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
-            item.quantity, item.unit_price, item.total_price,
+            item.quantity, item.buy_unit || null, item.buy_mode || 'unit',
+            item.mrp, item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
+            item.sell_unit, item.unit_factor, item.base_qty,
           ]
         )
       }
@@ -246,7 +317,8 @@ export async function POST(
       if (!saveAsDraft) {
         for (const item of processedItems) {
           if (!item.product_id) continue
-          const qty = item.quantity
+          // base_qty already resolved from unitFactorMap in processedItems (handles NULL buy_unit)
+          const qty = item.base_qty
           let stockBefore = 0
           if (item.sub_variant_id) {
             const row = await client.query<{ inventory_quantity: string }>(
@@ -294,7 +366,7 @@ export async function POST(
 
       await client.query(
         `UPDATE quotations SET converted_order_id = $1, updated_at = NOW() WHERE id = $2`,
-        [newOrder.id, params.id]
+        [newOrder.id, id]
       )
 
       return { id: newOrder.id, order_number: newOrder.order_number, invoice_number: invoiceNumber, saveAsDraft, insufficientItems }

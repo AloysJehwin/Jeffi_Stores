@@ -50,7 +50,8 @@ export async function authenticateBusiness(request: NextRequest): Promise<UserJW
       approvalStatus: payload.approvalStatus as string | undefined,
       scopes: (payload.scopes as string[] | undefined) ?? [],
     }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -66,7 +67,7 @@ export interface AdminJWTPayload {
 }
 
 export async function generateToken(payload: JWTPayload): Promise<string> {
-  const token = await new SignJWT(payload)
+  const token = await new SignJWT({ ...payload, type: 'admin_session' })
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(JWT_EXPIRES_IN)
@@ -78,8 +79,10 @@ export async function generateToken(payload: JWTPayload): Promise<string> {
 export async function verifyToken(token: string): Promise<JWTPayload | null> {
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
+    if (payload.type !== 'admin_session') return null
     return payload as JWTPayload
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -102,7 +105,8 @@ export async function authenticateUser(request: NextRequest): Promise<UserJWTPay
     // Reject tokens that belong to business or admin
     if (payload.type !== 'customer') return null
     return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }
@@ -140,6 +144,7 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
   try {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     if (!payload.adminId || typeof payload.adminId !== 'string') return null
+    if (payload.type !== 'admin_session') return null
     const result = {
       adminId: payload.adminId as string,
       username: payload.username as string,
@@ -155,9 +160,33 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
       } catch {}
     }
     return result
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
+}
+
+export interface ServiceAccountPayload {
+  id: string
+  name: string
+  allowed_scopes: string[]
+}
+
+export async function authenticateServiceAccount(request: NextRequest): Promise<ServiceAccountPayload | null> {
+  const certSerial = (request.headers.get('x-client-cert-serial') || '').trim()
+  // Cert serials are hex strings. Reject anything that isn't.
+  if (!certSerial || !/^[0-9a-fA-F]+$/.test(certSerial)) return null
+
+  const { queryOne } = await import('./db')
+  const sa = await queryOne<ServiceAccountPayload>(
+    `SELECT id, name, allowed_scopes FROM service_accounts
+     WHERE LOWER(serial_number) = $1 AND is_revoked = false`,
+    [certSerial.toLowerCase()]
+  )
+  if (!sa) return null
+
+  queryOne(`UPDATE service_accounts SET last_used_at = NOW() WHERE id = $1`, [sa.id]).catch(() => {})
+  return sa
 }
 
 export async function requireUserScope(

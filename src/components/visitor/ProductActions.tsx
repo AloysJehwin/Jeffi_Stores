@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
+import QuantityInput from '@/components/shared/QuantityInput'
 
 interface VariantImage {
   id: string
@@ -18,7 +19,8 @@ interface SubVariant {
   sku?: string | null
   price: number | null
   mrp: number | null
-  stock_quantity: number
+  price_ex_gst: number | null
+  stock_status: string
   is_active: boolean
 }
 
@@ -28,46 +30,62 @@ interface Variant {
   sku: string
   price: number | null
   mrp: number | null
+  mrp_ex_gst: number | null
   price_ex_gst: number | null
-  wholeprice_ex_gst: number | null
-  stock_quantity: number
+  stock_status: string
   pricing_type?: string
   unit?: string
   numeric_value?: number | null
-  weight_rate?: number | null
-  weight_unit?: string | null
-  length_rate?: number | null
-  length_unit?: string | null
   variant_type?: string | null
   sub_variant_type?: string | null
+  sell_unit_id?: string | null
   variant_images?: VariantImage[]
   sub_variants?: SubVariant[]
+}
+
+interface ProductUnit {
+  id: string
+  variant_id: string | null
+  sub_variant_id: string | null
+  unit: string
+  factor: number
+  is_base: boolean
+  is_purchase_default: boolean
+  display_label: string | null
+  dimension: string
+  min_qty?: number | null
+  max_qty?: number | null
+  qty_step?: number | null
 }
 
 interface ProductActionsProps {
   productId: string
   productName: string
   sku: string
-  stockQuantity: number
+  stockStatus: string
   basePrice: number
   salePrice: number | null
   mrp: number | null
   gstPercentage: number | null
-  wholesalePrice: number | null
   variants: Variant[]
   variantType: string
   initialSkuParam?: string
-  weightRate?: number | null
-  weightUnit?: string | null
-  lengthRate?: number | null
-  lengthUnit?: string | null
+  discountPct?: number | null
   onVariantChange?: (variant: Variant | null) => void
+  onUnitChange?: (unitKey: string, unitLabel: string | null, unitMeta: { min: number; max: number | null; step: number; factor: number; dimension: string }) => void
+  productUnits?: ProductUnit[]
+  sellUnitId?: string | null
 }
 
 const MODE_LABELS: Record<string, string> = {
   unit: 'By Piece',
-  weight: 'By Weight',
-  length: 'By Length',
+}
+
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
 }
 
 function getPerUnitRate(price: number, numeric_value: number, unit: string): string {
@@ -82,11 +100,10 @@ function getPerUnitRate(price: number, numeric_value: number, unit: string): str
 }
 
 export default function ProductActions({
-  productId, productName, sku, stockQuantity,
-  basePrice, salePrice, mrp, gstPercentage, wholesalePrice,
-  variants, variantType, initialSkuParam,
-  weightRate, weightUnit, lengthRate, lengthUnit,
-  onVariantChange,
+  productId, productName, sku, stockStatus,
+  basePrice, salePrice, mrp, gstPercentage,
+  variants, variantType, initialSkuParam, discountPct,
+  onVariantChange, onUnitChange, productUnits: productUnitsProp, sellUnitId,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -95,8 +112,6 @@ export default function ProductActions({
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
   const [quantityRaw, setQuantityRaw] = useState('1')
-  useEffect(() => { setQuantityRaw(String(quantity)) }, [quantity])
-  const [customQty, setCustomQty] = useState('1')
 
   const pricingTypes = Array.from(new Set(variants.map(v => v.pricing_type || 'unit')))
   const hasMultipleModes = pricingTypes.length > 1
@@ -137,7 +152,7 @@ export default function ProductActions({
     }) || variants.filter(v => (v.pricing_type || 'unit') === (variants[0]?.pricing_type || 'unit'))[0] || variants[0]
     const subs = initialVariant?.sub_variants || []
     if (subs.length > 0) {
-      const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
+      const firstActive = subs.find(s => s.is_active && s.stock_status !== 'Out of Stock') || subs.find(s => s.is_active) || subs[0]
       return firstActive?.id ?? null
     }
     return null
@@ -172,7 +187,7 @@ export default function ProductActions({
     if (subs.length > 0) {
       const currentStillValid = subs.find(s => s.id === selectedSubVariantId)
       if (!currentStillValid) {
-        const firstActive = subs.find(s => s.is_active && (s.stock_quantity ?? 0) > 0) || subs.find(s => s.is_active) || subs[0]
+        const firstActive = subs.find(s => s.is_active && s.stock_status !== 'Out of Stock') || subs.find(s => s.is_active) || subs[0]
         setSelectedSubVariantId(firstActive?.id ?? null)
       }
     } else {
@@ -195,18 +210,27 @@ export default function ProductActions({
 
   const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
 
+  const gstMultiplier = 1 + (gstPercentage ?? 0) / 100
+  const toInclGst = (exGst: number) => Math.round(exGst * gstMultiplier * 100) / 100
+
   const effectivePrice = hasVariants
-    ? (selectedSubVariant?.price != null ? Number(selectedSubVariant.price) : (selectedVariant?.price ?? basePrice))
+    ? (selectedSubVariant?.price_ex_gst != null
+        ? toInclGst(Number(selectedSubVariant.price_ex_gst))
+        : (() => {
+            const varMrp = selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : null
+            if (varMrp != null && discountPct != null) {
+              return Math.round(varMrp * (1 - discountPct / 100) * 100) / 100
+            }
+            if (selectedVariant?.price_ex_gst != null) return toInclGst(Number(selectedVariant.price_ex_gst))
+            return basePrice
+          })())
     : (salePrice ?? basePrice)
   const effectiveMrp = hasVariants
     ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))
     : mrp
-  const effectiveWholesalePrice = hasVariants
-    ? (selectedVariant?.wholeprice_ex_gst != null ? Number(selectedVariant.wholeprice_ex_gst) : wholesalePrice)
-    : wholesalePrice
   const effectiveStock = hasVariants
-    ? (selectedSubVariant ? selectedSubVariant.stock_quantity : (selectedVariant?.stock_quantity ?? 0))
-    : stockQuantity
+    ? ((selectedSubVariant ? selectedSubVariant.stock_status : selectedVariant?.stock_status) !== 'Out of Stock' ? 9999 : 0)
+    : (stockStatus !== 'Out of Stock' ? 9999 : 0)
 
   const mrpDiscount = effectiveMrp && effectiveMrp > effectivePrice
     ? Math.round(((effectiveMrp - effectivePrice) / effectiveMrp) * 100)
@@ -217,81 +241,76 @@ export default function ProductActions({
     ? getPerUnitRate(effectivePrice, selectedVariant.numeric_value, selectedVariant.unit)
     : null
 
-  const activeWeightRate = hasVariants
-    ? (selectedVariant?.weight_rate ?? null)
-    : (weightRate ?? null)
-  const activeWeightUnit = hasVariants
-    ? (selectedVariant?.weight_unit ?? weightUnit ?? 'kg')
-    : (weightUnit ?? 'kg')
-  const activeLengthRate = hasVariants
-    ? (selectedVariant?.length_rate ?? null)
-    : (lengthRate ?? null)
-  const activeLengthUnit = hasVariants
-    ? (selectedVariant?.length_unit ?? lengthUnit ?? 'm')
-    : (lengthUnit ?? 'm')
-
-  const nonVariantBuyModes: string[] = ['unit']
-  if (!hasVariants) {
-    if (activeWeightRate) nonVariantBuyModes.push('weight')
-    if (activeLengthRate) nonVariantBuyModes.push('length')
-  }
-  const hasNonVariantCustomModes = !hasVariants && nonVariantBuyModes.length > 1
-
-  const [buyMode, setBuyMode] = useState<string>('unit')
-
-  useEffect(() => {
-    setBuyMode('unit')
-    setCustomQty('1')
-    setQuantity(1)
-  }, [selectedVariantId])
-
-  const currentRate = buyMode === 'weight' ? activeWeightRate : buyMode === 'length' ? activeLengthRate : null
-  const currentUnit = buyMode === 'weight' ? activeWeightUnit : buyMode === 'length' ? activeLengthUnit : null
-
-  const variantHasCustomWeight = hasVariants && (activeWeightRate != null)
-  const variantHasCustomLength = hasVariants && (activeLengthRate != null)
-  const variantCustomModes: string[] = hasVariants
-    ? ['unit', ...(variantHasCustomWeight ? ['weight'] : []), ...(variantHasCustomLength ? ['length'] : [])]
-    : []
-  const variantHasMultipleBuyModes = variantCustomModes.length > 1
-
-  const parsedCustomQty = parseFloat(customQty) || 0
-  const customTotal = currentRate ? parsedCustomQty * currentRate : 0
-
-  useEffect(() => {
-    if (buyMode !== 'unit') return
-    setCustomQty('1')
-  }, [buyMode])
-
-  useEffect(() => {
-    if (hasNonVariantCustomModes && !nonVariantBuyModes.includes(buyMode)) {
-      setBuyMode('unit')
+  const productUnits = productUnitsProp ?? []
+  const effectiveSellUnitId = selectedVariant?.sell_unit_id ?? sellUnitId ?? null
+  const sellUnit = (() => {
+    if (effectiveSellUnitId) {
+      const u = productUnits.find(u => u.id === effectiveSellUnitId)
+      if (u) return u
     }
-  }, [weightRate, lengthRate])
-
-  useEffect(() => {
-    if (hasVariants && !variantCustomModes.includes(buyMode)) {
-      setBuyMode('unit')
+    if (selectedSubVariantId) {
+      const u = productUnits.find(u => u.sub_variant_id === selectedSubVariantId && u.is_base)
+        ?? productUnits.find(u => u.sub_variant_id === selectedSubVariantId)
+      if (u) return u
     }
+    if (selectedVariantId) {
+      const u = productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null && u.is_base)
+        ?? productUnits.find(u => u.variant_id === selectedVariantId && u.sub_variant_id === null)
+      if (u) return u
+    }
+    return productUnits.find(u => u.variant_id === null && u.sub_variant_id === null && u.is_base)
+      ?? productUnits[0]
+      ?? null
+  })()
+  const effectiveUnitKey = sellUnit?.unit ?? 'unit'
+  const effectiveUnitLabel = sellUnit?.display_label ?? sellUnit?.unit ?? null
+
+  const isContinuous = sellUnit?.dimension === 'length' || sellUnit?.dimension === 'weight' || sellUnit?.dimension === 'area' || sellUnit?.dimension === 'volume'
+  const unitFactor = sellUnit?.factor != null ? Number(sellUnit.factor) : 1
+  // baseUnit = the factor-1 unit that is distinct from the sell unit (e.g. "pc" when selling by "pair")
+  const baseUnit = (() => {
+    const variantUnits = selectedVariantId ? productUnits.filter(u => u.variant_id === selectedVariantId) : []
+    const productLevelUnits = productUnits.filter(u => u.variant_id === null)
+    const pool = variantUnits.length > 0 ? variantUnits : productLevelUnits
+    return pool.find(u => Number(u.factor) === 1 && u.unit !== (sellUnit?.unit ?? '')) ?? null
+  })()
+  const baseUnitLabel = baseUnit?.display_label ?? baseUnit?.unit ?? null
+  const showPerBasePrice = unitFactor !== 1
+  const qtyStep = sellUnit?.dimension === 'count'
+    ? 1
+    : (sellUnit?.qty_step != null ? Number(sellUnit.qty_step) : (isContinuous ? 0.001 : 1))
+  const qtyMin = sellUnit?.min_qty != null ? Number(sellUnit.min_qty) : 1
+  const qtyMax = sellUnit?.max_qty != null ? Number(sellUnit.max_qty) : undefined
+
+  useEffect(() => {
+    setQuantity(qtyMin)
+    setQuantityRaw(String(qtyMin))
   }, [selectedVariantId])
 
   useEffect(() => {
-    setQuantity(1)
-  }, [selectedVariantId])
+    const initial = qtyMin
+    setQuantity(initial)
+    setQuantityRaw(isContinuous ? Number(initial.toFixed(6)).toString() : String(initial))
+  }, [effectiveUnitKey])
+
+  useEffect(() => {
+    onUnitChange?.(effectiveUnitKey, effectiveUnitLabel ?? null, {
+      min: qtyMin,
+      max: qtyMax ?? null,
+      step: qtyStep,
+      factor: unitFactor,
+      dimension: sellUnit?.dimension ?? 'count',
+    })
+  }, [effectiveUnitKey, effectiveUnitLabel, qtyMin, qtyMax, qtyStep, unitFactor, sellUnit?.dimension])
 
   const handleAddToCart = async () => {
     setIsAddingToCart(true)
     try {
-      const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
-      if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
-        showToast('Enter a valid quantity', 'error')
-        return
-      }
       if (selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && !selectedSubVariantId) {
         showToast(`Please select a ${selectedVariant.sub_variant_type || 'sub-variant'}`, 'error')
         return
       }
-      await addToCart(productId, finalQty, selectedVariantId || undefined, buyMode, currentUnit || undefined, selectedSubVariantId || undefined)
+      await addToCart(productId, quantity, selectedVariantId || undefined, effectiveUnitKey, effectiveUnitKey, selectedSubVariantId || undefined)
       showToast('Item added to cart!', 'success')
     } catch (error: any) {
       showToast(error.message || 'Failed to add to cart', 'error')
@@ -302,12 +321,6 @@ export default function ProductActions({
 
   const handleBuyNow = async () => {
     setIsBuyingNow(true)
-    const finalQty = (buyMode === 'weight' || buyMode === 'length') ? parsedCustomQty : quantity
-    if ((buyMode === 'weight' || buyMode === 'length') && finalQty <= 0) {
-      showToast('Enter a valid quantity', 'error')
-      setIsBuyingNow(false)
-      return
-    }
     if (selectedVariant?.sub_variants && selectedVariant.sub_variants.length > 0 && !selectedSubVariantId) {
       showToast(`Please select a ${selectedVariant.sub_variant_type || 'sub-variant'}`, 'error')
       setIsBuyingNow(false)
@@ -322,9 +335,9 @@ export default function ProductActions({
           productId,
           variantId: selectedVariantId || null,
           subVariantId: selectedSubVariantId || null,
-          qty: finalQty,
-          buyMode,
-          buyUnit: currentUnit || null,
+          qty: quantity,
+          buyMode: effectiveUnitKey,
+          buyUnit: effectiveUnitKey,
         }),
       })
       const data = await res.json()
@@ -395,14 +408,14 @@ export default function ProductActions({
                         className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                           selectedVariantId === variant.id
                             ? 'bg-accent-500 text-white border-accent-500'
-                            : variant.stock_quantity > 0
+                            : variant.stock_status !== 'Out of Stock'
                               ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
                               : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
                         }`}
-                        disabled={variant.stock_quantity === 0}
+                        disabled={variant.stock_status === 'Out of Stock'}
                       >
                         {variant.variant_name}
-                        {variant.stock_quantity === 0 && ' (Out of Stock)'}
+                        {variant.stock_status === 'Out of Stock' && ' (Out of Stock)'}
                       </button>
                     ))}
                   </div>
@@ -441,18 +454,18 @@ export default function ProductActions({
                         <button
                           key={sv.id}
                           type="button"
-                          disabled={sv.stock_quantity === 0}
+                          disabled={sv.stock_status === 'Out of Stock'}
                           onClick={() => setSelectedSubVariantId(sv.id)}
                           className={`px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${
                             selectedSubVariantId === sv.id
                               ? 'bg-accent-500 text-white border-accent-500'
-                              : sv.stock_quantity > 0
+                              : sv.stock_status !== 'Out of Stock'
                                 ? 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-accent-400'
                                 : 'bg-surface-secondary text-foreground-muted border-border-default cursor-not-allowed'
                           }`}
                         >
                           {sv.sub_variant_name}
-                          {sv.stock_quantity === 0 && ' (Out of Stock)'}
+                          {sv.stock_status === 'Out of Stock' && ' (Out of Stock)'}
                         </button>
                       ))}
                     </div>
@@ -479,41 +492,53 @@ export default function ProductActions({
       {hasVariants && (
         <>
           <div className="bg-surface rounded-lg p-6">
-            <div className="flex items-baseline gap-3 mb-2">
+            {/* Big orange = base unit price (per m, per kg, per pc etc.) */}
+            <div className="flex items-baseline gap-2 flex-wrap mb-1">
               <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
                 Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
+              <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
               {effectiveMrp && effectiveMrp > effectivePrice && (
                 <span className="text-xl text-foreground-muted line-through">
                   Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               )}
             </div>
-            {perUnitRate && (
-              <p className="text-sm font-medium text-accent-600 dark:text-accent-400 mb-2">
-                {perUnitRate}
-              </p>
+            {/* Selling unit price (e.g. per pair/box) on its own line */}
+            {showPerBasePrice && (
+              <div className="mb-1">
+                <span className="text-base font-semibold text-foreground">
+                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                </span>
+                <span className="text-xs text-foreground-muted ml-2">
+                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                </span>
+              </div>
             )}
+
+            {/* Total = selling unit price × qty */}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm text-foreground-secondary">
+                Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
+              </span>
+              <span className="text-base font-semibold text-foreground">
+                Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+
             {mrpDiscount > 0 && (
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
                   {mrpDiscount}% off
                 </span>
                 <span className="text-sm text-foreground-secondary">
-                  You save Rs. {(effectiveMrp! - effectivePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  You save Rs. {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             )}
             <p className="text-xs text-foreground-muted">
               Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
             </p>
-            {effectiveWholesalePrice && (
-              <div className="mt-3 pt-3 border-t border-border-default">
-                <span className="text-sm text-foreground-secondary">
-                  Wholesale Price: <span className="font-semibold text-foreground">Rs. {(effectiveWholesalePrice * (1 + (gstPercentage || 0) / 100)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </span>
-              </div>
-            )}
           </div>
 
           <div>
@@ -522,7 +547,7 @@ export default function ProductActions({
                 <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
-                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock{effectiveStock < 10 ? ` (${effectiveStock} left)` : ''}</span>
+                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
               </div>
             ) : (
               <div className="flex items-center gap-2">
@@ -536,102 +561,23 @@ export default function ProductActions({
         </>
       )}
 
-      {(hasNonVariantCustomModes || variantHasMultipleBuyModes) && (
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-2">How to buy</label>
-          <div className="flex flex-wrap gap-2">
-            {(hasVariants ? variantCustomModes : nonVariantBuyModes).map(mode => (
-              <button
-                key={mode}
-                type="button"
-                onClick={() => setBuyMode(mode)}
-                className={`px-4 py-2 rounded-lg text-sm font-semibold border transition-colors ${
-                  buyMode === mode
-                    ? 'bg-primary-600 text-white border-primary-600'
-                    : 'bg-surface-elevated text-foreground-secondary border-border-secondary hover:border-primary-400'
-                }`}
-              >
-                {MODE_LABELS[mode] || mode}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {(buyMode === 'weight' || buyMode === 'length') && currentRate ? (
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-2">
-            Enter quantity ({currentUnit})
-          </label>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden">
-              <input
-                type="number"
-                min="0.001"
-                step="0.001"
-                value={customQty}
-                onChange={e => setCustomQty(e.target.value)}
-                className="w-28 px-3 py-2 text-center font-semibold bg-surface text-foreground focus:outline-none"
-              />
-              <span className="px-3 py-2 bg-surface-secondary text-foreground-secondary text-sm font-medium border-l border-border-secondary">
-                {currentUnit}
-              </span>
-            </div>
-            {parsedCustomQty > 0 && (
-              <div className="text-sm text-foreground-secondary">
-                = <span className="font-semibold text-primary-600 dark:text-primary-400">
-                  Rs. {customTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-                <span className="text-xs ml-1">({parsedCustomQty} {currentUnit} × Rs. {currentRate.toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{currentUnit})</span>
-              </div>
-            )}
-          </div>
-        </div>
-      ) : (
-        <div>
-          <label className="block text-sm font-medium text-foreground-secondary mb-2">Quantity</label>
-          <div className="flex items-center border border-border-secondary rounded-lg w-fit overflow-hidden">
-            <button
-              onClick={() => setQuantity(Math.max(1, quantity - 1))}
-              disabled={quantity <= 1}
-              className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-              </svg>
-            </button>
-            <input
-              type="number"
-              min={1}
-              max={effectiveStock}
-              value={quantityRaw}
-              onChange={e => {
-                const raw = e.target.value
-                setQuantityRaw(raw)
-                if (raw === '' || raw === '0') return
-                const v = parseInt(raw, 10)
-                if (!isNaN(v)) setQuantity(Math.min(effectiveStock, Math.max(1, v)))
-              }}
-              onBlur={e => {
-                const v = parseInt(e.target.value, 10)
-                const clamped = isNaN(v) || v < 1 ? 1 : Math.min(effectiveStock, v)
-                setQuantity(clamped)
-                setQuantityRaw(String(clamped))
-              }}
-              className="w-16 py-2 border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none animate-fade-in [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-            />
-            <button
-              onClick={() => setQuantity(Math.min(effectiveStock, quantity + 1))}
-              disabled={quantity >= effectiveStock}
-              className="px-4 py-2 hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            </button>
-          </div>
-        </div>
-      )}
+      <div>
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">
+          Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
+        </label>
+        <QuantityInput
+          dimension={sellUnit?.dimension ?? 'count'}
+          quantity={quantity}
+          quantityRaw={quantityRaw}
+          unitLabel={effectiveUnitLabel}
+          unitKey={effectiveUnitKey}
+          effectiveStock={effectiveStock}
+          qtyStep={qtyStep}
+          qtyMin={qtyMin}
+          qtyMax={qtyMax}
+          onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
+        />
+      </div>
 
       <div className="space-y-3">
         <button

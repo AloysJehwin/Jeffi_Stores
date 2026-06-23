@@ -26,11 +26,12 @@ const PatchSchema = z.object({
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const supplier = await queryOne<any>(
       `SELECT s.*, COUNT(po.id)::int AS po_count
@@ -38,7 +39,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
        LEFT JOIN purchase_orders po ON po.supplier_id = s.id
        WHERE s.id = $1
        GROUP BY s.id`,
-      [params.id]
+      [id]
     )
 
     if (!supplier) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -48,11 +49,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'inventory')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const raw = await request.json().catch(() => null)
     if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
@@ -81,7 +83,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
     if (updates.length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 })
 
     updates.push(`updated_at = NOW()`)
-    values.push(params.id)
+    values.push(id)
 
     await query(
       `UPDATE suppliers SET ${updates.join(', ')} WHERE id = $${i}`,

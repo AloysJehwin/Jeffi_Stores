@@ -10,8 +10,9 @@
     --color-foreground: #111827;
     --color-foreground-secondary: #4B5563;
     --color-foreground-muted: #9CA3AF;
-    --color-border: #E5E7EB;
-    --color-border-secondary: #D1D5DB;
+    --color-border: #D1D5DB;
+    --color-border-secondary: #9CA3AF;
+    --color-card-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.08), 0 1px 2px -1px rgb(0 0 0 / 0.06);
 
     /* Brand colors — light mode */
     --primary-500: #f59e0b;
@@ -87,6 +88,32 @@
   .dark select,
   .dark textarea {
     color-scheme: dark;
+  }
+
+
+  /* Light mode: make shadow-sm more visible so cards stand out from page bg */
+  :root .shadow-sm,
+  :root .hover\:shadow-xl:hover {
+    --tw-shadow: 0 1px 4px 0 rgb(0 0 0 / 0.10), 0 1px 2px -1px rgb(0 0 0 / 0.06);
+    box-shadow: var(--tw-shadow);
+  }
+}
+
+/* ── Shared form field size tiers ─────────────────────────────────────────
+   Use these on <input>, <textarea>, and pair with AdminSelect size props:
+     .field-normal  →  AdminSelect (default)
+     .field-compact →  AdminSelect sm
+     .field-xs      →  AdminSelect xs
+   ──────────────────────────────────────────────────────────────────────── */
+@layer components {
+  .field-normal {
+    @apply px-3 py-2 text-sm rounded-lg;
+  }
+  .field-compact {
+    @apply px-2 py-1.5 text-sm rounded-lg;
+  }
+  .field-xs {
+    @apply px-1.5 py-1 text-xs rounded h-[26px] leading-none;
   }
 }
 
@@ -167,4 +194,18 @@
 @keyframes img-shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
+}
+
+@keyframes razorpay-marquee {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+.razorpay-scroll {
+  display: flex;
+  width: max-content;
+  animation: razorpay-marquee 28s linear infinite;
+}
+.razorpay-scroll:hover {
+  animation-play-state: paused;
 }

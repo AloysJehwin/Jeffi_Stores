@@ -78,7 +78,8 @@ async function reEmbed(productId: string): Promise<boolean> {
     )
     await pool.end()
     return true
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return false
   }
 }
@@ -86,7 +87,7 @@ async function reEmbed(productId: string): Promise<boolean> {
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'catalog_enrichment')) {
+  if (!hasScope(admin.role, admin.scopes, 'catalog_enrichment:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 

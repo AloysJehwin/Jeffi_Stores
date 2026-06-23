@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
     `, [productId])
 
     return NextResponse.json({ reviews: reviews || [] })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 })
   }
 }
@@ -90,7 +91,8 @@ export async function PATCH(request: NextRequest) {
     )
 
     return NextResponse.json({ message: 'Review updated. Changes will be visible after re-approval.', review: updated })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to update review' }, { status: 500 })
   }
 }
@@ -184,7 +186,8 @@ export async function POST(request: NextRequest) {
     if (userDetails && product) {
       try {
         await sendNewReviewNotification(review, userDetails, product)
-      } catch {
+      } catch (err) {
+        console.error('[route]', err)
       }
     }
 
@@ -204,7 +207,8 @@ export async function POST(request: NextRequest) {
       message: 'Review submitted successfully!',
       review
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to submit review' }, { status: 500 })
   }
 }

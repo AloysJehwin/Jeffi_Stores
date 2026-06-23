@@ -6,10 +6,11 @@ import { type CampaignKind } from '@/lib/marketing'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest, { params }: { params: { kind: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer')) {
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { kind: strin
     return NextResponse.json({ error: 'Valid email required' }, { status: 400 })
   }
 
-  const result = await sendTestCampaignEmail(params.kind as CampaignKind, email)
+  const result = await sendTestCampaignEmail(kind as CampaignKind, email)
   if (!result.ok) {
     return NextResponse.json({ error: result.reason || 'Failed to send' }, { status: 500 })
   }

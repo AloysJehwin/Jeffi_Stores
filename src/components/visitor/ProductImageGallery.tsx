@@ -113,7 +113,7 @@ export default function ProductImageGallery({ images, productName, variantImages
                     : 'border-border-default hover:border-gray-400'
                 }`}
               >
-                <div className="w-full h-20">
+                <div className="w-full h-20 flex items-center justify-center">
                   <ImgWithSkeleton
                     src={image.thumbnail_url}
                     alt={`${productName} - Thumbnail ${index + 1}`}

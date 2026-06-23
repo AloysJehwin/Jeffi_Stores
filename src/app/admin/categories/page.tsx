@@ -7,11 +7,12 @@ import AdminFilters from '@/components/admin/AdminFilters'
 import CategoriesClient from '@/components/admin/CategoriesClient'
 import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
 
-export default async function CategoriesPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+export default async function CategoriesPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedSearchParams = await searchParams
   const host = (await headers()).get('host') ?? ''
   const [categories, productCountRows, misassignedRows] = await Promise.all([
     getFilteredCategories({
-      is_active: searchParams.is_active,
+      is_active: resolvedSearchParams.is_active,
     }),
     queryMany<{ category_id: string; count: string }>(
       'SELECT category_id, COUNT(*) as count FROM products WHERE is_active = true GROUP BY category_id'
@@ -98,8 +99,8 @@ export default async function CategoriesPage({ searchParams }: { searchParams: {
       <CategoriesClient
         initialCategories={allCategories}
         productCounts={productCounts}
-        initialSearch={searchParams.search || ''}
-        initialType={searchParams.type || ''}
+        initialSearch={resolvedSearchParams.search || ''}
+        initialType={resolvedSearchParams.type || ''}
       />
     </div>
   )

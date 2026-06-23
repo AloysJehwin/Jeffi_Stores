@@ -85,7 +85,7 @@ export function productToGmcItems(product: any): any[] {
         const price = Number(v.price)
         const mrp = v.mrp ? Number(v.mrp) : (product.mrp ? Number(product.mrp) : null)
         const hasSale = mrp && mrp > price
-        const [cl0, cl1, cl2, cl3, cl4] = buildCustomLabels(product, v.stock_quantity)
+        const [cl0, cl1, cl2, cl3, cl4] = buildCustomLabels(product, v.stock_status)
 
         return {
           ...common,
@@ -94,7 +94,7 @@ export function productToGmcItems(product: any): any[] {
           link: `${BASE_URL}/products/${product.slug}?sku=${encodeURIComponent(v.sku)}`,
           price: { value: (hasSale ? price : (mrp || price)).toFixed(2), currency: 'INR' },
           salePrice: hasSale ? { value: price.toFixed(2), currency: 'INR' } : undefined,
-          availability: v.stock_quantity > 0 ? 'in stock' : 'out of stock',
+          availability: v.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock',
           itemGroupId: buildOfferId(product.sku),
           size: v.variant_name || undefined,
           gtin: v.gtin || product.gtin || undefined,
@@ -121,7 +121,7 @@ export function productToGmcItems(product: any): any[] {
     link: `${BASE_URL}/products/${product.slug}`,
     price: { value: (hasSale ? price : (mrp || price)).toFixed(2), currency: 'INR' },
     salePrice: hasSale ? { value: price.toFixed(2), currency: 'INR' } : undefined,
-    availability: product.stock_quantity > 0 ? 'in stock' : 'out of stock',
+    availability: product.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock',
     size: product.size || undefined,
     customLabel0: cl0,
     customLabel1: cl1,

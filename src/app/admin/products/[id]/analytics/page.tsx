@@ -7,9 +7,10 @@ import { getProductAnalyticsData } from '@/lib/admin-product-analytics'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ProductAnalyticsPage({ params }: { params: { id: string } }) {
+export default async function ProductAnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const host = (await headers()).get('host') ?? ''
-  const data = await getProductAnalyticsData(params.id, 30)
+  const data = await getProductAnalyticsData(id, 30)
   if (!data) notFound()
 
   return (
@@ -18,13 +19,13 @@ export default async function ProductAnalyticsPage({ params }: { params: { id: s
         <div className="flex items-center gap-2 text-sm text-foreground-secondary">
           <Link href={ap('/admin/products', host)} className="text-accent-500 hover:text-accent-600 transition-colors">Products</Link>
           <span>/</span>
-          <Link href={ap(`/admin/products/${params.id}`, host)} className="text-accent-500 hover:text-accent-600 transition-colors truncate max-w-[200px]">{data.product.name}</Link>
+          <Link href={ap(`/admin/products/${id}`, host)} className="text-accent-500 hover:text-accent-600 transition-colors truncate max-w-[200px]">{data.product.name}</Link>
           <span>/</span>
           <span className="text-foreground">Analytics</span>
         </div>
         <div className="flex items-center gap-1 bg-surface-secondary rounded-lg p-0.5 text-sm">
           <Link
-            href={ap(`/admin/products/${params.id}`, host)}
+            href={ap(`/admin/products/${id}`, host)}
             className="px-3 py-1.5 rounded-md font-medium text-foreground-muted hover:text-foreground transition-colors"
           >
             Overview
@@ -34,7 +35,7 @@ export default async function ProductAnalyticsPage({ params }: { params: { id: s
           </span>
         </div>
       </div>
-      <ProductAnalyticsClient productId={params.id} initial={data} />
+      <ProductAnalyticsClient productId={id} initial={data} />
     </div>
   )
 }

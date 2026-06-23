@@ -136,6 +136,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
 
   const o = data.order
   const items: any[] = data.items || []
+  const hasItemDiscount = items.some((it: any) => parseFloat(it.discount_amount || '0') > 0)
   const isVoided = o.status === 'cancelled' || o.status === 'returned'
   const showQrSection = o.payment_mode === 'upi_qr' && o.payment_status !== 'paid'
 
@@ -195,7 +196,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          {o.status === 'draft' && o.source !== 'business' && (
+          {o.status === 'draft' && o.source === 'offline' && (
             <a
               href={ap(`/admin/invoices?view=edit&edit=${o.id}`)}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
@@ -204,7 +205,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               Edit
             </a>
           )}
-          {o.status === 'draft' && o.source === 'business' && (
+          {o.status === 'draft' && (
             <button
               onClick={finalizeInvoice}
               disabled={finalizing}
@@ -366,6 +367,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                 <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">GST%</th>
                 <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Qty</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Unit Price</th>
+                {hasItemDiscount && <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Disc.</th>}
                 <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Taxable</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Tax</th>
                 <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Total</th>
@@ -381,8 +383,27 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">{item.hsn_code || '—'}</td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>
-                  <td className="px-4 py-3 text-center text-foreground">{item.quantity}</td>
+                  <td className="px-4 py-3 text-center text-foreground">
+                    {(() => {
+                      const orderedQty = Number(item.quantity)
+                      const isCount = item.sell_unit_dimension === 'count'
+                      const factor = item.sell_unit_factor ? Number(item.sell_unit_factor) : 1
+                      const unitLabel = (item.buy_unit && item.buy_unit !== 'unit') ? item.buy_unit : null
+                      if (isCount && unitLabel && factor > 1) {
+                        return `${orderedQty} ${unitLabel} (${orderedQty * factor} pcs)`
+                      }
+                      if (unitLabel && !isCount) {
+                        return `${orderedQty} ${unitLabel}`
+                      }
+                      return orderedQty
+                    })()}
+                  </td>
                   <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(item.unit_price))}</td>
+                  {hasItemDiscount && (
+                    <td className="px-4 py-3 text-right text-green-600 dark:text-green-400 text-xs">
+                      {parseFloat(item.discount_amount || '0') > 0 ? `−${formatINR(parseFloat(item.discount_amount))}` : '—'}
+                    </td>
+                  )}
                   <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(item.taxable_amount || '0'))}</td>
                   <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(item.tax_amount || '0'))}</td>
                   <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(item.total_price))}</td>
@@ -401,8 +422,14 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
             </div>
             {parseFloat(o.discount_amount || '0') > 0 && (
               <div className="flex justify-between gap-8">
-                <span className="text-foreground-secondary">Discount</span>
+                <span className="text-foreground-secondary">Coupon Discount</span>
                 <span className="text-green-600 dark:text-green-400">−{formatINR(parseFloat(o.discount_amount))}</span>
+              </div>
+            )}
+            {parseFloat(o.business_discount_amount || '0') > 0 && (
+              <div className="flex justify-between gap-8">
+                <span className="text-foreground-secondary">Business Discount</span>
+                <span className="text-green-600 dark:text-green-400">−{formatINR(parseFloat(o.business_discount_amount))}</span>
               </div>
             )}
             {parseFloat(o.shipping_amount || '0') > 0 && (

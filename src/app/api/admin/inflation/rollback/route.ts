@@ -9,13 +9,12 @@ const COL_MAP: Record<string, string> = {
   mrp: 'mrp',
   price_ex_gst: 'price_ex_gst',
   base_price: 'price',
-  wholeprice_ex_gst: 'wholeprice_ex_gst',
 }
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inflation')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'inflation:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { log_id } = await request.json()
   if (!log_id) return NextResponse.json({ error: 'log_id required' }, { status: 400 })

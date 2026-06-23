@@ -79,7 +79,8 @@ export async function POST(request: NextRequest) {
       approvalStatus: 'approved',
       user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name, companyName: user.company_name },
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Login failed' }, { status: 500 })
   }
 }

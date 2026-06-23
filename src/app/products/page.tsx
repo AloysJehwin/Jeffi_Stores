@@ -6,6 +6,7 @@ import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildSearchClause, buildSearchRank } from '@/lib/search'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/visitor/ProductCard'
+import CompareStripLazy from '@/components/visitor/CompareStripLazy'
 
 const PAGE_SIZE = 21
 
@@ -112,20 +113,15 @@ async function getProducts(searchParams: any) {
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
       ) AS product_images,
-      COALESCE((SELECT SUM(
-        CASE
-          WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
-          THEN COALESCE((SELECT SUM(sv.stock_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
-          ELSE pv.stock_quantity
-        END
-      ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
+      COALESCE((SELECT COUNT(CASE WHEN pv.stock_status != 'Out of Stock' THEN 1 END)
+      FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
       (SELECT MIN(price) FROM (
-        SELECT pv.price
+        SELECT pv.price * (1 - COALESCE(p.discount_pct, 0) / 100.0) AS price
         FROM product_variants pv
         WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
         UNION ALL
-        SELECT sv.price
+        SELECT sv.price * (1 - COALESCE(p.discount_pct, 0) / 100.0) AS price
         FROM product_sub_variants sv
         JOIN product_variants pv ON pv.id = sv.variant_id
         WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
@@ -196,9 +192,10 @@ function buildPageUrl(searchParams: Record<string, string | undefined>, page: nu
 export default async function ProductsPage({
   searchParams,
 }: {
-  searchParams: { [key: string]: string | undefined }
+  searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
-  const { products, total, page, totalPages } = await getProducts(searchParams)
+  const resolvedSearchParams = await searchParams
+  const { products, total, page, totalPages } = await getProducts(resolvedSearchParams)
   const categories = await getCategories()
   const brands = await getBrands()
 
@@ -224,7 +221,7 @@ export default async function ProductsPage({
                   <label className="block text-sm font-medium text-foreground-secondary mb-2">
                     Search
                   </label>
-                  <ProductsSearch defaultValue={searchParams.search} />
+                  <ProductsSearch defaultValue={resolvedSearchParams.search} />
                 </div>
 
                 {/* Categories Filter */}
@@ -232,8 +229,8 @@ export default async function ProductsPage({
                   <h3 className="font-semibold text-foreground mb-3">Categories</h3>
                   <div className="space-y-1 max-h-64 overflow-y-auto">
                     {(() => {
-                      const activeCats = searchParams.category ? searchParams.category.split(',') : []
-                      const activeBrands = searchParams.brand ? searchParams.brand.split(',') : []
+                      const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
+                      const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
 
                       function catIsActive(cat: any) {
                         return activeCats.includes(cat.id) || activeCats.includes(cat.slug)
@@ -247,9 +244,9 @@ export default async function ProductsPage({
                         const p = new URLSearchParams()
                         if (next.length) p.set('category', next.join(','))
                         if (activeBrands.length) p.set('brand', activeBrands.join(','))
-                        if (searchParams.sort) p.set('sort', searchParams.sort)
-                        if (searchParams.order) p.set('order', searchParams.order)
-                        if (searchParams.search) p.set('search', searchParams.search)
+                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
+                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
+                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
                         return `/products${p.toString() ? `?${p.toString()}` : ''}`
                       }
 
@@ -320,8 +317,8 @@ export default async function ProductsPage({
                   <h3 className="font-semibold text-foreground mb-3">Brands</h3>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
                     {(() => {
-                      const activeCats = searchParams.category ? searchParams.category.split(',') : []
-                      const activeBrands = searchParams.brand ? searchParams.brand.split(',') : []
+                      const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
+                      const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
 
                       function brandIsActive(brand: any) {
                         return activeBrands.includes(brand.id) || activeBrands.includes(brand.slug)
@@ -335,18 +332,18 @@ export default async function ProductsPage({
                         const p = new URLSearchParams()
                         if (activeCats.length) p.set('category', activeCats.join(','))
                         if (next.length) p.set('brand', next.join(','))
-                        if (searchParams.sort) p.set('sort', searchParams.sort)
-                        if (searchParams.order) p.set('order', searchParams.order)
-                        if (searchParams.search) p.set('search', searchParams.search)
+                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
+                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
+                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
                         return `/products${p.toString() ? `?${p.toString()}` : ''}`
                       }
 
                       const clearBrandsUrl = (() => {
                         const p = new URLSearchParams()
                         if (activeCats.length) p.set('category', activeCats.join(','))
-                        if (searchParams.sort) p.set('sort', searchParams.sort)
-                        if (searchParams.order) p.set('order', searchParams.order)
-                        if (searchParams.search) p.set('search', searchParams.search)
+                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
+                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
+                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
                         return `/products${p.toString() ? `?${p.toString()}` : ''}`
                       })()
 
@@ -390,7 +387,7 @@ export default async function ProductsPage({
                 </div>
 
                 {/* Clear Filters */}
-                {(searchParams.category || searchParams.brand || searchParams.search) && (
+                {(resolvedSearchParams.category || resolvedSearchParams.brand || resolvedSearchParams.search) && (
                   <Link
                     href="/products"
                     className="block text-center w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors"
@@ -424,6 +421,9 @@ export default async function ProductsPage({
               <SortDropdown />
             </div>
 
+            {/* Compare strip — shows selected products + Compare button */}
+            <CompareStripLazy />
+
             {/* Products Grid */}
             {products.length > 0 ? (
               <>
@@ -434,7 +434,7 @@ export default async function ProductsPage({
                     const displayPrice = hasVariants && product.variant_min_price
                       ? Number(product.variant_min_price)
                       : Number(product.base_price)
-                    const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                    const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
                     const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
                     const mrpDiscount = mrp && mrp > displayPrice
                       ? Math.round(((mrp - displayPrice) / mrp) * 100)
@@ -454,6 +454,7 @@ export default async function ProductsPage({
                         primaryImage={primaryImage}
                         brandName={product.brands?.name ?? null}
                         categoryName={product.categories?.name ?? null}
+                        discountPct={Number(product.discount_pct ?? 0)}
                       />
                     )
                   })}
@@ -463,7 +464,7 @@ export default async function ProductsPage({
                 <Pagination
                   page={page}
                   totalPages={totalPages}
-                  buildHref={(p) => buildPageUrl(searchParams, p)}
+                  buildHref={(p) => buildPageUrl(resolvedSearchParams, p)}
                 />
               </>
             ) : (

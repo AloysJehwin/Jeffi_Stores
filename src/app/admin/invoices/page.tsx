@@ -8,7 +8,7 @@ import InvoicesClient from './InvoicesClient'
 export const metadata = { title: 'Invoices — Jeffi Admin' }
 
 export default async function InvoicesPage() {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))
@@ -16,7 +16,7 @@ export default async function InvoicesPage() {
   let session: any = null
   try { session = await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
 
-  if (!hasScope(session?.role || '', session?.scopes || [], 'invoices')) {
+  if (!hasScope(session?.role || '', session?.scopes || [], 'invoices:read')) {
     redirect(ap('/admin/dashboard', host))
   }
 

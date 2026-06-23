@@ -6,7 +6,7 @@ import { ALL_SCOPE_KEYS } from '@/lib/scopes'
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const admin = await authenticateAdmin(request)
@@ -14,7 +14,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const { id } = params
+    const { id } = await params
     const body = await request.json()
     const { scopes, role, is_active, reset_mfa } = body
 
@@ -80,14 +80,15 @@ export async function PATCH(
     }
 
     return NextResponse.json({ success: true, admin: updated })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const admin = await authenticateAdmin(request)
@@ -95,7 +96,7 @@ export async function DELETE(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const { id } = params
+    const { id } = await params
 
     if (id === admin.adminId) {
       return NextResponse.json({ error: 'Cannot delete your own account' }, { status: 400 })
@@ -114,7 +115,8 @@ export async function DELETE(
     }
 
     return NextResponse.json({ success: true })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

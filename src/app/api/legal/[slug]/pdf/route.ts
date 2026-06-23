@@ -4,8 +4,9 @@ import { generatePolicyPDF } from '@/lib/policy-pdf'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_request: Request, { params }: { params: { slug: string } }) {
-  const policy = getPolicyBySlug(params.slug)
+export async function GET(_request: Request, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
+  const policy = getPolicyBySlug(slug)
   if (!policy) return new NextResponse('Not found', { status: 404 })
 
   try {

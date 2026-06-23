@@ -16,17 +16,25 @@ import CustomerMailPanel from '@/components/admin/CustomerMailPanel'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
 
-export default async function OrderDetailsPage({ params }: { params: { id: string } }) {
+export default async function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const host = (await headers()).get('host') ?? ''
-  const order = await getOrder(params.id).catch(() => null)
+  const order = await getOrder(id).catch(() => null)
 
   if (!order) {
     notFound()
   }
 
-  const returnRequest = await getReturnRequest(params.id).catch(() => null)
+  const returnRequest = await getReturnRequest(id).catch(() => null)
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
   const showRetryEmailButton =
     (order.payment_status === 'failed' || order.payment_status === 'unpaid') &&
@@ -158,17 +166,34 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               </div>
             )}
             {!order.original_order_id && (order.invoice_number ? (
-              <a
-                href={`/api/orders/${order.id}/invoice`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="px-3 py-2 text-sm font-semibold rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 border border-accent-300 dark:border-accent-700 transition-colors inline-flex items-center gap-1.5"
-              >
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-                Invoice {order.invoice_number}
-              </a>
+              <div className="inline-flex rounded-full overflow-hidden border border-accent-300 dark:border-accent-700 text-sm font-semibold">
+                {order.view_token && (
+                  <a
+                    href={`/invoice/${order.view_token}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title="View Invoice"
+                    className="px-3 py-2 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center gap-1.5 border-r border-accent-300 dark:border-accent-700"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                    Invoice {order.invoice_number}
+                  </a>
+                )}
+                <a
+                  href={`/api/orders/${order.id}/invoice`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Download PDF"
+                  className="px-3 py-2 bg-accent-100 dark:bg-accent-900/30 text-accent-800 dark:text-accent-300 hover:bg-accent-200 dark:hover:bg-accent-800/50 transition-colors inline-flex items-center"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                </a>
+              </div>
             ) : (order.payment_status === 'paid' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'out_for_delivery' || order.status === 'delivered') && (
               <GenerateInvoiceButton orderId={order.id} />
             ))}
@@ -202,10 +227,16 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
                           </span>
                         )}
                         <p className="text-sm text-foreground-secondary mt-1">
-                          {item.buy_mode === 'weight' || item.buy_mode === 'length'
-                            ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''} × Rs. ${Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/${item.buy_unit}`
-                            : `Quantity: ${Math.round(Number(item.quantity))} × Rs. ${Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
-                          }
+                          {(() => {
+                            const isFractional = (item.buy_mode && item.buy_mode !== 'unit') || (item.buy_unit && item.buy_unit !== 'unit')
+                            const displayUnit = (item.buy_unit && item.buy_unit !== 'unit') ? item.buy_unit : (item.buy_mode !== 'unit' ? item.buy_mode : null)
+                            const qty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
+                            const qtyStr = isFractional ? qty.toFixed(qty % 1 === 0 ? 0 : 3).replace(/\.?0+$/, '') : String(qty)
+                            const priceStr = Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                            return displayUnit
+                              ? <>{qtyStr} <UnitLabel label={displayUnit} /> × Rs. {priceStr}/<UnitLabel label={displayUnit} /></>
+                              : <>Quantity: {qtyStr} × Rs. {priceStr}</>
+                          })()}
                         </p>
                       </div>
                       <div className="text-right">
@@ -247,6 +278,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
             </div>
           </div>
 
+          {!['processing', 'shipped', 'out_for_delivery', 'delivered', 'cancelled', 'return_requested', 'return_approved', 'return_received', 'returned', 'return_rejected'].includes(order.status) && (
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Inventory Status</h2>
@@ -255,15 +287,24 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               {order.order_items && order.order_items.length > 0 ? (
                 order.order_items.map((item: any) => {
                   const inv = item.sub_variant?.inventory_quantity ?? item.variant?.inventory_quantity ?? item.products?.inventory_quantity ?? 0
-                  const qty = Math.round(Number(item.quantity))
-                  const isOut = inv <= 0
-                  const isLow = inv > 0 && inv <= 5
+                  const orderedQty = Number(item.quantity)
+                  const isCount = item.sell_unit_dimension === 'count' || (!item.buy_mode || item.buy_mode === 'unit')
+                  const factor = item.sell_unit_factor ? Number(item.sell_unit_factor) : 1
+                  // For count dimension: inventory is in individual pieces; ordered qty is in selling units (e.g. boxes)
+                  // Show both: "5 box (250 pcs)" where factor=50
+                  const deductedQty = isCount ? orderedQty * factor : orderedQty
+                  const unitLabel = (item.buy_unit && item.buy_unit !== 'unit') ? item.buy_unit : null
+                  const isOut = inv < deductedQty
+                  const isLow = !isOut && inv < deductedQty * 2
                   return (
                     <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
                         <p className="text-xs text-foreground-muted mt-0.5">
-                          SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}{' · '}Ordered: {qty}
+                          SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}{' · '}
+                          Ordered: {isCount && unitLabel
+                            ? `${orderedQty} ${unitLabel}${factor > 1 ? ` (${deductedQty} pcs)` : ''}`
+                            : `${orderedQty}${unitLabel ? ` ${unitLabel}` : ''}`}
                         </p>
                         {item.variant_name && (
                           <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
@@ -298,6 +339,7 @@ export default async function OrderDetailsPage({ params }: { params: { id: strin
               )}
             </div>
           </div>
+          )}
 
           {order.status === 'cancel_requested' && (
             <div className="bg-surface-elevated rounded-lg shadow-sm border-2 border-orange-300 dark:border-orange-800">

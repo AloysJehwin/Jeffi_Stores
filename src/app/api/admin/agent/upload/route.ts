@@ -17,14 +17,15 @@ const ALLOWED_MIMES = new Set([
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'agent')) {
+  if (!hasScope(admin.role, admin.scopes, 'agent:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
   let form: FormData
   try {
     form = await req.formData()
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Expected multipart/form-data' }, { status: 400 })
   }
 

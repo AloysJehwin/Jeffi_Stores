@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const { searchParams } = new URL(request.url)
     const q = searchParams.get('q')?.trim() || ''
@@ -94,7 +94,8 @@ export async function GET(request: NextRequest) {
     )
 
     return NextResponse.json({ products: rows || [] })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

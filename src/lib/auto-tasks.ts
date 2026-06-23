@@ -46,6 +46,11 @@ let cachedSuperAdminId: string | null = null
 let cachedAt = 0
 const CACHE_MS = 5 * 60 * 1000
 
+export function __resetSuperAdminCache(): void {
+  cachedSuperAdminId = null
+  cachedAt = 0
+}
+
 async function getSuperAdminId(): Promise<string | null> {
   if (cachedSuperAdminId && Date.now() - cachedAt < CACHE_MS) return cachedSuperAdminId
   const row = await queryOne<{ id: string }>(
@@ -101,7 +106,8 @@ export async function createAutoTask(params: CreateAutoTaskParams): Promise<stri
       }).catch(() => {})
     }
     return taskId ?? null
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

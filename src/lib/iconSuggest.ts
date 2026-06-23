@@ -20,6 +20,10 @@ function getClient(): OpenAI {
   return client
 }
 
+export function __resetClientForTests(): void {
+  client = null
+}
+
 export async function suggestIcon(categoryName: string): Promise<string> {
   try {
     const openai = getClient()
@@ -45,7 +49,8 @@ export async function suggestIcon(categoryName: string): Promise<string> {
     const parsed = JSON.parse(raw) as { iconName?: string }
     const suggested = parsed.iconName?.trim() ?? ''
     return ICON_OPTIONS.includes(suggested) ? suggested : 'Package'
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return 'Package'
   }
 }

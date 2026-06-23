@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { use, useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { bp } from '@/lib/business-path'
@@ -24,6 +24,7 @@ interface RFQItem {
   variant_price: number | null
   variant_mrp: number | null
   variant_sku: string | null
+  unit_factor: number
   image_url: string | null
   quoted_rate: number | null
   quoted_discount_pct: number | null
@@ -96,7 +97,8 @@ function fmtTime(iso: string) {
   })
 }
 
-export default function BusinessRFQDetail({ params }: { params: { id: string } }) {
+export default function BusinessRFQDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = use(params)
   const [rfq, setRfq] = useState<RFQ | null>(null)
   const [items, setItems] = useState<RFQItem[]>([])
   const [linkedOrder, setLinkedOrder] = useState<LinkedOrder | null>(null)
@@ -128,7 +130,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
 
   const load = () => {
     setLoading(true)
-    fetch(`/api/business/rfqs/${params.id}`, { credentials: 'include' })
+    fetch(`/api/business/rfqs/${id}`, { credentials: 'include' })
       .then(r => r.json())
       .then(d => {
         setRfq(d.rfq || null)
@@ -139,13 +141,13 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
       })
       .catch(() => setLoading(false))
 
-    fetch(`/api/business/rfqs/${params.id}/messages`, { credentials: 'include' })
+    fetch(`/api/business/rfqs/${id}/messages`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : { messages: [] })
       .then(m => setMessages(m.messages || []))
       .catch(() => {/* messages table may not exist yet */})
   }
 
-  useEffect(() => { load() }, [params.id])
+  useEffect(() => { load() }, [id])
 
   useEffect(() => {
     if (threadRef.current) {
@@ -172,7 +174,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     setSaving(true)
     setSaveError('')
     try {
-      const res = await fetch(`/api/business/rfqs/${params.id}`, {
+      const res = await fetch(`/api/business/rfqs/${id}`, {
         method: 'PATCH',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -206,7 +208,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     setSendingMsg(true)
     setMsgError('')
     try {
-      const res = await fetch(`/api/business/rfqs/${params.id}/messages`, {
+      const res = await fetch(`/api/business/rfqs/${id}/messages`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -238,7 +240,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
         : undefined
       const payload: { action: string; message?: string; counter_items?: typeof counter_items } = { action, message }
       if (counter_items && counter_items.length > 0) payload.counter_items = counter_items
-      const res = await fetch(`/api/business/rfqs/${params.id}/respond`, {
+      const res = await fetch(`/api/business/rfqs/${id}/respond`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -261,7 +263,7 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
     setResubmitError('')
     setResubmitting(true)
     try {
-      const res = await fetch(`/api/business/rfqs/${params.id}/resubmit`, {
+      const res = await fetch(`/api/business/rfqs/${id}/resubmit`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -471,11 +473,14 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                 <div className="divide-y divide-border-default">
                   {items.map((item, i) => {
                     const offered = counterMap[item.id]
-                    const catalogUnit = item.variant_price ?? item.catalog_price
+                    const unitFactor = item.unit_factor > 1 ? item.unit_factor : 1
+                    const rawCatalogUnit = item.variant_price ?? item.catalog_price
+                    const catalogUnit = rawCatalogUnit != null ? Number(rawCatalogUnit) * unitFactor : null
                     const discountPct = item.category_id ? (discountMap[item.category_id] ?? 0) : 0
                     const businessUnitPrice = catalogUnit && discountPct > 0 ? applyDiscount(catalogUnit, discountPct) : null
                     const shownCatalogPrice = businessUnitPrice ?? catalogUnit
-                    const catalogMrp = item.variant_mrp ?? item.catalog_mrp
+                    const rawCatalogMrp = item.variant_mrp ?? item.catalog_mrp
+                    const catalogMrp = rawCatalogMrp != null ? Number(rawCatalogMrp) * unitFactor : null
 
                     // "Offered" = quoted_rate (finalized quotation, ex-GST → convert back to incl-GST after discount) or counter offer from messages (already incl-GST)
                     const quotedGstRate = item.quoted_gst_rate != null ? Number(item.quoted_gst_rate) : 18
@@ -792,7 +797,9 @@ export default function BusinessRFQDetail({ params }: { params: { id: string } }
                         <div className="space-y-1.5">
                           {latestCounter.counter_items!.map(ci => {
                             const item = items.find(it => it.id === ci.rfq_item_id)
-                            const catalogUnit = item ? (item.variant_price ?? item.catalog_price) : null
+                            const uf = item ? (item.unit_factor > 1 ? item.unit_factor : 1) : 1
+                            const rawCatalogUnit = item ? (item.variant_price ?? item.catalog_price) : null
+                            const catalogUnit = rawCatalogUnit != null ? Number(rawCatalogUnit) * uf : null
                             const discountPct = item?.category_id ? (discountMap[item.category_id] ?? 0) : 0
                             const businessPrice = catalogUnit && discountPct > 0 ? applyDiscount(catalogUnit, discountPct) : catalogUnit
                             const savingPct = businessPrice && businessPrice > 0

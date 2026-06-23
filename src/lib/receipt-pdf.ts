@@ -12,12 +12,14 @@ export interface ReceiptItem {
   product_name: string
   quantity: number
   unit_price: number
+  discount_amount?: number
   total_price: number
   taxable_amount: number
   cgst_amount: number
   sgst_amount: number
   igst_amount: number
   gst_rate: number
+  buy_unit?: string | null
 }
 
 export interface ReceiptOrder {
@@ -101,7 +103,8 @@ export async function generateReceiptPDF(
       ? [{ text: '', gap: 1 }] : []),
   ]
 
-  const itemsH = items.length * (LINE_H + 2)
+  const discountedItems = items.filter(i => (i.discount_amount ?? 0) > 0).length
+  const itemsH = items.length * (LINE_H + 2) + discountedItems * (FS_SM + 1)
   const summaryLines = 1 + (order.is_igst ? (order.igst_amount > 0 ? 1 : 0) : (order.cgst_amount > 0 ? 1 : 0) + (order.sgst_amount > 0 ? 1 : 0)) + 1
   const notesH = order.notes ? FS_SM + 6 : 0
   const footerH = 7 + 6 + 2
@@ -181,8 +184,8 @@ export async function generateReceiptPDF(
 
     ruler(true, 2)
 
-    const col = { item: x, qty: x + CW - 80, rate: x + CW - 52, amt: x + CW - 30 }
-    const colW = { item: CW - 80, qty: 28, rate: 22, amt: 30 }
+    const col = { item: x, qty: x + CW - 88, rate: x + CW - 54, amt: x + CW - 30 }
+    const colW = { item: CW - 88, qty: 34, rate: 24, amt: 30 }
 
     doc.font('Helvetica-Bold').fontSize(FS)
     doc.text('Item', col.item, y, { width: colW.item, lineGap: 0 })
@@ -197,13 +200,24 @@ export async function generateReceiptPDF(
     for (const item of items) {
       const ry = y
       doc.font('Helvetica').fontSize(FS)
+      const hasDiscount = (item.discount_amount ?? 0) > 0
+      const mrpTotal = hasDiscount ? item.unit_price * item.quantity : 0
       const nameH = doc.heightOfString(item.product_name, { width: colW.item })
+      const discH = hasDiscount ? FS_SM + 1 : 0
+      const qtyStr = item.buy_unit
+        ? `${parseFloat(String(item.quantity))} ${item.buy_unit}`
+        : String(item.quantity)
       doc.text(item.product_name, col.item, ry, { width: colW.item, lineGap: 0 })
+      if (hasDiscount) {
+        doc.font('Helvetica').fontSize(FS_SM)
+          .text(`MRP ₹${fmtAmt(mrpTotal)}  Disc -₹${fmtAmt(item.discount_amount!)}`, col.item, ry + nameH, { width: colW.item, lineGap: 0 })
+        doc.font('Helvetica').fontSize(FS)
+      }
       const ny = ry + Math.max(0, (nameH - FS) / 2)
-      doc.text(String(item.quantity), col.qty, ny, { width: colW.qty, align: 'right', lineGap: 0 })
+      doc.text(qtyStr, col.qty, ny, { width: colW.qty, align: 'right', lineGap: 0 })
       doc.text(fmtAmt(item.unit_price), col.rate, ny, { width: colW.rate, align: 'right', lineGap: 0 })
       doc.text(fmtAmt(item.total_price), col.amt, ny, { width: colW.amt, align: 'right', lineGap: 0 })
-      y = ry + nameH + 2
+      y = ry + nameH + discH + 2
     }
 
     ruler(true, 1)
@@ -212,8 +226,8 @@ export async function generateReceiptPDF(
       const ry = y
       const fs = bold ? 7.5 : FS
       const font = bold ? 'Helvetica-Bold' : 'Helvetica'
-      doc.font(font).fontSize(fs).text(label, x, ry, { width: CW - 38, lineGap: 0 })
-      doc.font(font).fontSize(fs).text(val, x + CW - 46, ry, { width: 46, align: 'right', lineGap: 0 })
+      doc.font(font).fontSize(fs).text(label, x, ry, { width: CW - 30, lineGap: 0 })
+      doc.font(font).fontSize(fs).text(val, x + CW - 30, ry, { width: 30, align: 'right', lineGap: 0 })
       doc.font('Helvetica')
       y = ry + fs + 2
     }

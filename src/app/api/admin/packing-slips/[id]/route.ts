@@ -29,12 +29,13 @@ async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
   return row || null
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'packing_slips')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'packing_slips:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-  const [order, store] = await Promise.all([fetchOrder(params.id), loadStoreSettings()])
+  const [order, store] = await Promise.all([fetchOrder(id), loadStoreSettings()])
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
   try {

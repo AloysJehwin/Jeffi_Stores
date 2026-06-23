@@ -60,7 +60,7 @@ function certStatus(admin: any): string {
 }
 
 export default async function TeamPage() {
-  const headersList = headers()
+  const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
   const host = headersList.get('host') ?? ''
 

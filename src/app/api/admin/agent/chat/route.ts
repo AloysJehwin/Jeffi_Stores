@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { aiChat, AiClientError } from '@/lib/ai-client'
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
+import { findSimilar } from '@/lib/rag'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
@@ -45,20 +46,59 @@ function buildSystemPrompt(): string {
   return buildSystemPromptBody(compactToolList(), '')
 }
 
-async function buildSystemPromptWithDynamic(): Promise<string> {
-  return buildSystemPromptBody(compactToolList(), '')
+async function buildSystemPromptWithDynamic(userMessage?: string): Promise<string> {
+  let ragContext = ''
+  if (userMessage) {
+    try {
+      const results = await findSimilar(userMessage, { limit: 12, minSimilarity: 0.3 })
+      if (results.length > 0) {
+        ragContext = '\n\n## STORE DATA CONTEXT\n' +
+          'The following records from the store database are semantically relevant to this query. ' +
+          'Use them to answer directly when the data is sufficient — only call a tool if you need fresher or more specific data.\n\n' +
+          results.map(r =>
+            `[${r.source_table}:${r.source_id}] ${r.content}`
+          ).join('\n')
+      }
+    } catch {
+      // RAG unavailable — fall through to tool-only mode
+    }
+  }
+  return buildSystemPromptBody(compactToolList(), ragContext)
 }
 
 function buildSystemPromptBody(toolList: string, dynamicList: string): string {
   return `/no_think
 You are the Jeffi Stores admin assistant. You help store operators run their business.
 
-## TOOL CALLING — MANDATORY PROTOCOL
+## TOOL CALLING — MANDATORY FORMAT
 
-To call a tool emit this block (nothing before it, no narration):
+Every tool call MUST use this exact XML block. No other format is accepted:
 <tool_use name="TOOL_NAME">
 {"arg":"value"}
 </tool_use>
+
+Example — user asks "show top products":
+<tool_use name="run_sql_readonly">
+{"sql":"SELECT id, name, sku FROM products ORDER BY created_at DESC LIMIT 5"}
+</tool_use>
+
+Example — user asks "find bolt products":
+<tool_use name="search_products">
+{"query":"bolt"}
+</tool_use>
+
+Example — user asks "send test featured products email to x@y.com":
+<tool_use name="list_featured_products">
+{"limit":10}
+</tool_use>
+[after getting productIds from result]
+<tool_use name="propose_product_announcement_email">
+{"productIds":["<id1>","<id2>"],"audience":"test_only","testEmail":"x@y.com","subject":"Featured Products","intro":"Check out our featured products."}
+</tool_use>
+
+NEVER write: run_sql_readonly{"sql":"..."}
+NEVER write: search_products\n{"query":"..."}
+ALWAYS write the full <tool_use name="..."> opening tag, JSON body, and </tool_use> closing tag.
 
 After each tool result you will decide the next step. Max ${MAX_ITERATIONS} tool calls per turn. When done, write the final answer — no XML.
 
@@ -80,6 +120,7 @@ ${toolList}${dynamicList}
 Data queries:
 - search_products → natural language ("hex bolts for steel"). NOT for filters like featured/low-stock/top-sellers — use run_sql_readonly for those (or list_featured_products for featured).
 - run_sql_readonly → ad-hoc SELECTs. Use describe_schema first if unsure of column names. Tables: products, orders, order_items, users, categories, brands, campaigns, email_campaigns_sent.
+- Time-based customer/order queries (joined today, last 48h, recent orders) MUST use run_sql_readonly with a WHERE created_at >= NOW() - INTERVAL filter. Exclude guest accounts: AND email NOT LIKE 'guest\_%@temporary.local'.
 - Products with has_variants=true: stock lives in product_variants, not inventory_quantity. Price = COALESCE(NULLIF(MIN(pv.price),0), p.base_price, 0).
 - Effective stock formula for variants: SUM of sub_variant inventory_quantity when sub-variants exist, else pv.inventory_quantity.
 
@@ -100,20 +141,36 @@ Output format — use ui_blocks for any data display:
 
 Quotation flow: DO NOT call propose_create_quotation with text. Always call match_quotation_items first to resolve product names → ids, then propose_create_quotation with productIds only.
 
-Marketing emails: ALWAYS call estimate_email_audience before propose_product_announcement_email. intro field = ONE plain sentence, no markdown links/images.
+Marketing emails:
+- "send featured products email" or "product announcement" → estimate_email_audience then propose_product_announcement_email. Single-address test: audience="test_only", testEmail=<address>. intro = ONE plain sentence. NO markdown.
+- "send a broadcast email" / "mailer blast" → propose_send_mailer_broadcast. Use audience="test_only" + testEmail="addr" for a test send (NOT the legacy "test_only:email" colon format).
+- "test campaign" (abandoned_cart / post_purchase / etc.) → send_test_email(campaignKind, toEmail). Valid kinds: abandoned_cart, abandoned_checkout, post_purchase, price_drop, restock, review_reminder, thank_you_for_your_purchase, winback_90, winback_180.
+- CRITICAL: "featured_products" is NOT a valid campaignKind. NEVER pass it to send_test_email.
 
 Currency: INR (₹). Dates: Asia/Kolkata.`
 }
 
 function parseToolCalls(text: string): { calls: { name: string; rawInput: string }[]; remainder: string } {
   const calls: { name: string; rawInput: string }[] = []
-  const re = /<tool_use\s+name="([^"]+)">\s*([\s\S]*?)\s*<\/tool_use>/g
+  const xmlRe = /<tool_use\s+name="([^"]+)">\s*([\s\S]*?)\s*<\/tool_use>/g
   let m
-  let remainder = text
-  while ((m = re.exec(text)) !== null) {
+  while ((m = xmlRe.exec(text)) !== null) {
     calls.push({ name: m[1], rawInput: m[2] })
   }
-  remainder = text.replace(re, '').trim()
+  let remainder = text.replace(xmlRe, '').trim()
+
+  if (calls.length === 0) {
+    const plainRe = new RegExp(
+      '(?:^|\\n)(' + TOOLS.map(t => t.name).join('|') + ')\\s*\\n(\\{[\\s\\S]*?\\})(?=\\n|$)',
+      'g'
+    )
+    let pm
+    while ((pm = plainRe.exec(text)) !== null) {
+      calls.push({ name: pm[1], rawInput: pm[2] })
+    }
+    if (calls.length > 0) remainder = text.replace(plainRe, '').trim()
+  }
+
   return { calls, remainder }
 }
 
@@ -126,7 +183,7 @@ function parseUiBlocks(text: string): { blocks: any[]; remainder: string } {
       const parsed = JSON.parse(m[1])
       if (Array.isArray(parsed)) blocks = blocks.concat(parsed)
       else if (parsed && Array.isArray(parsed.blocks)) blocks = blocks.concat(parsed.blocks)
-    } catch {}
+    } catch { /* malformed ui_blocks JSON — skip */ }
   }
   const remainder = text.replace(re, '').trim()
   return { blocks, remainder }
@@ -161,7 +218,7 @@ async function invokeAdminApiInternal(
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'agent')) {
+  if (!hasScope(admin.role, admin.scopes, 'agent:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -185,7 +242,7 @@ export async function POST(req: NextRequest) {
     [conversationId, HISTORY_TRUNCATE]
   )
 
-  const systemPrompt = await buildSystemPromptWithDynamic()
+  const systemPrompt = await buildSystemPromptWithDynamic(userMessage)
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
     { role: 'system', content: systemPrompt },
   ]
@@ -224,14 +281,27 @@ export async function POST(req: NextRequest) {
         const isShortPromise = text.length < 320 && stallRe.test(text)
         // Detect hallucinated answers: model answered with product/order/price data without calling a tool
         const looksLikeDataAnswer = iter === 0 && /\b(₹|\bsku\b|in stock|out of stock|\bprice\b.*\d|\bstock\b.*\d|\border number\b)/i.test(text)
-        const shouldRetry = (isShortPromise || looksLikeDataAnswer) && consecutiveStalls < 2 && iter < MAX_ITERATIONS - 1
+        // Detect false proposal claim: model says "I've proposed" but no proposed action was actually created
+        const claimsProposed = /i'?ve proposed|review the action card|has been proposed/i.test(text)
+        const falseProposal = claimsProposed && proposedActions.length === 0 && consecutiveStalls < 2 && iter < MAX_ITERATIONS - 1
+        const shouldRetry = (isShortPromise || looksLikeDataAnswer || falseProposal) && consecutiveStalls < 2 && iter < MAX_ITERATIONS - 1
         if (shouldRetry) {
           consecutiveStalls++
           messages.push({ role: 'assistant', content: r.content })
-          messages.push({
-            role: 'user',
-            content: '[system] You answered without calling a tool. That data is INVENTED — it does not come from this store\'s database. You MUST call a tool to get real data. Emit the <tool_use> block now. Do not write any text before it.',
-          })
+          // For false proposals: extract productIds from prior tool results to give glm4 a concrete nudge
+          let nudge: string
+          if (falseProposal) {
+            const featuredCall = toolCallRecords.find(tc => tc.tool === 'list_featured_products' && !tc.isError)
+            const productIds: string[] = featuredCall
+              ? ((featuredCall.output as any)?.data?.products ?? []).map((p: any) => p.id).filter(Boolean)
+              : []
+            nudge = productIds.length > 0
+              ? `[system] No action was proposed yet. Call propose_product_announcement_email now with these productIds: ${JSON.stringify(productIds)}, audience="test_only", testEmail from the user message, subject="Featured Products", intro="Check out our featured products."  Emit only the <tool_use> block.`
+              : '[system] No action was proposed yet. Call the appropriate mutating tool (propose_product_announcement_email) with the correct arguments. Emit only the <tool_use> block.'
+          } else {
+            nudge = '[system] You answered without calling a tool. That data is INVENTED — it does not come from this store\'s database. You MUST call a tool to get real data. Emit the <tool_use> block now. Do not write any text before it.'
+          }
+          messages.push({ role: 'user', content: nudge })
           continue
         }
         consecutiveStalls = 0
@@ -248,7 +318,7 @@ export async function POST(req: NextRequest) {
       for (const c of calls) {
         const tool = getTool(c.name)
         let parsed: Record<string, unknown> = {}
-        try { parsed = JSON.parse(c.rawInput || '{}') } catch {}
+        try { parsed = JSON.parse(c.rawInput || '{}') } catch { /* invalid JSON input — use empty object */ }
 
         if (!tool) {
           const err = `Unknown tool: ${c.name}`

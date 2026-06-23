@@ -21,7 +21,7 @@ async function recordFailedLogin(req: NextRequest, email: string, reason: string
        VALUES ($1, $2, $3, $4, $5)`,
       [email.toLowerCase(), userId, ip, ua, reason]
     )
-  } catch {}
+  } catch (err) { console.error("[route]", err) }
 }
 
 export async function POST(request: NextRequest) {

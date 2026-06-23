@@ -5,14 +5,15 @@ import { generateReceiptPDF, ReceiptBusinessSettings, ReceiptOrder, ReceiptItem 
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(_req: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ token: string }> }) {
+  const { token } = await params
   try {
     const order = await queryOne<any>(
       `SELECT o.*, a.full_name, a.address_line1, a.address_line2, a.city, a.state, a.postal_code, a.phone AS address_phone
        FROM orders o
        LEFT JOIN addresses a ON o.shipping_address_id = a.id
        WHERE o.view_token = $1 AND o.invoice_number IS NOT NULL`,
-      [params.token]
+      [token]
     )
     if (!order) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -88,6 +89,7 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
         tax_amount: parseFloat(order.tax_amount),
         total_amount: parseFloat(order.total_amount),
         discount_amount: parseFloat(order.discount_amount || '0'),
+        business_discount_amount: parseFloat(order.business_discount_amount || '0'),
         shipping_amount: parseFloat(order.shipping_amount || '0'),
         taxable_amount: parseFloat(order.taxable_amount || '0'),
         cgst_amount: parseFloat(order.cgst_amount || '0'),
@@ -115,6 +117,8 @@ export async function GET(_req: NextRequest, { params }: { params: { token: stri
         quantity: item.quantity,
         unit_price: parseFloat(item.unit_price),
         total_price: parseFloat(item.total_price),
+        discount_amount: parseFloat(item.discount_amount || '0'),
+        mrp: item.mrp != null ? parseFloat(item.mrp) : null,
         taxable_amount: parseFloat(item.taxable_amount || '0'),
         cgst_amount: parseFloat(item.cgst_amount || '0'),
         sgst_amount: parseFloat(item.sgst_amount || '0'),

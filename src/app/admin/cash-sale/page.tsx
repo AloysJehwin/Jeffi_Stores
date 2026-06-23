@@ -9,14 +9,14 @@ export const metadata = { title: 'Cash Sale — Jeffi Admin' }
 
 export default async function CashSalePage() {
   const host = (await headers()).get('host') ?? ''
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null
   try { session = await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
 
-  if (!hasScope(session?.role || '', session?.scopes || [], 'invoices')) {
+  if (!hasScope(session?.role || '', session?.scopes || [], 'invoices:read')) {
     redirect(ap('/admin/dashboard', host))
   }
 

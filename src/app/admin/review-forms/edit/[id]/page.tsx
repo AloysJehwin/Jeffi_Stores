@@ -15,10 +15,11 @@ interface ReviewForm {
 }
 interface Coupon { id: string; code: string; description: string | null }
 
-export default async function EditReviewFormPage({ params }: { params: { id: string } }) {
+export default async function EditReviewFormPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const host = (await headers()).get('host') ?? ''
   const [form, coupons] = await Promise.all([
-    queryOne<ReviewForm>('SELECT * FROM review_forms WHERE id = $1', [params.id]),
+    queryOne<ReviewForm>('SELECT * FROM review_forms WHERE id = $1', [id]),
     queryMany<Coupon>('SELECT id, code, description FROM coupons WHERE is_active = true ORDER BY code'),
   ])
   if (!form) notFound()

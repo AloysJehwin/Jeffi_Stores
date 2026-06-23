@@ -37,6 +37,7 @@ export interface DraftPayload {
   buyNowItem: DraftBuyNowItem | null
   notes: string | null
   paymentMethod: 'razorpay'
+  businessDiscountAmount: number
 }
 
 export async function signDraftToken(payload: DraftPayload): Promise<string> {
@@ -68,6 +69,7 @@ export async function verifyDraftToken(token: string): Promise<DraftPayload | nu
       buyNowItem: (payload.buyNowItem as DraftBuyNowItem) || null,
       notes: (payload.notes as string) || null,
       paymentMethod: 'razorpay',
+      businessDiscountAmount: typeof payload.businessDiscountAmount === 'number' ? payload.businessDiscountAmount : 0,
     }
   } catch {
     return null

@@ -18,13 +18,14 @@ const patchSchema = z
     message: 'At least one field is required',
   })
 
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   try {
-    const product = await getProduct(params.id)
+    const product = await getProduct(id)
     return NextResponse.json(product)
   } catch (err: any) {
     if (err.message === 'Product not found') return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -32,10 +33,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const raw = await req.json()
   const parsed = parseBody(patchSchema, raw)
@@ -46,7 +48,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (!category_id) return NextResponse.json({ error: 'category_id required' }, { status: 400 })
 
   await query('UPDATE products SET category_id = $1, updated_at = $2 WHERE id = $3', [
-    category_id, new Date().toISOString(), params.id,
+    category_id, new Date().toISOString(), id,
   ])
   revalidatePath('/admin/products')
   revalidatePath('/admin/categories')

@@ -3,7 +3,7 @@ import { headers } from 'next/headers'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
 import { mrpDiscountPct } from '@/lib/pricing'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import { bp } from '@/lib/business-path'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import Pagination from '@/components/ui/Pagination'
@@ -45,7 +45,7 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[],
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
@@ -62,10 +62,12 @@ export default async function BusinessCategoryDetailPage({
   params,
   searchParams,
 }: {
-  params: { slug: string }
-  searchParams: { [key: string]: string | string[] | undefined }
+  params: Promise<{ slug: string }>
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>
 }) {
-  const category = await getCategoryBySlug(params.slug)
+  const { slug } = await params
+  const resolvedSearchParams = await searchParams
+  const category = await getCategoryBySlug(slug)
 
   if (!category) {
     notFound()
@@ -73,7 +75,7 @@ export default async function BusinessCategoryDetailPage({
 
   const host = (await headers()).get('host') ?? ''
 
-  const pageParam = typeof searchParams.page === 'string' ? searchParams.page : '1'
+  const pageParam = typeof resolvedSearchParams.page === 'string' ? resolvedSearchParams.page : '1'
   const page = Math.max(1, parseInt(pageParam, 10) || 1)
 
   const subcategories = await getSubcategories(category.id)
@@ -154,7 +156,7 @@ export default async function BusinessCategoryDetailPage({
                 const displayPrice = hasVariants && product.variant_min_price
                   ? Number(product.variant_min_price)
                   : Number(product.base_price)
-                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
+                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
                 const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
                 const mrpDiscount = mrpDiscountPct(mrp, displayPrice)
 
@@ -172,6 +174,7 @@ export default async function BusinessCategoryDetailPage({
                     primaryImage={primaryImage || null}
                     brandName={product.brands?.name || null}
                     categoryName={product.categories?.name || null}
+                    categoryId={product.categories?.id || null}
                   />
                 )
               })}
@@ -179,7 +182,7 @@ export default async function BusinessCategoryDetailPage({
             <Pagination
               page={page}
               totalPages={totalPages}
-              buildHref={(p) => p > 1 ? bp(`/business/categories/${params.slug}?page=${p}`, host) : bp(`/business/categories/${params.slug}`, host)}
+              buildHref={(p) => p > 1 ? bp(`/business/categories/${slug}?page=${p}`, host) : bp(`/business/categories/${slug}`, host)}
             />
             </>
           ) : (

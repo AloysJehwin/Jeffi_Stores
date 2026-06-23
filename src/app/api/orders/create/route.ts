@@ -8,6 +8,8 @@ import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { quoteShipping } from '@/lib/order-commit'
+import { getBusinessDiscountMap } from '@/lib/business-discount'
+import { createDraftInvoice } from '@/lib/invoice'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 
 const CreateOrderSchema = z.object({
@@ -41,22 +43,6 @@ export async function POST(request: NextRequest) {
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = false
 
-    const existingUnpaidOrder = await queryOne(
-      `SELECT o.id, o.order_number FROM orders o
-       INNER JOIN payments p ON p.order_id = o.id AND p.payment_gateway = 'razorpay'
-       WHERE o.user_id = $1 AND o.payment_status = 'unpaid' AND o.status = 'pending'
-       ORDER BY o.created_at DESC LIMIT 1`,
-      [userId]
-    )
-
-    if (existingUnpaidOrder) {
-      return NextResponse.json({
-        error: 'You have an unpaid order. Please complete or cancel it before placing a new one.',
-        existingOrderId: existingUnpaidOrder.id,
-        existingOrderNumber: existingUnpaidOrder.order_number,
-      }, { status: 409 })
-    }
-
     const cartUserId = userId
 
     const cartItems = await queryMany(`
@@ -66,20 +52,23 @@ export async function POST(request: NextRequest) {
           'id', p.id, 'name', p.name, 'sku', p.sku,
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
-          'stock_quantity', p.stock_quantity, 'inventory_quantity', p.inventory_quantity, 'is_in_stock', p.is_in_stock
+          'stock_status', p.stock_status, 'inventory_quantity', p.inventory_quantity,
+          'category_id', p.category_id, 'discount_pct', p.discount_pct
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'price_ex_gst', pv.price_ex_gst,
-            'stock_quantity', pv.stock_quantity, 'inventory_quantity', pv.inventory_quantity
+            'stock_status', pv.stock_status, 'inventory_quantity', pv.inventory_quantity,
+            'discount_pct', pv.discount_pct
           )
         ELSE NULL END AS variant,
         CASE WHEN ci.sub_variant_id IS NOT NULL THEN
           json_build_object(
             'id', psv.id, 'sub_variant_name', psv.sub_variant_name, 'sku', psv.sku,
             'price', psv.price, 'price_ex_gst', psv.price_ex_gst,
-            'stock_quantity', psv.stock_quantity, 'inventory_quantity', psv.inventory_quantity
+            'stock_status', psv.stock_status, 'inventory_quantity', psv.inventory_quantity,
+            'discount_pct', psv.discount_pct
           )
         ELSE NULL END AS sub_variant
       FROM cart_items ci
@@ -94,11 +83,9 @@ export async function POST(request: NextRequest) {
     }
 
     const subtotal: number = cartItems.reduce((sum: number, item: any) => {
-      if (item.buy_mode === 'weight' || item.buy_mode === 'length') {
-        return sum + (parseFloat(item.price_at_addition) * parseFloat(item.quantity))
-      }
-      const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
-      return sum + (parseFloat(price) * parseFloat(item.quantity))
+      const pia = parseFloat(item.price_at_addition)
+      const price = (pia > 0) ? pia : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+      return sum + (price * parseFloat(item.quantity))
     }, 0)
 
     const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
@@ -107,55 +94,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: `Minimum order value is ₹${minOrderAmount}` }, { status: 400 })
     }
 
+    let businessDiscountAmount = 0
+    const bizDiscountMap = await getBusinessDiscountMap(userId)
+    if (Object.keys(bizDiscountMap).length > 0) {
+      for (const item of cartItems) {
+        const catId = (item as any).products?.category_id
+        const pct = catId ? (bizDiscountMap[catId] ?? 0) : 0
+        if (pct > 0) {
+          const _pia = parseFloat(item.price_at_addition)
+          const linePrice = (_pia > 0)
+            ? _pia
+            : parseFloat((item as any).sub_variant?.price ?? (item as any).variant?.price ?? (item as any).products.base_price)
+          businessDiscountAmount += linePrice * parseFloat(item.quantity) * pct / 100
+        }
+      }
+      businessDiscountAmount = Math.round(businessDiscountAmount * 100) / 100
+    }
+
     const taxAmount = cartItems.reduce((sum: number, item: any) => {
-      const lineTotal = item.buy_mode === 'weight' || item.buy_mode === 'length'
-        ? parseFloat(item.price_at_addition) * parseFloat(item.quantity)
-        : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * parseFloat(item.quantity)
+      const _pia2 = parseFloat(item.price_at_addition)
+      const _p = (_pia2 > 0) ? _pia2 : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+      const lineTotal = _p * parseFloat(item.quantity)
       const gstRate = parseFloat(item.products.gst_percentage || '0')
       return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
     }, 0)
-
-    let appliedDiscount = 0
-    if (couponId) {
-      const coupon = await queryOne<{
-        id: string; discount_type: string; discount_value: number;
-        min_purchase_amount: number | null; max_discount_amount: number | null;
-        usage_limit: number | null; usage_limit_per_user: number | null;
-        times_used: number; valid_from: string | null; valid_until: string | null; is_active: boolean
-      }>(`SELECT * FROM coupons WHERE id = $1`, [couponId])
-
-      if (coupon && coupon.is_active) {
-        const now = new Date()
-        const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null
-        const validUntil = coupon.valid_until ? new Date(coupon.valid_until) : null
-        const withinWindow = (!validFrom || validFrom <= now) && (!validUntil || validUntil >= now)
-        const underGlobalLimit = coupon.usage_limit === null || coupon.times_used < coupon.usage_limit
-
-        let underPerUserLimit = true
-        if (coupon.usage_limit_per_user !== null) {
-          const usage = await queryOne<{ cnt: string }>(
-            `SELECT COUNT(*) AS cnt FROM coupon_usage WHERE coupon_id = $1 AND user_id = $2`,
-            [coupon.id, userId]
-          )
-          underPerUserLimit = !usage || parseInt(usage.cnt) < coupon.usage_limit_per_user
-        }
-
-        const meetsMinPurchase = coupon.min_purchase_amount === null || subtotal >= coupon.min_purchase_amount
-
-        if (withinWindow && underGlobalLimit && underPerUserLimit && meetsMinPurchase) {
-          if (coupon.discount_type === 'percentage') {
-            appliedDiscount = (subtotal * Number(coupon.discount_value)) / 100
-            if (coupon.max_discount_amount !== null) {
-              appliedDiscount = Math.min(appliedDiscount, Number(coupon.max_discount_amount))
-            }
-          } else {
-            appliedDiscount = Number(coupon.discount_value)
-          }
-          appliedDiscount = Math.min(appliedDiscount, subtotal)
-          appliedDiscount = Math.round(appliedDiscount * 100) / 100
-        }
-      }
-    }
 
     const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
     const appliedShipping = destinationPin
@@ -166,10 +128,6 @@ export async function POST(request: NextRequest) {
           isCod,
         })
       : 0
-
-    const total = subtotal - appliedDiscount + appliedShipping
-
-    const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
     const order = await withTransaction(async (client) => {
       let shippingAddressId = null
@@ -223,9 +181,9 @@ export async function POST(request: NextRequest) {
       }
 
       const itemsWithGST = cartItems.map((item: any) => {
-        const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-        const unitPrice = isCustomQty
-          ? parseFloat(item.price_at_addition)
+        const _pia3 = parseFloat(item.price_at_addition)
+        const unitPrice = (_pia3 > 0)
+          ? _pia3
           : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
         const qty = parseFloat(item.quantity)
         const gstRate = parseFloat(item.products.gst_percentage || '0')
@@ -258,13 +216,66 @@ export async function POST(request: NextRequest) {
         addrSnapshot = addrRow.rows[0] || null
       }
 
+      const existingUnpaidResult = await client.query(
+        `SELECT o.id, o.order_number FROM orders o
+         INNER JOIN payments p ON p.order_id = o.id AND p.payment_gateway = 'razorpay'
+         WHERE o.user_id = $1 AND o.payment_status = 'unpaid' AND o.status = 'pending'
+         ORDER BY o.created_at DESC LIMIT 1
+         FOR UPDATE`,
+        [userId]
+      )
+      if (existingUnpaidResult.rows[0]) {
+        const existing = existingUnpaidResult.rows[0]
+        throw Object.assign(new Error('EXISTING_UNPAID_ORDER'), { existingOrderId: existing.id, existingOrderNumber: existing.order_number })
+      }
+
+      const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
+
+      let appliedDiscount = 0
+      if (couponId) {
+        const couponRes = await client.query(
+          `SELECT * FROM coupons WHERE id = $1 FOR UPDATE`,
+          [couponId]
+        )
+        const coupon = couponRes.rows[0]
+        if (coupon && coupon.is_active) {
+          const now = new Date()
+          const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null
+          const validUntil = coupon.valid_until ? new Date(coupon.valid_until) : null
+          const withinWindow = (!validFrom || validFrom <= now) && (!validUntil || validUntil >= now)
+          const underGlobalLimit = coupon.usage_limit === null || coupon.times_used < coupon.usage_limit
+          let underPerUserLimit = true
+          if (coupon.usage_limit_per_user !== null) {
+            const usageRes = await client.query(
+              `SELECT COUNT(*) AS cnt FROM coupon_usage WHERE coupon_id = $1 AND user_id = $2`,
+              [coupon.id, userId]
+            )
+            underPerUserLimit = parseInt(usageRes.rows[0]?.cnt || '0') < coupon.usage_limit_per_user
+          }
+          const meetsMinPurchase = coupon.min_purchase_amount === null || subtotal >= coupon.min_purchase_amount
+          if (withinWindow && underGlobalLimit && underPerUserLimit && meetsMinPurchase) {
+            if (coupon.discount_type === 'percentage') {
+              appliedDiscount = (subtotal * Number(coupon.discount_value)) / 100
+              if (coupon.max_discount_amount !== null) {
+                appliedDiscount = Math.min(appliedDiscount, Number(coupon.max_discount_amount))
+              }
+            } else {
+              appliedDiscount = Number(coupon.discount_value)
+            }
+            appliedDiscount = Math.min(appliedDiscount, subtotal)
+            appliedDiscount = Math.round(appliedDiscount * 100) / 100
+          }
+        }
+      }
+      const txTotal = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
+
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, Math.max(0, total), shippingAddressId, billingAddressId,
+         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(businessDiscountAmount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, txTotal, shippingAddressId, billingAddressId,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
@@ -276,9 +287,23 @@ export async function POST(request: NextRequest) {
 
       for (const { item, unitPrice, gstRate, itemTotal, gst, itemTax } of itemsWithGST) {
         const tax = isGSTEnabled && gst ? gst.totalTax : (itemTax || 0)
+        const catId = (item as any).products?.category_id
+        const bizPct = catId ? (bizDiscountMap[catId] ?? 0) : 0
+        const itemBizDiscount = bizPct > 0 ? Math.round(itemTotal * bizPct / 100 * 100) / 100 : 0
+
+        // Product-level discount: discount_pct lives on the product and applies to all variants
+        const variantDiscPct = Number((item as any).products?.discount_pct ?? 0)
+        const mrpUnitPrice = variantDiscPct > 0 ? unitPrice / (1 - variantDiscPct / 100) : unitPrice
+        const itemProductDiscount = variantDiscPct > 0 ? Math.round((mrpUnitPrice - unitPrice) * parseFloat(item.quantity) * 100) / 100 : 0
+
+        const totalItemDiscount = Math.round((itemBizDiscount + itemProductDiscount) * 100) / 100
+        const itemMrp = item.sub_variant?.mrp != null ? Number(item.sub_variant.mrp)
+          : item.variant?.mrp != null ? Number(item.variant.mrp)
+          : item.products?.mrp != null ? Number(item.products.mrp)
+          : null
         await client.query(
-          `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)`,
+          `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
           [createdOrder.id, item.product_id, item.variant?.id || null,
            item.sub_variant?.id || null,
            item.sub_variant
@@ -288,7 +313,7 @@ export async function POST(request: NextRequest) {
            item.sub_variant
              ? `${item.variant?.variant_name ? item.variant.variant_name + ' / ' : ''}${item.sub_variant.sub_variant_name}`
              : (item.variant?.variant_name || null),
-           item.quantity, unitPrice, itemTotal, Math.round(tax * 100) / 100,
+           item.quantity, unitPrice, itemTotal, totalItemDiscount, Math.round(tax * 100) / 100,
            isGSTEnabled ? (item.products.hsn_code || null) : null,
            isGSTEnabled ? gstRate : null,
            isGSTEnabled && gst ? gst.taxableAmount : 0,
@@ -296,7 +321,8 @@ export async function POST(request: NextRequest) {
            isGSTEnabled && gst ? gst.sgst : 0,
            isGSTEnabled && gst ? gst.igst : 0,
            item.buy_mode || 'unit',
-           item.buy_unit || null]
+           item.buy_unit || null,
+           itemMrp]
         )
       }
 
@@ -320,9 +346,9 @@ export async function POST(request: NextRequest) {
     })
 
     const orderItems = cartItems.map((item: any) => {
-      const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
-      const unitPrice = isCustomQty
-        ? parseFloat(item.price_at_addition)
+      const _pia4 = parseFloat(item.price_at_addition)
+      const unitPrice = (_pia4 > 0)
+        ? _pia4
         : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
       return {
         order_id: order.id,
@@ -340,8 +366,11 @@ export async function POST(request: NextRequest) {
     })
 
     if (!isRazorpayPayment) {
-      sendOrderConfirmationEmail(user.email, order, orderItems, null).catch(() => {})
-      sendNewOrderNotification(order, orderItems, user).catch(() => {})
+      await query(`UPDATE orders SET status = 'confirmed', updated_at = NOW() WHERE id = $1`, [order.id])
+      const confirmedOrder = { ...order, status: 'confirmed' }
+      createDraftInvoice(order.id).catch(() => {})
+      sendOrderConfirmationEmail(user.email, confirmedOrder, orderItems).catch(() => {})
+      sendNewOrderNotification(confirmedOrder, orderItems, user).catch(() => {})
     }
 
     logActivity({
@@ -377,7 +406,14 @@ export async function POST(request: NextRequest) {
       },
       requiresPayment: isRazorpayPayment,
     })
-  } catch {
+  } catch (err: any) {
+    if (err?.message === 'EXISTING_UNPAID_ORDER') {
+      return NextResponse.json({
+        error: 'You have an unpaid order. Please complete or cancel it before placing a new one.',
+        existingOrderId: err.existingOrderId,
+        existingOrderNumber: err.existingOrderNumber,
+      }, { status: 409 })
+    }
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

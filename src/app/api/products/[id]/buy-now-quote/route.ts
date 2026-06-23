@@ -3,10 +3,11 @@ import { resolveBuyNowItem } from '@/lib/order-commit'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const body = await req.json().catch(() => ({}))
   const resolved = await resolveBuyNowItem({
-    productId: params.id,
+    productId: id,
     variantId: body.variantId || null,
     subVariantId: body.subVariantId || null,
     qty: Number(body.qty) || 1,

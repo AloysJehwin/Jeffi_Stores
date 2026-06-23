@@ -5,11 +5,12 @@ import { queryOne, queryMany } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'financial')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'financial:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const expense = await queryOne<any>(
       `SELECT
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       LEFT JOIN purchase_orders po ON po.id = e.po_id
       LEFT JOIN suppliers s ON s.id = po.supplier_id
       WHERE e.id = $1`,
-      [params.id]
+      [id]
     )
 
     if (!expense) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
        FROM expense_payments
        WHERE expense_id = $1
        ORDER BY payment_date DESC, created_at DESC`,
-      [params.id]
+      [id]
     )
 
     return NextResponse.json({ expense, payments: payments || [] })

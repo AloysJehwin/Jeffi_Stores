@@ -26,7 +26,7 @@ function drawHeader(doc: any) {
   const logoPath = path.join(process.cwd(), 'public', 'images', 'store-logo.png')
   try {
     doc.image(logoPath, ML, 14, { width: 52, height: 52 })
-  } catch {}
+  } catch (err) { console.error("[route]", err) }
   doc.font('Helvetica-Bold').fontSize(20).fillColor('#ffffff')
   doc.text(STORE_NAME.toUpperCase(), ML + 64, 22, { lineBreak: false })
   doc.font('Helvetica').fontSize(8).fillColor('#cfe1c5')
@@ -51,7 +51,7 @@ function drawSeal(doc: any) {
     doc.opacity(0.85)
     doc.image(sealPath, x, y, { width: SEAL_SIZE, height: SEAL_SIZE })
     doc.opacity(1)
-  } catch {}
+  } catch (err) { console.error("[route]", err) }
   // Date inside seal
   const cx = x + SEAL_SIZE / 2
   const cy = y + SEAL_SIZE / 2

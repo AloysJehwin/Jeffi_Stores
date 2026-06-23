@@ -6,11 +6,12 @@ import { sendAdminContactEmail } from '@/lib/email'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
-    if (!admin || !hasScope(admin.role, admin.scopes, 'customers')) {
+    if (!admin || !hasScope(admin.role, admin.scopes, 'customers:write')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -20,7 +21,7 @@ export async function POST(
       return NextResponse.json({ error: 'Subject and message are required' }, { status: 400 })
     }
 
-    const customer = await getCustomerById(params.id)
+    const customer = await getCustomerById(id)
     const name = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Customer'
 
     await sendAdminContactEmail(customer.email, name, subject, message)

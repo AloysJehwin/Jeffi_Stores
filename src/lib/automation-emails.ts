@@ -73,7 +73,7 @@ export async function sendCampaignEmail(params: {
 
   try {
     await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      from: `"Jeffi Store's" <${process.env.SES_PROMO_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
       to: user.email,
       subject,
       html,
@@ -386,7 +386,7 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
 
   try {
     await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      from: `"Jeffi Store's" <${process.env.SES_PROMO_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
       to: toEmail,
       subject,
       html,

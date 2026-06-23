@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer')) {
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -118,7 +118,8 @@ If the scenario is one of these built-in kinds, follow the convention:
   let parsed: { name?: string; kind?: string; subject_template?: string; body_template?: string }
   try {
     parsed = JSON.parse(text)
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 502 })
   }
 

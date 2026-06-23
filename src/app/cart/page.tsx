@@ -16,6 +16,13 @@ interface AppliedCoupon {
   discountAmount: number
 }
 
+// Render unit labels with proper superscripts: "ft2" → "ft²", "m2" → "m²"
+function UnitLabel({ label }: { label: string }) {
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
+
 export default function CartPage() {
   const { cartItems, savedItems, cartCount, isLoading, removeFromCart, updateQuantity, saveForLater, moveToCart, getCartTotal, getCartTax } = useCart()
   const { user } = useAuth()
@@ -91,7 +98,7 @@ export default function CartPage() {
     return (
       <div className="container mx-auto px-4 py-16">
         <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
+          <div role="status" aria-label="Loading" className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
           <p className="mt-4 text-foreground-secondary">Loading cart...</p>
         </div>
       </div>
@@ -102,7 +109,7 @@ export default function CartPage() {
     return (
       <div className="container mx-auto px-4 py-16">
         <div className="max-w-md mx-auto text-center">
-          <svg className="w-24 h-24 mx-auto text-foreground-muted mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <svg aria-hidden="true" className="w-24 h-24 mx-auto text-foreground-muted mb-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
           </svg>
           <h2 className="text-2xl font-bold text-foreground mb-2">Your cart is empty</h2>
@@ -164,7 +171,7 @@ export default function CartPage() {
           <div className="lg:col-span-2">
             {cartItems.length === 0 ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-8 text-center">
-                <svg className="w-16 h-16 mx-auto text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg aria-hidden="true" className="w-16 h-16 mx-auto text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
                 <p className="text-foreground-secondary mb-4">Your cart is empty.</p>
@@ -174,19 +181,21 @@ export default function CartPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               {cartItems.map((item) => {
                 const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || !!(item.buy_mode && item.buy_mode !== 'unit')
                 const price = isCustomQty
                   ? item.price_at_addition
                   : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
                 const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
-                const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
+                const isOutOfStock = (item.sub_variant?.stock_status ?? item.variant?.stock_status ?? item.products.stock_status) === 'Out of Stock'
                 const itemTotal = isCustomQty
-                  ? item.price_at_addition * item.quantity
-                  : price * item.quantity
+                  ? item.price_at_addition * Number(item.quantity)
+                  : price * Math.round(Number(item.quantity))
                 const isUpdating = updatingItems.has(item.id)
                 const showMrp = !isCustomQty && mrp !== null && Number(mrp) > Number(price)
                 const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
                 const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
+                const unitLabel = (item.cart_item_unit?.display_label ?? item.buy_unit) || ''
+                const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
 
                 return (
                   <div key={item.id} className="p-4 sm:p-6 border-b border-border-default last:border-b-0">
@@ -202,7 +211,7 @@ export default function CartPage() {
                             />
                           ) : (
                             <div className="w-full h-full flex items-center justify-center">
-                              <svg className="w-12 h-12 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <svg aria-hidden="true" className="w-12 h-12 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                               </svg>
                             </div>
@@ -240,7 +249,7 @@ export default function CartPage() {
 
                         <div className="mt-2 flex items-center gap-3 flex-wrap">
                           <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                            ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? <>/&thinsp;<UnitLabel label={unitLabel || item.buy_unit || ''} /></> : (showUnitLabel ? <>/&thinsp;<UnitLabel label={unitLabel} /></> : '')}
                           </span>
                           {showMrp && (
                             <>
@@ -254,13 +263,6 @@ export default function CartPage() {
                           )}
                         </div>
 
-                        {/* Stock Status */}
-                        {stockQty < Number(item.quantity) && (
-                          <p className="text-sm text-red-600 dark:text-red-400 mt-2">
-                            Only {stockQty} left in stock
-                          </p>
-                        )}
-
                         {/* Quantity Controls */}
                         <div className="mt-4 flex items-center gap-3 flex-wrap">
                           {isCustomQty ? (
@@ -269,46 +271,46 @@ export default function CartPage() {
                                 type="number"
                                 min="0.001"
                                 step="0.001"
-                                defaultValue={Number(item.quantity).toFixed(3)}
+                                defaultValue={Number(Number(item.quantity).toFixed(6)).toString()}
                                 onBlur={(e) => {
                                   const val = parseFloat(e.target.value)
                                   if (!isNaN(val) && val > 0 && val !== Number(item.quantity)) {
                                     handleQuantityChange(item.id, val)
                                   } else {
-                                    e.target.value = Number(item.quantity).toFixed(3)
+                                    e.target.value = Number(Number(item.quantity).toFixed(6)).toString()
                                   }
                                 }}
                                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
                                 disabled={isUpdating}
                                 className="w-24 px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground font-semibold text-sm text-center focus:outline-none focus:border-accent-500 focus:ring-1 focus:ring-accent-500 disabled:opacity-50"
                               />
-                              <span className="text-sm text-foreground-muted">{item.buy_unit}</span>
-                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/{item.buy_unit}</span>
+                              <span className="text-sm text-foreground-muted"><UnitLabel label={unitLabel || item.buy_unit || ''} /></span>
+                              <span className="text-xs text-foreground-muted">@ ₹{Number(item.price_at_addition).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/&thinsp;<UnitLabel label={unitLabel || item.buy_unit || ''} /></span>
                             </div>
                           ) : (
                             <div className="flex items-center border border-border-secondary rounded-lg">
                               <button
                                 onClick={() => handleQuantityChange(item.id, Number(item.quantity) - 1)}
                                 disabled={isUpdating || Number(item.quantity) <= 1}
+                                aria-label={`Decrease quantity for ${item.products.name}`}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                                 </svg>
                               </button>
                               {isUpdating ? (
-                                <span className="px-4 py-2 border-x border-border-secondary min-w-[60px] text-center flex items-center justify-center">
+                                <span role="status" aria-label="Loading" className="px-4 py-2 border-x border-border-secondary min-w-[60px] text-center flex items-center justify-center">
                                   <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full"></div>
                                 </span>
                               ) : (
                                 <input
                                   type="number"
                                   min="1"
-                                  max={stockQty}
                                   defaultValue={Math.round(Number(item.quantity))}
                                   onBlur={(e) => {
                                     const val = parseInt(e.target.value, 10)
-                                    const safe = !isNaN(val) && val >= 1 ? Math.min(stockQty, val) : 1
+                                    const safe = !isNaN(val) && val >= 1 ? val : 1
                                     e.target.value = String(safe)
                                     if (safe !== Math.round(Number(item.quantity))) {
                                       handleQuantityChange(item.id, safe)
@@ -320,14 +322,19 @@ export default function CartPage() {
                               )}
                               <button
                                 onClick={() => handleQuantityChange(item.id, Number(item.quantity) + 1)}
-                                disabled={isUpdating || Number(item.quantity) >= stockQty}
+                                disabled={isUpdating}
+                                aria-label={`Increase quantity for ${item.products.name}`}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                 </svg>
                               </button>
                             </div>
+                          )}
+
+                          {!isCustomQty && showUnitLabel && (
+                            <span className="text-sm text-foreground-muted"><UnitLabel label={unitLabel} /></span>
                           )}
 
                           <button
@@ -339,6 +346,7 @@ export default function CartPage() {
                                 showToast('Failed to save', 'error')
                               }
                             }}
+                            aria-label={`Save ${item.products.name} for later`}
                             className="text-foreground-secondary hover:text-accent-600 text-sm font-medium transition-colors"
                           >
                             Save for later
@@ -346,6 +354,7 @@ export default function CartPage() {
 
                           <button
                             onClick={() => handleRemove(item.id)}
+                            aria-label={`Remove ${item.products.name} from cart`}
                             className="text-red-600 hover:text-red-700 text-sm font-medium transition-colors"
                           >
                             Remove
@@ -377,7 +386,7 @@ export default function CartPage() {
                 <div className="divide-y divide-border-default">
                   {savedItems.map((item) => {
                     const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                    const isCustomQty = item.buy_mode === 'weight' || item.buy_mode === 'length'
+                    const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || !!(item.buy_mode && item.buy_mode !== 'unit')
                     const price = isCustomQty
                       ? item.price_at_addition
                       : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
@@ -395,7 +404,7 @@ export default function CartPage() {
                               />
                             ) : (
                               <div className="w-full h-full flex items-center justify-center">
-                                <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <svg aria-hidden="true" className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                                 </svg>
                               </div>
@@ -427,7 +436,7 @@ export default function CartPage() {
                             )}
                           </div>
                           <p className="text-sm font-bold text-primary-600 dark:text-primary-400 mt-1">
-                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? `/${item.buy_unit}` : ''}
+                            ₹{Number(price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? <>/&thinsp;<UnitLabel label={item.cart_item_unit?.display_label ?? item.buy_unit ?? ''} /></> : ''}
                           </p>
                           <div className="flex items-center gap-3 mt-2">
                             <button
@@ -450,6 +459,7 @@ export default function CartPage() {
                             <button
                               onClick={() => handleRemove(item.id)}
                               disabled={isUpdating}
+                              aria-label={`Remove ${item.products.name} from cart`}
                               className="text-sm font-medium text-red-600 hover:text-red-700 transition-colors disabled:opacity-50"
                             >
                               Remove
@@ -543,7 +553,7 @@ export default function CartPage() {
                   className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                 >
                   {proceedingToCheckout ? 'Starting…' : 'Proceed to Checkout'}
-                  <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg aria-hidden="true" className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>
                 </button>
@@ -554,7 +564,7 @@ export default function CartPage() {
                     className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                   >
                     Login to Checkout
-                    <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg aria-hidden="true" className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                     </svg>
                   </Link>

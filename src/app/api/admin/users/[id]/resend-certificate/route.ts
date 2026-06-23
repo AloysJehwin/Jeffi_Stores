@@ -5,8 +5,9 @@ import { sendAdminCertificateEmail } from '@/lib/email'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST(_request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(_request)
     if (!admin || admin.role !== 'super_admin') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
@@ -21,7 +22,7 @@ export async function POST(_request: NextRequest, { params }: { params: { id: st
        WHERE a.id = $1
        ORDER BY ac.created_at DESC
        LIMIT 1`,
-      [params.id]
+      [id]
     )
 
     if (!row) return NextResponse.json({ error: 'Admin not found' }, { status: 404 })

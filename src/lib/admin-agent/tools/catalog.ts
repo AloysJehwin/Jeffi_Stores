@@ -232,7 +232,7 @@ export const CATALOG_TOOLS: ToolDef[] = [
       const subVariants = variantIds.length
         ? await queryMany(
             `SELECT id::text, variant_id::text, sku, sub_variant_name, price::text, mrp::text,
-                    stock_quantity AS stock, is_active
+                    stock_status AS stock, is_active
                FROM product_sub_variants
               WHERE variant_id = ANY($1::uuid[]) ORDER BY sub_variant_name`,
             [variantIds]

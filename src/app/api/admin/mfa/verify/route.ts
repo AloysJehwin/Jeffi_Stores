@@ -66,7 +66,7 @@ export async function POST(request: Request) {
     return await issueAdminSession(admin, t.certCN as string | undefined)
   } catch (err) {
     return NextResponse.json(
-      { error: 'Internal server error', detail: err instanceof Error ? err.message : String(err) },
+      { error: 'Internal server error' },
       { status: 500 }
     )
   }

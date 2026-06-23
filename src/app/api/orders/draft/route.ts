@@ -15,6 +15,7 @@ import {
   quoteShipping,
 } from '@/lib/order-commit'
 import { signDraftToken, hashCartItems } from '@/lib/order-draft'
+import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { verifyIntent } from '@/lib/checkout-intent'
 import { parseBody, zUuid } from '@/lib/validate'
 
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
   let cartHash: string | null = null
   let cartItemIds: string[] | null = null
   let buyNowItem: any = null
+  let businessDiscountAmount = 0
   let shippingItems: { productId: string; variantId: string | null; quantity: number }[] = []
 
   if (mode === 'cart') {
@@ -78,6 +80,19 @@ export async function POST(req: NextRequest) {
     cartHash = hashCartItems(cartItemsForHash(cart))
     cartItemIds = cart.map(c => `${c.product_id}:${c.variant_id || ''}:${c.sub_variant_id || ''}:${c.buy_mode}`)
     shippingItems = cart.map(c => ({ productId: c.product_id, variantId: c.variant_id, quantity: Number(c.quantity) }))
+
+    const discountMap = await getBusinessDiscountMap(authUser.userId)
+    if (Object.keys(discountMap).length > 0) {
+      for (const item of cart) {
+        const catId = item.products.category_id
+        const pct = catId ? (discountMap[catId] ?? 0) : 0
+        if (pct > 0) {
+          const linePrice = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+          businessDiscountAmount += linePrice * Number(item.quantity) * pct / 100
+        }
+      }
+      businessDiscountAmount = Math.round(businessDiscountAmount * 100) / 100
+    }
   } else {
     let resolveInput: { productId: string; variantId: string | null; subVariantId: string | null; qty: number; buyMode?: string; buyUnit?: string | null } | null = null
     if (resolvedIntent && resolvedIntent.mode === 'buyNow') {
@@ -108,6 +123,18 @@ export async function POST(req: NextRequest) {
     subtotal = Math.round(resolved.item.price * resolved.item.qty * 100) / 100
     buyNowItem = resolved.item
     shippingItems = [{ productId: resolved.item.productId, variantId: resolved.item.variantId, quantity: resolved.item.qty }]
+
+    const productRow = await queryOne<{ category_id: string | null }>(
+      `SELECT category_id FROM products WHERE id = $1`,
+      [resolved.item.productId]
+    )
+    if (productRow?.category_id) {
+      const discountMap = await getBusinessDiscountMap(authUser.userId)
+      const pct = discountMap[productRow.category_id] ?? 0
+      if (pct > 0) {
+        businessDiscountAmount = Math.round(resolved.item.price * resolved.item.qty * pct / 100 * 100) / 100
+      }
+    }
   }
 
   const shippingAmount = address.postal_code
@@ -130,7 +157,7 @@ export async function POST(req: NextRequest) {
     if (result.ok) appliedDiscount = result.appliedDiscount
   }
 
-  const total = Math.max(0, subtotal - appliedDiscount + shippingAmount)
+  const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + shippingAmount)
 
   const draftToken = await signDraftToken({
     userId: authUser.userId,
@@ -143,6 +170,7 @@ export async function POST(req: NextRequest) {
     buyNowItem,
     notes,
     paymentMethod: 'razorpay',
+    businessDiscountAmount,
   })
 
   return NextResponse.json({
@@ -150,6 +178,7 @@ export async function POST(req: NextRequest) {
     total,
     subtotal,
     appliedDiscount,
+    businessDiscountAmount,
     shippingAmount,
   })
 }

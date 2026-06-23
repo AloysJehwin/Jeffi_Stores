@@ -3,6 +3,24 @@ import type { NextRequest } from 'next/server'
 import { verifyToken } from './lib/jwt'
 import { getScopeForPath, hasScope } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
+import { jwtVerify } from 'jose'
+
+if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
+const BUSINESS_JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
+
+async function verifyBusinessToken(token: string): Promise<{ userId: string; email: string; approvalStatus: string } | null> {
+  try {
+    const { payload } = await jwtVerify(token, BUSINESS_JWT_SECRET)
+    if (payload.type !== 'business' || !payload.isBusiness) return null
+    return {
+      userId: payload.userId as string,
+      email: payload.email as string,
+      approvalStatus: (payload.approvalStatus as string) || 'pending',
+    }
+  } catch {
+    return null
+  }
+}
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -36,7 +54,7 @@ function buildRedirectUrl(request: NextRequest, path: string): URL {
 }
 
 export async function middleware(request: NextRequest) {
-  const hostname = request.headers.get('host') || ''
+  const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.hostname || ''
   const pathname = request.nextUrl.pathname
 
   if (hostname.startsWith('www.jeffistores.in')) {
@@ -55,6 +73,17 @@ export async function middleware(request: NextRequest) {
     const limited = await applyRateLimit(request)
     if (limited) return limited
   }
+
+  // Strip any inbound x-user-* / x-service-account-* headers that clients could forge.
+  // Middleware sets these itself below after verifying the token — they must not arrive untouched.
+  const stripped = new Headers(request.headers)
+  stripped.delete('x-user-id')
+  stripped.delete('x-username')
+  stripped.delete('x-user-role')
+  stripped.delete('x-user-scopes')
+  stripped.delete('x-service-account-id')
+  stripped.delete('x-service-account-name')
+  stripped.delete('x-service-account-scopes')
 
   if (hostname.startsWith('forms.')) {
     if (pathname.startsWith('/api/')) {
@@ -92,8 +121,8 @@ export async function middleware(request: NextRequest) {
       if (!token) {
         return NextResponse.redirect(buildRedirectUrl(request, '/signin'))
       }
-      const payload = await verifyToken(token)
-      if (!payload || !payload.isBusiness) {
+      const payload = await verifyBusinessToken(token)
+      if (!payload) {
         const res = NextResponse.redirect(buildRedirectUrl(request, '/signin'))
         res.cookies.delete('business_auth_token')
         return res
@@ -119,8 +148,8 @@ export async function middleware(request: NextRequest) {
       if (!token) {
         return NextResponse.redirect(buildRedirectUrl(request, '/business/signin'))
       }
-      const payload = await verifyToken(token)
-      if (!payload || !payload.isBusiness) {
+      const payload = await verifyBusinessToken(token)
+      if (!payload) {
         const res = NextResponse.redirect(buildRedirectUrl(request, '/business/signin'))
         res.cookies.delete('business_auth_token')
         return res
@@ -148,6 +177,8 @@ export async function middleware(request: NextRequest) {
     '/api/admin/mfa/verify',
   ]
   if (isAdminApiPath && publicApiPaths.some(path => pathname.startsWith(path))) {
+    const limited = await applyRateLimit(request)
+    if (limited) return limited
     return addSecurityHeaders(NextResponse.next())
   }
 
@@ -195,6 +226,21 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAdminApiPath) {
+    // Machine-to-machine endpoints authenticated by Bearer token — skip cookie check.
+    const bearerOnlyPaths = ['/api/admin/replication/log']
+    if (bearerOnlyPaths.some(p => pathname.startsWith(p)) && request.method === 'POST') {
+      return addSecurityHeaders(NextResponse.next())
+    }
+
+    // Service account auth via mTLS client certificate serial.
+    // nginx passes $ssl_client_serial as X-Client-Cert-Serial. The edge runtime
+    // cannot use pg (Node.js crypto), so we pass the request through and let the
+    // route handler validate via authenticateServiceAccount() in jwt.ts.
+    const certSerial = request.headers.get('x-client-cert-serial') || ''
+    if (certSerial) {
+      return addSecurityHeaders(NextResponse.next())
+    }
+
     const token = request.cookies.get('admin_token')?.value
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

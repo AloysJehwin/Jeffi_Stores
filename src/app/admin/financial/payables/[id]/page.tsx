@@ -2,6 +2,7 @@ import PayableDetailClient from './PayableDetailClient'
 
 export const dynamic = 'force-dynamic'
 
-export default function PayableDetailPage({ params }: { params: { id: string } }) {
-  return <PayableDetailClient id={params.id} />
+export default async function PayableDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  return <PayableDetailClient id={id} />
 }

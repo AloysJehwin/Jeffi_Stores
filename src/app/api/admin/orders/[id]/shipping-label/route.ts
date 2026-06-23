@@ -78,7 +78,7 @@ async function build4RPDF(pkg: any, awb: string, orderRow: any): Promise<Buffer>
       const logoH = 18
       const logoW = Math.round(logoH * (3246 / 546))
       doc.image(logoPath, M + BW - logoW - p, y + 6, { width: logoW, height: logoH })
-    } catch {
+    } catch (err) {
       doc.fontSize(20).font('Helvetica-Bold').fillColor('#e63927').text('DELHIVERY', 0, y + 4, { width: M + BW - p, align: 'right', lineBreak: false })
     }
     y += 30; hline(y)
@@ -160,11 +160,12 @@ async function build4RPDF(pkg: any, awb: string, orderRow: any): Promise<Buffer>
   })
 }
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
+    const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'orders')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
 
@@ -175,7 +176,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
        FROM orders o
        LEFT JOIN addresses sa ON sa.id = o.shipping_address_id
        WHERE o.id = $1`,
-      [params.id]
+      [id]
     )
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
@@ -184,7 +185,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const pdfSize = (request.nextUrl.searchParams.get('size') === '4R') ? '4R' : 'A4'
     const print = request.nextUrl.searchParams.get('print') === '1'
     const inline = request.nextUrl.searchParams.get('inline') === '1'
-    const safeOrderNum = (order.order_number || params.id.slice(0, 8)).replace(/[^a-zA-Z0-9-]/g, '-')
+    const safeOrderNum = (order.order_number || id.slice(0, 8)).replace(/[^a-zA-Z0-9-]/g, '-')
 
     if (pdfSize === '4R') {
       const labelUrl = `https://track.delhivery.com/api/p/packing_slip?wbns=${encodeURIComponent(order.awb_number)}`

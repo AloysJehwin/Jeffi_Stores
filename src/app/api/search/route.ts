@@ -3,7 +3,7 @@ import { query, queryMany } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { authenticateUser } from '@/lib/jwt'
 import { buildProductSearchClause, buildProductSearchRank, buildSearchClause } from '@/lib/search'
-import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL } from '@/lib/queries'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
         SELECT
           p.id, p.name, p.slug, p.base_price, p.price_ex_gst, p.has_variants,
           json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
-          ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+          ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
           COALESCE(
             (SELECT json_agg(json_build_object('image_url', pi.image_url, 'thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),
@@ -61,7 +61,8 @@ export async function GET(request: NextRequest) {
     })()
 
     return NextResponse.json({ products: productsArr, categories: categoriesArr })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ products: [], categories: [] }, { status: 500 })
   }
 }

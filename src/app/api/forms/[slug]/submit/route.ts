@@ -75,10 +75,11 @@ function couponEmail(coupon: Coupon, email: string) {
   return { subject: `Your reward coupon from Jeffi Store's — ${coupon.code}`, html }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { slug: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params
   const form = await queryOne<ReviewForm>(
     'SELECT id, coupon_id, is_active, custom_fields FROM review_forms WHERE slug = $1',
-    [params.slug]
+    [slug]
   )
   if (!form) return NextResponse.json({ error: 'Form not found' }, { status: 404 })
   if (!form.is_active) return NextResponse.json({ error: 'This form is no longer accepting submissions' }, { status: 410 })
@@ -86,7 +87,8 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
   let formData: FormData
   try {
     formData = await request.formData()
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Invalid form data' }, { status: 400 })
   }
 
@@ -124,7 +126,8 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
   try {
     const uploaded = await uploadGalleryImage(screenshotBuffer, `review-${form.id}-${Date.now()}`)
     screenshotUrl = uploaded.url
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to upload screenshot, please try again' }, { status: 500 })
   }
 
@@ -137,7 +140,8 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
         const buf = Buffer.from(await raw.arrayBuffer())
         const up = await uploadGalleryImage(buf, `review-field-${form.id}-${field.id}-${Date.now()}`)
         extraFields[field.id] = up.url
-      } catch {
+      } catch (err) {
+        console.error('[route]', err)
         extraFields[field.id] = ''
       }
     } else if (typeof raw === 'string') {
@@ -169,7 +173,8 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
     try {
       const { subject, html } = couponEmail(coupon, email)
       await transporter.sendMail({ from: FROM, to: email, subject, html })
-    } catch {
+    } catch (err) {
+      console.error('[route]', err)
     }
   }
 

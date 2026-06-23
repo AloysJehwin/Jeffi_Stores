@@ -1,12 +1,13 @@
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 import ProductCard from '@/components/visitor/ProductCard'
+import HeroCarousel from '@/components/visitor/HeroCarousel'
 
-export const dynamic = 'force-dynamic'
+export const revalidate = 120
 
 async function getFeaturedProducts() {
   return queryMany(`
@@ -19,13 +20,35 @@ async function getFeaturedProducts() {
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_SQL} AS variant_min_price,
+      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.is_featured = true AND p.is_active = true
-    LIMIT 6
+    LIMIT 8
+  `)
+}
+
+async function getNewArrivals() {
+  return queryMany(`
+    SELECT p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images,
+      ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
+      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE p.is_active = true
+    ORDER BY p.created_at DESC
+    LIMIT 4
   `)
 }
 
@@ -38,11 +61,69 @@ async function getMainCategories() {
   `)
 }
 
-export default async function HomePage() {
-  const featuredProducts = await getFeaturedProducts()
-  const mainCategories = await getMainCategories()
+async function getHeroSlides() {
+  // Pick 4 categories daily using a date-seeded deterministic shuffle.
+  // Prioritise categories with hero images; fall back to any active parent category.
+  const all = await queryMany<{
+    name: string; slug: string;
+    hero_image_mobile: string | null; hero_image_desktop: string | null;
+  }>(`
+    SELECT name, slug, hero_image_mobile, hero_image_desktop
+    FROM categories
+    WHERE parent_category_id IS NULL AND is_active = true
+    ORDER BY display_order ASC
+  `)
 
-  // Send business CTAs to the business subdomain on prod, /business locally.
+  // Date seed: days since epoch — changes once per day
+  const daySeed = Math.floor(Date.now() / 86_400_000)
+
+  // Fisher-Yates with seeded PRNG (mulberry32)
+  function mulberry32(seed: number) {
+    return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296 }
+  }
+  const rng = mulberry32(daySeed)
+  const shuffled = [...all]
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+  }
+
+  return shuffled.slice(0, 4)
+}
+
+function productCardProps(product: any) {
+  const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
+  const hasVariants = product.has_variants
+  const displayPrice = hasVariants && product.variant_min_price
+    ? Number(product.variant_min_price)
+    : Number(product.base_price)
+  const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
+  const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+  const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
+  return {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    hasVariants,
+    displayPrice,
+    mrp,
+    mrpDiscount,
+    effectiveStock,
+    primaryImage: primaryImage || null,
+    brandName: product.brands?.name || null,
+    categoryName: product.categories?.name || null,
+    discountPct: Number(product.discount_pct ?? 0),
+  }
+}
+
+export default async function HomePage() {
+  const [featuredProducts, newArrivals, mainCategories, heroSlides] = await Promise.all([
+    getFeaturedProducts(),
+    getNewArrivals(),
+    getMainCategories(),
+    getHeroSlides(),
+  ])
+
   const host = (await headers()).get('host') ?? ''
   const isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$)/.test(host) || /\.local(:|$)/.test(host)
   const businessOrigin = isLocal ? '' : 'https://business.jeffistores.in'
@@ -52,112 +133,35 @@ export default async function HomePage() {
   return (
     <div className="bg-surface">
 
-      {/* ── Hero ── */}
-      <section className="relative bg-gradient-to-br from-primary-600 via-primary-500 to-primary-700 overflow-hidden min-h-[calc(100svh-4rem)] flex items-center md:min-h-[calc(100vh-5rem)]">
-        <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-12 md:py-16 relative z-10 w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12 lg:gap-20 items-center">
+      {/* ── Hero Carousel ── */}
+      <HeroCarousel slides={heroSlides} />
 
-            {/* Text column */}
-            <div className="md:order-1">
-              <span className="inline-block bg-white/20 backdrop-blur-sm text-white font-bold uppercase tracking-widest rounded-full border border-white/30
-                               text-[10px] sm:text-xs px-3 py-1.5 mb-4
-                               md:text-sm md:px-4 md:py-2 md:mb-6">
-                Hardware &amp; Industrial Tools
-              </span>
-
-              <h1 className="font-extrabold text-white leading-[1.05] tracking-tight mb-3 sm:mb-5 md:mb-6
-                             text-[clamp(2.25rem,8vw,5rem)] md:text-[clamp(3rem,6vw,6rem)]">
-                Jeffi <span className="text-secondary-500">Stores</span>
-              </h1>
-
-              <p className="text-white/80 leading-relaxed mb-6 sm:mb-8 max-w-md md:max-w-none
-                            text-[clamp(0.875rem,2.5vw,1.25rem)] md:text-[clamp(1rem,2vw,1.5rem)]">
-                Industrial machinery parts, tools, and hardware — for manufacturing, construction, and repairs.
-              </p>
-
-              <div className="flex gap-3 mb-6 sm:mb-10">
-                <Link
-                  href="/products"
-                  className="bg-secondary-500 hover:bg-secondary-600 text-white font-bold rounded-xl shadow-lg transition-all
-                             px-5 py-2.5 text-sm
-                             sm:px-7 sm:py-3 sm:text-base
-                             md:px-8 md:py-4 md:text-lg"
-                >
-                  Shop Now
-                </Link>
-                <Link
-                  href="/categories"
-                  className="bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-all
-                             px-5 py-2.5 text-sm
-                             sm:px-7 sm:py-3 sm:text-base
-                             md:px-8 md:py-4 md:text-lg"
-                >
-                  Browse
-                </Link>
-              </div>
-
-              <div className="flex items-center gap-5 sm:gap-8 pt-4 sm:pt-6 border-t border-white/20">
-                {[
-                  { val: '500+', label: 'Products' },
-                  { val: '50+', label: 'Brands' },
-                  { val: '24/7', label: 'Support' },
-                ].map((stat, i, arr) => (
-                  <div key={stat.label} className="flex items-center gap-5 sm:gap-8">
-                    <div>
-                      <p className="font-black text-white text-[clamp(1.5rem,4vw,2.5rem)] md:text-[clamp(2rem,3.5vw,2.75rem)] leading-none">{stat.val}</p>
-                      <p className="text-white/60 font-medium mt-0.5 text-[clamp(0.65rem,1.5vw,0.875rem)]">{stat.label}</p>
-                    </div>
-                    {i < arr.length - 1 && <div className="w-px h-8 bg-white/20 shrink-0" />}
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Image column */}
-            <div className="flex md:order-2 justify-center md:justify-end mt-4 md:mt-0">
-              <img
-                src="/images/Welcome.png"
-                alt="Industrial hardware and tools"
-                className="w-80 sm:w-96 md:w-full max-w-xl lg:max-w-2xl object-contain drop-shadow-2xl"
-                style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.2))' }}
-              />
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* ── Categories ── */}
+      {/* ── Shop by Category ── */}
       {mainCategories.length > 0 && (
-        <section className="py-8 md:py-20 bg-surface">
+        <section className="pt-8 pb-12 md:py-20 bg-surface">
           <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between mb-5">
+            <div className="flex items-end justify-between mb-7">
               <div>
-                <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-0.5">Browse</p>
-                <h2 className="text-2xl md:text-4xl font-extrabold text-foreground">Shop by Category</h2>
+                <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1.5">Explore</p>
+                <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">Shop by Category</h2>
               </div>
-              <Link href="/categories" className="text-sm text-accent-500 hover:text-accent-600 font-semibold flex items-center gap-1 shrink-0">
+              <Link href="/categories" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
                 View All
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 lg:grid-cols-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:grid-cols-8">
               {mainCategories.map((category) => (
-                <Link
-                  key={category.id}
-                  href={`/categories/${category.slug}`}
-                  className="group h-full"
-                >
-                  <div className="flex flex-col items-center text-center gap-2 p-3 rounded-xl bg-surface-elevated border border-border-default hover:border-primary-400 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 h-full">
-                    <div className="w-11 h-11 sm:w-14 sm:h-14 bg-primary-50 dark:bg-primary-900/20 rounded-xl flex items-center justify-center group-hover:bg-primary-100 transition-colors shrink-0">
-                      <CategoryIcon
-                        categoryName={category.name}
-                        className="w-6 h-6 sm:w-7 sm:h-7 text-primary-600 dark:text-primary-400"
-                      />
+                <Link key={category.id} href={`/categories/${category.slug}`} className="group">
+                  <div className="flex flex-col items-center text-center gap-2.5 p-4 rounded-2xl bg-surface-elevated border border-border-default
+                                  hover:border-primary-400/60 hover:bg-primary-50 dark:hover:bg-primary-900/10 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
+                    <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/25 rounded-xl flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 transition-colors shrink-0">
+                      <CategoryIcon categoryName={category.name} className="w-6 h-6 text-primary-600 dark:text-primary-400" />
                     </div>
-                    <span className="text-xs font-semibold text-foreground group-hover:text-primary-600 transition-colors leading-tight line-clamp-2 flex items-center justify-center min-h-[2.25rem]">
+                    <span className="text-xs font-bold text-foreground group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2 flex items-center justify-center min-h-[2.25rem]">
                       {category.name}
                     </span>
                   </div>
@@ -170,64 +174,39 @@ export default async function HomePage() {
 
       {/* ── Featured Products ── */}
       {featuredProducts.length > 0 && (
-        <section className="py-8 md:py-20 bg-surface-secondary">
+        <section className="py-12 md:py-20 bg-surface-secondary">
           <div className="container mx-auto px-4">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-0.5">Handpicked</p>
-                <h2 className="text-2xl md:text-4xl font-extrabold text-foreground">Featured Products</h2>
+            {/* Title card */}
+            <div className="flex items-end justify-between mb-7">
+              <div className="flex items-center gap-4">
+                <div className="w-1 h-10 bg-primary-500 rounded-full" />
+                <div>
+                  <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Handpicked</p>
+                  <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">Featured Products</h2>
+                </div>
               </div>
-              <Link href="/products" className="text-sm text-accent-500 hover:text-accent-600 font-semibold flex items-center gap-1 shrink-0">
+              <Link href="/products" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
                 View All
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-6">
-              {featuredProducts.map((product) => {
-                const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-                const hasVariants = product.has_variants
-                const displayPrice = hasVariants && product.variant_min_price
-                  ? product.variant_min_price
-                  : (product.price_ex_gst || product.base_price)
-                const effectiveStock = hasVariants ? Number(product.variant_stock_total) : product.stock_quantity
-                const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
-                const inclPrice = hasVariants && product.variant_min_price
-                  ? Number(product.variant_min_price)
-                  : Number(product.base_price)
-                const mrpDiscount = mrp && mrp > inclPrice
-                  ? Math.round(((mrp - inclPrice) / mrp) * 100)
-                  : 0
-
-                return (
-                  <ProductCard
-                    key={product.id}
-                    id={product.id}
-                    name={product.name}
-                    slug={product.slug}
-                    hasVariants={hasVariants}
-                    displayPrice={Number(displayPrice)}
-                    mrp={mrp}
-                    mrpDiscount={mrpDiscount}
-                    effectiveStock={effectiveStock}
-                    primaryImage={primaryImage || null}
-                    brandName={product.brands?.name || null}
-                    categoryName={product.categories?.name || null}
-                  />
-                )
-              })}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
+              {featuredProducts.map((product) => (
+                <ProductCard key={product.id} {...productCardProps(product)} />
+              ))}
             </div>
 
-            <div className="text-center mt-7 md:mt-10">
+            <div className="text-center mt-8">
               <Link
                 href="/products"
-                className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-8 py-3 md:px-10 md:py-4 rounded-xl font-bold transition-all shadow-lg text-sm md:text-base"
+                className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-8 py-3 rounded-xl font-bold transition-all shadow-lg shadow-primary-500/20 text-sm md:text-base"
               >
                 View All Products
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
             </div>
@@ -235,41 +214,74 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── Why Jeffi Stores ── */}
-      <section className="py-8 md:py-20 bg-surface">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-6 md:mb-10">
-            <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-1">Why choose us</p>
-            <h2 className="text-2xl md:text-4xl font-extrabold text-foreground">Built for Industry</h2>
+      {/* ── New Arrivals ── */}
+      {newArrivals.length > 0 && (
+        <section className="py-12 md:py-20 bg-surface">
+          <div className="container mx-auto px-4">
+            <div className="flex items-end justify-between mb-7">
+              <div className="flex items-center gap-4">
+                <div className="w-1 h-10 bg-accent-500 rounded-full" />
+                <div>
+                  <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Just in</p>
+                  <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">New Arrivals</h2>
+                </div>
+              </div>
+              <Link href="/products?sort=newest" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
+                See All
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
+              {newArrivals.map((product) => (
+                <ProductCard key={product.id} {...productCardProps(product)} />
+              ))}
+            </div>
           </div>
+        </section>
+      )}
+
+      {/* ── Why Jeffi Stores ── */}
+      <section className="py-12 md:py-20 bg-surface-secondary">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-10">
+            <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">Why us</p>
+            <h2 className="text-2xl md:text-4xl font-black text-foreground tracking-tight">Built for Industry</h2>
+          </div>
+
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 md:gap-6">
             {[
               {
-                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />,
+                d: 'M13 10V3L4 14h7v7l9-11h-7z',
                 title: 'Fast Delivery',
                 desc: 'Prompt dispatch and reliable delivery to your doorstep across India.',
+                color: 'primary',
               },
               {
-                icon: <><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></>,
-                title: 'Wide Product Range',
+                d: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
+                title: 'Wide Range',
                 desc: 'Fasteners, power tools, electrical, welding, and hundreds of industrial categories.',
+                color: 'accent',
               },
               {
-                icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />,
+                d: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
                 title: '24/7 Support',
-                desc: 'Our expert team is always available to help you source the right product.',
+                desc: 'Expert team always available to help you source the right product fast.',
+                color: 'secondary',
               },
-            ].map((item, i) => (
-              <div key={i} className="flex sm:flex-col items-start sm:items-start gap-4 bg-surface-elevated rounded-xl border border-border-default p-5 md:p-8">
-                <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/30 rounded-xl flex items-center justify-center shrink-0">
-                  <svg className="w-6 h-6 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    {item.icon}
+            ].map((item) => (
+              <div key={item.title} className="relative bg-surface-elevated rounded-2xl border border-border-default p-6 md:p-8 overflow-hidden group hover:border-primary-400/50 hover:shadow-lg transition-all">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-5
+                  ${item.color === 'primary' ? 'bg-primary-100 dark:bg-primary-900/30' : item.color === 'accent' ? 'bg-accent-100 dark:bg-accent-900/30' : 'bg-secondary-100 dark:bg-secondary-800/50'}`}>
+                  <svg className={`w-6 h-6 ${item.color === 'primary' ? 'text-primary-600 dark:text-primary-400' : item.color === 'accent' ? 'text-accent-600 dark:text-accent-400' : 'text-secondary-600 dark:text-secondary-400'}`}
+                    fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={item.d} />
                   </svg>
                 </div>
-                <div>
-                  <h3 className="text-base md:text-lg font-bold text-foreground mb-1">{item.title}</h3>
-                  <p className="text-sm text-foreground-secondary leading-relaxed">{item.desc}</p>
-                </div>
+                <h3 className="text-lg font-black text-foreground mb-2">{item.title}</h3>
+                <p className="text-sm text-foreground-secondary leading-relaxed">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -277,100 +289,130 @@ export default async function HomePage() {
       </section>
 
       {/* ── About ── */}
-      <section className="py-8 md:py-20 bg-surface-secondary">
+      <section className="py-12 md:py-20 bg-surface">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-20 items-center">
-            <div className="relative rounded-2xl overflow-hidden shadow-xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-20 items-center">
+            <div className="relative rounded-2xl overflow-hidden shadow-2xl">
               <img
                 src="/images/Working.png"
                 alt="Jeffi Stores team"
-                className="w-full h-52 sm:h-72 md:h-[420px] object-cover"
+                className="w-full h-56 sm:h-80 md:h-[440px] object-cover"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/50 via-transparent to-transparent" />
+              <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 via-transparent to-transparent" />
+              <div className="absolute bottom-4 left-4 right-4 flex gap-3">
+                <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/15 flex-1">
+                  <p className="text-white font-black text-2xl">10+</p>
+                  <p className="text-white/60 text-xs font-semibold mt-0.5">Years in Business</p>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/15 flex-1">
+                  <p className="text-white font-black text-2xl">1000+</p>
+                  <p className="text-white/60 text-xs font-semibold mt-0.5">Happy Customers</p>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-2 mt-2 md:mt-0">About Us</p>
-              <h2 className="text-2xl md:text-5xl font-extrabold text-foreground mb-4 leading-tight">
-                Your Trusted<br />Hardware Partner
-              </h2>
-              <p className="text-sm md:text-lg text-foreground-secondary mb-3 leading-relaxed">
+            <div className="space-y-5">
+              <div>
+                <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">About Us</p>
+                <h2 className="text-2xl md:text-5xl font-black text-foreground leading-tight">
+                  Your Trusted<br />Hardware Partner
+                </h2>
+              </div>
+              <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">
                 Jeffi Stores is built for industry — offering machinery parts, fasteners, tools, and electrical components for manufacturing, construction, and industrial repairs.
               </p>
-              <p className="text-sm md:text-lg text-foreground-secondary mb-6 leading-relaxed">
+              <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">
                 We combine product breadth with expert service so your operations stay seamless and efficient.
               </p>
 
-              <div className="grid grid-cols-2 gap-3 mb-6">
-                <div className="bg-surface rounded-xl border border-border-default p-4">
-                  <p className="text-2xl sm:text-3xl font-black text-primary-600">10+</p>
-                  <p className="text-xs sm:text-sm text-foreground-secondary mt-0.5">Years in Business</p>
-                </div>
-                <div className="bg-surface rounded-xl border border-border-default p-4">
-                  <p className="text-2xl sm:text-3xl font-black text-primary-600">1000+</p>
-                  <p className="text-xs sm:text-sm text-foreground-secondary mt-0.5">Happy Customers</p>
-                </div>
+              <div className="flex flex-wrap gap-3 pt-2">
+                <Link
+                  href="/about"
+                  className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-bold transition-all text-sm shadow-lg shadow-primary-500/20"
+                >
+                  Learn More
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+                <Link
+                  href="/products"
+                  className="inline-flex items-center gap-2 border border-border-default hover:border-primary-400 text-foreground px-6 py-3 rounded-xl font-bold transition-all text-sm"
+                >
+                  Browse Products
+                </Link>
               </div>
-
-              <Link
-                href="/about"
-                className="inline-flex items-center gap-2 bg-primary-500 hover:bg-primary-600 text-white px-6 py-3 rounded-xl font-bold transition-all text-sm md:text-base shadow-lg"
-              >
-                Learn More About Us
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-              </Link>
             </div>
           </div>
         </div>
       </section>
 
-      <section className="py-12 md:py-16 bg-gradient-to-r from-secondary-700 to-secondary-600 relative overflow-hidden">
-        <div className="container mx-auto px-4 sm:px-6 relative z-10">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
-            <div>
-              <span className="inline-block bg-white/15 text-white text-xs font-bold uppercase tracking-widest rounded-full border border-white/30 px-3 py-1.5 mb-4">
-                For Procurement Teams
-              </span>
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white leading-tight mb-3">
-                Buying for a business?
-              </h2>
-              <p className="text-white/85 text-sm sm:text-base leading-relaxed mb-6 max-w-lg">
-                Open a business account for tiered bulk discounts, GST-compliant invoices, and a dedicated quote-request workflow.
-                Approval typically within 1 business day.
-              </p>
-              <div className="flex flex-wrap gap-3">
-                <a
-                  href={businessLandingUrl}
-                  className="px-5 py-2.5 bg-accent-500 hover:bg-accent-600 text-white font-bold rounded-xl shadow-lg transition-colors text-sm sm:text-base"
-                >
-                  Learn More
-                </a>
-                <a
-                  href={businessSignupUrl}
-                  className="px-5 py-2.5 bg-white/15 hover:bg-white/25 text-white font-semibold rounded-xl border border-white/40 transition-colors text-sm sm:text-base"
-                >
-                  Register Your Business
-                </a>
-              </div>
+      {/* ── Business CTA ── */}
+      <div className="px-3 sm:px-6 md:px-8 py-3 md:py-6 bg-surface">
+        <div className="relative rounded-2xl overflow-hidden shadow-2xl min-h-[340px] md:min-h-[400px]" style={{ background: '#0d0d0d' }}>
+          {/* Background image — right portion only, matching HeroCarousel */}
+          <div className="absolute inset-0">
+            <img
+              src="/images/business-hero.webp"
+              alt=""
+              className="absolute right-0 top-0 h-full w-[70%] sm:w-[65%] object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] from-35% via-[#0d0d0d]/80 via-60% to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/30" />
+          </div>
+
+          {/* Content — matches HeroCarousel text layout */}
+          <div className="relative z-10 h-full flex flex-col justify-start pt-10 sm:pt-12 md:pt-14 px-6 sm:px-12 md:px-16 pb-16 max-w-[58%] sm:max-w-[52%] pointer-events-none space-y-4">
+            <div className="inline-flex items-center gap-2 bg-accent-500/20 border border-accent-500/40 text-accent-400 text-[10px] font-black uppercase tracking-[0.18em] px-3 py-1.5 rounded-full w-fit">
+              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              For Business
             </div>
-            <div className="hidden md:grid grid-cols-2 gap-3">
+
+            <h2 className="text-2xl sm:text-3xl md:text-5xl font-black text-white leading-tight">
+              Buying for<br />a business?
+            </h2>
+
+            <p className="text-white/60 text-xs sm:text-sm leading-relaxed">
+              Bulk discounts, GSTIN invoicing, and a dedicated account manager. Trusted by 500+ businesses across India.
+            </p>
+
+            <div className="flex flex-col gap-2 pt-1">
               {[
-                { label: 'Bulk Discount', value: 'up to 30%' },
-                { label: 'GSTIN Invoicing', value: 'Auto' },
-                { label: 'Quote Turnaround', value: '< 24h' },
-                { label: 'Net-30 Credit', value: 'On approval' },
-              ].map((s) => (
-                <div key={s.label} className="bg-white/10 backdrop-blur-sm rounded-xl px-4 py-3 border border-white/15">
-                  <p className="text-white/70 text-xs">{s.label}</p>
-                  <p className="text-white font-bold mt-0.5">{s.value}</p>
+                { icon: 'M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z', label: 'Tiered bulk pricing' },
+                { icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', label: 'GST-compliant invoices' },
+                { icon: 'M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z', label: '24h RFQ turnaround' },
+              ].map((item) => (
+                <div key={item.label} className="flex items-center gap-2.5">
+                  <svg className="w-3.5 h-3.5 text-accent-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                  </svg>
+                  <span className="text-white/70 text-xs font-semibold">{item.label}</span>
                 </div>
               ))}
             </div>
+
+            <div className="flex flex-wrap gap-3 pt-1 pointer-events-auto">
+              <a
+                href={businessSignupUrl}
+                className="inline-flex items-center gap-2 bg-accent-500 hover:bg-accent-400 text-white font-black text-xs sm:text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-accent-500/25"
+              >
+                Register Now
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                </svg>
+              </a>
+              <a
+                href={businessLandingUrl}
+                className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl border border-white/15 transition-all"
+              >
+                Learn More
+              </a>
+            </div>
           </div>
         </div>
-      </section>
+      </div>
 
       <ReviewCouponPopup />
     </div>

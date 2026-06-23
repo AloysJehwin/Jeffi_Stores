@@ -7,8 +7,9 @@ import QuotationDetailClient from './QuotationDetailClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function QuotationDetailPage({ params }: { params: { id: string } }) {
-  const cookieStore = cookies()
+export default async function QuotationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   const host = (await headers()).get('host') ?? ''
   if (!token) redirect(ap('/admin/login', host))
@@ -16,9 +17,9 @@ export default async function QuotationDetailPage({ params }: { params: { id: st
   let session: any = null
   try { session = await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
 
-  if (!hasScope(session?.role || '', session?.scopes || [], 'quotations')) {
+  if (!hasScope(session?.role || '', session?.scopes || [], 'quotations:read')) {
     redirect(ap('/admin/dashboard', host))
   }
 
-  return <QuotationDetailClient id={params.id} />
+  return <QuotationDetailClient id={id} />
 }

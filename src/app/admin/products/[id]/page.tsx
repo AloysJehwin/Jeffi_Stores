@@ -6,13 +6,14 @@ import ProductDetailClient from './ProductDetailClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function ProductDetailPage({ params }: { params: { id: string } }) {
+export default async function ProductDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const host = (await headers()).get('host') ?? ''
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   if (!token) redirect(ap('/admin/login', host))
 
   try { await verifyToken(token.value) } catch { redirect(ap('/admin/login', host)) }
 
-  return <ProductDetailClient id={params.id} />
+  return <ProductDetailClient id={id} />
 }

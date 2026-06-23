@@ -4,9 +4,10 @@ import { cancelOrder } from '@/lib/orders'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const { id } = await params
     const authUser = await authenticateUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,7 +17,7 @@ export async function POST(
     const restoreToCart = body?.restoreToCart === true
     const autoCancelUnpaid = body?.autoCancelUnpaid === true
 
-    const result = await cancelOrder(params.id, {
+    const result = await cancelOrder(id, {
       reason: autoCancelUnpaid ? 'auto_cancel_unpaid' : 'user_request',
       restoreToCart,
       expectedUserId: authUser.userId,
@@ -27,7 +28,8 @@ export async function POST(
     }
 
     return NextResponse.json(result)
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to request cancellation' }, { status: 500 })
   }
 }

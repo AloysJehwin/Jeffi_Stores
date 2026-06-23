@@ -4,16 +4,17 @@ import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne } from '@/lib/db'
 import { generateQuotationPDF, QuotationBusiness } from '@/lib/quotation-pdf'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'quotations')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    if (!hasScope(admin.role, admin.scopes, 'quotations:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const qt = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [params.id])
+    const qt = await queryOne<any>(`SELECT * FROM quotations WHERE id = $1`, [id])
     if (!qt) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const items = await queryMany(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [params.id])
+    const items = await queryMany(`SELECT * FROM quotation_items WHERE quotation_id = $1 ORDER BY position`, [id])
 
     const settingsRows = await queryMany<{ key: string; value: string }>(
       `SELECT key, value FROM site_settings WHERE key LIKE 'business_%' OR key LIKE 'bank_%'`,

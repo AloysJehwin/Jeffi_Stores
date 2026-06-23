@@ -6,10 +6,11 @@ import { validateCampaignBodyTemplate } from '@/lib/campaigns/template-validatio
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: NextRequest, { params }: { params: { kind: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer')) {
+  if (!hasScope(admin.role, admin.scopes, 'mailer:read')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -17,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
   const limit = 20
   const offset = Math.max(0, parseInt(searchParams.get('offset') || '0', 10))
 
-  const campaign = await queryOne(`SELECT * FROM campaigns WHERE kind = $1`, [params.kind])
+  const campaign = await queryOne(`SELECT * FROM campaigns WHERE kind = $1`, [kind])
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
   const [recentSends, countRow] = await Promise.all([
@@ -26,16 +27,18 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
         ecs.id, ecs.user_id, ecs.reference_id, ecs.sent_at, ecs.opened_at, ecs.clicked_at,
         ecs.converted_at, ecs.unsubscribed_at, ecs.bounced_at,
         u.email AS user_email,
-        COALESCE(u.first_name || ' ' || u.last_name, u.email) AS user_name
+        COALESCE(u.first_name || ' ' || u.last_name, u.email) AS user_name,
+        COALESCE(csc.send_count, 1)::integer AS send_count
       FROM email_campaigns_sent ecs
       LEFT JOIN users u ON u.id = ecs.user_id
+      LEFT JOIN campaign_send_counts csc ON csc.campaign_kind = ecs.campaign_kind AND csc.user_id = ecs.user_id
       WHERE ecs.campaign_kind = $1
       ORDER BY ecs.sent_at DESC
       LIMIT $2 OFFSET $3
-    `, [params.kind, limit, offset]),
+    `, [kind, limit, offset]),
     queryOne<{ total: string }>(
       `SELECT COUNT(*) AS total FROM email_campaigns_sent WHERE campaign_kind = $1`,
-      [params.kind]
+      [kind]
     ),
   ])
 
@@ -48,10 +51,11 @@ export async function GET(req: NextRequest, { params }: { params: { kind: string
   })
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { kind: string } }) {
+export async function PATCH(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
+  const { kind } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'mailer')) {
+  if (!hasScope(admin.role, admin.scopes, 'mailer:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -90,10 +94,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { kind: stri
     const incoming = body.body_template.slice(0, 50000)
     const cur = await queryOne<{ scenario_kind: string | null }>(
       `SELECT scenario_kind FROM campaigns WHERE kind = $1`,
-      [params.kind]
+      [kind]
     )
-    const refKind = (typeof body.scenario_kind === 'string' && body.scenario_kind.trim()) || cur?.scenario_kind || params.kind
-    const tplCheck = validateCampaignBodyTemplate(incoming, { kind: params.kind, scenarioKind: refKind })
+    const refKind = (typeof body.scenario_kind === 'string' && body.scenario_kind.trim()) || cur?.scenario_kind || kind
+    const tplCheck = validateCampaignBodyTemplate(incoming, { kind: kind, scenarioKind: refKind })
     if (!tplCheck.ok) {
       return NextResponse.json({ error: tplCheck.reason, hint: tplCheck.hint }, { status: 400 })
     }
@@ -103,11 +107,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { kind: stri
   if ('scenario_kind' in body) {
     const current = await queryOne<{ scenario_kind: string | null }>(
       `SELECT scenario_kind FROM campaigns WHERE kind = $1`,
-      [params.kind]
+      [kind]
     )
     const nextKind = body.scenario_kind || null
     if ((current?.scenario_kind || null) !== nextKind) {
-      const seeded = await queryOne<{ kind: string }>(`SELECT kind FROM scenarios WHERE kind = $1`, [params.kind])
+      const seeded = await queryOne<{ kind: string }>(`SELECT kind FROM scenarios WHERE kind = $1`, [kind])
       if (seeded) {
         return NextResponse.json({ error: 'Cannot change scenario on a seeded campaign' }, { status: 400 })
       }
@@ -124,7 +128,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { kind: stri
     vals.push(JSON.stringify(body.parameters))
   }
 
-  vals.push(params.kind)
+  vals.push(kind)
   await query(`UPDATE campaigns SET ${updates.join(', ')} WHERE kind = $${i}`, vals)
 
   return NextResponse.json({ success: true })

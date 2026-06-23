@@ -56,7 +56,8 @@ async function makeBarcodeBuffer(text: string, heightMm: number): Promise<Buffer
       textxalign: 'center',
       textsize: 5,
     })
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     return null
   }
 }

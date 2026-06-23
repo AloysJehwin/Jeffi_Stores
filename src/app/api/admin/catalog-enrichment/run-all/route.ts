@@ -73,7 +73,8 @@ function parseEnrichment(raw: string): Enrichment {
   let obj: Record<string, unknown>
   try {
     obj = JSON.parse(raw)
-  } catch {
+  } catch (err) {
+    console.error('[route]', err)
     const m = raw.match(/\{[\s\S]*\}/)
     if (!m) throw new Error('No JSON in LLM response')
     obj = JSON.parse(m[0])
@@ -97,7 +98,7 @@ function parseEnrichment(raw: string): Enrichment {
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'catalog_enrichment')) {
+  if (!hasScope(admin.role, admin.scopes, 'catalog_enrichment:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -166,7 +167,8 @@ export async function POST(req: NextRequest) {
            e.ai_application, e.ai_product_type, e.ai_features, e.ai_search_tags,
            OLLAMA_MODEL]
         )
-      } catch {
+      } catch (err) {
+        console.error('[route]', err)
         void 0
       }
     }

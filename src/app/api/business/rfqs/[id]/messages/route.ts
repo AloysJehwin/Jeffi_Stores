@@ -2,32 +2,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateBusiness } from '@/lib/jwt'
 import { queryOne, queryMany, query } from '@/lib/db'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const rfq = await queryOne<any>(
     `SELECT id FROM business_rfqs WHERE id = $1 AND user_id = $2`,
-    [params.id, user.userId]
+    [id, user.userId]
   )
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const messages = await queryMany<any>(
     `SELECT id, sender, message, counter_items, created_at FROM rfq_messages
      WHERE rfq_id = $1 ORDER BY created_at ASC`,
-    [params.id]
+    [id]
   )
 
   return NextResponse.json({ messages })
 }
 
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   const user = await authenticateBusiness(request)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const rfq = await queryOne<any>(
     `SELECT id, status FROM business_rfqs WHERE id = $1 AND user_id = $2`,
-    [params.id, user.userId]
+    [id, user.userId]
   )
   if (!rfq) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   if (['converted', 'rejected'].includes(rfq.status)) {
@@ -49,7 +51,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
     const ids = counter_items.map((c: any) => c.rfq_item_id)
     const rows = await queryMany<{ id: string }>(
       `SELECT id FROM business_rfq_items WHERE rfq_id = $1 AND id = ANY($2::uuid[])`,
-      [params.id, ids]
+      [id, ids]
     )
     if (rows.length !== ids.length) {
       return NextResponse.json({ error: 'One or more counter items do not belong to this RFQ' }, { status: 400 })
@@ -59,14 +61,14 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   const msg = await queryOne<any>(
     `INSERT INTO rfq_messages (rfq_id, sender, message, counter_items)
      VALUES ($1, 'customer', $2, $3) RETURNING id, sender, message, counter_items, created_at`,
-    [params.id, message.trim(), counter_items && counter_items.length ? JSON.stringify(counter_items) : null]
+    [id, message.trim(), counter_items && counter_items.length ? JSON.stringify(counter_items) : null]
   )
 
   // Move to negotiating if still pending/reviewed
   if (['pending', 'reviewed'].includes(rfq.status)) {
     await query(
       `UPDATE business_rfqs SET status = 'negotiating' WHERE id = $1`,
-      [params.id]
+      [id]
     )
   }
 

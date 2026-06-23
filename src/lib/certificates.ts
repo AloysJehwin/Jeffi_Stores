@@ -1,7 +1,7 @@
 import fs from 'fs'
 import path from 'path'
 import crypto from 'crypto'
-import { execSync } from 'child_process'
+import { execFileSync } from 'child_process'
 import os from 'os'
 
 const CERTS_DIR = path.join(process.cwd(), 'certs')
@@ -18,6 +18,10 @@ export async function generateClientCertificate(
   adminUsername: string,
   _adminId: string
 ): Promise<CertificateResult> {
+  if (!/^[a-zA-Z0-9._@-]{1,64}$/.test(adminUsername)) {
+    throw new Error('Invalid username format for certificate generation')
+  }
+
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cert-'))
   const keyPath = path.join(tmpDir, 'client-key.pem')
   const csrPath = path.join(tmpDir, 'client.csr')
@@ -32,10 +36,10 @@ export async function generateClientCertificate(
   const downloadToken = crypto.randomUUID()
 
   try {
-    execSync(`openssl genrsa -out ${keyPath} 4096 2>/dev/null`)
+    execFileSync('openssl', ['genrsa', '-out', keyPath, '4096'], { stdio: 'pipe' })
 
     const subject = `/C=IN/ST=Chhattisgarh/L=Raipur/O=Jeffi Stores/OU=Admin/CN=${adminUsername}`
-    execSync(`openssl req -new -key ${keyPath} -out ${csrPath} -subj '${subject}' 2>/dev/null`)
+    execFileSync('openssl', ['req', '-new', '-key', keyPath, '-out', csrPath, '-subj', subject], { stdio: 'pipe' })
 
     fs.writeFileSync(extPath, [
       'basicConstraints = CA:FALSE',
@@ -45,17 +49,17 @@ export async function generateClientCertificate(
       'authorityKeyIdentifier = keyid,issuer',
     ].join('\n'))
 
-    execSync(
-      `openssl x509 -req -days 365 -in ${csrPath} ` +
-      `-CA ${caCertPath} -CAkey ${caKeyPath} -CAcreateserial ` +
-      `-out ${certPath} -extfile ${extPath} -set_serial 0x${serialHex} 2>/dev/null`
-    )
+    execFileSync('openssl', [
+      'x509', '-req', '-days', '365', '-in', csrPath,
+      '-CA', caCertPath, '-CAkey', caKeyPath, '-CAcreateserial',
+      '-out', certPath, '-extfile', extPath, '-set_serial', `0x${serialHex}`,
+    ], { stdio: 'pipe' })
 
-    execSync(
-      `openssl pkcs12 -export -out ${p12Path} ` +
-      `-inkey ${keyPath} -in ${certPath} -certfile ${caCertPath} ` +
-      `-name '${adminUsername}-admin-cert' -passout pass:${p12Password} 2>/dev/null`
-    )
+    execFileSync('openssl', [
+      'pkcs12', '-export', '-out', p12Path,
+      '-inkey', keyPath, '-in', certPath, '-certfile', caCertPath,
+      '-name', `${adminUsername}-admin-cert`, '-passout', `pass:${p12Password}`,
+    ], { stdio: 'pipe' })
 
     const p12Buffer = fs.readFileSync(p12Path)
 

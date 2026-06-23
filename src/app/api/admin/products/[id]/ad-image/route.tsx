@@ -34,11 +34,12 @@ function getFonts() {
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const admin = await authenticateAdmin(request)
   if (!admin) return new Response('Unauthorized', { status: 401 })
 
+  const { id } = await params
   const product = await queryOne<any>(`
     SELECT
       p.id, p.name, p.slug, p.base_price, p.price_ex_gst,
@@ -48,7 +49,7 @@ export async function GET(
        LIMIT 1) AS primary_image
     FROM products p
     WHERE p.id = $1
-  `, [params.id])
+  `, [id])
 
   if (!product) return new Response('Product not found', { status: 404 })
 

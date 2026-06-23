@@ -40,14 +40,15 @@ async function getForms(filters: { search?: string; page?: number }) {
   return { forms, total }
 }
 
-export default async function ReviewFormsPage({ searchParams }: { searchParams: { [key: string]: string | undefined } }) {
+export default async function ReviewFormsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const resolvedSearchParams = await searchParams
   const host = (await headers()).get('host') ?? ''
-  const page = Math.max(1, parseInt(searchParams.page || '1', 10))
-  const { forms, total } = await getForms({ search: searchParams.search, page })
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const { forms, total } = await getForms({ search: resolvedSearchParams.search, page })
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
-    if (searchParams.search) params.set('search', searchParams.search)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
     return ap(`/admin/review-forms${qs ? `?${qs}` : ''}`, host)
