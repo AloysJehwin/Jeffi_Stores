@@ -389,7 +389,7 @@ export default function NewPOPage() {
                         options={[{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }]} />
                     </div>
                     <div>
-                      <label className={labelCls}>Qty ({it.sell_unit_label || 'units'}) <span className="text-red-500">*</span></label>
+                      <label className={labelCls}>Qty ({it.purchase_unit || it.sell_unit_label || 'units'}) <span className="text-red-500">*</span></label>
                       <input type="number" min="0.001" step="0.001" className={inputCls} value={it.quantity}
                         onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, quantity: e.target.value }))} />
                     </div>
