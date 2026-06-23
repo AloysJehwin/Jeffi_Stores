@@ -77,9 +77,11 @@ export async function GET(request: NextRequest) {
            b.name AS brand_name,
            p.gtin,
            COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity,
-           COALESCE(p.discount_pct, 0)::numeric AS discount_pct
+           COALESCE(p.discount_pct, 0)::numeric AS discount_pct,
+           COALESCE(su.display_label, su.unit) AS sell_unit_label
          FROM products p
          LEFT JOIN brands b ON b.id = p.brand_id
+         LEFT JOIN product_units su ON su.id = p.sell_unit_id
          WHERE p.is_active = true AND p.has_variants = false AND ${catClause} AND ${productClause} AND ${searchWhere}
 
          UNION ALL
@@ -100,10 +102,13 @@ export async function GET(request: NextRequest) {
            b.name AS brand_name,
            COALESCE(pv.gtin, p.gtin) AS gtin,
            COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity,
-           COALESCE(pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct
+           COALESCE(pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
+           COALESCE(vsu.display_label, vsu.unit, psu.display_label, psu.unit) AS sell_unit_label
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id
+         LEFT JOIN product_units vsu ON vsu.id = pv.sell_unit_id
+         LEFT JOIN product_units psu ON psu.id = p.sell_unit_id
          WHERE pv.is_active = true AND p.is_active = true AND ${catClause} AND ${productClause} AND ${searchWherePv}
            AND NOT EXISTS (SELECT 1 FROM product_sub_variants WHERE variant_id = pv.id AND is_active = true)
 
@@ -125,11 +130,14 @@ export async function GET(request: NextRequest) {
            b.name AS brand_name,
            COALESCE(pv.gtin, p.gtin) AS gtin,
            COALESCE(ps.inventory_quantity, 0)::numeric AS inventory_quantity,
-           COALESCE(ps.discount_pct, pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct
+           COALESCE(ps.discount_pct, pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
+           COALESCE(vsu.display_label, vsu.unit, psu.display_label, psu.unit) AS sell_unit_label
          FROM product_sub_variants ps
          JOIN product_variants pv ON pv.id = ps.variant_id
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id
+         LEFT JOIN product_units vsu ON vsu.id = pv.sell_unit_id
+         LEFT JOIN product_units psu ON psu.id = p.sell_unit_id
          WHERE ps.is_active = true AND pv.is_active = true AND p.is_active = true AND ${catClause} AND ${productClause} AND ${searchWhereSv}
        ) results
        ORDER BY ${rank}, name ASC, variant_name ASC NULLS FIRST

@@ -19,9 +19,8 @@ type POSearchMode = 'name' | 'sku' | 'category'
 
 type POLineItem = {
   id: string; product_id: string; variant_id: string; product_name: string
-  sku: string; quantity: string; unit_cost: string; tax_rate: string; hsn_code: string; mrp: number
-  // purchase unit conversion
-  use_conversion: boolean
+  sku: string; quantity: string; tax_rate: string; hsn_code: string; mrp: number
+  sell_unit_label: string
   purchase_unit: string
   purchase_unit_factor: string
   line_total_incl_gst: string
@@ -31,21 +30,29 @@ type POLineItem = {
 type PickerProduct = {
   product_id: string; variant_id: string | null; name: string; variant_name: string | null
   sku: string; base_price: number | null; gst_percentage: number | null; hsn_code: string | null; mrp: number | null
+  sell_unit_label: string | null
 }
 
 function newPOLineItem(): POLineItem {
   return {
     id: Math.random().toString(36).slice(2),
     product_id: '', variant_id: '', product_name: '', sku: '',
-    quantity: '1', unit_cost: '', tax_rate: '0', hsn_code: '', mrp: 0,
-    use_conversion: false, purchase_unit: '', purchase_unit_factor: '1',
+    quantity: '1', tax_rate: '0', hsn_code: '', mrp: 0,
+    sell_unit_label: '',
+    purchase_unit: '', purchase_unit_factor: '1',
     line_total_incl_gst: '', gst_inclusive: true,
   }
 }
 
 function decodePOLineItemId(encoded: string) {
-  const [product_id, variant_id_raw, , gst_raw, hsn_raw] = encoded.split('|')
-  return { product_id, variant_id: variant_id_raw || '', tax_rate: gst_raw ? String(Math.round(parseFloat(gst_raw))) : '0', hsn_code: hsn_raw || '' }
+  const [product_id, variant_id_raw, , gst_raw, hsn_raw, , sell_unit_label_raw] = encoded.split('|')
+  return {
+    product_id,
+    variant_id: variant_id_raw || '',
+    tax_rate: gst_raw ? String(Math.round(parseFloat(gst_raw))) : '0',
+    hsn_code: hsn_raw || '',
+    sell_unit_label: sell_unit_label_raw || '',
+  }
 }
 
 function fmtINR2(n: number) {
@@ -140,6 +147,7 @@ export default function NewPOPage() {
       tax_rate: p.gst_percentage != null ? String(Math.round(Number(p.gst_percentage))) : '0',
       hsn_code: p.hsn_code || '',
       mrp: Number(p.mrp) || 0,
+      sell_unit_label: p.sell_unit_label || '',
     }
     setLineItems(mergeOrReplaceLineItem(pickerItemId, populated))
     setPickerOpen(false)
@@ -162,25 +170,17 @@ export default function NewPOPage() {
     setSaving(true)
     const items = lineItems
       .filter(it => it.product_id && parseFloat(it.quantity) > 0)
-      .map(it => {
-        const base = {
-          product_id: it.product_id, variant_id: it.variant_id || null,
-          product_name: it.product_name, sku: it.sku,
-          quantity: parseFloat(it.quantity),
-          tax_rate: parseFloat(it.tax_rate) || 0,
-          hsn_code: it.hsn_code,
-        }
-        if (it.use_conversion && it.line_total_incl_gst) {
-          return {
-            ...base,
-            purchase_unit: it.purchase_unit || null,
-            purchase_unit_factor: parseFloat(it.purchase_unit_factor) || 1,
-            line_total_incl_gst: parseFloat(it.line_total_incl_gst),
-            gst_inclusive: it.gst_inclusive,
-          }
-        }
-        return { ...base, unit_cost: parseFloat(it.unit_cost) || 0 }
-      })
+      .map(it => ({
+        product_id: it.product_id, variant_id: it.variant_id || null,
+        product_name: it.product_name, sku: it.sku,
+        quantity: parseFloat(it.quantity),
+        tax_rate: parseFloat(it.tax_rate) || 0,
+        hsn_code: it.hsn_code,
+        purchase_unit: it.purchase_unit || null,
+        purchase_unit_factor: parseFloat(it.purchase_unit_factor) || 1,
+        line_total_incl_gst: parseFloat(it.line_total_incl_gst) || 0,
+        gst_inclusive: it.gst_inclusive,
+      }))
     try {
       const res = await fetch('/api/admin/inventory/po', {
         method: 'POST',
@@ -198,20 +198,14 @@ export default function NewPOPage() {
 
   const taxableValue = lineItems.reduce((s, it) => {
     const gstRate = parseFloat(it.tax_rate) || 0
-    if (it.use_conversion && it.line_total_incl_gst) {
-      const inclGst = parseFloat(it.line_total_incl_gst) || 0
-      return s + (it.gst_inclusive ? inclGst / (1 + gstRate / 100) : inclGst)
-    }
-    return s + (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_cost) || 0)
+    const inclGst = parseFloat(it.line_total_incl_gst) || 0
+    return s + (it.gst_inclusive ? inclGst / (1 + gstRate / 100) : inclGst)
   }, 0)
   const cgst = lineItems.reduce((s, it) => {
     const gstRate = parseFloat(it.tax_rate) || 0
-    if (it.use_conversion && it.line_total_incl_gst) {
-      const inclGst = parseFloat(it.line_total_incl_gst) || 0
-      const exGst = it.gst_inclusive ? inclGst / (1 + gstRate / 100) : inclGst
-      return s + exGst * gstRate / 200
-    }
-    return s + (parseFloat(it.quantity) || 0) * (parseFloat(it.unit_cost) || 0) * gstRate / 200
+    const inclGst = parseFloat(it.line_total_incl_gst) || 0
+    const exGst = it.gst_inclusive ? inclGst / (1 + gstRate / 100) : inclGst
+    return s + exGst * gstRate / 200
   }, 0)
   const sgst = cgst
   const rawTotal = taxableValue + cgst + sgst
@@ -325,7 +319,7 @@ export default function NewPOPage() {
                           onSelect={s => {
                             const d = decodePOLineItemId(s.id)
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
-                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code }
+                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label }
                             setLineItems(mergeOrReplaceLineItem(it.id, populated))
                           }}
                           inputClassName={inputCls} placeholder="Search by product name..." />
@@ -336,7 +330,7 @@ export default function NewPOPage() {
                           onSelect={s => {
                             const d = decodePOLineItemId(s.id)
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
-                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code }
+                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label }
                             setLineItems(mergeOrReplaceLineItem(it.id, populated))
                           }}
                           inputClassName={inputCls + ' font-mono'} placeholder="e.g. JFS-1234" />
@@ -372,33 +366,13 @@ export default function NewPOPage() {
                         options={[{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }]} />
                     </div>
                     <div>
-                      <label className={labelCls}>Qty (purchase units) <span className="text-red-500">*</span></label>
+                      <label className={labelCls}>Qty ({it.sell_unit_label || 'units'}) <span className="text-red-500">*</span></label>
                       <input type="number" min="0.001" step="0.001" className={inputCls} value={it.quantity}
                         onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, quantity: e.target.value }))} />
                     </div>
-                    {!it.use_conversion && (
-                      <div>
-                        <label className={labelCls}>Unit Cost (₹) <span className="text-red-500">*</span></label>
-                        <input type="number" min="0" step="0.01" className={inputCls} value={it.unit_cost}
-                          onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, unit_cost: e.target.value }))} />
-                      </div>
-                    )}
                   </div>
 
-                  {/* Purchase unit conversion toggle */}
-                  <div className="flex items-center gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={() => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, use_conversion: !r.use_conversion }))}
-                      className={`relative inline-flex h-5 w-9 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 focus:outline-none ${it.use_conversion ? 'bg-secondary-500 dark:bg-secondary-400' : 'bg-border-default'}`}
-                      role="switch" aria-checked={it.use_conversion}
-                    >
-                      <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow ring-0 transition-transform duration-200 ${it.use_conversion ? 'translate-x-4' : 'translate-x-0'}`} />
-                    </button>
-                    <span className="text-xs text-foreground-secondary font-medium">Purchase unit conversion</span>
-                  </div>
-
-                  {it.use_conversion && (() => {
+                  {(() => {
                     const gstRate = parseFloat(it.tax_rate) || 0
                     const factor = parseFloat(it.purchase_unit_factor) || 1
                     const qty = parseFloat(it.quantity) || 0
@@ -419,7 +393,7 @@ export default function NewPOPage() {
                               className={inputCls} placeholder="Carton, Box…" />
                           </div>
                           <div>
-                            <label className={labelCls}>Selling units per purchase unit <span className="text-red-500">*</span></label>
+                            <label className={labelCls}>{it.sell_unit_label || 'Units'} per purchase unit <span className="text-red-500">*</span></label>
                             <input type="number" min="1" step="1" value={it.purchase_unit_factor}
                               onChange={e => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, purchase_unit_factor: e.target.value }))}
                               className={inputCls} placeholder="200" />
@@ -451,14 +425,14 @@ export default function NewPOPage() {
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 border-t border-border-default text-xs">
                             <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
                               <div className="text-foreground-muted mb-0.5">Base qty</div>
-                              <div className="font-semibold text-foreground">{baseQty.toLocaleString('en-IN')} pcs</div>
+                              <div className="font-semibold text-foreground">{baseQty.toLocaleString('en-IN')} {it.sell_unit_label || 'pcs'}</div>
                             </div>
                             <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
                               <div className="text-foreground-muted mb-0.5">Ex-GST total</div>
                               <div className="font-semibold text-foreground">₹{fmtINR2(totalExGst)}</div>
                             </div>
                             <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
-                              <div className="text-foreground-muted mb-0.5">Per pc (ex-GST)</div>
+                              <div className="text-foreground-muted mb-0.5">Per {it.sell_unit_label || 'pc'} (ex-GST)</div>
                               <div className="font-semibold text-secondary-600 dark:text-secondary-300">₹{fmtINR2(perPc)}</div>
                             </div>
                             <div className="text-center p-2 bg-surface rounded-lg border border-border-default">
@@ -470,13 +444,6 @@ export default function NewPOPage() {
                       </div>
                     )
                   })()}
-
-                  {!it.use_conversion && it.unit_cost && (
-                    <p className="text-xs text-foreground-secondary text-right">
-                      Line total: <span className="font-semibold text-foreground">₹{fmtINR2((parseFloat(it.quantity) || 0) * (parseFloat(it.unit_cost) || 0) * (1 + (parseFloat(it.tax_rate) || 0) / 100))}</span>
-                      {parseFloat(it.tax_rate) > 0 && <span className="ml-1 text-foreground-muted">(incl. {it.tax_rate}% GST)</span>}
-                    </p>
-                  )}
                 </div>
               )
             })}
@@ -495,7 +462,7 @@ export default function NewPOPage() {
             </button>
           )}
 
-          {lineItems.some(it => it.unit_cost || (it.use_conversion && it.line_total_incl_gst)) && (
+          {lineItems.some(it => it.line_total_incl_gst) && (
             <div className="border-t border-border-default pt-3 mt-3 flex justify-end">
               <div className="text-right space-y-1 min-w-[220px]">
                 <div className="flex justify-between text-xs text-foreground-secondary"><span>Taxable Value</span><span>₹{fmtINR2(taxableValue)}</span></div>
