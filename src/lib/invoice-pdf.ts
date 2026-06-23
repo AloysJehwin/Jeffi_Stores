@@ -324,8 +324,7 @@ export async function generateInvoicePDF(
       { label: 'HSN/SAC', w: 52, align: 'center' as const },
       { label: 'GST\nRate', w: 36, align: 'center' as const },
       { label: 'Quantity', w: 52, align: 'center' as const },
-      { label: 'Rate\n(Incl. of Tax)', w: 62, align: 'right' as const },
-      { label: 'Rate', w: 52, align: 'right' as const },
+      { label: 'Rate\n(Incl. of Tax)', w: 114, align: 'right' as const },
       { label: 'per', w: 30, align: 'center' as const },
       { label: 'Disc. %', w: 38, align: 'center' as const },
       { label: 'Amount', w: 62, align: 'right' as const },
@@ -385,7 +384,6 @@ export async function generateInvoicePDF(
 
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
-      const unitExcl = item.taxable_amount / item.quantity
       const isMeasured = item.buy_mode === 'weight' || item.buy_mode === 'length'
       const unitLabel = item.buy_unit ? item.buy_unit.toUpperCase() : 'NOS'
       const qtyLabel = isMeasured
@@ -418,7 +416,7 @@ export async function generateInvoicePDF(
         `${item.gst_rate} %`,
         qtyLabel,
         fmt(rateInclTax),
-        fmt(unitExcl),
+        perLabel,
         perLabel,
         discLabel,
         fmt(item.taxable_amount),
