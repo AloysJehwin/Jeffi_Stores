@@ -380,6 +380,9 @@ export async function generateInvoicePDF(
 
     drawTableHeader()
 
+    const bizDiscount = order.business_discount_amount || 0
+    const itemsSubtotal = items.reduce((s, it) => s + it.total_price, 0)
+
     for (let i = 0; i < items.length; i++) {
       const item = items[i]
       const unitExcl = item.taxable_amount / item.quantity
@@ -390,16 +393,23 @@ export async function generateInvoicePDF(
         : `${parseFloat(String(item.quantity))} ${unitLabel}`
       const perLabel = unitLabel
 
+      // Prorate order-level business discount to this line by its share of subtotal
+      const itemBizDiscount = itemsSubtotal > 0 ? bizDiscount * (item.total_price / itemsSubtotal) : 0
+      const netSellingTotal = item.total_price - itemBizDiscount
+
       let discPct = 0
       if (item.mrp != null && item.mrp > 0 && item.quantity > 0) {
         const mrpTotal = item.mrp * item.quantity
-        const sellingTotal = item.total_price
-        discPct = mrpTotal > sellingTotal ? ((mrpTotal - sellingTotal) / mrpTotal) * 100 : 0
+        discPct = mrpTotal > netSellingTotal ? ((mrpTotal - netSellingTotal) / mrpTotal) * 100 : 0
       } else {
-        const grossTotal = item.total_price + (item.discount_amount || 0)
-        discPct = grossTotal > 0 && (item.discount_amount || 0) > 0 ? ((item.discount_amount || 0) / grossTotal) * 100 : 0
+        const totalDisc = (item.discount_amount || 0) + itemBizDiscount
+        const grossTotal = netSellingTotal + totalDisc
+        discPct = grossTotal > 0 && totalDisc > 0 ? (totalDisc / grossTotal) * 100 : 0
       }
       const discLabel = discPct >= 0.01 ? `${discPct.toFixed(2)}%` : ''
+
+      // Rate (Incl. of Tax) = MRP when available, else unit_price
+      const rateInclTax = item.mrp != null && item.mrp > 0 ? item.mrp : item.unit_price
 
       const rowData = [
         String(i + 1),
@@ -407,7 +417,7 @@ export async function generateInvoicePDF(
         item.hsn_code || '',
         `${item.gst_rate} %`,
         qtyLabel,
-        fmt(item.unit_price),
+        fmt(rateInclTax),
         fmt(unitExcl),
         perLabel,
         discLabel,

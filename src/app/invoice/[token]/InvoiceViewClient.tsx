@@ -52,6 +52,9 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
   const bizDiscount = Number(order.business_discount_amount) || 0
   const shipping = Number(order.shipping_amount) || 0
 
+  // Prorate business discount across items by their share of items subtotal
+  const itemsSubtotal = items.reduce((s, it) => s + (Number(it.total_price) || 0), 0)
+
   return (
     <div className="container mx-auto px-4 py-6 sm:py-8">
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
@@ -158,19 +161,25 @@ export default function InvoiceViewClient({ order, items, settings, token }: Pro
                   const itemDiscount = Number(item.discount_amount) || 0
                   const mrpVal = item.mrp != null ? Number(item.mrp) : null
                   const qty = Number(item.quantity)
+                  const itemTotal = Number(item.total_price)
+                  // Prorate order-level business discount to this line by its share of subtotal
+                  const itemBizDiscount = itemsSubtotal > 0 ? bizDiscount * (itemTotal / itemsSubtotal) : 0
+                  const netSellingTotal = itemTotal - itemBizDiscount
                   let discPct = 0
                   if (mrpVal != null && mrpVal > 0 && qty > 0) {
                     const mrpTotal = mrpVal * qty
-                    const sellingTotal = Number(item.total_price)
-                    discPct = mrpTotal > sellingTotal ? ((mrpTotal - sellingTotal) / mrpTotal) * 100 : 0
+                    discPct = mrpTotal > netSellingTotal ? ((mrpTotal - netSellingTotal) / mrpTotal) * 100 : 0
                   } else {
-                    const grossTotal = Number(item.total_price) + itemDiscount
-                    discPct = grossTotal > 0 && itemDiscount > 0 ? (itemDiscount / grossTotal) * 100 : 0
+                    const grossTotal = netSellingTotal + itemDiscount + itemBizDiscount
+                    discPct = grossTotal > 0 && (itemDiscount + itemBizDiscount) > 0 ? ((itemDiscount + itemBizDiscount) / grossTotal) * 100 : 0
                   }
                   const discLabel = discPct >= 0.01 ? `${discPct.toFixed(2)}%` : '—'
-                  const unitExclGST = Number(item.taxable_amount) > 0 && Number(item.quantity) > 0
-                    ? Number(item.taxable_amount) / Number(item.quantity)
-                    : Number(item.unit_price)
+                  // Rate = MRP incl. GST when available, otherwise unit price incl. GST
+                  const unitExclGST = mrpVal != null && mrpVal > 0
+                    ? mrpVal
+                    : (Number(item.taxable_amount) > 0 && qty > 0
+                        ? Number(item.taxable_amount) / qty
+                        : Number(item.unit_price))
                   return (
                     <tr key={i} className="hover:bg-gray-50">
                       <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
