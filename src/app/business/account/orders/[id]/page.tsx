@@ -13,7 +13,6 @@ import { bp } from '@/lib/business-path'
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 const PH = { 'X-Auth-Portal': 'business' }
-const CONTINUOUS_UNITS = new Set(['m', 'cm', 'mm', 'km', 'ft', 'in', 'kg', 'g', 'mg', 'lb', 'oz', 'l', 'ml', 'm2', 'cm2', 'mm2', 'm3', 'cm3'])
 
 interface OrderItem {
   id: string
@@ -475,9 +474,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                           </span>
                         )}
                         {(() => {
-                          const isFractional = item.buyUnit
-                            ? CONTINUOUS_UNITS.has(item.buyUnit.toLowerCase())
-                            : (item.buyMode === 'weight' || item.buyMode === 'length')
+                          const isFractional = item.buyMode === 'weight' || item.buyMode === 'length'
                           const qtyDisplay = isFractional
                             ? `${Number(item.quantity).toFixed(3)}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
                             : `${Math.round(Number(item.quantity))}${item.buyUnit && item.buyUnit !== 'unit' ? ` ${item.buyUnit}` : ''}`
