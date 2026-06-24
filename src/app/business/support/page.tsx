@@ -21,7 +21,8 @@ async function getAuthUser() {
 
 export default async function BusinessSupportPage() {
   const user = await getAuthUser()
-  const host = (await headers()).get('host') ?? ''
+  const hdrs = await headers()
+  const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
 
   return (
     <div className="bg-surface min-h-screen">
