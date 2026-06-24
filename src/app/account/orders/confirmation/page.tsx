@@ -6,7 +6,12 @@ import Link from 'next/link'
 import { CheckCircle } from 'lucide-react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 
-const CONTINUOUS_UNITS = new Set(['m', 'cm', 'mm', 'km', 'ft', 'in', 'kg', 'g', 'mg', 'lb', 'oz', 'l', 'ml', 'm2', 'cm2', 'mm2', 'm3', 'cm3'])
+function UnitLabel({ label }: { label: string | null | undefined }) {
+  if (!label) return null
+  const match = label.match(/^(.+?)2$/)
+  if (match) return <>{match[1]}<sup>2</sup></>
+  return <>{label}</>
+}
 
 interface OrderDetails {
   id: string
@@ -122,20 +127,20 @@ function OrderConfirmationPage() {
 
           <div className="space-y-4 mb-6">
             {order.items.map((item) => {
-              const isFractional = item.buyUnit
-                ? CONTINUOUS_UNITS.has(item.buyUnit.toLowerCase())
-                : (item.buyMode === 'weight' || item.buyMode === 'length')
-              const qtyDisplay = isFractional
-                ? `${Number(item.quantity).toFixed(3)}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
-                : `${Math.round(Number(item.quantity))}${item.buyUnit && item.buyUnit !== 'unit' ? ` ${item.buyUnit}` : ''}`
-              const priceUnitSuffix = item.buyUnit && item.buyUnit !== 'unit' ? ` / ${item.buyUnit}` : ''
+              const isFractional = (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
+              const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : (item.buyMode && item.buyMode !== 'unit' ? item.buyMode : null)
+              const qtyNum = isFractional
+                ? Number(Number(item.quantity).toFixed(6)).toString()
+                : String(Math.round(Number(item.quantity)))
               return (
               <div key={item.id} className="flex justify-between items-center pb-4 border-b border-border-default last:border-b-0">
                 <div className="flex-1">
                   <p className="font-medium text-foreground">{item.productName}</p>
-                  <p className="text-sm text-foreground-secondary">Quantity: {qtyDisplay}</p>
                   <p className="text-sm text-foreground-secondary">
-                    ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{priceUnitSuffix} × {qtyDisplay}
+                    Quantity: {qtyNum}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}
+                  </p>
+                  <p className="text-sm text-foreground-secondary">
+                    ₹{item.unitPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{unitLabel ? <> / <UnitLabel label={unitLabel} /></> : ''} × {qtyNum}{unitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}
                   </p>
                 </div>
                 <p className="font-semibold text-foreground">

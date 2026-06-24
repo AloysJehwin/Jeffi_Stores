@@ -7,49 +7,6 @@ import { z } from 'zod'
 import { parseBody, zNonEmpty, zEmail } from '@/lib/validate'
 import { lineItemExGst } from '@/lib/pricing'
 
-import { createClient } from '@/lib/supabase-server'
-
-async function validateLineItemQty(
-  supabase: Awaited<ReturnType<typeof createClient>>,
-  productId: string | null,
-  variantId: string | null,
-  qty: number
-): Promise<string | null> {
-  if (!productId && !variantId) return null
-  let unit: { unit: string; dimension: string; min_qty: string; max_qty: string | null; qty_step: string } | null = null
-  if (variantId) {
-    const { data } = await supabase
-      .from('product_units')
-      .select('unit, dimension, min_qty, max_qty, qty_step')
-      .eq('variant_id', variantId)
-      .eq('is_sell_default', true)
-      .maybeSingle()
-    unit = data
-  }
-  if (!unit && productId) {
-    const { data } = await supabase
-      .from('product_units')
-      .select('unit, dimension, min_qty, max_qty, qty_step')
-      .eq('product_id', productId)
-      .is('variant_id', null)
-      .eq('is_sell_default', true)
-      .maybeSingle()
-    unit = data
-  }
-  if (!unit) return null
-  const min = Number(unit.min_qty ?? 1)
-  const max = unit.max_qty != null ? Number(unit.max_qty) : null
-  const step = Number(unit.qty_step ?? 1)
-  if (qty < min) return `Quantity must be at least ${min} ${unit.unit}`
-  if (max !== null && qty > max) return `Quantity cannot exceed ${max} ${unit.unit}`
-  if (unit.dimension !== 'count' && step > 0) {
-    const steps = Math.round((qty - min) / step)
-    const snapped = Math.round((min + steps * step) * 1e6) / 1e6
-    if (Math.abs(snapped - qty) > 1e-9) return `Quantity must be in steps of ${step} from ${min}`
-  }
-  return null
-}
-
 function calcTotals(items: any[]) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
   const cgst = items.reduce((s: number, i: any) => s + i.amount * i.gst_rate / 200, 0)

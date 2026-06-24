@@ -17,11 +17,7 @@ interface CartItem {
     display_label: string | null
     factor: number
     is_base: boolean
-    is_sell_default: boolean
-    dimension?: string | null
-    min_qty: number | null
-    max_qty: number | null
-    qty_step: number | null
+    dimension: string | null
   } | null
   products: {
     id: string
@@ -32,8 +28,7 @@ interface CartItem {
     price_ex_gst: number | null
     mrp: number | null
     gst_percentage: number | null
-    stock_quantity: number
-    is_in_stock: boolean
+    stock_status: string
     brand_name: string | null
     category_id: string | null
     product_images: Array<{
@@ -49,8 +44,7 @@ interface CartItem {
     price: number | null
     mrp: number | null
     price_ex_gst: number | null
-    wholeprice_ex_gst: number | null
-    stock_quantity: number
+    stock_status: string
     pricing_type?: string
     unit?: string | null
     numeric_value?: number | null
@@ -63,8 +57,7 @@ interface CartItem {
     mrp: number | null
     price_ex_gst: number | null
     mrp_ex_gst: number | null
-    wholeprice_ex_gst: number | null
-    stock_quantity: number
+    stock_status: string
     inventory_quantity: number
   } | null
 }
@@ -239,12 +232,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const price = item.price_at_addition > 0
         ? item.price_at_addition
         : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-      const categoryId = item.products.category_id
-      const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-        ? (user.businessDiscountMap?.[categoryId] ?? 0)
-        : 0
-      const effectivePrice = discountPct > 0 ? price * (1 - discountPct / 100) : price
-      return total + effectivePrice * item.quantity
+      return total + price * item.quantity
     }, 0)
   }
 
@@ -253,13 +241,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const price = item.price_at_addition > 0
         ? item.price_at_addition
         : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-      const categoryId = item.products.category_id
-      const discountPct = (user?.isBusiness && user.approvalStatus === 'approved' && categoryId)
-        ? (user.businessDiscountMap?.[categoryId] ?? 0)
-        : 0
-      const effectivePrice = discountPct > 0 ? price * (1 - discountPct / 100) : price
       const gstRate = item.products.gst_percentage || 0
-      const itemTotal = effectivePrice * item.quantity
+      const itemTotal = price * item.quantity
       const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))
       return tax + itemTax
     }, 0)
