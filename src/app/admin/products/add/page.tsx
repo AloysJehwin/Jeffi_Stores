@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { getAllCategories, getAllBrands } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { generateProductSku, generateVariantSku } from '@/lib/sku'
@@ -199,15 +199,15 @@ async function createProduct(formData: FormData) {
     const { syncProductToMerchant } = await import('@/lib/merchant/sync')
     syncProductToMerchant(data.id).catch(() => {})
 
-    const host = (await headers()).get('host') ?? ''
-    redirect(ap('/admin/products', host))
+    const host = await getHost()
+  redirect(ap('/admin/products', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error(err?.message || 'Failed to create product')
   }
 }
 export default async function AddProductPage() {
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const categories = await getAllCategories()
   const brands = await getAllBrands()
 

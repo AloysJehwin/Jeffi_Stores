@@ -3,6 +3,7 @@ import { headers } from 'next/headers'
 import Link from 'next/link'
 import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -95,8 +96,7 @@ function statusLabel(s: string) {
 export default async function AdminDashboard() {
   const headersList = await headers()
   const username = headersList.get('x-username') || 'Admin'
-  const host = headersList.get('host') ?? ''
-
+  const host = await getHost()
   const [stats, metrics] = await Promise.all([
     getDashboardStats(),
     getDashboardMetrics(),

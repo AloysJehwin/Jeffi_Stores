@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { getCustomers } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
@@ -7,6 +6,7 @@ import CustomersTableRows from '@/components/admin/CustomersTableRows'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -15,7 +15,7 @@ const PAGE_SIZE = 25
 
 export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
@@ -30,8 +30,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
       page,
       limit: PAGE_SIZE,
       sort,
-      dir,
-    }),
+      dir }),
     getCustomers({}),
   ])
 
@@ -88,8 +87,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               { value: 'active', label: 'Active' },
               { value: 'inactive', label: 'Inactive' },
               { value: 'flagged', label: 'Flagged' },
-            ],
-          },
+            ] },
           {
             name: 'segment',
             label: 'Segment',
@@ -103,8 +101,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               { value: 'dormant', label: 'Dormant (180d+)' },
               { value: 'b2b', label: 'B2B' },
               { value: 'lead', label: 'Lead (no orders)' },
-            ],
-          },
+            ] },
           {
             name: 'health',
             label: 'Health',
@@ -113,8 +110,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               { value: 'at_risk', label: 'At Risk (40-69)' },
               { value: 'critical', label: 'Critical (<40)' },
               { value: 'unknown', label: 'Not scored' },
-            ],
-          },
+            ] },
         ]}
         searchPlaceholder="Search by name, email or phone..."
         suggestType="customers"

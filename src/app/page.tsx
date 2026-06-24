@@ -1,11 +1,11 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { queryMany } from '@/lib/db'
 import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 import ProductCard from '@/components/visitor/ProductCard'
 import HeroCarousel from '@/components/visitor/HeroCarousel'
+import { getHost } from '@/lib/get-host'
 
 export const revalidate = 120
 
@@ -112,8 +112,7 @@ function productCardProps(product: any) {
     primaryImage: primaryImage || null,
     brandName: product.brands?.name || null,
     categoryName: product.categories?.name || null,
-    discountPct: Number(product.discount_pct ?? 0),
-  }
+    discountPct: Number(product.discount_pct ?? 0) }
 }
 
 export default async function HomePage() {
@@ -124,7 +123,7 @@ export default async function HomePage() {
     getHeroSlides(),
   ])
 
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const isLocal = /^(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|$)/.test(host) || /\.local(:|$)/.test(host)
   const businessOrigin = isLocal ? '' : 'https://business.jeffistores.in'
   const businessLandingUrl = isLocal ? '/business' : `${businessOrigin}/`
@@ -257,20 +256,17 @@ export default async function HomePage() {
                 d: 'M13 10V3L4 14h7v7l9-11h-7z',
                 title: 'Fast Delivery',
                 desc: 'Prompt dispatch and reliable delivery to your doorstep across India.',
-                color: 'primary',
-              },
+                color: 'primary' },
               {
                 d: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4',
                 title: 'Wide Range',
                 desc: 'Fasteners, power tools, electrical, welding, and hundreds of industrial categories.',
-                color: 'accent',
-              },
+                color: 'accent' },
               {
                 d: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
                 title: '24/7 Support',
                 desc: 'Expert team always available to help you source the right product fast.',
-                color: 'secondary',
-              },
+                color: 'secondary' },
             ].map((item) => (
               <div key={item.title} className="relative bg-surface-elevated rounded-2xl border border-border-default p-6 md:p-8 overflow-hidden group hover:border-primary-400/50 hover:shadow-lg transition-all">
                 <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-5

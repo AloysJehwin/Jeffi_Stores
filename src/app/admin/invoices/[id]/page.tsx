@@ -1,8 +1,9 @@
-import { cookies, headers } from 'next/headers'
+import { cookies} from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import InvoiceDetailClient from './InvoiceDetailClient'
 
 export const dynamic = 'force-dynamic'
@@ -11,7 +12,7 @@ export default async function InvoiceDetailPage({ params }: { params: Promise<{ 
   const { id } = await params
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null

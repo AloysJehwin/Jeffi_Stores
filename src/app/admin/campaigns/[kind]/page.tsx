@@ -1,14 +1,14 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import CampaignDetailClient from './CampaignDetailClient'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function CampaignDetailPage({ params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   return (
     <div className="p-4 sm:p-6 space-y-5">
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">

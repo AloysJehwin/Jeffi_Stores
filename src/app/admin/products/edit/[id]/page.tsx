@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
@@ -52,17 +52,14 @@ Schema: {"ai_description":"...","ai_use_cases":["..."],"ai_keywords":["..."],"ai
       ].filter(Boolean).join('\n')
 
       const res = await fetch(`${OLLAMA_URL}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           model: OLLAMA_MODEL, stream: false, format: 'json',
           messages: [
             { role: 'system', content: SYSTEM_PROMPT },
             { role: 'user', content: userPrompt },
           ],
-          options: { temperature: 0.3 },
-        }),
-      })
+          options: { temperature: 0.3 } }) })
       if (!res.ok) return
       const data = await res.json() as { message?: { content?: string } }
       const raw = data.message?.content || ''
@@ -191,9 +188,7 @@ async function updateProduct(productId: string, formData: FormData) {
           region: process.env.AWS_REGION || 'us-east-1',
           credentials: {
             accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-          },
-        })
+            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY! } })
         for (const img of imagesToDelete) {
           if (img.s3_key) await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket', Key: img.s3_key }))
           if (img.s3_thumbnail_key) await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket', Key: img.s3_thumbnail_key }))
@@ -403,8 +398,8 @@ async function updateProduct(productId: string, formData: FormData) {
 
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
-    const host = (await headers()).get('host') ?? ''
-    redirect(ap('/admin/products', host))
+    const host = await getHost()
+  redirect(ap('/admin/products', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error(err?.message || 'Failed to update product')
@@ -413,7 +408,7 @@ async function updateProduct(productId: string, formData: FormData) {
 
 export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const product = await getProduct(id).catch(() => null)
 
   if (!product) {

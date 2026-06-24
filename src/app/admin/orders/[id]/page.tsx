@@ -1,8 +1,8 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { getOrder, getReturnRequest } from '@/lib/queries'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import UpdateOrderStatus from '@/components/admin/UpdateOrderStatus'
 import CancelReview from '@/components/admin/CancelReview'
 import ReturnReview from '@/components/admin/ReturnReview'
@@ -27,7 +27,7 @@ const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received
 
 export default async function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const order = await getOrder(id).catch(() => null)
 
   if (!order) {
