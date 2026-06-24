@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories } from '@/lib/queries'
 import { query } from '@/lib/db'
@@ -41,12 +41,12 @@ async function createCategory(formData: FormData) {
   revalidatePath('/admin/products/edit/[id]', 'page')
 
   
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   redirect(ap('/admin/categories', host))
 }
 
 export default async function AddCategoryPage() {
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const categories = await getAllCategories()
 
   return (

@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { notFound } from 'next/navigation'
 import ProductAnalyticsClient from './ProductAnalyticsClient'
 import { getProductAnalyticsData } from '@/lib/admin-product-analytics'
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function ProductAnalyticsPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const data = await getProductAnalyticsData(id, 30)
   if (!data) notFound()
 

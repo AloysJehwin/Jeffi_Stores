@@ -1,8 +1,8 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { headers } from 'next/headers'
 import { getCustomerById } from '@/lib/queries'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import CustomerActionButton from '@/components/admin/CustomerActionButton'
 import CustomerMailerPanel from '@/components/admin/CustomerMailerPanel'
 import AdminSupportChat from '@/components/admin/AdminSupportChat'
@@ -30,8 +30,7 @@ function formatOrderStatus(status: string) {
     return_rejected: 'Return Rejected',
     return_picked_up: 'Picked Up',
     refunded: 'Refunded',
-    replaced: 'Replaced',
-  }
+    replaced: 'Replaced' }
   return map[status] || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
@@ -42,8 +41,7 @@ function formatPaymentStatus(status: string) {
     failed: 'Failed',
     refunded: 'Refunded',
     partial_refund: 'Part Refunded',
-    cod: 'COD',
-  }
+    cod: 'COD' }
   return map[status] || status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
 }
 
@@ -75,19 +73,17 @@ const SEGMENT_LABELS: Record<string, { label: string; color: string }> = {
   at_risk:  { label: 'At Risk',       color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300' },
   dormant:  { label: 'Dormant',       color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' },
   b2b:      { label: 'B2B',           color: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300' },
-  lead:     { label: 'Lead',          color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' },
-}
+  lead:     { label: 'Lead',          color: 'bg-pink-100 text-pink-800 dark:bg-pink-900/30 dark:text-pink-300' } }
 
 export default async function CustomerDetailPage({
   params,
-  searchParams,
-}: {
+  searchParams }: {
   params: Promise<{ id: string }>
   searchParams: Promise<{ chat?: string }>
 }) {
   const { id } = await params
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   let customer: any
   try {
     customer = await getCustomerById(id)
@@ -106,8 +102,7 @@ export default async function CustomerDetailPage({
   const statusBadge = {
     active: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
     inactive: 'bg-zinc-200 dark:bg-zinc-700 text-zinc-600 dark:text-zinc-300',
-    flagged: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
-  }
+    flagged: 'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300' }
 
   return (
     <div className="p-4 sm:p-6 max-w-full space-y-5">

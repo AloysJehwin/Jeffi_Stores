@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { cookies, headers } from 'next/headers'
+import { cookies} from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { getCrmDashboardData } from '@/lib/admin-crm'
 import HealthDistributionCard from './HealthDistributionCard'
@@ -12,12 +12,13 @@ import RecentTagsCard from './RecentTagsCard'
 import RecentSignupsCard from './RecentSignupsCard'
 import SegmentsCard from './SegmentsCard'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 
 
 export default async function CrmDashboardPage() {
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')?.value
   let adminId = ''

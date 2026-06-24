@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { getFilteredOrders } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
@@ -7,6 +6,7 @@ import OrdersTableRows from '@/components/admin/OrdersTableRows'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -15,7 +15,7 @@ const PAGE_SIZE = 25
 
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
@@ -29,8 +29,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       page,
       limit: PAGE_SIZE,
       sort,
-      dir,
-    }),
+      dir }),
     getFilteredOrders({}),
   ])
 
@@ -107,8 +106,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             options: [
               { value: 'online', label: 'Online' },
               { value: 'offline', label: 'Offline' },
-            ],
-          },
+            ] },
           {
             name: 'status',
             label: 'Order Status',
@@ -121,8 +119,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               { value: 'delivered', label: 'Delivered' },
               { value: 'cancel_requested', label: 'Cancel Requested' },
               { value: 'cancelled', label: 'Cancelled' },
-            ],
-          },
+            ] },
           {
             name: 'payment_status',
             label: 'Payment Status',
@@ -132,8 +129,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               { value: 'failed', label: 'Failed' },
               { value: 'refunded', label: 'Refunded' },
               { value: 'unpaid', label: 'Unpaid' },
-            ],
-          },
+            ] },
         ]}
         searchPlaceholder="Search by order number or customer..."
         searchParam="search"

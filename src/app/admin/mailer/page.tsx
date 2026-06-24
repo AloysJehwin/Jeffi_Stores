@@ -1,11 +1,11 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { queryMany, queryCount } from '@/lib/db'
 import Pagination from '@/components/admin/Pagination'
 import DeleteCampaignButton from '@/components/admin/DeleteCampaignButton'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AdminFilters from '@/components/admin/AdminFilters'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -17,16 +17,14 @@ const TEMPLATE_LABELS: Record<string, string> = {
   promotion: 'Promotion',
   event: 'Event',
   announcement: 'Announcement',
-  custom: 'Custom',
-}
+  custom: 'Custom' }
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
   scheduled: 'bg-blue-100 text-blue-700',
   sending: 'bg-yellow-100 text-yellow-700',
   sent: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-600',
-}
+  failed: 'bg-red-100 text-red-600' }
 
 interface Campaign {
   id: string
@@ -42,7 +40,7 @@ interface Campaign {
 }
 
 export default async function MailerPage({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const resolvedSearchParams = await searchParams
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const search = resolvedSearchParams.search?.trim() || ''

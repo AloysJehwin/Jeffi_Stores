@@ -1,12 +1,12 @@
 import Link from 'next/link'
 import { Star, MessageSquare, FileText } from 'lucide-react'
-import { headers } from 'next/headers'
 import { queryMany, queryCount } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -42,7 +42,7 @@ async function getForms(filters: { search?: string; page?: number }) {
 
 export default async function ReviewFormsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const { forms, total } = await getForms({ search: resolvedSearchParams.search, page })
 

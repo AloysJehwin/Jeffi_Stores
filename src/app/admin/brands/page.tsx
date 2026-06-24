@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { queryMany, queryCount } from '@/lib/db'
 import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
 import AdminFilters from '@/components/admin/AdminFilters'
@@ -41,7 +41,7 @@ async function getFilteredBrands(filters: { is_active?: string; search?: string;
 
 export default async function BrandsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
 
   const [{ brands, total }, allStats] = await Promise.all([
@@ -100,8 +100,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
             options: [
               { value: 'true', label: 'Active' },
               { value: 'false', label: 'Inactive' },
-            ],
-          },
+            ] },
         ]}
         searchPlaceholder="Search by name..."
         suggestType="brands"

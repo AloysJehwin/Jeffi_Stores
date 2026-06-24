@@ -1,10 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { queryOne, queryMany, queryCount } from '@/lib/db'
 import Pagination from '@/components/admin/Pagination'
 import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -14,16 +14,14 @@ const TEMPLATE_LABELS: Record<string, string> = {
   promotion: 'Promotion',
   event: 'Event',
   announcement: 'Announcement',
-  custom: 'Custom',
-}
+  custom: 'Custom' }
 
 const STATUS_STYLES: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600',
   scheduled: 'bg-blue-100 text-blue-700',
   sending: 'bg-yellow-100 text-yellow-700',
   sent: 'bg-green-100 text-green-700',
-  failed: 'bg-red-100 text-red-600',
-}
+  failed: 'bg-red-100 text-red-600' }
 
 interface Campaign {
   id: string
@@ -49,14 +47,13 @@ interface LogRow {
 
 export default async function CampaignDetailPage({
   params,
-  searchParams,
-}: {
+  searchParams }: {
   params: Promise<{ id: string }>
   searchParams: Promise<{ logPage?: string }>
 }) {
   const { id } = await params
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const campaign = await queryOne<Campaign>('SELECT * FROM email_campaigns WHERE id = $1', [id])
   if (!campaign) notFound()
 
