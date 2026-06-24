@@ -31,20 +31,29 @@ function getPool(): Pool {
       const dbName = process.env.RDS_DB!
       const region = process.env.AWS_REGION || 'us-east-1'
 
+      const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
       config.host = host
       config.port = port
       config.user = user
       config.database = dbName
-      config.ssl = { rejectUnauthorized: true }
+      config.ssl = fs.existsSync(certPath)
+        ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
+        : { rejectUnauthorized: false }
       config.password = makeRdsSigner(host, port, user, region)
     } else {
-      config.connectionString = dbUrl
       if (dbUrl.includes('rds.amazonaws.com')) {
+        // Strip sslmode/uselibpqcompat from the URL — pg v8 treats sslmode=require as
+        // verify-full and overrides our ssl object, causing SELF_SIGNED_CERT_IN_CHAIN.
+        // We control TLS entirely via the ssl: { ca } option below.
+        const cleanUrl = dbUrl.replace(/[?&](sslmode|uselibpqcompat)=[^&]*/g, '').replace(/[?&]$/, '')
+        config.connectionString = cleanUrl
         const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
         if (!fs.existsSync(certPath)) {
           throw new Error(`RDS TLS certificate not found at ${certPath}. Download from https://truststore.pki.rds.amazonaws.com/global/global-bundle.pem`)
         }
         config.ssl = { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
+      } else {
+        config.connectionString = dbUrl
       }
     }
 
