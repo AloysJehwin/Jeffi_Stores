@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryMany } from '@/lib/db'
 import { authenticateAdmin, authenticateServiceAccount } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { logAdminAudit } from '@/lib/admin-audit'
 
 export const dynamic = 'force-dynamic'
 
@@ -87,6 +88,23 @@ export async function POST(request: NextRequest) {
       body.message ?? null,
     ]
   )
+
+  await logAdminAudit({
+    adminId: null,
+    action: 'create',
+    entityType: 'system',
+    entityId: body.run_id,
+    summary: `Replication run ${body.run_id} recorded: status=${body.status}${body.row_count != null ? `, rows=${body.row_count}` : ''}${body.duration_seconds != null ? `, duration=${body.duration_seconds}s` : ''}`,
+    metadata: {
+      source: body.source || 'razer',
+      status: body.status,
+      row_count: body.row_count ?? null,
+      dump_bytes: body.dump_bytes ?? null,
+      duration_seconds: body.duration_seconds ?? null,
+      ...(sa ? { service_account: sa.name } : {}),
+    },
+    request,
+  })
 
   return NextResponse.json({ ok: true, run_id: body.run_id })
 }
