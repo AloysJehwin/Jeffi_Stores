@@ -452,9 +452,9 @@ jobs:
               add_dimension_to_product_units.sql
               product_level_units.sql
               drop_legacy_weight_length_columns.sql
+              add_sub_variant_id_to_product_units.sql
               add_sell_unit_id_drop_is_sell_default.sql
               add_unit_columns_to_inventory_transactions.sql
-              add_sub_variant_id_to_product_units.sql
               add_fractional_inventory.sql
               add_default_pc_unit.sql
               add_po_conversion.sql
