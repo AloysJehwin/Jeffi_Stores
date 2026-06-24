@@ -90,25 +90,25 @@ export async function middleware(request: NextRequest) {
       return addSecurityHeaders(NextResponse.next())
     }
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/forms${slug}`, request.url))
+    return NextResponse.rewrite(new URL(`/forms${slug}${request.nextUrl.search}`, request.url))
   }
 
   if (hostname.startsWith('quotation.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/quotation${slug}`, request.url))
+    return NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url))
   }
 
   if (hostname.startsWith('invoice.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/invoice${slug}`, request.url))
+    return NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url))
   }
 
   if (hostname.startsWith('purchaseorder.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/purchaseorder${slug}`, request.url))
+    return NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url))
   }
 
   if (hostname.startsWith('business.')) {
@@ -135,7 +135,7 @@ export async function middleware(request: NextRequest) {
       }
     }
     const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(NextResponse.rewrite(new URL(`/business${slug}`, request.url)))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/business${slug}${request.nextUrl.search}`, request.url)))
   }
 
   // Business portal auth — applies to /business/* paths (not subdomain, not API, not public pages)
@@ -198,6 +198,7 @@ export async function middleware(request: NextRequest) {
       // Rewrite subdomain root paths to /admin/* (same pattern as business subdomain)
       // e.g. admin.jeffistores.in/dashboard → served from /admin/dashboard
       const slug = pathname === '/' ? '' : pathname
+      const search = request.nextUrl.search
 
       // Auth check before rewrite so server components receive x-user-id etc.
       const isAdminLogin = pathname === '/login'
@@ -212,7 +213,7 @@ export async function middleware(request: NextRequest) {
           res.cookies.delete('admin_token')
           return res
         }
-        const rewriteUrl = new URL(`/admin${slug}`, request.url)
+        const rewriteUrl = new URL(`/admin${slug}${search}`, request.url)
         const response = NextResponse.rewrite(rewriteUrl)
         response.headers.set('x-pathname', `/admin${slug}`)
         response.headers.set('x-user-id', payload.adminId)
@@ -221,7 +222,7 @@ export async function middleware(request: NextRequest) {
         response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
         return addSecurityHeaders(response)
       }
-      return addSecurityHeaders(NextResponse.rewrite(new URL(`/admin${slug}`, request.url)))
+      return addSecurityHeaders(NextResponse.rewrite(new URL(`/admin${slug}${search}`, request.url)))
     }
   }
 
