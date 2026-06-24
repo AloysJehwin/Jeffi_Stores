@@ -1,15 +1,15 @@
 import { queryMany } from '@/lib/db'
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import ReviewFormForm from '../ReviewFormForm'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 
 interface Coupon { id: string; code: string; description: string | null }
 
 export default async function AddReviewFormPage() {
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const coupons = await queryMany<Coupon>('SELECT id, code, description FROM coupons WHERE is_active = true ORDER BY code')
 
   return (

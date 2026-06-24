@@ -1,12 +1,13 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { cookies, headers } from 'next/headers'
+import { cookies} from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { redirect } from 'next/navigation'
 import { queryMany } from '@/lib/db'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 const PAGE_SIZE = 25
 
@@ -27,8 +28,7 @@ interface BusinessCustomer {
 async function getBusinessCustomers({
   status,
   search,
-  page,
-}: {
+  page }: {
   status?: string
   search?: string
   page: number
@@ -74,18 +74,16 @@ async function getBusinessCustomers({
 const STATUS_STYLES: Record<string, string> = {
   pending: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
   approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-}
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }
 
 export default async function BusinessCustomersPage({
-  searchParams,
-}: {
+  searchParams }: {
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
   const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
   if (!session || !hasScope(session.role, session.scopes || [], 'business_customers:read')) redirect(ap('/admin/dashboard', host))
@@ -94,8 +92,7 @@ export default async function BusinessCustomersPage({
   const { customers, total } = await getBusinessCustomers({
     status: resolvedSearchParams.status,
     search: resolvedSearchParams.search,
-    page,
-  })
+    page })
   const totalPages = Math.ceil(total / PAGE_SIZE)
 
   const buildUrl = (p: number, extra: Record<string, string> = {}) => {

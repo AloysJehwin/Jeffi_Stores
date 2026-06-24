@@ -3,7 +3,8 @@ import { headers } from 'next/headers'
 import { bp } from '@/lib/business-path'
 
 export default async function BusinessAboutPage() {
-  const host = (await headers()).get('host') ?? ''
+  const hdrs = await headers()
+  const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
   return (
     <div className="bg-surface">
       <div className="bg-surface-elevated border-b border-border-default">

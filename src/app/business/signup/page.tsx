@@ -245,7 +245,13 @@ function BusinessSignUpPage() {
         })
       }
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Signup failed')
+      if (!res.ok) {
+        if (res.status === 400 && data.error?.includes('already exists')) {
+          router.push(`${bp('/business/signin')}?email=${encodeURIComponent(email)}&notice=already_registered`)
+          return
+        }
+        throw new Error(data.error || 'Signup failed')
+      }
       router.push(bp('/business/pending'))
     } catch (err: any) {
       setError(err.message)

@@ -73,7 +73,8 @@ export default async function BusinessCategoryDetailPage({
     notFound()
   }
 
-  const host = (await headers()).get('host') ?? ''
+  const hdrs = await headers()
+  const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
 
   const pageParam = typeof resolvedSearchParams.page === 'string' ? resolvedSearchParams.page : '1'
   const page = Math.max(1, parseInt(pageParam, 10) || 1)

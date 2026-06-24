@@ -12,7 +12,8 @@ export const metadata = {
 }
 
 export default async function BusinessLandingPage() {
-  const host = (await headers()).get('host') ?? ''
+  const hdrs = await headers()
+  const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
   const token = (await cookies()).get('business_auth_token')?.value
   let authState: 'guest' | 'pending' | 'approved' | 'rejected' = 'guest'
   if (token) {

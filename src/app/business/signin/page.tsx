@@ -49,6 +49,12 @@ function BusinessSignInPage() {
   const [phoneRequiresPolicy, setPhoneRequiresPolicy] = useState(false)
 
   const rejectedParam = searchParams.get('rejected')
+  const noticeParam = searchParams.get('notice')
+
+  useEffect(() => {
+    const emailParam = searchParams.get('email')
+    if (emailParam) setEmail(decodeURIComponent(emailParam))
+  }, [])
 
   useEffect(() => {
     if (resendCooldown <= 0) return
@@ -284,6 +290,12 @@ function BusinessSignInPage() {
           {rejectedParam && (
             <div className="mb-5 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
               Your business account application was not approved. Please contact support.
+            </div>
+          )}
+
+          {noticeParam === 'already_registered' && (
+            <div className="mb-5 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300 px-4 py-3 rounded-lg text-sm">
+              You already have a business account. Please sign in below.
             </div>
           )}
 

@@ -24,7 +24,8 @@ async function getCategoryProductCounts() {
 }
 
 export default async function BusinessCategoriesPage() {
-  const host = (await headers()).get('host') ?? ''
+  const hdrs = await headers()
+  const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
   const categories = await getAllCategories()
   const productCounts = await getCategoryProductCounts()
 

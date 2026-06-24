@@ -1,12 +1,13 @@
 export const dynamic = 'force-dynamic'
 
 import Link from 'next/link'
-import { cookies, headers } from 'next/headers'
+import { cookies} from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { redirect } from 'next/navigation'
 import { queryMany } from '@/lib/db'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 const PAGE_SIZE = 25
 
@@ -29,8 +30,7 @@ const STATUS_STYLES: Record<string, string> = {
   negotiating: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
   offer_accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400',
   converted: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-}
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }
 
 const STATUS_LABELS: Record<string, string> = {
   all: 'All',
@@ -39,18 +39,16 @@ const STATUS_LABELS: Record<string, string> = {
   negotiating: 'Negotiating',
   offer_accepted: 'Offer Accepted',
   converted: 'Converted',
-  rejected: 'Rejected',
-}
+  rejected: 'Rejected' }
 
 export default async function BusinessRFQsPage({
-  searchParams,
-}: {
+  searchParams }: {
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
   const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)
   if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs:read')) redirect(ap('/admin/dashboard', host))

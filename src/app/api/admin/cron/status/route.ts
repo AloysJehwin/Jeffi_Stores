@@ -39,7 +39,12 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    return NextResponse.json({ jobs })
+    const SYSTEM_JOBS = [
+      { id: 'certbot_renew', name: 'SSL cert renewal', schedule: '0 3 * * *', intervalLabel: 'daily at 03:00', description: 'certbot renew + restart jeffi-nginx', type: 'system' as const },
+      { id: 'backup_rds', name: 'RDS database backup', schedule: '30 20 * * *', intervalLabel: 'daily at 20:30', description: '/home/ec2-user/backup-rds.sh', type: 'system' as const },
+    ]
+
+    return NextResponse.json({ jobs, systemJobs: SYSTEM_JOBS })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

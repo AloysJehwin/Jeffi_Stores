@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/db'
 import Link from 'next/link'
@@ -34,12 +34,12 @@ async function createCoupon(formData: FormData) {
   }
   revalidatePath('/admin/coupons')
   
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   redirect(ap('/admin/coupons', host))
 }
 
 export default async function AddCouponPage() {
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">

@@ -1,11 +1,12 @@
-import { cookies, headers } from 'next/headers'
+import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export async function requireAuth() {
   const cookieStore = await cookies()
   const session = cookieStore.get('admin_session')
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
 
   if (!session) {
     redirect(ap('/admin/login', host))

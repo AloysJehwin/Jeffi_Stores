@@ -361,6 +361,13 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     group: 'Settings',
   },
   {
+    key: 'audit:write',
+    label: 'Audit Log (Write)',
+    description: 'Post audit log entries from service accounts and automated systems',
+    routes: ['/admin/audit'],
+    group: 'Settings',
+  },
+  {
     key: 'replication:read',
     label: 'Replication (Read)',
     description: 'View nightly RDS→Razer ML-replica replication history',
