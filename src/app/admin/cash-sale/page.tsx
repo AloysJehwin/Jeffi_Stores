@@ -1,14 +1,15 @@
-import { cookies, headers } from 'next/headers'
+import { cookies} from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import CashSaleClient from './CashSaleClient'
 
 export const metadata = { title: 'Cash Sale — Jeffi Admin' }
 
 export default async function CashSalePage() {
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
   if (!token) redirect(ap('/admin/login', host))

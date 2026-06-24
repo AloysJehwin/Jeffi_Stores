@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { query } from '@/lib/db'
 import BrandForm from '@/components/admin/BrandForm'
@@ -32,8 +32,8 @@ async function createBrand(formData: FormData) {
     revalidatePath('/admin/products/edit/[id]', 'page')
 
     
-    const host = (await headers()).get('host') ?? ''
-    redirect(ap('/admin/brands', host))
+    const host = await getHost()
+  redirect(ap('/admin/brands', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error('Failed to create brand')
@@ -41,7 +41,7 @@ async function createBrand(formData: FormData) {
 }
 
 export default async function AddBrandPage() {
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">

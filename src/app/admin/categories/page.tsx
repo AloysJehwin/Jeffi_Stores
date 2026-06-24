@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { getFilteredCategories } from '@/lib/queries'
 import { queryMany } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
@@ -9,11 +9,10 @@ import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBan
 
 export default async function CategoriesPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const [categories, productCountRows, misassignedRows] = await Promise.all([
     getFilteredCategories({
-      is_active: resolvedSearchParams.is_active,
-    }),
+      is_active: resolvedSearchParams.is_active }),
     queryMany<{ category_id: string; count: string }>(
       'SELECT category_id, COUNT(*) as count FROM products WHERE is_active = true GROUP BY category_id'
     ),
@@ -80,16 +79,14 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
             options: [
               { value: 'true', label: 'Active' },
               { value: 'false', label: 'Inactive' },
-            ],
-          },
+            ] },
           {
             name: 'type',
             label: 'Type',
             options: [
               { value: 'main', label: 'Main Categories' },
               { value: 'sub', label: 'Subcategories' },
-            ],
-          },
+            ] },
         ]}
         searchPlaceholder="Search by name..."
         suggestType="categories"

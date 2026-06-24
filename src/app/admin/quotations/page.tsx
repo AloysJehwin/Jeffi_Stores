@@ -1,18 +1,18 @@
-import { cookies, headers } from 'next/headers'
+import { cookies} from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import QuotationsClient from './QuotationsClient'
 
 export const metadata = {
-  title: 'Quotations — Jeffi Admin',
-}
+  title: 'Quotations — Jeffi Admin' }
 
 export default async function QuotationsPage() {
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null

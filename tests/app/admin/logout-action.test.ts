@@ -3,15 +3,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ---------------------------------------------------------------------------
 // Mocks — vi.hoisted() ensures variables are defined before vi.mock() factories
 // ---------------------------------------------------------------------------
-const { mockDelete, mockCookies, mockGet, mockHeaders, mockRedirect, mockAp } =
+const { mockDelete, mockCookies, mockGetHost, mockRedirect, mockAp } =
   vi.hoisted(() => {
     const mockDelete = vi.fn()
-    const mockGet = vi.fn()
     return {
       mockDelete,
       mockCookies: vi.fn().mockReturnValue({ delete: mockDelete }),
-      mockGet,
-      mockHeaders: vi.fn().mockResolvedValue({ get: mockGet }),
+      mockGetHost: vi.fn().mockResolvedValue(''),
       mockRedirect: vi.fn(),
       mockAp: vi.fn(),
     }
@@ -19,7 +17,10 @@ const { mockDelete, mockCookies, mockGet, mockHeaders, mockRedirect, mockAp } =
 
 vi.mock('next/headers', () => ({
   cookies: mockCookies,
-  headers: mockHeaders,
+}))
+
+vi.mock('@/lib/get-host', () => ({
+  getHost: mockGetHost,
 }))
 
 vi.mock('next/navigation', () => ({
@@ -35,7 +36,7 @@ import { logoutAction } from '@/app/admin/logout-action'
 describe('logoutAction', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockGet.mockReturnValue(null)
+    mockGetHost.mockResolvedValue('')
     mockAp.mockReturnValue('/admin/login')
   })
 
@@ -49,14 +50,14 @@ describe('logoutAction', () => {
     expect(mockDelete).toHaveBeenCalledWith('admin_session')
   })
 
-  it('reads the host header', async () => {
-    mockGet.mockReturnValue('admin.jeffistores.in')
+  it('calls getHost()', async () => {
+    mockGetHost.mockResolvedValue('admin.jeffistores.in')
     await logoutAction()
-    expect(mockGet).toHaveBeenCalledWith('host')
+    expect(mockGetHost).toHaveBeenCalled()
   })
 
   it('calls ap() with /admin/login and the host', async () => {
-    mockGet.mockReturnValue('admin.jeffistores.in')
+    mockGetHost.mockResolvedValue('admin.jeffistores.in')
     mockAp.mockReturnValue('/login')
     await logoutAction()
     expect(mockAp).toHaveBeenCalledWith('/admin/login', 'admin.jeffistores.in')
@@ -68,8 +69,8 @@ describe('logoutAction', () => {
     expect(mockRedirect).toHaveBeenCalledWith('/login')
   })
 
-  it('passes empty string host when host header is null', async () => {
-    mockGet.mockReturnValue(null)
+  it('passes empty string host when getHost returns empty', async () => {
+    mockGetHost.mockResolvedValue('')
     await logoutAction()
     expect(mockAp).toHaveBeenCalledWith('/admin/login', '')
   })

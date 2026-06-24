@@ -209,7 +209,8 @@ export default async function ProductsPage({
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const hdrs = await headers()
+  const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
   const { products, total, page, totalPages } = await getProducts(resolvedSearchParams)
   const categories = await getCategories()
   const brands = await getBrands()

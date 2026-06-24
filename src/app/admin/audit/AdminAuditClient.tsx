@@ -118,6 +118,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
   }
 
   const [cronJobs, setCronJobs] = useState<CronJob[]>([])
+  const [systemJobs, setSystemJobs] = useState<{ id: string; name: string; schedule: string; intervalLabel: string; description: string; type: 'system' }[]>([])
   const [cronLoading, setCronLoading] = useState(false)
   const [cronTogglingId, setCronTogglingId] = useState<string | null>(null)
   const [cronTriggeringId, setCronTriggeringId] = useState<string | null>(null)
@@ -256,6 +257,7 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
       if (res.ok) {
         const data = await res.json()
         setCronJobs(data.jobs || [])
+        setSystemJobs(data.systemJobs || [])
       }
     } finally {
       setCronLoading(false)
@@ -848,6 +850,26 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                 </div>
                   )
                 })}
+              {systemJobs.length > 0 && (
+                <>
+                  <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide pt-2">EC2 System Jobs</p>
+                  {systemJobs.map(job => (
+                    <div key={job.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+                      <div className="p-4 flex flex-col sm:flex-row sm:items-center gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-sm font-semibold text-foreground">{job.name}</span>
+                            <span className="text-[10px] font-mono text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">{job.intervalLabel}</span>
+                            <span className="text-[10px] text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">system</span>
+                          </div>
+                          <p className="text-[11px] text-foreground-muted mt-0.5 font-mono">{job.description}</p>
+                          <p className="text-[11px] text-foreground-muted mt-0.5 font-mono">{job.schedule}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>

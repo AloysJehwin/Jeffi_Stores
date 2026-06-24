@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { queryMany, queryCount } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
@@ -21,8 +21,7 @@ const COUPON_SORT_COLS: Record<string, string> = {
   min_purchase: 'min_purchase_amount',
   usage: 'times_used',
   valid_until: 'valid_until',
-  status: 'is_active',
-}
+  status: 'is_active' }
 
 async function getFilteredCoupons(filters: { is_active?: string; search?: string; campaign?: string; page?: number; sort?: string; dir?: string }) {
   const conditions: string[] = []
@@ -63,7 +62,7 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
 
 export default async function CouponsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined

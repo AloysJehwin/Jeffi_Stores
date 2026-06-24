@@ -1,9 +1,9 @@
 import { notFound } from 'next/navigation'
 import { queryOne, queryMany } from '@/lib/db'
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import ReviewFormForm from '../../ReviewFormForm'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +17,7 @@ interface Coupon { id: string; code: string; description: string | null }
 
 export default async function EditReviewFormPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const [form, coupons] = await Promise.all([
     queryOne<ReviewForm>('SELECT * FROM review_forms WHERE id = $1', [id]),
     queryMany<Coupon>('SELECT id, code, description FROM coupons WHERE is_active = true ORDER BY code'),
@@ -45,8 +45,7 @@ export default async function EditReviewFormPage({ params }: { params: Promise<{
           coupon_id: form.coupon_id,
           description: form.description,
           is_active: form.is_active,
-          custom_fields: form.custom_fields || [],
-        }}
+          custom_fields: form.custom_fields || [] }}
       />
     </div>
   )

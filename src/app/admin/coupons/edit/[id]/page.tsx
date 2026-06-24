@@ -1,6 +1,6 @@
 import { redirect, notFound } from 'next/navigation'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { query, queryOne, queryMany, queryCount } from '@/lib/db'
 import Link from 'next/link'
@@ -38,8 +38,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
   const coupon = await queryOne<Coupon>('SELECT * FROM coupons WHERE id = $1', [id])
   if (!coupon) notFound()
 
-  const host = (await headers()).get('host') ?? ''
-
+  const host = await getHost()
   const USERS_PAGE_SIZE = 10
   const usersPage = Math.max(1, parseInt(resolvedSearchParams.usersPage || '1', 10))
   const usersOffset = (usersPage - 1) * USERS_PAGE_SIZE
@@ -137,8 +136,8 @@ export default async function EditCouponPage({ params, searchParams }: { params:
     }
     revalidatePath('/admin/coupons')
     
-    const host = (await headers()).get('host') ?? ''
-    redirect(ap('/admin/coupons', host))
+    const host = await getHost()
+  redirect(ap('/admin/coupons', host))
   }
 
   return (
@@ -167,8 +166,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
           valid_from: toDatetimeLocal(coupon.valid_from),
           valid_until: toDatetimeLocal(coupon.valid_until),
           description: coupon.description,
-          is_active: coupon.is_active,
-        }}
+          is_active: coupon.is_active }}
       />
 
       {/* Eligible Users */}

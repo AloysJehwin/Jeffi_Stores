@@ -1,6 +1,6 @@
 import Link from 'next/link'
-import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
+import { getHost } from '@/lib/get-host'
 import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
@@ -17,7 +17,7 @@ const PAGE_SIZE = 25
 
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
-  const host = (await headers()).get('host') ?? ''
+  const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
@@ -32,8 +32,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       page,
       limit: PAGE_SIZE,
       sort,
-      dir,
-    }),
+      dir }),
     getAllCategories(),
     getAllBrands(),
     getFilteredProducts({}),
