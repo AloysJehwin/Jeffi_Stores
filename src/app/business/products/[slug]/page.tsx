@@ -302,7 +302,8 @@ export default async function ProductDetailPage({
     notFound()
   }
 
-  const host = (await headers()).get('host') ?? ''
+  const hdrs = await headers()
+  const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
 
   const relatedProducts = await getRelatedProducts(product.id, product.category_id, product.name)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
