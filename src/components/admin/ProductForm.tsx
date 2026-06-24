@@ -2289,6 +2289,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                 )}
               </div>
 
+              {variantPopupId && variantPopupId.startsWith('temp-') && (
+                <div className="px-5 pb-4 border-t border-border-default pt-4 mt-0">
+                  <p className="text-xs text-foreground-muted italic">Save the product first to configure selling units for this variant.</p>
+                </div>
+              )}
               {productId && variantPopupId && !variantPopupId.startsWith('temp-') && (
                 <div className="px-5 pb-4">
                   <UnitsManager

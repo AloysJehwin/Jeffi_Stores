@@ -10,13 +10,6 @@ import AddressFormModal from '@/components/visitor/AddressFormModal'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 
-function UnitLabel({ label }: { label: string | null | undefined }) {
-  if (!label) return null
-  const match = label.match(/^(.+?)2$/)
-  if (match) return <>{match[1]}<sup>2</sup></>
-  return <>{label}</>
-}
-
 export default function CheckoutReviewPageWrapper() {
   return (
     <Suspense>
@@ -82,7 +75,6 @@ function CheckoutReviewPage() {
     gstPercentage: number | null
     brandName: string | null
     imageUrl: string | null
-    businessDiscount: number
   } | null>(null)
 
   useEffect(() => {
@@ -141,7 +133,6 @@ function CheckoutReviewPage() {
             gstPercentage: d.gstPercentage != null ? Number(d.gstPercentage) : null,
             brandName: d.brandName || null,
             imageUrl: null,
-            businessDiscount: Number(d.businessDiscount) || 0,
           })
           const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
           fetch(imageUrl, { credentials: 'include' })
@@ -183,7 +174,6 @@ function CheckoutReviewPage() {
         gstPercentage: null,
         brandName: null,
         imageUrl: null,
-        businessDiscount: 0,
       })
 
       fetch(`/api/products/${productId}/primary-image`, { credentials: 'include' })
@@ -310,8 +300,7 @@ function CheckoutReviewPage() {
       .catch(() => {})
   }, [searchParams, cartSubtotal])
 
-  const buyNowBusinessDiscount = buyNowItem?.businessDiscount ?? 0
-  const finalTotal = Math.max(0, cartSubtotal - discountAmount - buyNowBusinessDiscount + (shippingCharge ?? 0))
+  const finalTotal = Math.max(0, cartSubtotal - discountAmount + (shippingCharge ?? 0))
 
   const handleProceedToCheckout = () => {
     if (!selectedAddress) {
@@ -491,15 +480,8 @@ function CheckoutReviewPage() {
                         )}
                       </div>
                       <div className="flex items-center justify-between mt-2">
-                        {(() => {
-                          const isBuyNowFractional = (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') || !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
-                          const effectiveBuyNowQty = isBuyNowFractional ? buyNowItem.qty : Math.round(buyNowItem.qty)
-                          const buyNowTotal = buyNowItem.price * effectiveBuyNowQty
-                          const displayUnit = buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit' ? buyNowItem.buyUnit : (buyNowItem.buyMode !== 'unit' ? buyNowItem.buyMode : null)
-                          return (
-                          <>
                         <p className="text-sm text-foreground-secondary">
-                          ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {isBuyNowFractional ? <>{Number(Number(buyNowItem.qty).toFixed(6)).toString()}{displayUnit ? <> <UnitLabel label={displayUnit} /></> : ''}</> : effectiveBuyNowQty}
+                          ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {buyNowItem.buyMode === 'weight' || buyNowItem.buyMode === 'length' ? `${buyNowItem.qty.toFixed(3)} ${buyNowItem.buyUnit ?? ''}` : Math.round(buyNowItem.qty)}
                           {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
                             <>
                               {' '}<span className="line-through text-foreground-muted">₹{buyNowItem.mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -508,15 +490,11 @@ function CheckoutReviewPage() {
                           )}
                         </p>
                         <p className="text-sm font-semibold text-foreground">
-                          ₹{buyNowTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          ₹{(buyNowItem.price * buyNowItem.qty).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
-                          </>
-                          )
-                        })()}
                       </div>
                       {buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
-                        const isBuyNowFractional2 = (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') || !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
-                        const lineTotal = buyNowItem.price * (isBuyNowFractional2 ? buyNowItem.qty : Math.round(buyNowItem.qty))
+                        const lineTotal = buyNowItem.price * buyNowItem.qty
                         const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
                         return (
                           <p className="text-[11px] text-foreground-muted mt-0.5">
@@ -529,14 +507,13 @@ function CheckoutReviewPage() {
                 ) : (
                   cartItems.map((item) => {
                     const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
-                    const isFractional = item.buy_mode && item.buy_mode !== 'unit'
-                    const price = isFractional ? item.price_at_addition : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-                    const effectiveQty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
-                    const itemTotal = price * effectiveQty
+                    const price = item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price
+                    const itemTotal = price * item.quantity
                     const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
                     const showMrp = mrp !== null && Number(mrp) > Number(price)
                     const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
                     const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
+                    const stockQty = item.sub_variant?.stock_quantity ?? item.variant?.stock_quantity ?? item.products.stock_quantity
                     const gstRate = Number(item.products.gst_percentage || 0)
                     const itemGst = gstRate > 0 ? itemTotal - (itemTotal / (1 + gstRate / 100)) : 0
 
@@ -577,7 +554,7 @@ function CheckoutReviewPage() {
                           </div>
                           <div className="flex items-center justify-between mt-2">
                             <p className="text-sm text-foreground-secondary">
-                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {isFractional ? <>{Number(Number(item.quantity).toFixed(6)).toString()}{item.buy_unit && item.buy_unit !== 'unit' ? <> <UnitLabel label={item.buy_unit} /></> : ''}</> : effectiveQty}
+                              ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {(item.cart_item_unit?.dimension === 'length' || item.cart_item_unit?.dimension === 'weight' || item.cart_item_unit?.dimension === 'area' || item.cart_item_unit?.dimension === 'volume') ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}
                               {showMrp && (
                                 <>
                                   {' '}<span className="line-through text-foreground-muted">₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -593,6 +570,9 @@ function CheckoutReviewPage() {
                             <p className="text-[11px] text-foreground-muted mt-0.5">
                               incl. ₹{itemGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })} GST @ {gstRate}%
                             </p>
+                          )}
+                          {stockQty < Number(item.quantity) && (
+                            <p className="text-xs text-red-600 dark:text-red-400 mt-1">Only {stockQty} left in stock</p>
                           )}
                         </div>
                       </div>
@@ -661,12 +641,6 @@ function CheckoutReviewPage() {
                   <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                     <span>Coupon ({appliedCoupon.code})</span>
                     <span>−₹{appliedCoupon.discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                )}
-                {buyNowBusinessDiscount > 0 && (
-                  <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
-                    <span>Business Discount</span>
-                    <span>−₹{buyNowBusinessDiscount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-foreground-secondary">

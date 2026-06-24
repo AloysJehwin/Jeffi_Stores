@@ -85,7 +85,10 @@ export async function GET(request: NextRequest) {
              'display_label', pu.display_label,
              'factor', pu.factor,
              'is_base', pu.is_base,
-             'dimension', pu.dimension
+             'dimension', pu.dimension,
+             'min_qty', pu.min_qty,
+             'max_qty', pu.max_qty,
+             'qty_step', pu.qty_step
            )
            FROM product_units pu
            WHERE pu.product_id = ci.product_id
@@ -169,14 +172,13 @@ export async function POST(request: NextRequest) {
       priceAtAddition = product.price_ex_gst || product.base_price
     }
 
-    // Apply unit factor: if buying by a non-base unit (e.g. 'm' when base is 'pc'),
-    // multiply price by the unit's factor so the stored price is per-selected-unit.
-    if (buyMode && buyMode !== 'unit') {
+    // Apply unit factor: multiply price by the unit's factor so stored price is per-selected-unit.
+    if (buyMode) {
       const effectiveVariantId = variantId || null
       const effectiveSubVariantId = subVariantId || null
       // Prefer sub-variant-level unit, then variant-level, then product-level
-      const unitRow = await queryOne<{ factor: string | number; is_base: boolean }>(
-        `SELECT factor, is_base FROM product_units
+      const unitRow = await queryOne<{ factor: string | number; is_base: boolean; dimension: string; min_qty: string | number | null; max_qty: string | number | null; qty_step: string | number | null }>(
+        `SELECT factor, is_base, dimension, min_qty, max_qty, qty_step FROM product_units
          WHERE product_id = $1 AND unit = $2
            AND (
              ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
@@ -193,7 +195,36 @@ export async function POST(request: NextRequest) {
         [productId, buyMode, effectiveVariantId, effectiveSubVariantId]
       )
       if (unitRow) {
-        priceAtAddition = Math.round(priceAtAddition * Number(unitRow.factor) * 100) / 100
+        const minQty = unitRow.min_qty != null ? Number(unitRow.min_qty) : 1
+        const maxQty = unitRow.max_qty != null ? Number(unitRow.max_qty) : null
+        const isContinuous = ['length', 'weight', 'area', 'volume'].includes(unitRow.dimension)
+
+        if (isContinuous) {
+          const step = unitRow.qty_step != null ? Number(unitRow.qty_step) : 0.001
+          if (quantity < minQty) {
+            return NextResponse.json({ error: `Minimum quantity for this unit is ${minQty}` }, { status: 400 })
+          }
+          if (maxQty !== null && quantity > maxQty) {
+            return NextResponse.json({ error: `Maximum quantity for this unit is ${maxQty}` }, { status: 400 })
+          }
+          // Round to nearest valid step
+          const rounded = Math.round(quantity / step) * step
+          if (Math.abs(rounded - quantity) > 1e-9) {
+            return NextResponse.json({ error: `Quantity must be a multiple of ${step} for this unit` }, { status: 400 })
+          }
+        } else {
+          const qtyInt = Math.round(quantity)
+          if (qtyInt < minQty) {
+            return NextResponse.json({ error: `Minimum quantity for this unit is ${minQty}` }, { status: 400 })
+          }
+          if (maxQty !== null && qtyInt > maxQty) {
+            return NextResponse.json({ error: `Maximum quantity for this unit is ${maxQty}` }, { status: 400 })
+          }
+        }
+
+        if (Number(unitRow.factor) !== 1) {
+          priceAtAddition = Math.round(priceAtAddition * Number(unitRow.factor) * 100) / 100
+        }
       }
     }
 
@@ -265,6 +296,34 @@ export async function PATCH(request: NextRequest) {
     }
 
     if (typeof quantity === 'number') {
+      if (quantity > 0) {
+        const unitRow2 = await queryOne<{ dimension: string; min_qty: string | number | null; max_qty: string | number | null; qty_step: string | number | null }>(
+          `SELECT pu.dimension, pu.min_qty, pu.max_qty, pu.qty_step
+           FROM cart_items ci
+           JOIN product_units pu ON pu.product_id = ci.product_id AND pu.unit = ci.buy_mode
+             AND (pu.variant_id = ci.variant_id OR (pu.variant_id IS NULL AND NOT EXISTS (
+               SELECT 1 FROM product_units pu2 WHERE pu2.product_id = ci.product_id AND pu2.unit = ci.buy_mode AND pu2.variant_id = ci.variant_id
+             )))
+           WHERE ci.id = $1
+           ORDER BY pu.variant_id NULLS LAST LIMIT 1`,
+          [cartItemId]
+        )
+        if (unitRow2) {
+          const minQty2 = unitRow2.min_qty != null ? Number(unitRow2.min_qty) : 1
+          const maxQty2 = unitRow2.max_qty != null ? Number(unitRow2.max_qty) : null
+          const isContinuous2 = ['length', 'weight', 'area', 'volume'].includes(unitRow2.dimension)
+          if (isContinuous2) {
+            const step2 = unitRow2.qty_step != null ? Number(unitRow2.qty_step) : 0.001
+            if (quantity < minQty2) return NextResponse.json({ error: `Minimum quantity is ${minQty2}` }, { status: 400 })
+            if (maxQty2 !== null && quantity > maxQty2) return NextResponse.json({ error: `Maximum quantity is ${maxQty2}` }, { status: 400 })
+            const rounded2 = Math.round(quantity / step2) * step2
+            if (Math.abs(rounded2 - quantity) > 1e-9) return NextResponse.json({ error: `Quantity must be a multiple of ${step2}` }, { status: 400 })
+          } else {
+            if (quantity < minQty2) return NextResponse.json({ error: `Minimum quantity is ${minQty2}` }, { status: 400 })
+            if (maxQty2 !== null && quantity > maxQty2) return NextResponse.json({ error: `Maximum quantity is ${maxQty2}` }, { status: 400 })
+          }
+        }
+      }
       await query('UPDATE cart_items SET quantity = $1, updated_at = NOW() WHERE id = $2', [quantity, cartItemId])
       return NextResponse.json({ message: 'Cart updated' })
     }
