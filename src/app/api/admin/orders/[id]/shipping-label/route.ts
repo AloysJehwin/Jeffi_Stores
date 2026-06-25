@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -31,7 +32,7 @@ async function build4RPDF(pkg: any, awb: string, orderRow: any): Promise<Buffer>
   const invoiceNo: string = pkg.oid || pkg.order || orderRow.order_number || ''
   const productDesc: string = pkg.prd || 'Hardware / Fasteners'
   const codAmount: number = parseFloat(pkg.cod || '0')
-  const totalAmount: string = pkg.total_amount || pkg.amount || (codAmount > 0 ? codAmount.toFixed(2) : String(Math.round(Number(orderRow.total_amount) * 100) / 100))
+  const totalAmount: string = pkg.total_amount || pkg.amount || (codAmount > 0 ? codAmount.toFixed(2) : String(round2(Number(orderRow.total_amount))))
   const now = new Date()
   const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }).replace(/ /g, '-')
     + ' | ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })

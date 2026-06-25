@@ -399,13 +399,13 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             onChange={e => setAiPrompt(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && generateWithAI()}
             placeholder="Describe changes you want to the email…"
-            className="flex-1 px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="field-normal flex-1 border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           />
           <button
             type="button"
             onClick={generateWithAI}
             disabled={aiGenerating || !aiPrompt.trim()}
-            className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
+            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
           >
             {aiGenerating ? 'Generating…' : 'Generate'}
           </button>
@@ -442,7 +442,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               max={720}
               value={form.delay_hours}
               onChange={e => setForm({ ...form, delay_hours: parseInt(e.target.value || '0', 10) })}
-              className="w-full px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <p className="text-[10px] text-foreground-muted mt-1">Hours after the trigger before sending</p>
           </div>
@@ -456,7 +456,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               max={100}
               value={form.discount_percent}
               onChange={e => setForm({ ...form, discount_percent: parseInt(e.target.value || '0', 10) })}
-              className="w-full px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <p className="text-[10px] text-foreground-muted mt-1">Auto-generates a unique per-user coupon if no coupon is assigned below</p>
           </div>
@@ -493,7 +493,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               type="text"
               value={form.subject_template}
               onChange={e => setForm({ ...form, subject_template: e.target.value })}
-              className="w-full px-3 py-2.5 pr-8 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="field-normal w-full pr-8 border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
           </AIEnrichButton>
         </div>
@@ -506,7 +506,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             value={form.body_template}
             onChange={e => setForm({ ...form, body_template: e.target.value })}
             rows={10}
-            className="w-full px-3 py-2.5 text-xs font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="field-normal text-xs font-mono w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           />
           <p className="text-[10px] text-foreground-muted mt-1">
             Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>
@@ -518,7 +518,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             type="button"
             onClick={save}
             disabled={saving}
-            className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+            className="px-4 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save changes'}
           </button>
@@ -527,13 +527,13 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             value={testEmail}
             onChange={e => setTestEmail(e.target.value)}
             placeholder="your@email.com for test send"
-            className="flex-1 max-w-xs px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="field-normal flex-1 max-w-xs border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           />
           <button
             type="button"
             onClick={sendTest}
             disabled={testBusy || !testEmail.trim()}
-            className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
           >
             {testBusy ? 'Sending…' : 'Send test'}
           </button>
@@ -661,7 +661,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
                             }
                             setForm({ ...form, parameters: next })
                           }}
-                          className="w-full px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                          className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                         />
                       )}
                       {def.description && (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
 import { z } from 'zod'
@@ -193,9 +194,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               expenseNumber,
               po.supplier_name,
               `GRN ${grnNumber} — PO ${po.po_number}`,
-              Math.round(receivedAmount * 100) / 100,
-              Math.round(receivedTax * 100) / 100,
-              Math.round((receivedAmount + receivedTax) * 100) / 100,
+              round2(receivedAmount),
+              round2(receivedTax),
+              round2(receivedAmount + receivedTax),
               receiveDate,
               id,
               grnId,

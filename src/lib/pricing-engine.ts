@@ -69,7 +69,7 @@ export class PricingError extends Error {
 }
 
 function round2(n: number): number {
-  return Math.round(n * 100) / 100
+  return parseFloat(n.toFixed(2))
 }
 
 export function priceLine(ctx: PricingContext): PricingResult {

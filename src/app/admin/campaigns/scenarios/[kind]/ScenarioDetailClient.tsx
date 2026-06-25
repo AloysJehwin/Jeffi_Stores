@@ -250,7 +250,7 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                                   if (raw === '') setOverrideValue(c.kind, key, null)
                                   else setOverrideValue(c.kind, key, def.type === 'integer' ? parseInt(raw, 10) : parseFloat(raw))
                                 }}
-                                className="w-full px-3 py-2.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                                className="field-normal w-full border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
                               />
                             )}
                             {def.description && <p className="text-[10px] text-foreground-muted mt-1">{def.description}</p>}

@@ -386,8 +386,7 @@ export default function QuotationsClient() {
           const mrpInclGst = Number(i.mrp) || unitPrice
           const rateExGst = mrpInclGst / (1 + gstRate / 100)
           // apply sell unit factor for count-dimension units (rate is per-piece)
-          const su = i.available_units[0] ?? null
-          const factor = (su && su.dimension === 'count' && su.factor > 1) ? su.factor : 1
+          const factor = (i.sell_unit_dimension === 'count' && (i.sell_unit_factor || 1) > 1) ? (i.sell_unit_factor || 1) : 1
           const effectiveQty = (Number(i.quantity) || 0) * factor
           return {
             description: i.product_name,
@@ -1151,12 +1150,12 @@ export default function QuotationsClient() {
         )}
         {!isFinal && (
           <button onClick={() => save('final')} disabled={saving}
-            className="px-5 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+            className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
             {saving ? 'Saving…' : 'Finalise & Save'}
           </button>
         )}
         <button onClick={downloadPDF} disabled={downloading || saving}
-          className="px-5 py-2.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
+          className="px-5 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
           {downloading ? 'Generating…' : 'Download PDF'}
         </button>
       </div>

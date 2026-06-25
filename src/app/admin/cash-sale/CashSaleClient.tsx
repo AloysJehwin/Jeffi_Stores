@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { round2 } from '@/lib/gst'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
@@ -85,7 +86,7 @@ function calcTotals(items: LineItem[]) {
     subtotal += lineEx + lineTax
     totalTax += lineTax
   })
-  return { subtotal: Math.round(subtotal * 100) / 100, tax: Math.round(totalTax * 100) / 100 }
+  return { subtotal: round2(subtotal), tax: round2(totalTax) }
 }
 
 export default function CashSaleClient() {

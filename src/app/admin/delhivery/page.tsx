@@ -291,7 +291,7 @@ export default function DelhiveryPickupPage() {
             <div className="px-6 py-4 border-t border-border-default flex items-center justify-between gap-3">
               <p className="text-sm text-foreground-secondary">{selected.size} of {orders.length} selected</p>
               <button onClick={handleSubmit} disabled={submitting || selected.size === 0}
-                className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center gap-2">
+                className="px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center gap-2">
                 {submitting ? (
                   <>
                     <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
@@ -360,13 +360,14 @@ export default function DelhiveryPickupPage() {
                           {req.pickup_status === 'pending' && orders.length > 0 && (
                             <button
                               onClick={() => { setAddAwbFor(addAwbFor === req.id ? null : req.id); setAddAwbOrderId('') }}
-                              className="px-2 py-0.5 rounded text-xs font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors"
+                              className="px-2 py-1.5 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors"
                             >
                               + Add AWB
                             </button>
                           )}
                           {req.pickup_status !== 'picked_up' && (
                             <AdminSelect
+                              sm
                               value={req.pickup_status}
                               disabled={updatingId === req.id}
                               options={STATUS_OPTIONS}

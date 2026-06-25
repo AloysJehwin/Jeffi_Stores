@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { queryOne } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { parseBody, zNonEmpty, zCurrency } from '@/lib/validate'
+import { round2 } from '@/lib/gst'
 
 const ApplyCouponSchema = z.object({
   code: zNonEmpty,
@@ -110,7 +111,7 @@ export async function POST(request: NextRequest) {
     }
 
     discountAmount = Math.min(discountAmount, orderSubtotal)
-    discountAmount = Math.round(discountAmount * 100) / 100
+    discountAmount = round2(discountAmount)
 
     return NextResponse.json({
       couponId: coupon.id,

@@ -3,6 +3,7 @@ import { authenticateAnyUser } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { loadActiveCart } from '@/lib/order-commit'
+import { round2 } from '@/lib/gst'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,5 +48,5 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ businessDiscountAmount: Math.round(businessDiscountAmount * 100) / 100 })
+  return NextResponse.json({ businessDiscountAmount: round2(businessDiscountAmount) })
 }

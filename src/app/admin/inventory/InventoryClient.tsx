@@ -21,10 +21,10 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'stock', label: 'Stock Ledger' },
 ]
 
-const inputCls = 'w-full px-3 py-2.5 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
+const inputCls = 'w-full px-3 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
-const btnPrimary = 'px-4 py-2.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
-const btnSecondary = 'px-4 py-2.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors'
+const btnPrimary = 'px-4 py-1.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
+const btnSecondary = 'px-4 py-1.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors'
 
 const PAGE_SIZE = 20
 const STOCK_PAGE_SIZE = 50
@@ -472,7 +472,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     <td className="px-4 py-3 text-right align-top">
                       <div className="inline-flex flex-col items-end gap-1">
                         <div className="flex items-center gap-1.5">
-                          <input type="number" min="0" step="0.001" className="w-24 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
+                          <input type="number" min="0" step="0.001" className="w-24 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
                             onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_qty: e.target.value } : r))} />
                           {puLabel && <span className="text-xs text-foreground-muted">{puLabel}</span>}
                         </div>
@@ -484,7 +484,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right align-top">
-                      <input type="number" min="0" step="0.01" className="w-28 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_cost}
+                      <input type="number" min="0" step="0.01" className="w-28 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_cost}
                         onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_cost: e.target.value } : r))} />
                     </td>
                   </tr>
@@ -1347,7 +1347,7 @@ function StockTab() {
                                     value={editQty}
                                     onChange={e => setEditQty(e.target.value)}
                                     onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
-                                    className="w-20 px-2 py-1 rounded border border-secondary-500 bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 text-right"
+                                    className="field-xs w-20 border border-secondary-500 bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500 text-right"
                                   />
                                   {(() => {
                                     const u = editUnits.find(u => u.id === editUnitId)
@@ -1386,13 +1386,13 @@ function StockTab() {
                                       value={editNotes}
                                       onChange={e => setEditNotes(e.target.value)}
                                       onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
-                                      className="hidden lg:block w-32 px-2 py-1 rounded border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500"
+                                      className="hidden lg:block field-xs w-32 border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500"
                                     />
                                     <button
                                       onClick={() => saveEdit(p)}
                                       disabled={editSaving || editQty === ''}
                                       title="Save"
-                                      className="px-2 py-1 rounded text-xs font-medium bg-secondary-500 hover:bg-secondary-600 text-white disabled:opacity-50 transition-colors"
+                                      className="field-xs font-medium bg-secondary-500 hover:bg-secondary-600 text-white disabled:opacity-50 transition-colors"
                                     >
                                       {editSaving ? '…' : 'Save'}
                                     </button>

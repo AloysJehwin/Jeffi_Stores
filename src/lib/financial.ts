@@ -1,5 +1,6 @@
 import { queryOne, queryMany } from './db'
 import { buildSearchClause, buildVectorSearchClause } from './search'
+import { round2 } from './gst'
 
 export interface ReceivableRow {
   order_id: string
@@ -377,7 +378,7 @@ export async function getPLReport(from: string, to: string): Promise<{ monthly: 
     row.net_revenue = row.revenue - row.refunds
     row.gross_profit = row.net_revenue - row.cogs
     row.gross_margin_pct = row.net_revenue > 0
-      ? Math.round((row.gross_profit / row.net_revenue) * 10000) / 100
+      ? round2((row.gross_profit / row.net_revenue) * 100)
       : 0
     row.operating_profit = row.gross_profit - row.operating_expenses
   }
@@ -407,7 +408,7 @@ export async function getPLReport(from: string, to: string): Promise<{ monthly: 
     revenue_offline:      acc.revenue_offline + m.revenue_offline,
   }), zero)
   totals.gross_margin_pct = totals.net_revenue > 0
-    ? Math.round((totals.gross_profit / totals.net_revenue) * 10000) / 100
+    ? round2((totals.gross_profit / totals.net_revenue) * 100)
     : 0
 
   return { monthly, totals }
@@ -505,7 +506,7 @@ export async function getCashflow(from: string, to: string): Promise<{ monthly: 
       row.cash_out = row.po_payments + row.refunds_out
       row.net = row.cash_in - row.cash_out
       running += row.net
-      row.running_balance = Math.round(running * 100) / 100
+      row.running_balance = round2(running)
       return row
     })
 
