@@ -282,6 +282,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             images={product.product_images || []}
             productName={product.name}
             variantImages={variantImages}
+            discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           />
           {businessDiscountPct > 0 && (
             <div className="absolute top-6 right-[-36px] w-44 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[11px] font-bold text-center py-1.5 shadow-md pointer-events-none select-none z-10">

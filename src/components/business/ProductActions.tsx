@@ -382,11 +382,6 @@ export default function ProductActions({
 
   return (
     <div className="space-y-4">
-      {discountPct != null && discountPct > 0 && (
-        <div className="inline-flex items-center gap-1 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-          SALE
-        </div>
-      )}
 
       {hasVariants && (
         <div className="space-y-3">

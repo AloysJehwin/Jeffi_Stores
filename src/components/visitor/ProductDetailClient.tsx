@@ -403,6 +403,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           images={product.product_images || []}
           productName={product.name}
           variantImages={variantImages}
+          discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
         />
 
         <div className="hidden lg:block mt-4">
