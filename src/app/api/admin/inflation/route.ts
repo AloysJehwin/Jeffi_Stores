@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany, withTransaction } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { z } from 'zod'
@@ -11,17 +12,17 @@ const postSchema = z.object({
 })
 
 function applyPct(val: number, pct: number): number {
-  return Math.round(val * (1 + pct / 100) * 100) / 100
+  return round2(val * (1 + pct / 100))
 }
 
 function deriveFromMrpEx(mrpEx: number, discPct: number, gstPct: number) {
-  const priceEx = Math.round(mrpEx * (1 - discPct / 100) * 100) / 100
+  const priceEx = round2(mrpEx * (1 - discPct / 100))
   const gstMult = 1 + gstPct / 100
   return {
     mrp_ex_gst: mrpEx,
-    mrp: Math.round(mrpEx * gstMult * 100) / 100,
+    mrp: round2(mrpEx * gstMult),
     price_ex_gst: priceEx,
-    base_price: Math.round(priceEx * gstMult * 100) / 100,
+    base_price: round2(priceEx * gstMult),
   }
 }
 

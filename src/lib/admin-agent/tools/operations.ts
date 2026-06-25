@@ -1,4 +1,5 @@
 import { queryMany, queryOne } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import type { ToolDef } from '../tools'
 
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
@@ -133,7 +134,7 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
       return {
         payables: rows,
         count: rows.length,
-        summary: { total_payable: Math.round(total_payable * 100) / 100, overdue: Math.round(overdue * 100) / 100 },
+        summary: { total_payable: round2(total_payable), overdue: round2(overdue) },
         truncated: rows.length === lim,
       }
     },
@@ -183,10 +184,10 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
         receivables: rows,
         count: rows.length,
         summary: {
-          total: Math.round(total * 100) / 100,
-          bucket_0_30: Math.round(b0_30 * 100) / 100,
-          bucket_31_60: Math.round(b31_60 * 100) / 100,
-          bucket_60plus: Math.round(b60p * 100) / 100,
+          total: round2(total),
+          bucket_0_30: round2(b0_30),
+          bucket_31_60: round2(b31_60),
+          bucket_60plus: round2(b60p),
         },
         truncated: rows.length === lim,
       }
@@ -221,9 +222,9 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
       const outAmt = parseFloat(outflow?.amt || '0')
       return {
         window_days: d,
-        receipts: { total: Math.round(inAmt * 100) / 100, count: inflow?.cnt || 0 },
-        payments: { total: Math.round(outAmt * 100) / 100, count: outflow?.cnt || 0 },
-        net: Math.round((inAmt - outAmt) * 100) / 100,
+        receipts: { total: round2(inAmt), count: inflow?.cnt || 0 },
+        payments: { total: round2(outAmt), count: outflow?.cnt || 0 },
+        net: round2(inAmt - outAmt),
       }
     },
   },
@@ -268,11 +269,11 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
       return {
         month: label,
         from, to,
-        revenue: Math.round(revenue * 100) / 100,
-        cogs: Math.round(cogs * 100) / 100,
-        gross_profit: Math.round(gross * 100) / 100,
-        gross_margin_pct: revenue > 0 ? Math.round((gross / revenue) * 10000) / 100 : 0,
-        tax_collected: Math.round(parseFloat(row?.tax || '0') * 100) / 100,
+        revenue: round2(revenue),
+        cogs: round2(cogs),
+        gross_profit: round2(gross),
+        gross_margin_pct: revenue > 0 ? round2((gross / revenue) * 100) : 0,
+        tax_collected: round2(parseFloat(row?.tax || '0')),
         order_count: row?.orders || 0,
       }
     },
@@ -316,19 +317,19 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
         month: label,
         from, to,
         output: {
-          taxable: Math.round(parseFloat(out?.taxable || '0') * 100) / 100,
-          cgst: Math.round(parseFloat(out?.cgst || '0') * 100) / 100,
-          sgst: Math.round(parseFloat(out?.sgst || '0') * 100) / 100,
-          igst: Math.round(parseFloat(out?.igst || '0') * 100) / 100,
-          total_tax: Math.round(totalOutTax * 100) / 100,
+          taxable: round2(parseFloat(out?.taxable || '0')),
+          cgst: round2(parseFloat(out?.cgst || '0')),
+          sgst: round2(parseFloat(out?.sgst || '0')),
+          igst: round2(parseFloat(out?.igst || '0')),
+          total_tax: round2(totalOutTax),
           invoice_count: out?.invoices || 0,
         },
         input_itc: {
-          taxable: Math.round(parseFloat(itc?.taxable || '0') * 100) / 100,
-          tax: Math.round(itcTax * 100) / 100,
+          taxable: round2(parseFloat(itc?.taxable || '0')),
+          tax: round2(itcTax),
           line_count: itc?.lines || 0,
         },
-        net_tax_payable: Math.round((totalOutTax - itcTax) * 100) / 100,
+        net_tax_payable: round2(totalOutTax - itcTax),
       }
     },
   },
@@ -561,7 +562,7 @@ export const OPERATIONS_TOOLS: ToolDef[] = [
           payableId: exp.id,
           expenseNumber: exp.expense_number,
           supplierName: exp.supplier_name,
-          amount: Math.round(payAmt * 100) / 100,
+          amount: round2(payAmt),
           paymentMode: mode,
           paidAt: payDate,
           transactionRef: ref,

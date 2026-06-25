@@ -13,6 +13,7 @@ const PostSchema = z.object({
   mrp: z.optional(zCurrency),
   price_ex_gst: z.optional(zCurrency),
   mrp_ex_gst: z.optional(zCurrency),
+  discount_pct: z.number().min(0).max(100).nullish(),
   stock_status: z.enum(['In Stock', 'Low Stock', 'Out of Stock']).nullish(),
   attributes: z.record(z.string(), z.unknown()).optional(),
 })
@@ -24,6 +25,7 @@ const PutSchema = z.object({
   mrp: z.optional(zCurrency),
   price_ex_gst: z.optional(zCurrency),
   mrp_ex_gst: z.optional(zCurrency),
+  discount_pct: z.number().min(0).max(100).nullish(),
   stock_status: z.enum(['In Stock', 'Low Stock', 'Out of Stock']).nullish(),
   attributes: z.record(z.string(), z.unknown()).optional(),
   is_active: z.boolean().nullish(),
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   const parsed = parseBody(PostSchema, raw)
   if (!parsed.ok) return parsed.response
-  const { sub_variant_name, sku: skuInput, price, mrp, price_ex_gst, mrp_ex_gst, stock_status, attributes } = parsed.data
+  const { sub_variant_name, sku: skuInput, price, mrp, price_ex_gst, mrp_ex_gst, discount_pct, stock_status, attributes } = parsed.data
 
   const productRow = await queryOne<{ sku: string }>(`SELECT sku FROM products WHERE id = $1`, [id])
   const parentSku = variant.sku || productRow?.sku || 'PRD'
@@ -70,11 +72,12 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const row = await queryOne(
     `INSERT INTO product_sub_variants
-       (variant_id, product_id, sku, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, stock_status, attributes)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+       (variant_id, product_id, sku, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, discount_pct, stock_status, attributes)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
      RETURNING *`,
     [variantId, id, sku, sub_variant_name, price ?? null, mrp ?? null,
      price_ex_gst ?? null, mrp_ex_gst ?? null,
+     discount_pct ?? null,
      stock_status ?? 'In Stock', attributes ? JSON.stringify(attributes) : null]
   )
   return NextResponse.json({ sub_variant: row }, { status: 201 })
@@ -90,7 +93,7 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (!rawPut) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   const parsedPut = parseBody(PutSchema, rawPut)
   if (!parsedPut.ok) return parsedPut.response
-  const { id, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, stock_status, attributes, is_active } = parsedPut.data
+  const { id, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, discount_pct, stock_status, attributes, is_active } = parsedPut.data
 
   let newSku: string | null = null
   if (sub_variant_name) {
@@ -108,14 +111,15 @@ export async function PUT(request: NextRequest, { params }: Params) {
        sub_variant_name = COALESCE($1, sub_variant_name),
        sku = COALESCE($2, sku),
        price = $3, mrp = $4, price_ex_gst = $5, mrp_ex_gst = $6,
-       stock_status = COALESCE($7, stock_status),
-       attributes = COALESCE($8, attributes),
-       is_active = COALESCE($9, is_active),
+       discount_pct = COALESCE($7, discount_pct),
+       stock_status = COALESCE($8, stock_status),
+       attributes = COALESCE($9, attributes),
+       is_active = COALESCE($10, is_active),
        updated_at = NOW()
-     WHERE id = $10 AND variant_id = $11
+     WHERE id = $11 AND variant_id = $12
      RETURNING *`,
     [sub_variant_name, newSku, price ?? null, mrp ?? null, price_ex_gst ?? null,
-     mrp_ex_gst ?? null, stock_status ?? null,
+     mrp_ex_gst ?? null, discount_pct ?? null, stock_status ?? null,
      attributes ? JSON.stringify(attributes) : null, is_active ?? null,
      id, variantId]
   )

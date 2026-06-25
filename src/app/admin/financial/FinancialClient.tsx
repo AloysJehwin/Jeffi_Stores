@@ -11,10 +11,10 @@ import DatePicker from '@/components/ui/DatePicker'
 
 type Tab = 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow'
 
-const inputCls = 'w-full px-3 py-2.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400'
+const inputCls = 'w-full px-3 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
-const btnPrimary = 'px-4 py-2 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors'
-const btnSecondary = 'px-4 py-2 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors'
+const btnPrimary = 'px-4 py-1.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors'
+const btnSecondary = 'px-4 py-1.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors'
 
 const PAYMENT_METHOD_OPTIONS = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
@@ -1460,7 +1460,7 @@ function TransactionsTab({ initialData }: { initialData: any }) {
           </div>
           <div className="flex-1 min-w-[180px]">
             <label className={labelCls}>Search party / ref</label>
-            <input className={inputCls.replace('py-2.5', 'py-1.5')} value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRefresh()} placeholder="Supplier, customer, ref..." />
+            <input className="field-compact w-full border border-border-default bg-surface-secondary text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400" value={search} onChange={e => setSearch(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleRefresh()} placeholder="Supplier, customer, ref..." />
           </div>
           <div className="flex gap-2 pb-0.5">
             <button className={btnPrimary} onClick={handleRefresh}>{loading ? 'Loading…' : 'Refresh'}</button>

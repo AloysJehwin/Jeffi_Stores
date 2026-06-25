@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
   const BATCH_SIZE = 25
   const results: { orderId: string; awb: string; syncedTo: string }[] = []
   const errors: { awb: string; error: string }[] = []
+  const pickedUpAwbs = new Set<string>()
 
   for (let i = 0; i < orders.length; i += BATCH_SIZE) {
     const batch = orders.slice(i, i + BATCH_SIZE)
@@ -95,6 +96,10 @@ export async function POST(request: NextRequest) {
             statusType = 'DL'
           } else if (topStatus === 'out for delivery') {
             statusType = 'OD'
+          } else if (topStatus === 'in transit') {
+            statusType = 'IT'
+          } else if (topStatus === 'picked up') {
+            statusType = 'PU'
           } else {
             const scans: any[] = shipment.Scans ?? []
             for (let i = 0; i < scans.length; i++) {
@@ -115,6 +120,13 @@ export async function POST(request: NextRequest) {
         }
         const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
         const syncRule = STATUS_SYNC[statusType]
+
+        // Track AWBs that have been physically picked up (PU or any forward/RTO stage)
+        // so we can auto-advance the pickup request status regardless of order state.
+        const PICKED_UP_TYPES = new Set(['PU', 'IT', 'OT', 'OD', 'DL', 'RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL'])
+        if (PICKED_UP_TYPES.has(statusType)) {
+          pickedUpAwbs.add(awb)
+        }
 
         if (!syncRule) continue
         if (syncRule.onlyIfCurrent && !syncRule.onlyIfCurrent.includes(order.status)) continue
@@ -172,6 +184,19 @@ export async function POST(request: NextRequest) {
     } catch (err: any) {
       batch.forEach(o => errors.push({ awb: o.awb_number, error: err.message }))
     }
+  }
+
+  // Auto-update pickup request status: if any AWB in a pending request has been
+  // picked up (PU/IT/OT/OD/DL or RTO variants), mark the whole request picked_up.
+  if (pickedUpAwbs.size > 0) {
+    const awbList = Array.from(pickedUpAwbs)
+    await query(
+      `UPDATE delhivery_pickup_requests
+       SET pickup_status = 'picked_up', updated_at = NOW()
+       WHERE pickup_status = 'pending'
+         AND awbs && $1::text[]`,
+      [awbList]
+    ).catch(() => {})
   }
 
   const rvpRequests = await queryMany<{

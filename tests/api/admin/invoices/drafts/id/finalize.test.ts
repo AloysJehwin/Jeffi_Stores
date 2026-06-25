@@ -15,6 +15,7 @@ vi.mock('@/lib/gst', () => ({
   getFinancialYear: vi.fn().mockReturnValue('2024-25'),
   generateInvoiceNumber: vi.fn().mockReturnValue('JS/2024-25/0001'),
   getNextInvoiceSequence: vi.fn().mockResolvedValue(1),
+  round2: (n: number) => Math.round(n * 100) / 100,
 }))
 vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendInvoiceFinalizedEmail: vi.fn(), sendOrderStatusUpdate: vi.fn() }))

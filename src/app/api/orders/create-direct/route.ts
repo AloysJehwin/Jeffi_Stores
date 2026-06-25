@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { query, queryOne, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
-import { isInterState, calculateGST } from '@/lib/gst'
+import { isInterState, calculateGST, round2 } from '@/lib/gst'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { resolveBuyNowItem, quoteShipping, validateCouponForUser, loadAddress } from '@/lib/order-commit'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
     const unitPrice = resolved.item.price
     const qty = resolved.item.qty
-    const itemTotal = Math.round(unitPrice * qty * 100) / 100
+    const itemTotal = round2(unitPrice * qty)
     const subtotal = itemTotal
 
     const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
@@ -115,7 +115,7 @@ export async function POST(request: NextRequest) {
     if (product.category_id && Object.keys(bizDiscountMap).length > 0) {
       const pct = bizDiscountMap[product.category_id] ?? 0
       if (pct > 0) {
-        businessDiscountAmount = Math.round(subtotal * pct / 100 * 100) / 100
+        businessDiscountAmount = round2(subtotal * pct / 100)
       }
     }
 
@@ -144,12 +144,12 @@ export async function POST(request: NextRequest) {
       isIGST = isInterState(buyerState, sellerStateCode)
       const gst = calculateGST(itemTotal, gstRate, isIGST)
       taxAmount = gst.totalTax
-      orderTaxableAmount = Math.round(gst.taxableAmount * 100) / 100
-      orderCgst = Math.round(gst.cgst * 100) / 100
-      orderSgst = Math.round(gst.sgst * 100) / 100
-      orderIgst = Math.round(gst.igst * 100) / 100
+      orderTaxableAmount = round2(gst.taxableAmount)
+      orderCgst = round2(gst.cgst)
+      orderSgst = round2(gst.sgst)
+      orderIgst = round2(gst.igst)
     } else {
-      taxAmount = Math.round((itemTotal - (itemTotal / (1 + gstRate / 100))) * 100) / 100
+      taxAmount = round2(itemTotal - (itemTotal / (1 + gstRate / 100)))
     }
 
     const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
@@ -205,7 +205,7 @@ export async function POST(request: NextRequest) {
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, Math.round(appliedDiscount * 100) / 100, Math.round(businessDiscountAmount * 100) / 100, Math.round(taxAmount * 100) / 100, appliedShipping, total,
+         'pending', 'unpaid', subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, total,
          shippingAddressId, billingAddressId,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
@@ -225,8 +225,8 @@ export async function POST(request: NextRequest) {
       // Product-level discount: discount_pct is on the product, shared across all variants
       const productDiscPct = Number(product.discount_pct ?? 0)
       const mrpUnitPrice = productDiscPct > 0 ? unitPrice / (1 - productDiscPct / 100) : unitPrice
-      const itemProductDiscount = productDiscPct > 0 ? Math.round((mrpUnitPrice - unitPrice) * qty * 100) / 100 : 0
-      const totalItemDiscount = Math.round((businessDiscountAmount + itemProductDiscount) * 100) / 100
+      const itemProductDiscount = productDiscPct > 0 ? round2((mrpUnitPrice - unitPrice) * qty) : 0
+      const totalItemDiscount = round2(businessDiscountAmount + itemProductDiscount)
 
       const itemMrp = variant?.mrp != null ? Number(variant.mrp) : (product.mrp != null ? Number(product.mrp) : null)
 
@@ -238,7 +238,7 @@ export async function POST(request: NextRequest) {
          variant?.sku || product.sku,
          variant?.variant_name || null,
          qty, unitPrice, itemTotal, totalItemDiscount,
-         Math.round(itemTaxAmount * 100) / 100,
+         round2(itemTaxAmount),
          isGSTEnabled ? (product.hsn_code || null) : null,
          isGSTEnabled ? gstRate : null,
          isGSTEnabled && gstForItem ? gstForItem.taxableAmount : 0,
@@ -253,7 +253,7 @@ export async function POST(request: NextRequest) {
       if (couponId && appliedDiscount > 0) {
         await client.query(
           `INSERT INTO coupon_usage (coupon_id, user_id, order_id, discount_amount) VALUES ($1, $2, $3, $4)`,
-          [couponId, userId, createdOrder.id, Math.round(appliedDiscount * 100) / 100]
+          [couponId, userId, createdOrder.id, round2(appliedDiscount)]
         )
         await client.query(
           `UPDATE coupons SET times_used = times_used + 1 WHERE id = $1`,

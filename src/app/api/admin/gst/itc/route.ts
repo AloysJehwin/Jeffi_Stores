@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,8 +63,8 @@ export async function GET(request: NextRequest) {
       supplierName: s.supplierName,
       gstin: s.gstin,
       poCount: s.poCount.size,
-      taxable: Math.round(s.taxable * 100) / 100,
-      tax: Math.round(s.tax * 100) / 100,
+      taxable: round2(s.taxable),
+      tax: round2(s.tax),
     }))
 
     if (format === 'csv') {
@@ -97,8 +98,8 @@ export async function GET(request: NextRequest) {
       period: { from, to },
       summary: {
         lineCount: rows.length,
-        totalTaxable: Math.round(totalTaxable * 100) / 100,
-        totalTax: Math.round(totalTax * 100) / 100,
+        totalTaxable: round2(totalTaxable),
+        totalTax: round2(totalTax),
       },
       supplierSummary,
       rows,

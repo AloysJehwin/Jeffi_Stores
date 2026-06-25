@@ -1,4 +1,5 @@
 import { queryOne, queryMany } from './db'
+import { round2 } from './gst'
 
 export async function getProductAnalyticsData(productId: string, days: number) {
   const product = await queryOne<{ id: string; name: string; sku: string; slug: string; brand_name: string | null; stock_status: string; inventory_quantity: number; base_price: string }>(
@@ -117,7 +118,7 @@ export async function getProductAnalyticsData(productId: string, days: number) {
       quantitySold: parseFloat(totals?.quantity_sold ?? '0'),
       conversionRate: views > 0 ? Math.round((orders / views) * 1000) / 10 : 0,
       cartConversionRate: cartAdds > 0 ? Math.round((orders / cartAdds) * 1000) / 10 : 0,
-      revenuePerView: views > 0 ? Math.round((parseFloat(totals?.revenue ?? '0') / views) * 100) / 100 : 0,
+      revenuePerView: views > 0 ? round2(parseFloat(totals?.revenue ?? '0') / views) : 0,
       activeCarts: parseInt(currentCarts?.active ?? '0'),
     },
     timeSeries: daily.map(r => ({

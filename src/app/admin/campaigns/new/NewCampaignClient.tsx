@@ -179,7 +179,7 @@ export default function NewCampaignClient() {
             onChange={e => setAiPrompt(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && generateWithAI()}
             placeholder="Describe the campaign email you want…"
-            className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="flex-1 field-normal border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           />
           <button
             type="button"
@@ -203,7 +203,7 @@ export default function NewCampaignClient() {
                 value={form.name}
                 onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
                 placeholder="e.g. Summer Sale"
-                className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
             </div>
             <div>
@@ -213,7 +213,7 @@ export default function NewCampaignClient() {
                 value={form.kind}
                 onChange={e => setForm(f => ({ ...f, kind: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') }))}
                 placeholder="e.g. summer_sale"
-                className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
               <p className="text-[10px] text-foreground-muted mt-1">Unique identifier — lowercase letters, numbers, underscores</p>
             </div>
@@ -252,7 +252,7 @@ export default function NewCampaignClient() {
                 max={720}
                 value={form.delay_hours}
                 onChange={e => setForm(f => ({ ...f, delay_hours: parseInt(e.target.value || '0', 10) }))}
-                className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
               <p className="text-[10px] text-foreground-muted mt-1">Hours after trigger before sending</p>
             </div>
@@ -264,7 +264,7 @@ export default function NewCampaignClient() {
                 max={100}
                 value={form.discount_percent}
                 onChange={e => setForm(f => ({ ...f, discount_percent: parseInt(e.target.value || '0', 10) }))}
-                className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
               />
               <p className="text-[10px] text-foreground-muted mt-1">Auto-generates per-user coupon if no coupon assigned</p>
             </div>
@@ -301,7 +301,7 @@ export default function NewCampaignClient() {
               value={form.body_template}
               onChange={e => setForm(f => ({ ...f, body_template: e.target.value }))}
               rows={10}
-              className="w-full px-3 py-2 text-xs font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+              className="w-full field-normal font-mono text-xs border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
             />
             <p className="text-[10px] text-foreground-muted mt-1">
               Variables: <code className="px-1 bg-surface-secondary rounded">{'{firstName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{orderNumber}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{couponCode}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{discountPercent}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productName}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{productImageUrl}'}</code> <code className="px-1 bg-surface-secondary rounded">{'{ctaUrl}'}</code>

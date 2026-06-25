@@ -300,12 +300,12 @@ export default function RFQDetailClient({ id }: { id: string }) {
               <p className="text-sm text-foreground-secondary">A draft quotation will be created with the prices from this RFQ. You can edit the rates in the quotation before sending.</p>
               <div className="flex gap-3 pt-1">
                 <button onClick={doConvert} disabled={converting}
-                  className="flex-1 px-4 py-2.5 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
+                  className="flex-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center justify-center gap-2">
                   {converting && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                   Convert
                 </button>
                 <button onClick={() => setConfirmOpen(false)}
-                  className="px-4 py-2.5 border border-border-default text-sm font-medium rounded-lg hover:bg-surface-secondary transition-colors">
+                  className="px-4 py-2 border border-border-default text-sm font-medium rounded-lg hover:bg-surface-secondary transition-colors">
                   Cancel
                 </button>
               </div>
@@ -928,7 +928,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           type="button"
                           disabled={sendingReply}
                           onClick={() => setReplyText(prev => prev === preset ? '' : preset)}
-                          className={`w-full text-left px-3 py-2.5 text-xs rounded-xl border transition-colors ${
+                          className={`w-full text-left px-3 py-1.5 text-xs rounded-xl border transition-colors ${
                             replyText === preset
                               ? 'bg-accent-500/15 border-accent-500/50 text-foreground font-medium'
                               : 'bg-surface border-border-default text-foreground-secondary hover:bg-surface-elevated hover:text-foreground hover:border-accent-500/30'
@@ -977,7 +977,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                     <button
                       onClick={handleSendReply}
                       disabled={sendingReply || !replyText.trim()}
-                      className="w-full px-4 py-2.5 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                      className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
                     >
                       {sendingReply && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                       Send
@@ -1000,7 +1000,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                           type="button"
                           disabled={sendingReply}
                           onClick={() => setReplyText(prev => prev === preset ? '' : preset)}
-                          className={`w-full text-left px-3 py-2.5 text-xs rounded-xl border transition-colors ${
+                          className={`w-full text-left px-3 py-1.5 text-xs rounded-xl border transition-colors ${
                             replyText === preset
                               ? 'bg-accent-500/15 border-accent-500/50 text-foreground font-medium'
                               : 'bg-surface border-border-default text-foreground-secondary hover:bg-surface-elevated hover:text-foreground hover:border-accent-500/30'
@@ -1057,7 +1057,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                     <button
                       onClick={handleSendReply}
                       disabled={sendingReply || !replyText.trim()}
-                      className="w-full px-4 py-2.5 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                      className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
                     >
                       {sendingReply && <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
                       Send Reply

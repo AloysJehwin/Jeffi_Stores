@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { queryMany, queryOne } from '@/lib/db'

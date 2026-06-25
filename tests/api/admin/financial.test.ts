@@ -20,6 +20,7 @@ vi.mock('@/lib/financial', () => ({
 
 vi.mock('@/lib/gst', () => ({
   getFinancialYear: vi.fn(),
+  round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
 // ---------------------------------------------------------------------------

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { withTransaction, queryMany } from '@/lib/db'
-import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
+import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, round2 } from '@/lib/gst'
 import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
 import { z } from 'zod'
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
       const gstRate = parseFloat(item.gst_rate || '18')
       const unitInfo = unitFactorMap.get(`${item.product_id}:${item.variant_id ?? ''}:${item.buy_unit}`)
       const effectiveQty = (unitInfo?.dimension === 'count' && unitInfo.factor > 1) ? rawQty * unitInfo.factor : rawQty
-      const lineTotal = Math.round(lineItemFromMrpIncl(effectiveQty, unitPrice, discPct, gstRate) * 100) / 100
+      const lineTotal = round2(lineItemFromMrpIncl(effectiveQty, unitPrice, discPct, gstRate))
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
       subtotal += lineTotal
@@ -97,8 +97,8 @@ export async function POST(request: NextRequest) {
       totalSgst += gst.sgst
       totalIgst += gst.igst
 
-      const mrpLineTotal = Math.round(effectiveQty * unitPrice * 100) / 100
-      const discountAmount = discPct > 0 ? Math.round((mrpLineTotal - lineTotal) * 100) / 100 : 0
+      const mrpLineTotal = round2(effectiveQty * unitPrice)
+      const discountAmount = discPct > 0 ? round2(mrpLineTotal - lineTotal) : 0
 
       return {
         product_id: item.product_id || null,
@@ -115,16 +115,16 @@ export async function POST(request: NextRequest) {
         unit_price: unitPrice,
         total_price: lineTotal,
         discount_amount: discountAmount,
-        taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
-        cgst_amount: Math.round(gst.cgst * 100) / 100,
-        sgst_amount: Math.round(gst.sgst * 100) / 100,
-        igst_amount: Math.round(gst.igst * 100) / 100,
-        tax_amount: Math.round((gst.cgst + gst.sgst + gst.igst) * 100) / 100,
+        taxable_amount: round2(gst.taxableAmount),
+        cgst_amount: round2(gst.cgst),
+        sgst_amount: round2(gst.sgst),
+        igst_amount: round2(gst.igst),
+        tax_amount: round2(gst.cgst + gst.sgst + gst.igst),
       }
     })
 
-    const taxAmount = Math.round((totalCgst + totalSgst + totalIgst) * 100) / 100
-    const totalAmount = Math.round(subtotal * 100) / 100
+    const taxAmount = round2(totalCgst + totalSgst + totalIgst)
+    const totalAmount = round2(subtotal)
 
     const result = await withTransaction(async (client) => {
       const ts = Date.now()
@@ -162,10 +162,10 @@ export async function POST(request: NextRequest) {
           saleNumber, invoiceNumber, fy, seq,
           paymentMode,
           subtotal, taxAmount, totalAmount,
-          Math.round(totalTaxable * 100) / 100,
-          Math.round(totalCgst * 100) / 100,
-          Math.round(totalSgst * 100) / 100,
-          Math.round(totalIgst * 100) / 100,
+          round2(totalTaxable),
+          round2(totalCgst),
+          round2(totalSgst),
+          round2(totalIgst),
           notes || null,
         ]
       )

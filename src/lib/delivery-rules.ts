@@ -1,3 +1,5 @@
+import { round2 } from './gst'
+
 export interface DeliverySettings {
   enabled: boolean
   freeThreshold: number
@@ -28,7 +30,7 @@ export function applyDeliveryRules(params: {
   settings: DeliverySettings
 }): ApplyDeliveryResult {
   const { baseCharge, subtotal, settings } = params
-  const original = Math.max(0, Math.round(baseCharge * 100) / 100)
+  const original = Math.max(0, round2(baseCharge))
 
   if (!settings.enabled) {
     return { charge: 0, originalCharge: original, discountApplied: original, source: 'admin_disabled' }
@@ -53,8 +55,8 @@ export function applyDeliveryRules(params: {
 
   const afterPercent = original - (original * settings.discountPercent) / 100
   const afterFlat = afterPercent - settings.discountFlat
-  const finalCharge = Math.max(0, Math.round(afterFlat * 100) / 100)
-  const discountApplied = Math.round((original - finalCharge) * 100) / 100
+  const finalCharge = Math.max(0, round2(afterFlat))
+  const discountApplied = round2(original - finalCharge)
 
   return {
     charge: finalCharge,

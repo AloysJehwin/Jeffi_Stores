@@ -10,6 +10,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/gst', () => ({
   isInterState: vi.fn(),
   calculateGST: vi.fn(),
+  round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
 vi.mock('@/lib/invoice', () => ({

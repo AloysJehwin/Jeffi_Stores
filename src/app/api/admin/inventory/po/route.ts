@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, query } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import { buildSearchClause } from '@/lib/search'
 import { z } from 'zod'
 import { parseBody, zUuid, zCurrency } from '@/lib/validate'
@@ -149,15 +150,15 @@ export async function POST(request: NextRequest) {
       [poNumber, supplier_id, status,
        order_date || new Date().toISOString().slice(0, 10),
        expected_date || null, notes || null,
-       Math.round(subtotal * 100) / 100,
-       Math.round(taxAmount * 100) / 100,
-       Math.round(totalAmount * 100) / 100]
+       round2(subtotal),
+       round2(taxAmount),
+       round2(totalAmount)]
     )
 
     for (const item of resolvedItems) {
       const { resolvedUnitCost, baseQty, factor } = item
       const tax = item.tax_rate ?? 0
-      const total = Math.round(baseQty * resolvedUnitCost * (1 + tax / 100) * 100) / 100
+      const total = round2(baseQty * resolvedUnitCost * (1 + tax / 100))
       await query(
         `INSERT INTO purchase_order_items
            (po_id, product_id, variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost,

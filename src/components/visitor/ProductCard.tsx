@@ -148,7 +148,7 @@ export default function ProductCard({
 
             {/* Sale ribbon */}
             {discountPct > 0 && (
-              <div className="absolute top-4 right-[-16px] w-20 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[8px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10">
+              <div className="absolute top-4 right-[-16px] w-20 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[8px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10 overflow-hidden">
                 SALE
               </div>
             )}

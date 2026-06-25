@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import {
   packIntoCartons,
   fallbackShippingRate,
@@ -215,7 +216,7 @@ export async function POST(request: NextRequest) {
       totalCharge += codFee
     }
 
-    const baseCharge = Math.round(totalCharge * 100) / 100
+    const baseCharge = round2(totalCharge)
     const ruleResult = applyDeliveryRules({
       baseCharge,
       subtotal: typeof subtotal === 'number' ? subtotal : 0,

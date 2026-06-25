@@ -21,6 +21,7 @@ vi.mock('@/lib/gst', () => ({
   getNextInvoiceSequence: vi.fn().mockResolvedValue(1),
   isInterState: vi.fn().mockReturnValue(false),
   calculateGST: vi.fn().mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 }),
+  round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
 vi.mock('@/lib/invoice-pdf', () => ({
