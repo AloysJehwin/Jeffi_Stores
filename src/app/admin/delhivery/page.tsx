@@ -360,13 +360,14 @@ export default function DelhiveryPickupPage() {
                           {req.pickup_status === 'pending' && orders.length > 0 && (
                             <button
                               onClick={() => { setAddAwbFor(addAwbFor === req.id ? null : req.id); setAddAwbOrderId('') }}
-                              className="px-2 py-0.5 rounded text-xs font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors"
+                              className="px-2 py-1.5 rounded-lg text-xs font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors"
                             >
                               + Add AWB
                             </button>
                           )}
                           {req.pickup_status !== 'picked_up' && (
                             <AdminSelect
+                              sm
                               value={req.pickup_status}
                               disabled={updatingId === req.id}
                               options={STATUS_OPTIONS}
