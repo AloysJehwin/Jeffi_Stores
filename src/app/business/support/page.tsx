@@ -1,3 +1,5 @@
+export const dynamic = 'force-dynamic'
+
 import SupportChat from '@/components/visitor/SupportChat'
 import { cookies, headers } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
