@@ -416,7 +416,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
                     <span className="font-semibold text-foreground text-sm">{u.unit}</span>
                     <span className="text-border-secondary">·</span>
                     <span className="text-foreground-muted">{Number(u.factor).toLocaleString('en-IN', { maximumFractionDigits: 4 })} pcs</span>
-                    {u.display_label && <><span className="text-border-secondary">·</span><span className="text-foreground-muted">"{u.display_label}"</span></>}
+                    {u.display_label && <><span className="text-border-secondary">·</span><span className="text-foreground-muted">&ldquo;{u.display_label}&rdquo;</span></>}
                     {u.min_qty != null && Number(u.min_qty) !== 1 && <><span className="text-border-secondary">·</span><span className="text-foreground-muted">min {Number(u.min_qty)}</span></>}
                     {u.max_qty != null && <><span className="text-border-secondary">·</span><span className="text-foreground-muted">max {Number(u.max_qty)}</span></>}
                   </div>
