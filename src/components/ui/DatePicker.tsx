@@ -159,7 +159,7 @@ export default function DatePicker({ value, onChange, disabled, min, max, classN
         type="button"
         disabled={disabled}
         onClick={openPicker}
-        className={`w-full flex items-center justify-between px-4 py-2 rounded-lg border bg-surface text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400 ${
+        className={`w-full flex items-center justify-between px-4 py-1.5 rounded-lg border bg-surface text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400 ${
           open
             ? 'border-accent-500 ring-2 ring-accent-500 dark:ring-accent-400'
             : 'border-border-secondary hover:border-border-default'
