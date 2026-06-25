@@ -123,7 +123,7 @@ export default function ProductCard({
               </div>
             )}
 
-            {shownDiscount > 0 && (
+            {shownDiscount > 0 && discountPct <= 0 && (
               <div className="absolute top-2 left-2 bg-accent-500 dark:bg-accent-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">
                 {shownDiscount}% off
               </div>
