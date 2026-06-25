@@ -114,16 +114,18 @@ export async function resolveBuyNowItem(input: {
     id: string
     is_active: boolean
     base_price: string | number | null
+    price_ex_gst: string | number | null
+    gst_percentage: string | number | null
   }>(
-    `SELECT id, is_active, base_price FROM products WHERE id = $1`,
+    `SELECT id, is_active, base_price, price_ex_gst, gst_percentage FROM products WHERE id = $1`,
     [input.productId]
   )
   if (!product || !product.is_active) return { ok: false, error: 'Product not found or inactive' }
 
-  let variant: { id: string; price: string | number | null } | null = null
+  let variant: { id: string; price: string | number | null; price_ex_gst: string | number | null } | null = null
   if (input.variantId) {
     variant = await queryOne(
-      `SELECT id, price
+      `SELECT id, price, price_ex_gst
          FROM product_variants
         WHERE id = $1 AND product_id = $2 AND is_active = TRUE`,
       [input.variantId, input.productId]
@@ -131,10 +133,10 @@ export async function resolveBuyNowItem(input: {
     if (!variant) return { ok: false, error: 'Variant not found' }
   }
 
-  let subVariant: { id: string; price: string | number | null } | null = null
+  let subVariant: { id: string; price: string | number | null; price_ex_gst: string | number | null } | null = null
   if (input.subVariantId) {
     subVariant = await queryOne(
-      `SELECT id, price FROM product_sub_variants
+      `SELECT id, price, price_ex_gst FROM product_sub_variants
         WHERE id = $1 AND is_active = TRUE
           AND ($2::uuid IS NULL OR variant_id = $2::uuid)`,
       [input.subVariantId, input.variantId || null]
@@ -142,7 +144,16 @@ export async function resolveBuyNowItem(input: {
     if (!subVariant) return { ok: false, error: 'Sub-variant not found' }
   }
 
-  let price: number = Number(subVariant?.price ?? variant?.price ?? product.base_price ?? 0)
+  // Mirror the product page: prefer price_ex_gst → convert to incl-GST, else use price directly.
+  const gstPct = Number(product.gst_percentage ?? 0)
+  const gstMultiplier = 1 + gstPct / 100
+  function toInclGst(exGst: number) { return Math.round(exGst * gstMultiplier * 100) / 100 }
+
+  const rawPriceExGst = subVariant?.price_ex_gst ?? variant?.price_ex_gst ?? product.price_ex_gst ?? null
+  const rawPrice = subVariant?.price ?? variant?.price ?? product.base_price ?? null
+  let price: number = rawPriceExGst != null && Number(rawPriceExGst) > 0
+    ? toInclGst(Number(rawPriceExGst))
+    : Number(rawPrice ?? 0)
   // Apply unit factor if buyMode is a real unit key (not 'unit')
   if (buyMode && buyMode !== 'unit') {
     const effectiveVariantId = input.variantId || null
