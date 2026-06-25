@@ -19,6 +19,7 @@ vi.mock('@/lib/scopes', () => ({
 vi.mock('@/lib/gst', () => ({
   isInterState: vi.fn().mockReturnValue(false),
   calculateGST: vi.fn().mockReturnValue({ taxableAmount: 80, cgst: 7.2, sgst: 7.2, igst: 0 }),
+  round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
 vi.mock('@/lib/pricing', () => ({

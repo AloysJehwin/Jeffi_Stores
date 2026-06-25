@@ -17,6 +17,7 @@ vi.mock('@/lib/email', () => ({
 vi.mock('@/lib/gst', () => ({
   isInterState: vi.fn().mockReturnValue(false),
   calculateGST: vi.fn().mockReturnValue({ taxableAmount: 0, cgst: 0, sgst: 0, igst: 0, totalTax: 0 }),
+  round2: (n: number) => Math.round(n * 100) / 100,
 }))
 vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/auto-tasks', () => ({ createAutoTask: vi.fn().mockResolvedValue(undefined) }))
