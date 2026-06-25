@@ -96,6 +96,10 @@ export async function POST(request: NextRequest) {
             statusType = 'DL'
           } else if (topStatus === 'out for delivery') {
             statusType = 'OD'
+          } else if (topStatus === 'in transit') {
+            statusType = 'IT'
+          } else if (topStatus === 'picked up') {
+            statusType = 'PU'
           } else {
             const scans: any[] = shipment.Scans ?? []
             for (let i = 0; i < scans.length; i++) {
