@@ -5,6 +5,7 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import QuantityInput from '@/components/shared/QuantityInput'
+import { round2 } from '@/lib/gst'
 
 interface VariantImage {
   id: string
@@ -211,7 +212,7 @@ export default function ProductActions({
   const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
 
   const gstMultiplier = 1 + (gstPercentage ?? 0) / 100
-  const toInclGst = (exGst: number) => Math.round(exGst * gstMultiplier * 100) / 100
+  const toInclGst = (exGst: number) => round2(exGst * gstMultiplier)
 
   const effectivePrice = hasVariants
     ? (selectedSubVariant?.price_ex_gst != null
@@ -219,7 +220,7 @@ export default function ProductActions({
         : (() => {
             const varMrp = selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : null
             if (varMrp != null && discountPct != null) {
-              return Math.round(varMrp * (1 - discountPct / 100) * 100) / 100
+              return round2(varMrp * (1 - discountPct / 100))
             }
             if (selectedVariant?.price_ex_gst != null) return toInclGst(Number(selectedVariant.price_ex_gst))
             return basePrice

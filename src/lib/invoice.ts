@@ -1,5 +1,5 @@
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, isInterState, calculateGST } from '@/lib/gst'
+import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, isInterState, calculateGST, round2 } from '@/lib/gst'
 import { generateInvoicePDF, InvoiceBusinessSettings, InvoiceOrder, InvoiceOrderItem, InvoiceBuyerAddress } from '@/lib/invoice-pdf'
 import { uploadInvoicePDF } from '@/lib/s3'
 
@@ -90,10 +90,10 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
         )
       }
 
-      taxableAmount = Math.round(totalTaxable * 100) / 100
-      cgstAmount = Math.round(totalCgst * 100) / 100
-      sgstAmount = Math.round(totalSgst * 100) / 100
-      igstAmount = Math.round(totalIgst * 100) / 100
+      taxableAmount = round2(totalTaxable)
+      cgstAmount = round2(totalCgst)
+      sgstAmount = round2(totalSgst)
+      igstAmount = round2(totalIgst)
     }
 
     await client.query(

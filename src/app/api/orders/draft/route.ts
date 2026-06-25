@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import {
   loadActiveCart,
   cartSubtotal,
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
           businessDiscountAmount += linePrice * Number(item.quantity) * pct / 100
         }
       }
-      businessDiscountAmount = Math.round(businessDiscountAmount * 100) / 100
+      businessDiscountAmount = round2(businessDiscountAmount)
     }
   } else {
     let resolveInput: { productId: string; variantId: string | null; subVariantId: string | null; qty: number; buyMode?: string; buyUnit?: string | null } | null = null
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest) {
     }
     const resolved = await resolveBuyNowItem(resolveInput)
     if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
-    subtotal = Math.round(resolved.item.price * resolved.item.qty * 100) / 100
+    subtotal = round2(resolved.item.price * resolved.item.qty)
     buyNowItem = resolved.item
     shippingItems = [{ productId: resolved.item.productId, variantId: resolved.item.variantId, quantity: resolved.item.qty }]
 
@@ -132,7 +133,7 @@ export async function POST(req: NextRequest) {
       const discountMap = await getBusinessDiscountMap(authUser.userId)
       const pct = discountMap[productRow.category_id] ?? 0
       if (pct > 0) {
-        businessDiscountAmount = Math.round(resolved.item.price * resolved.item.qty * pct / 100 * 100) / 100
+        businessDiscountAmount = round2(resolved.item.price * resolved.item.qty * pct / 100)
       }
     }
   }

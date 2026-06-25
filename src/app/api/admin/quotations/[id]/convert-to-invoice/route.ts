@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
-import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
+import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear, round2 } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { sendBusinessInvoiceGeneratedEmail } from '@/lib/email-business'
@@ -169,18 +169,18 @@ export async function POST(
         buy_unit: item.buy_unit || null,
         buy_mode: 'unit',
         mrp: rate,
-        unit_price: Math.round(discountedRate * (1 + gstRate / 100) * 100) / 100,
-        total_price: Math.round(incGstLineTotal * 100) / 100,
-        taxable_amount: Math.round(exGstLineTotal * 100) / 100,
-        cgst_amount: Math.round(cgst * 100) / 100,
-        sgst_amount: Math.round(sgst * 100) / 100,
-        igst_amount: Math.round(igst * 100) / 100,
-        tax_amount: Math.round(lineTax * 100) / 100,
+        unit_price: round2(discountedRate * (1 + gstRate / 100)),
+        total_price: round2(incGstLineTotal),
+        taxable_amount: round2(exGstLineTotal),
+        cgst_amount: round2(cgst),
+        sgst_amount: round2(sgst),
+        igst_amount: round2(igst),
+        tax_amount: round2(lineTax),
       }
     })
 
-    const taxAmount = Math.round((totalCgst + totalSgst + totalIgst) * 100) / 100
-    const totalAmount = Math.round((subtotal + taxAmount) * 100) / 100
+    const taxAmount = round2(totalCgst + totalSgst + totalIgst)
+    const totalAmount = round2(subtotal + taxAmount)
     // cash and bank_transfer are immediately paid; upi_qr and credit are unpaid until confirmed
     const isPaid = paymentMode === 'cash' || paymentMode === 'bank_transfer'
     const today = new Date().toISOString()
@@ -266,10 +266,10 @@ export async function POST(
           addressId,
           subtotal,
           taxAmount,
-          Math.round(totalTaxable * 100) / 100,
-          Math.round(totalCgst * 100) / 100,
-          Math.round(totalSgst * 100) / 100,
-          Math.round(totalIgst * 100) / 100,
+          round2(totalTaxable),
+          round2(totalCgst),
+          round2(totalSgst),
+          round2(totalIgst),
           totalAmount,
           enableDelivery,
           `Converted from quotation ${quotation.quote_number}`,

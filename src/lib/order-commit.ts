@@ -1,6 +1,6 @@
 import type { PoolClient } from 'pg'
 import { queryMany, queryOne, withTransaction } from './db'
-import { isInterState, calculateGST } from './gst'
+import { isInterState, calculateGST, round2 } from './gst'
 import { createDraftInvoice } from './invoice'
 import type { DraftBuyNowItem, DraftCartItem } from './order-draft'
 
@@ -147,7 +147,7 @@ export async function resolveBuyNowItem(input: {
   // Mirror the product page: prefer price_ex_gst → convert to incl-GST, else use price directly.
   const gstPct = Number(product.gst_percentage ?? 0)
   const gstMultiplier = 1 + gstPct / 100
-  function toInclGst(exGst: number) { return Math.round(exGst * gstMultiplier * 100) / 100 }
+  function toInclGst(exGst: number) { return round2(exGst * gstMultiplier) }
 
   const rawPriceExGst = subVariant?.price_ex_gst ?? variant?.price_ex_gst ?? product.price_ex_gst ?? null
   const rawPrice = subVariant?.price ?? variant?.price ?? product.base_price ?? null
@@ -177,11 +177,11 @@ export async function resolveBuyNowItem(input: {
       [input.productId, buyMode, effectiveVariantId, effectiveSubVariantId]
     )
     if (unitRow) {
-      price = Math.round(price * Number(unitRow.factor) * 100) / 100
+      price = round2(price * Number(unitRow.factor))
     }
   }
   if (!Number.isFinite(price) || price <= 0) return { ok: false, error: 'Could not resolve price for this product' }
-  price = Math.round(price * 100) / 100
+  price = round2(price)
 
   return {
     ok: true,
@@ -269,7 +269,7 @@ export async function validateCouponForUser(params: {
     appliedDiscount = Number(coupon.discount_value)
   }
   appliedDiscount = Math.min(appliedDiscount, params.subtotal)
-  return { appliedDiscount: Math.round(appliedDiscount * 100) / 100, ok: true }
+  return { appliedDiscount: round2(appliedDiscount), ok: true }
 }
 
 export async function loadAddress(userId: string, addressId: string) {
@@ -319,7 +319,7 @@ export async function quoteShipping(input: {
     if (!res.ok) return 0
     const data = await res.json()
     const charge = Number(data?.charge)
-    return Number.isFinite(charge) && charge >= 0 ? Math.round(charge * 100) / 100 : 0
+    return Number.isFinite(charge) && charge >= 0 ? round2(charge) : 0
   } catch {
     return 0
   }
@@ -497,10 +497,10 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
       }]
     }
 
-    orderTaxableAmount = Math.round(orderTaxableAmount * 100) / 100
-    orderCgst = Math.round(orderCgst * 100) / 100
-    orderSgst = Math.round(orderSgst * 100) / 100
-    orderIgst = Math.round(orderIgst * 100) / 100
+    orderTaxableAmount = round2(orderTaxableAmount)
+    orderCgst = round2(orderCgst)
+    orderSgst = round2(orderSgst)
+    orderIgst = round2(orderIgst)
 
     const addressSnapshot = JSON.stringify({
       full_name: address.full_name,
@@ -532,9 +532,9 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         orderNumber, input.userId, input.user.email, input.user.phone, customerName,
         orderStatus, paymentStatus,
         input.subtotal,
-        Math.round(input.appliedDiscount * 100) / 100,
-        Math.round(input.businessDiscountAmount * 100) / 100,
-        Math.round(input.taxAmount * 100) / 100, input.shippingAmount, total,
+        round2(input.appliedDiscount),
+        round2(input.businessDiscountAmount),
+        round2(input.taxAmount), input.shippingAmount, total,
         input.addressId, input.addressId, input.notes,
         isGSTEnabled ? orderTaxableAmount : 0,
         isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
@@ -545,7 +545,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     const created = orderResult.rows[0]
 
     for (const r of itemRows) {
-      const taxAmt = r.gst ? r.gst.totalTax : Math.round((r.itemTotal - r.itemTotal / (1 + r.gstRate / 100)) * 100) / 100
+      const taxAmt = r.gst ? r.gst.totalTax : round2(r.itemTotal - r.itemTotal / (1 + r.gstRate / 100))
       await client.query(
         `INSERT INTO order_items (
           order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name,
@@ -554,7 +554,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20)`,
         [
           created.id, r.productId, r.variantId, r.subVariantId, r.productName, r.productSku, r.variantName,
-          r.qty, r.unitPrice, r.itemTotal, Math.round(taxAmt * 100) / 100,
+          r.qty, r.unitPrice, r.itemTotal, round2(taxAmt),
           r.hsn, isGSTEnabled ? r.gstRate : null,
           r.gst ? r.gst.taxableAmount : 0,
           r.gst ? r.gst.cgst : 0,
@@ -575,7 +575,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     if (input.couponId && input.appliedDiscount > 0) {
       await client.query(
         `INSERT INTO coupon_usage (coupon_id, user_id, order_id, discount_amount) VALUES ($1, $2, $3, $4)`,
-        [input.couponId, input.userId, created.id, Math.round(input.appliedDiscount * 100) / 100]
+        [input.couponId, input.userId, created.id, round2(input.appliedDiscount)]
       )
       await client.query(
         `UPDATE coupons SET times_used = times_used + 1 WHERE id = $1`,

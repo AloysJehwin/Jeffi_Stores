@@ -1,6 +1,7 @@
 import { query, queryOne, queryMany, getClient } from './db'
 import { PoolClient } from 'pg'
 import { buildProductSearchClause } from './search'
+import { round2 } from './gst'
 
 export type TransactionType = 'purchase' | 'sale' | 'return' | 'adjustment'
 export type ReferenceType = 'order' | 'grn' | 'manual' | 'cash_sale'
@@ -86,7 +87,7 @@ export async function updateWeightedAvgCost(
       : unitCost
     await client.query(
       'UPDATE product_variants SET cost_price = $1 WHERE id = $2',
-      [Math.round(newCost * 100) / 100, variantId]
+      [round2(newCost), variantId]
     )
   } else {
     const row = await client.query<{ inventory_quantity: number; cost_price: number }>(
@@ -99,7 +100,7 @@ export async function updateWeightedAvgCost(
       : unitCost
     await client.query(
       'UPDATE products SET cost_price = $1 WHERE id = $2',
-      [Math.round(newCost * 100) / 100, productId]
+      [round2(newCost), productId]
     )
   }
 }
@@ -375,6 +376,6 @@ export async function getStockValuation(filters: {
   return {
     products: products || [],
     total,
-    totalValue: Math.round(totalValue * 100) / 100,
+    totalValue: round2(totalValue),
   }
 }

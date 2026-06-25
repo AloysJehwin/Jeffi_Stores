@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import { createRVPShipment } from '@/lib/delhivery'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -58,7 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const consigneePhone = rawPhone.length === 12 && rawPhone.startsWith('91') ? rawPhone.slice(2) : rawPhone.slice(-10)
     const address = [order.address_line1, order.address_line2, order.landmark].filter(Boolean).join(', ')
     const invoiceRef = `${order.order_number || order.id.slice(0, 12)}-${Date.now()}`
-    const totalAmount = String(Math.round(Number(order.total_amount) * 100) / 100)
+    const totalAmount = String(round2(Number(order.total_amount)))
     const orderDate = new Date(order.created_at).toISOString().slice(0, 10)
 
     const orderItems = await queryOne<{ total_weight: number; total_qty: number }>(`

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryOne, queryMany } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import { cookies } from 'next/headers'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { getUserIdForSession } from '@/lib/guest-user'
@@ -193,7 +194,7 @@ export async function POST(request: NextRequest) {
         [productId, buyMode, effectiveVariantId, effectiveSubVariantId]
       )
       if (unitRow) {
-        priceAtAddition = Math.round(priceAtAddition * Number(unitRow.factor) * 100) / 100
+        priceAtAddition = round2(priceAtAddition * Number(unitRow.factor))
       }
     }
 

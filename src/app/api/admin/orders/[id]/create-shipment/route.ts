@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query, queryMany } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import { computeShipmentDims, ShipmentItem, PackageType } from '@/lib/shipping'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
@@ -48,7 +49,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const productDesc = 'Hardware / Fasteners'
     const codAmount = '0'
-    const totalAmount = String(Math.round(Number(order.total_amount) * 100) / 100)
+    const totalAmount = String(round2(Number(order.total_amount)))
     const orderDate = new Date(order.created_at).toISOString().slice(0, 10)
     const baseRef = order.order_number || order.id.slice(0, 12)
     const invoiceRef = `${baseRef}-${Date.now()}`
