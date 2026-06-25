@@ -188,13 +188,11 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       </div>
 
       <Link href="/legal/faq" target="_blank" rel="noopener noreferrer"
-        className="flex flex-col gap-1.5 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group">
-        <div className="flex items-center gap-2.5">
-          <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-          </svg>
-          <span className="text-[11px] font-medium text-foreground-muted group-hover:text-accent-600 transition-colors">Secure Payment</span>
-        </div>
+        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group">
+        <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+        <span className="text-[11px] font-medium text-foreground-muted group-hover:text-accent-600 transition-colors w-10 leading-tight shrink-0">Secure Payment</span>
         <div className="flex items-center gap-1 flex-wrap">
           {['UPI', 'Cards', 'Net Banking', 'Wallets'].map(m => (
             <span key={m} className="text-[9px] font-semibold text-foreground-secondary bg-surface-secondary border border-border-default px-1 py-0.5 rounded whitespace-nowrap">
