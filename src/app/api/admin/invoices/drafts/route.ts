@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, withTransaction } from '@/lib/db'
-import { isInterState, calculateGST } from '@/lib/gst'
+import { isInterState, calculateGST, round2 } from '@/lib/gst'
 import { lineItemFromMrpIncl } from '@/lib/pricing'
 
 export const dynamic = 'force-dynamic'
@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
       const qty = parseFloat(item.quantity) || 0
       const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
-      const lineTotal = Math.round(lineItemFromMrpIncl(qty, unitPrice, discPct, gstRate) * 100) / 100
+      const lineTotal = round2(lineItemFromMrpIncl(qty, unitPrice, discPct, gstRate))
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
       subtotal += lineTotal
@@ -161,16 +161,16 @@ export async function POST(request: NextRequest) {
         unit_price: unitPrice,
         mrp: unitPrice,
         total_price: lineTotal,
-        taxable_amount: Math.round(gst.taxableAmount * 100) / 100,
-        cgst_amount: Math.round(gst.cgst * 100) / 100,
-        sgst_amount: Math.round(gst.sgst * 100) / 100,
-        igst_amount: Math.round(gst.igst * 100) / 100,
-        tax_amount: Math.round((gst.cgst + gst.sgst + gst.igst) * 100) / 100,
+        taxable_amount: round2(gst.taxableAmount),
+        cgst_amount: round2(gst.cgst),
+        sgst_amount: round2(gst.sgst),
+        igst_amount: round2(gst.igst),
+        tax_amount: round2(gst.cgst + gst.sgst + gst.igst),
       }
     })
 
-    const taxAmount = Math.round((totalCgst + totalSgst + totalIgst) * 100) / 100
-    const totalAmount = Math.round(subtotal * 100) / 100
+    const taxAmount = round2(totalCgst + totalSgst + totalIgst)
+    const totalAmount = round2(subtotal)
 
     const result = await withTransaction(async (client) => {
       const addrResult = await client.query(
@@ -202,10 +202,10 @@ export async function POST(request: NextRequest) {
         [
           orderNumber, customerName, customerPhone || '', customerEmail || '',
           subtotal, taxAmount, totalAmount,
-          Math.round(totalTaxable * 100) / 100,
-          Math.round(totalCgst * 100) / 100,
-          Math.round(totalSgst * 100) / 100,
-          Math.round(totalIgst * 100) / 100,
+          round2(totalTaxable),
+          round2(totalCgst),
+          round2(totalSgst),
+          round2(totalIgst),
           orderIsIgst,
           buyerGstin || null,
           paymentMode === 'credit' ? 'unpaid' : 'paid',

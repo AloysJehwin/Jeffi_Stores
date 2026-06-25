@@ -1,4 +1,5 @@
 import { query, queryMany, queryOne } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import { embed } from '@/lib/rag'
 import type { ToolDef } from '../tools'
@@ -542,9 +543,9 @@ const propose_create_quotation: ToolDef = {
         consigneeName,
         notes: notes ? String(notes).slice(0, 500) : null,
         items: previewItems,
-        subtotal: Math.round(subtotal * 100) / 100,
-        cgst: Math.round(cgst * 100) / 100,
-        sgst: Math.round(sgst * 100) / 100,
+        subtotal: round2(subtotal),
+        cgst: round2(cgst),
+        sgst: round2(sgst),
         total,
       },
       confirmation: `Create draft quotation for ${consigneeName} (${email}) with ${previewItems.length} line${previewItems.length === 1 ? '' : 's'}, total ₹${fmtINR(total)}?`,

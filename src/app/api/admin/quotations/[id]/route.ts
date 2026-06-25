@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryMany, queryOne } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 import { sendQuotationFinalizedEmail } from '@/lib/email'
 import { lineItemExGst } from '@/lib/pricing'
 
@@ -10,7 +11,7 @@ function calcTotals(items: any[]) {
   const cgst = items.reduce((s: number, i: any) => s + i.amount * i.gst_rate / 200, 0)
   const sgst = cgst
   const rawTotal = subtotal + cgst + sgst
-  const total = Math.round(rawTotal * 100) / 100
+  const total = round2(rawTotal)
   return { subtotal, cgst_amount: cgst, sgst_amount: sgst, total_amount: total }
 }
 

@@ -8,6 +8,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressFormModal from '@/components/visitor/AddressFormModal'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
+import { round2 } from '@/lib/gst'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { mrpDiscountPct } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
@@ -152,7 +153,7 @@ function CheckoutReviewPage() {
             imageUrl: null,
           })
           if (d.businessDiscount != null && Number(d.businessDiscount) > 0) {
-            setBusinessDiscountAmount(Math.round(Number(d.businessDiscount) * 100) / 100)
+            setBusinessDiscountAmount(round2(Number(d.businessDiscount)))
           }
           const imageUrl = `/api/products/${d.productId}/primary-image${d.variantId ? `?variantId=${d.variantId}` : ''}`
           fetch(imageUrl, { credentials: 'include' })

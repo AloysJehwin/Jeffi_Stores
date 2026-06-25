@@ -85,7 +85,7 @@ const EMAIL_TEMPLATES = [
   { value: 'announcement', label: 'Announcement' },
 ]
 
-const inputCls = 'w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
+const inputCls = 'w-full px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
 
 export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCount, onClose }: Props) {
   const [templateKey, setTemplateKey] = useState<'promotion' | 'announcement'>('promotion')

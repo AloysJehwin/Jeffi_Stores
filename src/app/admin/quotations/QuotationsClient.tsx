@@ -596,12 +596,12 @@ export default function QuotationsClient() {
                 inputClassName={inputCls + ' pr-9'}
               />
             </div>
-            <button onClick={() => loadList(1)} className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors">
+            <button onClick={() => loadList(1)} className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors">
               Search
             </button>
             {(searchQ || statusFilter !== 'all' || fromDate || toDate) && (
               <button onClick={() => { setSearchQ(''); setStatusFilter('all'); setFromDate(''); setToDate(''); syncUrl({ q: '', status: '', from: '', to: '' }) }}
-                className="px-4 py-2 border border-border-default rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
+                className="px-4 py-1.5 border border-border-default rounded-lg text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
                 Clear
               </button>
             )}

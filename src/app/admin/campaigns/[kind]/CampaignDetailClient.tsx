@@ -405,7 +405,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             type="button"
             onClick={generateWithAI}
             disabled={aiGenerating || !aiPrompt.trim()}
-            className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
+            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50 shrink-0"
           >
             {aiGenerating ? 'Generating…' : 'Generate'}
           </button>
@@ -518,7 +518,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             type="button"
             onClick={save}
             disabled={saving}
-            className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+            className="px-4 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
           >
             {saving ? 'Saving…' : 'Save changes'}
           </button>
@@ -533,7 +533,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             type="button"
             onClick={sendTest}
             disabled={testBusy || !testEmail.trim()}
-            className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
           >
             {testBusy ? 'Sending…' : 'Send test'}
           </button>

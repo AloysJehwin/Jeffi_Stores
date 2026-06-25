@@ -128,7 +128,7 @@ export default async function BusinessRFQsPage({
           placeholder="Search by RFQ number, company, email…"
           className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
         />
-        <button type="submit" className="px-4 py-2 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors">
+        <button type="submit" className="px-4 py-1.5 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors">
           Search
         </button>
       </form>

@@ -58,6 +58,11 @@ export interface GSTBreakdown {
   totalTax: number
 }
 
+/** Round a currency/percentage value to 2 decimal places without IEEE 754 drift. */
+export function round2(n: number): number {
+  return parseFloat(n.toFixed(2))
+}
+
 export function calculateGST(inclusivePrice: number, gstRate: number, isIGST: boolean): GSTBreakdown {
   if (gstRate <= 0) {
     return { taxableAmount: inclusivePrice, cgst: 0, sgst: 0, igst: 0, totalTax: 0 }

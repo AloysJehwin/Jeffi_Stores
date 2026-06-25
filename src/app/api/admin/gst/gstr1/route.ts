@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany } from '@/lib/db'
+import { round2 } from '@/lib/gst'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,7 +98,7 @@ export async function GET(request: NextRequest) {
 }
 
 function sum(rows: any[], field: string): number {
-  return Math.round(rows.reduce((acc: number, r: any) => acc + parseFloat(r[field] || '0'), 0) * 100) / 100
+  return round2(rows.reduce((acc: number, r: any) => acc + parseFloat(r[field] || '0'), 0))
 }
 
 function buildHsnSummary(rows: any[]) {
@@ -117,11 +118,11 @@ function buildHsnSummary(rows: any[]) {
   return Object.values(map).map(h => ({
     hsnCode: h.hsnCode,
     gstRate: h.gstRate,
-    taxableVal: Math.round(h.taxableVal * 100) / 100,
-    igstAmt: Math.round(h.igst * 100) / 100,
-    cgstAmt: Math.round(h.cgst * 100) / 100,
-    sgstAmt: Math.round(h.sgst * 100) / 100,
-    totalTax: Math.round((h.igst + h.cgst + h.sgst) * 100) / 100,
+    taxableVal: round2(h.taxableVal),
+    igstAmt: round2(h.igst),
+    cgstAmt: round2(h.cgst),
+    sgstAmt: round2(h.sgst),
+    totalTax: round2(h.igst + h.cgst + h.sgst),
   }))
 }
 
