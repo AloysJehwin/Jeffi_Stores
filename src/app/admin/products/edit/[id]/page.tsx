@@ -350,8 +350,8 @@ async function updateProduct(productId: string, formData: FormData) {
               if (!sv.sub_variant_name) continue
               const newSubSku = generateVariantSku(variantSku, sv.sub_variant_name)
               await query(
-                'UPDATE product_sub_variants SET sku = $1 WHERE id = $2',
-                [newSubSku, sv.id]
+                'UPDATE product_sub_variants SET sku = $1, discount_pct = $2 WHERE id = $3',
+                [newSubSku, discountPct, sv.id]
               )
             }
           } else if (!isPersisted && !variant._isDeleted) {
