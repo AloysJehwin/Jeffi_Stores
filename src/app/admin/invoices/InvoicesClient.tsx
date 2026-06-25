@@ -324,6 +324,7 @@ export default function InvoicesClient() {
         sell_unit_factor: 1,
         sell_unit_dimension: null,
         available_units: [],
+        selected_unit_key: '',
         unit_price: String(it.unit_price ?? ''),
         discount_pct: it.discount_pct ?? 0,
         mrp: it.mrp ?? 0,

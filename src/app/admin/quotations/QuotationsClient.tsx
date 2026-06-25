@@ -386,8 +386,7 @@ export default function QuotationsClient() {
           const mrpInclGst = Number(i.mrp) || unitPrice
           const rateExGst = mrpInclGst / (1 + gstRate / 100)
           // apply sell unit factor for count-dimension units (rate is per-piece)
-          const su = i.available_units[0] ?? null
-          const factor = (su && su.dimension === 'count' && su.factor > 1) ? su.factor : 1
+          const factor = (i.sell_unit_dimension === 'count' && (i.sell_unit_factor || 1) > 1) ? (i.sell_unit_factor || 1) : 1
           const effectiveQty = (Number(i.quantity) || 0) * factor
           return {
             description: i.product_name,
