@@ -159,10 +159,10 @@ export default function DatePicker({ value, onChange, disabled, min, max, classN
         type="button"
         disabled={disabled}
         onClick={openPicker}
-        className={`w-full flex items-center justify-between px-3 py-2 rounded-lg border bg-surface-secondary text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400 ${
+        className={`w-full flex items-center justify-between px-4 py-2 rounded-lg border bg-surface text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400 ${
           open
             ? 'border-accent-500 ring-2 ring-accent-500 dark:ring-accent-400'
-            : 'border-border-default hover:border-border-secondary'
+            : 'border-border-secondary hover:border-border-default'
         } ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'} text-${displayVal ? 'foreground' : 'foreground-muted'}`}
       >
         <span className={`whitespace-nowrap ${displayVal ? 'text-foreground' : 'text-foreground-muted'}`}>
