@@ -12,6 +12,7 @@ export interface SellUnit {
   display_label: string
   factor: number
   dimension: string
+  is_base: boolean
   min_qty: number
   max_qty: number | null
   qty_step: number
@@ -34,6 +35,7 @@ export interface LineItem {
   sell_unit_factor: number
   sell_unit_dimension: string | null
   available_units: SellUnit[]
+  selected_unit_key: string
   unit_price: string | number
   price_ex_gst?: number
   discount_pct: number
@@ -72,7 +74,8 @@ export function newLineItem(): LineItem {
     product_id: null, product_name: '', product_sku: '',
     variant_id: null, sub_variant_id: null, variant_name: '',
     hsn_code: '', gst_rate: '18', quantity: 1, unit: 'PCS',
-    buy_unit: null, buy_mode: null, sell_unit_factor: 1, sell_unit_dimension: null, available_units: [],
+    buy_unit: null, buy_mode: null, sell_unit_factor: 1, sell_unit_dimension: null,
+    available_units: [], selected_unit_key: '',
     unit_price: 0, discount_pct: 0, mrp: 0, inventory_quantity: null,
   }
 }
@@ -83,31 +86,46 @@ async function fetchProductUnits(productId: string, variantId?: string | null): 
     display_label: u.display_label || u.unit,
     factor: Number(u.factor) || 1,
     dimension: u.dimension || 'count',
+    is_base: !!u.is_base,
     min_qty: Number(u.min_qty) || 1,
     max_qty: u.max_qty != null ? Number(u.max_qty) : null,
     qty_step: Number(u.qty_step) || 1,
   }))
   try {
-    // Try variant-specific units first when a variant is selected
+    // Always fetch product-level units (includes base + extra count units)
+    const res = await fetch(`/api/admin/products/${productId}/units`, { credentials: 'include' })
+    if (!res.ok) return []
+    const productUnits = toUnits((await res.json()).units || [])
+
     if (variantId) {
+      // Fetch variant-specific units; if present, use variant's base unit
+      // but keep product-level non-base (extra) units (box, dozen, etc.)
       const vres = await fetch(
         `/api/admin/products/${productId}/units?variant_id=${variantId}`,
         { credentials: 'include' }
       )
       if (vres.ok) {
-        const vdata = await vres.json()
-        const vunits = toUnits(vdata.units || [])
-        if (vunits.length) return vunits
+        const vunits = toUnits((await vres.json()).units || [])
+        if (vunits.length) {
+          const variantBase = vunits.find(u => u.is_base) ?? vunits[0]
+          const productExtras = productUnits.filter(u => !u.is_base)
+          return [variantBase, ...productExtras]
+        }
       }
     }
-    // Fall back to product-level units
-    const res = await fetch(`/api/admin/products/${productId}/units`, { credentials: 'include' })
-    if (!res.ok) return []
-    const data = await res.json()
-    return toUnits(data.units || [])
+
+    return productUnits
   } catch {
     return []
   }
+}
+
+function getSelectedUnit(it: LineItem): SellUnit | null {
+  if (!it.available_units.length) return null
+  if (it.selected_unit_key) {
+    return it.available_units.find(u => u.unit === it.selected_unit_key) ?? it.available_units[0]
+  }
+  return it.available_units[0]
 }
 
 function calcLine(it: LineItem) {
@@ -117,7 +135,7 @@ function calcLine(it: LineItem) {
   const discPct = Number(it.discount_pct) || 0
   const mrpEx = mrpIncl / (1 + gstRate / 100)
   // For count-dimension units, MRP is per piece; multiply qty by factor
-  const su = it.available_units[0] ?? null
+  const su = getSelectedUnit(it)
   const effectiveQty = (su && su.dimension === 'count' && su.factor > 1)
     ? qty * su.factor
     : qty
@@ -202,6 +220,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
         return {
           ...it,
           available_units: found.units,
+          selected_unit_key: it.selected_unit_key || u.unit,
           buy_unit: it.buy_unit || u.unit,
           buy_mode: u.dimension === 'count' ? 'count' : u.dimension,
           sell_unit_factor: u.factor,
@@ -278,11 +297,12 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
   async function populateUnits(populated: LineItem): Promise<LineItem> {
     if (!populated.product_id) return populated
     const units = await fetchProductUnits(populated.product_id, populated.variant_id)
-    if (!units.length) return { ...populated, available_units: [], buy_unit: null }
+    if (!units.length) return { ...populated, available_units: [], selected_unit_key: '', buy_unit: null }
     const defaultUnit = units[0]
     return {
       ...populated,
       available_units: units,
+      selected_unit_key: defaultUnit.unit,
       buy_unit: defaultUnit.unit,
       buy_mode: defaultUnit.dimension === 'count' ? 'count' : defaultUnit.dimension,
       sell_unit_factor: defaultUnit.factor,
@@ -332,7 +352,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       ...it, product_id: null, product_name: '', product_sku: '',
       variant_id: null, variant_name: '', hsn_code: '', gst_rate: '18',
       unit_price: 0, discount_pct: 0, mrp: 0, inventory_quantity: null,
-      buy_unit: null, buy_mode: null, sell_unit_factor: 1, sell_unit_dimension: null, available_units: [],
+      buy_unit: null, buy_mode: null, sell_unit_factor: 1, sell_unit_dimension: null,
+      available_units: [], selected_unit_key: '',
     }))
     setNameInputs(p => { const n = { ...p }; delete n[itemId]; return n })
     setSkuInputs(p => { const n = { ...p }; delete n[itemId]; return n })
@@ -348,7 +369,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     const qty = Number(it.quantity) || 0
     const gstRate = Number(it.gst_rate) || 0
     const mrpEx = (Number(it.unit_price) || 0) / (1 + gstRate / 100)
-    const su = it.available_units[0] ?? null
+    const su = getSelectedUnit(it)
     const effectiveQty = (su && su.dimension === 'count' && su.factor > 1)
       ? qty * su.factor
       : qty
@@ -358,7 +379,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     const qty = Number(it.quantity) || 0
     const gstRate = Number(it.gst_rate) || 0
     const mrpEx = (Number(it.unit_price) || 0) / (1 + gstRate / 100)
-    const su = it.available_units[0] ?? null
+    const su = getSelectedUnit(it)
     const effectiveQty = (su && su.dimension === 'count' && su.factor > 1)
       ? qty * su.factor
       : qty
@@ -405,9 +426,10 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                       <div className="flex items-center gap-2 mt-0.5">
                         {item.product_sku && <p className="text-xs text-foreground-muted font-mono">{item.product_sku}</p>}
                         {item.inventory_quantity !== null && (() => {
-                          const factor = (item.sell_unit_dimension === 'count' && item.sell_unit_factor > 1) ? item.sell_unit_factor : 1
+                          const su = getSelectedUnit(item)
+                          const factor = (su && su.dimension === 'count' && su.factor > 1) ? su.factor : 1
                           const stockInUnits = factor > 1 ? Math.floor(item.inventory_quantity / factor) : item.inventory_quantity
-                          const unitLabel = factor > 1 ? (item.buy_unit || 'units') : 'pcs'
+                          const unitLabel = factor > 1 ? (su?.display_label ?? item.buy_unit ?? 'units') : 'pcs'
                           const isOut = stockInUnits === 0
                           const isLow = !isOut && stockInUnits <= 5
                           return (
@@ -561,7 +583,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                 <div>
                   <label className={labelCls}>Quantity <span className="text-red-500">*</span></label>
                   {(() => {
-                    const su = item.available_units[0] ?? null
+                    const su = getSelectedUnit(item)
                     const qMin  = su ? su.min_qty  : 0.001
                     const qStep = su ? su.qty_step : 1
                     // UI only caps at product_units.max_qty — stock is checked at finalization
@@ -638,9 +660,38 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                 </div>
                 <div>
                   <label className={labelCls}>Unit</label>
-                  <div className={inputCls + ' flex items-center justify-center font-medium text-center select-none bg-surface-secondary text-foreground'}>
-                    {item.buy_unit ? (item.available_units[0]?.display_label ?? item.buy_unit) : (item.unit || '—')}
-                  </div>
+                  {(() => {
+                    const countUnits = item.available_units.filter(u => u.dimension === 'count')
+                    if (countUnits.length > 1) {
+                      const selectedKey = item.selected_unit_key || countUnits[0].unit
+                      return (
+                        <AdminSelect
+                          value={selectedKey}
+                          onChange={v => {
+                            const picked = item.available_units.find(u => u.unit === v)
+                            if (!picked) return
+                            onChange(items.map(it => it.id !== item.id ? it : {
+                              ...it,
+                              selected_unit_key: picked.unit,
+                              buy_unit: picked.unit,
+                              sell_unit_factor: picked.factor,
+                              unit: picked.display_label.toUpperCase(),
+                            }))
+                          }}
+                          className="[&_button]:!bg-surface-secondary [&_button]:!border-border-default [&_button]:!rounded [&_button]:!py-1.5 [&_button]:!px-2 [&_button]:!text-sm [&_button]:!w-full"
+                          options={countUnits.map(u => ({
+                            value: u.unit,
+                            label: u.display_label + (u.factor > 1 ? ` (${u.factor} pcs)` : ''),
+                          }))}
+                        />
+                      )
+                    }
+                    return (
+                      <div className={inputCls + ' flex items-center justify-center font-medium text-center select-none bg-surface-secondary text-foreground'}>
+                        {item.buy_unit ? (getSelectedUnit(item)?.display_label ?? item.buy_unit) : (item.unit || '—')}
+                      </div>
+                    )
+                  })()}
                 </div>
                 <div>
                   <label className={labelCls}>MRP (incl. GST) <span className="text-red-500">*</span></label>
