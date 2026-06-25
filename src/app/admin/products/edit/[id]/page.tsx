@@ -7,6 +7,7 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
+import { round2 } from '@/lib/gst'
 
 function triggerEnrichment(productId: string) {
   const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
@@ -102,12 +103,12 @@ async function updateProduct(productId: string, formData: FormData) {
   const hasVariants = formData.get('has_variants') === 'true'
   const variantType = formData.get('variant_type') as string || null
   const subVariantType = formData.get('sub_variant_type') as string || null
-  const basePrice = hasVariants ? 0 : Math.round(parseFloat(formData.get('base_price') as string) * 100) / 100
-  const mrp = formData.get('mrp') ? Math.round(parseFloat(formData.get('mrp') as string) * 100) / 100 : null
-  const mrpExGst = formData.get('mrp_ex_gst') ? Math.round(parseFloat(formData.get('mrp_ex_gst') as string) * 100) / 100 : null
-  const salePrice = formData.get('price_ex_gst') ? Math.round(parseFloat(formData.get('price_ex_gst') as string) * 100) / 100 : null
-  const costPrice = formData.get('cost_price') ? Math.round(parseFloat(formData.get('cost_price') as string) * 100) / 100 : 0
-  const discountPct = formData.get('discount_pct') ? Math.round(parseFloat(formData.get('discount_pct') as string) * 100) / 100 : 0
+  const basePrice = hasVariants ? 0 : round2(parseFloat(formData.get('base_price') as string))
+  const mrp = formData.get('mrp') ? round2(parseFloat(formData.get('mrp') as string)) : null
+  const mrpExGst = formData.get('mrp_ex_gst') ? round2(parseFloat(formData.get('mrp_ex_gst') as string)) : null
+  const salePrice = formData.get('price_ex_gst') ? round2(parseFloat(formData.get('price_ex_gst') as string)) : null
+  const costPrice = formData.get('cost_price') ? round2(parseFloat(formData.get('cost_price') as string)) : 0
+  const discountPct = formData.get('discount_pct') ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2)) : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
   const mpn = formData.get('mpn') as string || null
@@ -320,11 +321,11 @@ async function updateProduct(productId: string, formData: FormData) {
                WHERE id = $21 AND product_id = $22`,
               [
                 variantSku, variant.variant_name,
-                variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
-                variant.mrp ? Math.round(parseFloat(variant.mrp) * 100) / 100 : null,
-                variant.mrp_ex_gst ? Math.round(parseFloat(variant.mrp_ex_gst) * 100) / 100 : null,
-                variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100
-                  : variant.price ? Math.round(parseFloat(variant.price) / (1 + gstPercentage / 100) * 100) / 100 : null,
+                variant.price ? round2(parseFloat(variant.price)) : null,
+                variant.mrp ? round2(parseFloat(variant.mrp)) : null,
+                variant.mrp_ex_gst ? round2(parseFloat(variant.mrp_ex_gst)) : null,
+                variant.price_ex_gst ? round2(parseFloat(variant.price_ex_gst))
+                  : variant.price ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100)) : null,
                 variant.stock_status || 'In Stock',
                 variant.mpn || null,
                 variant.gtin || null,
@@ -338,7 +339,7 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.height_cm ? parseFloat(variant.height_cm) : null,
                 variant.sub_variant_type || null,
                 variant.variant_type || null,
-                variant.discount_pct ? Math.round(parseFloat(variant.discount_pct) * 100) / 100 : 0,
+                variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
                 variant.id, productId,
               ]
             )
@@ -362,11 +363,11 @@ async function updateProduct(productId: string, formData: FormData) {
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, true)`,
               [
                 productId, variantSku, variant.variant_name,
-                variant.price ? Math.round(parseFloat(variant.price) * 100) / 100 : null,
-                variant.mrp ? Math.round(parseFloat(variant.mrp) * 100) / 100 : null,
-                variant.mrp_ex_gst ? Math.round(parseFloat(variant.mrp_ex_gst) * 100) / 100 : null,
-                variant.price_ex_gst ? Math.round(parseFloat(variant.price_ex_gst) * 100) / 100
-                  : variant.price ? Math.round(parseFloat(variant.price) / (1 + gstPercentage / 100) * 100) / 100 : null,
+                variant.price ? round2(parseFloat(variant.price)) : null,
+                variant.mrp ? round2(parseFloat(variant.mrp)) : null,
+                variant.mrp_ex_gst ? round2(parseFloat(variant.mrp_ex_gst)) : null,
+                variant.price_ex_gst ? round2(parseFloat(variant.price_ex_gst))
+                  : variant.price ? round2(parseFloat(variant.price) / (1 + gstPercentage / 100)) : null,
                 variant.stock_status || 'In Stock',
                 variant.mpn || null,
                 variant.gtin || null,
@@ -380,7 +381,7 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.height_cm ? parseFloat(variant.height_cm) : null,
                 variant.sub_variant_type || null,
                 variant.variant_type || null,
-                variant.discount_pct ? Math.round(parseFloat(variant.discount_pct) * 100) / 100 : 0,
+                variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
               ]
             )
           }

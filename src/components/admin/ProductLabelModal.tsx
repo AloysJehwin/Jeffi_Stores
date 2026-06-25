@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { LABEL_SIZES, LabelSpec, LabelSize } from '@/lib/label-sizes'
+import { round2 } from '@/lib/gst'
 
 interface LabelEntry {
   id: string
@@ -85,11 +86,11 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
   const variantName = entry?.variant_name || null
   const sku = entry?.sku || 'SKU-001'
   const brand = entry?.brand_name || null
-  const incGst = entry && entry.base_price ? Math.round(Number(entry.base_price) * 100) / 100 : null
-  const mrpInc = entry?.mrp && entry.mrp > 0 ? Math.round(Number(entry.mrp) * 100) / 100 : null
+  const incGst = entry && entry.base_price ? round2(Number(entry.base_price)) : null
+  const mrpInc = entry?.mrp && entry.mrp > 0 ? round2(Number(entry.mrp)) : null
   const gstPct = entry?.gst_percentage ?? 0
   const exGstDisplay = incGst && gstPct > 0 && entry?.price_ex_gst
-    ? Math.round(Number(entry.price_ex_gst) * 100) / 100
+    ? round2(Number(entry.price_ex_gst))
     : null
   const showMrp = mrpInc && incGst && mrpInc !== incGst
 

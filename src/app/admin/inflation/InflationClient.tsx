@@ -280,7 +280,7 @@ export default function InflationClient({ categories }: { categories: Category[]
               value={percentage}
               onChange={e => { setPercentage(e.target.value); setPreview(null) }}
               placeholder="e.g. 10 for +10%"
-              className="w-full px-4 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+              className="w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
             />
           </div>
         </div>

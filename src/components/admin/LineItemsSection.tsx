@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { applyDiscount, mrpDiscountPct, lineItemInclGst } from '@/lib/pricing'
+import { round2 } from '@/lib/gst'
 
 export interface SellUnit {
   unit: string
@@ -250,7 +251,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       : mrpDiscountPct(mrp, basePrice)
     // unit_price = MRP incl. GST (anchor); discount_pct is applied on top
     // Fall back to base_price if mrp is not set
-    const unit_price = mrp > 0 ? mrp : Math.round(basePrice * (1 + gstRate / 100) * 100) / 100
+    const unit_price = mrp > 0 ? mrp : round2(basePrice * (1 + gstRate / 100))
     return {
       ...it,
       product_id: s.product_id,
@@ -365,8 +366,8 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
     return s + exAmt * gstRate / 200
   }, 0)
   const sgst = cgst
-  const total = Math.round(rawTotal * 100) / 100
-  const roundOff = Math.round((total - rawTotal) * 100) / 100
+  const total = round2(rawTotal)
+  const roundOff = round2(total - rawTotal)
 
   return (
     <div className="bg-surface-elevated border border-border-default rounded-xl p-4">

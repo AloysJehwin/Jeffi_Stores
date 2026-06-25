@@ -967,7 +967,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     const disc = parseFloat(discountPct)
                     const mrpExN = parseFloat(v)
                     if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                      const newSaleEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
+                      const newSaleEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
                       const newSaleIncl = exToIncl(newSaleEx, gstRate)
                       setSalePrice(newSaleEx)
                       setBasePrice(newSaleIncl)
@@ -1041,7 +1041,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   const disc = parseFloat(v)
                   const mrpExN = parseFloat(mrpExGst)
                   if (!isNaN(disc) && !isNaN(mrpExN) && mrpExN > 0) {
-                    const newSaleEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
+                    const newSaleEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
                     const newSaleIncl = exToIncl(newSaleEx, gstRate)
                     setSalePrice(newSaleEx)
                     setBasePrice(newSaleIncl)
@@ -1051,7 +1051,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       setVariants(prev => prev.map(vr => {
                         const mrpExN2 = parseFloat(vr.mrp_ex_gst)
                         if (!isNaN(mrpExN2) && mrpExN2 > 0) {
-                          const newPriceEx = String(Math.round(mrpExN2 * (1 - disc / 100) * 100) / 100)
+                          const newPriceEx = parseFloat((mrpExN2 * (1 - disc / 100)).toFixed(2)).toString()
                           const newPriceIncl = exToIncl(newPriceEx, gstRate)
                           return { ...vr, discount_pct: v,
                             price_ex_gst: newPriceEx, price: newPriceIncl,
@@ -1364,7 +1364,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     const mrpExN = parseFloat(v)
                                     const disc = parseFloat(discountPct || '0')
                                     if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                                      const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
+                                      const newPriceEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
                                       const newPriceIncl = exToIncl(newPriceEx, gstRate)
                                       updated[index].price_ex_gst = newPriceEx
                                       updated[index].price = newPriceIncl
@@ -1557,7 +1557,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       const mrpExN = parseFloat(v)
                                       const disc = parseFloat(discountPct || '0')
                                       if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                                        const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
+                                        const newPriceEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
                                         const newPriceIncl = exToIncl(newPriceEx, gstRate)
                                         updated[index].price_ex_gst = newPriceEx
                                         updated[index].price = newPriceIncl
@@ -1852,7 +1852,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Ship Wt. (g)</label>
-                      <input type="number" step="1" min="0" value={popupVariant.weight_grams} onChange={(e) => updateVariant(popupIndex, 'weight_grams', e.target.value)} className="w-full h-9 px-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 500" />
+                      <input type="number" step="1" min="0" value={popupVariant.weight_grams} onChange={(e) => updateVariant(popupIndex, 'weight_grams', e.target.value)} className="w-full field-normal border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. 500" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">Package Type</label>
@@ -2150,7 +2150,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     const disc = parseFloat(discountPct || '0')
                                     const newMrpIncl = v ? exToIncl(v, gstRate) : ''
                                     if (!isNaN(mrpExN) && mrpExN > 0 && !isNaN(disc)) {
-                                      const newPriceEx = String(Math.round(mrpExN * (1 - disc / 100) * 100) / 100)
+                                      const newPriceEx = parseFloat((mrpExN * (1 - disc / 100)).toFixed(2)).toString()
                                       const newPriceIncl = exToIncl(newPriceEx, gstRate)
                                       setSubVariantEditDraft(d => d && ({ ...d, mrp_ex_gst: v, mrp: newMrpIncl, price_ex_gst: newPriceEx, price: newPriceIncl }))
                                     } else {
@@ -2281,7 +2281,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                             <input type="text" placeholder="auto" value={d.sku} onChange={(e) => setD('sku', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
-                            <button type="button" onClick={() => addSubVariant(variantPopupId)} disabled={!d.name || variantPopupId.startsWith('temp-')} className="px-4 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Add Sub-Variant</button>
+                            <button type="button" onClick={() => addSubVariant(variantPopupId)} disabled={!d.name || variantPopupId.startsWith('temp-')} className="field-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Add Sub-Variant</button>
                           </div>
                         </div>
                       )

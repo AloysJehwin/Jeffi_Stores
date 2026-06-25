@@ -120,7 +120,7 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
         <button
           onClick={() => setConfirming(true)}
           disabled={loading}
-          className="w-full px-4 py-2.5 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
+          className="w-full px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
         >
           {loading ? (
             <>

@@ -194,7 +194,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
               type="button"
               onClick={() => submit('approve')}
               disabled={isSubmitting}
-              className="flex-1 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Processing...' : 'Approve Return'}
             </button>
@@ -202,7 +202,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
               type="button"
               onClick={() => submit('reject')}
               disabled={isSubmitting}
-              className="flex-1 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+              className="flex-1 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Processing...' : 'Reject Return'}
             </button>
@@ -223,7 +223,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                 type="button"
                 onClick={handleCreateRVP}
                 disabled={isSubmitting}
-                className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
               >
                 {isSubmitting ? 'Creating...' : 'Create RVP Pickup (Delhivery QC)'}
               </button>
@@ -245,7 +245,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
             type="button"
             onClick={() => submit('mark_received')}
             disabled={isSubmitting}
-            className="w-full px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
           >
             {isSubmitting ? 'Processing...' : 'Mark Item as Received'}
           </button>
@@ -301,7 +301,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
               type="button"
               onClick={() => submit('process')}
               disabled={isSubmitting}
-              className="w-full px-4 py-2.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+              className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
             >
               {isSubmitting ? 'Processing...' : type === 'refund' ? 'Process Refund' : 'Create Replacement Order'}
             </button>

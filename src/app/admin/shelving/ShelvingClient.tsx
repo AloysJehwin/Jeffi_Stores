@@ -14,8 +14,8 @@ import { ap } from '@/lib/admin-path'
 type Tab = 'locations' | 'labels'
 type Panel = 'warehouse' | 'location' | 'stock'
 
-const btnPrimary = 'px-4 py-2.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
-const btnSecondary = 'px-4 py-2.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-50'
+const btnPrimary = 'px-4 py-2 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
+const btnSecondary = 'px-4 py-2 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-50'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 
@@ -547,7 +547,7 @@ function StockPanel({ location, stock, loading, locations, showAssign, setShowAs
             </div>
             <div className="flex items-center gap-2">
               {onPrintLabel && (
-                <button onClick={onPrintLabel} disabled={generating} className={btnSecondary + ' !py-2 !px-3 text-xs'}>
+                <button onClick={onPrintLabel} disabled={generating} className={btnSecondary + ' !px-3 text-xs'}>
                   {generating ? (
                     <span className="flex items-center gap-1.5">
                       <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
@@ -556,7 +556,7 @@ function StockPanel({ location, stock, loading, locations, showAssign, setShowAs
                   ) : 'Print Label'}
                 </button>
               )}
-              <button onClick={() => setShowAssign(!showAssign)} className={btnPrimary + ' !py-2 !px-3 text-xs'}>
+              <button onClick={() => setShowAssign(!showAssign)} className={btnPrimary + ' !px-3 text-xs'}>
                 + Assign Stock
               </button>
             </div>
@@ -577,7 +577,7 @@ function StockPanel({ location, stock, loading, locations, showAssign, setShowAs
               <div className="bg-surface-elevated rounded-xl border border-border-default p-12 text-center">
                 <p className="text-sm font-medium text-foreground-secondary">No stock assigned here yet</p>
                 <p className="text-xs text-foreground-muted mt-1 mb-4">Use the button above to assign products to this location</p>
-                <button onClick={() => setShowAssign(true)} className={btnPrimary + ' !py-2 !px-4 text-xs'}>
+                <button onClick={() => setShowAssign(true)} className={btnPrimary + ' !px-4 text-xs'}>
                   + Assign Stock
                 </button>
               </div>
