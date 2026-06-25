@@ -91,7 +91,7 @@ export default function ProductImageGallery({ images, productName, variantImages
 
           {/* Sale ribbon */}
           {discountPct != null && discountPct > 0 && (
-            <div className="absolute top-4 right-[-16px] w-20 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[10px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10">
+            <div className="absolute top-7 right-[-28px] w-32 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-xs font-bold text-center py-1 shadow-md pointer-events-none select-none z-10">
               SALE
             </div>
           )}

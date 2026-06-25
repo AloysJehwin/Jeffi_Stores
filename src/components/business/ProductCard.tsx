@@ -118,8 +118,8 @@ export default function ProductCard({
               </div>
             )}
             {discountPct > 0 && (
-              <div className="absolute top-8 right-[-32px] w-36 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[10px] font-bold text-center py-1 shadow-md pointer-events-none select-none z-10">
-                Business offer
+              <div className="absolute top-4 right-[-16px] w-20 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[8px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10 overflow-hidden">
+                SALE
               </div>
             )}
 
