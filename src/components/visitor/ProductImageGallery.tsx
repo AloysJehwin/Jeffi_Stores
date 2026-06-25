@@ -14,9 +14,10 @@ interface ProductImageGalleryProps {
   images: ProductImage[]
   productName: string
   variantImages?: ProductImage[]
+  discountPct?: number | null
 }
 
-export default function ProductImageGallery({ images, productName, variantImages }: ProductImageGalleryProps) {
+export default function ProductImageGallery({ images, productName, variantImages, discountPct }: ProductImageGalleryProps) {
   const displayImages = (variantImages && variantImages.length > 0) ? variantImages : images
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [isZoomed, setIsZoomed] = useState(false)
@@ -87,6 +88,13 @@ export default function ProductImageGallery({ images, productName, variantImages
               />
             </div>
           </div>
+
+          {/* Sale ribbon */}
+          {discountPct != null && discountPct > 0 && (
+            <div className="absolute top-4 right-[-16px] w-20 rotate-45 bg-gradient-to-r from-rose-500 to-orange-500 text-white text-[10px] font-bold text-center py-0.5 shadow-md pointer-events-none select-none z-10">
+              SALE
+            </div>
+          )}
 
           {/* Hover Overlay */}
           <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-5 transition-opacity pointer-events-none" />
