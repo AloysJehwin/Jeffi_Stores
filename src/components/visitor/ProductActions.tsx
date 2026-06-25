@@ -275,7 +275,7 @@ export default function ProductActions({
     const pool = variantUnits.length > 0 ? variantUnits : productLevelUnits
     return pool.find(u => Number(u.factor) === 1 && u.unit !== (sellUnit?.unit ?? '')) ?? null
   })()
-  const baseUnitLabel = baseUnit?.display_label ?? baseUnit?.unit ?? null
+  const baseUnitLabel = baseUnit?.display_label ?? baseUnit?.unit ?? (unitFactor !== 1 && sellUnit?.dimension === 'count' ? 'pc' : null)
   const showPerBasePrice = unitFactor !== 1
   const qtyStep = sellUnit?.dimension === 'count'
     ? 1
