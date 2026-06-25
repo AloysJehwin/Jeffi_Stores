@@ -351,12 +351,12 @@ export default function ProductReviews({ productId, productName }: ProductReview
     <div className="mt-10 sm:mt-14">
 
       {/* Section title — always on top, sticky */}
-      <div className="sticky top-16 lg:top-[80px] z-10 bg-surface py-3 mb-4 flex items-center justify-between gap-4">
+      <div className="sticky top-16 lg:top-[80px] z-10 bg-surface py-3 mb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-4">
         <div>
           <p className="text-accent-500 text-xs font-bold uppercase tracking-widest mb-0.5">What buyers say</p>
           <h2 className="text-xl sm:text-2xl font-extrabold text-foreground">Customer Reviews</h2>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex items-center gap-3 sm:shrink-0">
           {reviews.length > 0 && (
             <label className="flex items-center gap-2 text-sm">
               <span className="text-foreground-muted hidden sm:inline">Sort by</span>

@@ -205,7 +205,7 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
           <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
         </svg>
         <span className="text-[11px] font-medium text-foreground-muted group-hover:text-accent-600 transition-colors whitespace-nowrap">Secure Payment</span>
-        <div className="flex items-center gap-1 ml-auto flex-wrap justify-end">
+        <div className="flex items-center gap-1 ml-auto flex-nowrap">
           {['UPI', 'Cards', 'Net Banking', 'Wallets'].map(m => (
             <span key={m} className="text-[9px] font-semibold text-foreground-secondary bg-surface-secondary border border-border-default px-1 py-0.5 rounded whitespace-nowrap">
               {m}
