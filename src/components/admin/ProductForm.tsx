@@ -758,6 +758,7 @@ export default function ProductForm({ categories, brands, action, product, produ
             mrp: v.mrp,
             mrp_ex_gst: v.mrp_ex_gst,
             price_ex_gst: v.price_ex_gst || (v.price ? inclToEx(v.price, gstRate) : ''),
+            discount_pct: discountPct || '0',
           }
         })
         formData.set('variants_json', JSON.stringify(convertedVariants))
