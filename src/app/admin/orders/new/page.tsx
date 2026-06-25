@@ -287,14 +287,14 @@ export default function NewOfflineOrderPage() {
           <button
             type="submit"
             disabled={submitting}
-            className="px-6 py-2.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
+            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50"
           >
             {submitting ? 'Creating...' : 'Create Order & Generate Invoice'}
           </button>
           <button
             type="button"
             onClick={() => router.back()}
-            className="px-6 py-2.5 bg-surface border border-border-default rounded-lg text-sm font-medium text-foreground"
+            className="px-6 py-2 bg-surface border border-border-default rounded-lg text-sm font-medium text-foreground"
           >
             Cancel
           </button>

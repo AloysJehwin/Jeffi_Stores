@@ -54,7 +54,7 @@ const FIELD_TYPES = [
   { value: 'rating', label: 'Star rating' },
 ]
 
-const inputClass = 'w-full px-4 py-2.5 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
+const inputClass = 'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
 const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
 function randomId() {
@@ -223,7 +223,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
                     value={field.label}
                     onChange={e => updateField(field.id, { label: e.target.value })}
                     placeholder="Field label"
-                    className="px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    className="px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
                   />
                   <AdminSelect
                     sm

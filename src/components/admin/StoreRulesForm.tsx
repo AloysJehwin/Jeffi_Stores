@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { round2 } from '@/lib/gst'
 
 export default function StoreRulesForm({ minOrderAmount }: { minOrderAmount: number }) {
   const [value, setValue] = useState(String(minOrderAmount))
@@ -22,7 +23,7 @@ export default function StoreRulesForm({ minOrderAmount }: { minOrderAmount: num
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ key: 'min_order_amount', value: String(Math.round(num * 100) / 100) }),
+      body: JSON.stringify({ key: 'min_order_amount', value: String(round2(num)) }),
     })
     setSaving(false)
     if (res.ok) {

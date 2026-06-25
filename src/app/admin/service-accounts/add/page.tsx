@@ -207,7 +207,7 @@ curl --cert cert.pem --key key.pem \\
                 <button
                   type="button"
                   onClick={() => router.push(ap('/admin/service-accounts'))}
-                  className="w-full inline-flex items-center justify-center px-4 py-2.5 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground text-sm font-medium transition-colors"
+                  className="w-full inline-flex items-center justify-center px-4 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground text-sm font-medium transition-colors"
                 >
                   Back to Service Accounts
                 </button>
@@ -345,7 +345,7 @@ curl --cert cert.pem --key key.pem \\
           <button
             type="submit"
             disabled={loading || !name.trim()}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-secondary-500 hover:bg-secondary-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+            className="inline-flex items-center gap-2 px-5 py-2 rounded-lg bg-secondary-500 hover:bg-secondary-600 disabled:opacity-50 text-white text-sm font-medium transition-colors"
           >
             {loading ? (
               <>
@@ -360,7 +360,7 @@ curl --cert cert.pem --key key.pem \\
           <button
             type="button"
             onClick={() => router.push(ap('/admin/service-accounts'))}
-            className="px-5 py-2.5 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground text-sm font-medium transition-colors"
+            className="px-5 py-2 rounded-lg border border-border-default bg-surface hover:bg-surface-secondary text-foreground text-sm font-medium transition-colors"
           >
             Cancel
           </button>
