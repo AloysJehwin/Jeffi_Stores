@@ -20,6 +20,7 @@ vi.mock('@/lib/gst', () => ({
     const half = Math.round((totalTax / 2) * 100) / 100
     return { taxableAmount: taxable, cgst: half, sgst: Math.round((totalTax - half) * 100) / 100, igst: 0, totalTax }
   }),
+  round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
 vi.mock('@/lib/invoice', () => ({

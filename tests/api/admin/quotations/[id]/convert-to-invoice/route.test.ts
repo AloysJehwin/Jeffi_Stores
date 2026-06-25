@@ -25,6 +25,7 @@ vi.mock('@/lib/gst', () => ({
   generateInvoiceNumber: vi.fn(),
   getNextInvoiceSequence: vi.fn(),
   getFinancialYear: vi.fn(),
+  round2: (n: number) => Math.round(n * 100) / 100,
 }))
 
 vi.mock('@/lib/inventory', () => ({

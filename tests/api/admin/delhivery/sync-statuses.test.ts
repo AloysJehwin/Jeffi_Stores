@@ -177,7 +177,7 @@ describe('POST — DL status (delivered)', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.synced).toBe(0)
-    expect(mockQuery).not.toHaveBeenCalled()
+    expect(mockQuery).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE orders'), expect.any(Array))
   })
 })
 

@@ -20,6 +20,7 @@ vi.mock('@/lib/s3', () => ({
 }))
 vi.mock('@/lib/gst', () => ({
   getFinancialYear: vi.fn().mockReturnValue('2024-25'),
+  round2: (n: number) => Math.round(n * 100) / 100,
 }))
 vi.mock('@/lib/invoice', () => ({
   generateOrderInvoice: vi.fn().mockResolvedValue(Buffer.from('invoice-data')),
