@@ -12,6 +12,7 @@ vi.mock('@/lib/queries', () => ({
 vi.mock('@/lib/rag', () => ({
   embed: vi.fn().mockResolvedValue([0.1, 0.2, 0.3]),
   findSimilarProductIds: vi.fn(),
+  queryManyReplica: vi.fn(),
 }))
 vi.mock('pdf-parse', () => ({
   default: vi.fn(),
@@ -31,6 +32,7 @@ const mockQueryMany = vi.mocked(db.queryMany)
 const mockQueryOne = vi.mocked(db.queryOne)
 const mockQuery = vi.mocked(db.query)
 const mockEmbed = vi.mocked(rag.embed)
+const mockQueryManyReplica = vi.mocked(rag.queryManyReplica)
 const mockOcrPdfPages = vi.mocked(vision.ocrPdfPages)
 const mockOcrImage = vi.mocked(vision.ocrImage)
 
@@ -307,8 +309,8 @@ describe('match_quotation_items', () => {
     expect(result.summary).toMatch(/No lines provided/i)
   })
 
-  it('returns err for more than 30 lines', async () => {
-    const lines = JSON.stringify(Array(31).fill({ requestedText: 'bolt', qty: 1 }))
+  it('returns err for more than 50 lines', async () => {
+    const lines = JSON.stringify(Array(51).fill({ requestedText: 'bolt', qty: 1 }))
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.ok).toBe(false)
     expect(result.summary).toMatch(/Too many lines/i)
@@ -316,7 +318,7 @@ describe('match_quotation_items', () => {
 
   it('marks line unmatched when requestedText is empty string', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
-    mockQueryMany.mockResolvedValue([])
+    mockQueryManyReplica.mockResolvedValue([])
     const lines = JSON.stringify([{ requestedText: '', qty: 1 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.ok).toBe(true)
@@ -325,7 +327,7 @@ describe('match_quotation_items', () => {
 
   it('marks line unmatched when qty is 0', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
-    mockQueryMany.mockResolvedValue([])
+    mockQueryManyReplica.mockResolvedValue([])
     const lines = JSON.stringify([{ requestedText: 'bolt', qty: 0 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.data.lines[0].status).toBe('unmatched')
@@ -333,7 +335,7 @@ describe('match_quotation_items', () => {
 
   it('marks line unmatched when qty is negative', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
-    mockQueryMany.mockResolvedValue([])
+    mockQueryManyReplica.mockResolvedValue([])
     const lines = JSON.stringify([{ requestedText: 'bolt', qty: -5 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.data.lines[0].status).toBe('unmatched')
@@ -341,7 +343,7 @@ describe('match_quotation_items', () => {
 
   it('marks line unmatched when qty is NaN (non-numeric string)', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
-    mockQueryMany.mockResolvedValue([])
+    mockQueryManyReplica.mockResolvedValue([])
     const lines = JSON.stringify([{ requestedText: 'bolt', qty: 'abc' }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.data.lines[0].status).toBe('unmatched')
@@ -349,7 +351,7 @@ describe('match_quotation_items', () => {
 
   it('returns unmatched when embeddings query returns empty', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
-    mockQueryMany.mockResolvedValue([])
+    mockQueryManyReplica.mockResolvedValue([])
     const lines = JSON.stringify([{ requestedText: 'obscure item nobody sells', qty: 1 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.data.lines[0].status).toBe('unmatched')
@@ -359,9 +361,8 @@ describe('match_quotation_items', () => {
   it('returns unmatched when top candidate sim < 0.45', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
     // embeddings query → low sim product
-    mockQueryMany
-      .mockResolvedValueOnce([{ source_table: 'products', source_id: 'p1', sim: 0.3 }])
-      .mockResolvedValueOnce([{ id: 'p1', name: 'Widget', sku: 'W1', price: 50 }])
+    mockQueryManyReplica.mockResolvedValueOnce([{ source_table: 'products', source_id: 'p1', sim: 0.3 }])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Widget', sku: 'W1', price: 50 }])
     const lines = JSON.stringify([{ requestedText: 'unrelated item', qty: 1 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.data.lines[0].status).toBe('unmatched')
@@ -370,9 +371,8 @@ describe('match_quotation_items', () => {
   it('returns matched when top sim >= threshold with single candidate', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
     // embeddings returns 1 product result with high sim; no variants
-    mockQueryMany
-      .mockResolvedValueOnce([{ source_table: 'products', source_id: 'p1', sim: 0.9 }])
-      .mockResolvedValueOnce([{ id: 'p1', name: 'Bolt M20', sku: 'BOLT-M20', price: 100 }])
+    mockQueryManyReplica.mockResolvedValueOnce([{ source_table: 'products', source_id: 'p1', sim: 0.9 }])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Bolt M20', sku: 'BOLT-M20', price: 100 }])
     const lines = JSON.stringify([{ requestedText: 'M20 bolt', qty: 5 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.data.lines[0].status).toBe('matched')
@@ -381,15 +381,14 @@ describe('match_quotation_items', () => {
 
   it('returns matched when top sim >= threshold and lead >= 0.05 over second', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
-    mockQueryMany
-      .mockResolvedValueOnce([
-        { source_table: 'products', source_id: 'p1', sim: 0.85 },
-        { source_table: 'products', source_id: 'p2', sim: 0.79 },
-      ])
-      .mockResolvedValueOnce([
-        { id: 'p1', name: 'Bolt M20', sku: 'BOLT-M20', price: 100 },
-        { id: 'p2', name: 'Bolt M16', sku: 'BOLT-M16', price: 90 },
-      ])
+    mockQueryManyReplica.mockResolvedValueOnce([
+      { source_table: 'products', source_id: 'p1', sim: 0.85 },
+      { source_table: 'products', source_id: 'p2', sim: 0.79 },
+    ])
+    mockQueryMany.mockResolvedValueOnce([
+      { id: 'p1', name: 'Bolt M20', sku: 'BOLT-M20', price: 100 },
+      { id: 'p2', name: 'Bolt M16', sku: 'BOLT-M16', price: 90 },
+    ])
     const lines = JSON.stringify([{ requestedText: 'M20 structural bolt', qty: 10 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.data.lines[0].status).toBe('matched')
@@ -398,15 +397,14 @@ describe('match_quotation_items', () => {
   it('returns ambiguous when two candidates are close in score', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
     // sim 0.82 vs 0.80 — diff 0.02 < 0.05, both >= 0.45, top >= default threshold 0.62
-    mockQueryMany
-      .mockResolvedValueOnce([
-        { source_table: 'products', source_id: 'p1', sim: 0.82 },
-        { source_table: 'products', source_id: 'p2', sim: 0.80 },
-      ])
-      .mockResolvedValueOnce([
-        { id: 'p1', name: 'Bolt M20', sku: 'BOLT-M20', price: 100 },
-        { id: 'p2', name: 'Bolt M22', sku: 'BOLT-M22', price: 105 },
-      ])
+    mockQueryManyReplica.mockResolvedValueOnce([
+      { source_table: 'products', source_id: 'p1', sim: 0.82 },
+      { source_table: 'products', source_id: 'p2', sim: 0.80 },
+    ])
+    mockQueryMany.mockResolvedValueOnce([
+      { id: 'p1', name: 'Bolt M20', sku: 'BOLT-M20', price: 100 },
+      { id: 'p2', name: 'Bolt M22', sku: 'BOLT-M22', price: 105 },
+    ])
     const lines = JSON.stringify([{ requestedText: 'bolt', qty: 1 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.data.lines[0].status).toBe('ambiguous')
@@ -416,9 +414,8 @@ describe('match_quotation_items', () => {
   it('returns ambiguous when top sim is between 0.45 and threshold', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
     // sim 0.55 < default threshold 0.62, but >= 0.45 → ambiguous
-    mockQueryMany
-      .mockResolvedValueOnce([{ source_table: 'products', source_id: 'p1', sim: 0.55 }])
-      .mockResolvedValueOnce([{ id: 'p1', name: 'Bolt', sku: 'B', price: 80 }])
+    mockQueryManyReplica.mockResolvedValueOnce([{ source_table: 'products', source_id: 'p1', sim: 0.55 }])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Bolt', sku: 'B', price: 80 }])
     const lines = JSON.stringify([{ requestedText: 'some bolt', qty: 2 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.data.lines[0].status).toBe('ambiguous')
@@ -429,8 +426,8 @@ describe('match_quotation_items', () => {
     // embeddings: one variant result
     // variant lookup: maps v1 → p1
     // products lookup: p1 details
+    mockQueryManyReplica.mockResolvedValueOnce([{ source_table: 'product_variants', source_id: 'v1', sim: 0.92 }])
     mockQueryMany
-      .mockResolvedValueOnce([{ source_table: 'product_variants', source_id: 'v1', sim: 0.92 }])
       .mockResolvedValueOnce([{ id: 'v1', product_id: 'p1' }])
       .mockResolvedValueOnce([{ id: 'p1', name: 'Bolt M20 Variant', sku: 'BOLT-V', price: 120 }])
     const lines = JSON.stringify([{ requestedText: 'M20 hex bolt DIN933', qty: 25 }])
@@ -440,11 +437,11 @@ describe('match_quotation_items', () => {
 
   it('handles mix of products and variants in same embeddings result', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
+    mockQueryManyReplica.mockResolvedValueOnce([
+      { source_table: 'products', source_id: 'p1', sim: 0.88 },
+      { source_table: 'product_variants', source_id: 'v1', sim: 0.86 },
+    ])
     mockQueryMany
-      .mockResolvedValueOnce([
-        { source_table: 'products', source_id: 'p1', sim: 0.88 },
-        { source_table: 'product_variants', source_id: 'v1', sim: 0.86 },
-      ])
       .mockResolvedValueOnce([{ id: 'v1', product_id: 'p2' }]) // variant → p2
       .mockResolvedValueOnce([
         { id: 'p1', name: 'Bolt Direct', sku: 'BD', price: 100 },
@@ -459,9 +456,8 @@ describe('match_quotation_items', () => {
   it('uses custom simThreshold when provided', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
     // sim 0.75 >= custom threshold 0.70, single candidate → matched
-    mockQueryMany
-      .mockResolvedValueOnce([{ source_table: 'products', source_id: 'p1', sim: 0.75 }])
-      .mockResolvedValueOnce([{ id: 'p1', name: 'Widget', sku: 'W', price: 50 }])
+    mockQueryManyReplica.mockResolvedValueOnce([{ source_table: 'products', source_id: 'p1', sim: 0.75 }])
+    mockQueryMany.mockResolvedValueOnce([{ id: 'p1', name: 'Widget', sku: 'W', price: 50 }])
     const lines = JSON.stringify([{ requestedText: 'widget', qty: 1 }])
     const result = await getTool('match_quotation_items').handler({ lines, simThreshold: 0.70 }) as any
     expect(result.data.lines[0].status).toBe('matched')
@@ -470,7 +466,7 @@ describe('match_quotation_items', () => {
 
   it('clamps simThreshold to [0.3, 0.95]', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
-    mockQueryMany.mockResolvedValue([])
+    mockQueryManyReplica.mockResolvedValue([])
     const lines = JSON.stringify([{ requestedText: 'something', qty: 1 }])
     const result = await getTool('match_quotation_items').handler({ lines, simThreshold: 0.01 }) as any
     expect(result.data.threshold).toBe(0.3) // clamped to min 0.3
@@ -480,8 +476,7 @@ describe('match_quotation_items', () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
     // Line 1: no embeddings → unmatched
     // Line 2: empty text → unmatched (skips embed)
-    mockQueryMany
-      .mockResolvedValueOnce([]) // line 1 embeddings
+    mockQueryManyReplica.mockResolvedValueOnce([]) // line 1 embeddings
     const lines = JSON.stringify([
       { requestedText: 'unknown', qty: 1 },
       { requestedText: '', qty: 1 },
@@ -1105,8 +1100,8 @@ describe('match_quotation_items embeddings catch fallback', () => {
 
   it('treats line as unmatched when embeddings query rejects', async () => {
     mockEmbed.mockResolvedValue([0.1, 0.2, 0.3])
-    // First queryMany call (embeddings SELECT) rejects — .catch(() => []) should fire
-    mockQueryMany.mockRejectedValueOnce(new Error('DB down'))
+    // queryManyReplica (embeddings SELECT) rejects — .catch(() => []) should fire
+    mockQueryManyReplica.mockRejectedValueOnce(new Error('DB down'))
     const lines = JSON.stringify([{ requestedText: 'M16 bolt', qty: 2 }])
     const result = await getTool('match_quotation_items').handler({ lines }) as any
     expect(result.ok).toBe(true)
