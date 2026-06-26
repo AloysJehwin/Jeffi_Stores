@@ -50,7 +50,7 @@ export default function AdminShell({
   }
 
   return (
-    <div className="h-screen flex flex-row bg-surface-secondary">
+    <div className="fixed inset-0 flex flex-row bg-surface-secondary">
       {/* Left sidebar — desktop only */}
       <AdminSidebarNav
         navLinks={desktopNavLinks}
@@ -59,7 +59,7 @@ export default function AdminShell({
       />
 
       {/* Right column: top bar + content */}
-      <div className="flex flex-col flex-1 min-w-0 h-full">
+      <div className="flex flex-col flex-1 min-w-0 h-full overflow-hidden">
 
         {/* Top bar */}
         <div className="flex items-center px-4 h-12 bg-secondary-500 dark:bg-secondary-700 shrink-0 gap-3">
