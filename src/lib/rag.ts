@@ -39,6 +39,19 @@ function toVectorLiteral(vec: number[]): string {
   return `[${vec.join(',')}]`
 }
 
+export async function queryManyReplica<T = Record<string, unknown>>(
+  sql: string,
+  params: unknown[] = []
+): Promise<T[]> {
+  const client = await getPool().connect()
+  try {
+    const result = await client.query(sql, params)
+    return result.rows as T[]
+  } finally {
+    client.release()
+  }
+}
+
 export async function embed(text: string): Promise<number[]> {
   const url = process.env.RAG_OLLAMA_URL || 'http://100.82.208.8:11434'
   const model = process.env.RAG_EMBED_MODEL || 'nomic-embed-text'
