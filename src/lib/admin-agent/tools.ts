@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
-import { embed, findSimilarCustomers } from '@/lib/rag'
+import { embed, findSimilarCustomers, queryManyReplica } from '@/lib/rag'
 import { SALES_TOOLS } from './tools/sales'
 import { MARKETING_TOOLS } from './tools/marketing'
 import { CATALOG_TOOLS } from './tools/catalog'
@@ -233,7 +233,7 @@ export const TOOLS: ToolDef[] = [
       }
 
       // Fallback: SQL ILIKE on name / email / phone
-      const out = await queryMany(
+      const out = await queryManyReplica(
         `SELECT u.id::text, u.email, u.first_name, u.last_name, u.phone, u.created_at,
                 COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::int AS paid_orders,
                 COALESCE((SELECT SUM(o.total_amount) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::text AS lifetime_value
@@ -261,7 +261,7 @@ export const TOOLS: ToolDef[] = [
     handler: async ({ days, limit }) => {
       const d = clamp(typeof days === 'number' ? days : 7, 1, 90)
       const lim = clamp(typeof limit === 'number' ? limit : 20, 1, 100)
-      const rows = await queryMany(
+      const rows = await queryManyReplica(
         `SELECT u.id::text, u.email, u.first_name, u.last_name, u.phone, u.created_at,
                 COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::int AS paid_orders
          FROM users u

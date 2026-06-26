@@ -30,6 +30,7 @@ vi.mock('@/lib/rag', () => ({
   embed: vi.fn(),
   findSimilarProductIds: vi.fn(),
   findSimilarCustomers: vi.fn(),
+  queryManyReplica: vi.fn(),
 }))
 vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_PRICE_SQL: '(SELECT MIN(price) FROM product_variants WHERE product_id = p.id)',
@@ -52,6 +53,7 @@ const mockQueryMany = vi.mocked(db.queryMany)
 const mockQueryOne = vi.mocked(db.queryOne)
 const mockEmbed = vi.mocked(rag.embed)
 const mockFindSimilarCustomers = vi.mocked(rag.findSimilarCustomers)
+const mockQueryManyReplica = vi.mocked(rag.queryManyReplica)
 
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
@@ -229,7 +231,7 @@ describe('admin-agent/tools', () => {
 
     it('returns empty customers when no semantic or sql matches', async () => {
       mockFindSimilarCustomers.mockResolvedValueOnce([]) // no semantic hits
-      mockQueryMany.mockResolvedValueOnce([])            // no SQL fallback hits
+      mockQueryManyReplica.mockResolvedValueOnce([])     // no SQL fallback hits
       const result = await tool().handler({ query: 'nobody' })
       expect((result as any).customers).toHaveLength(0)
     })
@@ -250,7 +252,7 @@ describe('admin-agent/tools', () => {
 
     it('falls back to SQL ILIKE when semantic search returns empty', async () => {
       mockFindSimilarCustomers.mockResolvedValueOnce([])
-      mockQueryMany.mockResolvedValueOnce([
+      mockQueryManyReplica.mockResolvedValueOnce([
         { id: 'u3', email: 'bob@test.com', first_name: 'Bob', last_name: 'Brown', phone: null, created_at: '2024-03-01', paid_orders: 0, lifetime_value: '0' },
       ])
       const result = await tool().handler({ query: 'bob' })
@@ -260,7 +262,7 @@ describe('admin-agent/tools', () => {
 
     it('falls back to SQL when findSimilarCustomers throws', async () => {
       mockFindSimilarCustomers.mockRejectedValueOnce(new Error('replica unreachable'))
-      mockQueryMany.mockResolvedValueOnce([
+      mockQueryManyReplica.mockResolvedValueOnce([
         { id: 'u4', email: 'carol@test.com', first_name: 'Carol', last_name: 'White', phone: null, created_at: '2024-04-01', paid_orders: 1, lifetime_value: '300' },
       ])
       const result = await tool().handler({ query: 'carol' })
@@ -1084,7 +1086,7 @@ describe('admin-agent/tools', () => {
 
     it('handles findSimilarCustomers throwing and falls back to SQL', async () => {
       mockFindSimilarCustomers.mockRejectedValueOnce(new Error('network error'))
-      mockQueryMany.mockResolvedValueOnce([])
+      mockQueryManyReplica.mockResolvedValueOnce([])
       const result = await tool().handler({ query: 'alice' })
       expect((result as any).customers).toHaveLength(0)
       expect((result as any).source).toBe('sql_fallback')
@@ -1095,7 +1097,7 @@ describe('admin-agent/tools', () => {
     const tool = () => getTool('get_recent_customers')!
 
     it('returns customers joined in the last 7 days by default', async () => {
-      mockQueryMany.mockResolvedValueOnce([
+      mockQueryManyReplica.mockResolvedValueOnce([
         { id: 'u1', email: 'new@test.com', first_name: 'New', last_name: 'User', phone: null, created_at: '2026-06-25', paid_orders: 0 },
       ])
       const result = await tool().handler({})
@@ -1105,23 +1107,23 @@ describe('admin-agent/tools', () => {
     })
 
     it('respects custom days and limit params', async () => {
-      mockQueryMany.mockResolvedValueOnce([])
+      mockQueryManyReplica.mockResolvedValueOnce([])
       const result = await tool().handler({ days: 30, limit: 50 })
       expect((result as any).days).toBe(30)
-      const params = mockQueryMany.mock.calls[0][1] as unknown[]
+      const params = mockQueryManyReplica.mock.calls[0][1] as unknown[]
       expect(params[0]).toBe(30)
       expect(params[1]).toBe(50)
     })
 
     it('clamps days to max 90', async () => {
-      mockQueryMany.mockResolvedValueOnce([])
+      mockQueryManyReplica.mockResolvedValueOnce([])
       await tool().handler({ days: 999 })
-      const params = mockQueryMany.mock.calls[0][1] as unknown[]
+      const params = mockQueryManyReplica.mock.calls[0][1] as unknown[]
       expect(params[0]).toBe(90)
     })
 
     it('returns empty array when no recent customers', async () => {
-      mockQueryMany.mockResolvedValueOnce([])
+      mockQueryManyReplica.mockResolvedValueOnce([])
       const result = await tool().handler({ days: 1 })
       expect((result as any).customers).toHaveLength(0)
       expect((result as any).count).toBe(0)
