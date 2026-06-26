@@ -1,7 +1,7 @@
 import { query, queryMany, queryOne } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
-import { embed } from '@/lib/rag'
+import { embed, queryManyReplica } from '@/lib/rag'
 import type { ToolDef } from '../tools'
 import { ok, err } from '../tool-envelope'
 import { ocrImage, ocrPdfPages } from '../vision'
@@ -239,7 +239,7 @@ function vec(arr: number[]): string { return '[' + arr.join(',') + ']' }
 
 const match_quotation_items: ToolDef = {
   name: 'match_quotation_items',
-  description: 'Take a free-form list of requested items (text per line + qty) and resolve them against the catalog using semantic search. Returns each line as matched | ambiguous | unmatched with up to 3 candidate products per ambiguous line. Use BEFORE propose_create_quotation when the admin gives a free-form request like "50 M27 bolts, 200 washers". DOES NOT create anything — read-only.',
+  description: 'Take a free-form list of requested items (text per line + qty) and resolve them against the catalog using semantic search. Returns each line as matched | ambiguous | unmatched with up to 3 candidate products per ambiguous line. Use BEFORE propose_create_quotation when the admin gives a free-form request like "50 M27 bolts, 200 washers". IMPORTANT: pass ALL lines in a SINGLE call (up to 50 lines). Do NOT split into multiple calls. DOES NOT create anything — read-only.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -266,7 +266,7 @@ const match_quotation_items: ToolDef = {
       return err('Invalid lines payload', 'lines must be a JSON array of {requestedText, qty}')
     }
     if (parsed.length === 0) return err('No lines provided')
-    if (parsed.length > 30) return err('Too many lines', 'Limit 30 lines per call')
+    if (parsed.length > 50) return err('Too many lines', 'Limit 50 lines per call')
 
     const threshold = typeof simThreshold === 'number' ? Math.max(0.3, Math.min(0.95, simThreshold)) : 0.62
 
@@ -285,7 +285,7 @@ const match_quotation_items: ToolDef = {
         continue
       }
       const v = await embed(text)
-      const ids = await queryMany<{ source_table: string; source_id: string; sim: number }>(
+      const ids = await queryManyReplica<{ source_table: string; source_id: string; sim: number }>(
         `SELECT source_table, source_id, 1 - (embedding <=> $1::vector) AS sim
          FROM embeddings WHERE source_table IN ('products', 'product_variants')
          ORDER BY embedding <=> $1::vector LIMIT 6`,
