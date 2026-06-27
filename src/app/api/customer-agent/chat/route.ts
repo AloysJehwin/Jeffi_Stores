@@ -114,8 +114,8 @@ function formatProductList(products: ProductRow[], intro: string, note?: string)
     return note || 'No matching products found.'
   }
   const lines = products.map(p => {
-    const price = p.price ? ` — ₹${p.price}` : ''
-    return `[[product:${p.slug}|${p.name}]]${price}`
+    const price = p.price ? `|${p.price}` : ''
+    return `[[product:${p.slug}|${p.name}${price}]]`
   })
   const result = `${intro}\n\n${lines.join('\n')}`
   return note ? `${result}\n\n_${note}_` : result
