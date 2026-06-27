@@ -1,7 +1,5 @@
-import { Pool } from 'pg'
 import { queryMany, queryOne } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
-import { embed } from '@/lib/rag'
 import { findSimilarProductIds } from '@/lib/rag'
 
 function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
@@ -25,6 +23,51 @@ export interface CustomerToolDef {
 }
 
 export const CUSTOMER_TOOLS: CustomerToolDef[] = [
+  {
+    name: 'recommend_for_project',
+    description: 'Find products for a described project or use-case using semantic vector search. Use when the user describes what they are building or doing — e.g. "I need fasteners for a wooden shelf". Returns ranked products with price and stock. Always prefer this over search_products for project-style queries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Description of the project or use-case. Max 500 chars.', maximum: 500 },
+        limit: { type: 'integer', default: 8, minimum: 1, maximum: 12 },
+      },
+      required: ['query'],
+    },
+    handler: async ({ query: q, limit }) => {
+      const queryStr = String(q).slice(0, 500)
+      const lim = clamp(typeof limit === 'number' ? limit : 8, 1, 12)
+      const similar = await findSimilarProductIds(queryStr, lim * 3)
+
+      const productIds: string[] = []
+      const variantIds: string[] = []
+      for (const r of similar) {
+        if (r.matchedVia === 'products' && r.productId && !productIds.includes(r.productId)) productIds.push(r.productId)
+        else if (r.matchedVia === 'product_variants' && r.variantId) variantIds.push(r.variantId)
+      }
+      if (variantIds.length) {
+        const vp = await queryMany<{ product_id: string }>(
+          `SELECT product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`, [variantIds]
+        )
+        for (const r of vp) if (!productIds.includes(r.product_id)) productIds.push(r.product_id)
+      }
+      if (productIds.length === 0) return { products: [], note: 'No matching products found for that description.' }
+
+      const rows = await queryMany<{
+        id: string; name: string; slug: string; sku: string;
+        price: string; short_description: string | null; stock_status: string
+      }>(
+        `SELECT p.id::text, p.name, p.slug, p.sku,
+                COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
+                p.short_description, p.stock_status
+           FROM products p
+          WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
+        [productIds.slice(0, lim)]
+      )
+      const order = new Map(productIds.map((id, i) => [id, i]))
+      return { products: rows.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)) }
+    },
+  },
   {
     name: 'search_products',
     description: 'Semantic search over the active catalog. Use for "find me X" / "I need a Y" queries. Returns ranked candidates with current price + stock.',
@@ -57,7 +100,7 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
       const rows = await queryMany(
         `SELECT p.id::text, p.name, p.slug, p.sku,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.short_description, p.inventory_quantity AS stock
+                p.short_description, p.stock_status
            FROM products p
           WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
         [productIds.slice(0, lim)]
@@ -78,7 +121,7 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
       const row = await queryOne(
         `SELECT p.id::text, p.name, p.slug, p.sku, p.short_description, p.description,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.inventory_quantity AS stock
+                p.stock_status
            FROM products p
           WHERE (p.id::text = $1 OR p.slug = $2) AND p.is_active = TRUE
           LIMIT 1`,
@@ -116,7 +159,7 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
       const rows = await queryMany(
         `SELECT p.id::text, p.name, p.slug, p.sku,
                 COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
-                p.inventory_quantity AS stock
+                p.stock_status
            FROM products p
           WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
         [productIds.slice(0, lim)]
