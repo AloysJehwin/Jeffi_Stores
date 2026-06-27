@@ -57,7 +57,7 @@ function tokenize(text: string): Token[] {
   return tokens
 }
 
-function parseContent(text: string): React.ReactNode {
+function parseContent(text: string, onClose: () => void): React.ReactNode {
   const tokens = tokenize(text)
   const textParts: React.ReactNode[] = []
   const productCards: { slug: string; name: string }[] = []
@@ -67,7 +67,6 @@ function parseContent(text: string): React.ReactNode {
     if (t.kind === 'text') {
       textParts.push(<span key={i}>{t.value}</span>)
     } else if (t.kind === 'product') {
-      textParts.push(<strong key={i}>{t.name}</strong>)
       productCards.push({ slug: t.slug, name: t.name })
     } else {
       orderCards.push({ number: t.number, status: t.status, amount: t.amount, date: t.date })
@@ -85,6 +84,7 @@ function parseContent(text: string): React.ReactNode {
             <Link
               key={slug}
               href={`/products/${slug}`}
+              onClick={onClose}
               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-500 transition-colors group"
             >
               <div className="w-7 h-7 rounded-lg bg-accent-500/10 flex items-center justify-center shrink-0">
@@ -102,6 +102,7 @@ function parseContent(text: string): React.ReactNode {
             <Link
               key={number}
               href={`/account/orders`}
+              onClick={onClose}
               className="flex items-center gap-2 px-3 py-2 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary transition-colors group"
             >
               <div className="w-7 h-7 rounded-lg bg-foreground/5 flex items-center justify-center shrink-0">
@@ -284,7 +285,7 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
                       ? 'bg-accent-500 text-white rounded-tr-sm'
                       : 'bg-surface-secondary text-foreground rounded-tl-sm'
                   }`}>
-                    {msg.role === 'assistant' ? parseContent(msg.content) : msg.content}
+                    {msg.role === 'assistant' ? parseContent(msg.content, onClose) : msg.content}
                   </div>
                   {msg.role === 'assistant' && (
                     <div className="flex items-center gap-1 px-1">
