@@ -36,20 +36,20 @@ const STATUS_STYLES: Record<string, string> = {
 
 type Token =
   | { kind: 'text'; value: string }
-  | { kind: 'product'; slug: string; name: string }
+  | { kind: 'product'; slug: string; name: string; price?: string }
   | { kind: 'order'; number: string; status: string; amount: string; date: string }
 
 function tokenize(text: string): Token[] {
-  const re = /\[\[(product):([^\]|]+)\|([^\]|]+)\]\]|\[\[(order):([^\]|]+)\|([^\]|]+)\|([^\]|]+)\|([^\]]+)\]\]/g
+  const re = /\[\[(product):([^\]|]+)\|([^\]|]+)(?:\|([^\]]*))?\]\]|\[\[(order):([^\]|]+)\|([^\]|]+)\|([^\]|]+)\|([^\]]+)\]\]/g
   const tokens: Token[] = []
   let last = 0
   let m: RegExpExecArray | null
   while ((m = re.exec(text)) !== null) {
     if (m.index > last) tokens.push({ kind: 'text', value: text.slice(last, m.index) })
     if (m[1] === 'product') {
-      tokens.push({ kind: 'product', slug: m[2], name: m[3] })
+      tokens.push({ kind: 'product', slug: m[2], name: m[3], price: m[4] || undefined })
     } else {
-      tokens.push({ kind: 'order', number: m[5], status: m[6], amount: m[7], date: m[8] })
+      tokens.push({ kind: 'order', number: m[6], status: m[7], amount: m[8], date: m[9] })
     }
     last = m.index + m[0].length
   }
@@ -60,14 +60,14 @@ function tokenize(text: string): Token[] {
 function parseContent(text: string, onClose: () => void): React.ReactNode {
   const tokens = tokenize(text)
   const textParts: React.ReactNode[] = []
-  const productCards: { slug: string; name: string }[] = []
+  const productCards: { slug: string; name: string; price?: string }[] = []
   const orderCards: { number: string; status: string; amount: string; date: string }[] = []
 
   tokens.forEach((t, i) => {
     if (t.kind === 'text') {
       textParts.push(<span key={i}>{t.value}</span>)
     } else if (t.kind === 'product') {
-      productCards.push({ slug: t.slug, name: t.name })
+      productCards.push({ slug: t.slug, name: t.name, price: t.price })
     } else {
       orderCards.push({ number: t.number, status: t.status, amount: t.amount, date: t.date })
     }
@@ -80,7 +80,7 @@ function parseContent(text: string, onClose: () => void): React.ReactNode {
       <span className="whitespace-pre-wrap break-words">{textParts}</span>
       {hasCards && (
         <div className="mt-2 flex flex-col gap-2">
-          {productCards.map(({ slug, name }) => (
+          {productCards.map(({ slug, name, price }) => (
             <Link
               key={slug}
               href={`/products/${slug}`}
@@ -92,7 +92,10 @@ function parseContent(text: string, onClose: () => void): React.ReactNode {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 10V11" />
                 </svg>
               </div>
-              <span className="flex-1 text-sm font-medium text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 truncate">{name}</span>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 truncate">{name}</p>
+                {price && <p className="text-xs text-foreground-muted">₹{price}</p>}
+              </div>
               <svg className="w-3.5 h-3.5 text-foreground-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
               </svg>
