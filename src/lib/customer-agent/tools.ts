@@ -51,7 +51,7 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
         )
         for (const r of vp) if (!productIds.includes(r.product_id)) productIds.push(r.product_id)
       }
-      if (productIds.length === 0) return { products: [], note: 'No matching products found for that description.' }
+      if (productIds.length === 0) return { products: [], note: "Sorry, we don't carry products matching that description." }
 
       const rows = await queryMany<{
         id: string; name: string; slug: string; sku: string;
