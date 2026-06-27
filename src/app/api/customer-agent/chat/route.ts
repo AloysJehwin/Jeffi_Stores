@@ -148,9 +148,10 @@ function formatToolResult(toolName: string, out: Record<string, unknown>): strin
   if (toolName === 'get_my_orders') {
     const orders = (out.orders as any[]) || []
     if (orders.length === 0) return "You don't have any orders yet."
-    const lines = orders.map((o: any) =>
-      `**#${o.order_number}** — ${o.status} — ₹${o.total_amount} (${new Date(o.created_at).toLocaleDateString('en-IN')})`
-    )
+    const lines = orders.map((o: any) => {
+      const date = new Date(o.created_at).toLocaleDateString('en-IN')
+      return `[[order:${o.order_number}|${o.status}|${o.total_amount}|${date}]]`
+    })
     return `Here are your recent orders:\n\n${lines.join('\n')}`
   }
   return JSON.stringify(out)
