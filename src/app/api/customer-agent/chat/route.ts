@@ -111,7 +111,7 @@ type ProductRow = { name: string; slug: string; price?: string; stock_status?: s
 
 function formatProductList(products: ProductRow[], intro: string, note?: string): string {
   if (products.length === 0) {
-    return note || 'No matching products found.'
+    return note || "Sorry, we don't carry products matching that request."
   }
   const lines = products.map(p => {
     const price = p.price ? `|${p.price}` : ''
