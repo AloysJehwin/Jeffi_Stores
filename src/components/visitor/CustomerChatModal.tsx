@@ -65,7 +65,8 @@ function parseContent(text: string, onClose: () => void): React.ReactNode {
 
   tokens.forEach((t, i) => {
     if (t.kind === 'text') {
-      textParts.push(<span key={i}>{t.value}</span>)
+      const v = t.value.trimEnd()
+      if (v) textParts.push(<span key={i}>{v}</span>)
     } else if (t.kind === 'product') {
       productCards.push({ slug: t.slug, name: t.name, price: t.price })
     } else {
