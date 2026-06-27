@@ -190,7 +190,7 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
 
   merged.sort((a, b) => b.similarity - a.similarity)
 
-  const MIN_SIM = 0.35
+  const MIN_SIM = 0.50
   const seenProducts = new Set<string>()
   const out: SimilarProductId[] = []
   for (const r of merged) {

@@ -28,12 +28,6 @@ function resolveIntent(msg: string): { tool: string; input: Record<string, unkno
     return { tool: 'get_recent_products', input: {} }
   if (/popular|featured|best seller|trending/.test(m))
     return { tool: 'get_featured_products', input: {} }
-  // Project / build intent — "need X for Y", "building Z", "screws for", "I need X"
-  if (/\b(need|want|looking for|building|making|setting up|installing|fixing|outdoor|indoor)\b/.test(m))
-    return { tool: 'recommend_for_project', input: { query: msg.trim() } }
-  // Generic search — "find X", "search X", "show me X", "do you have X"
-  if (/\b(find|search|show|do you have|any|got)\b/.test(m))
-    return { tool: 'search_products', input: { query: msg.trim() } }
   return null
 }
 
