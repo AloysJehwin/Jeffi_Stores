@@ -107,7 +107,7 @@ function parseToolCalls(text: string): { calls: { name: string; rawInput: string
   return { calls, remainder }
 }
 
-type ProductRow = { name: string; slug: string; price?: string; stock?: number; short_description?: string | null }
+type ProductRow = { name: string; slug: string; price?: string; stock_status?: string; short_description?: string | null }
 
 function formatProductList(products: ProductRow[], intro: string, note?: string): string {
   if (products.length === 0) {
@@ -115,8 +115,7 @@ function formatProductList(products: ProductRow[], intro: string, note?: string)
   }
   const lines = products.map(p => {
     const price = p.price ? ` — ₹${p.price}` : ''
-    const stock = p.stock != null ? ` (${p.stock > 0 ? 'in stock' : 'out of stock'})` : ''
-    return `[[product:${p.slug}|${p.name}]]${price}${stock}`
+    return `[[product:${p.slug}|${p.name}]]${price}`
   })
   const result = `${intro}\n\n${lines.join('\n')}`
   return note ? `${result}\n\n_${note}_` : result
