@@ -241,16 +241,20 @@ function CheckoutPage() {
     const subtotal = isBuyNow
       ? buyNowItem!.price * buyNowItem!.qty
       : getCartTotal()
+    const items = isBuyNow
+      ? [{ productId: buyNowItem!.productId, variantId: buyNowItem!.variantId || null, quantity: buyNowItem!.qty }]
+      : cartItems.map(i => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: Number(i.quantity) }))
+    if (items.length === 0) return
     fetch('/api/shipping/rate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
       credentials: 'include',
-      body: JSON.stringify({ postalCode: address.postal_code, subtotal }),
+      body: JSON.stringify({ destinationPin: address.postal_code, cartItems: items, subtotal }),
     })
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.charge != null) setShippingCharge(Number(d.charge)) })
       .catch(() => {})
-  }, [address, buyNowItem])
+  }, [address, buyNowItem, cartItems])
 
   // Re-apply coupon from server once address + subtotal are known — never trust URL value
   useEffect(() => {
