@@ -59,14 +59,14 @@ function tokenize(text: string): Token[] {
 
 function parseContent(text: string, onClose: () => void): React.ReactNode {
   const tokens = tokenize(text)
-  const textParts: React.ReactNode[] = []
+  const allTextParts: { node: React.ReactNode; raw: string }[] = []
   const productCards: { slug: string; name: string; price?: string }[] = []
   const orderCards: { number: string; status: string; amount: string; date: string }[] = []
 
   tokens.forEach((t, i) => {
     if (t.kind === 'text') {
       const v = t.value.trimEnd()
-      if (v) textParts.push(<span key={i}>{v}</span>)
+      if (v) allTextParts.push({ node: <span key={i}>{v}</span>, raw: v })
     } else if (t.kind === 'product') {
       productCards.push({ slug: t.slug, name: t.name, price: t.price })
     } else {
@@ -76,9 +76,20 @@ function parseContent(text: string, onClose: () => void): React.ReactNode {
 
   const hasCards = productCards.length > 0 || orderCards.length > 0
 
+  const visibleText = hasCards
+    ? allTextParts
+        .filter(({ raw }) => {
+          if (/^\d+\.\s*[-–]?\s*₹/.test(raw)) return false
+          if (/^[-–]\s*₹/.test(raw)) return false
+          if (/these items|can help|for the assembly|assembl/i.test(raw)) return false
+          return true
+        })
+        .map(({ node }) => node)
+    : allTextParts.map(({ node }) => node)
+
   return (
     <div>
-      <span className="whitespace-pre-wrap break-words">{textParts}</span>
+      <span className="whitespace-pre-wrap break-words">{visibleText}</span>
       {hasCards && (
         <div className="mt-2 flex flex-col gap-2">
           {productCards.map(({ slug, name, price }) => (
