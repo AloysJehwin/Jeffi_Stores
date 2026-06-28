@@ -302,7 +302,7 @@ function CheckoutReviewPage() {
   const buyNowBusinessDiscount = buyNowItem?.businessDiscount ?? 0
   const finalTotal = Math.max(0, cartSubtotal - discountAmount - buyNowBusinessDiscount + (shippingCharge ?? 0))
 
-  const handleProceedToCheckout = () => {
+  const handleProceedToCheckout = async () => {
     if (!selectedAddress) {
       showToast('Please select a delivery address', 'warning')
       return
@@ -312,25 +312,48 @@ function CheckoutReviewPage() {
       return
     }
 
-    const params = new URLSearchParams({ addressId: selectedAddress.id })
-    if (appliedCoupon) {
-      params.set('couponId', appliedCoupon.couponId)
-      // couponCode and discountAmount intentionally omitted — recomputed server-side
+    if (isBuyNow) {
+      const params = new URLSearchParams({ addressId: selectedAddress.id })
+      if (appliedCoupon) {
+        params.set('couponId', appliedCoupon.couponId)
+      }
+      if (intentToken) {
+        params.set('intent', intentToken)
+      } else if (buyNowItem) {
+        params.set('buyNow', '1')
+        params.set('productId', buyNowItem.productId)
+        if (buyNowItem.variantId) params.set('variantId', buyNowItem.variantId)
+        if (buyNowItem.subVariantId) params.set('subVariantId', buyNowItem.subVariantId)
+        params.set('qty', String(buyNowItem.qty))
+        params.set('buyMode', buyNowItem.buyMode)
+        if (buyNowItem.buyUnit) params.set('buyUnit', buyNowItem.buyUnit)
+      }
+      router.push(`/checkout?${params.toString()}`)
+      return
     }
-    // shippingCharge intentionally omitted — recomputed server-side from addressId
-    if (isBuyNow && intentToken) {
-      params.set('intent', intentToken)
-    } else if (isBuyNow && buyNowItem) {
-      params.set('buyNow', '1')
-      params.set('productId', buyNowItem.productId)
-      if (buyNowItem.variantId) params.set('variantId', buyNowItem.variantId)
-      if (buyNowItem.subVariantId) params.set('subVariantId', buyNowItem.subVariantId)
-      params.set('qty', String(buyNowItem.qty))
-      params.set('buyMode', buyNowItem.buyMode)
-      if (buyNowItem.buyUnit) params.set('buyUnit', buyNowItem.buyUnit)
-      // price intentionally omitted — fetched from DB server-side
+
+    // Cart mode — embed addressId + shippingCharge in a signed intent
+    try {
+      const res = await fetch('/api/checkout/intents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mode: 'cart',
+          addressId: selectedAddress.id,
+          ...(shippingCharge != null && { shippingCharge }),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok || !data.intent) {
+        showToast(data.error || 'Failed to create checkout session', 'error')
+        return
+      }
+      const params = new URLSearchParams({ intent: data.intent })
+      if (appliedCoupon) params.set('couponId', appliedCoupon.couponId)
+      router.push(`/checkout?${params.toString()}`)
+    } catch {
+      showToast('Failed to create checkout session', 'error')
     }
-    router.push(`/checkout?${params.toString()}`)
   }
 
   if (authLoading || cartLoading) {

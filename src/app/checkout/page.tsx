@@ -86,12 +86,6 @@ function CheckoutPage() {
     }
 
     const addressId = searchParams.get('addressId')
-    if (!addressId) {
-      router.push('/checkout/review')
-      return
-    }
-
-    fetchAddress(addressId)
 
     if (intentToken) {
       fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include' })
@@ -100,6 +94,10 @@ function CheckoutPage() {
           if (!r.ok) { router.push('/'); return }
           if (d.mode === 'cart') {
             setIntentMode('cart')
+            const intentAddressId = d.addressId || addressId
+            if (!intentAddressId) { router.push('/checkout/review'); return }
+            if (d.shippingCharge != null) setShippingCharge(Number(d.shippingCharge))
+            fetchAddress(intentAddressId, d.shippingCharge != null)
             return
           }
           setIntentMode('buyNow')
@@ -140,6 +138,9 @@ function CheckoutPage() {
       const buyUnit = searchParams.get('buyUnit')
 
       if (!productId) { router.push('/'); return }
+      if (!addressId) { router.push('/checkout/review'); return }
+
+      fetchAddress(addressId, false)
 
       // Resolve price server-side via intent — never trust URL-provided price
       fetch('/api/checkout/intents', {
@@ -196,7 +197,7 @@ function CheckoutPage() {
       .catch(() => {})
   }
 
-  const fetchAddress = async (addressId: string) => {
+  const fetchAddress = async (addressId: string, skipShipping = false) => {
     try {
       const response = await fetch('/api/user/addresses', { credentials: 'include' })
       if (response.status === 401) {
@@ -208,7 +209,7 @@ function CheckoutPage() {
         const selectedAddr = data.addresses.find((a: any) => a.id === addressId)
         if (selectedAddr) {
           setAddress(selectedAddr)
-          fetchShipping(selectedAddr.postal_code)
+          if (!skipShipping) fetchShipping(selectedAddr.postal_code)
         } else {
           router.push('/checkout/review')
         }

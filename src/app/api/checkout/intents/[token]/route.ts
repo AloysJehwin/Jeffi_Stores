@@ -40,6 +40,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
       mode: 'cart',
       itemCount: cart.length,
       subtotal: cartSubtotal(cart),
+      addressId: (intent as any).addressId ?? null,
+      shippingCharge: (intent as any).shippingCharge ?? null,
     })
   }
 
