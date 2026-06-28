@@ -170,41 +170,30 @@ function CheckoutReviewPage() {
     if (isBuyNow) {
       const productId = searchParams.get('productId')
       const variantId = searchParams.get('variantId')
+      const subVariantId = searchParams.get('subVariantId')
       const qty = parseFloat(searchParams.get('qty') || '1')
       const buyMode = searchParams.get('buyMode') || 'unit'
       const buyUnit = searchParams.get('buyUnit')
-      const price = parseFloat(searchParams.get('price') || '0')
-      const productName = searchParams.get('productName') || ''
-      const variantName = searchParams.get('variantName')
 
-      if (!productId || !price) { router.push(bp('/business')); return }
+      if (!productId) { router.push(bp('/business')); return }
 
-      setBuyNowItem({
-        productId,
-        variantId: variantId || null,
-        subVariantId: null,
-        qty,
-        buyMode,
-        buyUnit: buyUnit || null,
-        price,
-        productName,
-        variantName: variantName || null,
-        subVariantName: null,
-        sku: null,
-        mrp: null,
-        gstPercentage: null,
-        brandName: null,
-        imageUrl: null,
+      // Create a server-signed intent so the price is resolved from DB, not URL
+      fetch('/api/checkout/intents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+        credentials: 'include',
+        body: JSON.stringify({ productId, variantId: variantId || null, subVariantId: subVariantId || null, qty, buyMode, buyUnit: buyUnit || null }),
       })
-
-      fetch(`/api/products/${productId}/primary-image`, { credentials: 'include' })
-        .then(r => r.ok ? r.json() : null)
+        .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => {
-          if (data?.imageUrl) {
-            setBuyNowItem(prev => prev ? { ...prev, imageUrl: data.imageUrl } : prev)
-          }
+          if (!data?.intent) { router.push(bp('/business')); return }
+          const next = new URLSearchParams(searchParams.toString())
+          next.set('intent', data.intent)
+          next.delete('buyNow')
+          next.delete('price')
+          router.replace(bp(`/business/checkout/review?${next.toString()}`))
         })
-        .catch(() => {})
+        .catch(() => router.push(bp('/business')))
     } else if (!intentToken && !cartLoading && cartCount === 0) {
       router.replace(bp('/business/cart'))
     }
@@ -370,12 +359,9 @@ function CheckoutReviewPage() {
     const params = new URLSearchParams({ addressId: selectedAddress.id })
     if (appliedCoupon) {
       params.set('couponId', appliedCoupon.couponId)
-      params.set('couponCode', appliedCoupon.code)
-      params.set('discountAmount', String(appliedCoupon.discountAmount))
+      // couponCode and discountAmount intentionally omitted — recomputed server-side
     }
-    if (shippingCharge != null) {
-      params.set('shippingCharge', String(shippingCharge))
-    }
+    // shippingCharge intentionally omitted — recomputed server-side from addressId
     if (isBuyNow && intentToken) {
       params.set('intent', intentToken)
     } else if (isBuyNow && buyNowItem) {
@@ -386,7 +372,7 @@ function CheckoutReviewPage() {
       params.set('qty', String(buyNowItem.qty))
       params.set('buyMode', buyNowItem.buyMode)
       if (buyNowItem.buyUnit) params.set('buyUnit', buyNowItem.buyUnit)
-      params.set('price', String(buyNowItem.price))
+      // price intentionally omitted — fetched from DB server-side
     }
     router.push(bp(`/business/checkout?${params.toString()}`))
   }

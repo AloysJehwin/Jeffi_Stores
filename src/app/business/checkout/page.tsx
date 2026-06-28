@@ -43,9 +43,9 @@ function CheckoutPage() {
   useEffect(() => {
     if (authLoading) authWasLoading.current = true
   }, [authLoading])
-  const couponCode = searchParams.get('couponCode')
-  const discountAmount = parseFloat(searchParams.get('discountAmount') || '0')
-  const shippingCharge = searchParams.get('shippingCharge') ? parseFloat(searchParams.get('shippingCharge')!) : null
+  const [couponCode, setCouponCode] = useState<string | null>(null)
+  const [discountAmount, setDiscountAmount] = useState(0)
+  const [shippingCharge, setShippingCharge] = useState<number | null>(null)
 
   const businessDiscountAmount = !isBuyNow && user?.isBusiness && user.approvalStatus === 'approved'
     ? Math.round(cartItems.reduce((sum, item) => {
@@ -171,45 +171,26 @@ function CheckoutPage() {
       const qty = parseFloat(searchParams.get('qty') || '1')
       const buyMode = searchParams.get('buyMode') || 'unit'
       const buyUnit = searchParams.get('buyUnit')
-      const price = parseFloat(searchParams.get('price') || '0')
-      const productName = searchParams.get('productName') || ''
-      const variantName = searchParams.get('variantName')
 
-      if (!productId || !price) { router.push(bp('/business')); return }
+      if (!productId) { router.push(bp('/business')); return }
 
-      setBuyNowItem({
-        productId,
-        variantId: variantId || null,
-        subVariantId: null,
-        qty,
-        buyMode,
-        buyUnit: buyUnit || null,
-        price,
-        productName,
-        variantName: variantName || null,
-        subVariantName: null,
-        sku: null,
-        mrp: null,
-        gstPercentage: null,
-        brandName: null,
-        imageUrl: null,
+      // Resolve price server-side via intent — never trust URL-provided price
+      fetch('/api/checkout/intents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+        credentials: 'include',
+        body: JSON.stringify({ productId, variantId: variantId || null, qty, buyMode, buyUnit: buyUnit || null }),
       })
-
-      const imageUrl = `/api/products/${productId}/primary-image${variantId ? `?variantId=${variantId}` : ''}`
-      fetch(imageUrl)
-        .then(r => r.json())
+        .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => {
-          setBuyNowItem(prev => {
-            if (!prev) return prev
-            return {
-              ...prev,
-              imageUrl: data.imageUrl || prev.imageUrl,
-              productName: prev.productName || data.productName || '',
-              variantName: prev.variantName || data.variantName || null,
-            }
-          })
+          if (!data?.intent) { router.push(bp('/business')); return }
+          const next = new URLSearchParams(searchParams.toString())
+          next.set('intent', data.intent)
+          next.delete('buyNow')
+          next.delete('price')
+          router.replace(bp(`/business/checkout?${next.toString()}`))
         })
-        .catch(() => {})
+        .catch(() => router.push(bp('/business')))
     }
   }, [cartCount, user, authLoading, cartLoading, router, searchParams, isBuyNow])
 
@@ -252,6 +233,46 @@ function CheckoutPage() {
       setIsLoadingAddress(false)
     }
   }
+
+  // Re-fetch shipping from server once address is known — never trust URL value
+  useEffect(() => {
+    if (!address?.postal_code) return
+    const subtotal = isBuyNow
+      ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
+      : getCartTotal()
+    fetch('/api/shipping/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+      credentials: 'include',
+      body: JSON.stringify({ postalCode: address.postal_code, subtotal }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.charge != null) setShippingCharge(Number(d.charge)) })
+      .catch(() => {})
+  }, [address])
+
+  // Re-apply coupon from server once address + subtotal are known — never trust URL value
+  useEffect(() => {
+    if (!couponId) return
+    const subtotal = isBuyNow
+      ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
+      : getCartTotal()
+    if (subtotal === 0) return
+    fetch('/api/coupons/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+      credentials: 'include',
+      body: JSON.stringify({ couponId, subtotal }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.discountAmount != null) {
+          setDiscountAmount(Number(d.discountAmount))
+          setCouponCode(d.code || null)
+        }
+      })
+      .catch(() => {})
+  }, [couponId, address])
 
   const verifyPayment = async (
     razorpay_order_id: string,
