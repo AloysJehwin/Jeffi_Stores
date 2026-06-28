@@ -15,7 +15,7 @@ const postSchema = z.object({
   })).max(20).default([]),
 })
 
-const MAX_ITERATIONS = 6
+const MAX_ITERATIONS = 10
 
 // Resolve intent → { tool, input } from the raw user message, or null if unclear
 function resolveIntent(msg: string): { tool: string; input: Record<string, unknown> } | null {
@@ -279,7 +279,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      messages.push({ role: 'user', content: toolOutputs.join('\n') })
+      messages.push({ role: 'user', content: toolOutputs.join('\n') + '\n\nNow apply the RELEVANCE CHECK and respond to the customer in plain text. If results are unrelated you may call one more tool with a refined query, otherwise give your final answer now.' })
     }
   } catch (err: any) {
     const msg = err instanceof AiClientError ? err.message : String(err?.message || 'AI request failed')
