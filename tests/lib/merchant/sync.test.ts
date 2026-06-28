@@ -5,6 +5,13 @@ vi.mock('@/lib/db', () => ({
   queryMany: vi.fn(),
   queryOne: vi.fn(),
 }))
+vi.mock('nodemailer', () => ({
+  default: {
+    createTransport: vi.fn(() => ({
+      sendMail: vi.fn().mockResolvedValue({ messageId: 'test' }),
+    })),
+  },
+}))
 vi.mock('@/lib/merchant/mapper', () => ({
   productToGmcItems: vi.fn(),
 }))
