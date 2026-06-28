@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface SelectOption {
   value: string
@@ -192,7 +193,7 @@ export default function AdminSelect({
           </svg>
         </button>
 
-        {isOpen && dropRect && (
+        {isOpen && dropRect && typeof document !== 'undefined' && createPortal(
           <div
             data-adminselect-dropdown
             className="fixed z-[9999] bg-surface-elevated border border-border-default rounded-lg shadow-xl overflow-hidden"
@@ -200,7 +201,7 @@ export default function AdminSelect({
               top: dropUp ? undefined : dropRect.top + 4,
               bottom: dropUp ? window.innerHeight - dropRect.bottom + 4 : undefined,
               left: dropRect.left,
-              minWidth: dropRect.width,
+              width: dropRect.width,
               maxHeight: maxDropdownH,
               animation: 'adminSelectFadeIn 0.12s ease-out',
             }}
@@ -241,19 +242,13 @@ export default function AdminSelect({
                 )
               })}
             </ul>
-          </div>
+          </div>,
+          document.body
         )}
       </div>
 
       {hint && !error && <p className="text-xs text-foreground-muted mt-1.5">{hint}</p>}
       {error && <p className="text-xs text-red-600 dark:text-red-400 mt-1.5">{error}</p>}
-
-      <style jsx>{`
-        @keyframes adminSelectFadeIn {
-          from { opacity: 0; transform: translateY(${dropUp ? '4px' : '-4px'}); }
-          to   { opacity: 1; transform: translateY(0); }
-        }
-      `}</style>
     </div>
   )
 }

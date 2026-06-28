@@ -1,12 +1,79 @@
 import { query, queryMany, queryOne } from '@/lib/db'
 import { round2 } from '@/lib/gst'
+import { lineItemExGst } from '@/lib/pricing'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
-import { embed, queryManyReplica } from '@/lib/rag'
+import { embed, queryManyReplica, runWithHnswTuning } from '@/lib/rag'
+import { aiChat } from '@/lib/ai-client'
 import type { ToolDef } from '../tools'
 import { ok, err } from '../tool-envelope'
 import { ocrImage, ocrPdfPages } from '../vision'
 
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
+
+// ─── Signal agents (pure JS, run in parallel, no latency) ────────────────────
+
+/** Agent 1: cosine similarity from embeddings (0–1) */
+function embeddingSignal(sim: number): number { return clamp(sim, 0, 1) }
+
+/** Agent 2: Jaccard token overlap between query and product name (0–1) */
+function tokenOverlapSignal(queryText: string, name: string): number {
+  const tok = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, ' ').split(/\s+/).filter(Boolean)
+  const qToks = new Set(tok(queryText))
+  const nToks = tok(name)
+  if (!qToks.size || !nToks.length) return 0
+  const hits = nToks.filter(t => qToks.has(t)).length
+  return hits / Math.max(qToks.size, nToks.length)
+}
+
+/** Agent 3: exact match on spec numbers — dimensions, grades, standards (0 or 1) */
+function specNumberSignal(queryText: string, name: string): number {
+  // extract tokens that look like specs: M8, M20, DIN933, 48mm, 2.5mm², 8.8, 6013, 3.15, etc.
+  const specRe = /\b(?:[mM]\d+|[dD][iI][nN]\s*\d+|[iI][sS][oO]\s*\d+|\d+(?:\.\d+)?(?:mm|cm|m|kg|kn|kw|hp|bar|psi|inch|"|')?\s*(?:x\s*\d+(?:\.\d+)?(?:mm|cm)?)?|\d+\.\d+)\b/g
+  const qSpecs = new Set((queryText.match(specRe) || []).map(s => s.toLowerCase().replace(/\s+/g, '')))
+  const nSpecs = new Set((name.match(specRe) || []).map(s => s.toLowerCase().replace(/\s+/g, '')))
+  if (!qSpecs.size) return 0.5 // no specs in query — neutral, don't penalise
+  const hits = [...qSpecs].filter(s => nSpecs.has(s)).length
+  return hits / qSpecs.size
+}
+
+/** Agent 4: SKU fragment match — if query contains a SKU-like token that appears in the product SKU (0 or 1) */
+function skuFragmentSignal(queryText: string, sku: string | null): number {
+  if (!sku) return 0.5 // no SKU — neutral
+  const skuNorm = sku.toLowerCase()
+  const tokens = queryText.toLowerCase().replace(/[^a-z0-9-]/g, ' ').split(/\s+/).filter(t => t.length >= 3)
+  return tokens.some(t => skuNorm.includes(t)) ? 1 : 0.5
+}
+
+/** Fast-path aggregator: weighted combination of the four JS signal agents */
+function aggregateSignals(sim: number, tokenOverlap: number, specNum: number, skuFrag: number): number {
+  const score = sim * 0.50 + tokenOverlap * 0.20 + specNum * 0.20 + skuFrag * 0.10
+  return Math.round(clamp(score * 100, 0, 100))
+}
+
+/**
+ * Haiku tiebreaker — only fires when top score is in the ambiguous range (45–89).
+ * Returns a 0–100 score override, or null on failure (fallback to JS score).
+ */
+async function haikuTiebreakerScore(queryText: string, productName: string): Promise<number | null> {
+  try {
+    const r = await aiChat({
+      modelHint: 'fast',
+      jsonMode: false,
+      temperature: 0,
+      maxTokens: 16,
+      messages: [
+        {
+          role: 'user',
+          content: `Rate 0-100 how well the product name matches the search query. Reply with ONLY the integer number, nothing else.\nQuery: "${queryText}"\nProduct: "${productName}"`,
+        },
+      ],
+    })
+    const n = parseInt(r.content.trim(), 10)
+    return isFinite(n) ? clamp(n, 0, 100) : null
+  } catch {
+    return null
+  }
+}
 function fmtINR(n: number | string | null | undefined): string {
   const num = typeof n === 'number' ? n : Number(n || 0)
   if (!isFinite(num)) return '—'
@@ -233,13 +300,24 @@ const get_cash_sale: ToolDef = {
   },
 }
 
-interface QuotationItemInput { productId?: string; variantId?: string; quantity: number; unitPrice?: number }
+interface QuotationItemInput {
+  productId?: string
+  variantId?: string
+  subVariantId?: string
+  quantity: number
+  unitPrice?: number
+  discountPct?: number
+  unit?: string
+  buyUnit?: string
+  hsnCode?: string
+  gstRate?: number
+}
 
 function vec(arr: number[]): string { return '[' + arr.join(',') + ']' }
 
 const match_quotation_items: ToolDef = {
   name: 'match_quotation_items',
-  description: 'Take a free-form list of requested items (text per line + qty) and resolve them against the catalog using semantic search. Returns each line as matched | ambiguous | unmatched with up to 3 candidate products per ambiguous line. Use BEFORE propose_create_quotation when the admin gives a free-form request like "50 M27 bolts, 200 washers". IMPORTANT: pass ALL lines in a SINGLE call (up to 50 lines). Do NOT split into multiple calls. DOES NOT create anything — read-only.',
+  description: 'Take a free-form list of requested items (text per line + qty) and resolve them against the catalog using semantic search + text overlap scoring (0–100). Score ≥ 90 with a clear lead = matched (auto-add). Score 45–89 = ambiguous (admin confirms). Score < 45 = unmatched. Returns a quotation_resolver UI block for admin confirmation. Use BEFORE propose_create_quotation. Pass ALL lines in a SINGLE call (up to 50 lines). DOES NOT create anything — read-only.',
   inputSchema: {
     type: 'object',
     properties: {
@@ -247,16 +325,11 @@ const match_quotation_items: ToolDef = {
         type: 'string',
         description: 'JSON array string: [{"requestedText":"M27 structural bolt","qty":50}, {"requestedText":"flat washer 8mm","qty":200}]. Each line.qty must be > 0.',
       },
-      simThreshold: {
-        type: 'number',
-        description: 'Cosine similarity threshold for "matched" vs "ambiguous". Default 0.62.',
-        default: 0.62,
-      },
     },
     required: ['lines'],
   },
   mutating: false,
-  handler: async ({ lines, simThreshold }) => {
+  handler: async ({ lines }) => {
     let parsed: { requestedText: string; qty: number }[]
     try {
       const raw = typeof lines === 'string' ? JSON.parse(lines) : lines
@@ -268,13 +341,11 @@ const match_quotation_items: ToolDef = {
     if (parsed.length === 0) return err('No lines provided')
     if (parsed.length > 50) return err('Too many lines', 'Limit 50 lines per call')
 
-    const threshold = typeof simThreshold === 'number' ? Math.max(0.3, Math.min(0.95, simThreshold)) : 0.62
-
     const results: Array<{
       requestedText: string
       qty: number
       status: 'matched' | 'ambiguous' | 'unmatched'
-      candidates: Array<{ productId: string; name: string; sku: string | null; price: number; sim: number }>
+      candidates: Array<{ productId: string; name: string; sku: string | null; price: number; sim: number; score: number }>
     }> = []
 
     for (const line of parsed) {
@@ -285,12 +356,14 @@ const match_quotation_items: ToolDef = {
         continue
       }
       const v = await embed(text)
-      const ids = await queryManyReplica<{ source_table: string; source_id: string; sim: number }>(
+      const hnswResult = await runWithHnswTuning(
         `SELECT source_table, source_id, 1 - (embedding <=> $1::vector) AS sim
-         FROM embeddings WHERE source_table IN ('products', 'product_variants')
-         ORDER BY embedding <=> $1::vector LIMIT 6`,
+         FROM embeddings
+         WHERE source_table IN ('products', 'product_variants')
+         ORDER BY embedding <=> $1::vector LIMIT 30`,
         [vec(v)]
-      ).catch(() => [])
+      ).catch(() => ({ rows: [] as { source_table: string; source_id: string; sim: number }[] }))
+      const ids = hnswResult.rows.map(r => ({ ...r, sim: typeof r.sim === 'string' ? parseFloat(r.sim) : r.sim }))
 
       const productSimMap = new Map<string, number>()
       for (const r of ids) {
@@ -318,8 +391,35 @@ const match_quotation_items: ToolDef = {
         }
       }
 
-      const productIds = Array.from(productSimMap.keys()).slice(0, 8)
-      const candidates: Array<{ productId: string; name: string; sku: string | null; price: number; sim: number }> = []
+      // Text fallback: when HNSW returns 0 product candidates (replica unreachable or no embeddings),
+      // do an ILIKE search on the primary DB so we still surface obvious name matches
+      if (productSimMap.size === 0) {
+        const words = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').trim().split(/\s+/).filter(w => w.length >= 3)
+        if (words.length > 0) {
+          // Try each significant word as an ILIKE pattern; use the longest word first for selectivity
+          const sorted = [...words].sort((a, b) => b.length - a.length)
+          for (const word of sorted.slice(0, 3)) {
+            const fallbackRows = await queryMany<{ id: string; name: string }>(
+              `SELECT id::text, name FROM products WHERE is_active = TRUE AND name ILIKE $1 LIMIT 20`,
+              [`%${word}%`]
+            ).catch(() => [] as { id: string; name: string }[])
+            for (const r of fallbackRows) {
+              if (!productSimMap.has(r.id)) productSimMap.set(r.id, 0.3) // low sim — will score via JS signals
+            }
+            if (productSimMap.size >= 5) break
+          }
+        }
+      }
+
+      const productIds = Array.from(productSimMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 15)
+        .map(([id]) => id)
+      const candidates: Array<{
+        productId: string; name: string; sku: string | null; price: number; sim: number; score: number
+        imageUrl?: string | null
+        variants?: Array<{ id: string; name: string; sku: string | null; price: number; subVariants?: Array<{ id: string; name: string; sku: string | null; price: number }> }>
+      }> = []
       if (productIds.length > 0) {
         const rows = await queryMany<{ id: string; name: string; sku: string | null; price: number }>(
           `SELECT p.id::text, p.name, p.sku,
@@ -328,22 +428,89 @@ const match_quotation_items: ToolDef = {
            WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
           [productIds]
         )
-        for (const r of rows) {
-          candidates.push({ productId: r.id, name: r.name, sku: r.sku, price: Number(r.price) || 0, sim: productSimMap.get(r.id) ?? 0 })
-        }
+        // Run all four JS signal agents in parallel per candidate
+        const scored = await Promise.all(rows.map(async r => {
+          const sim = productSimMap.get(r.id) ?? 0
+          const [tokenOverlap, specNum, skuFrag] = await Promise.all([
+            Promise.resolve(tokenOverlapSignal(text, r.name)),
+            Promise.resolve(specNumberSignal(text, r.name)),
+            Promise.resolve(skuFragmentSignal(text, r.sku)),
+          ])
+          const score = aggregateSignals(embeddingSignal(sim), tokenOverlap, specNum, skuFrag)
+          return { productId: r.id, name: r.name, sku: r.sku, price: Number(r.price) || 0, sim, score }
+        }))
+        candidates.push(...scored)
       }
-      candidates.sort((a, b) => b.sim - a.sim)
+      candidates.sort((a, b) => b.score - a.score)
+
+      // Haiku tiebreaker: only for the top candidate when score is in the ambiguous band
+      if (candidates.length > 0 && candidates[0].score >= 45 && candidates[0].score < 90) {
+        const override = await haikuTiebreakerScore(text, candidates[0].name)
+        if (override !== null) candidates[0].score = override
+      }
+      candidates.sort((a, b) => b.score - a.score)
 
       let status: 'matched' | 'ambiguous' | 'unmatched'
-      if (candidates.length === 0 || candidates[0].sim < 0.45) status = 'unmatched'
-      else if (candidates[0].sim >= threshold && (candidates.length === 1 || candidates[0].sim - candidates[1].sim >= 0.05)) status = 'matched'
+      if (candidates.length === 0 || candidates[0].score < 45) status = 'unmatched'
+      else if (candidates[0].score >= 80 && (candidates.length === 1 || candidates[0].score - candidates[1].score >= 5)) status = 'matched'
       else status = 'ambiguous'
+
+      // Enrich top-3 candidates with image + variant/subvariant data
+      const topCandidates = candidates.slice(0, 3)
+      const enrichIds = topCandidates.map(c => c.productId)
+      if (enrichIds.length > 0) {
+        type VariantRow = { product_id: string; id: string; name: string; sku: string | null; price: number; sub_variants: string }
+        const [images, variantRows] = await Promise.all([
+          queryMany<{ product_id: string; url: string }>(
+            `SELECT DISTINCT ON (product_id) product_id::text, image_url AS url
+             FROM product_images
+             WHERE product_id = ANY($1::uuid[])
+             ORDER BY product_id, is_primary DESC, display_order ASC`,
+            [enrichIds]
+          ).catch(() => [] as { product_id: string; url: string }[]),
+          queryMany<VariantRow>(
+            `SELECT pv.product_id::text, pv.id::text, pv.variant_name AS name, pv.sku,
+                    COALESCE(NULLIF(
+                      CASE WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+                           THEN (SELECT MIN(sv.price) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.price IS NOT NULL)
+                           ELSE pv.price END
+                    , 0), 0)::float AS price,
+                    COALESCE((
+                      SELECT json_agg(json_build_object('id', sv.id, 'name', sv.sub_variant_name, 'sku', sv.sku, 'price', sv.price::float) ORDER BY sv.sub_variant_name)
+                      FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true
+                    ), '[]'::json)::text AS sub_variants
+             FROM product_variants pv
+             WHERE pv.product_id = ANY($1::uuid[]) AND pv.is_active = true
+             ORDER BY pv.product_id, pv.variant_name`,
+            [enrichIds]
+          ).catch(() => [] as VariantRow[]),
+        ])
+
+        const imageByProduct = new Map(images.map(i => [i.product_id, i.url]))
+        const variantsByProduct = new Map<string, typeof variantRows>()
+        for (const v of variantRows) {
+          if (!variantsByProduct.has(v.product_id)) variantsByProduct.set(v.product_id, [])
+          variantsByProduct.get(v.product_id)!.push(v)
+        }
+
+        for (const c of topCandidates) {
+          c.imageUrl = imageByProduct.get(c.productId) ?? null
+          const pvs = variantsByProduct.get(c.productId) ?? []
+          if (pvs.length > 0) {
+            c.variants = pvs.map(v => {
+              let subVariants: Array<{ id: string; name: string; sku: string | null; price: number }> = []
+              try { subVariants = JSON.parse(v.sub_variants) } catch { /* ok */ }
+              return { id: v.id, name: v.name, sku: v.sku, price: v.price, subVariants }
+            })
+          }
+        }
+      }
 
       results.push({
         requestedText: text,
         qty,
         status,
-        candidates: candidates.slice(0, 3),
+        candidates: topCandidates,
       })
     }
 
@@ -355,10 +522,17 @@ const match_quotation_items: ToolDef = {
 
     return ok({
       summary: `Resolved ${counts.matched}/${results.length} lines exactly` +
-        (counts.ambiguous > 0 ? `, ${counts.ambiguous} ambiguous` : '') +
+        (counts.ambiguous > 0 ? `, ${counts.ambiguous} need confirmation` : '') +
         (counts.unmatched > 0 ? `, ${counts.unmatched} unmatched` : '') + '.',
       count: results.length,
-      data: { lines: results, counts, threshold },
+      data: { lines: results, counts },
+      uiBlocks: [
+        {
+          type: 'quotation_resolver',
+          lines: results,
+          counts,
+        },
+      ],
       displayHints: { primaryField: 'requestedText', itemNoun: 'line' },
     })
   },
@@ -474,18 +648,50 @@ const extract_quotation_lines_from_attachment: ToolDef = {
 
 const propose_create_quotation: ToolDef = {
   name: 'propose_create_quotation',
-  description: 'Propose creating a draft quotation for a customer with the given line items. Pass items as a JSON-stringified array (each: {productId, quantity, unitPrice?, variantId?}). If unitPrice is omitted, the variant min-price (or product base_price) is used. Admin must approve before the draft is created.',
+  description: 'Propose creating a draft quotation for a customer with the given line items. Pass items as a JSON-stringified array. If unitPrice is omitted, the variant min-price (or product base_price) is used. Admin must approve before the draft is created.',
   inputSchema: {
     type: 'object',
     properties: {
       customerEmail: { type: 'string', description: 'Email of the consignee (and buyer, since buyer_same defaults true).' },
-      items: { type: 'string', description: 'JSON array string: [{"productId":"<uuid>","quantity":2,"unitPrice":499.50}]' },
+      addressId: { type: 'string', description: 'UUID of a saved address from the addresses table. Pass this when the admin picks an address via the choice_picker instead of typing individual fields.' },
+      consigneeName: { type: 'string', description: 'Override consignee name. If omitted, looked up from users table.' },
+      consigneePhone: { type: 'string', description: 'Override consignee phone.' },
+      consigneeAddr1: { type: 'string', description: 'Address line 1.' },
+      consigneeAddr2: { type: 'string', description: 'Address line 2.' },
+      consigneeCity: { type: 'string', description: 'City.' },
+      consigneeState: { type: 'string', description: 'State, defaults to Chhattisgarh.' },
+      consigneeGstin: { type: 'string', description: 'GSTIN of consignee.' },
+      consigneePincode: { type: 'string', description: 'Pincode.' },
+      buyerSame: { type: 'boolean', description: 'Whether buyer is same as consignee. Defaults true.' },
+      buyerName: { type: 'string' },
+      buyerAddr1: { type: 'string' },
+      buyerAddr2: { type: 'string' },
+      buyerCity: { type: 'string' },
+      buyerState: { type: 'string' },
+      buyerGstin: { type: 'string' },
+      buyerPhone: { type: 'string' },
+      buyerPincode: { type: 'string' },
+      buyerEmail: { type: 'string' },
+      items: {
+        type: 'string',
+        description: 'JSON array: [{productId, quantity, unitPrice?, discountPct?, variantId?, subVariantId?, unit?, buyUnit?, hsnCode?, gstRate?}]',
+      },
       notes: { type: 'string', description: 'Optional internal notes for the quotation.' },
+      quoteDate: { type: 'string', description: 'ISO date string YYYY-MM-DD. Defaults to today.' },
     },
     required: ['customerEmail', 'items'],
   },
   mutating: true,
-  handler: async ({ customerEmail, items, notes }) => {
+  handler: async (args) => {
+    const {
+      customerEmail, addressId,
+      consigneeName: nameOverride, consigneePhone, consigneeAddr1, consigneeAddr2,
+      consigneeCity, consigneeState, consigneeGstin, consigneePincode,
+      buyerSame, buyerName, buyerAddr1, buyerAddr2, buyerCity, buyerState,
+      buyerGstin, buyerPhone, buyerPincode, buyerEmail,
+      items, notes, quoteDate,
+    } = args as Record<string, any>
+
     const email = String(customerEmail || '').trim()
     if (!email.includes('@')) throw new Error('customerEmail must be a valid email')
 
@@ -494,13 +700,16 @@ const propose_create_quotation: ToolDef = {
       const raw = typeof items === 'string' ? JSON.parse(items) : items
       if (!Array.isArray(raw)) throw new Error('not an array')
       parsed = raw as QuotationItemInput[]
-    } catch { throw new Error('items must be a JSON array of {productId, quantity, unitPrice?}') }
+    } catch { throw new Error('items must be a JSON array') }
     if (parsed.length < 1 || parsed.length > 50) throw new Error('items: provide 1-50 lines')
 
     const productIds = parsed.map(i => String(i.productId || '')).filter(Boolean)
     if (productIds.length !== parsed.length) throw new Error('every item needs a productId')
 
-    const products = await queryMany<{ id: string; name: string; sku: string; gst_percentage: string; hsn_code: string | null; price: string; base_price: string }>(
+    const products = await queryMany<{
+      id: string; name: string; sku: string; gst_percentage: string;
+      hsn_code: string | null; price: string; base_price: string
+    }>(
       `SELECT p.id::text, p.name, p.sku, COALESCE(p.gst_percentage, 18)::text AS gst_percentage,
               p.hsn_code,
               COALESCE(NULLIF(${VARIANT_MIN_PRICE_SQL}, 0), p.base_price)::text AS price,
@@ -513,48 +722,164 @@ const propose_create_quotation: ToolDef = {
     }
     const pById = new Map(products.map(p => [p.id, p]))
 
-    const customer = await queryOne<{ first_name: string | null; last_name: string | null }>(
-      `SELECT first_name, last_name FROM users WHERE email = $1 LIMIT 1`, [email]
+    const customer = await queryOne<{
+      user_id: string; first_name: string | null; last_name: string | null; phone: string | null;
+      business_address: string | null; gst_number: string | null; company_name: string | null;
+    }>(
+      `SELECT u.id::text AS user_id, u.first_name, u.last_name, u.phone,
+              bp.business_address,
+              COALESCE(cp.gst_number, bp.gst_number) AS gst_number,
+              COALESCE(cp.company_name, bp.company_name) AS company_name
+         FROM users u
+         LEFT JOIN business_profiles bp ON bp.user_id = u.id
+         LEFT JOIN customer_profiles cp ON cp.user_id = u.id
+        WHERE u.email = $1 LIMIT 1`,
+      [email]
     )
-    const consigneeName = customer
-      ? `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || email
-      : email
+
+    // Resolve display name — fall back to email-prefix (never raw email)
+    const emailPrefix = email.split('@')[0]
+    const consigneeNameResolved = nameOverride
+      ? String(nameOverride).trim()
+      : customer
+        ? (customer.company_name || `${customer.first_name || ''} ${customer.last_name || ''}`.trim() || emailPrefix)
+        : emailPrefix
+
+    // Fetch saved addresses for the user (or resolve a specific one by ID)
+    const savedAddresses = customer?.user_id
+      ? await queryMany<{
+          id: string; full_name: string; phone: string;
+          address_line1: string; address_line2: string | null;
+          city: string; state: string; postal_code: string;
+          is_default: boolean; address_type: string;
+        }>(
+          `SELECT id::text, full_name, phone, address_line1, address_line2,
+                  city, state, postal_code, is_default, address_type
+             FROM addresses
+            WHERE user_id = $1
+            ORDER BY is_default DESC, created_at DESC`,
+          [customer.user_id]
+        )
+      : []
+
+    // If a specific addressId was passed (from picker), resolve it directly
+    const pickedAddr = addressId
+      ? (savedAddresses.find(a => a.id === String(addressId)) ?? null)
+      : null
+
+    // Address disambiguation: if no explicit address and no picked ID, and multiple saved addresses exist
+    const hasExplicitAddress = !!(consigneeAddr1 || consigneeCity || consigneeState || consigneePincode)
+    if (!hasExplicitAddress && !pickedAddr && savedAddresses.length > 1) {
+      return {
+        needs_choice: true,
+        choice_kind: 'address',
+        options: savedAddresses.map(a => ({
+          id: a.id,
+          label: `${a.full_name} — ${a.address_line1}, ${a.city}`,
+          sublabel: `${a.state} ${a.postal_code} · ${a.phone}${a.is_default ? ' · default' : ''}`,
+        })),
+        note: `${consigneeNameResolved} has ${savedAddresses.length} saved addresses — pick one to use on the quotation`,
+      }
+    }
+
+    // Use the picked address, or the single/default saved address if no explicit fields provided
+    const addrToUse = pickedAddr
+      ?? (!hasExplicitAddress && savedAddresses.length === 1 ? savedAddresses[0] : null)
+      ?? (!hasExplicitAddress ? (savedAddresses.find(a => a.is_default) ?? null) : null)
 
     const previewItems = parsed.map(it => {
       const p = pById.get(String(it.productId))!
       const qty = Number(it.quantity)
       if (!isFinite(qty) || qty <= 0) throw new Error(`Invalid quantity for ${p.name}`)
       const unitPrice = it.unitPrice != null && Number(it.unitPrice) > 0 ? Number(it.unitPrice) : Number(p.price)
-      const gstRate = Number(p.gst_percentage) || 18
-      const lineAmount = qty * unitPrice
-      return { productId: p.id, name: p.name, sku: p.sku, hsnCode: p.hsn_code, gstRate, quantity: qty, unitPrice, lineAmount }
+      const discountPct = Number(it.discountPct) || 0
+      const gstRate = it.gstRate != null ? Number(it.gstRate) : (Number(p.gst_percentage) || 18)
+      const hsnCode = it.hsnCode || p.hsn_code || null
+      const unit = it.unit || 'PCS'
+      const buyUnit = it.buyUnit || null
+      const variantId = it.variantId || null
+      const subVariantId = it.subVariantId || null
+      const lineAmount = lineItemExGst(qty, unitPrice, discountPct)
+      return {
+        productId: p.id, variantId, subVariantId,
+        description: p.name, sku: p.sku, hsnCode, gstRate,
+        quantity: qty, unit, buyUnit, unitPrice, discountPct, lineAmount,
+      }
     })
 
     const subtotal = previewItems.reduce((s, i) => s + i.lineAmount, 0)
     const cgst = previewItems.reduce((s, i) => s + i.lineAmount * i.gstRate / 200, 0)
     const sgst = cgst
-    const total = Math.round(subtotal + cgst + sgst)
+    const total = round2(subtotal + cgst + sgst)
+
+    const payload = {
+      consignee_email: email,
+      consignee_name: consigneeNameResolved,
+      subtotal: round2(subtotal),
+      cgst: round2(cgst),
+      sgst: round2(sgst),
+      total,
+      consignee_phone: consigneePhone || addrToUse?.phone || customer?.phone || null,
+      consignee_addr1: consigneeAddr1 || addrToUse?.address_line1 || customer?.business_address || '',
+      consignee_addr2: consigneeAddr2 || addrToUse?.address_line2 || null,
+      consignee_city: consigneeCity || addrToUse?.city || '',
+      consignee_state: consigneeState || addrToUse?.state || 'Chhattisgarh',
+      consignee_gstin: consigneeGstin || customer?.gst_number || null,
+      consignee_pincode: consigneePincode || addrToUse?.postal_code || null,
+      buyer_same: buyerSame !== false,
+      buyer_name: buyerName || null,
+      buyer_addr1: buyerAddr1 || null,
+      buyer_addr2: buyerAddr2 || null,
+      buyer_city: buyerCity || null,
+      buyer_state: buyerState || null,
+      buyer_gstin: buyerGstin || null,
+      buyer_phone: buyerPhone || null,
+      buyer_pincode: buyerPincode || null,
+      buyer_email: buyerEmail || null,
+      notes: notes ? String(notes).slice(0, 500) : null,
+      quote_date: quoteDate || new Date().toISOString().slice(0, 10),
+      items: previewItems.map(i => ({
+        description: i.description,
+        quantity: i.quantity,
+        rate: i.unitPrice,
+        discount_pct: i.discountPct,
+        hsn_code: i.hsnCode,
+        gst_rate: i.gstRate,
+        unit: i.unit,
+        buy_unit: i.buyUnit,
+        product_id: i.productId,
+        variant_id: i.variantId,
+        sub_variant_id: i.subVariantId,
+        amount: i.lineAmount,
+      })),
+    }
 
     return {
       proposed: true,
       kind: 'create_quotation',
-      payload: {
-        customerEmail: email,
-        consigneeName,
-        notes: notes ? String(notes).slice(0, 500) : null,
-        items: previewItems,
-        subtotal: round2(subtotal),
-        cgst: round2(cgst),
-        sgst: round2(sgst),
-        total,
-      },
-      confirmation: `Create draft quotation for ${consigneeName} (${email}) with ${previewItems.length} line${previewItems.length === 1 ? '' : 's'}, total ₹${fmtINR(total)}?`,
+      payload,
+      confirmation: `Create draft quotation for ${consigneeNameResolved} (${email}) with ${previewItems.length} line${previewItems.length === 1 ? '' : 's'}, total ₹${fmtINR(total)}?`,
       ui_blocks: [
-        { type: 'heading', value: `Quotation preview · ${consigneeName}`, level: 2 },
+        { type: 'heading', value: `Quotation preview · ${consigneeNameResolved}`, level: 2 },
+        {
+          type: 'kv_pairs',
+          pairs: [
+            { key: 'Customer', value: `${consigneeNameResolved} <${email}>` },
+            ...(payload.consignee_phone ? [{ key: 'Phone', value: payload.consignee_phone }] : []),
+            ...(payload.consignee_addr1 ? [{ key: 'Address', value: [payload.consignee_addr1, payload.consignee_addr2, payload.consignee_city, payload.consignee_state, payload.consignee_pincode].filter(Boolean).join(', ') }] : []),
+            ...(payload.consignee_gstin ? [{ key: 'GSTIN', value: payload.consignee_gstin }] : []),
+          ],
+        },
         {
           type: 'table',
-          headers: ['Item', 'Qty', 'Unit ₹', 'Line ₹'],
-          rows: previewItems.map(i => [i.name + (i.sku ? ` (${i.sku})` : ''), String(i.quantity), fmtINR(i.unitPrice), fmtINR(i.lineAmount)]),
+          headers: ['Item', 'Qty', 'Unit ₹', 'Disc%', 'Line ₹'],
+          rows: previewItems.map(i => [
+            i.description + (i.sku ? ` (${i.sku})` : ''),
+            String(i.quantity),
+            fmtINR(i.unitPrice),
+            i.discountPct > 0 ? `${i.discountPct}%` : '—',
+            fmtINR(i.lineAmount),
+          ]),
         },
         {
           type: 'kv_pairs',

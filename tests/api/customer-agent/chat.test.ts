@@ -63,24 +63,26 @@ describe('POST /api/customer-agent/chat', () => {
     const res = await POST(makeRequest({ message: '' }) as any)
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toContain('message is required')
+    expect(json.error).toBe('Validation failed')
+    expect(json.fields?.message).toBeTruthy()
   })
 
-  it('returns 400 when message exceeds 1000 chars', async () => {
+  it('returns 400 when message exceeds 2000 chars', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    const res = await POST(makeRequest({ message: 'x'.repeat(1001) }) as any)
+    const res = await POST(makeRequest({ message: 'x'.repeat(2001) }) as any)
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toContain('message too long')
+    expect(json.error).toBe('Validation failed')
   })
 
   it('returns final text when AI responds without tool calls', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    mockAiChat.mockResolvedValueOnce({
-      content: 'Here are some products for you!',
-      provider: 'openai',
-      model: 'gpt-4o',
-    } as any)
+    const finalResponse = { content: 'Here are some products for you!', provider: 'openai', model: 'gpt-4o' } as any
+    // iter<2 forces tool call on first two plain-text responses; third is accepted
+    mockAiChat
+      .mockResolvedValueOnce(finalResponse)
+      .mockResolvedValueOnce(finalResponse)
+      .mockResolvedValueOnce(finalResponse)
 
     const res = await POST(makeRequest({ message: 'Show me hex bolts' }) as any)
     expect(res.status).toBe(200)
@@ -94,19 +96,16 @@ describe('POST /api/customer-agent/chat', () => {
   it('executes a tool call when AI emits tool_use XML', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
 
-    // First AI call returns a tool_use block
+    const finalResponse = { content: 'I found some hex bolts for you.', provider: 'openai', model: 'gpt-4o' } as any
+    // First call returns tool_use; second and third return plain text (iter<2 forces one retry)
     mockAiChat
       .mockResolvedValueOnce({
         content: '<tool_use name="search_products">\n{"query":"hex bolt"}\n</tool_use>',
         provider: 'openai',
         model: 'gpt-4o',
       } as any)
-      // Second AI call returns final text after tool result
-      .mockResolvedValueOnce({
-        content: 'I found some hex bolts for you.',
-        provider: 'openai',
-        model: 'gpt-4o',
-      } as any)
+      .mockResolvedValueOnce(finalResponse)
+      .mockResolvedValueOnce(finalResponse)
 
     const mockTool = { handler: vi.fn().mockResolvedValueOnce([{ id: 'p1', name: 'Hex Bolt' }]) }
     mockGetTool.mockReturnValueOnce(mockTool as any)
@@ -123,17 +122,15 @@ describe('POST /api/customer-agent/chat', () => {
   it('records tool error when tool not allowed', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
 
+    const finalResponse = { content: 'Sorry, I cannot do that.', provider: 'openai', model: 'gpt-4o' } as any
     mockAiChat
       .mockResolvedValueOnce({
         content: '<tool_use name="forbidden_tool">\n{}\n</tool_use>',
         provider: 'openai',
         model: 'gpt-4o',
       } as any)
-      .mockResolvedValueOnce({
-        content: 'Sorry, I cannot do that.',
-        provider: 'openai',
-        model: 'gpt-4o',
-      } as any)
+      .mockResolvedValueOnce(finalResponse)
+      .mockResolvedValueOnce(finalResponse)
 
     mockGetTool.mockReturnValueOnce(null) // tool not found
 
@@ -146,17 +143,15 @@ describe('POST /api/customer-agent/chat', () => {
   it('records tool error when tool handler throws', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
 
+    const finalResponse = { content: 'Something went wrong.', provider: 'openai', model: 'gpt-4o' } as any
     mockAiChat
       .mockResolvedValueOnce({
         content: '<tool_use name="search_products">\n{"query":"test"}\n</tool_use>',
         provider: 'openai',
         model: 'gpt-4o',
       } as any)
-      .mockResolvedValueOnce({
-        content: 'Something went wrong.',
-        provider: 'openai',
-        model: 'gpt-4o',
-      } as any)
+      .mockResolvedValueOnce(finalResponse)
+      .mockResolvedValueOnce(finalResponse)
 
     const mockTool = { handler: vi.fn().mockRejectedValueOnce(new Error('DB error')) }
     mockGetTool.mockReturnValueOnce(mockTool as any)

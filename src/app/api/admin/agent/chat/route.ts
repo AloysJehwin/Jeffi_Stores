@@ -109,6 +109,7 @@ RULES (non-negotiable):
 - Use ONLY values the tools returned. If a tool returns no results, say so — do not fill in from training.
 - Tools marked with ! are mutating — when they return {proposed:true}, tell the user "I've proposed this — review the action card."
 - If {needs_choice:true}: write "Multiple matches — pick one above." and stop.
+- If the user says "Use address id <uuid> ..." (from the address picker): call propose_create_quotation again with the same customerEmail and items, and pass addressId=<uuid>. Do NOT ask for confirmation — just call the tool.
 - Be concise. Numbers and bullet points beat paragraphs. No filler.
 
 ## TOOLS
@@ -139,7 +140,21 @@ Output format — use ui_blocks for any data display:
 - 2+ products → always product_grid, never bullet lists.
 - Free text outside ui_blocks renders above the blocks — use it for brief framing or questions only.
 
-Quotation flow: DO NOT call propose_create_quotation with text. Always call match_quotation_items first to resolve product names → ids, then propose_create_quotation with productIds only.
+## QUOTATION FLOW — MANDATORY (violations waste all iterations)
+
+When the user asks to "prepare a quotation", "create a quote", or provides a list of items/tools/materials:
+STEP 1 — Call match_quotation_items ONCE with ALL items packed into a single JSON array in the "lines" field.
+         DO NOT call search_products for quotation items. DO NOT loop per item. ONE call, ALL lines.
+STEP 2 — Wait for match_quotation_items result. It returns a quotation_resolver UI block automatically.
+STEP 3 — If all lines are matched: call propose_create_quotation with the productIds from the result.
+         If some are ambiguous: show the resolver block and ask the admin to confirm those lines first.
+         If some are unmatched: show the resolver block and tell the admin which items were not found.
+
+Example — user gives 26 items for customer x@y.com:
+<tool_use name="match_quotation_items">
+{"lines":"[{\"requestedText\":\"pneumatic grease pump 25kg\",\"qty\":1},{\"requestedText\":\"impact deep socket 48mm\",\"qty\":1},...]"}
+</tool_use>
+NEVER call search_products for items in a quotation request. NEVER call match_quotation_items more than once per turn.
 
 Marketing emails:
 - "send featured products email" or "product announcement" → estimate_email_audience then propose_product_announcement_email. Single-address test: audience="test_only", testEmail=<address>. intro = ONE plain sentence. NO markdown.
@@ -172,6 +187,46 @@ function parseToolCalls(text: string): { calls: { name: string; rawInput: string
   }
 
   return { calls, remainder }
+}
+
+const QUOTATION_TRIGGER_RE = /\b(prepare|create|make|generate|draft)\b.{0,20}\b(quotation|quote|rfq)\b/i
+const BATCH_SIZE = 8
+
+// Strip leading "N. " or "N) " or "N " list prefix
+const LIST_PREFIX_RE = /^\s*\d+[\.\)]?\s+/
+
+// Trailing qty+unit at end of line: "2 nos", "1 no.", "12 pkt", "50mtr each" etc.
+// Must be preceded by whitespace so "48mm" doesn't match as qty=48 unit=mm
+const TRAILING_QTY_RE = /\s+(\d+)\s*(?:no\.?s?|nos?\.?|pcs?\.?|pc\.?|units?|boxes?|box\.?|pkts?\.?|packets?|sets?|mtr\.?|m\.?|each|ea\.?)?\s*$/i
+
+function parseItemLine(raw: string): { requestedText: string; qty: number } | null {
+  if (!LIST_PREFIX_RE.test(raw)) return null
+  let line = raw.replace(LIST_PREFIX_RE, '').trim()
+
+  const qm = TRAILING_QTY_RE.exec(line)
+  if (!qm) return null
+
+  const qty = parseInt(qm[1], 10)
+  const text = line.slice(0, qm.index).trim()
+
+  if (!text || qty <= 0 || qty > 9999) return null
+  return { requestedText: text, qty }
+}
+
+function parseQuotationRequest(message: string): { customerEmail: string; lines: Array<{ requestedText: string; qty: number }> } | null {
+  if (!QUOTATION_TRIGGER_RE.test(message)) return null
+
+  const emailRe = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
+  const customerEmail = emailRe.exec(message)?.[0] ?? ''
+
+  const lines: Array<{ requestedText: string; qty: number }> = []
+  for (const raw of message.split('\n')) {
+    const parsed = parseItemLine(raw)
+    if (parsed) lines.push(parsed)
+  }
+
+  if (lines.length < 2) return null
+  return { customerEmail, lines }
 }
 
 function parseUiBlocks(text: string): { blocks: any[]; remainder: string } {
@@ -234,6 +289,185 @@ export async function POST(req: NextRequest) {
     [admin.adminId, conversationId, userMessage]
   )
 
+  // Short-circuit: bypass LLM entirely for quotation confirmation from the resolver UI
+  if (userMessage.startsWith('__quotation_confirm__')) {
+    try {
+      const itemsJson = userMessage.slice('__quotation_confirm__'.length)
+      const allItems: Array<{ productId?: string; quantity: number; variantId?: string; subVariantId?: string; skipped?: boolean; requestedText?: string }> = JSON.parse(itemsJson)
+      const items = allItems.filter(i => !i.skipped) as Array<{ productId: string; quantity: number; variantId?: string; subVariantId?: string }>
+      const skippedItems = allItems.filter(i => i.skipped)
+
+      const priorMessages = await queryMany<{ role: string; content: string }>(
+        `SELECT role, content FROM admin_agent_messages
+         WHERE conversation_id = $1 AND role = 'user'
+         ORDER BY created_at ASC`,
+        [conversationId]
+      )
+      const emailRe = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
+      const customerEmail = priorMessages
+        .map(m => emailRe.exec(m.content)?.[0])
+        .filter(Boolean)[0] ?? ''
+
+      const proposeTool = getTool('propose_create_quotation')
+      if (!proposeTool || !customerEmail || items.length === 0) {
+        const reason = !proposeTool ? 'tool not found' : !customerEmail ? 'customer email not found in conversation history' : skippedItems.length > 0 ? `all ${skippedItems.length} items were skipped — no products to quote` : 'no items'
+        await query(
+          `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
+           VALUES ($1, $2, 'assistant', $3, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb, '[]'::jsonb)`,
+          [admin.adminId, conversationId, `Could not confirm quotation: ${reason}.`]
+        )
+        return NextResponse.json({
+          conversationId,
+          message: `Could not confirm quotation: ${reason}.`,
+          uiBlocks: [],
+          toolCalls: [],
+          proposedActions: [],
+          pickers: [],
+          provider: '',
+          model: '',
+        })
+      }
+
+      const proposeOut = await proposeTool.handler({ customerEmail, items: JSON.stringify(items) }) as any
+      const toolCallRecords: ToolCallRecord[] = [{ tool: 'propose_create_quotation', input: { customerEmail, items: JSON.stringify(items) }, output: proposeOut }]
+      const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
+      const finalUiBlocks: any[] = []
+
+      // Address (or other) disambiguation required — surface picker to admin
+      if (proposeOut?.needs_choice === true) {
+        const pickerNote = proposeOut.note || `Multiple ${proposeOut.choice_kind} options — pick one`
+        const pickerMsg = `Multiple addresses found — please pick one above.`
+        await query(
+          `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
+           VALUES ($1, $2, 'assistant', $3, $4::jsonb, '[]'::jsonb, '[]'::jsonb, $5::jsonb)`,
+          [admin.adminId, conversationId, pickerMsg, JSON.stringify(toolCallRecords), JSON.stringify([{ choice_kind: proposeOut.choice_kind, options: proposeOut.options, note: pickerNote }])]
+        )
+        return NextResponse.json({
+          conversationId,
+          message: pickerMsg,
+          uiBlocks: [],
+          toolCalls: toolCallRecords,
+          proposedActions: [],
+          pickers: [{ choice_kind: proposeOut.choice_kind, options: proposeOut.options, note: pickerNote }],
+          provider: '',
+          model: '',
+        })
+      }
+
+      if (proposeOut?.proposed === true) {
+        const inserted = await queryOne<{ id: string }>(
+          `INSERT INTO admin_agent_actions (admin_id, conversation_id, kind, payload, status)
+           VALUES ($1, $2, $3, $4::jsonb, 'proposed')
+           RETURNING id`,
+          [admin.adminId, conversationId, proposeOut.kind, JSON.stringify(proposeOut.payload)]
+        )
+        if (inserted) {
+          proposedActions.push({ id: inserted.id, kind: proposeOut.kind, payload: proposeOut.payload, confirmation: proposeOut.confirmation })
+        }
+        if (Array.isArray(proposeOut.ui_blocks)) finalUiBlocks.push(...proposeOut.ui_blocks)
+      }
+
+      const skippedNote = skippedItems.length > 0
+        ? ` ${skippedItems.length} item${skippedItems.length > 1 ? 's' : ''} skipped: ${skippedItems.map(s => s.requestedText).join(', ')}.`
+        : ''
+      const finalText = proposeOut?.proposed === true ? `Quotation ready — review the proposal below.${skippedNote}` : (proposeOut?.summary || 'Could not create quotation.')
+      await query(
+        `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
+         VALUES ($1, $2, 'assistant', $3, $4::jsonb, $5::jsonb, $6::jsonb, '[]'::jsonb)`,
+        [admin.adminId, conversationId, finalText, JSON.stringify(toolCallRecords), JSON.stringify(finalUiBlocks), JSON.stringify(proposedActions)]
+      )
+      return NextResponse.json({
+        conversationId,
+        message: finalText,
+        uiBlocks: finalUiBlocks,
+        toolCalls: toolCallRecords,
+        proposedActions,
+        pickers: [],
+        provider: '',
+        model: '',
+      })
+    } catch (e: any) {
+      return NextResponse.json({ error: `Quotation confirm failed: ${String(e?.message || e)}` }, { status: 500 })
+    }
+  }
+
+  // Short-circuit: parse numbered-list quotation requests server-side, batch through match_quotation_items
+  const parsedQuotation = parseQuotationRequest(userMessage)
+  if (parsedQuotation && parsedQuotation.lines.length > 0) {
+    const { customerEmail, lines } = parsedQuotation
+    const matchTool = getTool('match_quotation_items')
+    if (matchTool) {
+      try {
+        // Run in batches to avoid embedding query bloat
+        const allLines: any[] = []
+        for (let i = 0; i < lines.length; i += BATCH_SIZE) {
+          const batch = lines.slice(i, i + BATCH_SIZE)
+          const batchOut = await matchTool.handler({ lines: JSON.stringify(batch) }) as any
+          if (batchOut?.ok && Array.isArray(batchOut.data?.lines)) {
+            allLines.push(...batchOut.data.lines)
+          } else {
+            // batch failed — fall through to LLM
+            allLines.length = 0
+            break
+          }
+        }
+
+        if (allLines.length > 0) {
+          const counts = { matched: 0, ambiguous: 0, unmatched: 0 }
+          for (const l of allLines) counts[l.status as 'matched' | 'ambiguous' | 'unmatched']++
+
+          const resolverBlock = {
+            type: 'quotation_resolver',
+            lines: allLines,
+            counts,
+          }
+
+          const toolCallRecords: ToolCallRecord[] = [{ tool: 'match_quotation_items', input: { lines: JSON.stringify(lines) }, output: { ok: true, data: { lines: allLines, counts } } }]
+          let finalUiBlocks: any[] = [resolverBlock]
+          const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
+          let finalText = ''
+
+          // All matched — auto-propose
+          if (counts.ambiguous === 0 && counts.unmatched === 0 && counts.matched > 0 && customerEmail) {
+            const proposeTool = getTool('propose_create_quotation')
+            if (proposeTool) {
+              const items = allLines
+                .filter((l: any) => l.status === 'matched' && l.candidates[0])
+                .map((l: any) => ({ productId: l.candidates[0].productId, quantity: l.qty }))
+              const proposeOut = await proposeTool.handler({ customerEmail, items: JSON.stringify(items) }) as any
+              toolCallRecords.push({ tool: 'propose_create_quotation', input: { customerEmail, items: JSON.stringify(items) }, output: proposeOut })
+              if (proposeOut?.proposed === true) {
+                const inserted = await queryOne<{ id: string }>(
+                  `INSERT INTO admin_agent_actions (admin_id, conversation_id, kind, payload, status)
+                   VALUES ($1, $2, $3, $4::jsonb, 'proposed') RETURNING id`,
+                  [admin.adminId, conversationId, proposeOut.kind, JSON.stringify(proposeOut.payload)]
+                )
+                if (inserted) proposedActions.push({ id: inserted.id, kind: proposeOut.kind, payload: proposeOut.payload, confirmation: proposeOut.confirmation })
+                if (Array.isArray(proposeOut.ui_blocks)) finalUiBlocks = finalUiBlocks.concat(proposeOut.ui_blocks)
+                finalText = 'All items matched. Review the quotation proposal below.'
+              }
+            }
+          } else {
+            const parts = []
+            if (counts.matched > 0) parts.push(`${counts.matched} matched`)
+            if (counts.ambiguous > 0) parts.push(`${counts.ambiguous} need review`)
+            if (counts.unmatched > 0) parts.push(`${counts.unmatched} not found`)
+            finalText = parts.join(' · ') + '. ' + (counts.ambiguous > 0 ? 'Select the correct product for ambiguous items above.' : 'Some items could not be matched to catalog products.')
+          }
+
+          await query(
+            `INSERT INTO admin_agent_messages (admin_id, conversation_id, role, content, tool_calls, ui_blocks, proposed_actions, pickers)
+             VALUES ($1, $2, 'assistant', $3, $4::jsonb, $5::jsonb, $6::jsonb, '[]'::jsonb)`,
+            [admin.adminId, conversationId, finalText, JSON.stringify(toolCallRecords), JSON.stringify(finalUiBlocks), JSON.stringify(proposedActions)]
+          )
+          return NextResponse.json({ conversationId, message: finalText, uiBlocks: finalUiBlocks, toolCalls: toolCallRecords, proposedActions, pickers: [], provider: '', model: '' })
+        }
+      } catch {
+        // fall through to LLM path
+      }
+    }
+  }
+
   const history = await queryMany<{ role: string; content: string }>(
     `SELECT role, content FROM admin_agent_messages
      WHERE conversation_id = $1
@@ -260,9 +494,10 @@ export async function POST(req: NextRequest) {
   let provider = ''
   let model = ''
   let consecutiveStalls = 0
+  let done = false
 
   try {
-    for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
+    for (let iter = 0; iter < MAX_ITERATIONS && !done; iter++) {
       const r = await aiChat({
         modelHint: 'agent',
         jsonMode: false,
@@ -307,7 +542,7 @@ export async function POST(req: NextRequest) {
         consecutiveStalls = 0
         const ui = parseUiBlocks(text)
         finalText = ui.remainder
-        finalUiBlocks = ui.blocks
+        finalUiBlocks = finalUiBlocks.concat(ui.blocks)
         break
       }
       consecutiveStalls = 0
@@ -316,6 +551,7 @@ export async function POST(req: NextRequest) {
 
       const toolOutputs: string[] = []
       for (const c of calls) {
+        if (done) break
         const tool = getTool(c.name)
         let parsed: Record<string, unknown> = {}
         try { parsed = JSON.parse(c.rawInput || '{}') } catch { /* invalid JSON input — use empty object */ }
@@ -377,7 +613,67 @@ export async function POST(req: NextRequest) {
             })
             toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(out).slice(0, 4000)}</tool_result>`)
           } else {
+            // Hoist any uiBlocks the tool embedded (e.g. quotation_resolver from match_quotation_items)
+            if (out && typeof out === 'object' && Array.isArray((out as any).uiBlocks)) {
+              finalUiBlocks = finalUiBlocks.concat((out as any).uiBlocks)
+            }
             toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(out).slice(0, 8000)}</tool_result>`)
+
+            // Deterministic quotation advance: if match_quotation_items resolved all lines, auto-call propose_create_quotation
+            if (
+              c.name === 'match_quotation_items' &&
+              out && typeof out === 'object' &&
+              (out as any).ok === true &&
+              (out as any).data?.counts?.ambiguous === 0 &&
+              (out as any).data?.counts?.unmatched === 0 &&
+              (out as any).data?.counts?.matched > 0
+            ) {
+              const resolvedLines: Array<{ status: string; qty: number; candidates: Array<{ productId: string }> }> =
+                (out as any).data.lines
+              const items = resolvedLines
+                .filter(l => l.status === 'matched' && l.candidates[0])
+                .map(l => ({ productId: l.candidates[0].productId, quantity: l.qty }))
+
+              // Extract customer email from any user message in this conversation
+              const emailRe = /\b[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}\b/
+              const customerEmail = messages
+                .filter(m => m.role === 'user')
+                .map(m => emailRe.exec(m.content)?.[0])
+                .filter(Boolean)[0] ?? ''
+
+              const proposeTool = getTool('propose_create_quotation')
+              if (proposeTool && customerEmail && items.length > 0) {
+                try {
+                  const proposeOut = await proposeTool.handler({
+                    customerEmail,
+                    items: JSON.stringify(items),
+                  })
+                  toolCallRecords.push({ tool: 'propose_create_quotation', input: { customerEmail, items: JSON.stringify(items) }, output: proposeOut })
+                  if (proposeOut && typeof proposeOut === 'object' && (proposeOut as any).proposed === true) {
+                    const o = proposeOut as any
+                    const inserted = await queryOne<{ id: string }>(
+                      `INSERT INTO admin_agent_actions (admin_id, conversation_id, kind, payload, status)
+                       VALUES ($1, $2, $3, $4::jsonb, 'proposed')
+                       RETURNING id`,
+                      [admin.adminId, conversationId, o.kind, JSON.stringify(o.payload)]
+                    )
+                    if (inserted) {
+                      proposedActions.push({ id: inserted.id, kind: o.kind, payload: o.payload, confirmation: o.confirmation })
+                    }
+                    // Surface the quotation preview ui_blocks
+                    if (Array.isArray(o.ui_blocks)) {
+                      finalUiBlocks = finalUiBlocks.concat(o.ui_blocks)
+                    }
+                  }
+                  toolOutputs.push(`<tool_result name="propose_create_quotation">${JSON.stringify(proposeOut).slice(0, 8000)}</tool_result>`)
+                } catch (autoErr: any) {
+                  toolOutputs.push(`<tool_result name="propose_create_quotation">Error: ${String(autoErr?.message || autoErr)}</tool_result>`)
+                }
+                // All done deterministically — no need for another LLM turn
+                done = true
+                if (!finalText) finalText = 'All items matched. Review the quotation proposal below.'
+              }
+            }
           }
         } catch (err: any) {
           const msg = String(err?.message || err)
@@ -393,7 +689,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: msg }, { status: 502 })
   }
 
-  if (!finalText && finalUiBlocks.length === 0) {
+  if (!finalText && finalUiBlocks.length === 0 && !done) {
     finalText = 'I ran into the iteration limit before reaching a final answer. Try a simpler question or break it into steps.'
   }
 

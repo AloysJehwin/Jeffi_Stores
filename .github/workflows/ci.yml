@@ -298,6 +298,11 @@ jobs:
             echo "── Pruning old images ──"
             docker image prune -f
 
+            echo "── Reloading nginx config ──"
+            docker compose -f docker-compose.prod.yml exec -T nginx nginx -t && \
+              docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload || \
+              echo "nginx reload skipped (container may not be named nginx)"
+
             echo "── Status ──"
             docker compose -f docker-compose.prod.yml ps
 
@@ -475,6 +480,7 @@ jobs:
               backfill_order_items_mrp_from_quotation.sql
               backfill_variant_sell_unit_id.sql
               add_service_accounts.sql
+              add_shipment_status_to_orders.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')
