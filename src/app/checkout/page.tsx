@@ -176,6 +176,26 @@ function CheckoutPage() {
     document.body.appendChild(script)
   }, [paymentMethod, razorpayLoaded])
 
+  const fetchShipping = (postalCode: string) => {
+    if (isBuyNow && !buyNowItem) return
+    const subtotal = isBuyNow
+      ? buyNowItem!.price * buyNowItem!.qty
+      : getCartTotal()
+    const items = isBuyNow
+      ? [{ productId: buyNowItem!.productId, variantId: buyNowItem!.variantId || null, quantity: buyNowItem!.qty }]
+      : cartItems.map(i => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: Number(i.quantity) }))
+    if (items.length === 0) return
+    fetch('/api/shipping/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ destinationPin: postalCode, cartItems: items, subtotal }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.charge != null) setShippingCharge(Number(d.charge)) })
+      .catch(() => {})
+  }
+
   const fetchAddress = async (addressId: string) => {
     try {
       const response = await fetch('/api/user/addresses', { credentials: 'include' })
@@ -188,6 +208,7 @@ function CheckoutPage() {
         const selectedAddr = data.addresses.find((a: any) => a.id === addressId)
         if (selectedAddr) {
           setAddress(selectedAddr)
+          fetchShipping(selectedAddr.postal_code)
         } else {
           router.push('/checkout/review')
         }
@@ -201,27 +222,12 @@ function CheckoutPage() {
     }
   }
 
-  // Re-fetch shipping from server once address AND item data are known
+  // Re-fetch shipping when cart items change after address is already loaded
   useEffect(() => {
     if (!address?.postal_code) return
-    if (isBuyNow && !buyNowItem) return
-    const subtotal = isBuyNow
-      ? buyNowItem!.price * buyNowItem!.qty
-      : getCartTotal()
-    const items = isBuyNow
-      ? [{ productId: buyNowItem!.productId, variantId: buyNowItem!.variantId || null, quantity: buyNowItem!.qty }]
-      : cartItems.map(i => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: Number(i.quantity) }))
-    if (items.length === 0) return
-    fetch('/api/shipping/rate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      body: JSON.stringify({ destinationPin: address.postal_code, cartItems: items, subtotal }),
-    })
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.charge != null) setShippingCharge(Number(d.charge)) })
-      .catch(() => {})
-  }, [address, buyNowItem, cartItems])
+    fetchShipping(address.postal_code)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems])
 
   // Re-apply coupon from server once address + subtotal are known — never trust URL value
   useEffect(() => {
