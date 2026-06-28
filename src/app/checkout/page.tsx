@@ -201,11 +201,12 @@ function CheckoutPage() {
     }
   }
 
-  // Re-fetch shipping from server once address is known — never trust URL value
+  // Re-fetch shipping from server once address AND item data are known
   useEffect(() => {
     if (!address?.postal_code) return
+    if (isBuyNow && !buyNowItem) return
     const subtotal = isBuyNow
-      ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
+      ? buyNowItem!.price * buyNowItem!.qty
       : getCartTotal()
     fetch('/api/shipping/rate', {
       method: 'POST',
@@ -216,7 +217,7 @@ function CheckoutPage() {
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.charge != null) setShippingCharge(Number(d.charge)) })
       .catch(() => {})
-  }, [address])
+  }, [address, buyNowItem])
 
   // Re-apply coupon from server once address + subtotal are known — never trust URL value
   useEffect(() => {
@@ -239,7 +240,7 @@ function CheckoutPage() {
         }
       })
       .catch(() => {})
-  }, [couponId, address])
+  }, [couponId, address, buyNowItem])
 
   const verifyPayment = async (
     razorpay_order_id: string,
