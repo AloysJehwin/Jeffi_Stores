@@ -91,9 +91,9 @@ Rules (apply after getting tool results):
 RELEVANCE CHECK (mandatory before responding with products):
 After receiving tool results, evaluate: does each returned product actually relate to what the user asked for?
 - If the results clearly match the user's request → list them.
-- If the results are unrelated (e.g. user asked about car tyres but results are V-belts or driver extensions) → do NOT list them. Instead, think about what tools or equipment ARE needed for the task (e.g. tyre change → jack, lug wrench, torque wrench) and call recommend_for_project again with that refined query (e.g. "car jack tyre change tools"). Present whatever matches as "we don't stock X but here are related tools we do carry".
-- If a second search also returns nothing relevant → say honestly that we don't carry anything for that task.
-Never present unrelated products as if they answer the user's question.`
+- If results are unrelated → discard them. Call recommend_for_project one more time with a broader related query derived from the user's task (e.g. user asks "car tyre" → retry with "tyre change automotive tools jack wrench"). Only list products that come back from THAT tool result.
+- If a second search also returns empty or unrelated → say "Sorry, we don't carry anything for that." Do NOT mention or name any product that did not appear in a tool result.
+- NEVER invent, guess, or mention product names from your own knowledge. If a product was not returned by a tool, it does not exist in our catalog.`
 }
 
 function parseToolCalls(text: string): { calls: { name: string; rawInput: string }[]; remainder: string } {
