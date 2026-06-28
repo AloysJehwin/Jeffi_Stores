@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
-import AiAssistantModal from './AiAssistantModal'
+import CustomerChatModal from './CustomerChatModal'
 
 export default function AiAssistantButton() {
   const { user } = useAuth()
@@ -29,7 +29,7 @@ export default function AiAssistantButton() {
           <path d="M5 4l.5 1.5L7 6l-1.5.5L5 8l-.5-1.5L3 6l1.5-.5L5 4z" />
         </svg>
       </button>
-      <AiAssistantModal isOpen={open} onClose={() => setOpen(false)} />
+      <CustomerChatModal isOpen={open} onClose={() => setOpen(false)} />
     </>
   )
 }

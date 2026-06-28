@@ -420,7 +420,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
             )}
 
             {/* Tracking */}
-            {['shipped', 'out_for_delivery', 'delivered'].includes(order.status) && order.awbNumber && (
+            {order.awbNumber && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
                 <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center gap-2">
                   <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">

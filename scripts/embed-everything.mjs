@@ -4,9 +4,9 @@ import crypto from 'node:crypto'
 
 const PG_HOST = process.env.RAZER_PG_HOST || '100.82.208.8'
 const PG_PORT = parseInt(process.env.RAZER_PG_PORT || '5432', 10)
-const PG_USER = process.env.RAZER_PG_USER || 'postgres'
+const PG_USER = process.env.RAZER_PG_USER || 'jeffi_replica'
 const PG_PASS = process.env.RAZER_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
-const PG_DB   = process.env.RAZER_PG_DB || 'jeffi_dev'
+const PG_DB   = process.env.RAZER_PG_DB || 'jeffi_replica'
 const OLLAMA_URL = process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434'
 const EMBED_MODEL = process.env.EMBED_MODEL || 'nomic-embed-text'
 const BATCH_SIZE = parseInt(process.env.BATCH_SIZE || '50', 10)

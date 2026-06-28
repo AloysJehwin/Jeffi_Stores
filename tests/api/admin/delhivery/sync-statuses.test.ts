@@ -177,7 +177,10 @@ describe('POST — DL status (delivered)', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.synced).toBe(0)
-    expect(mockQuery).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE orders'), expect.any(Array))
+    // shipment_status write may still fire; assert STATUS_SYNC status write did not
+    expect(mockQuery).not.toHaveBeenCalledWith(
+      expect.stringContaining("status = 'delivered'"), expect.any(Array)
+    )
   })
 })
 
@@ -218,9 +221,9 @@ describe('POST — RTO-DL status', () => {
     expect(body.results[0].syncedTo).toBe('returned')
 
     const updateCall = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('UPDATE orders')
+      (sql as string).includes('awb_number = NULL')
     )
-    expect((updateCall![0] as string)).toContain('awb_number = NULL')
+    expect(updateCall).toBeDefined()
   })
 })
 
@@ -320,7 +323,11 @@ describe('POST — unknown statusType skipped', () => {
     const res = await POST(makeReq())
     const body = await res.json()
     expect(body.synced).toBe(0)
-    expect(mockQuery).not.toHaveBeenCalled()
+    // shipment_status write may fire; assert no STATUS_SYNC order status write occurred
+    expect(mockQuery).not.toHaveBeenCalledWith(
+      expect.stringMatching(/status = '(shipped|delivered|out_for_delivery|returned)'/),
+      expect.any(Array)
+    )
   })
 })
 
@@ -652,7 +659,7 @@ describe('POST — statusDateTime absent', () => {
     const body = await res.json()
     expect(body.synced).toBe(1)
     const updateSql = mockQuery.mock.calls.find(([sql]) =>
-      (sql as string).includes('UPDATE orders')
+      (sql as string).includes('delivered_at')
     )
     expect((updateSql![0] as string)).toContain('delivered_at = NOW()')
   })

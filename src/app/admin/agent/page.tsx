@@ -490,6 +490,10 @@ export default function AdminAgentPage() {
                                   setTurns(prev => prev.map(t => t.id !== turn.id ? t : { ...t, pickerResolved: true }))
                                   sendMessage(`Use ${kind} id ${option.id} (${option.label}) for the previous request.`)
                                 }}
+                                onSendMessage={(msg) => {
+                                  setTurns(prev => prev.map(t => t.id !== turn.id ? t : { ...t, pickerResolved: true }))
+                                  sendMessage(msg)
+                                }}
                               />
                             </div>
                           )}
