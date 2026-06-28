@@ -235,6 +235,7 @@ export async function POST(req: NextRequest) {
     for (let iter = 0; iter < MAX_ITERATIONS; iter++) {
       const r = await aiChat({
         modelHint: 'agent',
+        forceProvider: 'openai',
         jsonMode: false,
         temperature: 0.2,
         maxTokens: 1200,
