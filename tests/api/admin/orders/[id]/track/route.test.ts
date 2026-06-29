@@ -44,6 +44,10 @@ function makeGet() {
   return new NextRequest(`http://localhost/api/admin/orders/${orderId}/track`)
 }
 
+function makeGetRefresh() {
+  return new NextRequest(`http://localhost/api/admin/orders/${orderId}/track?refresh=1`)
+}
+
 const mockOrder = {
   awb_number: 'AWB123456',
   status: 'shipped',
@@ -119,6 +123,19 @@ describe('GET /api/admin/orders/[id]/track', () => {
     expect(data.tracking).toBeNull()
   })
 
+  it('returns cached shipment_status from DB on plain GET (no refresh)', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQueryOne.mockResolvedValue({ ...mockOrder, shipment_status: 'in_transit' } as any)
+    const res = await GET(makeGet(), routeParams as any)
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.fromCache).toBe(true)
+    expect(data.tracking.shipmentStatus).toBe('in_transit')
+    expect(data.tracking.awb).toBe('AWB123456')
+    expect(data.statusSynced).toBe(false)
+  })
+
   it('returns 503 when DELHIVERY_API_KEY not configured', async () => {
     // TOKEN is captured at module load time, so we must re-import after
     // clearing the env var to exercise the !TOKEN branch.
@@ -141,7 +158,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
     vi.mocked(scopeFresh).mockReturnValue(true)
     vi.mocked(queryOneFresh).mockResolvedValue(mockOrder as any)
 
-    const res = await GETFresh(makeGet(), routeParams as any)
+    const res = await GETFresh(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(503)
     const data = await res.json()
     expect(data.error).toMatch(/not configured/i)
@@ -159,7 +176,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
 
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 500 }))
 
-    const res = await GET(makeGet(), routeParams as any)
+    const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(502)
     const data = await res.json()
     expect(data.error).toMatch(/unavailable/i)
@@ -177,7 +194,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
       json: vi.fn().mockResolvedValue({ ShipmentData: [] }),
     }))
 
-    const res = await GET(makeGet(), routeParams as any)
+    const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.tracking).toBeNull()
@@ -195,7 +212,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
       json: vi.fn().mockResolvedValue(buildTrackingResponse('IT')),
     }))
 
-    const res = await GET(makeGet(), routeParams as any)
+    const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.tracking).toBeTruthy()
@@ -216,7 +233,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
       json: vi.fn().mockResolvedValue(buildTrackingResponse('DL')),
     }))
 
-    const res = await GET(makeGet(), routeParams as any)
+    const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.statusSynced).toBe(true)
@@ -235,7 +252,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
       json: vi.fn().mockResolvedValue(buildTrackingResponse('RTO-DL')),
     }))
 
-    const res = await GET(makeGet(), routeParams as any)
+    const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.syncedTo).toBe('returned')
@@ -254,7 +271,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
       json: vi.fn().mockResolvedValue(buildTrackingResponse('PU')),
     }))
 
-    const res = await GET(makeGet(), routeParams as any)
+    const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.statusSynced).toBe(false)
@@ -302,7 +319,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
       json: vi.fn().mockResolvedValue(trackingWithException),
     }))
 
-    const res = await GET(makeGet(), routeParams as any)
+    const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
     const data = await res.json()
     // Should have resolved NDR -> OD (out for delivery)
@@ -321,7 +338,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
       json: vi.fn().mockResolvedValue(buildTrackingResponse('IT')),
     }))
 
-    const res = await GET(makeGet(), routeParams as any)
+    const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
     expect(mockSendStatus).toHaveBeenCalledWith(
       'john@example.com',
@@ -355,7 +372,7 @@ describe('GET /api/admin/orders/[id]/track', () => {
       json: vi.fn().mockResolvedValue(buildTrackingResponse('PU', scans)),
     }))
 
-    const res = await GET(makeGet(), routeParams as any)
+    const res = await GET(makeGetRefresh(), routeParams as any)
     expect(res.status).toBe(200)
     const data = await res.json()
     expect(data.tracking.scans).toHaveLength(1)

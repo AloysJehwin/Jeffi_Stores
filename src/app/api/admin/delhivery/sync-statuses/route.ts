@@ -18,12 +18,15 @@ const STATUS_SYNC: Record<string, {
 }> = {
   PU:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
   IT:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  RAD:      { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
   OT:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   OD:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   DL:       { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
   RTO:      { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  RTRN:     { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
   'RTO-IT': { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
   'RTO-OT': { orderStatus: 'out_for_delivery',                      onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-OFD':{ orderStatus: 'out_for_delivery',                      onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
   'RTO-DL': { orderStatus: 'returned',         clearAwb: true,       onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
 }
 
@@ -102,7 +105,8 @@ export async function POST(request: NextRequest) {
         const newShipmentStatus = resolveShipmentStatus(rawType, scans)
 
         // Derive the Delhivery statusType string we use for STATUS_SYNC
-        const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
+        // UD/NDR/HOLD/LOST/MIS/OC are ambiguous/exception codes — walk scan history to resolve true state
+        const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS', 'OC', 'PKD'])
         let statusType = rawType
         if (EXCEPTION_TYPES.has(rawType) || rawType === 'PP' || rawType === 'MF') {
           // First try scan history (most authoritative)
@@ -115,7 +119,7 @@ export async function POST(request: NextRequest) {
             if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
             if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
             if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
-            if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
+            if (activity.includes('in transit') || activity === 'transit' || activity.includes('added to bag') || activity.includes('reached') || activity.includes('arrived at')) { statusType = 'IT'; break }
             if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) { statusType = 'PU'; break }
             if (activity === 'manifested' || activity.includes('manifest')) { statusType = 'MF'; break }
             if (activity.includes('delivered')) { statusType = 'DL'; break }
@@ -137,7 +141,7 @@ export async function POST(request: NextRequest) {
 
         // Track AWBs that have been physically picked up (PU or any forward/RTO stage)
         // so we can auto-advance the pickup request status regardless of order state.
-        const PICKED_UP_TYPES = new Set(['PU', 'IT', 'OT', 'OD', 'DL', 'RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL'])
+        const PICKED_UP_TYPES = new Set(['PU', 'IT', 'RAD', 'OT', 'OD', 'DL', 'RTO', 'RTRN', 'RTO-IT', 'RTO-OT', 'RTO-OFD', 'RTO-DL'])
         if (PICKED_UP_TYPES.has(statusType)) {
           pickedUpAwbs.add(awb)
         }

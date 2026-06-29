@@ -31,12 +31,11 @@ type TrackingData = {
   returnedDate?: string | null
 }
 
-const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
+const EXCEPTION_TYPES = new Set(['NDR', 'HOLD', 'LOST', 'MIS'])
 
 function resolveDisplayType(statusType: string | null, scans: Scan[]): string | null {
   const type = statusType?.toUpperCase() ?? ''
 
-  // When Delhivery returns a stale PP/MF statusType, scan history shows the real state
   const staleCreated = type === 'PP' || type === 'MF'
   if (!EXCEPTION_TYPES.has(type) && !staleCreated) return statusType
 
@@ -55,14 +54,31 @@ function resolveDisplayType(statusType: string | null, scans: Scan[]): string | 
   return statusType
 }
 
+// Derive a display type code from the DB shipment_status when live statusType is unavailable
+function shipmentStatusToDisplayType(s: ShipmentStatus | null): string | null {
+  switch (s) {
+    case 'created':            return 'PP'
+    case 'picked_up':          return 'PU'
+    case 'in_transit':         return 'IT'
+    case 'out_for_delivery':   return 'OD'
+    case 'delivery_attempted': return 'NDR'
+    case 'delivered':          return 'DL'
+    case 'rto_initiated':      return 'RTO'
+    case 'rto_in_transit':     return 'RTO-IT'
+    case 'rto_out_for_return': return 'RTO-OT'
+    case 'rto_delivered':      return 'RTO-DL'
+    default:                   return null
+  }
+}
+
 function statusBadge(type: string | null) {
   switch (type?.toUpperCase()) {
     case 'DL':     return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
     case 'OT':
     case 'OD':     return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
     case 'IT':
-    case 'PU':     return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
     case 'UD':
+    case 'PU':     return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
     case 'NDR':    return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
     case 'RTO':
     case 'RTO-IT':
@@ -80,11 +96,11 @@ function statusLabel(type: string | null) {
     case 'PP':     return 'Shipment Created'
     case 'MF':     return 'Shipment Created'
     case 'PU':     return 'Picked Up'
-    case 'IT':     return 'In Transit'
+    case 'IT':
+    case 'UD':     return 'In Transit'
     case 'OT':
     case 'OD':     return 'Out for Delivery'
     case 'DL':     return 'Delivered'
-    case 'UD':     return 'Delivery Attempted'
     case 'NDR':    return 'Delivery Attempted'
     case 'RTO':    return 'Return Initiated'
     case 'RTO-IT': return 'Returning to Origin'
@@ -222,12 +238,16 @@ export default function DelhiveryTracking({
 }) {
   const [tracking, setTracking] = useState<TrackingData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showHistory, setShowHistory] = useState(false)
   const [statusSynced, setStatusSynced] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetch(`${apiBase}/${orderId}/${trackPath}`)
+  const loadTracking = (refresh = false) => {
+    const url = `${apiBase}/${orderId}/${trackPath}${refresh ? '?refresh=1' : ''}`
+    if (refresh) setRefreshing(true)
+    else setLoading(true)
+    fetch(url)
       .then(r => r.json())
       .then(d => {
         if (d.error) setError(d.error)
@@ -237,8 +257,10 @@ export default function DelhiveryTracking({
         }
       })
       .catch(() => setError('Could not load tracking'))
-      .finally(() => setLoading(false))
-  }, [orderId, apiBase])
+      .finally(() => { setLoading(false); setRefreshing(false) })
+  }
+
+  useEffect(() => { loadTracking() }, [orderId, apiBase])
 
   if (loading) {
     return (
@@ -260,9 +282,11 @@ export default function DelhiveryTracking({
     )
   }
 
-  const displayType = resolveDisplayType(tracking.statusType, tracking.scans)
+  const displayType = tracking.statusType
+    ? resolveDisplayType(tracking.statusType, tracking.scans)
+    : shipmentStatusToDisplayType(tracking.shipmentStatus)
   const latestScan = tracking.scans?.[0]
-  const isException = ['RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL', 'UD', 'NDR', 'HOLD', 'LOST', 'MIS'].includes(displayType?.toUpperCase() ?? '')
+  const isException = ['RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL', 'NDR', 'HOLD', 'LOST', 'MIS'].includes(displayType?.toUpperCase() ?? '')
 
   if (variant === 'admin') {
     return (
@@ -315,6 +339,16 @@ export default function DelhiveryTracking({
               EDD: <span className="text-foreground">{new Date(tracking.expectedDelivery).toLocaleDateString('en-IN')}</span>
             </span>
           )}
+          <button
+            onClick={() => loadTracking(true)}
+            disabled={refreshing}
+            className="ml-auto flex items-center gap-1.5 text-xs text-foreground-secondary hover:text-foreground disabled:opacity-50 transition-colors"
+          >
+            <svg className={`w-3.5 h-3.5 ${refreshing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {refreshing ? 'Refreshing…' : 'Refresh live'}
+          </button>
         </div>
 
         {tracking.scans?.length > 0 && (
