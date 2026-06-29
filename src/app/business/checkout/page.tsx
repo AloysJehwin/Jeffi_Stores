@@ -39,10 +39,6 @@ function CheckoutPage() {
   const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
   const couponId = searchParams.get('couponId')
 
-  const authWasLoading = useRef(false)
-  useEffect(() => {
-    if (authLoading) authWasLoading.current = true
-  }, [authLoading])
   const [couponCode, setCouponCode] = useState<string | null>(null)
   const [discountAmount, setDiscountAmount] = useState(0)
   const [shippingCharge, setShippingCharge] = useState<number | null>(null)
@@ -108,8 +104,8 @@ function CheckoutPage() {
   }, [isBuyNow, buyNowItem])
 
   useEffect(() => {
-    if (!authLoading && !user && authWasLoading.current) {
-      router.push(bp('/business/signin?redirect=/checkout'))
+    if (!authLoading && !user) {
+      router.push(bp('/business/signin?callbackUrl=/business/checkout'))
       return
     }
 

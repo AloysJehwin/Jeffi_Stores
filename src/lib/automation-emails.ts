@@ -14,6 +14,7 @@ import {
 import { baseLayout, ctaButton } from './email-campaigns'
 import { queryOne } from './db'
 import { sendAuditedMail } from './mail-audit'
+import { businessBaseUrl } from './business-path'
 
 function resolveAppUrl(): string {
   const isLocalhost = (v: string | undefined) => !!v && /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:|\/|$)/i.test(v)
@@ -41,6 +42,7 @@ interface UserContext {
   first_name: string | null
   last_name: string | null
   unsubscribe_token: string
+  baseUrl: string
 }
 
 export async function sendCampaignEmail(params: {
@@ -94,12 +96,68 @@ export async function sendCampaignEmail(params: {
   }
 }
 
+export async function sendCampaignEmailRendered(params: {
+  campaign: Campaign
+  user: UserContext
+  referenceId: string | null
+  subject: string
+  html: string
+  ampHtml?: string
+}): Promise<{ ok: boolean; sentId?: string; reason?: string }> {
+  const { campaign, user, referenceId, subject, html, ampHtml } = params
+
+  const eligibility = await canSendMarketing(user.id, campaign.kind as CampaignKind)
+  if (!eligibility.ok) return { ok: false, reason: eligibility.reason }
+
+  if (await alreadySentForReference(campaign.kind as CampaignKind, user.id, referenceId)) {
+    return { ok: false, reason: 'already_sent' }
+  }
+
+  const sentId = await recordSent({
+    campaignKind: campaign.kind as CampaignKind,
+    userId: user.id,
+    referenceId,
+  })
+  if (!sentId) return { ok: false, reason: 'record_failed' }
+
+  const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind)
+  const tracked = wrapWithTracking(html, sentId, unsubscribeUrl)
+
+  try {
+    await sendAuditedMail({
+      from: `"Jeffi Store's" <${process.env.SES_PROMO_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+      to: user.email,
+      subject,
+      html: tracked,
+      amp: ampHtml,
+      headers: {
+        'List-Unsubscribe': `<${unsubscribeUrl}>`,
+        'List-Unsubscribe-Post': 'List-Unsubscribe=One-Click',
+      },
+      kind: 'automation',
+      templateName: campaign.kind,
+      entityType: 'users',
+      entityId: user.id,
+      userId: user.id,
+      metadata: { sentId, referenceId },
+    })
+    return { ok: true, sentId }
+  } catch {
+    return { ok: false, reason: 'send_failed' }
+  }
+}
+
 export async function fetchUserContext(userId: string): Promise<UserContext | null> {
-  return queryOne<UserContext>(
-    `SELECT id, email, first_name, last_name, unsubscribe_token::text AS unsubscribe_token
-     FROM users WHERE id = $1`,
+  const row = await queryOne<{ id: string; email: string; first_name: string | null; last_name: string | null; unsubscribe_token: string; is_business: boolean }>(
+    `SELECT u.id, u.email, u.first_name, u.last_name, u.unsubscribe_token::text AS unsubscribe_token,
+            (bp.approval_status = 'approved') AS is_business
+     FROM users u
+     LEFT JOIN business_profiles bp ON bp.user_id = u.id
+     WHERE u.id = $1`,
     [userId]
   )
+  if (!row) return null
+  return { ...row, baseUrl: row.is_business ? businessBaseUrl() : APP_URL }
 }
 
 export async function fetchProductImageUrl(productId: string): Promise<string> {

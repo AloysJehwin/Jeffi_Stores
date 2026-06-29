@@ -1,10 +1,11 @@
 import { queryMany } from '@/lib/db'
+import { generateReviewToken } from '@/lib/jwt'
 import {
   fetchUserContext,
   resolveCoupon,
-  sendCampaignEmail,
-  renderItemRows,
+  sendCampaignEmailRendered,
 } from '@/lib/automation-emails'
+import { renderCampaignEmail } from '@/lib/email-campaigns'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -18,11 +19,11 @@ interface Row {
   order_number: string
 }
 
-export const reviewReminder: ScenarioModule<Params, Row> = {
-  kind: 'review_reminder',
-  name: 'Review Reminder',
-  description: 'Sent N hours after delivery if no review left',
-  trigger: 'Fires after delivery + the campaign\'s delay, but only if the customer hasn\'t already reviewed any product from that order. One send per order. Stops if a review is left after the email goes out.',
+export const reviewRequest: ScenarioModule<Params, Row> = {
+  kind: 'review_request',
+  name: 'Review Request (Email Form)',
+  description: 'Sent after delivery with per-product star links that open a pre-filled review form',
+  trigger: 'Fires after delivery + campaign delay, once per order, only if no review has been left yet',
   defaultParams: {
     lookbackDays: 30,
     maxRecipientsPerSweep: 50,
@@ -61,39 +62,44 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
-    const items = await queryMany<{ name: string; product_id: string; product_slug: string | null; image_url: string | null }>(`
+    const items = await queryMany<{ name: string; product_id: string; image_url: string | null; slug: string | null }>(`
       SELECT oi.product_name AS name,
              oi.product_id::text AS product_id,
-             p.slug AS product_slug,
-             (SELECT image_url FROM product_images WHERE product_id = oi.product_id ORDER BY display_order ASC LIMIT 1) AS image_url
+             (SELECT image_url FROM product_images WHERE product_id = oi.product_id ORDER BY display_order ASC LIMIT 1) AS image_url,
+             p.slug
       FROM order_items oi
-      LEFT JOIN products p ON p.id = oi.product_id
+      JOIN products p ON p.id = oi.product_id
       WHERE oi.order_id = $1::uuid
       LIMIT 8
     `, [row.id])
 
-    const itemsHtml = renderItemRows(
-      items.map(i => ({
-        name: i.name,
-        imageUrl: i.image_url,
-        productUrl: i.product_slug ? `${user.baseUrl}/products/${i.product_slug}?review=1` : null,
-      }))
-    )
+    const itemsWithLinks = await Promise.all(items.map(async item => {
+      const token = await generateReviewToken({ orderId: row.id, productId: item.product_id, userId: row.user_id })
+      const starLinks: string[] = []
+      for (let rating = 1; rating <= 5; rating++) {
+        starLinks.push(`${user.baseUrl}/review?token=${token}&rating=${rating}`)
+      }
+      const productUrl = item.slug ? `${user.baseUrl}/products/${item.slug}` : null
+      return { name: item.name, imageUrl: item.image_url, starLinks, productUrl }
+    }))
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
-    return sendCampaignEmail({
+    const { subject, html, ampHtml } = renderCampaignEmail('review_request', {
+      firstName: user.first_name || 'there',
+      orderNumber: row.order_number,
+      itemsJson: JSON.stringify(itemsWithLinks),
+      couponCode: couponCode ?? '',
+      discountPercent: discountPercent ? String(discountPercent) : '',
+    })
+
+    return sendCampaignEmailRendered({
       campaign,
       user,
       referenceId: row.id,
-      vars: {
-        firstName: user.first_name || 'there',
-        orderNumber: row.order_number,
-        itemsHtml,
-        couponCode,
-        discountPercent,
-        ctaUrl: `${user.baseUrl}/account/orders/${row.id}`,
-      },
+      subject,
+      html,
+      ampHtml,
     })
   },
 }

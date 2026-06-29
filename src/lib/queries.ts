@@ -995,6 +995,7 @@ export async function getOrder(id: string) {
             'sell_unit_dimension', (SELECT pu.dimension FROM product_units pu WHERE pu.unit = oi.buy_unit AND pu.product_id = oi.product_id LIMIT 1),
             'products', json_build_object(
               'id', pr.id, 'name', pr.name, 'sku', pr.sku,
+              'slug', pr.slug,
               'inventory_quantity', pr.inventory_quantity
             ),
             'variant', CASE WHEN oi.variant_id IS NOT NULL THEN

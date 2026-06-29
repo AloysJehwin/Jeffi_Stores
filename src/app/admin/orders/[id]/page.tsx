@@ -214,7 +214,13 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   order.order_items.map((item: any) => (
                     <div key={item.id} className="flex justify-between items-start pb-4 border-b border-border-default last:border-0">
                       <div className="flex-1">
-                        <h3 className="font-medium text-foreground">{item.product_name || item.products?.name || 'Product'}</h3>
+                        <h3 className="font-medium text-foreground">
+                          {item.product_id ? (
+                            <Link href={ap(`/admin/products/${item.product_id}`, host)} target="_blank" className="hover:underline text-orange-600 dark:text-orange-400">
+                              {item.product_name || item.products?.name || 'Product'}
+                            </Link>
+                          ) : (item.product_name || item.products?.name || 'Product')}
+                        </h3>
                         <p className="text-sm text-foreground-muted mt-1">SKU: {item.product_sku || item.products?.sku}</p>
                         {item.variant_name && (
                           <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
@@ -299,7 +305,13 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   return (
                     <div key={item.id} className="px-6 py-4 flex items-center justify-between gap-4">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
+                        <p className="text-sm font-medium text-foreground truncate">
+                          {item.product_id ? (
+                            <Link href={ap(`/admin/products/${item.product_id}`, host)} target="_blank" className="hover:underline text-orange-600 dark:text-orange-400">
+                              {item.product_name}
+                            </Link>
+                          ) : item.product_name}
+                        </p>
                         <p className="text-xs text-foreground-muted mt-0.5">
                           SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}{' · '}
                           Ordered: {isCount && unitLabel
@@ -481,7 +493,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                 {order.users?.phone && (
                   <div>
                     <p className="text-sm text-foreground-secondary">Phone</p>
-                    <p className="text-foreground">+91 {order.users.phone}</p>
+                    <p className="text-foreground">+91 {order.users.phone.replace(/^\+91|^91/, '')}</p>
                   </div>
                 )}
               </div>
@@ -501,7 +513,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   {order.billing_address.landmark && <p className="text-foreground-secondary">Landmark: {order.billing_address.landmark}</p>}
                   <p>{order.billing_address.city}, {order.billing_address.state} {order.billing_address.postal_code}</p>
                   <p>{order.billing_address.country || 'India'}</p>
-                  {order.billing_address.phone && <p className="mt-2">Phone: +91 {order.billing_address.phone}</p>}
+                  {order.billing_address.phone && <p className="mt-2">Phone: +91 {order.billing_address.phone.replace(/^\+91|^91/, '')}</p>}
                 </div>
               ) : (
                 <p className="text-sm text-foreground-muted">No billing address</p>
@@ -522,7 +534,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   {order.shipping_address.landmark && <p className="text-foreground-secondary">Landmark: {order.shipping_address.landmark}</p>}
                   <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
                   <p>{order.shipping_address.country || 'India'}</p>
-                  {order.shipping_address.phone && <p className="mt-2">Phone: +91 {order.shipping_address.phone}</p>}
+                  {order.shipping_address.phone && <p className="mt-2">Phone: +91 {order.shipping_address.phone.replace(/^\+91|^91/, '')}</p>}
                 </div>
               ) : (
                 <p className="text-sm text-foreground-muted">No shipping address</p>

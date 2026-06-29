@@ -8,6 +8,7 @@ import { useCart } from '@/contexts/CartContext'
 import { navItems } from '@/components/visitor/AccountSidebar'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
+import ReviewModal from '@/components/shared/ReviewModal'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
@@ -141,10 +142,6 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [isCancelling, setIsCancelling] = useState(false)
   const [isPayingNow, setIsPayingNow] = useState(false)
 
-  const authWasLoading = useRef(false)
-  useEffect(() => {
-    if (authLoading) authWasLoading.current = true
-  }, [authLoading])
   const [paymentError, setPaymentError] = useState('')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
@@ -167,9 +164,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [returnError, setReturnError] = useState('')
   const [returnSuccess, setReturnSuccess] = useState('')
 
+  const [reviewMap, setReviewMap] = useState<Record<string, { id: string; rating: number; title: string | null; comment: string; tags: string[]; image_urls: string[]; image_thumbnail_urls: string[] }>>({})
+  const [showReviewModal, setShowReviewModal] = useState(false)
+
   useEffect(() => {
-    if (!authLoading && !user && authWasLoading.current) {
-      router.push('/login?redirect=/account/orders')
+    if (!authLoading && !user) {
+      router.push(`/login?redirect=/account/orders/${id}`)
       return
     }
     if (user) {
@@ -185,6 +185,14 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       }
       const data = await response.json()
       setOrder(data.order)
+
+      const revRes = await fetch(`/api/reviews?orderId=${id}`, { credentials: 'include' })
+      if (revRes.ok) {
+        const revData = await revRes.json()
+        const map: typeof reviewMap = {}
+        for (const r of (revData.reviews ?? [])) map[r.product_id] = r
+        setReviewMap(map)
+      }
 
       const retRes = await fetch(`/api/orders/${id}/return`, { credentials: 'include' })
       if (retRes.ok) {
@@ -492,6 +500,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   }
 
   return (
+    <>
     <div className="bg-surface min-h-screen">
       <MobileAccountHeader />
       <div className="container mx-auto px-4">
@@ -933,6 +942,41 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             </div>
 
+            {/* Rate Your Order */}
+            {order.status === 'delivered' && (
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+                <div className="flex items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-base font-bold text-foreground">Rate Your Order</h3>
+                    <p className="text-sm text-foreground-muted mt-0.5">
+                      {order.items.every(item => reviewMap[item.productId])
+                        ? 'You have reviewed all items in this order.'
+                        : 'Share your experience with the products you received.'}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowReviewModal(true)}
+                    className="flex-shrink-0 px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors"
+                  >
+                    {order.items.every(item => reviewMap[item.productId]) ? 'Edit Reviews' : 'Write Reviews'}
+                  </button>
+                </div>
+                {order.items.some(item => reviewMap[item.productId]) && (
+                  <div className="mt-4 pt-4 border-t border-border-default flex flex-wrap gap-3">
+                    {order.items.filter(item => reviewMap[item.productId]).map(item => {
+                      const r = reviewMap[item.productId]
+                      return (
+                        <div key={item.productId} className="flex items-center gap-2 text-xs text-foreground-secondary">
+                          <span className="text-yellow-400 text-sm">{'★'.repeat(r.rating)}<span className="text-gray-300">{'★'.repeat(5 - r.rating)}</span></span>
+                          <span className="font-medium text-foreground truncate max-w-[140px]">{item.productName}</span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* Shipping Address */}
             {order.shippingAddress && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
@@ -1107,5 +1151,23 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           </div>
         </div>
       </div>
+      {showReviewModal && (
+        <ReviewModal
+          items={order.items.map(item => ({
+            productId: item.productId,
+            productName: item.productName,
+            productImage: item.products?.product_images?.find(img => img.is_primary)?.thumbnail_url
+              || item.products?.product_images?.[0]?.thumbnail_url
+              || null,
+          }))}
+          orderId={id}
+          reviewMap={reviewMap}
+          onClose={() => setShowReviewModal(false)}
+          onSuccess={(productId, review) => {
+            setReviewMap(prev => ({ ...prev, [productId]: review }))
+          }}
+        />
+      )}
+    </>
   )
 }

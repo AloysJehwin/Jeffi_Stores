@@ -18,6 +18,18 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
     const productId = searchParams.get('productId')
+    const orderId = searchParams.get('orderId')
+
+    if (orderId) {
+      const user = await authenticateUser(request)
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      const reviews = await queryMany(`
+        SELECT pr.* FROM product_reviews pr
+        JOIN order_items oi ON oi.product_id = pr.product_id
+        WHERE oi.order_id = $1 AND pr.user_id = $2
+      `, [orderId, user.userId])
+      return NextResponse.json({ reviews: reviews || [] })
+    }
 
     if (!productId) {
       return NextResponse.json({ error: 'Product ID required' }, { status: 400 })
@@ -34,8 +46,7 @@ export async function GET(request: NextRequest) {
     `, [productId])
 
     return NextResponse.json({ reviews: reviews || [] })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch reviews' }, { status: 500 })
   }
 }
@@ -91,8 +102,7 @@ export async function PATCH(request: NextRequest) {
     )
 
     return NextResponse.json({ message: 'Review updated. Changes will be visible after re-approval.', review: updated })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Failed to update review' }, { status: 500 })
   }
 }
@@ -186,8 +196,7 @@ export async function POST(request: NextRequest) {
     if (userDetails && product) {
       try {
         await sendNewReviewNotification(review, userDetails, product)
-      } catch (err) {
-        console.error('[route]', err)
+      } catch {
       }
     }
 
@@ -207,8 +216,7 @@ export async function POST(request: NextRequest) {
       message: 'Review submitted successfully!',
       review
     })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Failed to submit review' }, { status: 500 })
   }
 }
