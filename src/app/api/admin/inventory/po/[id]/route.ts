@@ -59,10 +59,13 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
                 'variant_id', gi.variant_id,
                 'quantity_received', gi.quantity_received,
                 'unit_cost', gi.unit_cost,
-                'purchase_unit_factor', gi.purchase_unit_factor
+                'purchase_unit_factor', gi.purchase_unit_factor,
+                'tax_rate', poi.tax_rate,
+                'gst_inclusive', poi.gst_inclusive
               ) ORDER BY gi.id) AS grn_items
        FROM grns g
        JOIN grn_items gi ON gi.grn_id = g.id
+       JOIN purchase_order_items poi ON poi.id = gi.po_item_id
        WHERE g.po_id = $1
        GROUP BY g.id
        ORDER BY g.received_date DESC, g.created_at DESC`,
