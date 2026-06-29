@@ -1,4 +1,7 @@
--- Module: 05_payments
+-- Generated from live RDS jeffi_stores on 2026-06-30
+-- Schema-only dump, no owner, no acl
+
+
 --
 -- Name: expense_payments; Type: TABLE; Schema: public; Owner: -
 --
@@ -15,6 +18,7 @@ CREATE TABLE public.expense_payments (
     payout_id text,
     payout_status text
 );
+
 
 
 --
@@ -41,6 +45,7 @@ CREATE TABLE public.expenses (
 );
 
 
+
 --
 -- Name: payments; Type: TABLE; Schema: public; Owner: -
 --
@@ -57,5 +62,4 @@ CREATE TABLE public.payments (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
-
 

@@ -1,4 +1,22 @@
--- Module: 04_orders
+-- Generated from live RDS jeffi_stores on 2026-06-30
+-- Schema-only dump, no owner, no acl
+
+
+--
+-- Name: back_in_stock_notify; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.back_in_stock_notify (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    product_id uuid NOT NULL,
+    email text NOT NULL,
+    notified boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    notified_at timestamp with time zone
+);
+
+
+
 --
 -- Name: cart_items; Type: TABLE; Schema: public; Owner: -
 --
@@ -13,8 +31,29 @@ CREATE TABLE public.cart_items (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     buy_mode character varying(10) DEFAULT 'unit'::character varying NOT NULL,
-    buy_unit character varying(10)
+    buy_unit character varying(10),
+    sub_variant_id uuid,
+    saved_for_later boolean DEFAULT false NOT NULL,
+    saved_at timestamp with time zone
 );
+
+
+
+--
+-- Name: delhivery_pickup_requests; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.delhivery_pickup_requests (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    pickup_id character varying(128),
+    pickup_date date NOT NULL,
+    awb_count integer NOT NULL,
+    awbs text[] NOT NULL,
+    raw_response jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    pickup_status character varying(32) DEFAULT 'pending'::character varying NOT NULL
+);
+
 
 
 --
@@ -42,8 +81,15 @@ CREATE TABLE public.order_items (
     sgst_amount numeric(12,2) DEFAULT 0,
     igst_amount numeric(12,2) DEFAULT 0,
     buy_mode character varying(10) DEFAULT 'unit'::character varying NOT NULL,
-    buy_unit character varying(10)
+    buy_unit character varying(10),
+    sub_variant_id uuid,
+    sold_unit character varying(20),
+    sold_unit_factor numeric(14,6),
+    base_quantity numeric(14,4),
+    applied_rules jsonb,
+    mrp numeric(12,2) DEFAULT NULL::numeric
 );
+
 
 
 --
@@ -58,6 +104,7 @@ CREATE TABLE public.order_status_history (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now()
 );
+
 
 
 --
@@ -119,19 +166,42 @@ CREATE TABLE public.orders (
     source character varying(20) DEFAULT 'online'::character varying NOT NULL,
     search_vector tsvector,
     order_type character varying(10) DEFAULT 'cart'::character varying NOT NULL,
-    view_token uuid DEFAULT gen_random_uuid()
+    view_token uuid DEFAULT gen_random_uuid(),
+    shipping_address_snapshot jsonb,
+    billing_address_snapshot jsonb,
+    payment_mode character varying(50) DEFAULT 'cash'::character varying NOT NULL,
+    razorpay_qr_id text,
+    razorpay_qr_image_url text,
+    needs_delivery boolean DEFAULT false NOT NULL,
+    business_discount_amount numeric(12,2) DEFAULT 0 NOT NULL,
+    shipment_status text,
+    CONSTRAINT orders_shipment_status_check CHECK (((shipment_status IS NULL) OR (shipment_status = ANY (ARRAY['created'::text, 'picked_up'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivery_attempted'::text, 'delivered'::text, 'rto_initiated'::text, 'rto_in_transit'::text, 'rto_out_for_return'::text, 'rto_delivered'::text]))))
 );
 
+COMMENT ON COLUMN public.orders.shipment_status IS 'Stable internal shipment progress enum, resolved from Delhivery scan history. Set to created when AWB is assigned; updated on each track API call.';
+
+
 
 --
--- Name: wishlist_items; Type: TABLE; Schema: public; Owner: -
+-- Name: return_requests; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.wishlist_items (
+CREATE TABLE public.return_requests (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid,
     user_id uuid,
-    product_id uuid,
-    created_at timestamp with time zone DEFAULT now()
+    type character varying(20) NOT NULL,
+    status character varying(50) DEFAULT 'pending_approval'::character varying NOT NULL,
+    reason character varying(100) NOT NULL,
+    description text,
+    admin_notes text,
+    return_tracking_number character varying(255),
+    received_at timestamp with time zone,
+    resolved_at timestamp with time zone,
+    replacement_order_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now(),
+    rvp_awb_number character varying(64),
+    rvp_created_at timestamp with time zone
 );
-
 

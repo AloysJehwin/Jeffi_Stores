@@ -1,4 +1,7 @@
--- Module: 02_catalog
+-- Generated from live RDS jeffi_stores on 2026-06-30
+-- Schema-only dump, no owner, no acl
+
+
 --
 -- Name: brands; Type: TABLE; Schema: public; Owner: -
 --
@@ -11,8 +14,13 @@ CREATE TABLE public.brands (
     description text,
     website character varying(255),
     is_active boolean DEFAULT true,
-    created_at timestamp with time zone DEFAULT now()
+    created_at timestamp with time zone DEFAULT now(),
+    return_allowed boolean DEFAULT true NOT NULL,
+    return_window_days integer DEFAULT 7 NOT NULL,
+    replacement_allowed boolean DEFAULT true NOT NULL,
+    replacement_window_days integer DEFAULT 7 NOT NULL
 );
+
 
 
 --
@@ -32,8 +40,15 @@ CREATE TABLE public.categories (
     updated_at timestamp with time zone DEFAULT now(),
     sku_prefix character varying(10),
     google_product_category character varying(255),
-    icon_name character varying(100)
+    icon_name character varying(100),
+    return_allowed boolean DEFAULT true,
+    return_window_days integer DEFAULT 7,
+    replacement_allowed boolean DEFAULT true,
+    replacement_window_days integer DEFAULT 7,
+    hero_image_mobile text,
+    hero_image_desktop text
 );
+
 
 
 --
@@ -57,6 +72,7 @@ CREATE TABLE public.gallery_images (
     custom_name character varying(255),
     category_id uuid
 );
+
 
 
 --
@@ -84,6 +100,7 @@ CREATE TABLE public.product_images (
 );
 
 
+
 --
 -- Name: product_sub_variants; Type: TABLE; Schema: public; Owner: -
 --
@@ -98,12 +115,62 @@ CREATE TABLE public.product_sub_variants (
     mrp numeric(12,2),
     price_ex_gst numeric(12,2),
     mrp_ex_gst numeric(12,2),
-    stock_status character varying(20) DEFAULT 'In Stock'::character varying,
     attributes jsonb,
     is_active boolean DEFAULT true,
     created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    updated_at timestamp with time zone DEFAULT now(),
+    inventory_quantity numeric(14,3) DEFAULT 0 NOT NULL,
+    discount_pct numeric(5,2) DEFAULT 0 NOT NULL,
+    stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
+    CONSTRAINT product_sub_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
+
+
+
+--
+-- Name: product_unit_rules; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_unit_rules (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    product_unit_id uuid NOT NULL,
+    rule_type text NOT NULL,
+    config jsonb NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    priority integer DEFAULT 100 NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_unit_rules_rule_type_check CHECK ((rule_type = ANY (ARRAY['tiered_price'::text, 'gst_threshold'::text, 'bonus_qty'::text, 'bundle_split'::text, 'physical_variance'::text])))
+);
+
+
+
+--
+-- Name: product_units; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_units (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    product_id uuid NOT NULL,
+    variant_id uuid,
+    unit character varying(20) NOT NULL,
+    factor numeric(14,6) NOT NULL,
+    is_base boolean DEFAULT false NOT NULL,
+    is_purchase_default boolean DEFAULT false NOT NULL,
+    price_override numeric(14,4),
+    display_label character varying(80),
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    dimension character varying(20) DEFAULT 'count'::character varying NOT NULL,
+    conversion_meta jsonb,
+    sub_variant_id uuid,
+    min_qty numeric(14,4) DEFAULT 1 NOT NULL,
+    max_qty numeric(14,4),
+    qty_step numeric(14,4) DEFAULT 1 NOT NULL,
+    CONSTRAINT product_units_dimension_check CHECK (((dimension)::text = ANY ((ARRAY['count'::character varying, 'length'::character varying, 'area'::character varying, 'volume'::character varying, 'weight'::character varying, 'custom'::character varying])::text[]))),
+    CONSTRAINT product_units_factor_check CHECK ((factor > (0)::numeric))
+);
+
 
 
 --
@@ -116,7 +183,6 @@ CREATE TABLE public.product_variants (
     sku character varying(100) NOT NULL,
     variant_name character varying(255) NOT NULL,
     price numeric(12,2),
-    stock_status character varying(20) DEFAULT 'In Stock'::character varying,
     attributes jsonb,
     is_active boolean DEFAULT true,
     created_at timestamp with time zone DEFAULT now(),
@@ -127,10 +193,6 @@ CREATE TABLE public.product_variants (
     pricing_type character varying(20) DEFAULT 'unit'::character varying NOT NULL,
     unit character varying(20),
     numeric_value numeric(10,3),
-    weight_rate numeric(12,2),
-    weight_unit character varying(10),
-    length_rate numeric(12,2),
-    length_unit character varying(10),
     updated_at timestamp with time zone DEFAULT now(),
     weight_grams integer DEFAULT 500,
     length_cm numeric(6,2) DEFAULT 10,
@@ -138,15 +200,19 @@ CREATE TABLE public.product_variants (
     height_cm numeric(6,2) DEFAULT 10,
     package_type character varying(30),
     cost_price numeric(12,2) DEFAULT 0,
-    inventory_quantity integer DEFAULT 0 NOT NULL,
+    inventory_quantity numeric(14,3) DEFAULT 0 NOT NULL,
     mrp_ex_gst numeric(12,2),
     variant_type character varying(100),
     sub_variant_type text,
     sub_variant_type_on boolean DEFAULT false NOT NULL,
-    weight_rate_on boolean DEFAULT false NOT NULL,
-    length_rate_on boolean DEFAULT false NOT NULL,
-    use_own_images boolean DEFAULT false NOT NULL
+    use_own_images boolean DEFAULT false NOT NULL,
+    discount_pct numeric(5,2) DEFAULT 0 NOT NULL,
+    stock_decimal_precision smallint DEFAULT 0 NOT NULL,
+    sell_unit_id uuid,
+    stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
+    CONSTRAINT product_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
+
 
 
 --
@@ -165,7 +231,6 @@ CREATE TABLE public.products (
     base_price numeric(12,2) NOT NULL,
     price_ex_gst numeric(12,2),
     currency character varying(10) DEFAULT 'INR'::character varying,
-    stock_status character varying(20) DEFAULT 'In Stock'::character varying,
     weight numeric(10,2),
     dimensions character varying(100),
     material character varying(100),
@@ -185,20 +250,30 @@ CREATE TABLE public.products (
     variant_type character varying(50),
     mpn character varying(100),
     gtin character varying(50),
-    weight_rate numeric(12,2),
-    weight_unit character varying(10),
-    length_rate numeric(12,2),
-    length_unit character varying(10),
     weight_grams integer DEFAULT 500,
     length_cm numeric(6,2) DEFAULT 10,
     breadth_cm numeric(6,2) DEFAULT 10,
     height_cm numeric(6,2) DEFAULT 10,
     package_type character varying(30),
     cost_price numeric(12,2) DEFAULT 0,
-    inventory_quantity integer DEFAULT 0 NOT NULL,
+    inventory_quantity numeric(14,3) DEFAULT 0 NOT NULL,
     mrp_ex_gst numeric(12,2),
-    sub_variant_type character varying(100)
+    sub_variant_type character varying(100),
+    ai_description text,
+    ai_use_cases text[],
+    ai_enriched_at timestamp with time zone,
+    ai_keywords text[],
+    ai_who_uses_it text,
+    ai_application text,
+    ai_product_type text,
+    ai_features text[],
+    ai_search_tags text[],
+    discount_pct numeric(5,2) DEFAULT 0 NOT NULL,
+    sell_unit_id uuid,
+    stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
+    CONSTRAINT products_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
+
 
 
 --
@@ -224,5 +299,4 @@ CREATE TABLE public.variant_images (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now()
 );
-
 

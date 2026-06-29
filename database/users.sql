@@ -1,4 +1,7 @@
--- Module: 01_users
+-- Generated from live RDS jeffi_stores on 2026-06-30
+-- Schema-only dump, no owner, no acl
+
+
 --
 -- Name: addresses; Type: TABLE; Schema: public; Owner: -
 --
@@ -23,6 +26,7 @@ CREATE TABLE public.addresses (
 );
 
 
+
 --
 -- Name: admin_certificates; Type: TABLE; Schema: public; Owner: -
 --
@@ -44,6 +48,21 @@ CREATE TABLE public.admin_certificates (
 );
 
 
+
+--
+-- Name: admin_mfa_recovery_codes; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.admin_mfa_recovery_codes (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    admin_id uuid NOT NULL,
+    code_hash text NOT NULL,
+    used_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+
 --
 -- Name: admins; Type: TABLE; Schema: public; Owner: -
 --
@@ -57,24 +76,28 @@ CREATE TABLE public.admins (
     created_at timestamp with time zone DEFAULT now(),
     last_login timestamp with time zone,
     scopes jsonb DEFAULT '[]'::jsonb,
-    is_active boolean DEFAULT true
+    is_active boolean DEFAULT true,
+    mfa_secret_enc text,
+    mfa_enabled boolean DEFAULT false NOT NULL,
+    mfa_enrolled_at timestamp with time zone
 );
 
 
+
 --
--- Name: customer_profiles; Type: TABLE; Schema: public; Owner: -
+-- Name: failed_login_attempts; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.customer_profiles (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+CREATE TABLE public.failed_login_attempts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    email character varying(255),
     user_id uuid,
-    company_name character varying(255),
-    gst_number character varying(50),
-    customer_type character varying(50) DEFAULT 'retail'::character varying,
-    credit_limit numeric(12,2) DEFAULT 0,
-    created_at timestamp with time zone DEFAULT now(),
-    updated_at timestamp with time zone DEFAULT now()
+    ip_address character varying(64),
+    user_agent text,
+    reason character varying(64),
+    created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
 
 
 --
@@ -90,6 +113,29 @@ CREATE TABLE public.otp_verifications (
     verified boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now()
 );
+
+
+
+--
+-- Name: service_accounts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.service_accounts (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    serial_number text NOT NULL,
+    common_name text NOT NULL,
+    allowed_scopes text[] DEFAULT '{}'::text[] NOT NULL,
+    is_revoked boolean DEFAULT false NOT NULL,
+    revoked_at timestamp with time zone,
+    p12_data bytea,
+    p12_password text,
+    p12_downloaded boolean DEFAULT false NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_used_at timestamp with time zone
+);
+
 
 
 --
@@ -113,7 +159,15 @@ CREATE TABLE public.users (
     is_flagged boolean DEFAULT false,
     flag_reason text,
     google_id text,
-    auth_provider character varying(20) DEFAULT 'email'::character varying
+    auth_provider character varying(20) DEFAULT 'email'::character varying,
+    marketing_opt_out boolean DEFAULT false NOT NULL,
+    marketing_opt_out_at timestamp with time zone,
+    unsubscribe_token uuid DEFAULT gen_random_uuid(),
+    avatar_url text,
+    avatar_s3_key text,
+    avatar_is_custom boolean DEFAULT false NOT NULL,
+    user_type character varying(20) DEFAULT 'customer'::character varying NOT NULL,
+    policies_accepted_version text,
+    policies_accepted_at timestamp with time zone
 );
-
 

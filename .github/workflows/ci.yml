@@ -17,30 +17,27 @@ concurrency:
 
 jobs:
   # ────────────────────────────────────────────────────────
-  # Stage 0 — Detect migration files  (PR + main)
+  # Stage 0 — Detect schema file changes  (main push only)
   # ────────────────────────────────────────────────────────
-  check-migrations:
-    name: Check for Migration Files
+  check-schema:
+    name: Check for Schema Changes
     runs-on: ubuntu-latest
     outputs:
-      has_migrations: ${{ steps.detect.outputs.has_migrations }}
+      schema_changed: ${{ steps.detect.outputs.schema_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Detect migration trigger in commit message
+      - name: Detect schema file changes
         id: detect
         run: |
-          COMMIT_MSG=$(git log -1 --pretty=%B)
-          echo "Commit message: $COMMIT_MSG"
-          if echo "$COMMIT_MSG" | grep -qiE '\[migrate\]|run-migrations'; then
-            echo "has_migrations=true" >> $GITHUB_OUTPUT
-            echo "Migration trigger found in commit message — will run migrations"
+          if git diff --name-only HEAD~1 HEAD | grep -q '^database/.*\.sql'; then
+            echo "schema_changed=true" >> $GITHUB_OUTPUT
+            echo "Schema files changed — will apply to RDS"
           else
-            echo "has_migrations=false" >> $GITHUB_OUTPUT
-            echo "No migration trigger in commit message — skipping migrate job"
-            echo "(Add '[migrate]' to your commit message to trigger migrations)"
+            echo "schema_changed=false" >> $GITHUB_OUTPUT
+            echo "No schema files changed — skipping schema-apply job"
           fi
 
   # ────────────────────────────────────────────────────────
@@ -336,139 +333,52 @@ jobs:
             });
 
   # ────────────────────────────────────────────────────────
-  # Stage 5 — DB migrations  (main only, gate: deploy + new .sql files)
+  # Stage 5 — Apply DB Schema  (main only, gate: deploy + schema changed)
   # ────────────────────────────────────────────────────────
-  migrate:
-    name: DB Migrations
+  schema-apply:
+    name: Apply DB Schema
     runs-on: ubuntu-latest
-    needs: [deploy, check-migrations]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-migrations.outputs.has_migrations == 'true'
+    needs: [deploy, check-schema]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-schema.outputs.schema_changed == 'true'
     steps:
-      - name: Get EC2 public IP
-        id: ec2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --query 'Reservations[0].Instances[0].PublicIpAddress' \
-            --output text)
-          echo "host=$IP" >> $GITHUB_OUTPUT
+      - uses: actions/checkout@v4
 
-      - name: Run migrations
-        uses: appleboy/ssh-action@v1
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ steps.ec2.outputs.host }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 10m
-          envs: AWS_ACCESS_KEY_ID,AWS_SECRET_ACCESS_KEY,AWS_DEFAULT_REGION
-          script: |
-            set -euo pipefail
-            cd /opt/jeffi-stores
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
 
-            if ! command -v psql >/dev/null 2>&1; then
-              echo "Installing postgresql client..."
-              sudo dnf install -y postgresql15 || sudo yum install -y postgresql
-            fi
+      - name: Install PostgreSQL client
+        run: sudo apt-get install -y postgresql-client
 
-            # RDS uses IAM auth with static AWS keys; app_user has rds_superuser for DDL
-            export PGHOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
-            export PGPORT=5432
-            export PGUSER=app_user
-            export PGDATABASE=jeffi_stores
-            export PGPASSWORD=$(aws rds generate-db-auth-token \
-              --hostname "$PGHOST" --port "$PGPORT" \
-              --region us-east-1 --username "$PGUSER")
-            export PGSSLMODE=require
+      - name: Apply schema to RDS
+        env:
+          PGHOST: ${{ secrets.RDS_HOST }}
+          PGPORT: ${{ secrets.RDS_PORT }}
+          PGDATABASE: ${{ secrets.RDS_DATABASE }}
+          PGUSER: ${{ secrets.RDS_USER }}
+          PGSSLMODE: require
+        run: |
+          export PGPASSWORD=$(aws rds generate-db-auth-token \
+            --hostname "$PGHOST" \
+            --port "$PGPORT" \
+            --region us-east-1 \
+            --username "$PGUSER")
 
-            echo "Verifying DB connectivity..."
-            psql -tAc 'SELECT 1' >/dev/null
-
-            echo "── Ensuring schema_migrations table ──"
-            psql -v ON_ERROR_STOP=1 -c "CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
-
-            MIGRATION_ORDER=(
-              allow_same_email_multi_user_type.sql
-              add_business_partner_tables.sql
-              add_requested_price_to_rfq_items.sql
-              add_sub_variant_to_rfq_items.sql
-              add_sale_id_to_invoices.sql
-              add_status_to_cash_sales.sql
-              add_sub_variant_id_to_inventory_transactions.sql
-              add_ui_blocks_to_agent_messages.sql
-              add_discount_pct_to_products.sql
-              add_payment_mode_to_orders.sql
-              add_qr_fields_to_orders.sql
-              extend_email_logs_for_audit.sql
-              add_replication_runs.sql
-              add_product_units_phase1.sql
-              cascade_shelf_stock_on_variant_delete.sql
-              cascade_variant_fk_history_tables.sql
-              add_dimension_to_product_units.sql
-              product_level_units.sql
-              drop_legacy_weight_length_columns.sql
-              add_sell_unit_id_drop_is_sell_default.sql
-              add_unit_columns_to_inventory_transactions.sql
-              add_sub_variant_id_to_product_units.sql
-              add_fractional_inventory.sql
-              add_default_pc_unit.sql
-              add_po_conversion.sql
-              drop_wholeprice_ex_gst.sql
-              drop_site_settings_audit.sql
-              fix_cart_items_unique_constraint.sql
-              stock_quantity_to_status_enum.sql
-              create_rfq_messages.sql
-              add_mrp_to_order_items.sql
-              add_back_in_stock_notify.sql
-              add_buy_unit_to_sale_tables.sql
-              add_buy_unit_to_quotation_items.sql
-              add_campaign_send_counts.sql
-              add_category_hero_images.sql
-              add_status_to_invoices.sql
-              add_user_policy_acceptance.sql
-              add_business_discount_amount_to_orders.sql
-              backfill_order_items_mrp_from_quotation.sql
-              backfill_variant_sell_unit_id.sql
-              add_service_accounts.sql
-              add_shipment_status_to_orders.sql
-            )
-
-            APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')
-
-            ran=0
-            skipped=0
-            missing=0
-            for file in "${MIGRATION_ORDER[@]}"; do
-              fp="database/migrations/$file"
-              if ! [[ -f "$fp" ]]; then
-                echo "  ! missing $file (will skip)"
-                missing=$((missing+1))
-                continue
-              fi
-              if echo "$APPLIED" | grep -qx "$file"; then
-                echo "  - skip   $file"
-                skipped=$((skipped+1))
-                continue
-              fi
-              echo "  + apply  $file"
-              psql -v ON_ERROR_STOP=1 -1 -f "$fp"
-              psql -v ON_ERROR_STOP=1 -c \
-                "INSERT INTO schema_migrations (filename) VALUES ('$file') ON CONFLICT DO NOTHING"
-              ran=$((ran+1))
-            done
-
-            echo ""
-            echo "── Migration summary ──"
-            echo "  Applied:  $ran"
-            echo "  Skipped:  $skipped (already applied)"
-            echo "  Missing:  $missing (file not in repo)"
+          echo "Applying schema modules..."
+          for f in database/extensions.sql database/users.sql database/catalog.sql \
+                   database/inventory.sql database/orders.sql database/payments.sql \
+                   database/quotations.sql database/invoices.sql database/marketing.sql \
+                   database/reviews.sql database/crm.sql database/support.sql \
+                   database/ai.sql database/logs.sql database/settings.sql \
+                   database/indexes.sql database/functions.sql database/triggers.sql \
+                   database/constraints.sql; do
+            echo ">> $(basename "$f")"
+            psql -v ON_ERROR_STOP=0 -f "$f"
+          done
+          echo "Schema apply complete."
 
   # ────────────────────────────────────────────────────────
   # Stage 6 — Smoke test  (main only, gate: deploy)
@@ -543,7 +453,7 @@ jobs:
   summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, build, docker, deploy, migrate, smoke-test, invalidate-cdn]
+    needs: [lint, typecheck, test, build, docker, deploy, schema-apply, smoke-test, invalidate-cdn]
     if: always()
     steps:
       - name: Result
@@ -560,7 +470,7 @@ jobs:
           if [[ "$IS_MAIN" == "true" ]]; then
           echo "║  Docker Push:        ${{ needs.docker.result }}"
           echo "║  Deploy to EC2:      ${{ needs.deploy.result }}"
-          echo "║  DB Migrations:      ${{ needs.migrate.result }}"
+          echo "║  Apply DB Schema:    ${{ needs.schema-apply.result }}"
           echo "║  Smoke Test:         ${{ needs.smoke-test.result }}"
           echo "║  Invalidate CDN:     ${{ needs.invalidate-cdn.result }}"
           fi
@@ -579,10 +489,10 @@ jobs:
           fi
 
           if [[ "$IS_MAIN" == "true" ]]; then
-            if [[ "${{ needs.docker.result }}"       == "failure" ||
-                  "${{ needs.deploy.result }}"       == "failure" ||
-                  "${{ needs.migrate.result }}"      == "failure" ||
-                  "${{ needs.smoke-test.result }}"   == "failure" ||
+            if [[ "${{ needs.docker.result }}"         == "failure" ||
+                  "${{ needs.deploy.result }}"         == "failure" ||
+                  "${{ needs.schema-apply.result }}"   == "failure" ||
+                  "${{ needs.smoke-test.result }}"     == "failure" ||
                   "${{ needs.invalidate-cdn.result }}" == "failure" ]]; then
               echo "PIPELINE FAILED at deployment stage."
               exit 1
