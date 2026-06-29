@@ -7,7 +7,7 @@ import { generatePackingSlipPDF, loadStoreSettings, PackingSlipOrder } from '@/l
 async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
   const row = await queryOne(
     `SELECT o.id, o.order_number, o.created_at, o.customer_name, o.customer_phone,
-            o.total_amount, o.discount_amount, o.shipping_amount,
+            o.total_amount, o.discount_amount, o.business_discount_amount, o.shipping_amount,
             o.taxable_amount, o.cgst_amount, o.sgst_amount, o.igst_amount, o.is_igst,
             row_to_json(a) AS shipping_address,
             json_agg(json_build_object(
