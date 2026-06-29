@@ -17,7 +17,7 @@ export default async function PurchaseOrderViewPage({ params }: { params: Promis
   if (!po) notFound()
 
   const items = await queryMany<any>(
-    `SELECT poi.quantity, poi.unit_cost, poi.total_cost, poi.tax_rate,
+    `SELECT poi.id, poi.quantity, poi.unit_cost, poi.total_cost, poi.tax_rate,
             poi.gst_inclusive, poi.line_total_incl_gst, poi.purchase_unit,
             poi.purchase_unit_factor, poi.sku, poi.quantity_received,
             COALESCE(poi.product_name, p.name) AS product_name,

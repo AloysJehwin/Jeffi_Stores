@@ -609,7 +609,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                         const productLabel = matchItem
                           ? `${matchItem.product_name}${matchItem.variant_name ? ' / ' + matchItem.variant_name : ''}`
                           : `Item #${idx + 1}`
-                        const taxRate = parseFloat(gi.tax_rate || '0')
+                        const taxRate = parseFloat(gi.tax_rate ?? matchItem?.tax_rate ?? '0')
                         const costPerPu = gi.unit_cost
                           ? parseFloat(gi.unit_cost) * factor * (1 + taxRate / 100)
                           : null

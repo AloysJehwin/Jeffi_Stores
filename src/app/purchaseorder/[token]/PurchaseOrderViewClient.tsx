@@ -237,7 +237,7 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                           const productLabel = matchItem
                             ? `${matchItem.product_name}${matchItem.variant_name ? ' / ' + matchItem.variant_name : ''}`
                             : `Item #${idx + 1}`
-                          const taxRate = Number(gi.tax_rate) || 0
+                          const taxRate = Number(gi.tax_rate ?? matchItem?.tax_rate) || 0
                           const costPerPu = gi.unit_cost
                             ? Number(gi.unit_cost) * factor * (1 + taxRate / 100)
                             : null
