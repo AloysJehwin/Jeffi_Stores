@@ -244,7 +244,6 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                                 <span className="text-gray-800 font-medium">
                                   {fmt(recvPu, recvPu % 1 === 0 ? 0 : 3)}
                                   <span className="ml-1 text-xs text-gray-400">{puLabel}</span>
-                                  {factor > 1 && <span className="ml-1 text-xs text-gray-400">({fmt(recvBase, recvBase % 1 === 0 ? 0 : 3)} base)</span>}
                                 </span>
                                 {gi.unit_cost && <span className="text-xs text-gray-400">@ ₹{fmt(gi.unit_cost)}</span>}
                               </div>

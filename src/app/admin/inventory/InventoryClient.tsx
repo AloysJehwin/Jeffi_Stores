@@ -615,7 +615,6 @@ function POTab({ initialPO }: { initialPO?: string }) {
                             <div className="flex items-center gap-4 text-right">
                               <span className="text-foreground font-medium">
                                 {recvPu}<span className="text-xs text-foreground-muted ml-1">{puLabel}</span>
-                                {factor > 1 && <span className="text-xs text-foreground-muted ml-1">({recvBase} base)</span>}
                               </span>
                               {gi.unit_cost && <span className="text-foreground-secondary text-xs">@ {formatINR(parseFloat(gi.unit_cost))}</span>}
                             </div>
