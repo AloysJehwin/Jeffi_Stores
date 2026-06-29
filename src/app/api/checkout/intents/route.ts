@@ -13,6 +13,8 @@ const IntentSchema = z.object({
   qty: z.number().positive().optional(),
   buyMode: z.string().nullish(),
   buyUnit: z.string().nullish(),
+  addressId: zUuid.optional(),
+  shippingCharge: z.number().min(0).optional(),
 })
 
 export const dynamic = 'force-dynamic'
@@ -28,7 +30,12 @@ export async function POST(req: NextRequest) {
     if (!auth) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     const cart = await loadActiveCart(auth.userId)
     if (cart.length === 0) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
-    const token = await signIntent({ mode: 'cart', userId: auth.userId })
+    const token = await signIntent({
+      mode: 'cart',
+      userId: auth.userId,
+      ...(parsed.data.addressId != null && { addressId: parsed.data.addressId }),
+      ...(parsed.data.shippingCharge != null && { shippingCharge: parsed.data.shippingCharge }),
+    })
     return NextResponse.json({ intent: token })
   }
 

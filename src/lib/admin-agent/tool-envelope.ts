@@ -23,6 +23,7 @@ export interface AgentToolResultOk<TData = unknown> {
   action?: AgentToolAction
   displayHints?: AgentToolDisplayHints
   meta?: Record<string, unknown>
+  uiBlocks?: Record<string, unknown>[]
 }
 
 export interface AgentToolResultErr {

@@ -39,6 +39,19 @@ function toVectorLiteral(vec: number[]): string {
   return `[${vec.join(',')}]`
 }
 
+export async function queryManyReplica<T = Record<string, unknown>>(
+  sql: string,
+  params: unknown[] = []
+): Promise<T[]> {
+  const client = await getPool().connect()
+  try {
+    const result = await client.query(sql, params)
+    return result.rows as T[]
+  } finally {
+    client.release()
+  }
+}
+
 export async function embed(text: string): Promise<number[]> {
   const url = process.env.RAG_OLLAMA_URL || 'http://100.82.208.8:11434'
   const model = process.env.RAG_EMBED_MODEL || 'nomic-embed-text'
@@ -121,7 +134,7 @@ export async function findSimilar(
 
 const HNSW_EF_SEARCH = parseInt(process.env.RAG_HNSW_EF_SEARCH || '200', 10)
 
-async function runWithHnswTuning(sql: string, params: unknown[]) {
+export async function runWithHnswTuning(sql: string, params: unknown[]) {
   const client = await getPool().connect()
   try {
     await client.query(`SET LOCAL hnsw.ef_search = ${HNSW_EF_SEARCH}`)
@@ -177,9 +190,11 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
 
   merged.sort((a, b) => b.similarity - a.similarity)
 
+  const MIN_SIM = 0.50
   const seenProducts = new Set<string>()
   const out: SimilarProductId[] = []
   for (const r of merged) {
+    if (r.similarity < MIN_SIM) break
     if (r.matchedVia === 'products') {
       if (seenProducts.has(r.productId)) continue
       seenProducts.add(r.productId)

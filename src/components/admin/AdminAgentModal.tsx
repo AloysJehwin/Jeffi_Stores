@@ -445,6 +445,7 @@ export default function AdminAgentModal({ isOpen, onClose }: Props) {
                                     setTurns(prev => prev.map(t => t.id !== turn.id ? t : { ...t, pickerResolved: true }))
                                     sendMessage(`Use ${kind} id ${option.id} (${option.label}) for the previous request.`)
                                   }}
+                                  onSendMessage={(msg) => sendMessage(msg)}
                                 />
                               </div>
                             )}

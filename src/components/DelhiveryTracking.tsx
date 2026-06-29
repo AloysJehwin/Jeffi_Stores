@@ -1,6 +1,11 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import {
+  type ShipmentStatus,
+  shipmentStatusToStep,
+  shipmentStatusToReverseStep,
+} from '@/lib/shipment-status'
 
 type Scan = {
   date: string | null
@@ -13,6 +18,7 @@ type TrackingData = {
   awb: string
   status: string | null
   statusType: string | null
+  shipmentStatus: ShipmentStatus | null
   statusDateTime: string | null
   pickUpDate: string | null
   expectedDelivery: string | null
@@ -29,10 +35,14 @@ const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
 
 function resolveDisplayType(statusType: string | null, scans: Scan[]): string | null {
   const type = statusType?.toUpperCase() ?? ''
-  if (!EXCEPTION_TYPES.has(type)) return statusType
+
+  // When Delhivery returns a stale PP/MF statusType, scan history shows the real state
+  const staleCreated = type === 'PP' || type === 'MF'
+  if (!EXCEPTION_TYPES.has(type) && !staleCreated) return statusType
 
   for (let i = 0; i < scans.length; i++) {
     const activity = (scans[i]?.activity ?? '').toLowerCase()
+    if (activity.includes('delivered') && !activity.includes('out for')) return 'DL'
     if (activity.includes('out for delivery')) return 'OD'
     if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) return 'RTO-DL'
     if (activity.includes('out for return')) return 'RTO-OT'
@@ -41,7 +51,6 @@ function resolveDisplayType(statusType: string | null, scans: Scan[]): string | 
     if (activity.includes('in transit') || activity === 'transit') return 'IT'
     if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) return 'PU'
     if (activity === 'manifested' || activity.includes('manifest')) return 'MF'
-    if (activity.includes('delivered')) return 'DL'
   }
   return statusType
 }
@@ -104,55 +113,11 @@ const REVERSE_TIMELINE_STEPS: { key: string; label: string }[] = [
   { key: 'delivered',  label: 'Received' },
 ]
 
-function resolveStep(scans: Scan[], statusType: string | null): number {
-  const type = resolveDisplayType(statusType, scans)?.toUpperCase() ?? ''
-  if (type === 'DL') return 4
-  if (type === 'OT' || type === 'OD') return 3
-  if (type === 'IT') return 2
-  if (type === 'PU') return 1
-  if (type === 'PP' || type === 'MF') return 0
-
-  const activities = scans.map(s => s.activity?.toLowerCase() ?? '')
-  if (activities.some(a => a.includes('deliver'))) return 4
-  if (activities.some(a => a.includes('out for'))) return 3
-  if (activities.some(a => a.includes('transit') || a.includes('in transit'))) return 2
-  if (activities.some(a => a.includes('picked') || a.includes('pickup'))) return 1
-  return 0
-}
-
-function resolveReverseStep(tracking: TrackingData): number {
-  if (tracking.destReceiveDate || tracking.returnedDate) return 4
-  if ((tracking.status ?? '').toLowerCase() === 'delivered') return 4
-
-  const scans = tracking.scans
-  const latestActivity = (scans[scans.length - 1]?.activity ?? '').toLowerCase()
-  const latestInstructions = (scans[scans.length - 1]?.instructions ?? '').toLowerCase()
-
-  if (latestActivity.includes('out for delivery') || latestInstructions.includes('out for delivery')) return 3
-  if (latestActivity === 'in transit' || latestActivity.includes('transit')) return 2
-
-  const everPickedUp = scans.some(s => {
-    const a = (s.activity ?? '').toLowerCase()
-    const ins = (s.instructions ?? '').toLowerCase()
-    return a === 'in transit' || ins.includes('pickup completed') || ins.includes('picked up')
-  })
-  if (everPickedUp) return 2
-
-  const everScheduled = scans.some(s => {
-    const a = (s.activity ?? '').toLowerCase()
-    const ins = (s.instructions ?? '').toLowerCase()
-    return a === 'scheduled' || a === 'dispatched' || ins.includes('out for pickup') || ins.includes('pickup scheduled')
-  })
-  if (everScheduled) return 1
-
-  return 0
-}
-
 function HorizontalTimeline({ tracking }: { tracking: TrackingData }) {
   const isReverse = tracking.orderType === 'Pickup' || tracking.reverseInTransit === true
   const activeStep = isReverse
-    ? resolveReverseStep(tracking)
-    : resolveStep(tracking.scans, tracking.statusType)
+    ? shipmentStatusToReverseStep(tracking.shipmentStatus)
+    : shipmentStatusToStep(tracking.shipmentStatus)
   const steps = isReverse ? REVERSE_TIMELINE_STEPS : TIMELINE_STEPS
 
   return (

@@ -68,6 +68,10 @@ function makeRequest(opts: {
 }
 
 // ── Import after mocks ────────────────────────────────────────────────────────
+vi.mock('@/lib/db', () => ({ queryOne: vi.fn() }))
+import * as dbMod from '@/lib/db'
+const mockDbQueryOne = vi.mocked(dbMod.queryOne)
+
 import {
   generateToken,
   verifyToken,
@@ -77,6 +81,11 @@ import {
   authenticateAnyUser,
   requireAdminScope,
   requireUserScope,
+  generateReviewToken,
+  verifyReviewToken,
+  verifyUserToken,
+  verifyBusinessToken,
+  authenticateServiceAccount,
   JWT_EXPIRES_IN,
   JWT_MAX_AGE_S,
 } from '@/lib/jwt'
@@ -413,5 +422,165 @@ describe('requireUserScope', () => {
     const req = makeRequest({ cookies: { auth_token: 'token' } })
     const result = await requireUserScope(req, 'write') as any
     expect(result.status).toBe(403)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('generateReviewToken', () => {
+  it('signs a review_token and returns the token string', async () => {
+    mockSign.mockResolvedValue('review.jwt.token')
+    const result = await generateReviewToken({ orderId: 'o1', productId: 'p1', userId: 'u1' })
+    expect(result).toBe('review.jwt.token')
+    expect(mockSign).toHaveBeenCalledWith(expect.objectContaining({ type: 'review_token', orderId: 'o1', productId: 'p1', userId: 'u1' }))
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verifyReviewToken', () => {
+  it('returns payload for a valid review_token', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'review_token', orderId: 'o1', productId: 'p1', userId: 'u1' } })
+    const result = await verifyReviewToken('valid.review.token')
+    expect(result).toEqual({ orderId: 'o1', productId: 'p1', userId: 'u1' })
+  })
+
+  it('returns null when type is not review_token', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'customer', orderId: 'o1', productId: 'p1', userId: 'u1' } })
+    const result = await verifyReviewToken('bad.token')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when orderId is missing', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'review_token', productId: 'p1', userId: 'u1' } })
+    const result = await verifyReviewToken('bad.token')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when productId is missing', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'review_token', orderId: 'o1', userId: 'u1' } })
+    const result = await verifyReviewToken('bad.token')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when userId is missing', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'review_token', orderId: 'o1', productId: 'p1' } })
+    const result = await verifyReviewToken('bad.token')
+    expect(result).toBeNull()
+  })
+
+  it('returns null on verification error', async () => {
+    mockJwtVerify.mockRejectedValueOnce(new Error('expired'))
+    const result = await verifyReviewToken('expired.token')
+    expect(result).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verifyUserToken', () => {
+  it('returns user payload for valid customer token', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'customer', scopes: ['read'] } })
+    const result = await verifyUserToken('valid.token')
+    expect(result?.userId).toBe('u1')
+    expect(result?.scopes).toEqual(['read'])
+  })
+
+  it('returns null when type is not customer', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'business' } })
+    const result = await verifyUserToken('biz.token')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when userId is missing', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { email: 'u@u.com', type: 'customer' } })
+    const result = await verifyUserToken('no-uid.token')
+    expect(result).toBeNull()
+  })
+
+  it('defaults scopes to empty array when absent', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'customer' } })
+    const result = await verifyUserToken('token')
+    expect(result?.scopes).toEqual([])
+  })
+
+  it('returns null on verification error', async () => {
+    mockJwtVerify.mockRejectedValueOnce(new Error('expired'))
+    const result = await verifyUserToken('expired.token')
+    expect(result).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('verifyBusinessToken', () => {
+  it('returns business payload for valid token', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'b1', email: 'b@b.com', type: 'business', isBusiness: true, approvalStatus: 'approved', scopes: [] } })
+    const result = await verifyBusinessToken('biz.token')
+    expect(result?.userId).toBe('b1')
+    expect(result?.isBusiness).toBe(true)
+    expect(result?.approvalStatus).toBe('approved')
+  })
+
+  it('returns null when type is not business', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'customer', isBusiness: true } })
+    const result = await verifyBusinessToken('customer.token')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when isBusiness is false', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'business', isBusiness: false } })
+    const result = await verifyBusinessToken('token')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when userId is missing', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { email: 'b@b.com', type: 'business', isBusiness: true } })
+    const result = await verifyBusinessToken('token')
+    expect(result).toBeNull()
+  })
+
+  it('defaults scopes to empty array when absent', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'b1', email: 'b@b.com', type: 'business', isBusiness: true } })
+    const result = await verifyBusinessToken('token')
+    expect(result?.scopes).toEqual([])
+  })
+
+  it('returns null on verification error', async () => {
+    mockJwtVerify.mockRejectedValueOnce(new Error('expired'))
+    const result = await verifyBusinessToken('expired.token')
+    expect(result).toBeNull()
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('authenticateServiceAccount', () => {
+  it('returns null when x-client-cert-serial header is missing', async () => {
+    const req = makeRequest({})
+    const result = await authenticateServiceAccount(req)
+    expect(result).toBeNull()
+  })
+
+  it('returns null when serial contains non-hex characters', async () => {
+    const req = makeRequest({ headers: { 'x-client-cert-serial': 'ZZZZZZ' } })
+    const result = await authenticateServiceAccount(req)
+    expect(result).toBeNull()
+  })
+
+  it('returns null when no service account matches', async () => {
+    mockDbQueryOne.mockResolvedValueOnce(null)
+    const req = makeRequest({ headers: { 'x-client-cert-serial': 'DEADBEEF' } })
+    const result = await authenticateServiceAccount(req)
+    expect(result).toBeNull()
+  })
+
+  it('returns service account payload when serial matches', async () => {
+    const sa = { id: 'sa-1', name: 'CI Bot', allowed_scopes: ['products:read'] }
+    mockDbQueryOne.mockResolvedValueOnce(sa)
+    mockDbQueryOne.mockResolvedValueOnce(null)
+    const req = makeRequest({ headers: { 'x-client-cert-serial': 'DEADBEEF01' } })
+    const result = await authenticateServiceAccount(req)
+    expect(result).toEqual(sa)
   })
 })

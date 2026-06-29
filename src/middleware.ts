@@ -146,11 +146,15 @@ export async function middleware(request: NextRequest) {
     if (!isPublic) {
       const token = request.cookies.get('business_auth_token')?.value
       if (!token) {
-        return NextResponse.redirect(buildRedirectUrl(request, '/business/signin'))
+        const signinUrl = buildRedirectUrl(request, '/business/signin')
+        signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
+        return NextResponse.redirect(signinUrl)
       }
       const payload = await verifyBusinessToken(token)
       if (!payload) {
-        const res = NextResponse.redirect(buildRedirectUrl(request, '/business/signin'))
+        const signinUrl = buildRedirectUrl(request, '/business/signin')
+        signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
+        const res = NextResponse.redirect(signinUrl)
         res.cookies.delete('business_auth_token')
         return res
       }

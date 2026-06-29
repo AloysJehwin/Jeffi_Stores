@@ -8,6 +8,7 @@ async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
   const row = await queryOne(
     `SELECT o.id, o.order_number, o.created_at, o.customer_name, o.customer_phone,
             o.total_amount, o.discount_amount, o.shipping_amount,
+            o.taxable_amount, o.cgst_amount, o.sgst_amount, o.igst_amount, o.is_igst,
             row_to_json(a) AS shipping_address,
             json_agg(json_build_object(
               'product_name', COALESCE(oi.product_name, p.name, 'Product'),
@@ -16,12 +17,22 @@ async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
               'buy_mode', oi.buy_mode,
               'buy_unit', oi.buy_unit,
               'unit_price', oi.unit_price,
-              'total_price', oi.total_price
+              'total_price', oi.total_price,
+              'mrp', oi.mrp,
+              'discount_amount', oi.discount_amount,
+              'hsn_code', COALESCE(oi.hsn_code, p.hsn_code),
+              'gst_rate', COALESCE(oi.gst_rate, p.gst_rate, 0),
+              'taxable_amount', oi.taxable_amount,
+              'cgst_amount', oi.cgst_amount,
+              'sgst_amount', oi.sgst_amount,
+              'igst_amount', oi.igst_amount,
+              'image_url', pi.thumbnail_url
             ) ORDER BY oi.created_at) AS items
      FROM orders o
      LEFT JOIN addresses a ON a.id = o.shipping_address_id
      LEFT JOIN order_items oi ON oi.order_id = o.id
      LEFT JOIN products p ON p.id = oi.product_id
+     LEFT JOIN product_images pi ON pi.product_id = p.id AND pi.is_primary = true
      WHERE o.id = $1
      GROUP BY o.id, a.id`,
     [id]
@@ -38,6 +49,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   const [order, store] = await Promise.all([fetchOrder(id), loadStoreSettings()])
   if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
+  // Filter null items that json_agg produces when there are no matching rows
+  order.items = (order.items || []).filter(Boolean)
+
   try {
     const pdfBuffer = await generatePackingSlipPDF(order, store)
     const inline = request.nextUrl.searchParams.get('inline') === '1'
@@ -51,6 +65,6 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       },
     })
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'Failed to generate PDF' }, { status: 500 })
+    return NextResponse.json({ error: e.message || 'Failed to generate PDF', stack: e.stack }, { status: 500 })
   }
 }

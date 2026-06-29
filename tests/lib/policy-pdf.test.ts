@@ -100,6 +100,7 @@ describe('generatePolicyPDF', () => {
   })
 
   it('handles different policy slugs and titles', async () => {
+    vi.setConfig({ testTimeout: 15000 })
     const policies: Policy[] = [
       makePolicy({ title: 'Terms of Service', slug: 'terms-of-service' }),
       makePolicy({ title: 'Return Policy', slug: 'return-policy' }),

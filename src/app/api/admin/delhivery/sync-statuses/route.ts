@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryMany } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
+import { resolveShipmentStatus, isAdvancement } from '@/lib/shipment-status'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,11 +38,11 @@ export async function POST(request: NextRequest) {
   }
 
   const orders = await queryMany<{
-    id: string; awb_number: string; status: string
+    id: string; awb_number: string; status: string; shipment_status: string | null
     order_number: string; customer_name: string; customer_email: string
     user_id: string | null
   }>(
-    `SELECT o.id, o.awb_number, o.status, o.order_number, o.user_id,
+    `SELECT o.id, o.awb_number, o.status, o.shipment_status, o.order_number, o.user_id,
             COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
             COALESCE(u.email, o.customer_email) AS customer_email
      FROM orders o
@@ -88,37 +89,50 @@ export async function POST(request: NextRequest) {
         if (!order) continue
 
         const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+        const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
+
+        const rawScans: any[] = shipment.Scans ?? []
+        const scans = rawScans.map((s: any) => ({
+          activity: s.ScanDetail?.Scan ?? null,
+          scanType: s.ScanDetail?.ScanType ?? null,
+          instructions: s.ScanDetail?.Instructions ?? null,
+        }))
+
+        // Resolve stable internal status (shared lib — same logic as admin track route)
+        const newShipmentStatus = resolveShipmentStatus(rawType, scans)
+
+        // Derive the Delhivery statusType string we use for STATUS_SYNC
         const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
         let statusType = rawType
-        if (EXCEPTION_TYPES.has(rawType)) {
-          const topStatus = (shipment.Status?.Status ?? '').toLowerCase()
-          if (topStatus === 'delivered') {
-            statusType = 'DL'
-          } else if (topStatus === 'out for delivery') {
-            statusType = 'OD'
-          } else if (topStatus === 'in transit') {
-            statusType = 'IT'
-          } else if (topStatus === 'picked up') {
-            statusType = 'PU'
-          } else {
-            const scans: any[] = shipment.Scans ?? []
-            for (let i = 0; i < scans.length; i++) {
-              const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
-              if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
-              const activity = (scans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
-              if (activity.includes('out for delivery')) { statusType = 'OD'; break }
-              if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
-              if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
-              if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
-              if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
-              if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
-              if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) { statusType = 'PU'; break }
-              if (activity === 'manifested' || activity.includes('manifest')) { statusType = 'MF'; break }
-              if (activity.includes('delivered')) { statusType = 'DL'; break }
-            }
+        if (EXCEPTION_TYPES.has(rawType) || rawType === 'PP' || rawType === 'MF') {
+          // First try scan history (most authoritative)
+          for (const scan of rawScans) {
+            const t = (scan.ScanDetail?.ScanType ?? '').toUpperCase()
+            if (t && !EXCEPTION_TYPES.has(t) && t !== 'PP' && t !== 'MF') { statusType = t; break }
+            const activity = (scan.ScanDetail?.Scan ?? '').toLowerCase()
+            if (activity.includes('out for delivery')) { statusType = 'OD'; break }
+            if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
+            if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
+            if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
+            if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
+            if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
+            if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) { statusType = 'PU'; break }
+            if (activity === 'manifested' || activity.includes('manifest')) { statusType = 'MF'; break }
+            if (activity.includes('delivered')) { statusType = 'DL'; break }
+          }
+          // Fall back to Status.Status label when scans are absent or unhelpful
+          if (statusType === rawType) {
+            const label = (shipment.Status?.Status ?? '').toLowerCase()
+            if (label.includes('delivered') && !label.includes('out for')) statusType = 'DL'
+            else if (label.includes('out for delivery')) statusType = 'OD'
+            else if (label.includes('rto delivered') || label.includes('returned to origin')) statusType = 'RTO-DL'
+            else if (label.includes('out for return')) statusType = 'RTO-OT'
+            else if (label.includes('return in transit') || label.includes('in return transit')) statusType = 'RTO-IT'
+            else if (label.includes('rto') || label.includes('return initiated')) statusType = 'RTO'
+            else if (label.includes('in transit') || label === 'transit') statusType = 'IT'
+            else if (label.includes('picked up') || label.includes('pickup')) statusType = 'PU'
           }
         }
-        const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
         const syncRule = STATUS_SYNC[statusType]
 
         // Track AWBs that have been physically picked up (PU or any forward/RTO stage)
@@ -126,6 +140,14 @@ export async function POST(request: NextRequest) {
         const PICKED_UP_TYPES = new Set(['PU', 'IT', 'OT', 'OD', 'DL', 'RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL'])
         if (PICKED_UP_TYPES.has(statusType)) {
           pickedUpAwbs.add(awb)
+        }
+
+        // Always advance shipment_status for every shipment we fetched
+        if (isAdvancement(order.shipment_status as any, newShipmentStatus)) {
+          await query(
+            `UPDATE orders SET shipment_status = $2, updated_at = NOW() WHERE id = $1`,
+            [order.id, newShipmentStatus]
+          ).catch(() => {})
         }
 
         if (!syncRule) continue

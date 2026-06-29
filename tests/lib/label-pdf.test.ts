@@ -139,6 +139,22 @@ describe('generateLabelPDF', () => {
     expect(result).toBeInstanceOf(Buffer)
   })
 
+  it('renders 50x50 with variant_name (covers lines 256-259)', async () => {
+    const result = await generateLabelPDF([mockProductWithVariant], '50x50', 1)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('renders 50x50 with variant_name and brand_name both set', async () => {
+    const p: LabelProduct = { ...mockProductWithVariant, brand_name: 'Unbrako' }
+    const result = await generateLabelPDF([p], '50x50', 1)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('renders 80x20 with variant_name (covers lines 294-297)', async () => {
+    const result = await generateLabelPDF([mockProductWithVariant], '80x20', 1)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
   it('handles zero copies gracefully (no pages added)', async () => {
     const result = await generateLabelPDF([mockProduct], '30x20', 0)
     expect(result).toBeInstanceOf(Buffer)

@@ -180,6 +180,41 @@ describe('admin-agent/tools/operations', () => {
         getTool('propose_create_pickup_request').handler({ orderIds: [], pickupDate: '2024-12-25' })
       ).rejects.toThrow()
     })
+
+    // Line 308 branch: eligible.length !== ids.length (partial eligibility)
+    it('returns proposed false with eligibleCount when only some orders qualify', async () => {
+      // 2 ids requested but only 1 comes back eligible
+      mockQueryMany.mockResolvedValueOnce([
+        { id: 'o1', order_number: 'ORD-001', awb_number: 'AWB123', customer_name: 'Test', total_amount: '1000', status: 'confirmed' },
+      ])
+      const result = await getTool('propose_create_pickup_request').handler({
+        orderIds: ['o1', 'o2'],
+        pickupDate: '2024-12-25',
+      })
+      expect((result as any).proposed).toBe(false)
+      expect((result as any).eligibleCount).toBe(1)
+    })
+
+    it('uses tomorrow as pickupDate when not supplied', async () => {
+      mockQueryMany.mockResolvedValueOnce([
+        { id: 'o1', order_number: 'ORD-001', awb_number: 'AWB123', customer_name: 'Test', total_amount: '500', status: 'confirmed' },
+      ])
+      const result = await getTool('propose_create_pickup_request').handler({
+        orderIds: ['o1'],
+      })
+      expect((result as any).proposed).toBe(true)
+      // pickupDate in payload should be a YYYY-MM-DD string
+      expect((result as any).payload.pickupDate).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    })
+
+    it('throws when pickupDate is not YYYY-MM-DD', async () => {
+      await expect(
+        getTool('propose_create_pickup_request').handler({
+          orderIds: ['o1'],
+          pickupDate: '25-12-2024',
+        })
+      ).rejects.toThrow('pickupDate must be YYYY-MM-DD')
+    })
   })
 
   describe('propose_sync_delhivery_statuses', () => {
@@ -247,6 +282,99 @@ describe('admin-agent/tools/operations', () => {
           paymentMode: 'cash',
         })
       ).rejects.toThrow()
+    })
+
+    // Line 526: exp.status === 'paid' — already fully paid branch
+    it('returns proposed false when payable is already fully paid', async () => {
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'pay3',
+        expense_number: 'EXP-003',
+        supplier_name: 'Vendor',
+        total_amount: '5000',
+        status: 'paid',
+        paid_amount: '5000',
+      })
+      const result = await getTool('propose_pay_payable').handler({
+        payableId: 'pay3',
+        paymentMode: 'upi',
+      })
+      expect((result as any).proposed).toBe(false)
+      expect((result as any).info).toContain('already fully paid')
+    })
+
+    // Lines 531-534: custom amount string supplied — valid partial payment
+    it('accepts a custom partial amount when provided as a string', async () => {
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'pay4',
+        expense_number: 'EXP-004',
+        supplier_name: 'PartialVendor',
+        total_amount: '10000',
+        status: 'partial',
+        paid_amount: '4000',
+      })
+      const result = await getTool('propose_pay_payable').handler({
+        payableId: 'pay4',
+        paymentMode: 'upi',
+        amount: '3000',
+      })
+      expect((result as any).proposed).toBe(true)
+      expect((result as any).payload.amount).toBe(3000)
+    })
+
+    // Lines 532: amount not finite or <= 0 → throws
+    it('throws when custom amount is not a positive number', async () => {
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'pay5',
+        expense_number: 'EXP-005',
+        supplier_name: 'Vendor',
+        total_amount: '5000',
+        status: 'unpaid',
+        paid_amount: '0',
+      })
+      await expect(
+        getTool('propose_pay_payable').handler({
+          payableId: 'pay5',
+          paymentMode: 'cash',
+          amount: '-100',
+        })
+      ).rejects.toThrow('amount must be a positive number')
+    })
+
+    // Lines 533: amount exceeds remaining → throws
+    it('throws when custom amount exceeds remaining balance', async () => {
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'pay6',
+        expense_number: 'EXP-006',
+        supplier_name: 'Vendor',
+        total_amount: '5000',
+        status: 'unpaid',
+        paid_amount: '0',
+      })
+      await expect(
+        getTool('propose_pay_payable').handler({
+          payableId: 'pay6',
+          paymentMode: 'cash',
+          amount: '9999',
+        })
+      ).rejects.toThrow('exceeds remaining')
+    })
+
+    // transactionRef path: confirmation string includes ref
+    it('includes transaction reference in confirmation when provided', async () => {
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'pay7',
+        expense_number: 'EXP-007',
+        supplier_name: 'Vendor',
+        total_amount: '2000',
+        status: 'unpaid',
+        paid_amount: '0',
+      })
+      const result = await getTool('propose_pay_payable').handler({
+        payableId: 'pay7',
+        paymentMode: 'upi',
+        transactionRef: 'UPI-REF-123',
+      })
+      expect((result as any).confirmation).toContain('UPI-REF-123')
     })
   })
 

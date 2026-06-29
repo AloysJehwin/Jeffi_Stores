@@ -1,6 +1,5 @@
 import { queryMany } from '@/lib/db'
 import {
-  APP_URL,
   fetchUserContext,
   resolveCoupon,
   sendCampaignEmail,
@@ -46,11 +45,13 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         o.id, o.user_id, o.order_number, o.total_amount::text
       FROM orders o
       JOIN users u ON u.id = o.user_id
+      LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE o.status = 'cancelled' AND o.payment_status = 'cancelled'
         AND (o.updated_at - o.created_at) <= ($6 || ' minutes')::interval
         AND o.updated_at > NOW() - ($2 || ' hours')::interval
         AND o.updated_at < NOW() - ($3 || ' minutes')::interval
         AND u.is_active = TRUE AND u.marketing_opt_out = FALSE
+        AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
@@ -136,7 +137,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         quantity: i.quantity,
         price: i.unit_price,
         imageUrl: i.image_url,
-        productUrl: i.product_slug ? `${APP_URL}/products/${i.product_slug}` : null,
+        productUrl: i.product_slug ? `${user.baseUrl}/products/${i.product_slug}` : null,
       }))
     )
 
@@ -153,7 +154,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         itemsHtml,
         couponCode,
         discountPercent,
-        ctaUrl: `${APP_URL}/cart`,
+        ctaUrl: `${user.baseUrl}/cart`,
       },
     })
   },

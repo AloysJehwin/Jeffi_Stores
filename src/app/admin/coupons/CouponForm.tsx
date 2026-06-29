@@ -7,10 +7,12 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import Toggle from '@/components/ui/Toggle'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import CouponUserSelector from '@/components/admin/CouponUserSelector'
 
 interface CouponFormProps {
   action: (formData: FormData) => Promise<void>
   submitLabel: string
+  showUserSelector?: boolean
   defaultValues?: {
     code?: string
     discount_type?: string
@@ -34,7 +36,7 @@ const DISCOUNT_TYPE_OPTIONS = [
 const inputClass = 'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
-export default function CouponForm({ action, submitLabel, defaultValues: d = {} }: CouponFormProps) {
+export default function CouponForm({ action, submitLabel, showUserSelector = false, defaultValues: d = {} }: CouponFormProps) {
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
   const [validFrom, setValidFrom] = useState(d.valid_from ?? '')
   const [validUntil, setValidUntil] = useState(d.valid_until ?? '')
@@ -181,6 +183,16 @@ export default function CouponForm({ action, submitLabel, defaultValues: d = {} 
           </div>
         </aside>
       </div>
+
+      {showUserSelector && (
+        <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-4">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground-secondary uppercase tracking-wide">Eligible Users</h2>
+            <p className="text-xs text-foreground-muted mt-1">Optional — restrict this coupon to specific customers. Leave empty to allow all users.</p>
+          </div>
+          <CouponUserSelector name="eligible_user_ids" />
+        </div>
+      )}
 
       <div className="flex gap-3 pt-2 sticky bottom-0 bg-surface/90 backdrop-blur py-3 -mx-4 sm:-mx-6 px-4 sm:px-6 border-t border-border-default">
         <Link href={ap('/admin/coupons')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">

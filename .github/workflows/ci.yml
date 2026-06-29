@@ -298,6 +298,11 @@ jobs:
             echo "── Pruning old images ──"
             docker image prune -f
 
+            echo "── Reloading nginx config ──"
+            docker compose -f docker-compose.prod.yml exec -T nginx nginx -t && \
+              docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload || \
+              echo "nginx reload skipped (container may not be named nginx)"
+
             echo "── Status ──"
             docker compose -f docker-compose.prod.yml ps
 
@@ -390,49 +395,7 @@ jobs:
             psql -v ON_ERROR_STOP=1 -c "CREATE TABLE IF NOT EXISTS schema_migrations (filename TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())"
 
             MIGRATION_ORDER=(
-              add_brand_return_policy.sql
-              add_buyer_fields_to_quotations.sql
-              add_cart_items_saved_for_later.sql
-              add_category_return_policy.sql
-              add_category_policy_inheritance.sql
-              add_consignee_email_to_quotations.sql
-              add_crm_and_search_logs.sql
-              add_customer_activity_and_tasks.sql
-              add_customer_health.sql
-              add_auto_tasks.sql
-              add_customer_tag_definitions.sql
-              add_delivery_settings.sql
-              add_email_campaigns.sql
-              add_image_thumbnail_urls_to_product_reviews.sql
-              add_image_urls_to_product_reviews.sql
-              add_inventory_quantity_to_sub_variants.sql
-              add_merchant_sync_log.sql
-              add_mfa_to_admins.sql
-              add_sub_variant_id_to_cart_items.sql
-              add_template_type_to_review_forms.sql
-              add_variant_images_and_sub_variants.sql
-              add_view_tokens.sql
-              normalize_phone_numbers.sql
-              rename_products_price_fields.sql
-              rename_sale_price_add_ex_gst.sql
-              reseed_campaign_templates.sql
-              reseed_campaign_templates_with_images.sql
-              add_ai_assistant_log.sql
-              add_scenarios_to_campaigns.sql
-              add_custom_scenarios.sql
-              add_custom_scenario_product_sql.sql
-              add_ai_feedback.sql
-              add_recommended_product_ids_to_ai_queries.sql
-              add_ai_briefing_log.sql
-              add_admin_agent.sql
-              add_product_ai_enrichment.sql
-              add_product_ai_enrichment_v2.sql
-              add_admin_agent_proposed_tools.sql
-              add_admin_audit_log.sql
-              add_admin_agent_attachments.sql
-              add_sub_variant_id_to_order_items.sql
-              add_user_avatar.sql
-              add_user_search_history.sql
+              allow_same_email_multi_user_type.sql
               add_business_partner_tables.sql
               add_requested_price_to_rfq_items.sql
               add_sub_variant_to_rfq_items.sql
@@ -440,7 +403,6 @@ jobs:
               add_status_to_cash_sales.sql
               add_sub_variant_id_to_inventory_transactions.sql
               add_ui_blocks_to_agent_messages.sql
-              allow_same_email_multi_user_type.sql
               add_discount_pct_to_products.sql
               add_payment_mode_to_orders.sql
               add_qr_fields_to_orders.sql
@@ -475,6 +437,7 @@ jobs:
               backfill_order_items_mrp_from_quotation.sql
               backfill_variant_sell_unit_id.sql
               add_service_accounts.sql
+              add_shipment_status_to_orders.sql
             )
 
             APPLIED=$(psql -tAc "SELECT filename FROM schema_migrations" | tr -d ' ')

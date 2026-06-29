@@ -8,6 +8,7 @@ import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { resolveBuyNowItem, quoteShipping, validateCouponForUser, loadAddress } from '@/lib/order-commit'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { parseBody, zUuid } from '@/lib/validate'
+import { verifyIntent } from '@/lib/checkout-intent'
 
 const DirectItemSchema = z.object({
   productId: zUuid,
@@ -20,7 +21,8 @@ const DirectItemSchema = z.object({
 
 const CreateDirectOrderSchema = z.object({
   paymentMethod: z.enum(['razorpay', 'manual']),
-  item: DirectItemSchema,
+  item: DirectItemSchema.optional(),
+  intent: z.string().nullish(),
   shippingAddress: z.any().optional(),
   notes: z.string().nullish(),
   couponId: z.string().nullish(),
@@ -47,9 +49,30 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const parsed = parseBody(CreateDirectOrderSchema, body)
     if (!parsed.ok) return parsed.response
-    const { shippingAddress, notes, paymentMethod, couponId, item, addressId } = parsed.data
+    const { shippingAddress, notes, paymentMethod, couponId, addressId } = parsed.data
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = false
+
+    // When an intent token is present, derive item from the server-signed intent
+    // rather than trusting the raw client body — prevents qty/buyMode/buyUnit tampering.
+    let item = parsed.data.item
+    if (parsed.data.intent) {
+      const intentData = await verifyIntent(parsed.data.intent)
+      if (!intentData) {
+        return NextResponse.json({ error: 'Invalid or expired checkout intent' }, { status: 400 })
+      }
+      if (intentData.mode === 'cart') {
+        return NextResponse.json({ error: 'Cart checkout must use the cart order route' }, { status: 400 })
+      }
+      item = {
+        productId: intentData.productId,
+        variantId: intentData.variantId ?? undefined,
+        subVariantId: intentData.subVariantId ?? undefined,
+        qty: intentData.qty,
+        buyMode: intentData.buyMode ?? undefined,
+        buyUnit: intentData.buyUnit ?? undefined,
+      }
+    }
 
     if (!item || !item.productId || !item.qty) {
       return NextResponse.json({ error: 'Item details are required' }, { status: 400 })

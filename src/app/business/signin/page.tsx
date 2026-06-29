@@ -21,9 +21,11 @@ function BusinessSignInPage() {
   const searchParams = useSearchParams()
   const { user, isLoading: authLoading } = useAuth()
 
+  const callbackUrl = searchParams.get('callbackUrl')
+
   useEffect(() => {
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'approved') {
-      router.replace(bp('/business/products'))
+      router.replace(callbackUrl || bp('/business/products'))
     }
     if (!authLoading && user?.isBusiness && user.approvalStatus === 'pending') {
       router.replace(bp('/business/pending'))
@@ -130,7 +132,7 @@ function BusinessSignInPage() {
         return
       }
       // Redirect to business portal
-      window.location.href = bp('/business/products')
+      window.location.href = callbackUrl || bp('/business/products')
     } catch (err: any) {
       setError(err.message)
       setOtp('')
@@ -223,7 +225,7 @@ function BusinessSignInPage() {
         setShowPhoneModal(true)
         return
       }
-      window.location.href = bp('/business/products')
+      window.location.href = callbackUrl || bp('/business/products')
     } catch (err: any) {
       setError(err.message)
     } finally {

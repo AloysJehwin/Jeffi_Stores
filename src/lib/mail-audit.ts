@@ -14,6 +14,7 @@ export interface SendAuditedMailOptions {
   subject: string
   html?: string
   text?: string
+  amp?: string
   from?: string
   cc?: string | string[]
   bcc?: string | string[]
@@ -95,8 +96,7 @@ async function logMail(opts: {
         opts.metadata ? JSON.stringify(opts.metadata) : null,
       ]
     )
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     // Audit must never block real mail flow.
   }
 }
@@ -113,6 +113,7 @@ export async function sendAuditedMail(o: SendAuditedMailOptions): Promise<{ mess
       subject: o.subject,
       html: o.html,
       text: o.text,
+      amp: o.amp,
       cc: o.cc,
       bcc: o.bcc,
       attachments: o.attachments,

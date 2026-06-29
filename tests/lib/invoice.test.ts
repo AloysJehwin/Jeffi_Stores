@@ -365,4 +365,101 @@ describe('generateOrderInvoice with separate billing address', () => {
       city: 'Mumbai',
     })
   })
+
+  it('passes undefined billingAddress when billing address row is not found', async () => {
+    // billing_address_id differs from shipping_address_id but the row doesn't exist
+    const orderWithBilling = {
+      ...mockOrder,
+      billing_address_id: 'addr-2',
+      shipping_address_id: 'addr-1',
+    }
+
+    mockQueryOne
+      .mockResolvedValueOnce(null)              // no finalized invoice
+      .mockResolvedValueOnce(orderWithBilling)  // order
+      .mockResolvedValueOnce(null)              // billing address row not found
+      .mockResolvedValueOnce({ id: 'inv-up' })  // UPDATE pdf_url
+
+    mockQueryMany
+      .mockResolvedValueOnce([mockOrderItem])   // order items
+      .mockResolvedValueOnce([{ key: 'business_gstin', value: '22AAAAA0000A1Z5' }]) // settings
+      .mockResolvedValueOnce([mockOrderItem])   // updated items
+
+    mockWithTransaction.mockImplementation(async (fn) => {
+      const mockClient = {
+        query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
+      }
+      return fn(mockClient as any)
+    })
+
+    mockGetFinancialYear.mockReturnValue('2024-25')
+    mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0003')
+    mockIsInterState.mockReturnValue(false)
+    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 })
+    mockGenerateInvoicePDF.mockResolvedValue(Buffer.from('pdf'))
+    mockUploadInvoicePDF.mockResolvedValue('https://s3.example.com/inv.pdf')
+
+    const result = await generateOrderInvoice('order-1')
+
+    // Should still succeed — billingAddress stays undefined when row missing
+    expect(result).toBeInstanceOf(Buffer)
+    const [, , , , billingAddress] = mockGenerateInvoicePDF.mock.calls[0]
+    expect(billingAddress).toBeUndefined()
+  })
+
+  it('falls back to empty strings when billing address fields are null', async () => {
+    // billing address row exists but all fields are null — exercises the || '' fallbacks
+    // on lines 218-219 and 221-224 (right-hand sides of each || operator)
+    const orderWithBilling = {
+      ...mockOrder,
+      billing_address_id: 'addr-2',
+      shipping_address_id: 'addr-1',
+    }
+
+    mockQueryOne
+      .mockResolvedValueOnce(null)              // no finalized invoice
+      .mockResolvedValueOnce(orderWithBilling)  // order
+      .mockResolvedValueOnce({                  // billing address with all-null fields
+        full_name: null,
+        address_line1: null,
+        address_line2: null,
+        city: null,
+        state: null,
+        postal_code: null,
+        phone: null,
+      })
+      .mockResolvedValueOnce({ id: 'inv-up' })  // UPDATE pdf_url
+
+    mockQueryMany
+      .mockResolvedValueOnce([mockOrderItem])   // order items
+      .mockResolvedValueOnce([{ key: 'business_gstin', value: '22AAAAA0000A1Z5' }]) // settings
+      .mockResolvedValueOnce([mockOrderItem])   // updated items
+
+    mockWithTransaction.mockImplementation(async (fn) => {
+      const mockClient = {
+        query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
+      }
+      return fn(mockClient as any)
+    })
+
+    mockGetFinancialYear.mockReturnValue('2024-25')
+    mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0004')
+    mockIsInterState.mockReturnValue(false)
+    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 })
+    mockGenerateInvoicePDF.mockResolvedValue(Buffer.from('pdf'))
+    mockUploadInvoicePDF.mockResolvedValue('https://s3.example.com/inv.pdf')
+
+    await generateOrderInvoice('order-1')
+
+    const [, , , , billingAddress] = mockGenerateInvoicePDF.mock.calls[0]
+    expect(billingAddress).toMatchObject({
+      full_name: '',
+      address_line1: '',
+      address_line2: null,
+      city: '',
+      state: '',
+      postal_code: '',
+      phone: '',
+    })
+  })
 })

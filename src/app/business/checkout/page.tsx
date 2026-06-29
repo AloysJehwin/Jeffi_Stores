@@ -39,13 +39,9 @@ function CheckoutPage() {
   const isBuyNow = intentMode === 'buyNow' || (intentMode === null && (searchParams.get('buyNow') === '1' && !intentToken))
   const couponId = searchParams.get('couponId')
 
-  const authWasLoading = useRef(false)
-  useEffect(() => {
-    if (authLoading) authWasLoading.current = true
-  }, [authLoading])
-  const couponCode = searchParams.get('couponCode')
-  const discountAmount = parseFloat(searchParams.get('discountAmount') || '0')
-  const shippingCharge = searchParams.get('shippingCharge') ? parseFloat(searchParams.get('shippingCharge')!) : null
+  const [couponCode, setCouponCode] = useState<string | null>(null)
+  const [discountAmount, setDiscountAmount] = useState(0)
+  const [shippingCharge, setShippingCharge] = useState<number | null>(null)
 
   const businessDiscountAmount = !isBuyNow && user?.isBusiness && user.approvalStatus === 'approved'
     ? Math.round(cartItems.reduce((sum, item) => {
@@ -108,8 +104,8 @@ function CheckoutPage() {
   }, [isBuyNow, buyNowItem])
 
   useEffect(() => {
-    if (!authLoading && !user && authWasLoading.current) {
-      router.push(bp('/business/signin?redirect=/checkout'))
+    if (!authLoading && !user) {
+      router.push(bp('/business/signin?callbackUrl=/business/checkout'))
       return
     }
 
@@ -119,12 +115,6 @@ function CheckoutPage() {
     }
 
     const addressId = searchParams.get('addressId')
-    if (!addressId) {
-      router.push(bp('/business/checkout/review'))
-      return
-    }
-
-    fetchAddress(addressId)
 
     if (intentToken) {
       fetch(`/api/checkout/intents/${encodeURIComponent(intentToken)}`, { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
@@ -133,6 +123,10 @@ function CheckoutPage() {
           if (!r.ok) { router.push(bp('/business')); return }
           if (d.mode === 'cart') {
             setIntentMode('cart')
+            const intentAddressId = d.addressId || addressId
+            if (!intentAddressId) { router.push(bp('/business/checkout/review')); return }
+            if (d.shippingCharge != null) setShippingCharge(Number(d.shippingCharge))
+            fetchAddress(intentAddressId, d.shippingCharge != null)
             return
           }
           setIntentMode('buyNow')
@@ -171,45 +165,29 @@ function CheckoutPage() {
       const qty = parseFloat(searchParams.get('qty') || '1')
       const buyMode = searchParams.get('buyMode') || 'unit'
       const buyUnit = searchParams.get('buyUnit')
-      const price = parseFloat(searchParams.get('price') || '0')
-      const productName = searchParams.get('productName') || ''
-      const variantName = searchParams.get('variantName')
 
-      if (!productId || !price) { router.push(bp('/business')); return }
+      if (!productId) { router.push(bp('/business')); return }
+      if (!addressId) { router.push(bp('/business/checkout/review')); return }
 
-      setBuyNowItem({
-        productId,
-        variantId: variantId || null,
-        subVariantId: null,
-        qty,
-        buyMode,
-        buyUnit: buyUnit || null,
-        price,
-        productName,
-        variantName: variantName || null,
-        subVariantName: null,
-        sku: null,
-        mrp: null,
-        gstPercentage: null,
-        brandName: null,
-        imageUrl: null,
+      fetchAddress(addressId, false)
+
+      // Resolve price server-side via intent — never trust URL-provided price
+      fetch('/api/checkout/intents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+        credentials: 'include',
+        body: JSON.stringify({ productId, variantId: variantId || null, qty, buyMode, buyUnit: buyUnit || null }),
       })
-
-      const imageUrl = `/api/products/${productId}/primary-image${variantId ? `?variantId=${variantId}` : ''}`
-      fetch(imageUrl)
-        .then(r => r.json())
+        .then(r => r.ok ? r.json() : Promise.reject())
         .then(data => {
-          setBuyNowItem(prev => {
-            if (!prev) return prev
-            return {
-              ...prev,
-              imageUrl: data.imageUrl || prev.imageUrl,
-              productName: prev.productName || data.productName || '',
-              variantName: prev.variantName || data.variantName || null,
-            }
-          })
+          if (!data?.intent) { router.push(bp('/business')); return }
+          const next = new URLSearchParams(searchParams.toString())
+          next.set('intent', data.intent)
+          next.delete('buyNow')
+          next.delete('price')
+          router.replace(bp(`/business/checkout?${next.toString()}`))
         })
-        .catch(() => {})
+        .catch(() => router.push(bp('/business')))
     }
   }, [cartCount, user, authLoading, cartLoading, router, searchParams, isBuyNow])
 
@@ -228,7 +206,27 @@ function CheckoutPage() {
     document.body.appendChild(script)
   }, [paymentMethod, razorpayLoaded])
 
-  const fetchAddress = async (addressId: string) => {
+  const fetchShipping = (postalCode: string) => {
+    if (isBuyNow && !buyNowItem) return
+    const subtotal = isBuyNow
+      ? buyNowItem!.price * buyNowItem!.qty
+      : getCartTotal()
+    const items = isBuyNow
+      ? [{ productId: buyNowItem!.productId, variantId: buyNowItem!.variantId || null, quantity: buyNowItem!.qty }]
+      : cartItems.map(i => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: Number(i.quantity) }))
+    if (items.length === 0) return
+    fetch('/api/shipping/rate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+      credentials: 'include',
+      body: JSON.stringify({ destinationPin: postalCode, cartItems: items, subtotal }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.charge != null) setShippingCharge(Number(d.charge)) })
+      .catch(() => {})
+  }
+
+  const fetchAddress = async (addressId: string, skipShipping = false) => {
     try {
       const response = await fetch('/api/user/addresses', { credentials: 'include', headers: { 'X-Auth-Portal': 'business' } })
       if (response.status === 401) {
@@ -240,6 +238,7 @@ function CheckoutPage() {
         const selectedAddr = data.addresses.find((a: any) => a.id === addressId)
         if (selectedAddr) {
           setAddress(selectedAddr)
+          if (!skipShipping) fetchShipping(selectedAddr.postal_code)
         } else {
           router.push(bp('/business/checkout/review'))
         }
@@ -252,6 +251,36 @@ function CheckoutPage() {
       setIsLoadingAddress(false)
     }
   }
+
+  // Re-fetch shipping when cart items change after address is already loaded
+  useEffect(() => {
+    if (!address?.postal_code) return
+    fetchShipping(address.postal_code)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cartItems])
+
+  // Re-apply coupon from server once address + subtotal are known — never trust URL value
+  useEffect(() => {
+    if (!couponId) return
+    const subtotal = isBuyNow
+      ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
+      : getCartTotal()
+    if (subtotal === 0) return
+    fetch('/api/coupons/apply', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+      credentials: 'include',
+      body: JSON.stringify({ couponId, subtotal }),
+    })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.discountAmount != null) {
+          setDiscountAmount(Number(d.discountAmount))
+          setCouponCode(d.code || null)
+        }
+      })
+      .catch(() => {})
+  }, [couponId, address, buyNowItem])
 
   const verifyPayment = async (
     razorpay_order_id: string,

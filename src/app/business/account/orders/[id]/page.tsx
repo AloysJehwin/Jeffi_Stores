@@ -13,6 +13,7 @@ import { bp } from '@/lib/business-path'
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 const PH = { 'X-Auth-Portal': 'business' }
+const CONTINUOUS_UNITS = new Set(['m', 'cm', 'mm', 'km', 'ft', 'in', 'kg', 'g', 'mg', 'lb', 'oz', 'l', 'ml', 'm2', 'cm2', 'mm2', 'm3', 'cm3'])
 
 interface OrderItem {
   id: string
@@ -129,16 +130,11 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [isAutoCancelling, setIsAutoCancelling] = useState(false)
   const autoCancelTriggeredRef = useRef(false)
-  const authWasLoading = useRef(false)
   const { refreshCart } = useCart()
 
   useEffect(() => {
-    if (authLoading) authWasLoading.current = true
-  }, [authLoading])
-
-  useEffect(() => {
-    if (!authLoading && !user && authWasLoading.current) {
-      router.push(bp('/business/signin?redirect=/account/orders'))
+    if (!authLoading && !user) {
+      router.push(bp(`/business/signin?callbackUrl=/business/account/orders/${id}`))
       return
     }
     if (user) fetchOrder()
@@ -420,7 +416,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
             )}
 
             {/* Tracking */}
-            {['shipped', 'out_for_delivery', 'delivered'].includes(order.status) && order.awbNumber && (
+            {order.awbNumber && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
                 <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center gap-2">
                   <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -474,7 +470,9 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                           </span>
                         )}
                         {(() => {
-                          const isFractional = item.buyMode === 'weight' || item.buyMode === 'length'
+                          const isFractional = item.buyUnit
+                            ? CONTINUOUS_UNITS.has(item.buyUnit.toLowerCase())
+                            : (item.buyMode === 'weight' || item.buyMode === 'length')
                           const qtyDisplay = isFractional
                             ? `${Number(item.quantity).toFixed(3)}${item.buyUnit ? ` ${item.buyUnit}` : ''}`
                             : `${Math.round(Number(item.quantity))}${item.buyUnit && item.buyUnit !== 'unit' ? ` ${item.buyUnit}` : ''}`

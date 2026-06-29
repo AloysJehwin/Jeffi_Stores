@@ -50,8 +50,7 @@ export async function authenticateBusiness(request: NextRequest): Promise<UserJW
       approvalStatus: payload.approvalStatus as string | undefined,
       scopes: (payload.scopes as string[] | undefined) ?? [],
     }
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return null
   }
 }
@@ -81,8 +80,7 @@ export async function verifyToken(token: string): Promise<JWTPayload | null> {
     const { payload } = await jwtVerify(token, JWT_SECRET)
     if (payload.type !== 'admin_session') return null
     return payload as JWTPayload
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return null
   }
 }
@@ -105,8 +103,7 @@ export async function authenticateUser(request: NextRequest): Promise<UserJWTPay
     // Reject tokens that belong to business or admin
     if (payload.type !== 'customer') return null
     return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return null
   }
 }
@@ -160,8 +157,7 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
       } catch {}
     }
     return result
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return null
   }
 }
@@ -199,4 +195,56 @@ export async function requireUserScope(
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   return user
+}
+
+export interface ReviewTokenPayload {
+  orderId: string
+  productId: string
+  userId: string
+}
+
+export async function generateReviewToken(payload: ReviewTokenPayload): Promise<string> {
+  return new SignJWT({ ...payload, type: 'review_token' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setExpirationTime('48h')
+    .sign(JWT_SECRET)
+}
+
+export async function verifyUserToken(token: string): Promise<UserJWTPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+    if (!payload.userId || typeof payload.userId !== 'string') return null
+    if (payload.type !== 'customer') return null
+    return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
+  } catch {
+    return null
+  }
+}
+
+export async function verifyBusinessToken(token: string): Promise<UserJWTPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+    if (!payload.userId || typeof payload.userId !== 'string') return null
+    if (payload.type !== 'business') return null
+    if (!payload.isBusiness) return null
+    return { userId: payload.userId as string, email: payload.email as string, isBusiness: true, approvalStatus: payload.approvalStatus as string | undefined, scopes: (payload.scopes as string[] | undefined) ?? [] }
+  } catch {
+    return null
+  }
+}
+
+export async function verifyReviewToken(token: string): Promise<ReviewTokenPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+    if (payload.type !== 'review_token') return null
+    if (!payload.orderId || !payload.productId || !payload.userId) return null
+    return {
+      orderId: payload.orderId as string,
+      productId: payload.productId as string,
+      userId: payload.userId as string,
+    }
+  } catch {
+    return null
+  }
 }
