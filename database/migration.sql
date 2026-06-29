@@ -11,6 +11,14 @@ CREATE TABLE IF NOT EXISTS coupon_eligible_users (
 );
 CREATE INDEX IF NOT EXISTS idx_ceu_user_id ON coupon_eligible_users(user_id);
 
--- Add a new unique constraint that includes sub_variant_id
-ALTER TABLE cart_items ADD CONSTRAINT IF NOT EXISTS cart_items_user_product_variant_subvariant_key
-  UNIQUE (user_id, product_id, variant_id, sub_variant_id);
+-- Add a new unique constraint that includes sub_variant_id (PG 16 compatible)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'cart_items_user_product_variant_subvariant_key'
+  ) THEN
+    ALTER TABLE cart_items ADD CONSTRAINT cart_items_user_product_variant_subvariant_key
+      UNIQUE (user_id, product_id, variant_id, sub_variant_id);
+  END IF;
+END $$;
