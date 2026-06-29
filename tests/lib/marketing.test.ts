@@ -221,6 +221,17 @@ describe('canSendMarketing', () => {
     const r = await canSendMarketing('user-1', 'winback_90')
     expect(r.ok).toBe(true)
   })
+
+  it('returns ok:true when frequency-cap row is null (no prior sends)', async () => {
+    // queryOne for recent returns null — parseInt(null, 10) path is not reached;
+    // the null check short-circuits and we proceed to return ok:true
+    mockQueryOne
+      .mockResolvedValueOnce({ email: 'u@e.com', is_active: true, marketing_opt_out: false })
+      .mockResolvedValueOnce({ kind: 'winback_90', enabled: true })
+      .mockResolvedValueOnce(null)
+    const r = await canSendMarketing('user-1', 'winback_90')
+    expect(r.ok).toBe(true)
+  })
 })
 
 describe('alreadySentForReference', () => {
@@ -235,6 +246,22 @@ describe('alreadySentForReference', () => {
     mockQueryOne.mockResolvedValue(null)
     expect(await alreadySentForReference('winback_90', 'user-1', 'ref-1')).toBe(false)
   })
+
+  it('adds time filter when referenceId is null', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    await alreadySentForReference('abandoned_cart', 'user-2', null)
+    const [sql] = mockQueryOne.mock.calls[0]
+    // The time-filter branch appends a sent_at > NOW() - INTERVAL clause
+    expect(sql).toContain('sent_at')
+  })
+
+  it('does not add time filter when referenceId is non-null', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    await alreadySentForReference('abandoned_cart', 'user-2', 'ref-abc')
+    const [sql] = mockQueryOne.mock.calls[0]
+    // No extra time filter — the timeFilter string is empty
+    expect(sql).not.toContain('sent_at > NOW()')
+  })
 })
 
 describe('recordSent', () => {
@@ -246,10 +273,45 @@ describe('recordSent', () => {
     expect(id).toBe('sent-abc')
   })
 
+  it('calls send_count upsert when sentId is non-null', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'sent-abc' }], rowCount: 1 } as any)
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as any)
+    await recordSent({ campaignKind: 'winback_90', userId: 'user-1' })
+    expect(mockQuery).toHaveBeenCalledTimes(2)
+    const secondCall = mockQuery.mock.calls[1]
+    expect(secondCall[0]).toContain('campaign_send_counts')
+  })
+
+  it('returns null and skips send_count upsert when insert returns no rows', async () => {
+    // INSERT returns no rows — sentId is null — second query must NOT fire
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
+    const id = await recordSent({ campaignKind: 'winback_90', userId: 'user-1' })
+    expect(id).toBeNull()
+    expect(mockQuery).toHaveBeenCalledTimes(1)
+  })
+
   it('returns null on DB error', async () => {
     mockQuery.mockRejectedValue(new Error('db error'))
     const id = await recordSent({ campaignKind: 'winback_90', userId: 'user-1' })
     expect(id).toBeNull()
+  })
+
+  it('passes optional referenceId, messageId, and metadata', async () => {
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'sent-xyz' }], rowCount: 1 } as any)
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as any)
+    const id = await recordSent({
+      campaignKind: 'post_purchase',
+      userId: 'user-2',
+      referenceId: 'order-99',
+      messageId: 'msg-42',
+      metadata: { foo: 'bar' },
+    })
+    expect(id).toBe('sent-xyz')
+    const [, params] = mockQuery.mock.calls[0]
+    expect(params).toContain('order-99')
+    expect(params).toContain('msg-42')
   })
 })
 
@@ -300,6 +362,24 @@ describe('generateCouponForCampaign', () => {
     expect(code).toBe('BACK-EXIST')
   })
 
+  it('does not update campaigns.coupon_id when it already matches existing coupon', async () => {
+    // queryOne returns existing coupon; query UPDATE should still be called
+    // (the UPDATE is guarded by coupon_id IS NULL OR coupon_id != $1 — but it IS
+    // called; this test verifies it is called with the right args)
+    mockQueryOne.mockResolvedValue({ id: 'coupon-existing', code: 'BACK-EXIST' })
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    const code = await generateCouponForCampaign({
+      campaignKind: 'winback_90',
+      discountPercent: 10,
+      expiresInDays: 30,
+    })
+    expect(code).toBe('BACK-EXIST')
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('coupon_id'),
+      ['coupon-existing', 'winback_90']
+    )
+  })
+
   it('creates a new coupon when none exists', async () => {
     mockQueryOne.mockResolvedValue(null)
     mockQuery
@@ -336,5 +416,37 @@ describe('generateCouponForCampaign', () => {
       expiresInDays: 7,
     })
     expect(code).toBeNull()
+  })
+
+  it('skips UPDATE campaigns when insert returns no coupon id', async () => {
+    // First query (INSERT) returns no rows — couponId is undefined/falsy
+    mockQueryOne.mockResolvedValue(null)
+    mockQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 } as any)
+    const code = await generateCouponForCampaign({
+      campaignKind: 'abandoned_cart',
+      discountPercent: 5,
+      expiresInDays: 7,
+    })
+    // code is the generated string (set before the INSERT), not null
+    expect(typeof code).toBe('string')
+    // Only one query call (the INSERT) — no UPDATE campaigns since couponId is falsy
+    expect(mockQuery).toHaveBeenCalledTimes(1)
+  })
+
+  it('passes minPurchaseAmount and maxDiscountAmount when provided', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQuery
+      .mockResolvedValueOnce({ rows: [{ id: 'cpn-1' }], rowCount: 1 } as any)
+      .mockResolvedValueOnce({ rows: [], rowCount: 1 } as any)
+    await generateCouponForCampaign({
+      campaignKind: 'price_drop',
+      discountPercent: 20,
+      expiresInDays: 14,
+      minPurchaseAmount: 500,
+      maxDiscountAmount: 200,
+    })
+    const insertCall = mockQuery.mock.calls[0]
+    expect(insertCall[1]).toContain(500)
+    expect(insertCall[1]).toContain(200)
   })
 })

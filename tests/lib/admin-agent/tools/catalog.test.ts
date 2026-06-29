@@ -239,6 +239,36 @@ describe('admin-agent/tools/catalog', () => {
         })
       ).rejects.toThrow('Product not found')
     })
+
+    // Line 449: newStock < 0 — negative stock callout
+    it('includes negative-stock error callout when delta would make stock negative', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Widget', sku: 'W-001', inventory_quantity: 3, has_variants: false })
+      const result = await getTool('propose_adjust_inventory').handler({
+        productId: 'p1',
+        delta: -10,
+        reason: 'write-off',
+      })
+      expect(result).toHaveProperty('proposed', true)
+      const blocks = (result as any).ui_blocks as any[]
+      const errBlock = blocks.find((b: any) => b.tone === 'error')
+      expect(errBlock).toBeDefined()
+      expect(errBlock.title).toContain('Negative stock')
+    })
+
+    // Line 448: p.has_variants — variants info callout
+    it('includes has-variants info callout when product has variants', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Multi', sku: 'M-001', inventory_quantity: 20, has_variants: true })
+      const result = await getTool('propose_adjust_inventory').handler({
+        productId: 'p1',
+        delta: 5,
+        reason: 'stock top-up',
+      })
+      expect(result).toHaveProperty('proposed', true)
+      const blocks = (result as any).ui_blocks as any[]
+      const infoBlock = blocks.find((b: any) => b.tone === 'info')
+      expect(infoBlock).toBeDefined()
+      expect(infoBlock.title).toContain('variants')
+    })
   })
 
   // propose_set_product_featured uses camelCase: productId, featured
@@ -279,6 +309,27 @@ describe('admin-agent/tools/catalog', () => {
       })
       expect(result).toHaveProperty('proposed', true)
     })
+
+    // Line 485: p.is_featured === target — no-op branch
+    it('returns proposed false when product is already featured and target is featured', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Widget', is_featured: true })
+      const result = await getTool('propose_set_product_featured').handler({
+        productId: 'p1',
+        featured: true,
+      })
+      expect(result).toHaveProperty('proposed', false)
+      expect((result as any).info).toContain('already featured')
+    })
+
+    it('returns proposed false when product is already not featured and target is not featured', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'p1', name: 'Widget', is_featured: false })
+      const result = await getTool('propose_set_product_featured').handler({
+        productId: 'p1',
+        featured: false,
+      })
+      expect(result).toHaveProperty('proposed', false)
+      expect((result as any).info).toContain('not featured')
+    })
   })
 
   // propose_create_brand returns { proposed, kind, payload, ... } — no ok wrapper, no 'action' key
@@ -301,6 +352,29 @@ describe('admin-agent/tools/catalog', () => {
       expect(result).toHaveProperty('proposed', true)
       const payload = (result as any).payload
       expect(payload?.slug).toMatch(/^[a-z0-9-]+$/)
+    })
+
+    // Line 557: conflict truthy — duplicate callout added
+    it('still proposes but adds a duplicate-warning callout when slug/name conflicts', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'b99', name: 'Existing Brand' }) // conflict found
+      const result = await getTool('propose_create_brand').handler({
+        name: 'Existing Brand',
+      })
+      // Source still sets proposed: true and adds a warn callout block
+      expect(result).toHaveProperty('proposed', true)
+      const blocks = (result as any).ui_blocks as any[]
+      const warnBlock = blocks.find((b: any) => b.tone === 'warn')
+      expect(warnBlock).toBeDefined()
+      expect(warnBlock.title).toContain('duplicate')
+    })
+
+    it('throws when logoUrl is not an http(s) URL', async () => {
+      await expect(
+        getTool('propose_create_brand').handler({
+          name: 'Brand',
+          logoUrl: 'ftp://bad.url/logo.png',
+        })
+      ).rejects.toThrow('logoUrl must be http(s) URL')
     })
   })
 
@@ -327,6 +401,47 @@ describe('admin-agent/tools/catalog', () => {
         parentId: 'c1',
       })
       expect(result).toHaveProperty('proposed', true)
+    })
+
+    // Line 617: conflict truthy — slug-in-use callout added
+    it('still proposes but adds slug-in-use warn callout when slug conflicts', async () => {
+      mockQueryOne.mockResolvedValueOnce(null) // no conflict on slug without parentId path
+      // Re-mock: actually the conflict check is the only queryOne for no-parent case
+      // Reset and set conflict
+      vi.resetAllMocks()
+      mockQueryOne.mockResolvedValueOnce({ id: 'c99', name: 'Existing Category' }) // conflict
+      const result = await getTool('propose_create_category').handler({
+        name: 'Power Tools',
+        slug: 'power-tools',
+      })
+      expect(result).toHaveProperty('proposed', true)
+      const blocks = (result as any).ui_blocks as any[]
+      const warnBlock = blocks.find((b: any) => b.tone === 'warn')
+      expect(warnBlock).toBeDefined()
+      expect(warnBlock.title).toContain('Slug')
+    })
+
+    it('throws when parent category not found', async () => {
+      mockQueryOne.mockResolvedValueOnce(null) // parent lookup → not found
+      await expect(
+        getTool('propose_create_category').handler({
+          name: 'Drills',
+          parentId: 'nonexistent-uuid',
+        })
+      ).rejects.toThrow('Parent category not found')
+    })
+
+    it('builds nested path label from grandparent when parent has a parent_name', async () => {
+      mockQueryOne
+        .mockResolvedValueOnce({ id: 'c2', name: 'Hand Tools', parent_name: 'Hardware' }) // parent has grandparent
+        .mockResolvedValueOnce(null) // slug conflict → none
+      const result = await getTool('propose_create_category').handler({
+        name: 'Hammers',
+        parentId: 'c2',
+      })
+      expect(result).toHaveProperty('proposed', true)
+      // pathLabel should be "Hardware / Hand Tools / Hammers"
+      expect((result as any).payload.pathLabel).toBe('Hardware / Hand Tools / Hammers')
     })
   })
 })

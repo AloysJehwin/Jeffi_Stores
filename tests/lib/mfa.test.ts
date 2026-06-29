@@ -328,3 +328,80 @@ describe('hashRecoveryCode', () => {
     expect(hashRecoveryCode(code)).toBe(hashRecoveryCode(code))
   })
 })
+
+// ---------------------------------------------------------------------------
+// verifyMfaTicket — type !== 'mfa_ticket' branch
+// ---------------------------------------------------------------------------
+
+describe('verifyMfaTicket – type check', () => {
+  it('returns null when payload type is not mfa_ticket', async () => {
+    mockMfaJwtVerify.mockResolvedValueOnce({
+      payload: { adminId: 'a1', username: 'alice', purpose: 'enroll', type: 'other_ticket' },
+    })
+    const result = await verifyMfaTicket('token', 'enroll')
+    expect(result).toBeNull()
+  })
+
+  it('returns null when payload type is missing', async () => {
+    mockMfaJwtVerify.mockResolvedValueOnce({
+      payload: { adminId: 'a1', username: 'alice', purpose: 'enroll' },
+    })
+    const result = await verifyMfaTicket('token', 'enroll')
+    expect(result).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// hashRecoveryCode — fallback to JWT_SECRET when RECOVERY_CODE_PEPPER absent
+// ---------------------------------------------------------------------------
+
+describe('hashRecoveryCode – pepper fallback', () => {
+  it('falls back to JWT_SECRET when RECOVERY_CODE_PEPPER is not set', () => {
+    const originalPepper = process.env.RECOVERY_CODE_PEPPER
+    delete process.env.RECOVERY_CODE_PEPPER
+
+    const h1 = hashRecoveryCode('ABCDE-12345')
+    expect(h1).toMatch(/^[0-9a-f]{64}$/)
+
+    // Restore
+    if (originalPepper !== undefined) {
+      process.env.RECOVERY_CODE_PEPPER = originalPepper
+    }
+  })
+
+  it('uses RECOVERY_CODE_PEPPER when set (different result from JWT_SECRET)', () => {
+    const originalPepper = process.env.RECOVERY_CODE_PEPPER
+    delete process.env.RECOVERY_CODE_PEPPER
+    const withJwt = hashRecoveryCode('ABCDE-12345')
+
+    process.env.RECOVERY_CODE_PEPPER = 'a-different-pepper-value-for-testing'
+    const withPepper = hashRecoveryCode('ABCDE-12345')
+
+    expect(withJwt).not.toBe(withPepper)
+
+    // Restore
+    if (originalPepper !== undefined) {
+      process.env.RECOVERY_CODE_PEPPER = originalPepper
+    } else {
+      delete process.env.RECOVERY_CODE_PEPPER
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// encryptSecret / getKey — non-hex key path (sha256 derivation)
+// ---------------------------------------------------------------------------
+
+describe('encryptSecret / decryptSecret – short key (sha256 path)', () => {
+  it('encrypts and decrypts correctly with a short non-hex key', () => {
+    const originalKey = process.env.MFA_ENCRYPTION_KEY
+    // A key that is NOT 64 chars → triggers sha256 derivation in getKey()
+    process.env.MFA_ENCRYPTION_KEY = 'short-key-triggers-sha256-path'
+
+    const ciphertext = encryptSecret('test-secret')
+    const plaintext = decryptSecret(ciphertext)
+    expect(plaintext).toBe('test-secret')
+
+    process.env.MFA_ENCRYPTION_KEY = originalKey
+  })
+})

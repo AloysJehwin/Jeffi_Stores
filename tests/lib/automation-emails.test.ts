@@ -79,7 +79,7 @@ const mockUser = {
   first_name: 'Alice',
   last_name: 'Smith',
   unsubscribe_token: 'token-abc',
-  baseUrl: 'https://jeffistores.com',
+  baseUrl: '',
   is_business: false,
 }
 

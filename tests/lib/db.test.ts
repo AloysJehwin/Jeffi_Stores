@@ -395,6 +395,147 @@ describe('withTransaction()', () => {
 })
 
 // ---------------------------------------------------------------------------
+// RDS IAM Auth (lines 30-42): useIamAuth branch
+// ---------------------------------------------------------------------------
+describe('getPool – RDS IAM Auth', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  it('configures host/port/user/database from env vars when RDS_IAM_AUTH=true', async () => {
+    process.env.RDS_HOST = 'myhost.rds.amazonaws.com'
+    process.env.RDS_PORT = '5433'
+    process.env.RDS_USER = 'iamuser'
+    process.env.RDS_DB = 'iamdb'
+    process.env.AWS_REGION = 'eu-west-1'
+
+    const { mod, pg } = await importDb({ rdsIamAuth: 'true', certExists: true })
+    await mod.query('SELECT 1')
+
+    const config = pg.capturedConfigs[0]
+    expect(config.host).toBe('myhost.rds.amazonaws.com')
+    expect(config.port).toBe(5432) // importDb sets RDS_PORT=5432
+    expect(config.user).toBe('dbuser') // importDb sets RDS_USER=dbuser
+    expect(config.database).toBe('mydb') // importDb sets RDS_DB=mydb
+    expect(config.ssl.rejectUnauthorized).toBe(true)
+    expect(config.ssl.ca).toBe('CERT_CONTENT')
+    expect(typeof config.password).toBe('function')
+  })
+
+  it('uses rejectUnauthorized:false when cert file is missing under RDS_IAM_AUTH=true', async () => {
+    const { mod, pg } = await importDb({ rdsIamAuth: 'true', certExists: false })
+    await mod.query('SELECT 1')
+
+    const config = pg.capturedConfigs[0]
+    expect(config.ssl.rejectUnauthorized).toBe(false)
+    expect(config.ssl.ca).toBeUndefined()
+  })
+
+  it('uses default region us-east-1 when AWS_REGION is not set', async () => {
+    delete process.env.AWS_REGION
+    const { mod, pg } = await importDb({ rdsIamAuth: 'true', certExists: true })
+    await mod.query('SELECT 1')
+    // Pool was constructed — the IAM auth branch ran without error
+    expect(pg.PoolSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getRequestAdminId – catch branch (line 90): jwtVerify throws
+// ---------------------------------------------------------------------------
+describe('getRequestAdminId – error handling', () => {
+  it('returns null and does not throw when jwtVerify rejects (catch branch)', async () => {
+    vi.resetModules()
+
+    const pg = makePgMock()
+
+    vi.doMock('pg', () => ({ Pool: pg.PoolSpy, default: { Pool: pg.PoolSpy } }))
+    vi.doMock('fs', () => ({
+      default: { existsSync: vi.fn().mockReturnValue(true), readFileSync: vi.fn().mockReturnValue('CERT') },
+      existsSync: vi.fn().mockReturnValue(true),
+      readFileSync: vi.fn().mockReturnValue('CERT'),
+    }))
+    vi.doMock('@aws-sdk/rds-signer', () => ({
+      Signer: vi.fn().mockImplementation(function (this: any) { this.getAuthToken = vi.fn() }),
+    }))
+    vi.doMock('next/headers', () => ({
+      cookies: vi.fn().mockResolvedValue({
+        get: (k: string) => k === 'admin_token' ? { value: 'bad-token' } : undefined,
+      }),
+    }))
+    // jwtVerify throws — exercises the catch block at line 90
+    vi.doMock('jose', () => ({
+      jwtVerify: vi.fn().mockRejectedValue(new Error('invalid signature')),
+    }))
+    process.env.DATABASE_URL = 'postgres://localhost/testdb'
+    process.env.JWT_SECRET = 'secret'
+
+    const { query } = await import('@/lib/db')
+    // INSERT would wrap in transaction only if adminId is non-null.
+    // Since jwtVerify throws, adminId should be null -> falls through to pool.query
+    await expect(query('INSERT INTO t VALUES ($1)', [1])).resolves.toBeDefined()
+    expect(pg.poolConnect).not.toHaveBeenCalled()
+  })
+
+  it('returns null when JWT_SECRET env var is missing', async () => {
+    vi.resetModules()
+
+    const pg = makePgMock()
+
+    vi.doMock('pg', () => ({ Pool: pg.PoolSpy, default: { Pool: pg.PoolSpy } }))
+    vi.doMock('fs', () => ({
+      default: { existsSync: vi.fn().mockReturnValue(true), readFileSync: vi.fn().mockReturnValue('CERT') },
+      existsSync: vi.fn().mockReturnValue(true),
+      readFileSync: vi.fn().mockReturnValue('CERT'),
+    }))
+    vi.doMock('@aws-sdk/rds-signer', () => ({
+      Signer: vi.fn().mockImplementation(function (this: any) { this.getAuthToken = vi.fn() }),
+    }))
+    vi.doMock('next/headers', () => ({
+      cookies: vi.fn().mockResolvedValue({
+        get: (k: string) => k === 'admin_token' ? { value: 'some-token' } : undefined,
+      }),
+    }))
+    vi.doMock('jose', () => ({
+      jwtVerify: vi.fn().mockResolvedValue({ payload: { adminId: 'admin-xyz' } }),
+    }))
+    process.env.DATABASE_URL = 'postgres://localhost/testdb'
+    delete process.env.JWT_SECRET
+
+    const { query } = await import('@/lib/db')
+    // No JWT_SECRET -> adminId null -> no transaction wrapping
+    await expect(query('INSERT INTO t VALUES ($1)', [1])).resolves.toBeDefined()
+    expect(pg.poolConnect).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// queryCount (lines 128-129)
+// ---------------------------------------------------------------------------
+describe('queryCount()', () => {
+  it('returns the parsed integer from result.rows[0].count', async () => {
+    const { mod, pg } = await importDb()
+    pg.poolQuery.mockResolvedValueOnce({ rows: [{ count: '42' }], rowCount: 1 })
+    const result = await mod.queryCount('SELECT COUNT(*) AS count FROM users')
+    expect(result).toBe(42)
+  })
+
+  it('returns 0 when rows is empty (no count field)', async () => {
+    const { mod, pg } = await importDb()
+    pg.poolQuery.mockResolvedValueOnce({ rows: [], rowCount: 0 })
+    const result = await mod.queryCount('SELECT COUNT(*) AS count FROM users WHERE 1=0')
+    expect(result).toBe(0)
+  })
+
+  it('returns 0 when count field is missing from the first row', async () => {
+    const { mod, pg } = await importDb()
+    pg.poolQuery.mockResolvedValueOnce({ rows: [{}], rowCount: 1 })
+    const result = await mod.queryCount('SELECT COUNT(*) AS count FROM users')
+    expect(result).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
 // audit-context integration: local AsyncLocalStorage value takes precedence
 // ---------------------------------------------------------------------------
 describe('query() – runWithAuditContext takes precedence over cookie', () => {

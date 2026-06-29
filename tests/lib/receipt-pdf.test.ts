@@ -143,5 +143,51 @@ describe('receipt-pdf', () => {
       const result = await generateReceiptPDF(order, mockItems, mockBusiness)
       expect(result).toBeInstanceOf(Buffer)
     })
+
+    // Covers toWords Lakh branch (lines 50): total_amount in range 100000–9999999
+    it('handles total_amount in Lakh range for toWords coverage', async () => {
+      const order: ReceiptOrder = {
+        ...mockOrder,
+        total_amount: 150000,
+        taxable_amount: 127118.64,
+        cgst_amount: 11440.68,
+        sgst_amount: 11440.68,
+      }
+      const result = await generateReceiptPDF(order, mockItems, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    // Covers toWords Crore branch (line 51): total_amount >= 10000000
+    it('handles total_amount in Crore range for toWords coverage', async () => {
+      const order: ReceiptOrder = {
+        ...mockOrder,
+        total_amount: 12500000,
+        taxable_amount: 10593220.34,
+        cgst_amount: 953389.83,
+        sgst_amount: 953389.83,
+      }
+      const result = await generateReceiptPDF(order, mockItems, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    // Covers hasDiscount branch (lines 212-214): item with discount_amount > 0
+    it('renders discount line for items with a discount', async () => {
+      const discountedItems: ReceiptItem[] = [
+        {
+          product_name: 'Discounted Widget',
+          quantity: 2,
+          unit_price: 600,
+          discount_amount: 100,
+          total_price: 1100,
+          taxable_amount: 932.2,
+          cgst_amount: 83.9,
+          sgst_amount: 83.9,
+          igst_amount: 0,
+          gst_rate: 18,
+        },
+      ]
+      const result = await generateReceiptPDF(mockOrder, discountedItems, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
   })
 })
