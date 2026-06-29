@@ -1,7 +1,7 @@
 import { Pool } from 'pg'
 import { query, queryMany, queryOne } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL, EFFECTIVE_STOCK_SQL } from '@/lib/queries'
-import { embed } from '@/lib/rag'
+import { embed, findSimilarCustomers, queryManyReplica } from '@/lib/rag'
 import { SALES_TOOLS } from './tools/sales'
 import { MARKETING_TOOLS } from './tools/marketing'
 import { CATALOG_TOOLS } from './tools/catalog'
@@ -203,7 +203,7 @@ export const TOOLS: ToolDef[] = [
   },
   {
     name: 'search_customers',
-    description: 'Semantic search over customers by name / email / phone fragments.',
+    description: 'Search customers by name / email / phone fragments. Uses semantic search on the replica when available, falls back to SQL ILIKE.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -215,23 +215,63 @@ export const TOOLS: ToolDef[] = [
     mutating: false,
     handler: async ({ query: q, limit }) => {
       const lim = clamp(typeof limit === 'number' ? limit : 10, 1, 50)
-      const v = await embed(String(q))
-      const rows = await queryMany<{ source_id: string }>(
-        `SELECT source_id, 1 - (embedding <=> $1::vector) AS sim
-         FROM embeddings WHERE source_table = 'users'
-         ORDER BY embedding <=> $1::vector LIMIT $2`,
-        [vec(v), lim]
-      ).catch(() => [])
-      const ids = rows.map(x => x.source_id)
-      if (ids.length === 0) return { customers: [] }
-      const out = await queryMany(
+      const queryStr = String(q || '').trim()
+
+      // Try semantic search via replica RAG pool first
+      const similar = await findSimilarCustomers(queryStr, lim).catch(() => [])
+      const ids = similar.map(r => r.source_id)
+
+      if (ids.length > 0) {
+        const out = await queryMany(
+          `SELECT u.id::text, u.email, u.first_name, u.last_name, u.phone, u.created_at,
+                  COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::int AS paid_orders,
+                  COALESCE((SELECT SUM(o.total_amount) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::text AS lifetime_value
+           FROM users u WHERE u.id = ANY($1::uuid[])`,
+          [ids]
+        )
+        return { customers: out, source: 'semantic' }
+      }
+
+      // Fallback: SQL ILIKE on name / email / phone
+      const out = await queryManyReplica(
         `SELECT u.id::text, u.email, u.first_name, u.last_name, u.phone, u.created_at,
                 COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::int AS paid_orders,
                 COALESCE((SELECT SUM(o.total_amount) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::text AS lifetime_value
-         FROM users u WHERE u.id = ANY($1::uuid[])`,
-        [ids]
+         FROM users u
+         WHERE u.is_guest = false
+           AND (u.email ILIKE $1 OR u.first_name ILIKE $1 OR u.last_name ILIKE $1
+                OR (u.first_name || ' ' || u.last_name) ILIKE $1 OR u.phone ILIKE $1)
+         ORDER BY u.created_at DESC LIMIT $2`,
+        [`%${queryStr}%`, lim]
       )
-      return { customers: out }
+      return { customers: out, source: 'sql_fallback' }
+    },
+  },
+  {
+    name: 'get_recent_customers',
+    description: 'List customers who signed up recently, ordered by registration date descending. Use for "who joined in the last N days" or "new customers" queries.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        days: { type: 'integer', default: 7, minimum: 1, maximum: 90 },
+        limit: { type: 'integer', default: 20, minimum: 1, maximum: 100 },
+      },
+    },
+    mutating: false,
+    handler: async ({ days, limit }) => {
+      const d = clamp(typeof days === 'number' ? days : 7, 1, 90)
+      const lim = clamp(typeof limit === 'number' ? limit : 20, 1, 100)
+      const rows = await queryManyReplica(
+        `SELECT u.id::text, u.email, u.first_name, u.last_name, u.phone, u.created_at,
+                COALESCE((SELECT COUNT(*) FROM orders o WHERE o.user_id = u.id AND o.payment_status = 'paid'), 0)::int AS paid_orders
+         FROM users u
+         WHERE u.created_at >= NOW() - ($1 || ' days')::interval
+           AND u.is_guest = false
+         ORDER BY u.created_at DESC
+         LIMIT $2`,
+        [d, lim]
+      )
+      return { customers: rows, days: d, count: rows.length }
     },
   },
   {

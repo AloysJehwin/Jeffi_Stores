@@ -244,5 +244,232 @@ describe('invoice-pdf', () => {
       const result = await generateInvoicePDF(orderWithGstin, mockItems, mockBusiness, mockBuyer)
       expect(result).toBeInstanceOf(Buffer)
     })
+
+    it('generates cancelled invoice with default CANCELLED label when voidLabel omitted', async () => {
+      const result = await generateInvoicePDF(mockOrder, mockItems, mockBusiness, mockBuyer, undefined, true, undefined)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles eway_bill_no present', async () => {
+      const orderWithEwb = { ...mockOrder, eway_bill_no: 'EWB12345678901' }
+      const result = await generateInvoicePDF(orderWithEwb, mockItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles IRN present but irn_ack_no and irn_ack_dt absent', async () => {
+      const orderIrnOnly = { ...mockOrder, irn: 'abc123irn', irn_ack_no: null, irn_ack_dt: null }
+      const result = await generateInvoicePDF(orderIrnOnly, mockItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles item with buy_mode weight (isMeasured = true)', async () => {
+      const weightItems: InvoiceOrderItem[] = [
+        { ...mockItems[0], buy_mode: 'weight', buy_unit: 'kg', quantity: 1.5 },
+      ]
+      const result = await generateInvoicePDF(mockOrder, weightItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles item with buy_mode length (isMeasured = true)', async () => {
+      const lengthItems: InvoiceOrderItem[] = [
+        { ...mockItems[0], buy_mode: 'length', buy_unit: 'm', quantity: 3.25 },
+      ]
+      const result = await generateInvoicePDF(mockOrder, lengthItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('calculates MRP-based discount percentage when mrp is set', async () => {
+      const itemsWithMrp: InvoiceOrderItem[] = [
+        { ...mockItems[0], mrp: 600, quantity: 2, total_price: 1000 },
+      ]
+      const result = await generateInvoicePDF(mockOrder, itemsWithMrp, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('shows zero discount label when mrp equals selling price (no discount)', async () => {
+      const itemsNoDisc: InvoiceOrderItem[] = [
+        { ...mockItems[0], mrp: 500, quantity: 2, total_price: 1000 },
+      ]
+      const result = await generateInvoicePDF(mockOrder, itemsNoDisc, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('calculates discount from discount_amount when mrp is null', async () => {
+      const itemsDiscAmt: InvoiceOrderItem[] = [
+        { ...mockItems[0], mrp: null, discount_amount: 100, total_price: 900 },
+      ]
+      const result = await generateInvoicePDF(mockOrder, itemsDiscAmt, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles item with mrp = 0 (falls back to discount_amount path)', async () => {
+      const itemsMrpZero: InvoiceOrderItem[] = [
+        { ...mockItems[0], mrp: 0, discount_amount: 50, total_price: 950 },
+      ]
+      const result = await generateInvoicePDF(mockOrder, itemsMrpZero, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles business_discount_amount > 0', async () => {
+      const orderBizDisc = { ...mockOrder, business_discount_amount: 80 }
+      const result = await generateInvoicePDF(orderBizDisc, mockItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles round-off row when total_amount differs from tax sum', async () => {
+      // Force a roundOff >= 0.01 by making total_amount differ from taxable+tax+shipping-discount
+      const orderRound = {
+        ...mockOrder,
+        total_amount: 1180.50,
+        taxable_amount: 847.46,
+        cgst_amount: 76.27,
+        sgst_amount: 76.27,
+        igst_amount: 0,
+        shipping_amount: 0,
+        discount_amount: 0,
+        business_discount_amount: 0,
+      }
+      const result = await generateInvoicePDF(orderRound, mockItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles business with no phone but has email', async () => {
+      const bizNoPhone = { ...mockBusiness, phone: '' }
+      const result = await generateInvoicePDF(mockOrder, mockItems, bizNoPhone, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles business with no email', async () => {
+      const bizNoEmail = { ...mockBusiness, email: '' }
+      const result = await generateInvoicePDF(mockOrder, mockItems, bizNoEmail, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles business with no phone and no email', async () => {
+      const bizMinimal = { ...mockBusiness, phone: '', email: '' }
+      const result = await generateInvoicePDF(mockOrder, mockItems, bizMinimal, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles order with payment_link_url (pay QR generated)', async () => {
+      const orderWithPayQR = { ...mockOrder, payment_link_url: 'https://pay.example.com/xyz' }
+      const result = await generateInvoicePDF(orderWithPayQR, mockItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles both signed_qr_code and payment_link_url together', async () => {
+      const orderBothQR = {
+        ...mockOrder,
+        signed_qr_code: 'qr-data-string',
+        payment_link_url: 'https://pay.example.com/xyz',
+      }
+      const result = await generateInvoicePDF(orderBothQR, mockItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles IGST order with is_igst HSN table', async () => {
+      const igstOrder = {
+        ...mockOrder,
+        is_igst: true,
+        igst_amount: 152.54,
+        cgst_amount: 0,
+        sgst_amount: 0,
+      }
+      const igstItems: InvoiceOrderItem[] = [
+        { ...mockItems[0], igst_amount: 152.54, cgst_amount: 0, sgst_amount: 0 },
+      ]
+      const result = await generateInvoicePDF(igstOrder, igstItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles item with null hsn_code (falls back to N/A key in HSN map)', async () => {
+      const itemsNoHsn: InvoiceOrderItem[] = [
+        { ...mockItems[0], hsn_code: null },
+      ]
+      const result = await generateInvoicePDF(mockOrder, itemsNoHsn, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles buyer state with a known state code (renderAddressBlock stateCode branch)', async () => {
+      const buyerKarnataka: InvoiceBuyerAddress = {
+        ...mockBuyer,
+        state: 'Karnataka',
+      }
+      const result = await generateInvoicePDF(mockOrder, mockItems, mockBusiness, buyerKarnataka)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles buyer state with unknown state (empty stateCode)', async () => {
+      const buyerUnknown: InvoiceBuyerAddress = {
+        ...mockBuyer,
+        state: 'Atlantis',
+      }
+      const result = await generateInvoicePDF(mockOrder, mockItems, mockBusiness, buyerUnknown)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles buyer with no phone in address block', async () => {
+      const buyerNoPhone: InvoiceBuyerAddress = {
+        ...mockBuyer,
+        phone: '',
+      }
+      const result = await generateInvoicePDF(mockOrder, mockItems, mockBusiness, buyerNoPhone)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles zero total_amount (numberToWords zero branch)', async () => {
+      const zeroOrder = {
+        ...mockOrder,
+        total_amount: 0,
+        taxable_amount: 0,
+        cgst_amount: 0,
+        sgst_amount: 0,
+        igst_amount: 0,
+        subtotal: 0,
+        tax_amount: 0,
+        discount_amount: 0,
+        shipping_amount: 0,
+      }
+      const zeroItems: InvoiceOrderItem[] = [
+        { ...mockItems[0], total_price: 0, taxable_amount: 0, cgst_amount: 0, sgst_amount: 0, igst_amount: 0, unit_price: 0 },
+      ]
+      const result = await generateInvoicePDF(zeroOrder, zeroItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles large total_amount (crore/lakh/thousand branches in numberToWords)', async () => {
+      const largeOrder = {
+        ...mockOrder,
+        total_amount: 12345678.50,
+        taxable_amount: 10463286.44,
+        cgst_amount: 941095.78,
+        sgst_amount: 941095.78,
+        igst_amount: 0,
+        subtotal: 12345678.50,
+        tax_amount: 1882191.56,
+      }
+      const result = await generateInvoicePDF(largeOrder, mockItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles order with tracking_number and shipped_at set', async () => {
+      const orderTracked = {
+        ...mockOrder,
+        tracking_number: 'TRACK123',
+        shipped_at: '2025-06-02T12:00:00.000Z',
+        shipping_method: 'Speed Post',
+      }
+      const result = await generateInvoicePDF(orderTracked, mockItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles itemsSubtotal = 0 (bizDiscount proration guard)', async () => {
+      const zeroItems: InvoiceOrderItem[] = [
+        { ...mockItems[0], total_price: 0, taxable_amount: 0, cgst_amount: 0, sgst_amount: 0, igst_amount: 0, unit_price: 0 },
+      ]
+      const orderBizDisc = { ...mockOrder, business_discount_amount: 10, total_amount: 0, taxable_amount: 0, cgst_amount: 0, sgst_amount: 0 }
+      const result = await generateInvoicePDF(orderBizDisc, zeroItems, mockBusiness, mockBuyer)
+      expect(result).toBeInstanceOf(Buffer)
+    })
   })
 })

@@ -5,6 +5,7 @@ vi.mock('@/lib/jwt', () => ({
 }))
 vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
+  query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
 import { GET } from '@/app/api/orders/[id]/track/route'
@@ -77,7 +78,7 @@ describe('GET /api/orders/[id]/track', () => {
 
   it('returns 500 when fetch throws (network error)', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ awb_number: 'AWB123456', status: 'shipped' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ awb_number: 'AWB123456', status: 'shipped', shipment_status: null })
 
     global.fetch = vi.fn().mockRejectedValueOnce(new Error('Network error'))
 
@@ -87,7 +88,7 @@ describe('GET /api/orders/[id]/track', () => {
 
   it('returns tracking data on success', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ awb_number: 'AWB123456', status: 'shipped' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ awb_number: 'AWB123456', status: 'shipped', shipment_status: null })
 
     global.fetch = vi.fn().mockResolvedValueOnce({
       ok: true,
@@ -105,7 +106,7 @@ describe('GET /api/orders/[id]/track', () => {
 
   it('returns 502 when Delhivery API returns error', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ awb_number: 'AWB123456', status: 'shipped' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ awb_number: 'AWB123456', status: 'shipped', shipment_status: null })
 
     global.fetch = vi.fn().mockResolvedValueOnce({
       ok: false,
@@ -117,7 +118,7 @@ describe('GET /api/orders/[id]/track', () => {
 
   it('returns tracking null when no shipment data in response', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce({ awb_number: 'AWB123456', status: 'shipped' })
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ awb_number: 'AWB123456', status: 'shipped', shipment_status: null })
 
     global.fetch = vi.fn().mockResolvedValueOnce({
       ok: true,

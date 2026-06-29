@@ -5,10 +5,10 @@ import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { parseBody, zNonEmpty, zCurrency } from '@/lib/validate'
 import { round2 } from '@/lib/gst'
 
-const ApplyCouponSchema = z.object({
-  code: zNonEmpty,
-  subtotal: zCurrency,
-})
+const ApplyCouponSchema = z.union([
+  z.object({ code: zNonEmpty, subtotal: zCurrency, couponId: z.string().uuid().optional() }),
+  z.object({ couponId: z.string().uuid(), subtotal: zCurrency, code: zNonEmpty.optional() }),
+])
 
 export async function POST(request: NextRequest) {
   try {
@@ -20,7 +20,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const parsed = parseBody(ApplyCouponSchema, body)
     if (!parsed.ok) return parsed.response
-    const { code, subtotal } = parsed.data
+    const { code, couponId: lookupId, subtotal } = parsed.data
 
     const coupon = await queryOne<{
       id: string
@@ -38,15 +38,16 @@ export async function POST(request: NextRequest) {
       is_active: boolean
       generated_for_user_id: string | null
     }>(
-      `SELECT * FROM coupons WHERE code = $1`,
-      [code.toUpperCase().trim()]
+      lookupId
+        ? `SELECT * FROM coupons WHERE id = $1`
+        : `SELECT * FROM coupons WHERE code = $1`,
+      lookupId ? [lookupId] : [code!.toUpperCase().trim()]
     )
 
     if (!coupon) {
       return NextResponse.json({ error: 'Invalid coupon code' }, { status: 404 })
     }
 
-    // If coupon has eligible user restrictions, verify this user is on the list
     const eligibleCount = await queryOne<{ cnt: string }>(
       `SELECT COUNT(*) AS cnt FROM coupon_eligible_users WHERE coupon_id = $1`,
       [coupon.id]
@@ -61,7 +62,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // If coupon is targeted at a specific user via generated_for_user_id, enforce it
     if (coupon.generated_for_user_id && coupon.generated_for_user_id !== authUser.userId) {
       return NextResponse.json({ error: 'This coupon is not valid for your account' }, { status: 400 })
     }
@@ -122,8 +122,7 @@ export async function POST(request: NextRequest) {
       discountAmount,
       maxDiscountAmount: coupon.max_discount_amount ? Number(coupon.max_discount_amount) : null,
     })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

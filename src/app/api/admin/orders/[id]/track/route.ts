@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
+import { resolveShipmentStatus, isAdvancement } from '@/lib/shipment-status'
 
 const TOKEN = process.env.DELHIVERY_API_KEY
 
@@ -35,10 +36,10 @@ export async function GET(
     if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const order = await queryOne<{
-      awb_number: string | null; status: string
+      awb_number: string | null; status: string; shipment_status: string | null
       order_number: string; customer_name: string; customer_email: string
     }>(
-      `SELECT o.awb_number, o.status, o.order_number,
+      `SELECT o.awb_number, o.status, o.shipment_status, o.order_number,
               COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
               COALESCE(u.email, o.customer_email) AS customer_email
        FROM orders o
@@ -70,14 +71,26 @@ export async function GET(
     const rawStatusType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
     const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
 
+    const rawScans: any[] = shipment.Scans ?? []
+    const scans = rawScans.map((s: any) => ({
+      date: s.ScanDetail?.ScanDateTime ?? null,
+      location: s.ScanDetail?.ScannedLocation ?? null,
+      activity: s.ScanDetail?.Scan ?? null,
+      instructions: s.ScanDetail?.Instructions ?? null,
+      scanType: s.ScanDetail?.ScanType ?? null,
+    }))
+
+    // Resolve stable internal shipment status from raw type + scan history
+    const newShipmentStatus = resolveShipmentStatus(rawStatusType, scans)
+
+    // Derive the Delhivery statusType string we use for STATUS_SYNC (keep legacy behaviour)
     const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
     let statusType = rawStatusType
     if (EXCEPTION_TYPES.has(rawStatusType)) {
-      const scans: any[] = shipment.Scans ?? []
-      for (let i = 0; i < scans.length; i++) {
-        const t = (scans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
+      for (let i = 0; i < rawScans.length; i++) {
+        const t = (rawScans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
         if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
-        const activity = (scans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
+        const activity = (rawScans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
         if (activity.includes('out for delivery')) { statusType = 'OD'; break }
         if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
         if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
@@ -133,23 +146,27 @@ export async function GET(
       statusSynced = true
     }
 
+    // Always advance shipment_status if the new value is further along
+    if (isAdvancement(order.shipment_status as any, newShipmentStatus)) {
+      await query(
+        `UPDATE orders SET shipment_status = $2, updated_at = NOW() WHERE id = $1`,
+        [id, newShipmentStatus]
+      ).catch(() => {})
+    }
+
     return NextResponse.json({
       tracking: {
         awb: shipment.AWB,
         status: shipment.Status?.Status ?? null,
         statusType: shipment.Status?.StatusType ?? null,
+        shipmentStatus: newShipmentStatus,
         statusDateTime,
         instructions: shipment.Status?.Instructions ?? null,
         pickUpDate: shipment.PickUpDate ?? null,
         expectedDelivery: shipment.ExpectedDeliveryDate ?? null,
         origin: shipment.Origin ?? null,
         destination: shipment.Destination ?? null,
-        scans: (shipment.Scans ?? []).map((s: any) => ({
-          date: s.ScanDetail?.ScanDateTime ?? null,
-          location: s.ScanDetail?.ScannedLocation ?? null,
-          activity: s.ScanDetail?.Scan ?? null,
-          instructions: s.ScanDetail?.Instructions ?? null,
-        })),
+        scans,
       },
       statusSynced,
       syncedTo: statusSynced ? STATUS_SYNC[statusType]?.orderStatus : null,

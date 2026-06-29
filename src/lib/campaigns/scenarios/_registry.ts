@@ -3,6 +3,7 @@ import { abandonedCart } from './abandoned-cart'
 import { abandonedCheckout } from './abandoned-checkout'
 import { postPurchase } from './post-purchase'
 import { reviewReminder } from './review-reminder'
+import { reviewRequest } from './review-request'
 import { winback90 } from './winback-90'
 import { winback180 } from './winback-180'
 import { restock } from './restock'
@@ -13,6 +14,7 @@ export const SCENARIOS: Record<string, AnyScenarioModule> = {
   [abandonedCheckout.kind]: abandonedCheckout as unknown as AnyScenarioModule,
   [postPurchase.kind]:      postPurchase as unknown as AnyScenarioModule,
   [reviewReminder.kind]:    reviewReminder as unknown as AnyScenarioModule,
+  [reviewRequest.kind]:     reviewRequest as unknown as AnyScenarioModule,
   [winback90.kind]:         winback90 as unknown as AnyScenarioModule,
   [winback180.kind]:        winback180 as unknown as AnyScenarioModule,
   [restock.kind]:           restock as unknown as AnyScenarioModule,

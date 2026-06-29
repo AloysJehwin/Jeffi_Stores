@@ -1,6 +1,5 @@
 import { queryMany } from '@/lib/db'
 import {
-  APP_URL,
   fetchUserContext,
   resolveCoupon,
   sendCampaignEmail,
@@ -42,12 +41,14 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       SELECT DISTINCT ci.user_id
       FROM cart_items ci
       JOIN users u ON u.id = ci.user_id
+      LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE ci.saved_for_later = FALSE
         AND ci.updated_at < NOW() - ($2 || ' hours')::interval
         AND ci.updated_at > NOW() - ($3 || ' days')::interval
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
+        AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
@@ -132,7 +133,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         quantity: i.quantity,
         price: i.price,
         imageUrl: i.image_url,
-        productUrl: i.product_slug ? `${APP_URL}/products/${i.product_slug}` : null,
+        productUrl: i.product_slug ? `${user.baseUrl}/products/${i.product_slug}` : null,
       }))
     )
 
@@ -149,7 +150,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         itemsHtml,
         couponCode,
         discountPercent,
-        ctaUrl: `${APP_URL}/cart`,
+        ctaUrl: `${user.baseUrl}/cart`,
       },
     })
   },

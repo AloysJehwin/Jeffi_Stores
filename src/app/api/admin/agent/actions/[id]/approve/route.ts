@@ -163,14 +163,23 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
     }
 
     case 'create_quotation': {
-      const { customerEmail, consigneeName, notes, items } = action.payload as {
-        customerEmail: string; consigneeName: string; notes: string | null;
-        items: { productId: string; name: string; sku: string; hsnCode: string | null;
-                 gstRate: number; quantity: number; unitPrice: number; lineAmount: number }[]
+      const p = action.payload as {
+        consignee_email: string; consignee_name: string; consignee_phone: string | null;
+        consignee_addr1: string; consignee_addr2: string | null; consignee_city: string;
+        consignee_state: string; consignee_gstin: string | null; consignee_pincode: string | null;
+        buyer_same: boolean; buyer_name: string | null; buyer_addr1: string | null;
+        buyer_addr2: string | null; buyer_city: string | null; buyer_state: string | null;
+        buyer_gstin: string | null; buyer_phone: string | null; buyer_pincode: string | null;
+        buyer_email: string | null; notes: string | null; quote_date: string | null;
+        items: {
+          description: string; quantity: number; rate: number; discount_pct: number;
+          hsn_code: string | null; gst_rate: number; unit: string; buy_unit: string | null;
+          product_id: string; variant_id: string | null; sub_variant_id: string | null; amount: number;
+        }[]
       }
-      if (!Array.isArray(items) || items.length === 0) return { result: null, error: 'items missing' }
-      const subtotal = items.reduce((s, i) => s + i.lineAmount, 0)
-      const cgst = items.reduce((s, i) => s + i.lineAmount * i.gstRate / 200, 0)
+      if (!Array.isArray(p.items) || p.items.length === 0) return { result: null, error: 'items missing' }
+      const subtotal = p.items.reduce((s, i) => s + i.amount, 0)
+      const cgst = p.items.reduce((s, i) => s + i.amount * i.gst_rate / 200, 0)
       const sgst = cgst
       const total = Math.round(subtotal + cgst + sgst)
       const now = new Date()
@@ -189,21 +198,52 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
           const seq = (parseInt(seqRow.rows[0]?.max_seq || '0') || 0) + 1
           const quoteNumber = `${prefix}${seq}`
           const qt = await client.query<{ id: string; quote_number: string; view_token: string }>(
-            `INSERT INTO quotations (quote_number, quote_date, status, consignee_name, consignee_addr1, consignee_state,
-                                     consignee_email, buyer_same, notes, subtotal, cgst_amount, sgst_amount, total_amount, created_by)
-             VALUES ($1,$2,'draft',$3,'','Chhattisgarh',$4,TRUE,$5,$6,$7,$8,$9,$10::uuid)
-             RETURNING id::text, quote_number, view_token::text`,
-            [quoteNumber, now.toISOString().slice(0, 10), consigneeName || customerEmail,
-             customerEmail, notes, subtotal, cgst, sgst, total, action.admin_id]
+            `INSERT INTO quotations (
+               quote_number, quote_date, status,
+               consignee_name, consignee_addr1, consignee_addr2, consignee_city, consignee_state,
+               consignee_gstin, consignee_phone, consignee_pincode, consignee_email,
+               buyer_same, buyer_name, buyer_addr1, buyer_addr2, buyer_city, buyer_state,
+               buyer_gstin, buyer_phone, buyer_pincode, buyer_email,
+               notes, subtotal, cgst_amount, sgst_amount, total_amount, created_by
+             ) VALUES (
+               $1,$2,'draft',
+               $3,$4,$5,$6,$7,
+               $8,$9,$10,$11,
+               $12,$13,$14,$15,$16,$17,
+               $18,$19,$20,$21,
+               $22,$23,$24,$25,$26,$27::uuid
+             ) RETURNING id::text, quote_number, view_token::text`,
+            [
+              quoteNumber, p.quote_date || now.toISOString().slice(0, 10),
+              p.consignee_name || p.consignee_email,
+              p.consignee_addr1 || '', p.consignee_addr2 || null,
+              p.consignee_city || '', p.consignee_state || 'Chhattisgarh',
+              p.consignee_gstin || null, p.consignee_phone || null, p.consignee_pincode || null,
+              p.consignee_email,
+              p.buyer_same !== false,
+              p.buyer_name || null, p.buyer_addr1 || null, p.buyer_addr2 || null,
+              p.buyer_city || null, p.buyer_state || null,
+              p.buyer_gstin || null, p.buyer_phone || null, p.buyer_pincode || null, p.buyer_email || null,
+              p.notes || null, subtotal, cgst, sgst, total, action.admin_id,
+            ]
           )
           const qid = qt.rows[0].id
-          for (let idx = 0; idx < items.length; idx++) {
-            const it = items[idx]
+          for (let idx = 0; idx < p.items.length; idx++) {
+            const it = p.items[idx]
             await client.query(
-              `INSERT INTO quotation_items (quotation_id, position, description, hsn_code, gst_rate,
-                                             quantity, unit, rate, discount_pct, amount, product_id)
-               VALUES ($1,$2,$3,$4,$5,$6,'PCS',$7,0,$8,$9::uuid)`,
-              [qid, idx, it.name, it.hsnCode, it.gstRate, it.quantity, it.unitPrice, it.lineAmount, it.productId]
+              `INSERT INTO quotation_items (
+                 quotation_id, position, description, hsn_code, gst_rate,
+                 quantity, unit, buy_unit, rate, discount_pct, amount,
+                 product_id, variant_id, sub_variant_id
+               ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12::uuid,$13,$14)`,
+              [
+                qid, idx, it.description, it.hsn_code || null, it.gst_rate || 18,
+                it.quantity, it.unit || 'PCS', it.buy_unit || null,
+                it.rate, it.discount_pct || 0, it.amount,
+                it.product_id,
+                it.variant_id ? it.variant_id : null,
+                it.sub_variant_id ? it.sub_variant_id : null,
+              ]
             )
           }
           return { id: qid, quote_number: qt.rows[0].quote_number, view_token: qt.rows[0].view_token }

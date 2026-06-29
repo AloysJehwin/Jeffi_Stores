@@ -172,4 +172,55 @@ describe('generateClientCertificate', () => {
     await generateClientCertificate('admin_user', 'aid1')
     expect(mockExecFileSync).toHaveBeenCalledTimes(4)
   })
+
+  // --- Validation branch: invalid username ---
+
+  it('throws on empty string username', async () => {
+    await expect(generateClientCertificate('', 'aid1'))
+      .rejects.toThrow('Invalid username format for certificate generation')
+  })
+
+  it('throws on username longer than 64 characters', async () => {
+    const longName = 'a'.repeat(65)
+    await expect(generateClientCertificate(longName, 'aid1'))
+      .rejects.toThrow('Invalid username format for certificate generation')
+  })
+
+  it('throws on username with spaces', async () => {
+    await expect(generateClientCertificate('admin user', 'aid1'))
+      .rejects.toThrow('Invalid username format for certificate generation')
+  })
+
+  it('throws on username with forward slash', async () => {
+    await expect(generateClientCertificate('admin/user', 'aid1'))
+      .rejects.toThrow('Invalid username format for certificate generation')
+  })
+
+  it('throws on username with semicolon', async () => {
+    await expect(generateClientCertificate('admin;drop', 'aid1'))
+      .rejects.toThrow('Invalid username format for certificate generation')
+  })
+
+  it('does not throw for a 64-character username (boundary valid)', async () => {
+    const maxName = 'a'.repeat(64)
+    await expect(generateClientCertificate(maxName, 'aid1')).resolves.toBeDefined()
+  })
+
+  it('does not throw for username with all allowed special chars (. _ @ -)', async () => {
+    await expect(generateClientCertificate('user.name_admin@org-1', 'aid1')).resolves.toBeDefined()
+  })
+
+  it('does not throw for a single-character username (boundary valid)', async () => {
+    await expect(generateClientCertificate('a', 'aid1')).resolves.toBeDefined()
+  })
+
+  it('does not call execFileSync when username is invalid', async () => {
+    await expect(generateClientCertificate('bad user!', 'aid1')).rejects.toThrow()
+    expect(mockExecFileSync).not.toHaveBeenCalled()
+  })
+
+  it('does not call mkdtempSync when username is invalid', async () => {
+    await expect(generateClientCertificate('', 'aid1')).rejects.toThrow()
+    expect(mockMkdtempSync).not.toHaveBeenCalled()
+  })
 })

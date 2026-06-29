@@ -214,7 +214,10 @@ describe('POST /api/admin/delhivery/sync-statuses', () => {
     const res = await POST(makeReq())
     const body = await res.json()
     expect(body.synced).toBe(0)
-    expect(mockQuery).not.toHaveBeenCalledWith(expect.stringContaining('UPDATE orders'), expect.any(Array))
+    // shipment_status write may still fire; assert STATUS_SYNC status write did not
+    expect(mockQuery).not.toHaveBeenCalledWith(
+      expect.stringContaining("status = 'delivered'"), expect.any(Array)
+    )
   })
 
   it('skips unknown status types', async () => {

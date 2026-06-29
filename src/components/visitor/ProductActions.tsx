@@ -215,16 +215,16 @@ export default function ProductActions({
   const toInclGst = (exGst: number) => round2(exGst * gstMultiplier)
 
   const effectivePrice = hasVariants
-    ? (selectedSubVariant?.price_ex_gst != null
-        ? toInclGst(Number(selectedSubVariant.price_ex_gst))
-        : (() => {
-            const varMrp = selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : null
-            if (varMrp != null && discountPct != null) {
-              return round2(varMrp * (1 - discountPct / 100))
-            }
-            if (selectedVariant?.price_ex_gst != null) return toInclGst(Number(selectedVariant.price_ex_gst))
-            return basePrice
-          })())
+    ? (() => {
+        if (selectedSubVariant) {
+          if (selectedSubVariant.price != null) return round2(Number(selectedSubVariant.price))
+          if (selectedSubVariant.price_ex_gst != null) return toInclGst(Number(selectedSubVariant.price_ex_gst))
+        }
+        if (selectedVariant?.price != null) return round2(Number(selectedVariant.price))
+        const varMrp = selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : null
+        if (varMrp != null && discountPct != null) return round2(varMrp * (1 - discountPct / 100))
+        return basePrice
+      })()
     : (salePrice ?? basePrice)
   const effectiveMrp = hasVariants
     ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))

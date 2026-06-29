@@ -26,8 +26,23 @@ vi.mock('@/lib/automation-emails', () => ({
   fetchProductImageUrl: vi.fn(),
   resolveCoupon: vi.fn(),
   sendCampaignEmail: vi.fn(),
+  sendCampaignEmailRendered: vi.fn(),
   renderItemRows: vi.fn(),
   renderHeroProduct: vi.fn(),
+}))
+
+// ---------------------------------------------------------------------------
+// Mock @/lib/email-campaigns (used by review-request)
+// ---------------------------------------------------------------------------
+vi.mock('@/lib/email-campaigns', () => ({
+  renderCampaignEmail: vi.fn(),
+}))
+
+// ---------------------------------------------------------------------------
+// Mock @/lib/jwt (used by review-request for generateReviewToken)
+// ---------------------------------------------------------------------------
+vi.mock('@/lib/jwt', () => ({
+  generateReviewToken: vi.fn(),
 }))
 
 // ---------------------------------------------------------------------------
@@ -46,6 +61,7 @@ import { postPurchase }   from '@/lib/campaigns/scenarios/post-purchase'
 import { priceDrop }      from '@/lib/campaigns/scenarios/price-drop'
 import { restock }        from '@/lib/campaigns/scenarios/restock'
 import { reviewReminder } from '@/lib/campaigns/scenarios/review-reminder'
+import { reviewRequest }  from '@/lib/campaigns/scenarios/review-request'
 
 import { queryMany, query } from '@/lib/db'
 import {
@@ -53,19 +69,25 @@ import {
   fetchProductImageUrl,
   resolveCoupon,
   sendCampaignEmail,
+  sendCampaignEmailRendered,
   renderItemRows,
   renderHeroProduct,
 } from '@/lib/automation-emails'
+import { renderCampaignEmail } from '@/lib/email-campaigns'
+import { generateReviewToken } from '@/lib/jwt'
 
 // Typed mocks
-const mockQueryMany         = vi.mocked(queryMany)
-const mockQuery             = vi.mocked(query)
-const mockFetchUser         = vi.mocked(fetchUserContext)
-const mockFetchProductImg   = vi.mocked(fetchProductImageUrl)
-const mockResolveCoupon     = vi.mocked(resolveCoupon)
-const mockSendEmail         = vi.mocked(sendCampaignEmail)
-const mockRenderItemRows    = vi.mocked(renderItemRows)
-const mockRenderHeroProduct = vi.mocked(renderHeroProduct)
+const mockQueryMany                 = vi.mocked(queryMany)
+const mockQuery                     = vi.mocked(query)
+const mockFetchUser                 = vi.mocked(fetchUserContext)
+const mockFetchProductImg           = vi.mocked(fetchProductImageUrl)
+const mockResolveCoupon             = vi.mocked(resolveCoupon)
+const mockSendEmail                 = vi.mocked(sendCampaignEmail)
+const mockSendEmailRendered         = vi.mocked(sendCampaignEmailRendered)
+const mockRenderItemRows            = vi.mocked(renderItemRows)
+const mockRenderHeroProduct         = vi.mocked(renderHeroProduct)
+const mockRenderCampaignEmail       = vi.mocked(renderCampaignEmail)
+const mockGenerateReviewToken       = vi.mocked(generateReviewToken)
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -114,11 +136,18 @@ beforeEach(() => {
   mockFetchUser.mockResolvedValue(makeUser() as any)
   mockResolveCoupon.mockResolvedValue(makeCoupon() as any)
   mockSendEmail.mockResolvedValue({ ok: true } as any)
+  mockSendEmailRendered.mockResolvedValue({ ok: true } as any)
   mockRenderItemRows.mockReturnValue('<table>items</table>')
   mockRenderHeroProduct.mockReturnValue('<div>hero</div>')
   mockFetchProductImg.mockResolvedValue('https://cdn.example.com/img.jpg')
   mockQueryMany.mockResolvedValue([])
   mockQuery.mockResolvedValue({ rows: [], rowCount: 0 } as any)
+  mockGenerateReviewToken.mockResolvedValue('tok-abc' as any)
+  mockRenderCampaignEmail.mockReturnValue({
+    subject: 'Review your order',
+    html: '<html>review</html>',
+    ampHtml: undefined,
+  } as any)
 })
 
 // ===========================================================================
@@ -788,8 +817,243 @@ describe('reviewReminder scenario', () => {
 })
 
 // ===========================================================================
-// TYPES — resolveParams (from types.ts)
+// PRICE DROP — additional branch coverage
 // ===========================================================================
+describe('priceDrop scenario — branch coverage', () => {
+  it('send falls back firstName to "there" when first_name is null', async () => {
+    mockFetchUser.mockResolvedValueOnce({ ...makeUser(), first_name: null } as any)
+    const row = {
+      user_id: 'u1', product_id: 'p1', product_name: 'Drill', product_slug: 'drill',
+      snapshot_price: '500', current_price: '400', current_in_stock: true,
+    }
+
+    await priceDrop.send(
+      row,
+      { campaign: makeCampaign({ kind: 'price_drop' }) as any, params: priceDrop.defaultParams }
+    )
+
+    const [payload] = mockSendEmail.mock.calls[0]
+    expect(payload.vars.firstName).toBe('there')
+  })
+})
+
+// ===========================================================================
+// RESTOCK — additional branch coverage
+// ===========================================================================
+describe('restock scenario — branch coverage', () => {
+  it('send falls back firstName to "there" when first_name is null', async () => {
+    mockFetchUser.mockResolvedValueOnce({ ...makeUser(), first_name: null } as any)
+    const row = {
+      user_id: 'u1', product_id: 'p1', product_name: 'Bolt', product_slug: 'bolt',
+      current_price: '50', current_in_stock: true,
+    }
+
+    await restock.send(
+      row,
+      { campaign: makeCampaign({ kind: 'restock' }) as any, params: restock.defaultParams }
+    )
+
+    const [payload] = mockSendEmail.mock.calls[0]
+    expect(payload.vars.firstName).toBe('there')
+  })
+})
+
+// ===========================================================================
+// REVIEW REQUEST
+// ===========================================================================
+describe('reviewRequest scenario', () => {
+  it('has required static fields', () => {
+    expect(reviewRequest.kind).toBe('review_request')
+    expect(typeof reviewRequest.name).toBe('string')
+    expect(typeof reviewRequest.description).toBe('string')
+    expect(typeof reviewRequest.trigger).toBe('string')
+  })
+
+  it('has all required defaultParams', () => {
+    const p = reviewRequest.defaultParams
+    expect(typeof p.lookbackDays).toBe('number')
+    expect(typeof p.maxRecipientsPerSweep).toBe('number')
+  })
+
+  it('paramSchema covers all defaultParam keys', () => {
+    const defKeys   = Object.keys(reviewRequest.defaultParams).sort()
+    const schemKeys = Object.keys(reviewRequest.paramSchema).sort()
+    expect(schemKeys).toEqual(defKeys)
+  })
+
+  it('exposes findEligible and send', () => {
+    expect(typeof reviewRequest.findEligible).toBe('function')
+    expect(typeof reviewRequest.send).toBe('function')
+  })
+
+  it('findEligible passes campaign.kind, delay_hours, lookbackDays and maxRecipientsPerSweep to queryMany', async () => {
+    mockQueryMany.mockResolvedValueOnce([])
+    const campaign = makeCampaign({ kind: 'review_request', delay_hours: 24 })
+
+    await reviewRequest.findEligible({
+      campaign: campaign as any,
+      params: reviewRequest.defaultParams,
+    })
+
+    const [sql, args] = mockQueryMany.mock.calls[0]
+    expect(typeof sql).toBe('string')
+    expect(args).toContain('review_request')
+    expect(args).toContain(24)
+    expect(args).toContain(reviewRequest.defaultParams.lookbackDays)
+    expect(args).toContain(reviewRequest.defaultParams.maxRecipientsPerSweep)
+  })
+
+  it('findEligible returns rows from queryMany', async () => {
+    const rows = [{ id: 'ord-1', user_id: 'u1', order_number: 'RQ001' }]
+    mockQueryMany.mockReset()
+    mockQueryMany.mockResolvedValue(rows as any)
+
+    const result = await reviewRequest.findEligible({
+      campaign: makeCampaign({ kind: 'review_request' }) as any,
+      params: reviewRequest.defaultParams,
+    })
+
+    expect(result).toEqual(rows)
+  })
+
+  it('send returns ok: false when user not found', async () => {
+    mockFetchUser.mockResolvedValueOnce(null)
+    mockQueryMany.mockResolvedValueOnce([])
+
+    const result = await reviewRequest.send(
+      { id: 'ord-1', user_id: 'u1', order_number: 'RQ001' },
+      { campaign: makeCampaign({ kind: 'review_request' }) as any, params: reviewRequest.defaultParams }
+    )
+
+    expect(result.ok).toBe(false)
+    expect(result.reason).toBe('no_user')
+  })
+
+  it('send calls renderCampaignEmail and sendCampaignEmailRendered with correct args', async () => {
+    const items = [
+      { name: 'Widget', product_id: 'p1', image_url: 'img.jpg', slug: 'widget' },
+    ]
+    mockQueryMany.mockResolvedValueOnce(items as any)
+    const user = { ...makeUser(), baseUrl: 'https://jeffistores.com' }
+    mockFetchUser.mockResolvedValueOnce(user as any)
+
+    await reviewRequest.send(
+      { id: 'ord-abc', user_id: 'usr-123', order_number: 'RQ-001' },
+      { campaign: makeCampaign({ kind: 'review_request' }) as any, params: reviewRequest.defaultParams }
+    )
+
+    expect(mockRenderCampaignEmail).toHaveBeenCalledTimes(1)
+    const [template, vars] = mockRenderCampaignEmail.mock.calls[0]
+    expect(template).toBe('review_request')
+    expect(vars.firstName).toBe('Alice')
+    expect(vars.orderNumber).toBe('RQ-001')
+    expect(typeof vars.itemsJson).toBe('string')
+
+    expect(mockSendEmailRendered).toHaveBeenCalledTimes(1)
+    const [payload] = mockSendEmailRendered.mock.calls[0]
+    expect(payload.referenceId).toBe('ord-abc')
+    expect(payload.subject).toBe('Review your order')
+    expect(payload.html).toBe('<html>review</html>')
+  })
+
+  it('send falls back firstName to "there" when first_name is null', async () => {
+    const items = [{ name: 'Widget', product_id: 'p1', image_url: null, slug: 'widget' }]
+    mockQueryMany.mockResolvedValueOnce(items as any)
+    mockFetchUser.mockResolvedValueOnce({ ...makeUser(), first_name: null, baseUrl: 'https://jeffistores.com' } as any)
+
+    await reviewRequest.send(
+      { id: 'ord-1', user_id: 'usr-123', order_number: 'RQ-1' },
+      { campaign: makeCampaign({ kind: 'review_request' }) as any, params: reviewRequest.defaultParams }
+    )
+
+    const [, vars] = mockRenderCampaignEmail.mock.calls[0]
+    expect(vars.firstName).toBe('there')
+  })
+
+  it('send generates star links (ratings 1–5) for each item', async () => {
+    const items = [{ name: 'Widget', product_id: 'p1', image_url: null, slug: 'widget' }]
+    mockQueryMany.mockResolvedValueOnce(items as any)
+    mockFetchUser.mockResolvedValueOnce({ ...makeUser(), baseUrl: 'https://jeffistores.com' } as any)
+    mockGenerateReviewToken.mockResolvedValueOnce('tok-xyz' as any)
+
+    await reviewRequest.send(
+      { id: 'ord-1', user_id: 'usr-123', order_number: 'RQ-1' },
+      { campaign: makeCampaign({ kind: 'review_request' }) as any, params: reviewRequest.defaultParams }
+    )
+
+    const [, vars] = mockRenderCampaignEmail.mock.calls[0]
+    const parsed = JSON.parse(vars.itemsJson)
+    expect(parsed).toHaveLength(1)
+    expect(parsed[0].starLinks).toHaveLength(5)
+    for (let rating = 1; rating <= 5; rating++) {
+      expect(parsed[0].starLinks[rating - 1]).toContain(`rating=${rating}`)
+      expect(parsed[0].starLinks[rating - 1]).toContain('tok-xyz')
+    }
+  })
+
+  it('send sets productUrl from slug when slug is present', async () => {
+    const items = [{ name: 'Widget', product_id: 'p1', image_url: null, slug: 'widget' }]
+    mockQueryMany.mockResolvedValueOnce(items as any)
+    mockFetchUser.mockResolvedValueOnce({ ...makeUser(), baseUrl: 'https://jeffistores.com' } as any)
+
+    await reviewRequest.send(
+      { id: 'ord-1', user_id: 'usr-123', order_number: 'RQ-1' },
+      { campaign: makeCampaign({ kind: 'review_request' }) as any, params: reviewRequest.defaultParams }
+    )
+
+    const [, vars] = mockRenderCampaignEmail.mock.calls[0]
+    const parsed = JSON.parse(vars.itemsJson)
+    expect(parsed[0].productUrl).toContain('/products/widget')
+  })
+
+  it('send sets productUrl to null when slug is null', async () => {
+    const items = [{ name: 'Widget', product_id: 'p1', image_url: null, slug: null }]
+    mockQueryMany.mockReset()
+    mockQueryMany.mockResolvedValueOnce(items as any)
+    mockFetchUser.mockResolvedValueOnce({ ...makeUser(), baseUrl: 'https://jeffistores.com' } as any)
+
+    await reviewRequest.send(
+      { id: 'ord-1', user_id: 'usr-123', order_number: 'RQ-1' },
+      { campaign: makeCampaign({ kind: 'review_request' }) as any, params: reviewRequest.defaultParams }
+    )
+
+    const [, vars] = mockRenderCampaignEmail.mock.calls[0]
+    const parsed = JSON.parse(vars.itemsJson)
+    expect(parsed[0].productUrl).toBeNull()
+  })
+
+  it('send passes couponCode and discountPercent as strings to renderCampaignEmail', async () => {
+    const items = [{ name: 'Widget', product_id: 'p1', image_url: null, slug: 'widget' }]
+    mockQueryMany.mockResolvedValueOnce(items as any)
+    mockFetchUser.mockResolvedValueOnce({ ...makeUser(), baseUrl: 'https://jeffistores.com' } as any)
+    mockResolveCoupon.mockResolvedValueOnce({ couponCode: 'SAVE20', discountPercent: 20 } as any)
+
+    await reviewRequest.send(
+      { id: 'ord-1', user_id: 'usr-123', order_number: 'RQ-1' },
+      { campaign: makeCampaign({ kind: 'review_request' }) as any, params: reviewRequest.defaultParams }
+    )
+
+    const [, vars] = mockRenderCampaignEmail.mock.calls[0]
+    expect(vars.couponCode).toBe('SAVE20')
+    expect(vars.discountPercent).toBe('20')
+  })
+
+  it('send passes empty strings for coupon vars when coupon is null', async () => {
+    const items = [{ name: 'Widget', product_id: 'p1', image_url: null, slug: 'widget' }]
+    mockQueryMany.mockResolvedValueOnce(items as any)
+    mockFetchUser.mockResolvedValueOnce({ ...makeUser(), baseUrl: 'https://jeffistores.com' } as any)
+    mockResolveCoupon.mockResolvedValueOnce({ couponCode: null, discountPercent: null } as any)
+
+    await reviewRequest.send(
+      { id: 'ord-1', user_id: 'usr-123', order_number: 'RQ-1' },
+      { campaign: makeCampaign({ kind: 'review_request' }) as any, params: reviewRequest.defaultParams }
+    )
+
+    const [, vars] = mockRenderCampaignEmail.mock.calls[0]
+    expect(vars.couponCode).toBe('')
+    expect(vars.discountPercent).toBe('')
+  })
+})
 describe('resolveParams', () => {
   // Dynamic import to avoid top-level import issues with module augmentation
   it('merges override values onto defaults', async () => {
@@ -837,6 +1101,7 @@ describe('all scenarios — structural contract', () => {
     { name: 'priceDrop',      mod: priceDrop },
     { name: 'restock',        mod: restock },
     { name: 'reviewReminder', mod: reviewReminder },
+    { name: 'reviewRequest',  mod: reviewRequest },
   ]
 
   for (const { name, mod } of scenarios) {

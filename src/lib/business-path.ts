@@ -16,3 +16,19 @@ export function bp(path: string, host?: string): string {
   }
   return path
 }
+
+/**
+ * Returns the absolute base URL for the business portal, for use in emails
+ * and server-side contexts where there is no request host available.
+ *
+ * Prod:  https://business.jeffistores.in  (paths are /products, /orders etc.)
+ * Local: http://localhost:3000/business   (paths are /business/products etc.)
+ *
+ * Usage: `${businessBaseUrl()}/products/some-slug`
+ */
+export function businessBaseUrl(): string {
+  const explicit = process.env.BUSINESS_APP_URL
+  if (explicit) return explicit.replace(/\/$/, '')
+  const isProd = process.env.NODE_ENV === 'production'
+  return isProd ? 'https://business.jeffistores.in' : 'http://localhost:3000/business'
+}

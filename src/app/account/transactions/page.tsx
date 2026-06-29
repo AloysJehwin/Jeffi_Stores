@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/contexts/AuthContext'
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useRef, useMemo } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 
@@ -82,13 +82,8 @@ export default function TransactionsPage() {
     })
   }, [transactions, filterStatus, filterMethod])
 
-  const authWasLoading = useRef(false)
   useEffect(() => {
-    if (authLoading) authWasLoading.current = true
-  }, [authLoading])
-
-  useEffect(() => {
-    if (!authLoading && !user && authWasLoading.current) {
+    if (!authLoading && !user) {
       router.push('/login?redirect=/account/transactions')
       return
     }

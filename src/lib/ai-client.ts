@@ -8,7 +8,8 @@ export interface AiChatRequest {
   temperature?: number
   maxTokens?: number
   jsonMode?: boolean
-  modelHint?: 'sql' | 'copy' | 'agent'
+  modelHint?: 'sql' | 'copy' | 'agent' | 'fast'
+  forceProvider?: 'openai' | 'ollama'
 }
 
 export interface AiChatResponse {
@@ -37,8 +38,7 @@ async function isOllamaReachable(): Promise<boolean> {
     const res = await fetch(`${OLLAMA_BASE_URL}/api/tags`, { signal: ctrl.signal })
     clearTimeout(t)
     return res.ok
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return false
   }
 }
@@ -116,7 +116,7 @@ async function callOpenAi(req: AiChatRequest): Promise<{ content: string; model:
 
 export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
   const start = Date.now()
-  const provider = (process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'ollama'
+  const provider = (req.forceProvider ?? process.env.AI_PROVIDER ?? 'openai').toLowerCase() as 'openai' | 'ollama'
   const fallbackEnabled = process.env.OLLAMA_FALLBACK_TO_OPENAI === 'true'
 
   if (provider === 'ollama') {

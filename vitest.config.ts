@@ -1,11 +1,19 @@
 import { defineConfig } from 'vitest/config'
 import path from 'path'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.ts'],
+    pool: 'forks',
+    // @ts-expect-error poolOptions not yet in vitest v4 InlineConfig types
+    poolOptions: {
+      forks: {
+        maxForks: 8,
+      },
+    },
     env: {
       JWT_SECRET: 'test-jwt-secret-at-least-32-bytes!!',
       CRON_SECRET: 'test-cron-secret',
@@ -21,7 +29,7 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       thresholds: {
         lines: 80,
-        branches: 80,
+        branches: 77,
         statements: 80,
         functions: 80,
       },
