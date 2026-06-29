@@ -1,4 +1,7 @@
--- Module: 10_invoices
+-- Generated from live RDS jeffi_stores on 2026-06-30
+-- Schema-only dump, no owner, no acl
+
+
 --
 -- Name: cash_sale_items; Type: TABLE; Schema: public; Owner: -
 --
@@ -22,8 +25,12 @@ CREATE TABLE public.cash_sale_items (
     cgst_amount numeric DEFAULT 0 NOT NULL,
     sgst_amount numeric DEFAULT 0 NOT NULL,
     igst_amount numeric DEFAULT 0 NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    sub_variant_id uuid,
+    buy_unit character varying(20),
+    buy_mode character varying(10) DEFAULT 'unit'::character varying
 );
+
 
 
 --
@@ -52,8 +59,10 @@ CREATE TABLE public.cash_sales (
     notes text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    search_vector tsvector
+    search_vector tsvector,
+    status character varying DEFAULT 'active'::character varying NOT NULL
 );
+
 
 
 --
@@ -63,11 +72,14 @@ CREATE TABLE public.cash_sales (
 CREATE TABLE public.invoices (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     order_id uuid,
-    invoice_number character varying(50) NOT NULL,
-    financial_year character varying(10) NOT NULL,
-    sequence_number integer NOT NULL,
+    invoice_number character varying(50),
+    financial_year character varying(10),
+    sequence_number integer,
     pdf_url character varying(500),
-    generated_at timestamp with time zone DEFAULT now()
+    generated_at timestamp with time zone DEFAULT now(),
+    sale_id uuid,
+    status character varying(10) DEFAULT 'finalized'::character varying NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT invoices_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'finalized'::character varying])::text[])))
 );
-
 

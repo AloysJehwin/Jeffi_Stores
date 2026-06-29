@@ -1,4 +1,7 @@
--- Module: 12_support
+-- Generated from live RDS jeffi_stores on 2026-06-30
+-- Schema-only dump, no owner, no acl
+
+
 --
 -- Name: support_messages; Type: TABLE; Schema: public; Owner: -
 --
@@ -10,6 +13,7 @@ CREATE TABLE public.support_messages (
     message text NOT NULL,
     created_at timestamp with time zone DEFAULT now()
 );
+
 
 
 --
@@ -24,18 +28,4 @@ CREATE TABLE public.support_sessions (
     created_at timestamp with time zone DEFAULT now(),
     closed_at timestamp with time zone
 );
-
-
---
--- Name: websocket_connections; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.websocket_connections (
-    connection_id character varying(200) NOT NULL,
-    user_id uuid,
-    session_id uuid,
-    role character varying(10) NOT NULL,
-    connected_at timestamp with time zone DEFAULT now()
-);
-
 

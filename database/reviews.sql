@@ -1,4 +1,7 @@
--- Module: 09_reviews
+-- Generated from live RDS jeffi_stores on 2026-06-30
+-- Schema-only dump, no owner, no acl
+
+
 --
 -- Name: product_reviews; Type: TABLE; Schema: public; Owner: -
 --
@@ -20,6 +23,23 @@ CREATE TABLE public.product_reviews (
 );
 
 
+
+--
+-- Name: product_views; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_views (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    product_id uuid,
+    user_id uuid,
+    session_id character varying(255),
+    ip_address inet,
+    user_agent text,
+    created_at timestamp with time zone DEFAULT now()
+);
+
+
+
 --
 -- Name: review_form_submissions; Type: TABLE; Schema: public; Owner: -
 --
@@ -35,6 +55,7 @@ CREATE TABLE public.review_form_submissions (
     email character varying(255),
     extra_fields jsonb DEFAULT '{}'::jsonb
 );
+
 
 
 --
@@ -55,4 +76,19 @@ CREATE TABLE public.review_forms (
     template_type text DEFAULT 'google_review'::text NOT NULL
 );
 
+
+
+--
+-- Name: wishlist_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.wishlist_items (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid,
+    product_id uuid,
+    created_at timestamp with time zone DEFAULT now(),
+    snapshot_price numeric(12,2),
+    snapshot_in_stock boolean,
+    snapshot_taken_at timestamp with time zone
+);
 
