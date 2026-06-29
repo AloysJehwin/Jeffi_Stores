@@ -60,13 +60,13 @@ describe('businessBaseUrl', () => {
 
   it('returns prod URL when NODE_ENV is production and BUSINESS_APP_URL is not set', () => {
     delete process.env.BUSINESS_APP_URL
-    process.env.NODE_ENV = 'production'
+    ;(process.env as Record<string, string>).NODE_ENV = 'production'
     expect(businessBaseUrl()).toBe('https://business.jeffistores.in')
   })
 
   it('returns localhost URL when NODE_ENV is not production and BUSINESS_APP_URL is not set', () => {
     delete process.env.BUSINESS_APP_URL
-    process.env.NODE_ENV = 'test'
+    ;(process.env as Record<string, string>).NODE_ENV = 'test'
     expect(businessBaseUrl()).toBe('http://localhost:3000/business')
   })
 })

@@ -1,12 +1,14 @@
 import { defineConfig } from 'vitest/config'
 import path from 'path'
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export default defineConfig({
   test: {
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.ts'],
     pool: 'forks',
+    // @ts-expect-error poolOptions not yet in vitest v4 InlineConfig types
     poolOptions: {
       forks: {
         maxForks: 8,
