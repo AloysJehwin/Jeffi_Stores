@@ -237,6 +237,10 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                           const productLabel = matchItem
                             ? `${matchItem.product_name}${matchItem.variant_name ? ' / ' + matchItem.variant_name : ''}`
                             : `Item #${idx + 1}`
+                          const taxRate = Number(gi.tax_rate) || 0
+                          const costPerPu = gi.unit_cost
+                            ? Number(gi.unit_cost) * factor * (1 + taxRate / 100)
+                            : null
                           return (
                             <div key={idx} className="flex items-center justify-between px-4 py-2">
                               <span className="text-gray-600">{productLabel}</span>
@@ -245,7 +249,7 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                                   {fmt(recvPu, recvPu % 1 === 0 ? 0 : 3)}
                                   <span className="ml-1 text-xs text-gray-400">{puLabel}</span>
                                 </span>
-                                {gi.unit_cost && <span className="text-xs text-gray-400">@ ₹{fmt(gi.unit_cost)}/{puLabel}</span>}
+                                {costPerPu != null && <span className="text-xs text-gray-400">@ ₹{fmt(costPerPu)}/{puLabel}</span>}
                               </div>
                             </div>
                           )

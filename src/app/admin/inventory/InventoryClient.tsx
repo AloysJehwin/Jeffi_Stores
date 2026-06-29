@@ -609,6 +609,10 @@ function POTab({ initialPO }: { initialPO?: string }) {
                         const productLabel = matchItem
                           ? `${matchItem.product_name}${matchItem.variant_name ? ' / ' + matchItem.variant_name : ''}`
                           : `Item #${idx + 1}`
+                        const taxRate = parseFloat(gi.tax_rate || '0')
+                        const costPerPu = gi.unit_cost
+                          ? parseFloat(gi.unit_cost) * factor * (1 + taxRate / 100)
+                          : null
                         return (
                           <div key={idx} className="flex items-center justify-between px-4 py-2 text-sm">
                             <span className="text-foreground-secondary">{productLabel}</span>
@@ -616,7 +620,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                               <span className="text-foreground font-medium">
                                 {recvPu}<span className="text-xs text-foreground-muted ml-1">{puLabel}</span>
                               </span>
-                              {gi.unit_cost && <span className="text-foreground-secondary text-xs">@ {formatINR(parseFloat(gi.unit_cost))}/{puLabel}</span>}
+                              {costPerPu != null && <span className="text-foreground-secondary text-xs">@ {formatINR(costPerPu)}/{puLabel}</span>}
                             </div>
                           </div>
                         )
