@@ -6,6 +6,7 @@ import { query, queryOne, queryMany, queryCount } from '@/lib/db'
 import Link from 'next/link'
 import CouponForm from '../../CouponForm'
 import Pagination from '@/components/admin/Pagination'
+import CouponEligibleUsersClient from '@/components/admin/CouponEligibleUsersClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -181,7 +182,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
                 ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} received this campaign — only they have this code`
                 : hasMailerEligible
                 ? `${usersTotal} user${usersTotal === 1 ? '' : 's'} were granted this coupon via mailer — only they can redeem it`
-                : `All ${usersTotal} active users can redeem this coupon`}
+                : `${usersTotal} active app users can redeem this coupon`}
             </p>
           </div>
           {!coupon.auto_generated && !hasMailerEligible && (
@@ -194,43 +195,22 @@ export default async function EditCouponPage({ params, searchParams }: { params:
               Mailer-assigned
             </span>
           )}
-
           {coupon.generated_for_campaign && (
             <span className="px-2.5 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
               {coupon.generated_for_campaign}
             </span>
           )}
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-secondary">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">User</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Email</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Redeemed</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border-default">
-              {eligibleUsers.map(u => (
-                <tr key={u.id} className="hover:bg-surface-secondary/50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-foreground">
-                    {u.first_name || u.last_name ? `${u.first_name ?? ''} ${u.last_name ?? ''}`.trim() : '—'}
-                  </td>
-                  <td className="px-4 py-3 text-foreground-secondary">{u.email}</td>
-                  <td className="px-4 py-3">
-                    {u.times_used > 0
-                      ? <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">{u.times_used}x used</span>
-                      : <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-surface-secondary text-foreground-muted">Not used</span>
-                    }
-                  </td>
-                </tr>
-              ))}
-              {eligibleUsers.length === 0 && (
-                <tr><td colSpan={3} className="px-4 py-6 text-center text-foreground-muted text-sm">No users found</td></tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+
+        {/* Interactive remove/add table — client component */}
+        <CouponEligibleUsersClient
+          couponId={coupon.id}
+          initialUsers={eligibleUsers}
+          canRemove={!isPersonal && !isCampaign}
+          canAdd={!isPersonal && !isCampaign}
+          allUsersMode={!isPersonal && !isCampaign && !hasMailerEligible}
+        />
+
         {!isPersonal && usersTotal > USERS_PAGE_SIZE && (
           <div className="border-t border-border-default px-4 py-2">
             <Pagination
