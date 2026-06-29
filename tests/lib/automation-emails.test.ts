@@ -79,6 +79,8 @@ const mockUser = {
   first_name: 'Alice',
   last_name: 'Smith',
   unsubscribe_token: 'token-abc',
+  baseUrl: 'https://jeffistores.com',
+  is_business: false,
 }
 
 beforeEach(() => {
