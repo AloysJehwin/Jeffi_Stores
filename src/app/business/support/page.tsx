@@ -2,7 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import SupportChat from '@/components/visitor/SupportChat'
 import { cookies, headers } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
+import { verifyBusinessToken } from '@/lib/jwt'
 import { bp } from '@/lib/business-path'
 
 export const metadata = {
@@ -15,7 +15,7 @@ async function getAuthUser() {
     const cookieStore = await cookies()
     const token = cookieStore.get('business_auth_token')?.value
     if (!token) return null
-    return await verifyToken(token)
+    return await verifyBusinessToken(token)
   } catch {
     return null
   }

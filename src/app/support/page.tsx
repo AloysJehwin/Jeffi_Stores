@@ -1,6 +1,6 @@
 import SupportChat from '@/components/visitor/SupportChat'
 import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
+import { verifyUserToken } from '@/lib/jwt'
 
 export const metadata = {
   title: 'Support | Jeffi Stores',
@@ -12,7 +12,7 @@ async function getAuthUser() {
     const cookieStore = await cookies()
     const token = cookieStore.get('auth_token')?.value
     if (!token) return null
-    return await verifyToken(token)
+    return await verifyUserToken(token)
   } catch {
     return null
   }
