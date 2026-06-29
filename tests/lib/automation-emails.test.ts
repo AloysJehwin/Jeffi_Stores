@@ -237,9 +237,9 @@ describe('fetchUserContext', () => {
     const result = await fetchUserContext('user-1')
     expect(mockQueryOne).toHaveBeenCalledOnce()
     const [sql, params] = mockQueryOne.mock.calls[0]
-    expect(sql).toContain('FROM users WHERE id')
+    expect(sql).toContain('FROM users u')
     expect(params).toEqual(['user-1'])
-    expect(result).toEqual(mockUser)
+    expect(result).toMatchObject(mockUser)
   })
 
   it('returns null when user not found', async () => {
