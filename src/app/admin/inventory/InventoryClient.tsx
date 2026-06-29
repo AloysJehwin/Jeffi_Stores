@@ -3,7 +3,6 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
-import Toggle from '@/components/ui/Toggle'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import HoverCard from '@/components/ui/HoverCard'
@@ -165,10 +164,16 @@ function SuppliersTab() {
           />
         </div>
         <div className="flex flex-col">
-          <span className={labelCls}>&nbsp;</span>
-          <div className="py-2.5">
-            <Toggle checked={showAll} onChange={v => { setShowAll(v); setPage(1) }} label="Show inactive" />
-          </div>
+          <AdminSelect
+            label="Status"
+            value={showAll ? 'all' : 'active'}
+            onChange={v => { setShowAll(v === 'all'); setPage(1) }}
+            options={[
+              { value: 'active', label: 'Active only' },
+              { value: 'all', label: 'Show inactive' },
+            ]}
+            sm
+          />
         </div>
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>
@@ -275,7 +280,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
-  const [viewPO, setViewPO] = useState<{ po: any; items: POItem[] } | null>(null)
+  const [viewPO, setViewPO] = useState<{ po: any; items: POItem[]; grns: any[] } | null>(null)
   const [receiveMode, setReceiveMode] = useState<{ po: any } | null>(null)
   const [poCategories, setPoCategories] = useState<{ id: string; name: string }[]>([])
   const [saving, setSaving] = useState(false)
@@ -349,7 +354,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
   async function openPO(id: string) {
     const res = await fetch(`/api/admin/inventory/po/${id}`)
     const json = await res.json()
-    setViewPO({ po: json.purchase_order, items: json.items || [] })
+    setViewPO({ po: json.purchase_order, items: json.items || [], grns: json.grns || [] })
   }
 
   async function openReceive(id: string) {
@@ -396,7 +401,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
     if (viewPO?.po.id === id) {
       const res = await fetch(`/api/admin/inventory/po/${id}`)
       const json = await res.json()
-      setViewPO({ po: json.purchase_order, items: json.items || [] })
+      setViewPO({ po: json.purchase_order, items: json.items || [], grns: json.grns || [] })
     }
   }
 
@@ -424,11 +429,9 @@ function POTab({ initialPO }: { initialPO?: string }) {
     return (
       <div className="space-y-5">
         <div className="flex items-center gap-3">
-          <button className={btnSecondary} onClick={() => setReceiveMode(null)}>
-            <span className="flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-              Back
-            </span>
+          <button className="inline-flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors" onClick={() => setReceiveMode(null)}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+            Back
           </button>
           <div>
             <h3 className="font-semibold text-foreground">Receive Goods — {receiveMode.po.po_number}</h3>
@@ -510,11 +513,9 @@ function POTab({ initialPO }: { initialPO?: string }) {
     return (
       <div className="space-y-5">
         <div className="flex items-center gap-3">
-          <button className={btnSecondary} onClick={() => setViewPO(null)}>
-            <span className="flex items-center gap-1.5">
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
-              Back
-            </span>
+          <button className="inline-flex items-center gap-1.5 text-sm text-foreground-secondary hover:text-foreground transition-colors" onClick={() => setViewPO(null)}>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+            Back
           </button>
           <div className="flex items-center gap-2">
             <h3 className="font-semibold text-foreground">{viewPO.po.po_number}</h3>
@@ -581,6 +582,54 @@ function POTab({ initialPO }: { initialPO?: string }) {
             </table>
           </div>
         </div>
+
+        {/* Receipt history */}
+        {viewPO.grns.length > 0 && (
+          <div>
+            <h4 className="text-sm font-semibold text-foreground mb-2">Receipt History</h4>
+            <div className="space-y-3">
+              {viewPO.grns.map((grn: any) => {
+                const grnItems: any[] = grn.grn_items || []
+                return (
+                  <div key={grn.id} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+                    <div className="flex items-center justify-between px-4 py-2.5 bg-surface-secondary border-b border-border-default">
+                      <div className="flex items-center gap-3">
+                        <span className="font-mono text-xs font-semibold text-foreground">{grn.grn_number}</span>
+                        <span className="text-xs text-foreground-secondary">{formatDate(grn.received_date)}</span>
+                      </div>
+                      {grn.notes && <span className="text-xs text-foreground-muted italic truncate max-w-xs">{grn.notes}</span>}
+                    </div>
+                    <div className="divide-y divide-border-default">
+                      {grnItems.map((gi: any, idx: number) => {
+                        const matchItem = viewPO.items.find((it: POItem) => it.id === gi.po_item_id)
+                        const factor = parseFloat(gi.purchase_unit_factor || '1')
+                        const recvBase = parseFloat(gi.quantity_received || '0')
+                        const recvPu = factor > 1 ? Math.round((recvBase / factor) * 1000) / 1000 : recvBase
+                        const puLabel = matchItem?.purchase_unit || poBaseUnitLabel(matchItem || { sell_unit_label: '', sell_unit_dimension: '' })
+                        const productLabel = matchItem
+                          ? `${matchItem.product_name}${matchItem.variant_name ? ' / ' + matchItem.variant_name : ''}`
+                          : `Item #${idx + 1}`
+                        return (
+                          <div key={idx} className="flex items-center justify-between px-4 py-2 text-sm">
+                            <span className="text-foreground-secondary">{productLabel}</span>
+                            <div className="flex items-center gap-4 text-right">
+                              <span className="text-foreground font-medium">
+                                {recvPu}<span className="text-xs text-foreground-muted ml-1">{puLabel}</span>
+                                {factor > 1 && <span className="text-xs text-foreground-muted ml-1">({recvBase} base)</span>}
+                              </span>
+                              {gi.unit_cost && <span className="text-foreground-secondary text-xs">@ {formatINR(parseFloat(gi.unit_cost))}</span>}
+                            </div>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {viewPO.po.status === 'draft' && (
           <div className="flex gap-3 pt-2">
             <button className={btnPrimary} onClick={() => sendPO(viewPO.po.id)}>Mark as Sent</button>
