@@ -1,6 +1,5 @@
 import { queryMany } from '@/lib/db'
 import {
-  APP_URL,
   fetchUserContext,
   resolveCoupon,
   sendCampaignEmail,
@@ -38,10 +37,12 @@ export const postPurchase: ScenarioModule<Params, Row> = {
       SELECT o.id, o.user_id, o.order_number
       FROM orders o
       JOIN users u ON u.id = o.user_id
+      LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE o.status = 'delivered'
         AND o.delivered_at < NOW() - ($2 || ' hours')::interval
         AND o.delivered_at > NOW() - ($3 || ' days')::interval
         AND u.marketing_opt_out = FALSE AND u.is_active = TRUE
+        AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
         AND NOT EXISTS (
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
@@ -71,7 +72,7 @@ export const postPurchase: ScenarioModule<Params, Row> = {
         name: i.name,
         quantity: i.quantity,
         imageUrl: i.image_url,
-        productUrl: i.product_slug ? `${APP_URL}/products/${i.product_slug}` : null,
+        productUrl: i.product_slug ? `${user.baseUrl}/products/${i.product_slug}` : null,
       }))
     )
 
@@ -87,7 +88,7 @@ export const postPurchase: ScenarioModule<Params, Row> = {
         itemsHtml,
         couponCode,
         discountPercent,
-        ctaUrl: `${APP_URL}/account/orders/${row.id}`,
+        ctaUrl: `${user.baseUrl}/account/orders/${row.id}`,
       },
     })
   },

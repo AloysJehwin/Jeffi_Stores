@@ -83,14 +83,9 @@ export default function TransactionsPage() {
     })
   }, [transactions, filterStatus, filterMethod])
 
-  const authWasLoading = useRef(false)
   useEffect(() => {
-    if (authLoading) authWasLoading.current = true
-  }, [authLoading])
-
-  useEffect(() => {
-    if (!authLoading && !user && authWasLoading.current) {
-      router.push(bp('/business/signin?redirect=/account/transactions'))
+    if (!authLoading && !user) {
+      router.push(bp('/business/signin?callbackUrl=/business/account/transactions'))
       return
     }
     if (user) {

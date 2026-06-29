@@ -130,16 +130,11 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [isAutoCancelling, setIsAutoCancelling] = useState(false)
   const autoCancelTriggeredRef = useRef(false)
-  const authWasLoading = useRef(false)
   const { refreshCart } = useCart()
 
   useEffect(() => {
-    if (authLoading) authWasLoading.current = true
-  }, [authLoading])
-
-  useEffect(() => {
-    if (!authLoading && !user && authWasLoading.current) {
-      router.push(bp('/business/signin?redirect=/account/orders'))
+    if (!authLoading && !user) {
+      router.push(bp(`/business/signin?callbackUrl=/business/account/orders/${id}`))
       return
     }
     if (user) fetchOrder()

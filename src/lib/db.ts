@@ -86,8 +86,7 @@ async function getRequestAdminId(): Promise<string | null> {
     const secret = new TextEncoder().encode(jwtSecret)
     const { payload } = await jwtVerify(token, secret)
     return typeof payload.adminId === 'string' ? payload.adminId : null
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return null
   }
 }

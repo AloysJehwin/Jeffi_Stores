@@ -116,12 +116,12 @@ async function getProducts(searchParams: any) {
       COALESCE((SELECT COUNT(CASE WHEN pv.stock_status != 'Out of Stock' THEN 1 END)
       FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
       (SELECT MIN(price) FROM (
-        SELECT pv.price * (1 - COALESCE(p.discount_pct, 0) / 100.0) AS price
+        SELECT pv.price AS price
         FROM product_variants pv
         WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
           AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
         UNION ALL
-        SELECT sv.price * (1 - COALESCE(p.discount_pct, 0) / 100.0) AS price
+        SELECT sv.price AS price
         FROM product_sub_variants sv
         JOIN product_variants pv ON pv.id = sv.variant_id
         WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
@@ -435,7 +435,9 @@ export default async function ProductsPage({
                       ? Number(product.variant_min_price)
                       : Number(product.base_price)
                     const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
-                    const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                    const mrp = hasVariants
+                      ? (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                      : (product.mrp ? Number(product.mrp) : null)
                     const mrpDiscount = mrp && mrp > displayPrice
                       ? Math.round(((mrp - displayPrice) / mrp) * 100)
                       : 0

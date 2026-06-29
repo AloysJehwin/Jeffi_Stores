@@ -43,10 +43,128 @@ function ctaButton(text: string, url: string) {
 
 export { baseLayout, ctaButton }
 
-export function renderCampaignEmail(templateKey: string, data: TemplateData, recipientName?: string): { subject: string; html: string } {
+export function renderCampaignEmail(templateKey: string, data: TemplateData, recipientName?: string): { subject: string; html: string; ampHtml?: string } {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
 
   switch (templateKey) {
+    case 'review_request': {
+      const subject = data.subject || 'How was your order? Share your thoughts ⭐'
+      const items: Array<{ name: string; imageUrl: string | null; starLinks: string[]; productUrl?: string }> = JSON.parse(data.itemsJson || '[]')
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://jeffistores.in'
+
+      // Fallback HTML: one link per product to its detail page (non-Gmail clients)
+      const fallbackLinks = items.map(item => {
+        const url = item.productUrl || item.starLinks[4] || `${appUrl}/products`
+        const img = item.imageUrl
+          ? `<img src="${item.imageUrl}" width="48" height="48" style="object-fit:cover;border-radius:6px;display:inline-block;vertical-align:middle;margin-right:10px;" alt="">`
+          : ''
+        return `<tr><td style="padding:10px 0;border-bottom:1px solid #f0f0f0;">
+          <a href="${url}" style="color:#1a3a4a;text-decoration:none;font-size:14px;font-weight:600;display:flex;align-items:center;">
+            ${img}<span>${item.name}</span>
+          </a>
+        </td></tr>`
+      }).join('')
+
+      const couponBlock = data.couponCode ? `
+        <p style="margin:20px 0 8px;font-size:14px;color:#555;">As a thank-you, use this code on your next order:</p>
+        <p style="font-size:18px;font-weight:700;color:#e07b3f;letter-spacing:2px;">${data.couponCode}</p>
+        ${data.discountPercent ? `<p style="font-size:13px;color:#888;">${data.discountPercent}% off your next purchase</p>` : ''}` : ''
+
+      const html = baseLayout(subject, `
+        <p style="font-size:16px;color:#333;margin:0 0 12px;">Hi ${data.firstName || 'there'},</p>
+        <h2 style="font-size:22px;color:#1a3a4a;margin:0 0 8px;">How did we do?</h2>
+        <p style="color:#555;line-height:1.6;margin:0 0 20px;">We hope you love your recent purchase! Tap a product below to leave a quick review.</p>
+        <table cellpadding="0" cellspacing="0" width="100%">${fallbackLinks}</table>
+        ${couponBlock}
+      `)
+
+      // AMP HTML: inline form per product (Gmail only)
+      const ampProductForms = items.map((item, idx) => {
+        const token = item.starLinks[0]?.match(/token=([^&]+)/)?.[1] ?? ''
+        const img = item.imageUrl
+          ? `<img src="${item.imageUrl}" width="56" height="56" style="object-fit:cover;border-radius:6px;display:block;" alt="">`
+          : ''
+        return `
+        <div style="padding:16px 0;border-bottom:1px solid #f0f0f0;">
+          <table cellpadding="0" cellspacing="0" width="100%"><tr>
+            ${img ? `<td width="68" style="vertical-align:top;padding-right:12px;">${img}</td>` : ''}
+            <td style="vertical-align:top;">
+              <p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1a3a4a;">${item.name}</p>
+              <amp-form method="POST"
+                action="${appUrl}/api/reviews/amp"
+                action-xhr="${appUrl}/api/reviews/amp"
+                id="review-form-${idx}"
+                on="submit-success:review-form-${idx}.hide,review-thanks-${idx}.show">
+                <input type="hidden" name="token" value="${token}">
+                <div style="margin-bottom:10px;">
+                  <amp-selector name="rating" layout="container">
+                    <span option="1" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
+                    <span option="2" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
+                    <span option="3" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
+                    <span option="4" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
+                    <span option="5" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
+                  </amp-selector>
+                </div>
+                <textarea name="comment" placeholder="Tell us what you think…" rows="3"
+                  style="width:100%;padding:8px;border:1px solid #ddd;border-radius:6px;font-size:13px;resize:none;box-sizing:border-box;"
+                  required></textarea>
+                <div style="margin-top:8px;">
+                  <input type="submit" value="Submit Review"
+                    style="background:#e07b3f;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
+                </div>
+                <div submit-error style="color:#e53e3e;font-size:12px;margin-top:6px;">
+                  <template type="amp-mustache">Something went wrong. <a href="${item.productUrl || appUrl + '/products'}">Open in browser</a></template>
+                </div>
+              </amp-form>
+              <div id="review-thanks-${idx}" hidden style="color:#22863a;font-size:14px;font-weight:600;padding:8px 0;">✓ Thanks for your review!</div>
+            </td>
+          </tr></table>
+        </div>`
+      }).join('')
+
+      const ampCoupon = data.couponCode ? `
+        <p style="margin:20px 0 8px;font-size:14px;color:#555;">As a thank-you, use this code on your next order:</p>
+        <p style="font-size:18px;font-weight:700;color:#e07b3f;letter-spacing:2px;">${data.couponCode}</p>
+        ${data.discountPercent ? `<p style="font-size:13px;color:#888;">${data.discountPercent}% off your next purchase</p>` : ''}` : ''
+
+      const ampHtml = `<!doctype html>
+<html amp4email>
+<head>
+  <meta charset="utf-8">
+  <script async src="https://cdn.ampproject.org/v0.js"></script>
+  <script async custom-element="amp-form" src="https://cdn.ampproject.org/v0/amp-form-0.1.js"></script>
+  <script async custom-element="amp-selector" src="https://cdn.ampproject.org/v0/amp-selector-0.1.js"></script>
+  <script async custom-template="amp-mustache" src="https://cdn.ampproject.org/v0/amp-mustache-0.2.js"></script>
+  <style amp4email-boilerplate>body{visibility:hidden}</style>
+  <style amp-custom>
+    body { margin:0; padding:0; background:#f5f5f5; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; }
+    .wrap { max-width:600px; margin:0 auto; background:#fff; }
+    .header { background:#1a3a4a; padding:20px 32px; }
+    .header a { color:#fff; font-size:20px; font-weight:700; text-decoration:none; }
+    .body { padding:28px 32px; }
+    amp-selector [option] { cursor:pointer; }
+    amp-selector [selected] { color:#e07b3f !important; }
+    amp-selector [option]:focus { outline:none; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <div class="header"><a href="${appUrl}">Jeffi Store's</a></div>
+  <div class="body">
+    <p style="font-size:16px;color:#333;margin:0 0 12px;">Hi ${data.firstName || 'there'},</p>
+    <h2 style="font-size:22px;color:#1a3a4a;margin:0 0 8px;">How did we do?</h2>
+    <p style="color:#555;line-height:1.6;margin:0 0 20px;">We hope you love your recent purchase! Leave a quick review right here.</p>
+    ${ampProductForms}
+    ${ampCoupon}
+  </div>
+  <div style="padding:16px;text-align:center;font-size:12px;color:#999;">&copy; ${new Date().getFullYear()} Jeffi Store's</div>
+</div>
+</body>
+</html>`
+
+      return { subject, html, ampHtml }
+    }
+
     case 'review_form_share': {
       const subject = data.subject || `Share your experience — get ${data.couponCode ? data.couponCode : 'a reward'}!`
       const html = baseLayout(subject, `
