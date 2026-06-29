@@ -14,15 +14,18 @@ const STATUS_SYNC: Record<string, {
   clearAwb?: boolean
   onlyIfCurrent?: string[]
 }> = {
-  PU:      { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  IT:      { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
-  OT:      { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  OD:      { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
-  DL:      { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  RTO:     { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  'RTO-IT':{ orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  'RTO-OT':{ orderStatus: 'out_for_delivery',                      onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
-  'RTO-DL':{ orderStatus: 'returned',         clearAwb: true,       onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
+  PU:        { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  IT:        { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  RAD:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
+  OT:        { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  OD:        { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  DL:        { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  RTO:       { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  RTRN:      { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-IT':  { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-OT':  { orderStatus: 'out_for_delivery',                      onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-OFD': { orderStatus: 'out_for_delivery',                      onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
+  'RTO-DL':  { orderStatus: 'returned',         clearAwb: true,       onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing'] },
 }
 
 export async function GET(
@@ -50,6 +53,30 @@ export async function GET(
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.awb_number) return NextResponse.json({ tracking: null })
+
+    // Default: return DB-cached shipment_status without hitting Delhivery.
+    // Pass ?refresh=1 to force a live fetch and re-sync.
+    const refresh = request.nextUrl.searchParams.get('refresh') === '1'
+    if (!refresh) {
+      return NextResponse.json({
+        tracking: {
+          awb: order.awb_number,
+          status: null,
+          statusType: null,
+          shipmentStatus: order.shipment_status,
+          statusDateTime: null,
+          instructions: null,
+          pickUpDate: null,
+          expectedDelivery: null,
+          origin: null,
+          destination: null,
+          scans: [],
+        },
+        statusSynced: false,
+        syncedTo: null,
+        fromCache: true,
+      })
+    }
 
     if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 

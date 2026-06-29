@@ -46,6 +46,7 @@ export interface PackingSlipOrder {
   total_amount: number
   subtotal?: number
   discount_amount?: number
+  business_discount_amount?: number
   shipping_amount?: number
   taxable_amount?: number
   cgst_amount?: number
@@ -297,10 +298,12 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   const isIgst = !!order.is_igst
   const hasTax = (order.cgst_amount || 0) + (order.sgst_amount || 0) + (order.igst_amount || 0) > 0
   const hasOrderDiscount = (order.discount_amount || 0) > 0
+  const hasBizDiscount = (order.business_discount_amount || 0) > 0
   const hasShipping = (order.shipping_amount || 0) > 0
   const summaryRowH = 14
   let summaryRowCount = hasTax ? (isIgst ? 2 : 3) : 1  // taxable + igst OR cgst+sgst
   if (hasOrderDiscount) summaryRowCount++
+  if (hasBizDiscount) summaryRowCount++
   if (hasShipping) summaryRowCount++
   const SUMMARY_H = summaryRowCount * summaryRowH + TOTAL_BAR_H
 
@@ -342,8 +345,8 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     const isWL = item.buy_mode === 'weight' || item.buy_mode === 'length'
     const unitLabel = item.buy_unit ? item.buy_unit.toUpperCase() : 'NOS'
     const qtyStr = isWL
-      ? `${Number(item.quantity).toFixed(3)}\n${unitLabel}`
-      : `${Math.round(Number(item.quantity))}\n${unitLabel}`
+      ? `${Number(item.quantity).toFixed(3)} ${unitLabel}`
+      : `${Math.round(Number(item.quantity))} ${unitLabel}`
 
     // Discount %
     let discPct = 0
@@ -382,7 +385,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_DARK)
     doc.text(item.hsn_code || '', tblX + COL_IMG + COL_PROD, midY, { width: COL_HSN, align: 'center', lineBreak: false })
     doc.text(gstStr, tblX + COL_IMG + COL_PROD + COL_HSN, midY, { width: COL_GST, align: 'center', lineBreak: false })
-    doc.text(qtyStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST, midY - 4, { width: COL_QTY, align: 'center', lineBreak: true })
+    doc.text(qtyStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST, midY, { width: COL_QTY, align: 'center', lineBreak: false })
     doc.text(rs(rateInclTax), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, midY, { width: COL_RATE, align: 'right', lineBreak: false })
     doc.text(discStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, midY, { width: COL_DISC, align: 'center', lineBreak: false })
     doc.font('Helvetica-Bold').fontSize(7.5)
@@ -393,14 +396,15 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   }
 
   // ── Summary rows ──────────────────────────────────────────────────────────────
-  const summaryLabelX = tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC - 4
+  const summaryLabelX = tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY
+  const summaryLabelW = COL_RATE + COL_DISC - 4
   const summaryAmtX   = tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC
   const summaryAmtW   = COL_AMT
 
   function summaryRow(label: string, value: string, bold = false, color = TEXT_MID) {
     hRule(doc, ML + 1, iy, ML + CW - 1, '#eeeeee', 0.3)
     doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(7.5).fillColor(color)
-    doc.text(label, summaryLabelX, iy + 3, { width: COL_DISC + COL_RATE, align: 'right', lineBreak: false })
+    doc.text(label, summaryLabelX, iy + 3, { width: summaryLabelW, align: 'right', lineBreak: false })
     doc.text(value, summaryAmtX, iy + 3, { width: summaryAmtW, align: 'right', lineBreak: false })
     iy += summaryRowH
   }
@@ -416,6 +420,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     }
   }
   if (hasOrderDiscount) summaryRow('Discount', `-${rs(order.discount_amount!)}`, false, '#166534')
+  if (hasBizDiscount) summaryRow('Business Discount', `-${rs(order.business_discount_amount!)}`, false, '#166534')
   if (hasShipping) summaryRow('Delivery Charges', rs(order.shipping_amount!))
 
   // Total bar

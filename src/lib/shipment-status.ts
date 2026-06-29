@@ -39,7 +39,9 @@ type RawScan = { activity?: string | null; scanType?: string | null }
 
 /**
  * Derive our internal ShipmentStatus from Delhivery's raw statusType + scan history.
- * Walks scans newest-first (index 0 = latest) to find the most advanced real state.
+ * The top-level StatusType is always the most current state — use it directly when
+ * it has a direct mapping. Only fall back to scan history for ambiguous codes (PP/MF)
+ * where the top-level type is stale and the scans tell the real story.
  */
 export function resolveShipmentStatus(
   rawStatusType: string | null,
@@ -47,45 +49,54 @@ export function resolveShipmentStatus(
 ): ShipmentStatus {
   const type = rawStatusType?.toUpperCase() ?? ''
 
-  // Direct mapping for unambiguous Delhivery status codes
+  // Direct mapping for unambiguous Delhivery status codes — StatusType is authoritative
   const direct = directMap(type)
   if (direct) return direct
 
-  // For stale PP/MF or unrecognised codes, walk scan history to find the real state
-  let best: ShipmentStatus = 'created'
+  // Only for PP/MF (stale pre-pickup codes) walk scan history to find the real state.
+  // Walk newest-first and take the first scan that resolves to a known status.
   for (const scan of scans) {
     const scanType = scan.scanType?.toUpperCase() ?? ''
-    const activity = (scan.activity ?? '').toLowerCase()
-
     const fromScanType = directMap(scanType)
-    if (fromScanType && (RANK[fromScanType] ?? 0) > (RANK[best] ?? 0)) {
-      best = fromScanType
-    }
+    if (fromScanType) return fromScanType
 
+    const activity = (scan.activity ?? '').toLowerCase()
     const fromActivity = activityMap(activity)
-    if (fromActivity && (RANK[fromActivity] ?? 0) > (RANK[best] ?? 0)) {
-      best = fromActivity
-    }
+    if (fromActivity) return fromActivity
   }
-  return best
+  return 'created'
 }
 
 function directMap(code: string): ShipmentStatus | null {
   switch (code) {
-    case 'PP': return 'created'
-    case 'MF': return 'created'
-    case 'PU': return 'picked_up'
-    case 'IT': return 'in_transit'
-    case 'OT':
-    case 'OD': return 'out_for_delivery'
-    case 'UD':
-    case 'NDR': return 'delivery_attempted'
-    case 'DL': return 'delivered'
-    case 'RTO': return 'rto_initiated'
-    case 'RTO-IT': return 'rto_in_transit'
-    case 'RTO-OT': return 'rto_out_for_return'
-    case 'RTO-DL': return 'rto_delivered'
-    default: return null
+    // Pre-pickup / manifested
+    case 'PP':       return 'created'       // Pre-pickup / label created
+    case 'MF':       return 'created'       // Manifested
+    case 'PKD':      return 'created'       // Packed (pre-dispatch)
+    // Pickup
+    case 'PU':       return 'picked_up'     // Picked up from seller
+    // In transit
+    case 'IT':       return 'in_transit'    // In transit at facility
+    case 'UD':       return 'in_transit'    // Update — generic bag/transit scan (NOT a failed delivery)
+    case 'RAD':      return 'in_transit'    // Reached at destination facility
+    case 'HOLD':     return 'in_transit'    // Held at facility (address issue etc.) — still in transit
+    case 'MIS':      return 'in_transit'    // Misrouted — being corrected, still in network
+    case 'LOST':     return 'in_transit'    // Lost (map to in_transit; order status handled separately)
+    // Out for delivery
+    case 'OT':       return 'out_for_delivery'  // Out for delivery (hub scan)
+    case 'OD':       return 'out_for_delivery'  // Out for delivery (DE scan)
+    // Delivery attempt failed
+    case 'NDR':      return 'delivery_attempted' // Non Delivery Report
+    // Delivered
+    case 'DL':       return 'delivered'
+    // RTO lifecycle
+    case 'RTO':      return 'rto_initiated'
+    case 'RTRN':     return 'rto_initiated'      // Return initiated (alias)
+    case 'RTO-IT':   return 'rto_in_transit'
+    case 'RTO-OT':   return 'rto_out_for_return'
+    case 'RTO-OFD':  return 'rto_out_for_return' // RTO out for delivery back to hub
+    case 'RTO-DL':   return 'rto_delivered'
+    default:         return null
   }
 }
 
@@ -95,9 +106,9 @@ function activityMap(activity: string): ShipmentStatus | null {
   if (activity.includes('return in transit') || activity.includes('in return transit')) return 'rto_in_transit'
   if (activity.includes('rto initiated') || activity.includes('return initiated')) return 'rto_initiated'
   if (activity.includes('out for delivery')) return 'out_for_delivery'
-  if (activity.includes('delivery attempt') || activity.includes('undelivered')) return 'delivery_attempted'
-  if (activity.includes('delivered') && !activity.includes('out for')) return 'delivered'
-  if (activity.includes('in transit') || activity === 'transit') return 'in_transit'
+  if (activity.includes('delivery attempt') || activity.includes('undelivered') || activity.includes('not delivered') || activity.includes('customer not available') || activity.includes('door locked') || activity.includes('refused delivery')) return 'delivery_attempted'
+  if (activity.includes('delivered') && !activity.includes('out for') && !activity.includes('return')) return 'delivered'
+  if (activity.includes('added to bag') || activity.includes('in transit') || activity === 'transit' || activity.includes('reached') || activity.includes('arrived at') || activity.includes('misrouted') || activity.includes('held at')) return 'in_transit'
   if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) return 'picked_up'
   if (activity === 'manifested' || activity.includes('manifest')) return 'created'
   return null
