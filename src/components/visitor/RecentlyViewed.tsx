@@ -109,8 +109,8 @@ export default function RecentlyViewed({ excludeId, basePath = '/products' }: { 
                       Business offer
                     </div>
                   )}
-                  {discount > 0 && (
-                    <div className="absolute top-1.5 right-1.5 bg-accent-500 text-white px-1.5 py-0.5 rounded-full text-xs font-bold leading-none shadow">
+                  {discount > 0 && discountPct <= 0 && (
+                    <div className="absolute top-1.5 left-1.5 bg-accent-500 text-white px-1.5 py-0.5 rounded-full text-xs font-bold leading-none shadow">
                       {discount}% off
                     </div>
                   )}
