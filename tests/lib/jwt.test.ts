@@ -578,7 +578,7 @@ describe('authenticateServiceAccount', () => {
   it('returns service account payload when serial matches', async () => {
     const sa = { id: 'sa-1', name: 'CI Bot', allowed_scopes: ['products:read'] }
     mockDbQueryOne.mockResolvedValueOnce(sa)
-    mockDbQueryOne.mockResolvedValueOnce(undefined)
+    mockDbQueryOne.mockResolvedValueOnce(null)
     const req = makeRequest({ headers: { 'x-client-cert-serial': 'DEADBEEF01' } })
     const result = await authenticateServiceAccount(req)
     expect(result).toEqual(sa)
