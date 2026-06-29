@@ -51,7 +51,25 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       [id]
     )
 
-    return NextResponse.json({ purchase_order: po, items: items || [] })
+    const grns = await queryMany<any>(
+      `SELECT g.id, g.grn_number, g.received_date, g.notes, g.created_at,
+              json_agg(json_build_object(
+                'po_item_id', gi.po_item_id,
+                'product_id', gi.product_id,
+                'variant_id', gi.variant_id,
+                'quantity_received', gi.quantity_received,
+                'unit_cost', gi.unit_cost,
+                'purchase_unit_factor', gi.purchase_unit_factor
+              ) ORDER BY gi.id) AS grn_items
+       FROM grns g
+       JOIN grn_items gi ON gi.grn_id = g.id
+       WHERE g.po_id = $1
+       GROUP BY g.id
+       ORDER BY g.received_date DESC, g.created_at DESC`,
+      [id]
+    )
+
+    return NextResponse.json({ purchase_order: po, items: items || [], grns: grns || [] })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
