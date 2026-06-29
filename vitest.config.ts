@@ -6,6 +6,12 @@ export default defineConfig({
     globals: true,
     environment: 'happy-dom',
     setupFiles: ['./tests/setup.ts'],
+    pool: 'forks',
+    poolOptions: {
+      forks: {
+        maxForks: 8,
+      },
+    },
     env: {
       JWT_SECRET: 'test-jwt-secret-at-least-32-bytes!!',
       CRON_SECRET: 'test-cron-secret',

@@ -319,3 +319,208 @@ describe('generateBulkPackingSlipPDF', () => {
     expect(result).toBeInstanceOf(Buffer)
   })
 })
+
+// ---------------------------------------------------------------------------
+// Additional branch coverage — generatePackingSlipPDF
+// ---------------------------------------------------------------------------
+describe('generatePackingSlipPDF — additional branches', () => {
+  it('renders CGST/SGST summary rows when is_igst=false and tax amounts > 0', async () => {
+    const orderWithTax: PackingSlipOrder = {
+      ...mockOrder,
+      is_igst: false,
+      taxable_amount: 100,
+      cgst_amount: 9,
+      sgst_amount: 9,
+      igst_amount: 0,
+      items: [
+        {
+          ...mockItems[0],
+          taxable_amount: 100,
+          cgst_amount: 9,
+          sgst_amount: 9,
+          igst_amount: 0,
+        },
+      ],
+    }
+    const result = await generatePackingSlipPDF(orderWithTax, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('renders IGST summary row when is_igst=true and igst_amount > 0', async () => {
+    const orderIgst: PackingSlipOrder = {
+      ...mockOrder,
+      is_igst: true,
+      taxable_amount: 100,
+      cgst_amount: 0,
+      sgst_amount: 0,
+      igst_amount: 18,
+      items: [
+        {
+          ...mockItems[0],
+          taxable_amount: 100,
+          cgst_amount: 0,
+          sgst_amount: 0,
+          igst_amount: 18,
+        },
+      ],
+    }
+    const result = await generatePackingSlipPDF(orderIgst, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('renders shipping summary row when shipping_amount > 0', async () => {
+    const orderShipping: PackingSlipOrder = { ...mockOrder, shipping_amount: 50 }
+    const result = await generatePackingSlipPDF(orderShipping, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('uses mrp as rateInclTax when item.mrp > 0', async () => {
+    const itemWithMrp: PackingSlipItem = {
+      ...mockItems[0],
+      mrp: 25,
+      unit_price: 15,
+      total_price: 75,
+    }
+    const orderMrp: PackingSlipOrder = { ...mockOrder, items: [itemWithMrp] }
+    const result = await generatePackingSlipPDF(orderMrp, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('uses unit_price as rateInclTax when mrp is null', async () => {
+    const itemNoMrp: PackingSlipItem = {
+      ...mockItems[0],
+      mrp: null,
+      unit_price: 20,
+    }
+    const orderNoMrp: PackingSlipOrder = { ...mockOrder, items: [itemNoMrp] }
+    const result = await generatePackingSlipPDF(orderNoMrp, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('calculates disc% from discount_amount when mrp is null and discount_amount > 0', async () => {
+    const itemDiscAmt: PackingSlipItem = {
+      ...mockItems[0],
+      mrp: null,
+      unit_price: 20,
+      total_price: 60,
+      discount_amount: 15,
+    }
+    const orderDiscAmt: PackingSlipOrder = { ...mockOrder, items: [itemDiscAmt] }
+    const result = await generatePackingSlipPDF(orderDiscAmt, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('shows zero discount when mrp <= total_price (mrp-based disc% = 0)', async () => {
+    const itemMrpNoDisc: PackingSlipItem = {
+      ...mockItems[0],
+      mrp: 15,
+      quantity: 5,
+      total_price: 75,  // mrp * qty = 75 = total_price, so discPct = 0
+    }
+    const orderMrpNoDisc: PackingSlipOrder = { ...mockOrder, items: [itemMrpNoDisc] }
+    const result = await generatePackingSlipPDF(orderMrpNoDisc, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('uses taxable_amount from item when order.taxable_amount is undefined', async () => {
+    const orderNoTaxable: PackingSlipOrder = {
+      ...mockOrder,
+      taxable_amount: undefined,
+      cgst_amount: 9,
+      sgst_amount: 9,
+      igst_amount: 0,
+      is_igst: false,
+      items: [
+        {
+          ...mockItems[0],
+          taxable_amount: 100,
+          cgst_amount: 9,
+          sgst_amount: 9,
+          igst_amount: 0,
+        },
+      ],
+    }
+    const result = await generatePackingSlipPDF(orderNoTaxable, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('handles store with no name (empty store.name)', async () => {
+    const storeNoName: StoreSettings = { ...mockStore, name: '' }
+    const result = await generatePackingSlipPDF(mockOrder, storeNoName)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('handles item with image_url set (fetchImageBuffer called)', async () => {
+    // fetchImageBuffer will fail (no real HTTP) and return null — tests the try/catch path
+    const itemWithImage: PackingSlipItem = {
+      ...mockItems[0],
+      image_url: 'https://example.com/product-image.jpg',
+    }
+    const orderWithImage: PackingSlipOrder = { ...mockOrder, items: [itemWithImage] }
+    const result = await generatePackingSlipPDF(orderWithImage, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('handles gst_rate = 0 on item (gstStr empty)', async () => {
+    const itemNoGst: PackingSlipItem = {
+      ...mockItems[0],
+      gst_rate: 0,
+    }
+    const orderNoGst: PackingSlipOrder = { ...mockOrder, items: [itemNoGst] }
+    const result = await generatePackingSlipPDF(orderNoGst, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('handles gst_rate = null on item (gstStr empty)', async () => {
+    const itemNullGst: PackingSlipItem = {
+      ...mockItems[0],
+      gst_rate: null,
+    }
+    const orderNullGst: PackingSlipOrder = { ...mockOrder, items: [itemNullGst] }
+    const result = await generatePackingSlipPDF(orderNullGst, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('handles item with buy_unit set (unit label uppercased)', async () => {
+    const itemWithUnit: PackingSlipItem = {
+      ...mockItems[0],
+      buy_mode: 'unit',
+      buy_unit: 'pcs',
+    }
+    const orderUnit: PackingSlipOrder = { ...mockOrder, items: [itemWithUnit] }
+    const result = await generatePackingSlipPDF(orderUnit, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('handles item with buy_unit null (defaults to NOS)', async () => {
+    const itemNullUnit: PackingSlipItem = {
+      ...mockItems[0],
+      buy_mode: 'unit',
+      buy_unit: null,
+    }
+    const orderNullUnit: PackingSlipOrder = { ...mockOrder, items: [itemNullUnit] }
+    const result = await generatePackingSlipPDF(orderNullUnit, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('handles both discount and shipping on the same order', async () => {
+    const orderBoth: PackingSlipOrder = {
+      ...mockOrder,
+      discount_amount: 20,
+      shipping_amount: 40,
+      cgst_amount: 9,
+      sgst_amount: 9,
+      igst_amount: 0,
+      is_igst: false,
+      taxable_amount: 100,
+    }
+    const result = await generatePackingSlipPDF(orderBoth, mockStore)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+
+  it('handles store.email absent in footer filter', async () => {
+    const storeNoEmail: StoreSettings = { ...mockStore, email: '' }
+    const result = await generatePackingSlipPDF(mockOrder, storeNoEmail)
+    expect(result).toBeInstanceOf(Buffer)
+  })
+})

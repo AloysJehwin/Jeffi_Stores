@@ -161,5 +161,124 @@ describe('quotation-pdf', () => {
       const result = await generateQuotationPDF(mockData, items, mockBusiness)
       expect(result).toBeInstanceOf(Buffer)
     })
+
+    it('triggers round-off row when total needs rounding', async () => {
+      // gst_rate 18% on amount 100 => cgst = sgst = 9 each, rawTotal = 118, total = 118, roundOff = 0
+      // Use an amount that produces a non-integer rawTotal to trigger hasRound
+      const items: QuotationItem[] = [
+        { ...mockItems[0], amount: 101, gst_rate: 18 },
+      ]
+      // rawTotal = 101 + 101*18/200 + 101*18/200 = 101 + 9.09 + 9.09 = 119.18
+      // total = Math.round(119.18) = 119, roundOff = 119 - 119.18 = -0.18 => hasRound = true
+      const result = await generateQuotationPDF(mockData, items, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles buyer_same = false with buyer_addr2 null', async () => {
+      const data: QuotationData = {
+        ...mockData,
+        buyer_same: false,
+        buyer_name: 'Corp Ltd',
+        buyer_addr1: '789 Business Park',
+        buyer_addr2: null,
+        buyer_city: 'Delhi',
+        buyer_state: 'Delhi',
+        buyer_gstin: null,
+      }
+      const result = await generateQuotationPDF(data, mockItems, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles business without email', async () => {
+      const biz = { ...mockBusiness, email: '' }
+      const result = await generateQuotationPDF(mockData, mockItems, biz)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('uses state code when consignee state is known', async () => {
+      const data: QuotationData = { ...mockData, consignee_state: 'Karnataka' }
+      const result = await generateQuotationPDF(data, mockItems, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('uses empty state code when consignee state is unknown', async () => {
+      const data: QuotationData = { ...mockData, consignee_state: 'Atlantis' }
+      const result = await generateQuotationPDF(data, mockItems, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles integer quantity in fmtQty', async () => {
+      const items: QuotationItem[] = [
+        { ...mockItems[0], quantity: 10 },
+      ]
+      const result = await generateQuotationPDF(mockData, items, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles fractional quantity in fmtQty', async () => {
+      const items: QuotationItem[] = [
+        { ...mockItems[0], quantity: 2.5 },
+      ]
+      const result = await generateQuotationPDF(mockData, items, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles item with null hsn_code (falls back to N/A in HSN map)', async () => {
+      const items: QuotationItem[] = [
+        { ...mockItems[0], hsn_code: null },
+      ]
+      const result = await generateQuotationPDF(mockData, items, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles long business address that wraps across lines', async () => {
+      const biz: QuotationBusiness = {
+        ...mockBusiness,
+        address: 'Very Long Street Name Part One, Very Long Street Name Part Two, Very Long Area Name, Very Long City Name, State Name, PIN 492001',
+      }
+      const result = await generateQuotationPDF(mockData, mockItems, biz)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles zero total (numberToWords zero path)', async () => {
+      const items: QuotationItem[] = [
+        { ...mockItems[0], amount: 0, gst_rate: 0 },
+      ]
+      const result = await generateQuotationPDF(mockData, items, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles large total triggering crore/lakh/thousand in numberToWords', async () => {
+      const items: QuotationItem[] = [
+        { ...mockItems[0], amount: 15000000, gst_rate: 18 },
+      ]
+      const result = await generateQuotationPDF(mockData, items, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles many items that may trigger page break', async () => {
+      const manyItems: QuotationItem[] = Array.from({ length: 30 }, (_, i) => ({
+        description: `Product Item Number ${i + 1} with a reasonably descriptive name`,
+        hsn_code: '8481',
+        gst_rate: 18,
+        quantity: i + 1,
+        unit: 'pcs',
+        rate: 100,
+        discount_pct: 0,
+        amount: 100 * (i + 1),
+      }))
+      const result = await generateQuotationPDF(mockData, manyItems, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
+
+    it('handles consignee with address_line2 and GSTIN both set', async () => {
+      const data: QuotationData = {
+        ...mockData,
+        consignee_addr2: 'Block B, Floor 3',
+        consignee_gstin: '22AAAAA0000A1Z5',
+      }
+      const result = await generateQuotationPDF(data, mockItems, mockBusiness)
+      expect(result).toBeInstanceOf(Buffer)
+    })
   })
 })

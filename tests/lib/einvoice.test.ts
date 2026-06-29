@@ -232,3 +232,147 @@ describe('cancelIRN', () => {
     await expect(cancelIRN('irn-001', 2, 'test')).rejects.toThrow('IRN cancellation failed')
   })
 })
+
+// ---------------------------------------------------------------------------
+// Token cache — hit path
+// ---------------------------------------------------------------------------
+
+describe('token cache re-use', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    __resetTokenCacheForTests()
+  })
+
+  afterEach(() => clearEnvVars())
+
+  it('reuses a cached token and does not call auth a second time', async () => {
+    setEnvVars()
+    const mockFetch = vi.mocked(global.fetch)
+
+    // First generateIRN: auth + invoice
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ Data: { AuthToken: 'cached-token' } }),
+    } as Response)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        Data: { Irn: 'irn-1', AckNo: 'ack-1', AckDt: '01/01/2024', SignedQRCode: 'qr' },
+      }),
+    } as Response)
+
+    await generateIRN(MOCK_PAYLOAD)
+
+    // Second generateIRN: should reuse the token (no second auth call)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        Data: { Irn: 'irn-2', AckNo: 'ack-2', AckDt: '01/01/2024', SignedQRCode: 'qr2' },
+      }),
+    } as Response)
+
+    const result = await generateIRN(MOCK_PAYLOAD)
+    expect(result.irn).toBe('irn-2')
+    // Only 3 total fetch calls (auth + irn + irn) — no second auth
+    expect(mockFetch).toHaveBeenCalledTimes(3)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// generateIRN — additional error branches
+// ---------------------------------------------------------------------------
+
+describe('generateIRN – additional branches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    __resetTokenCacheForTests()
+  })
+
+  afterEach(() => clearEnvVars())
+
+  it('throws with data.error when IRN response has error object', async () => {
+    setEnvVars()
+    const mockFetch = vi.mocked(global.fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ Data: { AuthToken: 'tok' } }),
+    } as Response)
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: { code: 'DUPLICATE', desc: 'Duplicate IRN' } }),
+    } as Response)
+
+    await expect(generateIRN(MOCK_PAYLOAD)).rejects.toThrow('IRN generation failed')
+  })
+
+  it('throws when res.ok but Data is missing', async () => {
+    setEnvVars()
+    const mockFetch = vi.mocked(global.fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ Data: { AuthToken: 'tok' } }),
+    } as Response)
+    // res.ok=true but no Data field
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ Status: 0, message: 'no data' }),
+    } as Response)
+
+    await expect(generateIRN(MOCK_PAYLOAD)).rejects.toThrow('IRN generation failed')
+  })
+
+  it('auth fails when AuthToken is missing from Data', async () => {
+    setEnvVars()
+    const mockFetch = vi.mocked(global.fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ Data: {} }), // AuthToken missing
+    } as Response)
+
+    await expect(generateIRN(MOCK_PAYLOAD)).rejects.toThrow('IRP auth failed')
+  })
+
+  it('uses URP when buyerGstin is empty string', async () => {
+    setEnvVars()
+    const mockFetch = vi.mocked(global.fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ Data: { AuthToken: 'tok' } }),
+    } as Response)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        Data: { Irn: 'irn-x', AckNo: 'ack-x', AckDt: '01/01/2024', SignedQRCode: '' },
+      }),
+    } as Response)
+
+    const payloadNoGstin: EInvoicePayload = { ...MOCK_PAYLOAD, buyerGstin: '' }
+    await generateIRN(payloadNoGstin)
+
+    const invoiceCall = mockFetch.mock.calls[1]
+    const body = JSON.parse(invoiceCall[1]!.body as string)
+    expect(body.BuyerDtls.Gstin).toBe('URP')
+  })
+
+  it('uses EINVOICE_BASE_URL when set', async () => {
+    setEnvVars()
+    process.env.EINVOICE_BASE_URL = 'https://custom-irp.example.com'
+    const mockFetch = vi.mocked(global.fetch)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ Data: { AuthToken: 'tok' } }),
+    } as Response)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        Data: { Irn: 'irn-y', AckNo: 'ack-y', AckDt: '01/01/2024', SignedQRCode: '' },
+      }),
+    } as Response)
+
+    await generateIRN(MOCK_PAYLOAD)
+
+    const authCall = mockFetch.mock.calls[0]
+    expect((authCall[0] as string)).toContain('https://custom-irp.example.com')
+    delete process.env.EINVOICE_BASE_URL
+  })
+})

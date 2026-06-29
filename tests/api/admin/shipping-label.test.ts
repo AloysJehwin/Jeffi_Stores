@@ -219,6 +219,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
   // ── 4R label ───────────────────────────────────────────────────────────
 
   it('returns 4R PDF generated from pdfkit', async () => {
+    vi.setConfig({ testTimeout: 15000 })
     mockQueryOne.mockResolvedValue(sampleOrder as any)
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,

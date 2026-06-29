@@ -286,3 +286,256 @@ describe('getOrComputeHealth', () => {
     expect(result).toBeNull()
   })
 })
+
+// ---------------------------------------------------------------------------
+// Scoring band coverage — recency, frequency, monetary, engagement, satisfaction
+// ---------------------------------------------------------------------------
+
+describe('computeHealthForUser – scoring bands', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  // recency bands
+  it('scores recency=50 for 90–179 days', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ days_since_last_order: '120' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.recency_score).toBe(50)
+  })
+
+  it('scores recency=20 for 180–364 days', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ days_since_last_order: '200' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.recency_score).toBe(20)
+  })
+
+  // frequency bands
+  it('scores frequency=100 for ordersPerYear >= 12', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ paid_orders: '24', account_age_days: '365' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.frequency_score).toBe(100)
+  })
+
+  it('scores frequency=80 for ordersPerYear 6–11', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ paid_orders: '6', account_age_days: '365' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.frequency_score).toBe(80)
+  })
+
+  it('scores frequency=60 for ordersPerYear 3–5', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ paid_orders: '3', account_age_days: '365' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.frequency_score).toBe(60)
+  })
+
+  it('scores frequency=30 for ordersPerYear 1–2', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ paid_orders: '1', account_age_days: '365' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.frequency_score).toBe(30)
+  })
+
+  it('scores frequency=0 for ordersPerYear < 1', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ paid_orders: '0', account_age_days: '365' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.frequency_score).toBe(0)
+  })
+
+  // monetary bands
+  it('scores monetary=80 for ltv 50000–99999', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ ltv: '75000' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.monetary_score).toBe(80)
+  })
+
+  it('scores monetary=60 for ltv 20000–49999', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ ltv: '30000' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.monetary_score).toBe(60)
+  })
+
+  it('scores monetary=40 for ltv 5000–19999', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ ltv: '10000' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.monetary_score).toBe(40)
+  })
+
+  it('scores monetary=20 for ltv 1–4999', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ ltv: '2500' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.monetary_score).toBe(20)
+  })
+
+  // engagement bands
+  it('scores engagement=100 for blended >= 0.5', async () => {
+    // 10 sends, 6 opens (openRate=0.6), 6 clicks (clickRate=0.6)
+    // blended = 0.6*0.4 + 0.6*0.6 = 0.6 >= 0.5
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ email_sends_90d: '10', email_opens_90d: '6', email_clicks_90d: '6' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.engagement_score).toBe(100)
+  })
+
+  it('scores engagement=70 for blended 0.25–0.49', async () => {
+    // 10 sends, 3 opens (0.3), 2 clicks (0.2)
+    // blended = 0.3*0.4 + 0.2*0.6 = 0.12 + 0.12 = 0.24 — too low, adjust:
+    // 10 sends, 4 opens (0.4), 2 clicks (0.2) → 0.4*0.4 + 0.2*0.6 = 0.16+0.12=0.28
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ email_sends_90d: '10', email_opens_90d: '4', email_clicks_90d: '2' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.engagement_score).toBe(70)
+  })
+
+  it('scores engagement=40 for blended 0.1–0.24', async () => {
+    // 10 sends, 2 opens (0.2), 1 click (0.1) → 0.2*0.4+0.1*0.6 = 0.08+0.06=0.14
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ email_sends_90d: '10', email_opens_90d: '2', email_clicks_90d: '1' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.engagement_score).toBe(40)
+  })
+
+  it('scores engagement=20 for blended < 0.1', async () => {
+    // 10 sends, 0 opens, 0 clicks → blended=0 < 0.1
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ email_sends_90d: '10', email_opens_90d: '0', email_clicks_90d: '0' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.engagement_score).toBe(20)
+  })
+
+  // satisfaction branches
+  it('scores satisfaction=70 when paidOrders=0', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ paid_orders: '0', return_count: '0', low_review_count: '0', avg_rating: null }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.satisfaction_score).toBe(70)
+  })
+
+  it('satisfaction adjusts upward for avg_rating > 3', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ paid_orders: '10', return_count: '0', low_review_count: '0', avg_rating: '5' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    // score = 100 + (5-3)*10 = 120 → clamped to 100
+    expect(result!.satisfaction_score).toBe(100)
+  })
+
+  it('satisfaction adjusts downward for avg_rating < 3', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ paid_orders: '10', return_count: '0', low_review_count: '0', avg_rating: '1' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    // score = 100 + (1-3)*10 = 80
+    expect(result!.satisfaction_score).toBe(80)
+  })
+
+  it('satisfaction clamps to 0 with high returns and low reviews', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ paid_orders: '2', return_count: '2', low_review_count: '5', avg_rating: '1' }))
+      .mockResolvedValueOnce(null)
+    const result = await computeHealthForUser('user-1')
+    expect(result!.satisfaction_score).toBe(0)
+  })
+
+  // churn_risk: rising_concern via score < 50 and trendDelta < -5
+  it('churn_risk is rising_concern when score < 50 and trendDelta30d < -5', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ days_since_last_order: '50', ltv: '0', paid_orders: '0', email_sends_90d: '0', email_opens_90d: '0', email_clicks_90d: '0' }))
+      .mockResolvedValueOnce({ score: 55, trend_delta_30d: -10 }) // trendDelta = -10 < -5
+
+    const result = await computeHealthForUser('user-1')
+    expect(result!.churn_risk).toBe('rising_concern')
+  })
+
+  // churn_risk: high when score < 40 and days_since_last_order is null
+  it('churn_risk is high when score < 40 and days_since_last_order is null', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow({ days_since_last_order: null, ltv: '0', paid_orders: '0', email_sends_90d: '10', email_opens_90d: '0', email_clicks_90d: '0' }))
+      .mockResolvedValueOnce(null)
+
+    const result = await computeHealthForUser('user-1')
+    expect(result!.churn_risk).toBe('high')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// recomputeHealth – trend calculation branches (snap7/snap30 present)
+// ---------------------------------------------------------------------------
+
+describe('recomputeHealth – trend branches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockQuery.mockResolvedValue({ rows: [] })
+  })
+
+  it('uses snap7 for trend7 when it exists', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow()) // loadSignals
+      .mockResolvedValueOnce({ score: 70, trend_delta_30d: 0 }) // previous health (computeHealthForUser)
+      .mockResolvedValueOnce({ score: 65 }) // oldHealth
+      .mockResolvedValueOnce({ score: 60 }) // snap7
+      .mockResolvedValueOnce(null)          // snap30
+      .mockResolvedValueOnce(null)          // lastSnap
+      .mockResolvedValueOnce({ user_id: 'user-1', score: 72, recency_score: 80, frequency_score: 60, monetary_score: 80, engagement_score: 50, satisfaction_score: 100, churn_risk: 'healthy', trend_delta_7d: 12, trend_delta_30d: 0, last_computed_at: '2024-01-01' })
+
+    const result = await recomputeHealth('user-1')
+    expect(result).not.toBeNull()
+    const insertCall = mockQuery.mock.calls[0]
+    // trend7 = computed.score - snap7.score (passed as arg $9)
+    expect(insertCall[1][8]).toBeDefined() // trend7 param exists
+  })
+
+  it('uses snap30 for trend30 when it exists', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow()) // loadSignals
+      .mockResolvedValueOnce({ score: 70, trend_delta_30d: 0 }) // previous health
+      .mockResolvedValueOnce({ score: 65 }) // oldHealth
+      .mockResolvedValueOnce(null)          // snap7
+      .mockResolvedValueOnce({ score: 55 }) // snap30
+      .mockResolvedValueOnce(null)          // lastSnap
+      .mockResolvedValueOnce({ user_id: 'user-1', score: 72, recency_score: 80, frequency_score: 60, monetary_score: 80, engagement_score: 50, satisfaction_score: 100, churn_risk: 'healthy', trend_delta_7d: 0, trend_delta_30d: 17, last_computed_at: '2024-01-01' })
+
+    const result = await recomputeHealth('user-1')
+    expect(result).not.toBeNull()
+  })
+
+  it('skips snapshot insert when lastSnap is recent (< 7 days)', async () => {
+    const recentSnap = new Date(Date.now() - 1 * 86400000).toISOString() // 1 day ago
+    mockQueryOne
+      .mockResolvedValueOnce(makeSignalRow())
+      .mockResolvedValueOnce({ score: 70, trend_delta_30d: 0 })
+      .mockResolvedValueOnce({ score: 65 })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ snapshot_at: recentSnap }) // recent snap → skip insert
+      .mockResolvedValueOnce({ user_id: 'user-1', score: 72, recency_score: 80, frequency_score: 60, monetary_score: 80, engagement_score: 50, satisfaction_score: 100, churn_risk: 'healthy', trend_delta_7d: 0, trend_delta_30d: 0, last_computed_at: '2024-01-01' })
+
+    await recomputeHealth('user-1')
+    const queryCalls = mockQuery.mock.calls.map(c => c[0] as string)
+    // Should NOT insert into customer_health_history
+    expect(queryCalls.filter(s => s.includes('customer_health_history')).length).toBe(0)
+  })
+})
