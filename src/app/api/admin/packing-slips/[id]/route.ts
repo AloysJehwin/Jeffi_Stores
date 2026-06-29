@@ -21,7 +21,7 @@ async function fetchOrder(id: string): Promise<PackingSlipOrder | null> {
               'mrp', oi.mrp,
               'discount_amount', oi.discount_amount,
               'hsn_code', COALESCE(oi.hsn_code, p.hsn_code),
-              'gst_rate', COALESCE(oi.gst_rate, p.gst_rate, 0),
+              'gst_rate', COALESCE(oi.gst_rate, p.gst_percentage, 0),
               'taxable_amount', oi.taxable_amount,
               'cgst_amount', oi.cgst_amount,
               'sgst_amount', oi.sgst_amount,
