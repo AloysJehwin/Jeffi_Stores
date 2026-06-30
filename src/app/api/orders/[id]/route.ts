@@ -140,6 +140,7 @@ export async function GET(
       notes: order.notes,
       trackingUrl: order.tracking_url || null,
       awbNumber: order.awb_number || null,
+      estimatedDeliveryDate: order.estimated_delivery_date || null,
       originalOrderId: order.original_order_id || null,
       originalOrderNumber: order.original_order_number || null,
       orderType: order.order_type || 'cart',

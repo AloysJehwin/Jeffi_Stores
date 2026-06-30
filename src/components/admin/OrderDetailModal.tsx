@@ -249,6 +249,14 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               Shipping Label
             </a>
             )}
+            {o.estimated_delivery_date && (
+              <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                EDD: {new Date(o.estimated_delivery_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+              </span>
+            )}
             {o.invoice_number && (
             <a
               href={`/api/orders/${order.id}/invoice`}
