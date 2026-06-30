@@ -354,13 +354,12 @@ jobs:
         run: sudo apt-get install -y postgresql-client
 
       - name: Apply schema to RDS
-        env:
-          PGHOST: ${{ secrets.RDS_HOST }}
-          PGPORT: ${{ secrets.RDS_PORT }}
-          PGDATABASE: ${{ secrets.RDS_DATABASE }}
-          PGUSER: ${{ secrets.RDS_USER }}
-          PGSSLMODE: require
         run: |
+          export PGHOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
+          export PGPORT=5432
+          export PGDATABASE=jeffi_stores
+          export PGUSER=app_user
+          export PGSSLMODE=require
           export PGPASSWORD=$(aws rds generate-db-auth-token \
             --hostname "$PGHOST" \
             --port "$PGPORT" \
