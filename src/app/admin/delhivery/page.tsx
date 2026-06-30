@@ -348,6 +348,7 @@ export default function DelhiveryPickupPage() {
                 <tr className="border-b border-border-default bg-surface-secondary">
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Pickup Date</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Delhivery ID</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Request ID</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWBs</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Requested At</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Status</th>
@@ -363,6 +364,9 @@ export default function DelhiveryPickupPage() {
                       </td>
                       <td className="px-4 py-3 font-mono text-foreground-secondary">
                         {req.pickup_id ?? <span className="italic text-foreground-muted">—</span>}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-foreground-secondary" title={req.id}>
+                        {req.id.slice(0, 8)}…
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
@@ -422,7 +426,7 @@ export default function DelhiveryPickupPage() {
                     </tr>
                     {addAwbFor === req.id && (
                       <tr key={`${req.id}-add`} className="bg-surface-secondary border-b border-border-default">
-                        <td colSpan={6} className="px-4 py-3">
+                        <td colSpan={7} className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">Add order to this pickup:</label>
                             <AdminSelect
