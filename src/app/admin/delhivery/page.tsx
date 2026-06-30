@@ -387,7 +387,7 @@ export default function DelhiveryPickupPage() {
                               onClick={() => handleRefresh(req)}
                               disabled={refreshingId === req.id}
                               title="Poll AWB tracking for live pickup status"
-                              className="p-1.5 rounded-lg border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 disabled:opacity-50 transition-colors"
+                              className="h-[34px] w-[34px] flex items-center justify-center rounded-lg border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 disabled:opacity-50 transition-colors"
                             >
                               <svg className={`w-3.5 h-3.5 ${refreshingId === req.id ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -397,7 +397,7 @@ export default function DelhiveryPickupPage() {
                           {req.pickup_status === 'pending' && orders.length > 0 && (
                             <button
                               onClick={() => { setAddAwbFor(addAwbFor === req.id ? null : req.id); setAddAwbOrderId('') }}
-                              className="px-2 py-1.5 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors"
+                              className="h-[34px] px-3 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors whitespace-nowrap"
                             >
                               + Add AWB
                             </button>
