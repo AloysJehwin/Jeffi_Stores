@@ -109,8 +109,8 @@ export async function POST(request: NextRequest) {
         const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS', 'OC', 'PKD'])
         let statusType = rawType
         if (EXCEPTION_TYPES.has(rawType) || rawType === 'PP' || rawType === 'MF') {
-          // First try scan history (most authoritative)
-          for (const scan of rawScans) {
+          // First try scan history newest-first (most recent state wins)
+          for (const scan of [...rawScans].reverse()) {
             const t = (scan.ScanDetail?.ScanType ?? '').toUpperCase()
             if (t && !EXCEPTION_TYPES.has(t) && t !== 'PP' && t !== 'MF') { statusType = t; break }
             const activity = (scan.ScanDetail?.Scan ?? '').toLowerCase()
