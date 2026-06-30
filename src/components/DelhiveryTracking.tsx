@@ -228,11 +228,13 @@ export default function DelhiveryTracking({
   apiBase = '/api/orders',
   variant = 'default',
   trackPath = 'track',
+  headers: extraHeaders,
 }: {
   orderId: string
   apiBase?: string
   variant?: 'default' | 'admin'
   trackPath?: string
+  headers?: Record<string, string>
 }) {
   const [tracking, setTracking] = useState<TrackingData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -245,7 +247,7 @@ export default function DelhiveryTracking({
     const url = `${apiBase}/${orderId}/${trackPath}${refresh ? '?refresh=1' : ''}`
     if (refresh) setRefreshing(true)
     else setLoading(true)
-    fetch(url)
+    fetch(url, extraHeaders ? { headers: extraHeaders } : undefined)
       .then(r => r.json())
       .then(d => {
         if (d.error) setError(d.error)
