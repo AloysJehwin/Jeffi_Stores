@@ -225,7 +225,7 @@ export async function POST(request: NextRequest) {
       }, { status: 422 })
     }
 
-    const pickupId = data.id || data.pickup_id || data.pk || null
+    const pickupId = data.pickup_id ?? null
 
     await query(
       `INSERT INTO delhivery_pickup_requests (pickup_id, pickup_date, awb_count, awbs, raw_response, pickup_status)
