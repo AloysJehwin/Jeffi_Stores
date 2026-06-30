@@ -426,7 +426,7 @@ export default function DelhiveryPickupPage() {
                           <div className="flex items-center gap-3">
                             <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">Add order to this pickup:</label>
                             <AdminSelect
-                              compact
+                              sm
                               value={addAwbOrderId}
                               placeholder="— select an order —"
                               options={orders.map(o => ({
@@ -439,13 +439,13 @@ export default function DelhiveryPickupPage() {
                             <button
                               onClick={() => handleAddAwb(req.id)}
                               disabled={!addAwbOrderId || addAwbLoading}
-                              className="px-3 py-1.5 text-xs font-semibold rounded bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
+                              className="h-[34px] px-3 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
                             >
                               {addAwbLoading ? 'Adding…' : 'Confirm'}
                             </button>
                             <button
                               onClick={() => { setAddAwbFor(null); setAddAwbOrderId('') }}
-                              className="px-3 py-1.5 text-xs font-medium rounded border border-border-default text-foreground-secondary hover:text-foreground transition-colors"
+                              className="h-[34px] px-3 text-xs font-medium rounded-lg border border-border-default text-foreground-secondary hover:text-foreground transition-colors"
                             >
                               Cancel
                             </button>
