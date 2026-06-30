@@ -28,7 +28,8 @@ export async function GET(
         `SELECT awb_number, status, shipment_status FROM orders
          WHERE id = $1 AND status != 'draft' AND (
            user_id = $2 OR
-           (source = 'business' AND (customer_email = $3 OR ($4::text IS NOT NULL AND customer_phone = $4)))
+           customer_email = $3 OR
+           ($4::text IS NOT NULL AND customer_phone = $4)
          )`,
         [id, authUser.userId, email, phone]
       )
