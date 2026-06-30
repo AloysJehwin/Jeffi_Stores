@@ -55,6 +55,7 @@ interface OrderDetails {
   notes: string | null
   trackingUrl: string | null
   awbNumber: string | null
+  estimatedDeliveryDate: string | null
   originalOrderId: string | null
   originalOrderNumber: string | null
   orderType: string
@@ -416,6 +417,19 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
             )}
 
             {/* Tracking */}
+            {!order.awbNumber && order.estimatedDeliveryDate && (
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default px-4 sm:px-6 py-4 flex items-center gap-3">
+                <svg className="w-5 h-5 text-accent-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <div>
+                  <p className="text-xs text-foreground-muted">Estimated Delivery</p>
+                  <p className="text-sm font-semibold text-foreground">
+                    {new Date(order.estimatedDeliveryDate + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </p>
+                </div>
+              </div>
+            )}
             {order.awbNumber && (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
                 <div className="px-4 sm:px-6 py-4 border-b border-border-default flex items-center gap-2">
