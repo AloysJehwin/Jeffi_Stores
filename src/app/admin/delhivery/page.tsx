@@ -351,6 +351,7 @@ export default function DelhiveryPickupPage() {
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWBs</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Requested At</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Status</th>
+                  <th className="px-4 py-3 text-right font-medium text-foreground-secondary">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -375,10 +376,12 @@ export default function DelhiveryPickupPage() {
                         {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[req.pickup_status]}`}>
-                            {req.pickup_status.replace('_', ' ')}
-                          </span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[req.pickup_status]}`}>
+                          {req.pickup_status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
                           {req.pickup_status === 'pending' && (
                             <button
                               onClick={() => handleRefresh(req)}
@@ -419,7 +422,7 @@ export default function DelhiveryPickupPage() {
                     </tr>
                     {addAwbFor === req.id && (
                       <tr key={`${req.id}-add`} className="bg-surface-secondary border-b border-border-default">
-                        <td colSpan={5} className="px-4 py-3">
+                        <td colSpan={6} className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">Add order to this pickup:</label>
                             <AdminSelect
