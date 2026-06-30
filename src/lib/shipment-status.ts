@@ -39,9 +39,8 @@ type RawScan = { activity?: string | null; scanType?: string | null }
 
 /**
  * Derive our internal ShipmentStatus from Delhivery's raw statusType + scan history.
- * The top-level StatusType is always the most current state — use it directly when
- * it has a direct mapping. Only fall back to scan history for ambiguous codes (PP/MF)
- * where the top-level type is stale and the scans tell the real story.
+ * Unambiguous codes (PU, IT, OD, DL, etc.) map directly. Ambiguous codes (UD, PP, MF,
+ * NDR, HOLD, LOST, MIS) walk scan history newest-first to find the real state.
  */
 export function resolveShipmentStatus(
   rawStatusType: string | null,
@@ -53,9 +52,10 @@ export function resolveShipmentStatus(
   const direct = directMap(type)
   if (direct) return direct
 
-  // Only for PP/MF (stale pre-pickup codes) walk scan history to find the real state.
-  // Walk newest-first and take the first scan that resolves to a known status.
-  for (const scan of scans) {
+  // Ambiguous codes: walk scan history newest-first to find the true state.
+  // UD is used for manifests, bag-adds, and generic updates — resolve from scans.
+  // PP/MF are pre-pickup codes that may have progressed. NDR/HOLD/LOST/MIS need context.
+  for (const scan of [...scans].reverse()) {
     const scanType = scan.scanType?.toUpperCase() ?? ''
     const fromScanType = directMap(scanType)
     if (fromScanType) return fromScanType
@@ -64,6 +64,9 @@ export function resolveShipmentStatus(
     const fromActivity = activityMap(activity)
     if (fromActivity) return fromActivity
   }
+
+  // UD with no resolvable scans = just manifested / generic update — treat as created
+  if (type === 'UD') return 'created'
   return 'created'
 }
 
@@ -77,11 +80,8 @@ function directMap(code: string): ShipmentStatus | null {
     case 'PU':       return 'picked_up'     // Picked up from seller
     // In transit
     case 'IT':       return 'in_transit'    // In transit at facility
-    case 'UD':       return 'in_transit'    // Update — generic bag/transit scan (NOT a failed delivery)
     case 'RAD':      return 'in_transit'    // Reached at destination facility
-    case 'HOLD':     return 'in_transit'    // Held at facility (address issue etc.) — still in transit
-    case 'MIS':      return 'in_transit'    // Misrouted — being corrected, still in network
-    case 'LOST':     return 'in_transit'    // Lost (map to in_transit; order status handled separately)
+    // UD/HOLD/MIS/LOST are ambiguous — handled by scan-walk in resolveShipmentStatus
     // Out for delivery
     case 'OT':       return 'out_for_delivery'  // Out for delivery (hub scan)
     case 'OD':       return 'out_for_delivery'  // Out for delivery (DE scan)
