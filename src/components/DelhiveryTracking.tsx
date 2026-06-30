@@ -31,7 +31,7 @@ type TrackingData = {
   returnedDate?: string | null
 }
 
-const EXCEPTION_TYPES = new Set(['NDR', 'HOLD', 'LOST', 'MIS'])
+const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
 
 function resolveDisplayType(statusType: string | null, scans: Scan[]): string | null {
   const type = statusType?.toUpperCase() ?? ''
@@ -77,7 +77,6 @@ function statusBadge(type: string | null) {
     case 'OT':
     case 'OD':     return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
     case 'IT':
-    case 'UD':
     case 'PU':     return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
     case 'NDR':    return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
     case 'RTO':
@@ -96,8 +95,7 @@ function statusLabel(type: string | null) {
     case 'PP':     return 'Shipment Created'
     case 'MF':     return 'Shipment Created'
     case 'PU':     return 'Picked Up'
-    case 'IT':
-    case 'UD':     return 'In Transit'
+    case 'IT':     return 'In Transit'
     case 'OT':
     case 'OD':     return 'Out for Delivery'
     case 'DL':     return 'Delivered'
