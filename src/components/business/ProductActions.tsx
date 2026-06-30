@@ -115,6 +115,21 @@ export default function ProductActions({
   const { showToast } = useToast()
   const router = useRouter()
   const { user } = useAuth()
+  const [edd, setEdd] = useState<string | null>(null)
+  useEffect(() => {
+    if (!user) return
+    fetch('/api/user/addresses', { headers: { 'X-Auth-Portal': 'business' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const pin = d?.addresses?.find((a: any) => a.is_default)?.postal_code
+          ?? d?.addresses?.[0]?.postal_code
+        if (!pin) return
+        return fetch(`/api/products/edd?pin=${pin}`)
+      })
+      .then(r => r?.ok ? r.json() : null)
+      .then(d => { if (d?.edd) setEdd(d.edd) })
+      .catch(() => {})
+  }, [user])
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
@@ -616,7 +631,13 @@ export default function ProductActions({
                 </svg>
                 <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
               </div>
-            ) : (
+            ) : null}
+            {edd && effectiveStock > 0 && (
+              <p className="text-xs text-foreground-secondary mt-1">
+                Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+              </p>
+            )}
+            {effectiveStock <= 0 && (
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />

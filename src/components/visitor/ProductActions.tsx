@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/contexts/AuthContext'
 import QuantityInput from '@/components/shared/QuantityInput'
 import { round2 } from '@/lib/gst'
 
@@ -109,6 +110,22 @@ export default function ProductActions({
   const { addToCart } = useCart()
   const { showToast } = useToast()
   const router = useRouter()
+  const { user } = useAuth()
+  const [edd, setEdd] = useState<string | null>(null)
+  useEffect(() => {
+    if (!user) return
+    fetch('/api/user/addresses')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const pin = d?.addresses?.find((a: any) => a.is_default)?.postal_code
+          ?? d?.addresses?.[0]?.postal_code
+        if (!pin) return
+        return fetch(`/api/products/edd?pin=${pin}`)
+      })
+      .then(r => r?.ok ? r.json() : null)
+      .then(d => { if (d?.edd) setEdd(d.edd) })
+      .catch(() => {})
+  }, [user])
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
@@ -554,6 +571,11 @@ export default function ProductActions({
                 </svg>
                 <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
               </div>
+            )}
+            {edd && effectiveStock > 0 && (
+              <p className="text-xs text-foreground-secondary mt-1">
+                Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+              </p>
             )}
           </div>
         </>
