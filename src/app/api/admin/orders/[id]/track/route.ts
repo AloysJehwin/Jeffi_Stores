@@ -114,7 +114,7 @@ export async function GET(
     const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
     let statusType = rawStatusType
     if (EXCEPTION_TYPES.has(rawStatusType)) {
-      for (let i = 0; i < rawScans.length; i++) {
+      for (let i = rawScans.length - 1; i >= 0; i--) {
         const t = (rawScans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
         if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
         const activity = (rawScans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
