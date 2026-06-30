@@ -425,7 +425,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                   <h3 className="text-base font-semibold text-foreground">Shipment Tracking</h3>
                 </div>
                 <div className="p-4 sm:p-6">
-                  <DelhiveryTracking orderId={order.id} apiBase="/api/orders" />
+                  <DelhiveryTracking orderId={order.id} apiBase="/api/orders" headers={{ 'x-auth-portal': 'business' }} />
                 </div>
               </div>
             )}
