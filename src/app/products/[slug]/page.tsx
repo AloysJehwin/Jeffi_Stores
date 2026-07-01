@@ -609,6 +609,7 @@ export default async function ProductDetailPage({
                     brandName={relatedProduct.brands?.name || null}
                     categoryName={relatedProduct.categories?.name || null}
                     discountPct={Number(relatedProduct.discount_pct ?? 0)}
+                    extraDeliveryDays={Number(relatedProduct.extra_delivery_days ?? 0)}
                   />
                 )
               })}

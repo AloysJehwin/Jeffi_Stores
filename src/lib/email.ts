@@ -1438,7 +1438,7 @@ export async function sendAdminContactEmail(
   name: string,
   subject: string,
   message: string,
-  opts: { isHtml?: boolean } = {}
+  opts: { isHtml?: boolean; entityType?: string; entityId?: string } = {}
 ) {
   const messageHtml = opts.isHtml
     ? message
@@ -1454,7 +1454,7 @@ export async function sendAdminContactEmail(
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
             .container { background-color: #f9f9f9; border-radius: 10px; padding: 30px; border: 1px solid #e0e0e0; }
-            .header { text-align: center; padding-bottom: 20px; border-bottom: 3px solid #f97316; margin-bottom: 30px; }
+            .header { text-align: center; padding-bottom: 20px; margin-bottom: 30px; }
             .logo { font-size: 28px; font-weight: bold; color: #f97316; }
             .message-box { background-color: #fff; border-left: 4px solid #f97316; padding: 20px; border-radius: 4px; margin: 20px 0;${opts.isHtml ? '' : ' white-space: pre-wrap;'} }
             .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #e0e0e0; color: #666; font-size: 13px; }
@@ -1466,8 +1466,6 @@ export async function sendAdminContactEmail(
               <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
               <p style="color: #666; margin: 4px 0 0;">Hardware &amp; Tools</p>
             </div>
-            <p>Hello ${name || 'Valued Customer'},</p>
-            <p>You have received a message from the Jeffi Stores team:</p>
             <div class="message-box">${messageHtml}</div>
             <div class="footer">
               <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
@@ -1485,6 +1483,7 @@ export async function sendAdminContactEmail(
       ...mailOptions,
       kind: 'admin_notification',
       templateName: 'admin_contact',
+      ...(opts.entityType && opts.entityId ? { entityType: opts.entityType, entityId: opts.entityId } : {}),
     })
     return { success: true, messageId: info.messageId }
   } catch (error) {

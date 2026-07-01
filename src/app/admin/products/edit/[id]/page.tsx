@@ -122,7 +122,7 @@ async function updateProduct(productId: string, formData: FormData) {
   const breadthCm = formData.get('breadth_cm') ? parseFloat(formData.get('breadth_cm') as string) : null
   const heightCm = formData.get('height_cm') ? parseFloat(formData.get('height_cm') as string) : null
   const intent = formData.get('intent') as string | null
-  const isActive = intent === 'draft' ? false : (intent === 'publish' ? true : formData.get('is_active') === 'true')
+  const isActive = (intent === 'draft' || intent === 'draft-stay') ? false : (intent === 'publish' ? true : formData.get('is_active') === 'true')
   const isFeatured = formData.get('is_featured') === 'true'
   const imageCount = parseInt(formData.get('image_count') as string || '0')
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
@@ -168,6 +168,9 @@ async function updateProduct(productId: string, formData: FormData) {
       setClauses.push(`mpn = $${params.length + 1}`, `gtin = $${params.length + 2}`)
       params.push(mpn, gtin)
     }
+    const extraDeliveryDays = parseInt(formData.get('extra_delivery_days') as string || '0') || 0
+    setClauses.push(`extra_delivery_days = $${params.length + 1}`)
+    params.push(extraDeliveryDays)
     params.push(productId)
     await query(
       `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
@@ -400,15 +403,24 @@ async function updateProduct(productId: string, formData: FormData) {
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
     const host = await getHost()
-  redirect(ap('/admin/products', host))
+    if (intent === 'draft-stay') {
+      const popupVariantId = formData.get('popup_variant_id') as string | null
+      const dest = popupVariantId
+        ? `/admin/products/edit/${productId}?popup=${encodeURIComponent(popupVariantId)}`
+        : `/admin/products/edit/${productId}`
+      redirect(ap(dest, host))
+    }
+    const back = formData.get('_back') as string | null
+    redirect(ap(back && back.startsWith('/admin/products') ? back : '/admin/products', host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error(err?.message || 'Failed to update product')
   }
 }
 
-export default async function EditProductPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditProductPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const { id } = await params
+  const { back } = await searchParams
   const host = await getHost()
   const product = await getProduct(id).catch(() => null)
 
@@ -418,11 +430,12 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
 
   const categories = await getAllCategories()
   const brands = await getAllBrands()
+  const backUrl = back && back.startsWith('/admin/products') ? back : '/admin/products'
 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href={ap('/admin/products', host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a href={ap(backUrl, host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
           Products
         </a>
@@ -441,6 +454,7 @@ export default async function EditProductPage({ params }: { params: Promise<{ id
         product={product}
         productId={id}
         action={updateProduct.bind(null, id)}
+        backUrl={backUrl}
       />
     </div>
   )

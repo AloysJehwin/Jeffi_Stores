@@ -209,6 +209,7 @@ describe('generateOrderInvoice success path', () => {
     mockQueryOne
       .mockResolvedValueOnce(null)           // no finalized invoice
       .mockResolvedValueOnce(mockOrder)      // fetch order
+      .mockResolvedValueOnce(null)           // paymentRecord (no razorpay txn)
       .mockResolvedValueOnce(null)           // billing address not fetched (billing_address_id null)
       .mockResolvedValueOnce({ id: 'inv-updated' })  // UPDATE pdf_url
 
@@ -327,6 +328,7 @@ describe('generateOrderInvoice with separate billing address', () => {
     mockQueryOne
       .mockResolvedValueOnce(null)              // no finalized invoice
       .mockResolvedValueOnce(orderWithBilling)  // order
+      .mockResolvedValueOnce(null)              // paymentRecord (no razorpay txn)
       .mockResolvedValueOnce({                  // billing address
         full_name: 'Jane Doe',
         address_line1: '456 Business Rd',
@@ -377,6 +379,7 @@ describe('generateOrderInvoice with separate billing address', () => {
     mockQueryOne
       .mockResolvedValueOnce(null)              // no finalized invoice
       .mockResolvedValueOnce(orderWithBilling)  // order
+      .mockResolvedValueOnce(null)              // paymentRecord (no razorpay txn)
       .mockResolvedValueOnce(null)              // billing address row not found
       .mockResolvedValueOnce({ id: 'inv-up' })  // UPDATE pdf_url
 
@@ -419,6 +422,7 @@ describe('generateOrderInvoice with separate billing address', () => {
     mockQueryOne
       .mockResolvedValueOnce(null)              // no finalized invoice
       .mockResolvedValueOnce(orderWithBilling)  // order
+      .mockResolvedValueOnce(null)              // paymentRecord (no razorpay txn)
       .mockResolvedValueOnce({                  // billing address with all-null fields
         full_name: null,
         address_line1: null,

@@ -178,6 +178,16 @@ export async function POST(request: NextRequest) {
     const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
+    function _getTat(pin: string): number {
+      if (/^49/.test(pin)) return 7
+      const p3 = parseInt(pin.slice(0, 3), 10)
+      if ([110, 400, 500, 600, 700, 560, 380].includes(p3)) return 10
+      return 14
+    }
+    const _eddPin = String(destinationPin || '')
+    const _eddTat = (/^\d{6}$/.test(_eddPin) ? _getTat(_eddPin) : 7) + Number(product.extra_delivery_days ?? 0)
+    const _edd = new Date(Date.now() + _eddTat * 86400000).toISOString().slice(0, 10)
+
     const order = await withTransaction(async (client) => {
       let shippingAddressId = null
       let billingAddressId = null
@@ -223,8 +233,8 @@ export async function POST(request: NextRequest) {
       }
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 'direct', $22, $23)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 'direct', $22, $23, $24)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
@@ -234,7 +244,8 @@ export async function POST(request: NextRequest) {
          isGSTEnabled ? orderTaxableAmount : 0,
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
          shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null),
-         shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null)]
+         shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null),
+         _edd]
       )
 
       const createdOrder = orderResult.rows[0]

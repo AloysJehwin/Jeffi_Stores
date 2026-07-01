@@ -59,6 +59,7 @@ export default function DelhiveryPickupPage() {
   const [addAwbFor, setAddAwbFor] = useState<string | null>(null)
   const [addAwbOrderId, setAddAwbOrderId] = useState<string>('')
   const [addAwbLoading, setAddAwbLoading] = useState(false)
+  const [refreshingId, setRefreshingId] = useState<string | null>(null)
 
   const PAGE_SIZE = 25
   const [ordersPage, setOrdersPage] = useState(1)
@@ -174,6 +175,27 @@ export default function DelhiveryPickupPage() {
       setResult({ success: false, message: err.message || 'Request failed' })
     } finally {
       setAddAwbLoading(false)
+    }
+  }
+
+  const handleRefresh = async (req: PickupRequest) => {
+    setRefreshingId(req.id)
+    try {
+      const res = await fetch(`/api/admin/delhivery/pickup-request?poll=${req.id}`)
+      const data = await res.json()
+      if (!res.ok) {
+        setResult({ success: false, message: data.error || 'Refresh failed' })
+      } else if (data.updated) {
+        setPickupHistory(prev => prev.map(r => r.id === req.id ? { ...r, pickup_status: data.pickup_status } : r))
+        setResult({ success: true, message: `Pickup #${req.pickup_id ?? req.id.slice(0, 8)} status updated to ${data.pickup_status.replace('_', ' ')}.` })
+        if (data.pickup_status === 'picked_up') loadData()
+      } else {
+        setResult({ success: true, message: `No change — still ${data.pickup_status.replace('_', ' ')}.` })
+      }
+    } catch (err: any) {
+      setResult({ success: false, message: err.message || 'Refresh failed' })
+    } finally {
+      setRefreshingId(null)
     }
   }
 
@@ -326,9 +348,11 @@ export default function DelhiveryPickupPage() {
                 <tr className="border-b border-border-default bg-surface-secondary">
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Pickup Date</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Delhivery ID</th>
+                  <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Request ID</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">AWBs</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Requested At</th>
                   <th className="px-4 py-3 text-left font-medium text-foreground-secondary">Status</th>
+                  <th className="px-4 py-3 text-right font-medium text-foreground-secondary">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -340,6 +364,9 @@ export default function DelhiveryPickupPage() {
                       </td>
                       <td className="px-4 py-3 font-mono text-foreground-secondary">
                         {req.pickup_id ?? <span className="italic text-foreground-muted">—</span>}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-foreground-secondary" title={req.id}>
+                        {req.id.slice(0, 8)}…
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-1">
@@ -353,14 +380,28 @@ export default function DelhiveryPickupPage() {
                         {new Date(req.created_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[req.pickup_status]}`}>
-                            {req.pickup_status.replace('_', ' ')}
-                          </span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium capitalize ${STATUS_STYLES[req.pickup_status]}`}>
+                          {req.pickup_status.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center justify-end gap-2">
+                          {req.pickup_status === 'pending' && (
+                            <button
+                              onClick={() => handleRefresh(req)}
+                              disabled={refreshingId === req.id}
+                              title="Poll AWB tracking for live pickup status"
+                              className="h-[34px] w-[34px] flex items-center justify-center rounded-lg border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 disabled:opacity-50 transition-colors"
+                            >
+                              <svg className={`w-3.5 h-3.5 ${refreshingId === req.id ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                            </button>
+                          )}
                           {req.pickup_status === 'pending' && orders.length > 0 && (
                             <button
                               onClick={() => { setAddAwbFor(addAwbFor === req.id ? null : req.id); setAddAwbOrderId('') }}
-                              className="px-2 py-1.5 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors"
+                              className="h-[34px] px-3 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors whitespace-nowrap"
                             >
                               + Add AWB
                             </button>
@@ -385,11 +426,11 @@ export default function DelhiveryPickupPage() {
                     </tr>
                     {addAwbFor === req.id && (
                       <tr key={`${req.id}-add`} className="bg-surface-secondary border-b border-border-default">
-                        <td colSpan={5} className="px-4 py-3">
+                        <td colSpan={7} className="px-4 py-3">
                           <div className="flex items-center gap-3">
                             <label className="text-xs font-medium text-foreground-secondary whitespace-nowrap">Add order to this pickup:</label>
                             <AdminSelect
-                              compact
+                              sm
                               value={addAwbOrderId}
                               placeholder="— select an order —"
                               options={orders.map(o => ({
@@ -402,13 +443,13 @@ export default function DelhiveryPickupPage() {
                             <button
                               onClick={() => handleAddAwb(req.id)}
                               disabled={!addAwbOrderId || addAwbLoading}
-                              className="px-3 py-1.5 text-xs font-semibold rounded bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
+                              className="h-[34px] px-3 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors whitespace-nowrap"
                             >
                               {addAwbLoading ? 'Adding…' : 'Confirm'}
                             </button>
                             <button
                               onClick={() => { setAddAwbFor(null); setAddAwbOrderId('') }}
-                              className="px-3 py-1.5 text-xs font-medium rounded border border-border-default text-foreground-secondary hover:text-foreground transition-colors"
+                              className="h-[34px] px-3 text-xs font-medium rounded-lg border border-border-default text-foreground-secondary hover:text-foreground transition-colors"
                             >
                               Cancel
                             </button>

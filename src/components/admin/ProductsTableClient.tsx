@@ -15,9 +15,10 @@ import HoverCard from '@/components/ui/HoverCard'
 interface Props {
   products: any[]
   featuredCount: number
+  backUrl?: string
 }
 
-export default function ProductsTableClient({ products, featuredCount }: Props) {
+export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products' }: Props) {
   const [selected, setSelected] = useState<any>(null)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
 
@@ -195,56 +196,80 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                 {(() => {
                   const invStock = product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)
                   const listedStock = product.has_variants ? Number(product.variant_stock_total) : null
-                  const isLow = product.stock_status === 'Low Stock' || (product.has_variants && invStock > 0 && invStock <= 3)
+                  const stockStatus: string = product.stock_status || 'In Stock'
+                  const isOut = invStock === 0 || stockStatus === 'Out of Stock'
+                  const isLow = !isOut && (stockStatus === 'Low Stock' || (product.has_variants && invStock > 0 && invStock <= 3))
+                  const invColor = isOut ? 'text-red-600 dark:text-red-400' : isLow ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'
+                  const statusColor = isOut
+                    ? 'text-red-600 dark:text-red-400'
+                    : isLow
+                    ? 'text-orange-500 dark:text-orange-400'
+                    : 'text-green-600 dark:text-green-400'
                   return (
-                    <div className="text-sm text-foreground flex items-center gap-0.5">
-                      <span>
-                        {invStock}
-                        {isLow && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Low</span>}
-                        {invStock === 0 && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Out</span>}
-                        {listedStock !== null && listedStock !== invStock && <span className="ml-1 text-xs text-foreground-muted">/ {listedStock}</span>}
-                      </span>
-                      {product.has_variants && (
-                        <HoverCard
-                          trigger={
-                            <span className="ml-1 text-xs text-blue-600 dark:text-blue-400 underline decoration-dotted underline-offset-2 cursor-default hover:text-blue-800 dark:hover:text-blue-200 transition-colors">(v)</span>
-                          }
-                          align="left"
-                          side="bottom"
-                          width="240px"
-                        >
-                          <div className="p-3 space-y-2">
-                            <div className="flex items-center justify-between">
+                    <div className="text-xs space-y-0.5">
+                      <div className="flex items-center gap-1">
+                        <span className="text-foreground-muted shrink-0">Inv:</span>
+                        <span className={`font-semibold ${invColor}`}>{invStock}</span>
+                        {product.has_variants && (
+                          <HoverCard
+                            trigger={
+                              <span className="text-[10px] text-blue-500 dark:text-blue-400 underline decoration-dotted underline-offset-2 cursor-default hover:text-blue-700 dark:hover:text-blue-200 transition-colors">(v)</span>
+                            }
+                            align="left"
+                            side="bottom"
+                            width="240px"
+                          >
+                            <div className="p-3 space-y-2">
                               <p className="text-xs font-semibold text-foreground">Variant Stock</p>
-                              <div className="flex gap-2 text-xs">
-                                <span className={`font-semibold ${invStock === 0 ? 'text-red-600 dark:text-red-400' : isLow ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>Inv: {invStock}</span>
-                                <span className="text-foreground-muted">Listed: {listedStock ?? (product.stock_status || '—')}</span>
-                              </div>
-                            </div>
-                            {Array.isArray(product.product_variants) && product.product_variants.length > 0 ? (
-                              <div className="border-t border-border-default pt-2 space-y-1.5">
-                                {product.product_variants.map((v: any) => {
-                                  const hasSubs = Array.isArray(v.sub_variants) && v.sub_variants.length > 0
-                                  const vInv = hasSubs ? Number(v.sub_variant_inventory_total || 0) : Number(v.inventory_quantity || 0)
-                                  const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : (v.stock_status !== 'Out of Stock' ? 1 : 0)
-                                  const vColor = vInv === 0 ? 'text-red-600 dark:text-red-400' : vInv <= 3 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
-                                  return (
-                                    <div key={v.id} className="flex items-center justify-between gap-2 text-xs">
-                                      <span className="text-foreground-secondary truncate">{v.variant_name}</span>
-                                      <div className="flex gap-2 shrink-0">
-                                        <span className={`font-semibold ${vColor}`}>{vInv}</span>
-                                        {vListed !== vInv && <span className="text-foreground-muted">/ {vListed}</span>}
+                              {Array.isArray(product.product_variants) && product.product_variants.length > 0 ? (
+                                <div className="border-t border-border-default pt-2 space-y-1.5">
+                                  {product.product_variants.map((v: any) => {
+                                    const hasSubs = Array.isArray(v.sub_variants) && v.sub_variants.length > 0
+                                    const vInv = hasSubs ? Number(v.sub_variant_inventory_total || 0) : Number(v.inventory_quantity || 0)
+                                    const vColor = vInv === 0 ? 'text-red-600 dark:text-red-400' : vInv <= 3 ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'
+                                    return (
+                                      <div key={v.id} className="text-xs">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <span className="text-foreground font-medium truncate">{v.variant_name}</span>
+                                          {!hasSubs && <span className={`font-semibold shrink-0 ${vColor}`}>{vInv}</span>}
+                                        </div>
+                                        {hasSubs && (
+                                          <div className="ml-2 mt-0.5 space-y-0.5">
+                                            {v.sub_variants.map((sv: any) => {
+                                              const svInv = Number(sv.inventory_quantity || 0)
+                                              const svColor = svInv === 0 ? 'text-red-600 dark:text-red-400' : svInv <= 3 ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'
+                                              return (
+                                                <div key={sv.id} className="flex items-center justify-between gap-2">
+                                                  <span className="text-foreground-muted truncate">{sv.sub_variant_name}</span>
+                                                  <span className={`font-semibold shrink-0 ${svColor}`}>{svInv}</span>
+                                                </div>
+                                              )
+                                            })}
+                                          </div>
+                                        )}
                                       </div>
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            ) : (
-                              <p className="text-xs text-foreground-muted border-t border-border-default pt-2">Click row to see individual variants →</p>
-                            )}
-                          </div>
-                        </HoverCard>
+                                    )
+                                  })}
+                                </div>
+                              ) : (
+                                <p className="text-xs text-foreground-muted border-t border-border-default pt-2">No variant data.</p>
+                              )}
+                            </div>
+                          </HoverCard>
+                        )}
+                      </div>
+                      {listedStock !== null && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-foreground-muted shrink-0">Listed:</span>
+                          <span className="text-foreground">{listedStock}</span>
+                        </div>
                       )}
+                      <div className="flex items-center gap-1">
+                        <span className="text-foreground-muted shrink-0">Online:</span>
+                        <span className={`font-semibold ${statusColor}`}>
+                          {stockStatus === 'Out of Stock' ? 'Out' : stockStatus === 'Low Stock' ? 'Low' : 'In Stock'}
+                        </span>
+                      </div>
                     </div>
                   )
                 })()}
@@ -273,7 +298,7 @@ export default function ProductsTableClient({ products, featuredCount }: Props) 
                     </svg>
                   </Link>
                   <Link
-                    href={ap(`/admin/products/edit/${product.id}`)}
+                    href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`)}
                     title="Edit Product"
                     className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                   >

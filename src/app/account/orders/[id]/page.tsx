@@ -33,6 +33,7 @@ interface OrderItem {
   replacementWindowDays: number
   products: {
     slug: string
+    extra_delivery_days?: number | null
     product_images: Array<{
       thumbnail_url: string
       image_url: string
@@ -59,6 +60,7 @@ interface OrderDetails {
   notes: string | null
   trackingUrl: string | null
   awbNumber: string | null
+  estimatedDeliveryDate: string | null
   originalOrderId: string | null
   originalOrderNumber: string | null
   orderType: string
@@ -80,6 +82,27 @@ function UnitLabel({ label }: { label: string | null | undefined }) {
   const match = label.match(/^(.+?)2$/)
   if (match) return <>{match[1]}<sup>2</sup></>
   return <>{label}</>
+}
+
+function resolveOrderEdd(order: OrderDetails): string | null {
+  if (!order.estimatedDeliveryDate) return null
+  return new Date(order.estimatedDeliveryDate + 'T00:00:00Z').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'long', year: 'numeric' })
+}
+function getEddDisplay(order: OrderDetails, edd: string): { label: string; sub: string; color: string } {
+  if (order.status === 'delivered') {
+    return { label: 'Delivered', sub: order.deliveredAt ? new Date(order.deliveredAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' }) : edd, color: 'text-green-600 dark:text-green-400' }
+  }
+  if (order.status === 'out_for_delivery') {
+    return { label: 'Arriving Today', sub: 'Out for delivery', color: 'text-accent-500' }
+  }
+  const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  todayIST.setHours(0, 0, 0, 0)
+  const eddDate = new Date(edd + ' 00:00:00')
+  const diffDays = Math.round((eddDate.getTime() - todayIST.getTime()) / 86400000)
+  if (diffDays === 0) return { label: 'Arriving Today', sub: edd, color: 'text-accent-500' }
+  if (diffDays === 1) return { label: 'Arriving Tomorrow', sub: edd, color: 'text-accent-500' }
+  if (diffDays < 0) return { label: 'Expected by ' + edd, sub: 'Delivery delayed', color: 'text-orange-500 dark:text-orange-400' }
+  return { label: 'Estimated Delivery', sub: edd, color: 'text-foreground' }
 }
 
 function getStatusColor(status: string) {
@@ -806,6 +829,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                 </div>
               </div>
             )}
+
+            {/* Estimated Delivery */}
+            {!['cancelled', 'returned'].includes(order.status) && (() => { const edd = resolveOrderEdd(order); if (!edd) return null; const { label, sub, color } = getEddDisplay(order, edd); return (
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default px-4 sm:px-6 py-4 flex items-center gap-3">
+                <svg className="w-5 h-5 text-accent-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+                <div>
+                  <p className={`text-sm font-semibold ${color}`}>{label}</p>
+                  <p className="text-xs text-foreground-muted">{sub}</p>
+                </div>
+              </div>
+            ) })()}
 
             {/* Tracking */}
             {order.awbNumber && (

@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
 
         const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
         const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
+        const delhiveryEdd: string | null = shipment.ExpectedDeliveryDate ?? null
 
         const rawScans: any[] = shipment.Scans ?? []
         const scans = rawScans.map((s: any) => ({
@@ -109,8 +110,8 @@ export async function POST(request: NextRequest) {
         const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS', 'OC', 'PKD'])
         let statusType = rawType
         if (EXCEPTION_TYPES.has(rawType) || rawType === 'PP' || rawType === 'MF') {
-          // First try scan history (most authoritative)
-          for (const scan of rawScans) {
+          // First try scan history newest-first (most recent state wins)
+          for (const scan of [...rawScans].reverse()) {
             const t = (scan.ScanDetail?.ScanType ?? '').toUpperCase()
             if (t && !EXCEPTION_TYPES.has(t) && t !== 'PP' && t !== 'MF') { statusType = t; break }
             const activity = (scan.ScanDetail?.Scan ?? '').toLowerCase()
@@ -164,6 +165,10 @@ export async function POST(request: NextRequest) {
             ? `shipped_at = LEAST(COALESCE(shipped_at, $2::timestamptz), $2::timestamptz)`
             : `shipped_at = COALESCE(shipped_at, NOW())`
           )
+          // Write Delhivery EDD when first shipping — only if not already set
+          if (delhiveryEdd) {
+            setClauses.push(`estimated_delivery_date = COALESCE(estimated_delivery_date, '${delhiveryEdd}'::date)`)
+          }
         }
         if (syncRule.setDeliveredAt) {
           setClauses.push(statusDateTime

@@ -35,6 +35,7 @@ interface ReviewFormFormProps {
   submitLabel: string
   coupons: Coupon[]
   formId?: string
+  backUrl?: string
   defaultValues?: {
     title?: string
     slug?: string
@@ -61,7 +62,7 @@ function randomId() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-export default function ReviewFormForm({ submitLabel, coupons, formId, defaultValues: d = {} }: ReviewFormFormProps) {
+export default function ReviewFormForm({ submitLabel, coupons, formId, backUrl, defaultValues: d = {} }: ReviewFormFormProps) {
   const router = useRouter()
   const [templateType, setTemplateType] = useState<TemplateType>(d.template_type || 'google_review')
   const [title, setTitle] = useState(d.title || '')
@@ -125,7 +126,8 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
         return
       }
 
-      router.push(ap('/admin/review-forms'))
+      const destination = backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms'
+      router.push(ap(destination))
       router.refresh()
     } finally {
       setSubmitting(false)
@@ -244,7 +246,7 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, defaultVa
         {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>}
 
         <div className="flex gap-3 pt-2">
-          <Link href={ap('/admin/review-forms')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
+          <Link href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
             Cancel
           </Link>
           <button type="submit" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">

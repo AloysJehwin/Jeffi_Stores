@@ -7,7 +7,7 @@ import Tooltip from '@/components/ui/Tooltip'
 import HoverCard from '@/components/ui/HoverCard'
 import { ap } from '@/lib/admin-path'
 
-function CustomerDetailModal({ customer, onClose }: { customer: any; onClose: () => void }) {
+function CustomerDetailModal({ customer, onClose, backUrl }: { customer: any; onClose: () => void; backUrl: string }) {
   if (typeof document === 'undefined') return null
   const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown'
   const initials = [customer.first_name?.[0], customer.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
@@ -31,7 +31,7 @@ function CustomerDetailModal({ customer, onClose }: { customer: any; onClose: ()
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
-              href={ap(`/admin/customers/${customer.id}`)}
+              href={ap(`/admin/customers/${customer.id}?back=${encodeURIComponent(backUrl)}`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
             >
               Full Profile
@@ -103,7 +103,7 @@ function CustomerDetailModal({ customer, onClose }: { customer: any; onClose: ()
   )
 }
 
-export default function CustomersTableRows({ customers }: { customers: any[] }) {
+export default function CustomersTableRows({ customers, backUrl = '/admin/customers' }: { customers: any[]; backUrl?: string }) {
   const [selected, setSelected] = useState<any>(null)
 
   if (!customers.length) {
@@ -116,7 +116,7 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
 
   return (
     <>
-      {selected && <CustomerDetailModal customer={selected} onClose={() => setSelected(null)} />}
+      {selected && <CustomerDetailModal customer={selected} onClose={() => setSelected(null)} backUrl={backUrl} />}
       {customers.map((customer: any) => (
         <tr
           key={customer.id}
@@ -127,7 +127,7 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
             <HoverCard
               trigger={
                 <Link
-                  href={ap(`/admin/customers/${customer.id}`)}
+                  href={ap(`/admin/customers/${customer.id}?back=${encodeURIComponent(backUrl)}`)}
                   className="text-sm font-medium text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2 whitespace-nowrap"
                 >
                   {[customer.first_name, customer.last_name].filter(Boolean).join(' ') || '—'}
@@ -258,7 +258,7 @@ export default function CustomersTableRows({ customers }: { customers: any[] }) 
           <td className="px-6 py-4 whitespace-nowrap text-right" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-end gap-1">
               <Link
-                href={ap(`/admin/customers/${customer.id}`)}
+                href={ap(`/admin/customers/${customer.id}?back=${encodeURIComponent(backUrl)}`)}
                 title="View Customer"
                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
               >

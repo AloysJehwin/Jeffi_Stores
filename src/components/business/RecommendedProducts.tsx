@@ -15,6 +15,7 @@ interface Product {
   variant_min_mrp: number | null
   variant_stock_total: number | null
   stock_status: string | null
+  extra_delivery_days: number | null
   product_images: Array<{ image_url: string; thumbnail_url: string; is_primary: boolean }>
   brands?: { name: string } | null
   categories?: { name: string; id: string } | null
@@ -72,6 +73,7 @@ export default function BusinessRecommendedProducts({ title = 'You Might Also Li
               brandName={product.brands?.name || null}
               categoryName={product.categories?.name || null}
               categoryId={product.categories?.id || null}
+              extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
             />
           )
         })}

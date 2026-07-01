@@ -40,6 +40,8 @@ export default async function EditCouponPage({ params, searchParams }: { params:
   if (!coupon) notFound()
 
   const host = await getHost()
+  const back = resolvedSearchParams?.back
+  const backUrl = back && back.startsWith('/admin/coupons') ? back : '/admin/coupons'
   const USERS_PAGE_SIZE = 10
   const usersPage = Math.max(1, parseInt(resolvedSearchParams.usersPage || '1', 10))
   const usersOffset = (usersPage - 1) * USERS_PAGE_SIZE
@@ -136,15 +138,17 @@ export default async function EditCouponPage({ params, searchParams }: { params:
       throw new Error('Failed to update coupon')
     }
     revalidatePath('/admin/coupons')
-    
+
     const host = await getHost()
-  redirect(ap('/admin/coupons', host))
+    const rawBack = formData.get('_back') as string | null
+    const destination = rawBack && rawBack.startsWith('/admin/coupons') ? rawBack : '/admin/coupons'
+    redirect(ap(destination, host))
   }
 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href={ap('/admin/coupons', host)} className="text-foreground-muted hover:text-foreground transition-colors">
+        <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div>
@@ -156,6 +160,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
       <CouponForm
         action={updateCoupon}
         submitLabel="Save Changes"
+        backUrl={backUrl}
         defaultValues={{
           code: coupon.code,
           discount_type: coupon.discount_type,

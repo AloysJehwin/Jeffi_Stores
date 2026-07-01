@@ -14,10 +14,33 @@ export async function GET(
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const order = await queryOne<{ awb_number: string | null; status: string; shipment_status: string | null }>(
-      `SELECT awb_number, status, shipment_status FROM orders WHERE id = $1 AND user_id = $2`,
-      [id, authUser.userId]
-    )
+    console.log('[track] userId:', authUser.userId, 'isBusiness:', authUser.isBusiness)
+
+    const isBusiness = authUser.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
+
+    let order: { awb_number: string | null; status: string; shipment_status: string | null } | null
+    if (isBusiness) {
+      const bizUser = await queryOne<{ email: string; phone: string | null }>(
+        'SELECT email, phone FROM users WHERE id = $1',
+        [authUser.userId]
+      )
+      const email = bizUser?.email || ''
+      const phone = bizUser?.phone || null
+      order = await queryOne(
+        `SELECT awb_number, status, shipment_status FROM orders
+         WHERE id = $1 AND status != 'draft' AND (
+           user_id = $2 OR
+           customer_email = $3 OR
+           ($4::text IS NOT NULL AND customer_phone = $4)
+         )`,
+        [id, authUser.userId, email, phone]
+      )
+    } else {
+      order = await queryOne(
+        `SELECT awb_number, status, shipment_status FROM orders WHERE id = $1 AND user_id = $2`,
+        [id, authUser.userId]
+      )
+    }
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.awb_number) return NextResponse.json({ tracking: null })

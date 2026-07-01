@@ -473,6 +473,7 @@ export default async function ProductsPage({
                         brandName={product.brands?.name ?? null}
                         categoryName={product.categories?.name ?? null}
                         categoryId={product.categories?.id ?? null}
+                        extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
                       />
                     )
                   })}

@@ -12,9 +12,13 @@ import RetryPaymentEmailButton from '@/components/admin/RetryPaymentEmailButton'
 import CreateShipmentButton from '@/components/admin/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import CustomerMailPanel from '@/components/admin/CustomerMailPanel'
+import MailLogsPanel from '@/components/admin/MailLogsPanel'
+import ExtendEddButton from '@/components/admin/ExtendEddButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -25,8 +29,11 @@ function UnitLabel({ label }: { label: string | null | undefined }) {
 
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
 
-export default async function OrderDetailsPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function OrderDetailsPage({ params, searchParams }: { params: Promise<{ id: string }>, searchParams?: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const { id } = await params
+  const resolvedSearchParams = searchParams ? await searchParams : undefined
+  const back = resolvedSearchParams?.back
+  const backUrl = (typeof back === 'string' && back.startsWith('/admin/orders')) ? back : '/admin/orders'
   const host = await getHost()
   const order = await getOrder(id).catch(() => null)
 
@@ -40,11 +47,41 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
     (order.payment_status === 'failed' || order.payment_status === 'unpaid') &&
     (Date.now() - new Date(order.created_at).getTime()) / 3600000 < 24
 
+  const eddDateStr = order.estimated_delivery_date
+    ? (order.estimated_delivery_date instanceof Date
+        ? order.estimated_delivery_date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+        : String(order.estimated_delivery_date).slice(0, 10))
+    : null
+  const edd = eddDateStr
+    ? new Date(eddDateStr + 'T00:00:00Z').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })
+    : null
+  const rawEdd: string | null = eddDateStr ?? null
+
+  let eddLabel = 'Expected Delivery'
+  let eddLabelColor = 'text-foreground-muted'
+  if (eddDateStr) {
+    if (order.status === 'delivered') {
+      eddLabel = 'Delivered'
+      eddLabelColor = 'text-green-500'
+    } else if (order.status === 'out_for_delivery') {
+      eddLabel = 'Arriving Today'
+      eddLabelColor = 'text-accent-500'
+    } else {
+      const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+      todayIST.setHours(0, 0, 0, 0)
+      const eddDate = new Date(eddDateStr + 'T00:00:00Z')
+      const diffDays = Math.round((eddDate.getTime() - todayIST.getTime()) / 86400000)
+      if (diffDays === 0) { eddLabel = 'Arriving Today'; eddLabelColor = 'text-accent-500' }
+      else if (diffDays === 1) { eddLabel = 'Arriving Tomorrow'; eddLabelColor = 'text-accent-500' }
+      else if (diffDays < 0) { eddLabel = 'Delayed'; eddLabelColor = 'text-orange-500' }
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
         <Link
-          href={ap('/admin/orders', host)}
+          href={ap(backUrl, host)}
           className="text-accent-500 hover:text-accent-600 text-sm mb-2 inline-block"
         >
           ← Back to Orders
@@ -212,8 +249,21 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
               <div className="space-y-4">
                 {order.order_items && order.order_items.length > 0 ? (
                   order.order_items.map((item: any) => (
-                    <div key={item.id} className="flex justify-between items-start pb-4 border-b border-border-default last:border-0">
-                      <div className="flex-1">
+                    <div key={item.id} className="flex gap-3 items-start pb-4 border-b border-border-default last:border-0">
+                      {item.products?.image_url ? (
+                        <img
+                          src={item.products.image_url}
+                          alt={item.product_name || item.products?.name || ''}
+                          className="w-14 h-14 rounded-lg object-cover border border-border-default shrink-0"
+                        />
+                      ) : (
+                        <div className="w-14 h-14 rounded-lg bg-surface-secondary border border-border-default shrink-0 flex items-center justify-center">
+                          <svg className="w-6 h-6 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M9 9.75a2.25 2.25 0 100-4.5 2.25 2.25 0 000 4.5z" />
+                          </svg>
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
                         <h3 className="font-medium text-foreground">
                           {item.product_id ? (
                             <Link href={ap(`/admin/products/${item.product_id}`, host)} target="_blank" className="hover:underline text-orange-600 dark:text-orange-400">
@@ -245,7 +295,7 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                           })()}
                         </p>
                       </div>
-                      <div className="text-right">
+                      <div className="text-right shrink-0">
                         <p className="font-semibold text-foreground">
                           Rs. {Number(item.total_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                         </p>
@@ -471,6 +521,8 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
             }
             customerEmail={order.users?.email || order.billing_email || ''}
           />
+
+          <MailLogsPanel orderId={order.id} />
         </div>
 
         <div className="space-y-4 sm:space-y-6">
@@ -535,6 +587,21 @@ export default async function OrderDetailsPage({ params }: { params: Promise<{ i
                   <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
                   <p>{order.shipping_address.country || 'India'}</p>
                   {order.shipping_address.phone && <p className="mt-2">Phone: +91 {order.shipping_address.phone.replace(/^\+91|^91/, '')}</p>}
+                  {edd && (
+                    <div className="mt-4 px-4 py-3 rounded-xl border border-border-default bg-surface">
+                      <div className="flex items-center gap-3">
+                        <svg className="w-8 h-8 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13 16V5a1 1 0 00-1-1H4a1 1 0 00-1 1v11m10 0h-3M6 16H3m4-7h6l3 5"/>
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <p className={`text-xs font-medium ${eddLabelColor}`}>{eddLabel}</p>
+                          <p className="font-bold text-foreground">{edd}</p>
+                        </div>
+                      </div>
+                      {order.status !== 'delivered' && <ExtendEddButton orderId={order.id} currentEdd={rawEdd} />}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <p className="text-sm text-foreground-muted">No shipping address</p>

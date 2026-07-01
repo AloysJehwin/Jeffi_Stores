@@ -18,7 +18,7 @@ export default function ProductImage({ thumbnailUrl, altText }: ProductImageProp
   }
 
   return (
-    <div className="h-10 w-10 rounded overflow-hidden">
+    <div className="h-10 w-10 rounded overflow-hidden border border-border-default">
       <ImgWithSkeleton src={thumbnailUrl} alt={altText} className="w-full h-full object-cover" />
     </div>
   )

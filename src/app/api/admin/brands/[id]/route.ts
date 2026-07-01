@@ -34,6 +34,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const computedSlug = slug?.trim() || name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 
+  const existingBrand = await queryOne<any>('SELECT is_active FROM brands WHERE id = $1', [id])
+
   await query(
     `UPDATE brands SET
       name = $1, slug = $2, description = $3, website = $4, logo_url = $5, is_active = $6,
@@ -46,6 +48,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       id,
     ]
   )
+
+  if (existingBrand && existingBrand.is_active !== !!is_active) {
+    await query('UPDATE products SET is_active = $1 WHERE brand_id = $2', [!!is_active, id])
+  }
 
   revalidatePath('/admin/brands')
 

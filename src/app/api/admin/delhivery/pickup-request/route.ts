@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryMany, query } from '@/lib/db'
+import { queryMany, queryOne, query } from '@/lib/db'
 
 const TOKEN = process.env.DELHIVERY_API_KEY
 const PICKUP_LOCATION = process.env.DELHIVERY_PICKUP_LOCATION || 'Jeffi Stores'
@@ -9,11 +9,82 @@ const DELHIVERY_PICKUP_URL = 'https://track.delhivery.com/fm/request/new/'
 
 const EXCLUDE_STATUSES = ['shipped', 'delivered', 'cancelled', 'returned', 'return_requested', 'return_approved', 'return_received', 'return_rejected']
 
+// AWB status types that indicate the shipment has been physically picked up
+const PICKED_UP_TYPES = new Set(['PU', 'IT', 'RAD', 'OT', 'OD', 'DL', 'RTO', 'RTRN', 'RTO-IT', 'RTO-OT', 'RTO-OFD', 'RTO-DL'])
+const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
+
+/** Resolve a Delhivery rawStatusType to a canonical code (walks scans for ambiguous types) */
+function resolveStatusCode(rawType: string, scans: { scanType?: string | null; activity?: string | null }[]): string {
+  if (!EXCEPTION_TYPES.has(rawType) && rawType !== 'PP' && rawType !== 'MF') return rawType
+  for (const scan of [...scans].reverse()) {
+    const t = (scan.scanType ?? '').toUpperCase()
+    if (t && !EXCEPTION_TYPES.has(t) && t !== 'PP' && t !== 'MF') return t
+    const a = (scan.activity ?? '').toLowerCase()
+    if (a.includes('out for delivery')) return 'OD'
+    if (a.includes('rto delivered') || a.includes('returned to origin')) return 'RTO-DL'
+    if (a.includes('out for return')) return 'RTO-OT'
+    if (a.includes('return in transit') || a.includes('in return transit')) return 'RTO-IT'
+    if (a.includes('rto initiated') || a.includes('return initiated')) return 'RTO'
+    if (a.includes('in transit') || a === 'transit') return 'IT'
+    if (a.includes('picked up') || a.includes('shipment picked') || a.includes('pickup')) return 'PU'
+    if (a === 'manifested' || a.includes('manifest')) return 'MF'
+    if (a.includes('delivered')) return 'DL'
+  }
+  return rawType
+}
+
 export async function GET(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+    // ?poll=<db_id> — fetch live AWB status for a specific pickup request
+    const pollId = request.nextUrl.searchParams.get('poll')
+    if (pollId) {
+      if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
+
+      const req = await queryOne<{ id: string; awbs: string[]; pickup_status: string }>(
+        `SELECT id, awbs, pickup_status FROM delhivery_pickup_requests WHERE id = $1`,
+        [pollId]
+      )
+      if (!req) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+      if (req.awbs.length === 0) return NextResponse.json({ pickup_status: req.pickup_status, updated: false })
+
+      const res = await fetch(
+        `https://track.delhivery.com/api/v1/packages/json/?waybill=${req.awbs.join(',')}`,
+        { headers: { Authorization: `Token ${TOKEN}` }, next: { revalidate: 0 } }
+      )
+      if (!res.ok) return NextResponse.json({ error: 'Tracking unavailable' }, { status: 502 })
+
+      const data = await res.json()
+      const shipments: any[] = data?.ShipmentData ?? []
+
+      let anyPickedUp = false
+      for (const entry of shipments) {
+        const shipment = entry?.Shipment
+        if (!shipment) continue
+        const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
+        const scans = (shipment.Scans ?? []).map((s: any) => ({
+          scanType: s.ScanDetail?.ScanType ?? null,
+          activity: s.ScanDetail?.Scan ?? null,
+        }))
+        const resolved = resolveStatusCode(rawType, scans)
+        if (PICKED_UP_TYPES.has(resolved)) { anyPickedUp = true; break }
+      }
+
+      let newStatus = req.pickup_status
+      if (anyPickedUp && req.pickup_status === 'pending') {
+        await query(
+          `UPDATE delhivery_pickup_requests SET pickup_status = 'picked_up', updated_at = NOW() WHERE id = $1`,
+          [pollId]
+        )
+        newStatus = 'picked_up'
+      }
+
+      return NextResponse.json({ pickup_status: newStatus, updated: newStatus !== req.pickup_status })
+    }
 
     const [orders, pickupHistory] = await Promise.all([
       queryMany(`
@@ -154,7 +225,7 @@ export async function POST(request: NextRequest) {
       }, { status: 422 })
     }
 
-    const pickupId = data.id || data.pickup_id || data.pk || null
+    const pickupId = data.pickup_id ?? null
 
     await query(
       `INSERT INTO delhivery_pickup_requests (pickup_id, pickup_date, awb_count, awbs, raw_response, pickup_status)

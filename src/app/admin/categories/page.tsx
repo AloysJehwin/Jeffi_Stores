@@ -34,6 +34,15 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
   const totalCategories = allCategories.length
   const subCategoriesCount = totalCategories - mainCategoriesCount
 
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (resolvedSearchParams.type) params.set('type', resolvedSearchParams.type)
+    const qs = params.toString()
+    return `/admin/categories${qs ? `?${qs}` : ''}`
+  })()
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -98,6 +107,7 @@ export default async function CategoriesPage({ searchParams }: { searchParams: P
         productCounts={productCounts}
         initialSearch={resolvedSearchParams.search || ''}
         initialType={resolvedSearchParams.type || ''}
+        backUrl={currentListUrl}
       />
     </div>
   )

@@ -35,6 +35,7 @@ interface CategoryFormProps {
   categories: Category[]
   action: (formData: FormData) => Promise<void>
   category?: any
+  backUrl?: string
 }
 
 function IconPreview({ name, className }: { name: string; className?: string }) {
@@ -91,7 +92,7 @@ function resolveIconByName(name: string): string {
   return 'Package'
 }
 
-export default function CategoryForm({ categories, action, category }: CategoryFormProps) {
+export default function CategoryForm({ categories, action, category, backUrl }: CategoryFormProps) {
   const isSubcat = !!category?.parent_category_id
   const isCurrentlyInherited = isSubcat && category?.return_allowed == null
 
@@ -163,6 +164,7 @@ export default function CategoryForm({ categories, action, category }: CategoryF
 
   return (
     <form onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+      {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">

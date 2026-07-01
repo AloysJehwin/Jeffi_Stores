@@ -15,9 +15,12 @@ interface ReviewForm {
 }
 interface Coupon { id: string; code: string; description: string | null }
 
-export default async function EditReviewFormPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditReviewFormPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const { id } = await params
+  const resolvedSearchParams = await searchParams
   const host = await getHost()
+  const back = resolvedSearchParams?.back
+  const backUrl = back && back.startsWith('/admin/review-forms') ? back : '/admin/review-forms'
   const [form, coupons] = await Promise.all([
     queryOne<ReviewForm>('SELECT * FROM review_forms WHERE id = $1', [id]),
     queryMany<Coupon>('SELECT id, code, description FROM coupons WHERE is_active = true ORDER BY code'),
@@ -27,7 +30,7 @@ export default async function EditReviewFormPage({ params }: { params: Promise<{
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href={ap('/admin/review-forms', host)} className="text-foreground-muted hover:text-foreground transition-colors">
+        <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">Edit Review Form</h1>
@@ -37,6 +40,7 @@ export default async function EditReviewFormPage({ params }: { params: Promise<{
         submitLabel="Save Changes"
         coupons={coupons}
         formId={form.id}
+        backUrl={backUrl}
         defaultValues={{
           title: form.title,
           slug: form.slug,
