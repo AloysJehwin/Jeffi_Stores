@@ -567,74 +567,74 @@ export default function ProductActions({
             </p>
           </div>
 
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <label className="block text-sm font-medium text-foreground-secondary mb-2">
+          <div>
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <label className="text-sm font-medium text-foreground-secondary">
                 Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
               </label>
-              <QuantityInput
-                dimension={sellUnit?.dimension ?? 'count'}
-                quantity={quantity}
-                quantityRaw={quantityRaw}
-                unitLabel={effectiveUnitLabel}
-                unitKey={effectiveUnitKey}
-                effectiveStock={effectiveStock}
-                qtyStep={qtyStep}
-                qtyMin={qtyMin}
-                qtyMax={qtyMax}
-                onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
-              />
-            </div>
-            <div className="text-right">
-              {effectiveStock > 0 ? (
-                <div className="flex items-center justify-end gap-2">
-                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
-                </div>
-              ) : (
-                <div className="flex items-center justify-end gap-2">
-                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
-                </div>
-              )}
-              {edd && effectiveStock > 0 && (
-                <div className="mt-1 relative">
-                  <p className="text-xs text-foreground-secondary whitespace-nowrap">
-                    Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-                    {selectedPin && (
-                      <> · <span className="font-medium">{selectedPin}</span>
-                        {addresses.length > 0 && (
+              <div className="text-right">
+                {effectiveStock > 0 ? (
+                  <div className="flex items-center justify-end gap-2">
+                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-end gap-2">
+                    <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
+                  </div>
+                )}
+                {edd && effectiveStock > 0 && (
+                  <div className="relative">
+                    <p className="text-xs text-foreground-secondary whitespace-nowrap">
+                      Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                      {selectedPin && (
+                        <> · <span className="font-medium">{selectedPin}</span>
+                          {addresses.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAddressPicker(v => !v)}
+                              className="ml-1 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:no-underline"
+                            >Change</button>
+                          )}
+                        </>
+                      )}
+                    </p>
+                    {showAddressPicker && (
+                      <div className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1">
+                        {addresses.map((a, i) => (
                           <button
+                            key={i}
                             type="button"
-                            onClick={() => setShowAddressPicker(v => !v)}
-                            className="ml-1 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:no-underline"
-                          >Change</button>
-                        )}
-                      </>
+                            onClick={() => pickAddress(a.postal_code)}
+                            className="w-full text-left px-3 py-2 hover:bg-surface-hover text-xs"
+                          >
+                            <span className="font-medium block">{a.full_name}</span>
+                            <span className="text-foreground-secondary">{a.city}, {a.state} – {a.postal_code}</span>
+                          </button>
+                        ))}
+                      </div>
                     )}
-                  </p>
-                  {showAddressPicker && (
-                    <div className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1">
-                      {addresses.map((a, i) => (
-                        <button
-                          key={i}
-                          type="button"
-                          onClick={() => pickAddress(a.postal_code)}
-                          className="w-full text-left px-3 py-2 hover:bg-surface-hover text-xs"
-                        >
-                          <span className="font-medium block">{a.full_name}</span>
-                          <span className="text-foreground-secondary">{a.city}, {a.state} – {a.postal_code}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
+            <QuantityInput
+              dimension={sellUnit?.dimension ?? 'count'}
+              quantity={quantity}
+              quantityRaw={quantityRaw}
+              unitLabel={effectiveUnitLabel}
+              unitKey={effectiveUnitKey}
+              effectiveStock={effectiveStock}
+              qtyStep={qtyStep}
+              qtyMin={qtyMin}
+              qtyMax={qtyMax}
+              onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
+            />
           </div>
         </>
       )}
