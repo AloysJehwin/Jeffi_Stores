@@ -206,3 +206,6 @@ CREATE TABLE public.return_requests (
     rvp_created_at timestamp with time zone
 );
 
+-- Live migration (idempotent)
+ALTER TABLE orders ADD COLUMN IF NOT EXISTS estimated_delivery_date date;
+
