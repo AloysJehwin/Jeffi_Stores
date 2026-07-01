@@ -34,7 +34,7 @@ function addDays(from: Date, days: number): Date {
 
 export async function GET(request: NextRequest) {
   const pin = request.nextUrl.searchParams.get('pin') ?? ''
-  const tat = /^\d{6}$/.test(pin) ? getTat(pin) : 14
+  const tat = /^\d{6}$/.test(pin) ? getTat(pin) : 7
   const edd = addDays(new Date(), tat).toISOString().slice(0, 10)
   return NextResponse.json({ edd })
 }
