@@ -64,6 +64,8 @@ export interface InvoiceOrder {
   signed_qr_code?: string | null
   payment_link_url?: string | null
   eway_bill_no?: string | null
+  payment_transaction_id?: string | null
+  estimated_delivery_date?: string | null
 }
 
 export interface InvoiceBuyerAddress {
@@ -259,7 +261,7 @@ export async function generateInvoicePDF(
     const metaRowH = 18
     const metaRows = [
       { left: 'Invoice No.', leftVal: order.invoice_number, right: 'Dated', rightVal: formatDate(order.invoice_date) },
-      { left: 'Delivery Note', leftVal: order.tracking_number || '', right: 'Mode/Terms of Payment', rightVal: order.payment_mode || 'Online Payment' },
+      { left: 'Delivery Note', leftVal: order.payment_transaction_id || order.tracking_number || '', right: 'Mode/Terms of Payment', rightVal: order.payment_mode || 'Online Payment' },
       { left: 'Reference No. & Date.', leftVal: '', right: 'Other References', rightVal: '' },
       { left: "Buyer's Order No.", leftVal: order.order_number, right: 'Dated', rightVal: order.order_date ? formatDate(order.order_date) : '' },
       { left: 'Dispatch Doc No.', leftVal: order.tracking_number || '', right: 'Delivery Note Date', rightVal: order.shipped_at ? formatDate(order.shipped_at) : '' },
@@ -281,6 +283,9 @@ export async function generateInvoicePDF(
 
     drawRect(doc, metaX, my, metaW, metaRowH)
     doc.font(F).fontSize(6).text('Terms of Delivery', metaX + 2, my + 2, { width: metaW - 4 })
+    if (order.estimated_delivery_date) {
+      doc.font(FB).fontSize(7).text(`Expected Delivery: ${formatDate(order.estimated_delivery_date)}`, metaX + 2, my + 9, { width: metaW - 4 })
+    }
     my += metaRowH
 
     const sellerEndY = Math.max(sy + 4, my)

@@ -149,6 +149,11 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     [orderId]
   )
 
+  const paymentRecord = await queryOne(
+    `SELECT transaction_id FROM payments WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed' LIMIT 1`,
+    [orderId]
+  )
+
   const invoiceOrder: InvoiceOrder = {
     order_number: order.order_number,
     invoice_number: invoiceData.invoiceNumber,
@@ -178,6 +183,8 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     signed_qr_code: order.signed_qr || null,
     payment_link_url: order.payment_link_url || null,
     eway_bill_no: order.eway_bill_no || null,
+    payment_transaction_id: paymentRecord?.transaction_id || null,
+    estimated_delivery_date: order.estimated_delivery_date || null,
   }
 
   const invoiceItems: InvoiceOrderItem[] = (updatedItems || []).map((item: any) => ({
