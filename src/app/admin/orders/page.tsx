@@ -13,7 +13,7 @@ export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const resolvedSearchParams = await searchParams
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
@@ -43,16 +43,29 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
-    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
-    if (resolvedSearchParams.payment_status) params.set('payment_status', resolvedSearchParams.payment_status)
-    if (resolvedSearchParams.source) params.set('source', resolvedSearchParams.source)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status as string)
+    if (resolvedSearchParams.payment_status) params.set('payment_status', resolvedSearchParams.payment_status as string)
+    if (resolvedSearchParams.source) params.set('source', resolvedSearchParams.source as string)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search as string)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
     const qs = params.toString()
     return ap(`/admin/orders${qs ? `?${qs}` : ''}`, host)
   }
+
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status as string)
+    if (resolvedSearchParams.payment_status) params.set('payment_status', resolvedSearchParams.payment_status as string)
+    if (resolvedSearchParams.source) params.set('source', resolvedSearchParams.source as string)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search as string)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    return `/admin/orders${qs ? `?${qs}` : ''}`
+  })()
 
   return (
     <div className="p-4 sm:p-6">
@@ -143,7 +156,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               key={order.id}
               className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4"
             >
-              <Link href={ap(`/admin/orders/${order.id}`, host)} className="block">
+              <Link href={ap(`/admin/orders/${order.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="block">
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-semibold text-foreground">
@@ -188,6 +201,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     {order.payment_status}
                   </span>
                 </div>
+                {order.estimated_delivery_date && (
+                  <div className="text-xs text-foreground-muted mt-1">
+                    EDD: <span className="text-foreground">{new Date(order.estimated_delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+                  </div>
+                )}
               </Link>
               <div className="flex items-center gap-3 mt-3 pt-3 border-t border-border-default">
                 <a
@@ -247,6 +265,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                 <SortableHeader label="Source" column="source" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
                 <SortableHeader label="Customer" column="customer" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
                 <SortableHeader label="Date" column="date" options={sortOptions('date')} currentSort={sort} currentDir={dir} />
+                <th className="px-6 py-3 text-left text-xs font-medium text-foreground-muted uppercase tracking-wider">EDD</th>
                 <SortableHeader label="Total" column="total" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
                 <SortableHeader label="Payment" column="payment" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
                 <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
@@ -254,7 +273,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              <OrdersTableRows orders={orders ?? []} />
+              <OrdersTableRows orders={orders ?? []} backUrl={currentListUrl} />
             </tbody>
           </table>
         </div>

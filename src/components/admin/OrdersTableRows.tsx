@@ -75,13 +75,13 @@ function CustomerPopover({ order }: { order: any }) {
   )
 }
 
-export default function OrdersTableRows({ orders }: { orders: any[] }) {
+export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: { orders: any[], backUrl?: string }) {
   const [selected, setSelected] = useState<any>(null)
 
   if (!orders.length) {
     return (
       <tr>
-        <td colSpan={8} className="px-6 py-12 text-center text-foreground-muted">No orders found.</td>
+        <td colSpan={9} className="px-6 py-12 text-center text-foreground-muted">No orders found.</td>
       </tr>
     )
   }
@@ -99,7 +99,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
             <HoverCard
               trigger={
                 <a
-                  href={ap(`/admin/orders/${order.id}`)}
+                  href={ap(`/admin/orders/${order.id}?back=${encodeURIComponent(backUrl)}`)}
                   className="font-mono font-semibold text-accent-500 hover:text-accent-600 underline decoration-dotted underline-offset-2"
                   onClick={e => e.stopPropagation()}
                 >
@@ -149,6 +149,12 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
               <div className="text-sm text-foreground">{new Date(order.created_at).toLocaleDateString('en-IN')}</div>
               <div className="text-xs text-foreground-muted">{new Date(order.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Kolkata' })}</div>
             </div>
+          </td>
+          <td className="px-6 py-4 whitespace-nowrap">
+            {order.estimated_delivery_date
+              ? <span className="text-sm text-foreground">{new Date(order.estimated_delivery_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
+              : <span className="text-sm text-foreground-muted">--</span>
+            }
           </td>
           <td className="px-6 py-4 whitespace-nowrap">
             <span className="text-sm font-medium text-foreground">
@@ -205,7 +211,7 @@ export default function OrdersTableRows({ orders }: { orders: any[] }) {
                 </a>
               )}
               <Link
-                href={ap(`/admin/orders/${order.id}`)}
+                href={ap(`/admin/orders/${order.id}?back=${encodeURIComponent(backUrl)}`)}
                 title="View Details"
                 className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
               >

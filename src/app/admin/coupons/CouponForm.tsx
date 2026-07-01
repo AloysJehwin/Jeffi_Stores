@@ -13,6 +13,7 @@ interface CouponFormProps {
   action: (formData: FormData) => Promise<void>
   submitLabel: string
   showUserSelector?: boolean
+  backUrl?: string
   defaultValues?: {
     code?: string
     discount_type?: string
@@ -36,7 +37,7 @@ const DISCOUNT_TYPE_OPTIONS = [
 const inputClass = 'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
-export default function CouponForm({ action, submitLabel, showUserSelector = false, defaultValues: d = {} }: CouponFormProps) {
+export default function CouponForm({ action, submitLabel, showUserSelector = false, backUrl, defaultValues: d = {} }: CouponFormProps) {
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
   const [validFrom, setValidFrom] = useState(d.valid_from ?? '')
   const [validUntil, setValidUntil] = useState(d.valid_until ?? '')
@@ -44,6 +45,7 @@ export default function CouponForm({ action, submitLabel, showUserSelector = fal
 
   return (
     <form action={action} className="space-y-5">
+      {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div className="xl:col-span-2 space-y-5">
           <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
@@ -195,7 +197,7 @@ export default function CouponForm({ action, submitLabel, showUserSelector = fal
       )}
 
       <div className="flex gap-3 pt-2 sticky bottom-0 bg-surface/90 backdrop-blur py-3 -mx-4 sm:-mx-6 px-4 sm:px-6 border-t border-border-default">
-        <Link href={ap('/admin/coupons')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
+        <Link href={ap(backUrl ?? '/admin/coupons')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
           Cancel
         </Link>
         <button type="submit" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">

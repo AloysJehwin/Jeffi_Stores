@@ -83,6 +83,14 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
     return ap(`/admin/mailer${s ? `?${s}` : ''}`, host)
   }
 
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    return `/admin/mailer${qs ? `?${qs}` : ''}`
+  })()
+
   if (migrationPending) {
     return (
       <div className="p-4 sm:p-6">
@@ -133,7 +141,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
               {campaigns.map(c => (
                 <tr key={c.id} className="hover:bg-surface-secondary/50 transition-colors">
                   <td className="px-4 py-3">
-                    <Link href={ap(`/admin/mailer/${c.id}`, host)} className="font-medium text-foreground hover:text-accent-500 transition-colors">{c.title}</Link>
+                    <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="font-medium text-foreground hover:text-accent-500 transition-colors">{c.title}</Link>
                     <p className="text-xs text-foreground-muted truncate max-w-[200px]">{c.subject}</p>
                   </td>
                   <td className="px-4 py-3 text-foreground-secondary">{TEMPLATE_LABELS[c.template_key] || c.template_key}</td>
@@ -156,7 +164,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
                       {(c.status === 'draft' || c.status === 'scheduled') && (
                         <DispatchCampaignButton id={c.id} />
                       )}
-                      <Link href={ap(`/admin/mailer/${c.id}`, host)} className="text-accent-500 hover:underline text-sm">View</Link>
+                      <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 hover:underline text-sm">View</Link>
                       {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
                     </div>
                   </td>
@@ -173,7 +181,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
           {campaigns.map(c => (
             <div key={c.id} className="p-4 space-y-2">
               <div className="flex items-start justify-between gap-2">
-                <Link href={ap(`/admin/mailer/${c.id}`, host)} className="font-medium text-foreground">{c.title}</Link>
+                <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="font-medium text-foreground">{c.title}</Link>
                 <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 capitalize ${STATUS_STYLES[c.status] || 'bg-gray-100 text-gray-600'}`}>
                   {c.status}
                 </span>
@@ -182,7 +190,7 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
               {c.recipient_count != null && <p className="text-xs text-foreground-muted">{c.recipient_count} recipients</p>}
               <div className="flex gap-3 pt-1">
                 {(c.status === 'draft' || c.status === 'scheduled') && <DispatchCampaignButton id={c.id} />}
-                <Link href={ap(`/admin/mailer/${c.id}`, host)} className="text-xs text-accent-500 hover:underline">View</Link>
+                <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-xs text-accent-500 hover:underline">View</Link>
                 {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
               </div>
             </div>

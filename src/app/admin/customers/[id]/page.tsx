@@ -79,11 +79,13 @@ export default async function CustomerDetailPage({
   params,
   searchParams }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ chat?: string }>
+  searchParams: Promise<{ chat?: string; back?: string }>
 }) {
   const { id } = await params
   const resolvedSearchParams = await searchParams
   const host = await getHost()
+  const back = resolvedSearchParams?.back
+  const backUrl = back && back.startsWith('/admin/customers') ? back : '/admin/customers'
   let customer: any
   try {
     customer = await getCustomerById(id)
@@ -108,7 +110,7 @@ export default async function CustomerDetailPage({
     <div className="p-4 sm:p-6 max-w-full space-y-5">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
-        <Link href={ap('/admin/customers', host)} className="text-accent-500 hover:text-accent-600 transition-colors">
+        <Link href={ap(backUrl, host)} className="text-accent-500 hover:text-accent-600 transition-colors">
           Customers
         </Link>
         <span>/</span>

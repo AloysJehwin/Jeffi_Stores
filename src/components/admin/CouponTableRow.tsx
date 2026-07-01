@@ -22,7 +22,7 @@ interface CouponRow {
   generated_for_campaign: string | null
 }
 
-export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
+export default function CouponTableRow({ coupon: c, backUrl = '/admin/coupons' }: { coupon: CouponRow; backUrl?: string }) {
   const isExpired = c.valid_until && new Date(c.valid_until) < new Date()
   const [open, setOpen] = useState(false)
 
@@ -99,7 +99,7 @@ export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
               </div>
               <div className="flex gap-3 pt-1 border-t border-border-default">
                 <Link
-                  href={ap(`/admin/coupons/edit/${c.id}`)}
+                  href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(backUrl)}`)}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
                   onClick={() => setOpen(false)}
                 >
@@ -117,7 +117,7 @@ export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
             <HoverCard
               trigger={
                 <Link
-                  href={ap(`/admin/coupons/edit/${c.id}`)}
+                  href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(backUrl)}`)}
                   className="text-accent-500 hover:text-accent-600 hover:underline transition-colors"
                   onClick={e => e.stopPropagation()}
                 >
@@ -193,7 +193,7 @@ export default function CouponTableRow({ coupon: c }: { coupon: CouponRow }) {
         </td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3">
-            <Link href={ap(`/admin/coupons/edit/${c.id}`)} className="text-accent-500 hover:underline text-sm">Edit</Link>
+            <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 hover:underline text-sm">Edit</Link>
             <DeleteCouponButton id={c.id} code={c.code} />
           </div>
         </td>
