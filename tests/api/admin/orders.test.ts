@@ -38,12 +38,14 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne, queryMany } from '@/lib/db'
 import { hasScope } from '@/lib/scopes'
 import { parseBody } from '@/lib/validate'
+import { sendAuditedMail } from '@/lib/mail-audit'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)
 const mockHasScope = vi.mocked(hasScope)
 const mockParseBody = vi.mocked(parseBody)
+const mockSendAuditedMail = vi.mocked(sendAuditedMail)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -143,7 +145,10 @@ describe('GET /api/admin/orders/[id]', () => {
 })
 
 describe('PATCH /api/admin/orders/[id]', () => {
-  beforeEach(() => vi.resetAllMocks())
+  beforeEach(() => {
+    vi.resetAllMocks()
+    mockSendAuditedMail.mockResolvedValue({ messageId: 'msg-1' } as any)
+  })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValue(null)
@@ -195,5 +200,78 @@ describe('PATCH /api/admin/orders/[id]', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.ok).toBe(true)
+  })
+
+  it('returns ok on notes update', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { notes: 'Handle with care' } } as any)
+    mockQueryOne.mockResolvedValue(null)
+
+    const req = makeRequest('PATCH', 'order-1', { notes: 'Handle with care' })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+  })
+
+  it('returns 400 when updating EDD on a delivered order', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { estimated_delivery_date: '2025-12-31' } } as any)
+    mockQueryOne.mockResolvedValueOnce({ status: 'delivered' })
+
+    const req = makeRequest('PATCH', 'order-1', { estimated_delivery_date: '2025-12-31' })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/delivered/i)
+  })
+
+  it('returns ok on EDD update for non-delivered order, sends email when order has email', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { estimated_delivery_date: '2025-12-31' } } as any)
+    // 1st queryOne: EDD guard — non-delivered status
+    // 2nd queryOne: UPDATE
+    // 3rd queryOne: order lookup for email
+    mockQueryOne
+      .mockResolvedValueOnce({ status: 'processing' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ order_number: 'ORD-001', id: 'order-1', email: 'customer@example.com', first_name: 'John' })
+
+    const req = makeRequest('PATCH', 'order-1', { estimated_delivery_date: '2025-12-31' })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.ok).toBe(true)
+  })
+
+  it('returns ok on EDD update when order has no email (skips mail)', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { estimated_delivery_date: '2025-12-31' } } as any)
+    mockQueryOne
+      .mockResolvedValueOnce({ status: 'processing' })
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ order_number: 'ORD-001', id: 'order-1', email: null, first_name: null })
+
+    const req = makeRequest('PATCH', 'order-1', { estimated_delivery_date: '2025-12-31' })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
+    expect(res.status).toBe(200)
+  })
+
+  it('returns ok on EDD update when EDD guard returns null (no current row)', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { estimated_delivery_date: '2025-12-31' } } as any)
+    mockQueryOne
+      .mockResolvedValueOnce(null)  // EDD guard — order not found, non-delivered
+      .mockResolvedValueOnce(null)  // UPDATE
+      .mockResolvedValueOnce(null)  // order lookup for email — null
+
+    const req = makeRequest('PATCH', 'order-1', { estimated_delivery_date: '2025-12-31' })
+    const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
+    expect(res.status).toBe(200)
   })
 })
