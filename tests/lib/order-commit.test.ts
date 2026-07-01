@@ -71,6 +71,7 @@ function makeCartLine(overrides: Partial<CartLine> = {}): CartLine {
       hsn_code: '8501',
       category_id: null,
       mrp: null,
+      extra_delivery_days: null,
     },
     variant: null,
     sub_variant: null,

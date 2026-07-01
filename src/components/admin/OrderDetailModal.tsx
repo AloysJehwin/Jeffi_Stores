@@ -5,6 +5,33 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 
+const METRO_PINS_3 = new Set([
+  '110','111','112','400','401','402','403','410','421',
+  '560','561','562','563','600','601','602','603',
+  '500','501','502','503','700','711','712','411','412','413','380','382','383',
+])
+function getTatDays(pin: string): number {
+  if (pin.startsWith('49')) return 7
+  if (METRO_PINS_3.has(pin.slice(0, 3))) return 10
+  return 14
+}
+function resolveOrderEdd(o: any): string | null {
+  const isShipped = ['shipped', 'out_for_delivery', 'delivered'].includes(o.status)
+  if (isShipped && o.estimated_delivery_date) {
+    return new Date(o.estimated_delivery_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+  }
+  const pin: string = o.shipping_address?.postal_code ?? ''
+  if (!pin) return null
+  const maxExtra = (o.order_items ?? []).reduce((max: number, item: any) => {
+    const d = Number(item.products?.extra_delivery_days ?? 0)
+    return d > max ? d : max
+  }, 0)
+  const tat = (/^\d{6}$/.test(pin) ? getTatDays(pin) : 7) + maxExtra
+  const d = new Date(o.created_at)
+  d.setDate(d.getDate() + tat)
+  return d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
+}
+
 interface Props {
   order: any | null
   onClose: () => void
@@ -249,14 +276,14 @@ export default function OrderDetailModal({ order, onClose }: Props) {
               Shipping Label
             </a>
             )}
-            {o.estimated_delivery_date && (
+            {(() => { const e = resolveOrderEdd(o); return e ? (
               <span className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
                 <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
-                EDD: {new Date(o.estimated_delivery_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                EDD: {e}
               </span>
-            )}
+            ) : null })()}
             {o.invoice_number && (
             <a
               href={`/api/orders/${order.id}/invoice`}

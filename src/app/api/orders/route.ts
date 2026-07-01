@@ -49,7 +49,11 @@ export async function GET(request: NextRequest) {
         SELECT
           o.id, o.order_number, o.created_at, o.status, o.payment_status, o.payment_mode,
           o.total_amount, o.subtotal, o.shipping_address_id,
-          o.razorpay_qr_image_url,
+          o.razorpay_qr_image_url, o.awb_number,
+          CASE WHEN o.estimated_delivery_date IS NOT NULL
+            THEN to_char(o.estimated_delivery_date, 'YYYY-MM-DD')
+            ELSE NULL
+          END AS estimated_delivery_date,
           COALESCE(
             o.shipping_address_snapshot,
             (SELECT to_jsonb(a) FROM (
@@ -65,6 +69,7 @@ export async function GET(request: NextRequest) {
                 'buy_mode', oi.buy_mode, 'buy_unit', oi.buy_unit,
                 'products', json_build_object(
                   'slug', pr.slug,
+                  'extra_delivery_days', pr.extra_delivery_days,
                   'product_images', COALESCE(
                     (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
                      FROM product_images pi WHERE pi.product_id = pr.id),
@@ -87,8 +92,7 @@ export async function GET(request: NextRequest) {
     ])
 
     return NextResponse.json({ orders, total, page, pageSize: PAGE_SIZE })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

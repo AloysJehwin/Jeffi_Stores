@@ -529,7 +529,25 @@ export async function getFilteredProducts(filters: {
           FROM product_sub_variants sv
           JOIN product_variants pv ON pv.id = sv.variant_id
           WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.mrp IS NOT NULL AND sv.mrp > 0
-        ) AS combined_mrps) AS variant_min_mrp
+        ) AS combined_mrps) AS variant_min_mrp,
+        COALESCE(
+          (SELECT json_agg(
+            json_build_object(
+              'id', pv.id,
+              'variant_name', pv.variant_name,
+              'inventory_quantity', pv.inventory_quantity,
+              'stock_status', pv.stock_status,
+              'sub_variant_inventory_total', COALESCE((SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0),
+              'sub_variant_stock_total', COALESCE((SELECT COUNT(*) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true AND sv.stock_status != 'Out of Stock'), 0),
+              'sub_variants', COALESCE(
+                (SELECT json_agg(json_build_object('id', sv.id, 'sub_variant_name', sv.sub_variant_name, 'inventory_quantity', sv.inventory_quantity, 'stock_status', sv.stock_status) ORDER BY sv.id)
+                 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true),
+                '[]'::json
+              )
+            ) ORDER BY pv.id
+          ) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
+          '[]'::json
+        ) AS product_variants
       FROM products p
       LEFT JOIN categories c ON p.category_id = c.id
       LEFT JOIN categories pc ON c.parent_category_id = pc.id
@@ -996,7 +1014,9 @@ export async function getOrder(id: string) {
             'products', json_build_object(
               'id', pr.id, 'name', pr.name, 'sku', pr.sku,
               'slug', pr.slug,
-              'inventory_quantity', pr.inventory_quantity
+              'inventory_quantity', pr.inventory_quantity,
+              'extra_delivery_days', pr.extra_delivery_days,
+              'image_url', (SELECT COALESCE(pi2.thumbnail_url, pi2.image_url) FROM product_images pi2 WHERE pi2.product_id = pr.id AND pi2.is_primary = true LIMIT 1)
             ),
             'variant', CASE WHEN oi.variant_id IS NOT NULL THEN
               json_build_object(
@@ -1023,8 +1043,14 @@ export async function getOrder(id: string) {
         WHERE oi.order_id = o.id),
         '[]'::json
       ) AS order_items,
-      (SELECT row_to_json(sa) FROM addresses sa WHERE sa.id = o.shipping_address_id) AS shipping_address,
-      (SELECT row_to_json(ba) FROM addresses ba WHERE ba.id = o.billing_address_id) AS billing_address,
+      COALESCE(
+        (SELECT row_to_json(sa) FROM addresses sa WHERE sa.id = o.shipping_address_id),
+        o.shipping_address_snapshot::json
+      ) AS shipping_address,
+      COALESCE(
+        (SELECT row_to_json(ba) FROM addresses ba WHERE ba.id = o.billing_address_id),
+        o.billing_address_snapshot::json
+      ) AS billing_address,
       COALESCE(
         (SELECT json_agg(pay) FROM payments pay WHERE pay.order_id = o.id),
         '[]'::json

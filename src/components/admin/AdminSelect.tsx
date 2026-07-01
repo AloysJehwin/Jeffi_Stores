@@ -27,6 +27,7 @@ interface AdminSelectProps {
   compact?: boolean
   sm?: boolean
   xs?: boolean
+  md?: boolean
 }
 
 export default function AdminSelect({
@@ -46,6 +47,7 @@ export default function AdminSelect({
   compact = false,
   sm = false,
   xs = false,
+  md = false,
 }: AdminSelectProps) {
   const [internalValue, setInternalValue] = useState(defaultValue)
   const [isOpen, setIsOpen] = useState(false)
@@ -176,7 +178,7 @@ export default function AdminSelect({
           onKeyDown={handleKeyDown}
           className={`w-full bg-surface border text-left transition-all cursor-pointer flex items-center justify-between
             ${compact || xs ? 'rounded' : 'rounded-lg'}
-            ${compact ? 'px-2 py-0.5 text-xs gap-1 leading-none' : xs ? 'px-1.5 py-1 text-xs gap-1 leading-none h-[26px]' : sm ? 'px-2 py-1.5 text-sm gap-2' : 'px-4 py-2 text-sm gap-2'}
+            ${compact ? 'px-2 py-0.5 text-xs gap-1 leading-none' : xs ? 'px-1.5 py-1 text-xs gap-1 leading-none h-[26px]' : sm ? 'px-2 py-1.5 text-sm gap-2' : md ? 'px-3 py-2 text-sm gap-2' : 'px-3 py-2 text-sm gap-2'}
             ${isOpen ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-secondary hover:border-border-default'}
             ${error ? 'border-red-400 ring-red-500' : ''}
             ${disabled ? 'opacity-50 cursor-not-allowed bg-surface-secondary' : ''}
@@ -186,7 +188,7 @@ export default function AdminSelect({
             {displayLabel}
           </span>
           <svg
-            className={`text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${compact || xs ? 'w-3 h-3' : 'w-4 h-4'}`}
+            className={`text-foreground-muted shrink-0 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''} ${compact || xs || md ? 'w-3 h-3' : 'w-4 h-4'}`}
             fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
           >
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />

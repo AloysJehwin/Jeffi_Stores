@@ -6,6 +6,7 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
+import { resolveEdd } from '@/lib/edd-cache'
 
 interface ProductCardProps {
   id: string
@@ -37,24 +38,8 @@ export default function ProductCard({
   const [edd, setEdd] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!user) {
-      fetch(`/api/products/edd${extraDeliveryDays > 0 ? '?extraDays=' + extraDeliveryDays : ''}`)
-        .then(r => r.ok ? r.json() : null)
-        .then(d => { if (d?.edd) setEdd(d.edd) })
-        .catch(() => {})
-      return
-    }
-    fetch('/api/user/addresses')
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        const list = d?.addresses ?? []
-        const pin = list.find((a: any) => a.is_default)?.postal_code ?? list[0]?.postal_code ?? null
-        return fetch(`/api/products/edd${pin ? '?pin=' + pin : ''}${extraDeliveryDays > 0 ? (pin ? '&' : '?') + 'extraDays=' + extraDeliveryDays : ''}`)
-      })
-      .then(r => r?.ok ? r.json() : null)
-      .then(d => { if (d?.edd) setEdd(d.edd) })
-      .catch(() => {})
-  }, [user])
+    resolveEdd(!!user, extraDeliveryDays).then(v => { if (v) setEdd(v) })
+  }, [user, extraDeliveryDays])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
