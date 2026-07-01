@@ -168,6 +168,9 @@ async function updateProduct(productId: string, formData: FormData) {
       setClauses.push(`mpn = $${params.length + 1}`, `gtin = $${params.length + 2}`)
       params.push(mpn, gtin)
     }
+    const extraDeliveryDays = parseInt(formData.get('extra_delivery_days') as string || '0') || 0
+    setClauses.push(`extra_delivery_days = $${params.length + 1}`)
+    params.push(extraDeliveryDays)
     params.push(productId)
     await query(
       `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`,

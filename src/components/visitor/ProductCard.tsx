@@ -20,11 +20,13 @@ interface ProductCardProps {
   brandName?: string | null
   categoryName?: string | null
   discountPct?: number
+  extraDeliveryDays?: number
 }
 
 export default function ProductCard({
   id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
   effectiveStock, primaryImage, brandName, categoryName, discountPct = 0,
+  extraDeliveryDays = 0,
 }: ProductCardProps) {
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
@@ -36,7 +38,7 @@ export default function ProductCard({
 
   useEffect(() => {
     if (!user) {
-      fetch('/api/products/edd')
+      fetch(`/api/products/edd${extraDeliveryDays > 0 ? '?extraDays=' + extraDeliveryDays : ''}`)
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.edd) setEdd(d.edd) })
         .catch(() => {})
@@ -47,7 +49,7 @@ export default function ProductCard({
       .then(d => {
         const list = d?.addresses ?? []
         const pin = list.find((a: any) => a.is_default)?.postal_code ?? list[0]?.postal_code ?? null
-        return fetch(`/api/products/edd${pin ? '?pin=' + pin : ''}`)
+        return fetch(`/api/products/edd${pin ? '?pin=' + pin : ''}${extraDeliveryDays > 0 ? (pin ? '&' : '?') + 'extraDays=' + extraDeliveryDays : ''}`)
       })
       .then(r => r?.ok ? r.json() : null)
       .then(d => { if (d?.edd) setEdd(d.edd) })

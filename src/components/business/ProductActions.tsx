@@ -80,6 +80,7 @@ interface ProductActionsProps {
   categoryId?: string | null
   productUnits?: ProductUnit[]
   sellUnitId?: string | null
+  extraDeliveryDays?: number
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -109,7 +110,7 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onSelectionChange, onUnitChange, categoryId,
-  productUnits: productUnitsProp, sellUnitId,
+  productUnits: productUnitsProp, sellUnitId, extraDeliveryDays = 0,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -121,7 +122,7 @@ export default function ProductActions({
   const [showAddressPicker, setShowAddressPicker] = useState(false)
   useEffect(() => {
     if (!user) {
-      fetch('/api/products/edd')
+      fetch(`/api/products/edd${extraDeliveryDays > 0 ? '?extraDays=' + extraDeliveryDays : ''}`)
         .then(r => r.ok ? r.json() : null)
         .then(d => { if (d?.edd) setEdd(d.edd) })
         .catch(() => {})
@@ -134,7 +135,7 @@ export default function ProductActions({
         setAddresses(list)
         const pin = list.find((a: any) => a.is_default)?.postal_code ?? list[0]?.postal_code ?? null
         setSelectedPin(pin)
-        return fetch(`/api/products/edd${pin ? '?pin=' + pin : ''}`)
+        return fetch(`/api/products/edd${pin ? '?pin=' + pin : ''}${extraDeliveryDays > 0 ? (pin ? '&' : '?') + 'extraDays=' + extraDeliveryDays : ''}`)
       })
       .then(r => r?.ok ? r.json() : null)
       .then(d => { if (d?.edd) setEdd(d.edd) })
@@ -143,7 +144,7 @@ export default function ProductActions({
   function pickAddress(pin: string) {
     setSelectedPin(pin)
     setShowAddressPicker(false)
-    fetch(`/api/products/edd?pin=${pin}`)
+    fetch(`/api/products/edd?pin=${pin}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.edd) setEdd(d.edd) })
       .catch(() => {})

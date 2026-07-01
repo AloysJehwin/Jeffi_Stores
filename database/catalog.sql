@@ -256,6 +256,7 @@ CREATE TABLE public.products (
     height_cm numeric(6,2) DEFAULT 10,
     package_type character varying(30),
     cost_price numeric(12,2) DEFAULT 0,
+    extra_delivery_days integer DEFAULT 0 NOT NULL,
     inventory_quantity numeric(14,3) DEFAULT 0 NOT NULL,
     mrp_ex_gst numeric(12,2),
     sub_variant_type character varying(100),
@@ -300,3 +301,6 @@ CREATE TABLE public.variant_images (
     updated_at timestamp with time zone DEFAULT now()
 );
 
+
+-- Live migration (idempotent)
+ALTER TABLE products ADD COLUMN IF NOT EXISTS extra_delivery_days integer DEFAULT 0 NOT NULL;
