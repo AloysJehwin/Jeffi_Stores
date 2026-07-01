@@ -54,6 +54,14 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
     return ap(`/admin/review-forms${qs ? `?${qs}` : ''}`, host)
   }
 
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    return `/admin/review-forms${qs ? `?${qs}` : ''}`
+  })()
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -89,7 +97,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                   <tr key={f.id} className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 font-medium">
                       <Link
-                        href={ap(`/admin/review-forms/edit/${f.id}`, host)}
+                        href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
                         className="text-foreground hover:text-accent-500 transition-colors"
                       >
                         {f.title}
@@ -134,7 +142,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-3">
-                        <Link href={ap(`/admin/review-forms/edit/${f.id}`, host)} className="text-accent-500 hover:underline text-sm">Edit</Link>
+                        <Link href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 hover:underline text-sm">Edit</Link>
                         <DeleteReviewFormButton id={f.id} title={f.title} />
                       </div>
                     </td>
@@ -164,7 +172,7 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
                 <div className="flex gap-3 pt-1">
                   <a href={formUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-foreground-muted hover:underline">Open ↗</a>
                   <Link href={ap(`/admin/review-forms/${f.id}/submissions`, host)} className="text-xs text-accent-500 hover:underline">Submissions</Link>
-                  <Link href={ap(`/admin/review-forms/edit/${f.id}`, host)} className="text-xs text-accent-500 hover:underline">Edit</Link>
+                  <Link href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-xs text-accent-500 hover:underline">Edit</Link>
                   <DeleteReviewFormButton id={f.id} title={f.title} />
                 </div>
               </div>

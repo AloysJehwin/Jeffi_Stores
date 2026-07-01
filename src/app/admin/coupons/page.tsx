@@ -90,6 +90,18 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
     return ap(`/admin/coupons${qs ? `?${qs}` : ''}`, host)
   }
 
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (campaign) params.set('campaign', campaign)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    return `/admin/coupons${qs ? `?${qs}` : ''}`
+  })()
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -147,7 +159,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
             </thead>
             <tbody className="divide-y divide-border-default">
               {(coupons as CouponRow[]).map(c => (
-                <CouponTableRow key={c.id} coupon={c} />
+                <CouponTableRow key={c.id} coupon={c} backUrl={currentListUrl} />
               ))}
               {coupons.length === 0 && (
                 <tr><td colSpan={8} className="px-4 py-8 text-center text-foreground-muted">No coupons found</td></tr>
@@ -179,7 +191,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
                 {c.valid_until && ` · Expires ${new Date(c.valid_until).toLocaleDateString('en-IN')}`}
               </div>
               <div className="flex gap-3 pt-1">
-                <Link href={ap(`/admin/coupons/edit/${c.id}`, host)} className="text-sm text-accent-500 hover:underline">Edit</Link>
+                <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">Edit</Link>
                 <DeleteCouponButton id={c.id} code={c.code} />
               </div>
             </div>
