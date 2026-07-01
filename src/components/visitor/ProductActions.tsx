@@ -554,48 +554,49 @@ export default function ProductActions({
             </p>
           </div>
 
-          <div>
-            {effectiveStock > 0 ? (
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
-              </div>
-            )}
-            {edd && effectiveStock > 0 && (
-              <p className="text-xs text-foreground-secondary mt-1">
-                Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-              </p>
-            )}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              {effectiveStock > 0 ? (
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
+                </div>
+              )}
+              {edd && effectiveStock > 0 && (
+                <p className="text-xs text-foreground-secondary mt-1">
+                  Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-foreground-secondary mb-2">
+                Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
+              </label>
+              <QuantityInput
+                dimension={sellUnit?.dimension ?? 'count'}
+                quantity={quantity}
+                quantityRaw={quantityRaw}
+                unitLabel={effectiveUnitLabel}
+                unitKey={effectiveUnitKey}
+                effectiveStock={effectiveStock}
+                qtyStep={qtyStep}
+                qtyMin={qtyMin}
+                qtyMax={qtyMax}
+                onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
+              />
+            </div>
           </div>
         </>
       )}
-
-      <div>
-        <label className="block text-sm font-medium text-foreground-secondary mb-2">
-          Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
-        </label>
-        <QuantityInput
-          dimension={sellUnit?.dimension ?? 'count'}
-          quantity={quantity}
-          quantityRaw={quantityRaw}
-          unitLabel={effectiveUnitLabel}
-          unitKey={effectiveUnitKey}
-          effectiveStock={effectiveStock}
-          qtyStep={qtyStep}
-          qtyMin={qtyMin}
-          qtyMax={qtyMax}
-          onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
-        />
-      </div>
 
       <div className="space-y-3">
         <button
