@@ -1,0 +1,80 @@
+- generic [active] [ref=e1]:
+  - button "Open Next.js Dev Tools" [ref=e7] [cursor=pointer]:
+    - img [ref=e8]
+  - alert [ref=e11]
+  - generic [ref=e13]:
+    - generic [ref=e14]:
+      - generic [ref=e15]:
+        - heading "PURCHASE ORDER" [level=1] [ref=e16]
+        - paragraph [ref=e17]: "#PO-20260623-0001"
+        - generic [ref=e18]:
+          - generic [ref=e19]: "Date: 23 Jun 2026"
+          - generic [ref=e20]: "Expected by: 26 Jun 2026"
+      - button "Download PDF" [ref=e21] [cursor=pointer]:
+        - img [ref=e22]
+        - text: Download PDF
+    - generic [ref=e24]:
+      - generic [ref=e25]:
+        - generic [ref=e26]:
+          - paragraph [ref=e27]: From
+          - paragraph [ref=e28]: Jeffi Store's
+          - paragraph [ref=e29]: PON MUTHU THOMAS JUBILEE MADURADAS
+          - paragraph [ref=e30]: Near Arihant Complex. Sanjay Gandhi Chowk, Station Road, Raipur, Chhattisgarh - 492001, India
+          - paragraph [ref=e31]: "GSTIN: 22AQFPJ2897M1ZG"
+          - paragraph [ref=e32]: "Ph: 07713585374,9685354099,8903031299"
+          - paragraph [ref=e33]: jeffistoress@gmail.com
+        - generic [ref=e34]:
+          - paragraph [ref=e35]: Supplier
+          - paragraph [ref=e36]: Aloys Jehwin
+          - paragraph [ref=e37]: "Attn: Aloys Jehwin"
+          - paragraph [ref=e38]: 42 VR Balaji Prashanti Niketan Layout
+          - paragraph [ref=e39]: aloysjehwin@gmail.com
+      - table [ref=e41]:
+        - rowgroup [ref=e42]:
+          - row "# Product Purchase Qty Selling Units Unit Cost GST% Amount" [ref=e43]:
+            - columnheader "#" [ref=e44]
+            - columnheader "Product" [ref=e45]
+            - columnheader "Purchase Qty" [ref=e46]
+            - columnheader "Selling Units" [ref=e47]
+            - columnheader "Unit Cost" [ref=e48]
+            - columnheader "GST%" [ref=e49]
+            - columnheader "Amount" [ref=e50]
+        - rowgroup [ref=e51]:
+          - row "1 Color Code Test For Sub Varient products — Horizontal / Horizontal UNB-COLOR-CODE-SUB-HORIZONTAL 250Drum 1 Drum = 50 L 12,500L ₹67.80 incl. GST 18% (incl.) ₹19,999.98" [ref=e52]:
+            - cell "1" [ref=e53]
+            - cell "Color Code Test For Sub Varient products — Horizontal / Horizontal UNB-COLOR-CODE-SUB-HORIZONTAL" [ref=e54]:
+              - text: Color Code Test For Sub Varient products — Horizontal / Horizontal
+              - generic [ref=e55]: UNB-COLOR-CODE-SUB-HORIZONTAL
+            - cell "250Drum 1 Drum = 50 L" [ref=e56]:
+              - text: 250Drum
+              - generic [ref=e57]: 1 Drum = 50 L
+            - cell "12,500L" [ref=e58]
+            - cell "₹67.80 incl. GST" [ref=e59]:
+              - text: ₹67.80
+              - generic [ref=e60]: incl. GST
+            - cell "18% (incl.)" [ref=e61]:
+              - text: 18%
+              - generic [ref=e62]: (incl.)
+            - cell "₹19,999.98" [ref=e63]
+      - generic [ref=e65]:
+        - generic [ref=e66]:
+          - generic [ref=e67]: Subtotal (excl. GST)
+          - generic [ref=e68]: ₹16,949.14
+        - generic [ref=e69]:
+          - generic [ref=e70]: GST @ 18%
+          - generic [ref=e71]: ₹3,050.84
+        - generic [ref=e72]:
+          - generic [ref=e73]: Total
+          - generic [ref=e74]: ₹19,999.98
+      - generic [ref=e75]:
+        - paragraph [ref=e76]: Bank Details
+        - generic [ref=e77]:
+          - generic [ref=e78]: Bank
+          - generic [ref=e79]: ICICI BANK
+          - generic [ref=e80]: Account No.
+          - generic [ref=e81]: "134805001829"
+          - generic [ref=e82]: IFSC
+          - generic [ref=e83]: ICIC0001348
+          - generic [ref=e84]: Branch
+          - generic [ref=e85]: CHOUBEY COLONY, RAIPUR
+      - generic [ref=e86]: This is a computer-generated purchase order. For queries contact jeffistoress@gmail.com.

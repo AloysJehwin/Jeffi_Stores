@@ -1,0 +1,76 @@
+- generic [ref=e3]:
+  - generic [ref=e4]:
+    - generic [ref=e5]:
+      - heading "PURCHASE ORDER" [level=1] [ref=e6]
+      - paragraph [ref=e7]: "#PO-20260623-0001"
+      - generic [ref=e8]:
+        - generic [ref=e9]: "Date: 23 Jun 2026"
+        - generic [ref=e10]: "Expected by: 26 Jun 2026"
+    - button "Download PDF" [ref=e11] [cursor=pointer]:
+      - img [ref=e12]
+      - text: Download PDF
+  - generic [ref=e14]:
+    - generic [ref=e15]:
+      - generic [ref=e16]:
+        - paragraph [ref=e17]: From
+        - paragraph [ref=e18]: Jeffi Store's
+        - paragraph [ref=e19]: PON MUTHU THOMAS JUBILEE MADURADAS
+        - paragraph [ref=e20]: Near Arihant Complex. Sanjay Gandhi Chowk, Station Road, Raipur, Chhattisgarh - 492001, India
+        - paragraph [ref=e21]: "GSTIN: 22AQFPJ2897M1ZG"
+        - paragraph [ref=e22]: "Ph: 07713585374,9685354099,8903031299"
+        - paragraph [ref=e23]: jeffistoress@gmail.com
+      - generic [ref=e24]:
+        - paragraph [ref=e25]: Supplier
+        - paragraph [ref=e26]: Aloys Jehwin
+        - paragraph [ref=e27]: "Attn: Aloys Jehwin"
+        - paragraph [ref=e28]: 42 VR Balaji Prashanti Niketan Layout
+        - paragraph [ref=e29]: aloysjehwin@gmail.com
+    - table [ref=e31]:
+      - rowgroup [ref=e32]:
+        - row "# Product Purchase Qty Selling Units Unit Cost GST% Amount" [ref=e33]:
+          - columnheader "#" [ref=e34]
+          - columnheader "Product" [ref=e35]
+          - columnheader "Purchase Qty" [ref=e36]
+          - columnheader "Selling Units" [ref=e37]
+          - columnheader "Unit Cost" [ref=e38]
+          - columnheader "GST%" [ref=e39]
+          - columnheader "Amount" [ref=e40]
+      - rowgroup [ref=e41]:
+        - row "1 Color Code Test For Sub Varient products — Horizontal / Horizontal UNB-COLOR-CODE-SUB-HORIZONTAL 5Drum 1 Drum = 50 L 250L ₹67.80 incl. GST 18% (incl.) ₹19,999.98" [ref=e42]:
+          - cell "1" [ref=e43]
+          - cell "Color Code Test For Sub Varient products — Horizontal / Horizontal UNB-COLOR-CODE-SUB-HORIZONTAL" [ref=e44]:
+            - text: Color Code Test For Sub Varient products — Horizontal / Horizontal
+            - generic [ref=e45]: UNB-COLOR-CODE-SUB-HORIZONTAL
+          - cell "5Drum 1 Drum = 50 L" [ref=e46]:
+            - text: 5Drum
+            - generic [ref=e47]: 1 Drum = 50 L
+          - cell "250L" [ref=e48]
+          - cell "₹67.80 incl. GST" [ref=e49]:
+            - text: ₹67.80
+            - generic [ref=e50]: incl. GST
+          - cell "18% (incl.)" [ref=e51]:
+            - text: 18%
+            - generic [ref=e52]: (incl.)
+          - cell "₹19,999.98" [ref=e53]
+    - generic [ref=e55]:
+      - generic [ref=e56]:
+        - generic [ref=e57]: Subtotal (excl. GST)
+        - generic [ref=e58]: ₹16,949.14
+      - generic [ref=e59]:
+        - generic [ref=e60]: GST @ 18%
+        - generic [ref=e61]: ₹3,050.84
+      - generic [ref=e62]:
+        - generic [ref=e63]: Total
+        - generic [ref=e64]: ₹19,999.98
+    - generic [ref=e65]:
+      - paragraph [ref=e66]: Bank Details
+      - generic [ref=e67]:
+        - generic [ref=e68]: Bank
+        - generic [ref=e69]: ICICI BANK
+        - generic [ref=e70]: Account No.
+        - generic [ref=e71]: "134805001829"
+        - generic [ref=e72]: IFSC
+        - generic [ref=e73]: ICIC0001348
+        - generic [ref=e74]: Branch
+        - generic [ref=e75]: CHOUBEY COLONY, RAIPUR
+    - generic [ref=e76]: This is a computer-generated purchase order. For queries contact jeffistoress@gmail.com.

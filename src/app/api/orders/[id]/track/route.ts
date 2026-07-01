@@ -14,6 +14,8 @@ export async function GET(
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+    console.log('[track] userId:', authUser.userId, 'isBusiness:', authUser.isBusiness)
+
     const isBusiness = authUser.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
 
     let order: { awb_number: string | null; status: string; shipment_status: string | null } | null
