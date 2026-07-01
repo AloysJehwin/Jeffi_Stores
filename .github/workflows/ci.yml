@@ -343,41 +343,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: us-east-1
-
-      - name: Install PostgreSQL client
-        run: sudo apt-get install -y postgresql-client
-
-      - name: Apply schema to RDS
+      - name: Get EC2 public IP
+        id: ec2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
         run: |
-          export PGHOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
-          export PGPORT=5432
-          export PGDATABASE=jeffi_stores
-          export PGUSER=app_user
-          export PGSSLMODE=require
-          export PGPASSWORD=$(aws rds generate-db-auth-token \
-            --hostname "$PGHOST" \
-            --port "$PGPORT" \
-            --region us-east-1 \
-            --username "$PGUSER")
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "host=$IP" >> $GITHUB_OUTPUT
 
-          echo "Applying schema modules..."
-          for f in database/extensions.sql database/users.sql database/catalog.sql \
-                   database/inventory.sql database/orders.sql database/payments.sql \
-                   database/quotations.sql database/invoices.sql database/marketing.sql \
-                   database/reviews.sql database/crm.sql database/support.sql \
-                   database/ai.sql database/logs.sql database/settings.sql \
-                   database/indexes.sql database/functions.sql database/triggers.sql \
-                   database/constraints.sql; do
-            echo ">> $(basename "$f")"
-            psql -v ON_ERROR_STOP=0 -f "$f"
-          done
-          echo "Schema apply complete."
+      - name: Apply schema to RDS via EC2 tunnel
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ steps.ec2.outputs.host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -e
+            cd /opt/jeffi-stores
+
+            echo "Generating IAM auth token..."
+            PGPASSWORD=$(aws rds generate-db-auth-token \
+              --hostname jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com \
+              --port 5432 \
+              --region us-east-1 \
+              --username app_user)
+            export PGPASSWORD
+
+            echo "Applying schema modules..."
+            for f in database/extensions.sql database/users.sql database/catalog.sql \
+                     database/inventory.sql database/orders.sql database/payments.sql \
+                     database/quotations.sql database/invoices.sql database/marketing.sql \
+                     database/reviews.sql database/crm.sql database/support.sql \
+                     database/ai.sql database/logs.sql database/settings.sql \
+                     database/indexes.sql database/functions.sql database/triggers.sql \
+                     database/constraints.sql; do
+              echo ">> $(basename "$f")"
+              PGSSLMODE=require psql \
+                -h jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com \
+                -p 5432 -U app_user -d jeffi_stores \
+                -v ON_ERROR_STOP=0 -f "$f"
+            done
+            echo "Schema apply complete."
 
   # ────────────────────────────────────────────────────────
   # Stage 6 — Smoke test  (main only, gate: deploy)
