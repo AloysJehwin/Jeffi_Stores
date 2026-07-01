@@ -52,7 +52,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const finalSubject = substituteVars(subject.trim(), vars)
   const finalBody = substituteVars(body.trim(), vars)
 
-  const result = await sendAdminContactEmail(email, name, finalSubject, finalBody, { isHtml: !!isHtml })
+  const result = await sendAdminContactEmail(email, name, finalSubject, finalBody, {
+    isHtml: !!isHtml,
+    entityType: 'orders',
+    entityId: id,
+  })
 
   if (!result.success) {
     return NextResponse.json({ error: 'Failed to send email' }, { status: 500 })

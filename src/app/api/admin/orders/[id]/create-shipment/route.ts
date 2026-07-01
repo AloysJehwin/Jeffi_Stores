@@ -13,6 +13,16 @@ const SELLER_NAME = process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores'
 const SELLER_ADD = process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
 const SELLER_PHONE = process.env.DELHIVERY_SELLER_PHONE || '07713585374'
 
+function addBusinessDays(from: Date, days: number): Date {
+  const d = new Date(from)
+  let added = 0
+  while (added < days) {
+    d.setDate(d.getDate() + 1)
+    if (d.getDay() !== 0) added++ // skip Sundays
+  }
+  return d
+}
+
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const { id } = await params
@@ -164,14 +174,33 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       return NextResponse.json({ error: 'No AWB returned by Delhivery' }, { status: 502 })
     }
 
+    // Fetch TAT (turnaround days) from Delhivery serviceability API — non-fatal
+    let estimatedDeliveryDate: string | null = null
+    try {
+      const tatRes = await fetch(
+        `https://track.delhivery.com/api/kinko/v0.2/pickup/serviceability/?md=S&ss=Delivered&d_pin=${pin}&o_pin=${ORIGIN_PIN}`,
+        { headers: { Authorization: `Token ${TOKEN}` }, next: { revalidate: 0 } }
+      )
+      if (tatRes.ok) {
+        const tatData = await tatRes.json()
+        const tat = tatData?.tat ?? tatData?.[0]?.tat ?? null
+        if (typeof tat === 'number' && tat > 0) {
+          estimatedDeliveryDate = addBusinessDays(new Date(), tat).toISOString().slice(0, 10)
+        }
+      }
+    } catch {
+      // TAT lookup failed — proceed without EDD
+    }
+
     await query(
-      `UPDATE orders SET awb_number = $1, status = 'processing', updated_at = NOW() WHERE id = $2`,
-      [awb, id]
+      `UPDATE orders SET awb_number = $1, status = 'processing', estimated_delivery_date = $3, updated_at = NOW() WHERE id = $2`,
+      [awb, id, estimatedDeliveryDate]
     )
 
     return NextResponse.json({
       awb,
       sortCode: pkg.sort_code,
+      estimatedDeliveryDate,
       message: `Shipment created. AWB: ${awb}`,
     })
   } catch (err: any) {

@@ -49,13 +49,16 @@ export default async function CampaignDetailPage({
   params,
   searchParams }: {
   params: Promise<{ id: string }>
-  searchParams: Promise<{ logPage?: string }>
+  searchParams: Promise<{ logPage?: string; back?: string }>
 }) {
   const { id } = await params
   const resolvedSearchParams = await searchParams
   const host = await getHost()
   const campaign = await queryOne<Campaign>('SELECT * FROM email_campaigns WHERE id = $1', [id])
   if (!campaign) notFound()
+
+  const back = resolvedSearchParams?.back
+  const backUrl = back && back.startsWith('/admin/mailer') ? back : '/admin/mailer'
 
   const logPage = Math.max(1, parseInt(resolvedSearchParams.logPage || '1', 10))
   const logPageSize = 50
@@ -76,7 +79,7 @@ export default async function CampaignDetailPage({
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-3 mb-6">
-        <Link href={ap('/admin/mailer', host)} className="text-foreground-muted hover:text-foreground transition-colors">
+        <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div className="flex-1 min-w-0">

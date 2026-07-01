@@ -108,7 +108,7 @@ async function commitDraft(args: {
     taxAmount = cartTaxAmount(cartItems)
   } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
     const product = await queryOne<any>(
-      `SELECT id, name, sku, gst_percentage, hsn_code, mrp FROM products WHERE id = $1`,
+      `SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`,
       [draft.buyNowItem.productId]
     )
     if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })

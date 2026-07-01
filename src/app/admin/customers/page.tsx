@@ -52,6 +52,20 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
     return ap(`/admin/customers${qs ? `?${qs}` : ''}`, host)
   }
 
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
+    if (resolvedSearchParams.tag) params.set('tag', resolvedSearchParams.tag)
+    if (resolvedSearchParams.health) params.set('health', resolvedSearchParams.health)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    return `/admin/customers${qs ? `?${qs}` : ''}`
+  })()
+
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6">
@@ -211,7 +225,7 @@ export default async function CustomersPage({ searchParams }: { searchParams: Pr
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              <CustomersTableRows customers={customers ?? []} />
+              <CustomersTableRows customers={customers ?? []} backUrl={currentListUrl} />
             </tbody>
           </table>
         </div>

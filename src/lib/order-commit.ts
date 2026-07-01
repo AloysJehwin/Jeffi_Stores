@@ -24,6 +24,7 @@ export interface CartLine {
     hsn_code: string | null
     category_id: string | null
     mrp: number | null
+    extra_delivery_days: number | null
   }
   variant: { id: string; variant_name: string; sku: string; price: number | null; price_ex_gst: number | null; mrp: number | null } | null
   sub_variant: { id: string; sub_variant_name: string; sku: string | null; price: number | null; price_ex_gst: number | null; mrp: number | null } | null
@@ -38,7 +39,8 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
         'id', p.id, 'name', p.name, 'sku', p.sku,
         'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
         'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
-        'category_id', p.category_id, 'mrp', p.mrp
+        'category_id', p.category_id, 'mrp', p.mrp,
+        'extra_delivery_days', p.extra_delivery_days
       ) AS products,
       CASE WHEN ci.variant_id IS NOT NULL THEN
         json_build_object(
@@ -287,6 +289,22 @@ export async function getMinOrderAmount(): Promise<number> {
   return row ? parseFloat(row.value) || 0 : 0
 }
 
+function getTat(pin: string): number {
+  if (/^49/.test(pin)) return 7
+  if (/^\d{3}/.test(pin)) {
+    const prefix3 = parseInt(pin.slice(0, 3), 10)
+    const metro = [110, 400, 500, 600, 700, 560, 380]
+    if (metro.includes(prefix3)) return 10
+  }
+  return 14
+}
+
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date)
+  d.setDate(d.getDate() + days)
+  return d
+}
+
 interface ShippingQuoteItem {
   productId: string
   variantId?: string | null
@@ -357,7 +375,7 @@ export interface CartCommitInput extends CommitInput {
 export interface BuyNowCommitInput extends CommitInput {
   mode: 'buyNow'
   item: DraftBuyNowItem
-  product: { id: string; name: string; sku: string | null; gst_percentage: string | number | null; hsn_code: string | null; mrp: number | null }
+  product: { id: string; name: string; sku: string | null; gst_percentage: string | number | null; hsn_code: string | null; mrp: number | null; extra_delivery_days?: number | null }
   variant: { id: string; variant_name: string; sku: string; mrp: number | null } | null
   subVariant: { id: string; sub_variant_name: string; sku: string | null; mrp: number | null } | null
   subtotal: number
@@ -388,6 +406,13 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
   return withTransaction(async (client) => {
     const address = await ensureAddressOnOrder(client, input.userId, input.addressId)
     if (!address) throw new Error('Address not found')
+
+    const pin = String(address.postal_code ?? '')
+    const maxExtraDays = input.mode === 'cart'
+      ? Math.max(0, ...input.cartItems.map(i => Number(i.products.extra_delivery_days ?? 0)))
+      : Number(input.product.extra_delivery_days ?? 0)
+    const tat = (/^\d{6}$/.test(pin) ? getTat(pin) : 7) + maxExtraDays
+    const estimatedDeliveryDate = addDays(new Date(), tat).toISOString().slice(0, 10)
 
     const customerName = `${input.user.first_name || ''} ${input.user.last_name || ''}`.trim() || 'Customer'
     const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'
@@ -524,9 +549,10 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         tax_amount, shipping_amount, total_amount,
         shipping_address_id, billing_address_id, notes,
         taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst,
-        order_type, shipping_address_snapshot, billing_address_snapshot
+        order_type, shipping_address_snapshot, billing_address_snapshot,
+        estimated_delivery_date
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
       RETURNING id, order_number, total_amount, status`,
       [
         orderNumber, input.userId, input.user.email, input.user.phone, customerName,
@@ -540,6 +566,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
         input.mode === 'buyNow' ? 'direct' : 'cart',
         addressSnapshot, addressSnapshot,
+        estimatedDeliveryDate,
       ]
     )
     const created = orderResult.rows[0]

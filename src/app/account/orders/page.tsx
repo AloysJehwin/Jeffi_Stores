@@ -20,6 +20,7 @@ interface OrderItem {
   buy_unit?: string | null
   products: {
     slug: string
+    extra_delivery_days?: number | null
     product_images: Array<{
       thumbnail_url: string
       is_primary: boolean
@@ -35,6 +36,8 @@ interface Order {
   payment_status: string
   total_amount: number
   subtotal: number
+  awb_number: string | null
+  estimated_delivery_date: string | null
   addresses: {
     address_line1: string
     address_line2?: string
@@ -43,6 +46,23 @@ interface Order {
     postal_code: string
   }
   order_items: OrderItem[]
+}
+
+function resolveOrderEdd(order: Order): string | null {
+  if (!order.estimated_delivery_date) return null
+  return new Date(order.estimated_delivery_date + 'T00:00:00Z').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' })
+}
+function getEddDisplay(order: Order, edd: string): { label: string; color: string } {
+  if (order.status === 'delivered') return { label: edd ? 'Delivered · ' + edd : 'Delivered', color: 'text-green-600 dark:text-green-400' }
+  if (order.status === 'out_for_delivery') return { label: 'Arriving Today', color: 'text-accent-500' }
+  const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
+  todayIST.setHours(0, 0, 0, 0)
+  const eddDate = new Date(edd + ' 00:00:00')
+  const diffDays = Math.round((eddDate.getTime() - todayIST.getTime()) / 86400000)
+  if (diffDays === 0) return { label: 'Arriving Today', color: 'text-accent-500' }
+  if (diffDays === 1) return { label: 'Arriving Tomorrow', color: 'text-accent-500' }
+  if (diffDays < 0) return { label: 'Delayed · ' + edd, color: 'text-orange-500 dark:text-orange-400' }
+  return { label: 'Est. ' + edd, color: 'text-foreground-muted' }
 }
 
 function getStatusColor(status: string) {
@@ -232,6 +252,14 @@ export default function OrdersPage() {
                           <span>{orderDate}</span>
                           <span className="w-px h-3 bg-border-default" />
                           <span className="font-semibold text-foreground">₹{order.total_amount.toLocaleString('en-IN')}</span>
+                          {(() => { const e = resolveOrderEdd(order); return e && !['cancelled', 'returned'].includes(order.status) ? (
+                            <>
+                              <span className="w-px h-3 bg-border-default" />
+                              <span className={`font-medium ${getEddDisplay(order, e).color}`}>
+                                {getEddDisplay(order, e).label}
+                              </span>
+                            </>
+                          ) : null })()}
                         </div>
                       </div>
                       <div className="px-4 py-3">
@@ -298,6 +326,12 @@ export default function OrdersPage() {
                               <p className="text-xs text-foreground-muted mb-1">Total</p>
                               <p className="text-sm font-semibold text-foreground">₹{order.total_amount.toLocaleString('en-IN')}</p>
                             </div>
+                            {(() => { const e = resolveOrderEdd(order); return e && !['cancelled', 'returned'].includes(order.status) ? (
+                              <div>
+                                <p className="text-xs text-foreground-muted mb-1">Delivery</p>
+                                <p className={`text-sm font-medium ${getEddDisplay(order, e).color}`}>{getEddDisplay(order, e).label}</p>
+                              </div>
+                            ) : null })()}
                           </div>
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(order.status)}`}>
                             {getStatusLabel(order.status)}
@@ -306,7 +340,7 @@ export default function OrdersPage() {
                       </div>
                       <div className="p-6">
                         <div className="space-y-4">
-                          {order.order_items.map((item) => {
+                          {order.order_items.slice(0, 2).map((item) => {
                             const primaryImage = item.products?.product_images?.find(img => img.is_primary) || item.products?.product_images?.[0]
                             return (
                               <div key={item.id} className="flex gap-4">
@@ -333,6 +367,26 @@ export default function OrdersPage() {
                               </div>
                             )
                           })}
+                          {order.order_items.length > 2 && (
+                            <Link href={`/account/orders/${order.id}`} className="flex items-center gap-3 text-sm text-foreground-muted hover:text-accent-600 dark:hover:text-accent-400 transition-colors">
+                              <div className="relative h-12 w-16 flex-shrink-0">
+                                {order.order_items.slice(2, Math.min(order.order_items.length, 5)).map((item, idx) => {
+                                  const img = item.products?.product_images?.find(i => i.is_primary) || item.products?.product_images?.[0]
+                                  const bgColors = ['bg-white', 'bg-zinc-800', 'bg-zinc-600']
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      className={`absolute rounded-xl overflow-hidden border-2 border-border-default ${bgColors[idx]}`}
+                                      style={{ width: 44, height: 44, top: idx * 4, left: idx * 8, zIndex: 10 - idx }}
+                                    >
+                                      {img && <img src={img.thumbnail_url} alt="" className="w-full h-full object-cover" />}
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                              +{order.order_items.length - 2} more item{order.order_items.length - 2 > 1 ? 's' : ''} — View all
+                            </Link>
+                          )}
                         </div>
                         {order.addresses && (
                           <div className="mt-6 pt-6 border-t border-border-default">

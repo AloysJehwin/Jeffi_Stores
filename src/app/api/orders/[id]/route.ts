@@ -5,6 +5,7 @@ import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/li
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice } from '@/lib/invoice'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
+import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { logStockMovement } from '@/lib/inventory'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
@@ -79,7 +80,7 @@ export async function GET(
     const orderItems = await queryMany(`
       SELECT oi.id, oi.product_id, oi.product_name, oi.product_sku, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price, oi.buy_mode, oi.buy_unit,
         psv.sub_variant_name, psv.sku AS sub_variant_sku,
-        json_build_object('slug', p.slug, 'product_images',
+        json_build_object('slug', p.slug, 'extra_delivery_days', p.extra_delivery_days, 'product_images',
           COALESCE(
             (SELECT json_agg(pi ORDER BY pi.display_order)
              FROM product_images pi WHERE pi.product_id = p.id),
@@ -140,6 +141,11 @@ export async function GET(
       notes: order.notes,
       trackingUrl: order.tracking_url || null,
       awbNumber: order.awb_number || null,
+      estimatedDeliveryDate: order.estimated_delivery_date
+        ? (order.estimated_delivery_date instanceof Date
+            ? order.estimated_delivery_date.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' })
+            : String(order.estimated_delivery_date).slice(0, 10))
+        : null,
       originalOrderId: order.original_order_id || null,
       originalOrderNumber: order.original_order_number || null,
       orderType: order.order_type || 'cart',
@@ -332,15 +338,56 @@ export async function PATCH(
         }).catch(() => {})
 
         if (status === 'cancelled' && currentOrder.payment_status === 'paid' && (payment_status !== 'refunded')) {
-          createAutoTask({
-            userId: currentOrder.user_id,
-            sourceKind: 'process_refund',
-            sourceRefId: orderId,
-            title: `Issue refund for cancelled #${currentOrder.order_number}`,
-            description: `Order was paid (₹${currentOrder.total_amount}) and is now cancelled — refund the customer.`,
-            priority: 'urgent',
-            dueInDays: 0,
-          }).catch(() => {})
+          // Attempt automatic Razorpay refund; fall back to manual task on failure
+          ;(async () => {
+            try {
+              if (!isRazorpayEnabled()) throw new Error('Razorpay disabled')
+              const paymentRecord = await queryOne<{ id: string; transaction_id: string; amount: string }>(
+                `SELECT id, transaction_id, amount FROM payments WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed' LIMIT 1`,
+                [orderId]
+              )
+              if (!paymentRecord?.transaction_id) throw new Error('No Razorpay payment found')
+              const razorpay = getRazorpayInstance()
+              const amountInPaise = Math.round(parseFloat(paymentRecord.amount) * 100)
+              const refund = await razorpay.payments.refund(paymentRecord.transaction_id, { amount: amountInPaise })
+              await query(
+                `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
+                [JSON.stringify(refund), paymentRecord.id]
+              )
+              await query(
+                `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
+                [orderId]
+              )
+              sendPaymentStatusUpdate(
+                currentOrder.customer_email,
+                currentOrder.customer_name,
+                currentOrder.order_number,
+                orderId,
+                'refunded',
+                parseFloat(currentOrder.total_amount)
+              ).catch(() => {})
+              logActivity({
+                userId: currentOrder.user_id,
+                actorId: admin.adminId,
+                kind: 'payment_status',
+                referenceId: orderId,
+                referenceType: 'orders',
+                summary: `Auto-refund issued for cancelled order #${currentOrder.order_number}`,
+                metadata: { refundId: (refund as any).id, amount: paymentRecord.amount },
+              }).catch(() => {})
+              completeAutoTask('process_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
+            } catch {
+              createAutoTask({
+                userId: currentOrder.user_id,
+                sourceKind: 'process_refund',
+                sourceRefId: orderId,
+                title: `Issue refund for cancelled #${currentOrder.order_number}`,
+                description: `Order was paid (₹${currentOrder.total_amount}) and is now cancelled — refund the customer.`,
+                priority: 'urgent',
+                dueInDays: 0,
+              }).catch(() => {})
+            }
+          })()
         }
 
         if (status === 'processing') {

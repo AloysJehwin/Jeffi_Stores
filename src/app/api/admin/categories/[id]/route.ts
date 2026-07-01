@@ -56,6 +56,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   revalidatePath('/admin/categories')
 
+  if (before && 'is_active' in body && before.is_active !== !!is_active) {
+    await query('UPDATE products SET is_active = $1 WHERE category_id = $2', [!!is_active, id])
+    const subcatIds = await query<{ id: string }>(
+      'SELECT id FROM categories WHERE parent_category_id = $1',
+      [id]
+    )
+    for (const sub of subcatIds.rows) {
+      await query('UPDATE products SET is_active = $1 WHERE category_id = $2', [!!is_active, sub.id])
+    }
+  }
+
   const updated = await queryOne<any>('SELECT * FROM categories WHERE id = $1', [id])
 
   return NextResponse.json(updated)

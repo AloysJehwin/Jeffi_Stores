@@ -35,6 +35,8 @@ async function updateCategory(categoryId: string, formData: FormData) {
   const manualIcon = (formData.get('icon_name') as string || '').trim()
   const iconName = manualIcon || await suggestIcon(name)
 
+  const existing = await queryOne<any>('SELECT is_active FROM categories WHERE id = $1', [categoryId])
+
   await query(
     `UPDATE categories SET
       name = $1, slug = $2, description = $3, parent_category_id = $4,
@@ -45,6 +47,17 @@ async function updateCategory(categoryId: string, formData: FormData) {
     [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, iconName, returnAllowed, returnWindowDays, replacementAllowed, replacementWindowDays, new Date().toISOString(), categoryId]
   )
 
+  if (existing && existing.is_active !== isActive) {
+    await query('UPDATE products SET is_active = $1 WHERE category_id = $2', [isActive, categoryId])
+    const subcatResult = await query<{ id: string }>(
+      'SELECT id FROM categories WHERE parent_category_id = $1',
+      [categoryId]
+    )
+    for (const sub of subcatResult.rows) {
+      await query('UPDATE products SET is_active = $1 WHERE category_id = $2', [isActive, sub.id])
+    }
+  }
+
   revalidatePath('/admin/categories')
   revalidatePath('/admin/categories/add')
   revalidatePath('/admin/categories/edit/[id]', 'page')
@@ -53,11 +66,13 @@ async function updateCategory(categoryId: string, formData: FormData) {
 
   
   const host = await getHost()
-  redirect(ap('/admin/categories', host))
+  const back = formData.get('_back') as string | null
+  redirect(ap(back && back.startsWith('/admin/categories') ? back : '/admin/categories', host))
 }
 
-export default async function EditCategoryPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function EditCategoryPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const { id } = await params
+  const { back } = await searchParams
   const category = await getCategory(id).catch(() => null)
 
   if (!category) {
@@ -66,11 +81,12 @@ export default async function EditCategoryPage({ params }: { params: Promise<{ i
 
   const host = await getHost()
   const categories = await getAllCategories()
+  const backUrl = back && back.startsWith('/admin/categories') ? back : '/admin/categories'
 
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
-        <a href={ap('/admin/categories', host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
+        <a href={ap(backUrl, host)} className="flex items-center gap-1.5 text-foreground-muted hover:text-foreground transition-colors">
           <ChevronLeft className="w-4 h-4" />
           Categories
         </a>
@@ -86,6 +102,7 @@ export default async function EditCategoryPage({ params }: { params: Promise<{ i
         categories={categories || []}
         category={category}
         action={updateCategory.bind(null, id)}
+        backUrl={backUrl}
       />
 
       {/* Hero image management — only shown for parent categories */}

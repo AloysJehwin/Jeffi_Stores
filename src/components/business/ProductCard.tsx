@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
+import { resolveEdd } from '@/lib/edd-cache'
 
 interface ProductCardProps {
   id: string
@@ -21,11 +22,13 @@ interface ProductCardProps {
   brandName?: string | null
   categoryName?: string | null
   categoryId?: string | null
+  extraDeliveryDays?: number
 }
 
 export default function ProductCard({
   id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
   effectiveStock, primaryImage, brandName, categoryName, categoryId,
+  extraDeliveryDays = 0,
 }: ProductCardProps) {
   const { user } = useAuth()
 
@@ -38,6 +41,11 @@ export default function ProductCard({
     : mrpDiscount
   const { showToast } = useToast()
   const [showQuickView, setShowQuickView] = useState(false)
+  const [edd, setEdd] = useState<string | null>(null)
+
+  useEffect(() => {
+    resolveEdd(!!user, extraDeliveryDays, 'business').then(v => { if (v) setEdd(v) })
+  }, [user, extraDeliveryDays])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
@@ -181,6 +189,11 @@ export default function ProductCard({
                   </span>
                 </div>
               </div>
+              {edd && effectiveStock > 0 && (
+                <p className="text-[10px] text-foreground-muted mt-0.5">
+                  Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                </p>
+              )}
             </div>
           </div>
         </div>

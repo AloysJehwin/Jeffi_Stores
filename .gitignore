@@ -64,3 +64,10 @@ database/schema-live.sql
 
 # Personal notes (career planning, scratch docs)
 ML_JOURNEY.md
+
+# Claude Code runtime files
+.claude/scheduled_tasks.json
+.claude/scheduled_tasks.lock
+
+# Playwright MCP artifacts
+.playwright-mcp/

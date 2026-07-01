@@ -564,7 +564,7 @@ export default function AccountPage() {
                     <Link key={order.id} href={`/account/orders/${order.id}`} className="flex items-center gap-3 p-3 rounded-xl hover:bg-surface transition-colors group border border-transparent hover:border-border-default">
                       <div className="flex -space-x-2 flex-shrink-0">
                         {order.items.slice(0, 3).map((item, i) => (
-                          <div key={i} className="w-10 h-10 rounded-lg border-2 border-surface-elevated overflow-hidden bg-surface flex items-center justify-center flex-shrink-0">
+                          <div key={i} className="w-10 h-10 rounded-lg border-2 border-border-default overflow-hidden bg-surface flex items-center justify-center flex-shrink-0">
                             {item.thumbnail_url ? (
                               <img src={item.thumbnail_url} alt="" aria-hidden className="w-full h-full object-cover" />
                             ) : (

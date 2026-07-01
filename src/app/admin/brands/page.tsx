@@ -6,6 +6,7 @@ import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import BrandTableRow from '@/components/admin/BrandTableRow'
+import BrandStatusToggle from '@/components/admin/BrandStatusToggle'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -61,6 +62,15 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
     const qs = params.toString()
     return ap(`/admin/brands${qs ? `?${qs}` : ''}`, host)
   }
+
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    return `/admin/brands${qs ? `?${qs}` : ''}`
+  })()
 
   return (
     <div className="p-4 sm:p-6">
@@ -118,13 +128,20 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
                     <div className="text-xs text-foreground-muted mt-1 line-clamp-2">{brand.description}</div>
                   )}
                 </div>
-                <span className={`flex-shrink-0 ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${
-                  brand.is_active
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                    : 'bg-surface-secondary text-foreground'
-                }`}>
-                  {brand.is_active ? 'Active' : 'Inactive'}
-                </span>
+                <BrandStatusToggle
+                  brandId={brand.id}
+                  brandData={{
+                    name: brand.name,
+                    slug: brand.slug,
+                    description: brand.description ?? null,
+                    website: brand.website ?? null,
+                    is_active: brand.is_active,
+                    return_allowed: brand.return_allowed,
+                    return_window_days: brand.return_window_days,
+                    replacement_allowed: brand.replacement_allowed,
+                    replacement_window_days: brand.replacement_window_days,
+                  }}
+                />
               </div>
               <div className="text-xs text-foreground-muted mb-3">{brand.slug}</div>
               {brand.website && (
@@ -135,7 +152,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
                 </div>
               )}
               <div className="flex items-center justify-end gap-3 text-sm">
-                <Link href={ap(`/admin/brands/edit/${brand.id}`, host)} className="text-accent-500 font-medium">
+                <Link href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">
                   Edit
                 </Link>
                 <DeleteBrandButton brandId={brand.id} brandName={brand.name} />
@@ -165,7 +182,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
             <tbody className="divide-y divide-border-default">
               {brands && brands.length > 0 ? (
                 brands.map((brand: any) => (
-                  <BrandTableRow key={brand.id} brand={brand} />
+                  <BrandTableRow key={brand.id} brand={brand} backUrl={currentListUrl} />
                 ))
               ) : (
                 <tr>

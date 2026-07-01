@@ -13,6 +13,7 @@ interface ProductDisplay {
   gst_percentage: number | null
   brand_name: string | null
   category_id: string | null
+  extra_delivery_days: number | null
   variant_name: string | null
   variant_sku: string | null
   variant_mrp: number | null
@@ -60,6 +61,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
        p.name, p.sku, p.mrp::float AS mrp,
        p.gst_percentage::float AS gst_percentage,
        p.category_id,
+       p.extra_delivery_days,
        b.name AS brand_name,
        pv.variant_name, pv.sku AS variant_sku, pv.mrp::float AS variant_mrp,
        psv.sub_variant_name, psv.sku AS sub_variant_sku, psv.mrp::float AS sub_variant_mrp
@@ -101,6 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     mrp,
     gstPercentage: display?.gst_percentage ?? null,
     brandName: display?.brand_name || null,
+    extraDeliveryDays: display?.extra_delivery_days ?? 0,
     businessDiscount,
   })
 }

@@ -175,6 +175,7 @@ CREATE TABLE public.orders (
     needs_delivery boolean DEFAULT false NOT NULL,
     business_discount_amount numeric(12,2) DEFAULT 0 NOT NULL,
     shipment_status text,
+    estimated_delivery_date date,
     CONSTRAINT orders_shipment_status_check CHECK (((shipment_status IS NULL) OR (shipment_status = ANY (ARRAY['created'::text, 'picked_up'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivery_attempted'::text, 'delivered'::text, 'rto_initiated'::text, 'rto_in_transit'::text, 'rto_out_for_return'::text, 'rto_delivered'::text]))))
 );
 

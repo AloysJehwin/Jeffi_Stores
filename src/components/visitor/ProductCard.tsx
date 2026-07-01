@@ -6,6 +6,7 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
+import { resolveEdd } from '@/lib/edd-cache'
 
 interface ProductCardProps {
   id: string
@@ -20,11 +21,13 @@ interface ProductCardProps {
   brandName?: string | null
   categoryName?: string | null
   discountPct?: number
+  extraDeliveryDays?: number
 }
 
 export default function ProductCard({
   id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
   effectiveStock, primaryImage, brandName, categoryName, discountPct = 0,
+  extraDeliveryDays = 0,
 }: ProductCardProps) {
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
@@ -32,6 +35,11 @@ export default function ProductCard({
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [showQuickView, setShowQuickView] = useState(false)
+  const [edd, setEdd] = useState<string | null>(null)
+
+  useEffect(() => {
+    resolveEdd(!!user, extraDeliveryDays).then(v => { if (v) setEdd(v) })
+  }, [user, extraDeliveryDays])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
@@ -212,6 +220,11 @@ export default function ProductCard({
                   View Details &#x2192;
                 </span>
               </div>
+              {edd && effectiveStock > 0 && (
+                <p className="text-[10px] text-foreground-muted mt-0.5">
+                  Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                </p>
+              )}
             </div>
           </div>
         </div>

@@ -8,6 +8,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { bp } from '@/lib/business-path'
 import QuantityInput from '@/components/shared/QuantityInput'
 import { round2 } from '@/lib/gst'
+import { resolveEdd } from '@/lib/edd-cache'
 
 interface VariantImage {
   id: string
@@ -80,6 +81,7 @@ interface ProductActionsProps {
   categoryId?: string | null
   productUnits?: ProductUnit[]
   sellUnitId?: string | null
+  extraDeliveryDays?: number
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -109,12 +111,41 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onSelectionChange, onUnitChange, categoryId,
-  productUnits: productUnitsProp, sellUnitId,
+  productUnits: productUnitsProp, sellUnitId, extraDeliveryDays = 0,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
   const router = useRouter()
   const { user } = useAuth()
+  const [edd, setEdd] = useState<string | null>(null)
+  const [addresses, setAddresses] = useState<any[]>([])
+  const [selectedPin, setSelectedPin] = useState<string | null>(null)
+  const [showAddressPicker, setShowAddressPicker] = useState(false)
+  useEffect(() => {
+    if (!user) {
+      resolveEdd(false, extraDeliveryDays, 'business').then(v => { if (v) setEdd(v) })
+      return
+    }
+    fetch('/api/user/addresses', { headers: { 'X-Auth-Portal': 'business' } })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const list = d?.addresses ?? []
+        setAddresses(list)
+        const pin = list.find((a: any) => a.is_default)?.postal_code ?? list[0]?.postal_code ?? null
+        setSelectedPin(pin)
+        return resolveEdd(true, extraDeliveryDays, 'business')
+      })
+      .then(v => { if (v) setEdd(v) })
+      .catch(() => {})
+  }, [user])
+  function pickAddress(pin: string) {
+    setSelectedPin(pin)
+    setShowAddressPicker(false)
+    fetch(`/api/products/edd?pin=${pin}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d?.edd) setEdd(d.edd) })
+      .catch(() => {})
+  }
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
@@ -609,42 +640,206 @@ export default function ProductActions({
           </div>
 
           <div>
-            {effectiveStock > 0 ? (
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <label className="text-sm font-medium text-foreground-secondary">
+                Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
+              </label>
+              <div className="text-right">
+                {effectiveStock > 0 ? (
+                  <div className="flex items-center justify-end gap-2">
+                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  </div>
+                ) : null}
+                {edd && effectiveStock > 0 && (
+                  <div className="relative">
+                    <p className="text-xs text-foreground-secondary whitespace-nowrap">
+                      Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                      {user && selectedPin && (
+                        <> · <span className="font-medium">{selectedPin}</span>
+                          {addresses.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAddressPicker(v => !v)}
+                              className="ml-1 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:no-underline"
+                            >Change</button>
+                          )}
+                        </>
+                      )}
+                    </p>
+                    {showAddressPicker && (
+                      <div className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1">
+                        {addresses.map((a, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => pickAddress(a.postal_code)}
+                            className="w-full text-left px-3 py-2 hover:bg-surface-hover text-xs"
+                          >
+                            <span className="font-medium block">{a.full_name}</span>
+                            <span className="text-foreground-secondary">{a.city}, {a.state} – {a.postal_code}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {effectiveStock <= 0 && (
+                  <div className="flex items-center justify-end gap-2">
+                    <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
+                  </div>
+                )}
               </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-                <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
-              </div>
-            )}
+            </div>
+            <QuantityInput
+              dimension={sellUnit?.dimension ?? 'count'}
+              quantity={quantity}
+              quantityRaw={quantityRaw}
+              unitLabel={effectiveUnitLabel}
+              unitKey={effectiveUnitKey}
+              effectiveStock={effectiveStock}
+              qtyStep={qtyStep}
+              qtyMin={qtyMin}
+              qtyMax={qtyMax}
+              onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
+            />
           </div>
         </>
       )}
 
-      <div>
-        <label className="block text-sm font-medium text-foreground-secondary mb-2">
-          Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
-        </label>
-        <QuantityInput
-          dimension={sellUnit?.dimension ?? 'count'}
-          quantity={quantity}
-          quantityRaw={quantityRaw}
-          unitLabel={effectiveUnitLabel}
-          unitKey={effectiveUnitKey}
-          effectiveStock={effectiveStock}
-          qtyStep={qtyStep}
-          qtyMin={qtyMin}
-          qtyMax={qtyMax}
-          onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
-        />
-      </div>
+      {!hasVariants && (
+        <>
+          <div className="bg-surface rounded-lg p-6">
+            {businessDiscountPct > 0 ? (
+              <>
+                <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+                  <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                  {effectiveMrp && effectiveMrp > effectivePrice && (
+                    <span className="text-xl text-foreground-muted line-through tabular-nums">
+                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+                {effectiveMrp && effectiveMrp > effectivePrice && (
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
+                      {mrpDiscount}% off
+                    </span>
+                    <span className="text-sm text-foreground-secondary">
+                      You save Rs.&nbsp;{(effectiveMrp - effectivePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                    <span className="text-xs text-foreground-muted">
+                      ({Math.round(((effectiveMrp - rawEffectivePrice) / effectiveMrp) * 100)}% MRP discount + {businessDiscountPct}% business discount)
+                    </span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline gap-3 mb-1 flex-wrap">
+                  <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
+                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                  {effectiveMrp && effectiveMrp > effectivePrice && (
+                    <span className="text-xl text-foreground-muted line-through tabular-nums">
+                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  )}
+                </div>
+                {effectiveMrp && effectiveMrp > effectivePrice && (
+                  <div className="flex items-center gap-2 mb-2 flex-wrap">
+                    <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
+                      {mrpDiscount}% off
+                    </span>
+                    <span className="text-sm text-foreground-secondary">
+                      You save Rs.&nbsp;{(effectiveMrp - effectivePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
+            <p className="text-xs text-foreground-muted">
+              Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
+            </p>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between gap-4 mb-2">
+              <label className="text-sm font-medium text-foreground-secondary">Quantity</label>
+              <div className="text-right">
+                {effectiveStock > 0 ? (
+                  <div className="flex items-center justify-end gap-2">
+                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  </div>
+                ) : null}
+                {edd && effectiveStock > 0 && (
+                  <div className="relative">
+                    <p className="text-xs text-foreground-secondary whitespace-nowrap">
+                      Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                      {user && selectedPin && (
+                        <> · <span className="font-medium">{selectedPin}</span>
+                          {addresses.length > 0 && (
+                            <button
+                              type="button"
+                              onClick={() => setShowAddressPicker(v => !v)}
+                              className="ml-1 text-primary-600 dark:text-primary-400 underline underline-offset-2 hover:no-underline"
+                            >Change</button>
+                          )}
+                        </>
+                      )}
+                    </p>
+                    {showAddressPicker && (
+                      <div className="absolute right-0 mt-1 w-64 bg-surface border border-border rounded-lg shadow-lg z-10 py-1">
+                        {addresses.map((a, i) => (
+                          <button
+                            key={i}
+                            type="button"
+                            onClick={() => pickAddress(a.postal_code)}
+                            className="w-full text-left px-3 py-2 hover:bg-surface-hover text-xs"
+                          >
+                            <span className="font-medium block">{a.full_name}</span>
+                            <span className="text-foreground-secondary">{a.city}, {a.state} – {a.postal_code}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {effectiveStock <= 0 && (
+                  <div className="flex items-center justify-end gap-2">
+                    <svg className="w-5 h-5 text-red-600 dark:text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                    </svg>
+                    <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
+                  </div>
+                )}
+              </div>
+            </div>
+            <QuantityInput
+              dimension={sellUnit?.dimension ?? 'count'}
+              quantity={quantity}
+              quantityRaw={quantityRaw}
+              unitLabel={effectiveUnitLabel}
+              unitKey={effectiveUnitKey}
+              effectiveStock={effectiveStock}
+              qtyStep={qtyStep}
+              qtyMin={qtyMin}
+              qtyMax={qtyMax}
+              onChange={(qty, raw) => { setQuantity(qty); setQuantityRaw(raw) }}
+            />
+          </div>
+        </>
+      )}
 
       <div className="space-y-3">
         <button
