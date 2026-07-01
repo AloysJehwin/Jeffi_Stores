@@ -116,6 +116,13 @@ export default function ProductActions({
   const [selectedPin, setSelectedPin] = useState<string | null>(null)
   const [showAddressPicker, setShowAddressPicker] = useState(false)
   useEffect(() => {
+    if (!user) {
+      fetch('/api/products/edd')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.edd) setEdd(d.edd) })
+        .catch(() => {})
+      return
+    }
     fetch('/api/user/addresses')
       .then(r => r.ok ? r.json() : null)
       .then(d => {
@@ -128,7 +135,7 @@ export default function ProductActions({
       .then(r => r?.ok ? r.json() : null)
       .then(d => { if (d?.edd) setEdd(d.edd) })
       .catch(() => {})
-  }, [])
+  }, [user])
   function pickAddress(pin: string) {
     setSelectedPin(pin)
     setShowAddressPicker(false)
