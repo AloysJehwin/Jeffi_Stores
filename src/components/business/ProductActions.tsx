@@ -117,19 +117,11 @@ export default function ProductActions({
   const { user } = useAuth()
   const [edd, setEdd] = useState<string | null>(null)
   useEffect(() => {
-    if (!user) return
-    fetch('/api/user/addresses', { headers: { 'X-Auth-Portal': 'business' } })
+    fetch('/api/products/edd')
       .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        const pin = d?.addresses?.find((a: any) => a.is_default)?.postal_code
-          ?? d?.addresses?.[0]?.postal_code
-        if (!pin) return
-        return fetch(`/api/products/edd?pin=${pin}`)
-      })
-      .then(r => r?.ok ? r.json() : null)
       .then(d => { if (d?.edd) setEdd(d.edd) })
       .catch(() => {})
-  }, [user])
+  }, [])
   const [isAddingToCart, setIsAddingToCart] = useState(false)
   const [isBuyingNow, setIsBuyingNow] = useState(false)
   const [quantity, setQuantity] = useState(1)
