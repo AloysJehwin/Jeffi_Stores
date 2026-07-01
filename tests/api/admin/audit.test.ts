@@ -248,8 +248,8 @@ describe('GET /api/admin/audit', () => {
     expect(body.page).toBe(2)
     expect(body.pageSize).toBe(100)
     // rowVals should end with [100, 100] (pageSize=100, offset=(2-1)*100=100)
-    const [, rowVals] = mockQueryMany.mock.calls[0]
-    const last2 = rowVals.slice(-2)
+    const [, rowVals] = mockQueryMany.mock.calls[0]!
+    const last2 = rowVals!.slice(-2)
     expect(last2).toEqual([100, 100])
   })
 
