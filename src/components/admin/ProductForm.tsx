@@ -263,6 +263,9 @@ export default function ProductForm({ categories, brands, action, product, produ
     return ''
   })
   const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '')
+  const [extraDeliveryDays, setExtraDeliveryDays] = useState(
+    product?.extra_delivery_days != null ? String(product.extra_delivery_days) : '0'
+  )
   const [mrp, setMrp] = useState(product?.mrp != null ? String(product.mrp) : '')
   const [mrpExGst, setMrpExGst] = useState(() => {
     if (product?.mrp_ex_gst != null) return String(product.mrp_ex_gst)
@@ -743,6 +746,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         formData.set('discount_pct', discountPct || '0')
       }
       formData.set('cost_price', costPrice || '0')
+      formData.set('extra_delivery_days', extraDeliveryDays || '0')
 
       if (hasVariants) {
         const convertedVariants = variants.map(v => {
@@ -1086,6 +1090,24 @@ export default function ProductForm({ categories, brands, action, product, produ
               placeholder="Your purchase / landed cost"
             />
             <p className="text-xs text-foreground-muted mt-1">Used for P&amp;L gross margin — not shown to customers</p>
+          </div>
+
+          <div>
+            <label htmlFor="extra_delivery_days" className="block text-sm font-medium text-foreground-secondary mb-2">
+              Extra Delivery Days
+            </label>
+            <input
+              type="number"
+              id="extra_delivery_days"
+              name="extra_delivery_days"
+              step="1"
+              min="0"
+              value={extraDeliveryDays}
+              onChange={e => setExtraDeliveryDays(e.target.value)}
+              className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+              placeholder="0"
+            />
+            <p className="text-xs text-foreground-muted mt-1">Added on top of zone TAT for every delivery estimate</p>
           </div>
 
           {/* GST Rate + Entry Mode */}

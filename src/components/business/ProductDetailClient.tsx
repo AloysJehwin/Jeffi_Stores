@@ -416,6 +416,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           variantType={product.variant_type || 'Variant'}
           initialSkuParam={initialSkuParam}
           discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
+          extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
           onVariantChange={handleVariantChange}
           onSelectionChange={(vId, svId) => { setSelectedVariantId(vId); setSelectedSubVariantId(svId) }}
           onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}

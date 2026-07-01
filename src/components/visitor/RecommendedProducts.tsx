@@ -16,6 +16,7 @@ interface Product {
   variant_stock_total: number | null
   stock_status: string | null
   discount_pct: number | null
+  extra_delivery_days: number | null
   product_images: Array<{ image_url: string; thumbnail_url: string; is_primary: boolean }>
   brands?: { name: string } | null
   categories?: { name: string } | null
@@ -73,6 +74,7 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
               brandName={product.brands?.name || null}
               categoryName={product.categories?.name || null}
               discountPct={Number(product.discount_pct ?? 0)}
+              extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
             />
           )
         })}
