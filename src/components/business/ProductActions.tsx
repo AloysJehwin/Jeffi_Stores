@@ -634,7 +634,7 @@ export default function ProductActions({
             </p>
           </div>
 
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-center justify-between gap-4">
             <div>
               <label className="block text-sm font-medium text-foreground-secondary mb-2">
                 Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}
@@ -663,7 +663,7 @@ export default function ProductActions({
               ) : null}
               {edd && effectiveStock > 0 && (
                 <div className="mt-1 relative">
-                  <p className="text-xs text-foreground-secondary">
+                  <p className="text-xs text-foreground-secondary whitespace-nowrap">
                     Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
                     {selectedPin && (
                       <> · <span className="font-medium">{selectedPin}</span>
