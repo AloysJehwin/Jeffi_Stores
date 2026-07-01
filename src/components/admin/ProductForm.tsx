@@ -1092,25 +1092,7 @@ export default function ProductForm({ categories, brands, action, product, produ
             <p className="text-xs text-foreground-muted mt-1">Used for P&amp;L gross margin — not shown to customers</p>
           </div>
 
-          <div>
-            <label htmlFor="extra_delivery_days" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Extra Delivery Days
-            </label>
-            <input
-              type="number"
-              id="extra_delivery_days"
-              name="extra_delivery_days"
-              step="1"
-              min="0"
-              value={extraDeliveryDays}
-              onChange={e => setExtraDeliveryDays(e.target.value)}
-              className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              placeholder="0"
-            />
-            <p className="text-xs text-foreground-muted mt-1">Added on top of zone TAT for every delivery estimate</p>
-          </div>
-
-          {/* GST Rate + Entry Mode */}
+          {/* GST Rate + Extra Delivery Days */}
           <div className="md:col-span-2">
             <div className="flex flex-wrap items-end gap-4">
               <div className="flex-1 min-w-[140px]">
@@ -1128,6 +1110,23 @@ export default function ProductForm({ categories, brands, action, product, produ
                     { value: '28', label: '28% GST' },
                   ]}
                 />
+              </div>
+              <div className="w-40 shrink-0">
+                <label htmlFor="extra_delivery_days" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Extra Delivery Days
+                </label>
+                <input
+                  type="number"
+                  id="extra_delivery_days"
+                  name="extra_delivery_days"
+                  step="1"
+                  min="0"
+                  value={extraDeliveryDays}
+                  onChange={e => setExtraDeliveryDays(e.target.value)}
+                  className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="0"
+                />
+                <p className="text-xs text-foreground-muted mt-1">Added on top of zone TAT</p>
               </div>
             </div>
           </div>
