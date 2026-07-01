@@ -6,6 +6,7 @@ import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import BrandTableRow from '@/components/admin/BrandTableRow'
+import BrandStatusToggle from '@/components/admin/BrandStatusToggle'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -118,13 +119,20 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
                     <div className="text-xs text-foreground-muted mt-1 line-clamp-2">{brand.description}</div>
                   )}
                 </div>
-                <span className={`flex-shrink-0 ml-2 px-2 py-0.5 text-xs font-semibold rounded-full ${
-                  brand.is_active
-                    ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                    : 'bg-surface-secondary text-foreground'
-                }`}>
-                  {brand.is_active ? 'Active' : 'Inactive'}
-                </span>
+                <BrandStatusToggle
+                  brandId={brand.id}
+                  brandData={{
+                    name: brand.name,
+                    slug: brand.slug,
+                    description: brand.description ?? null,
+                    website: brand.website ?? null,
+                    is_active: brand.is_active,
+                    return_allowed: brand.return_allowed,
+                    return_window_days: brand.return_window_days,
+                    replacement_allowed: brand.replacement_allowed,
+                    replacement_window_days: brand.replacement_window_days,
+                  }}
+                />
               </div>
               <div className="text-xs text-foreground-muted mb-3">{brand.slug}</div>
               {brand.website && (

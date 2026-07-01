@@ -22,6 +22,39 @@ interface Brand {
 
 export default function BrandTableRow({ brand }: { brand: Brand }) {
   const [open, setOpen] = useState(false)
+  const [isActive, setIsActive] = useState(brand.is_active)
+  const [toggling, setToggling] = useState(false)
+
+  async function toggleStatus(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (toggling) return
+    setToggling(true)
+    const next = !isActive
+    setIsActive(next)
+    try {
+      const res = await fetch(`/api/admin/brands/${brand.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: brand.name,
+          slug: brand.slug,
+          description: brand.description,
+          website: brand.website,
+          logo_url: null,
+          is_active: next,
+          return_allowed: brand.return_allowed,
+          return_window_days: brand.return_window_days,
+          replacement_allowed: brand.replacement_allowed,
+          replacement_window_days: brand.replacement_window_days,
+        }),
+      })
+      if (!res.ok) setIsActive(!next)
+    } catch {
+      setIsActive(!next)
+    } finally {
+      setToggling(false)
+    }
+  }
 
   return (
     <>
@@ -160,13 +193,17 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
           )}
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
-          <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-            brand.is_active
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-              : 'bg-surface-secondary text-foreground'
-          }`}>
-            {brand.is_active ? 'Active' : 'Inactive'}
-          </span>
+          <button
+            onClick={toggleStatus}
+            disabled={toggling}
+            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full transition-opacity ${toggling ? 'opacity-50' : 'hover:opacity-75'} ${
+              isActive
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                : 'bg-surface-secondary text-foreground'
+            }`}
+          >
+            {isActive ? 'Active' : 'Inactive'}
+          </button>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
           <Link href={ap(`/admin/brands/edit/${brand.id}`)} className="text-accent-500 hover:text-accent-600 mr-4">

@@ -296,6 +296,7 @@ function SortableRow({
   onView,
   policyOpen,
   onTogglePolicy,
+  onToggleStatus,
 }: {
   category: Category
   isSubcat: boolean
@@ -307,6 +308,7 @@ function SortableRow({
   onView?: () => void
   policyOpen?: boolean
   onTogglePolicy?: () => void
+  onToggleStatus?: () => void
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
@@ -447,13 +449,16 @@ function SortableRow({
       <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground-secondary">{category.slug}</td>
       <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">{category.display_order}</td>
       <td className="px-4 py-3 whitespace-nowrap">
-        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-          category.is_active
-            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-            : 'bg-surface-secondary text-foreground'
-        }`}>
+        <button
+          onClick={e => { e.stopPropagation(); onToggleStatus?.() }}
+          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full hover:opacity-75 transition-opacity ${
+            category.is_active
+              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+              : 'bg-surface-secondary text-foreground'
+          }`}
+        >
           {category.is_active ? 'Active' : 'Inactive'}
-        </span>
+        </button>
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
         <button
@@ -616,6 +621,35 @@ export default function CategoriesClient({
     router.refresh()
   }
 
+  const handleToggleStatus = async (cat: Category) => {
+    const next = !cat.is_active
+    setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, is_active: next } : c))
+    try {
+      const res = await fetch(`/api/admin/categories/${cat.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: cat.name,
+          description: cat.description || null,
+          parent_id: cat.parent_category_id || null,
+          display_order: cat.display_order,
+          sku_prefix: cat.sku_prefix || null,
+          is_active: next,
+          icon_name: cat.icon_name || null,
+          return_allowed: cat.return_allowed ?? null,
+          return_window_days: cat.return_window_days ?? null,
+          replacement_allowed: cat.replacement_allowed ?? null,
+          replacement_window_days: cat.replacement_window_days ?? null,
+        }),
+      })
+      if (!res.ok) {
+        setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, is_active: !next } : c))
+      }
+    } catch {
+      setCategories(prev => prev.map(c => c.id === cat.id ? { ...c, is_active: !next } : c))
+    }
+  }
+
   const activeCategory = categories.find(c => c.id === activeId)
 
   return (
@@ -673,6 +707,7 @@ export default function CategoriesClient({
                           onView={() => setViewCategory(sub)}
                           policyOpen={policyOpenId === sub.id}
                           onTogglePolicy={() => setPolicyOpenId(policyOpenId === sub.id ? null : sub.id)}
+                          onToggleStatus={() => handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub)}
                         />
                         {policyOpenId === sub.id && (
                           <PolicyExpandRow
@@ -710,6 +745,7 @@ export default function CategoriesClient({
                         onView={() => setViewCategory(cat)}
                         policyOpen={policyOpenId === cat.id}
                         onTogglePolicy={() => setPolicyOpenId(policyOpenId === cat.id ? null : cat.id)}
+                        onToggleStatus={() => handleToggleStatus(categories.find(c => c.id === cat.id) ?? cat)}
                       />
                       {policyOpenId === cat.id && (
                         <PolicyExpandRow
@@ -730,6 +766,7 @@ export default function CategoriesClient({
                             onView={() => setViewCategory(sub)}
                             policyOpen={policyOpenId === sub.id}
                             onTogglePolicy={() => setPolicyOpenId(policyOpenId === sub.id ? null : sub.id)}
+                            onToggleStatus={() => handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub)}
                           />
                           {policyOpenId === sub.id && (
                             <PolicyExpandRow
@@ -783,9 +820,12 @@ export default function CategoriesClient({
                     </div>
                     {sub.name}
                   </div>
-                  <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+                  <button
+                    onClick={e => { e.stopPropagation(); handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub) }}
+                    className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
+                  >
                     {sub.is_active ? 'Active' : 'Inactive'}
-                  </span>
+                  </button>
                 </div>
                 {parent && <p className="text-xs text-foreground-muted mb-1">Under: {parent.name}</p>}
                 <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
@@ -829,9 +869,12 @@ export default function CategoriesClient({
                         <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">{subcats.length}</span>
                       )}
                     </div>
-                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+                    <button
+                      onClick={e => { e.stopPropagation(); handleToggleStatus(categories.find(c => c.id === cat.id) ?? cat) }}
+                      className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
+                    >
                       {cat.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    </button>
                   </div>
                   <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
                     <span>{cat.slug}</span>
@@ -856,9 +899,12 @@ export default function CategoriesClient({
                         </div>
                         <span className="text-foreground-muted mr-1">└</span>{sub.name}
                       </div>
-                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+                      <button
+                        onClick={e => { e.stopPropagation(); handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub) }}
+                        className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
+                      >
                         {sub.is_active ? 'Active' : 'Inactive'}
-                      </span>
+                      </button>
                     </div>
                     <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
                       <span>{sub.slug}</span>
