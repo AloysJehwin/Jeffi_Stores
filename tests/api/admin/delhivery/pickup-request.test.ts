@@ -8,6 +8,7 @@ vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
+  queryOne: vi.fn(),
 }))
 
 // Mock global fetch
@@ -19,19 +20,22 @@ vi.stubGlobal('fetch', mockFetch)
 import { GET, PATCH, POST } from '@/app/api/admin/delhivery/pickup-request/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { query, queryMany } from '@/lib/db'
+import { query, queryMany, queryOne } from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
 const mockQuery = vi.mocked(query)
 const mockQueryMany = vi.mocked(queryMany)
+const mockQueryOne = vi.mocked(queryOne)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const ADMIN = { adminId: 'admin-1', username: 'testadmin', role: 'super_admin', scopes: ['orders'] }
 
-function makeGet() {
-  return new NextRequest('http://localhost/api/admin/delhivery/pickup-request')
+function makeGet(params?: Record<string, string>) {
+  const url = new URL('http://localhost/api/admin/delhivery/pickup-request')
+  if (params) Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
+  return new NextRequest(url.toString())
 }
 
 function makePatch(body: unknown) {
@@ -98,6 +102,136 @@ describe('GET /api/admin/delhivery/pickup-request', () => {
     const res = await GET(makeGet())
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('DB down')
+  })
+})
+
+// ── GET ?poll= ────────────────────────────────────────────────────────────────
+
+describe('GET /api/admin/delhivery/pickup-request?poll=<id>', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockAuth.mockResolvedValue(ADMIN as any)
+    mockHasScope.mockReturnValue(true)
+  })
+
+  it('returns 404 when pickup request not found', async () => {
+    mockQueryOne.mockResolvedValueOnce(null as any)
+    const res = await GET(makeGet({ poll: 'no-such-id' }))
+    expect(res.status).toBe(404)
+    expect((await res.json()).error).toBe('Not found')
+  })
+
+  it('returns current status without fetching when awbs array is empty', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: [], pickup_status: 'pending' } as any)
+    const res = await GET(makeGet({ poll: 'ph-1' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pickup_status).toBe('pending')
+    expect(body.updated).toBe(false)
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it('returns 502 when Delhivery tracking API is unavailable', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB123'], pickup_status: 'pending' } as any)
+    mockFetch.mockResolvedValueOnce({ ok: false })
+    const res = await GET(makeGet({ poll: 'ph-1' }))
+    expect(res.status).toBe(502)
+    expect((await res.json()).error).toBe('Tracking unavailable')
+  })
+
+  it('returns pickup_status unchanged when no shipment data is present', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB123'], pickup_status: 'pending' } as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ ShipmentData: [] }),
+    })
+    const res = await GET(makeGet({ poll: 'ph-1' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pickup_status).toBe('pending')
+    expect(body.updated).toBe(false)
+  })
+
+  it('returns pickup_status unchanged when entry has no Shipment key', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB123'], pickup_status: 'pending' } as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ ShipmentData: [{ Shipment: null }] }),
+    })
+    const res = await GET(makeGet({ poll: 'ph-1' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pickup_status).toBe('pending')
+    expect(body.updated).toBe(false)
+  })
+
+  it('updates pickup_status to picked_up when a PICKED_UP_TYPES status is resolved and current is pending', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB123'], pickup_status: 'pending' } as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        ShipmentData: [{
+          Shipment: {
+            Status: { StatusType: 'PU' },
+            Scans: [],
+          },
+        }],
+      }),
+    })
+    mockQuery.mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeGet({ poll: 'ph-1' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pickup_status).toBe('picked_up')
+    expect(body.updated).toBe(true)
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("pickup_status = 'picked_up'"),
+      ['ph-1']
+    )
+  })
+
+  it('does NOT update DB when status is already picked_up even if shipment shows PU', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB123'], pickup_status: 'picked_up' } as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        ShipmentData: [{
+          Shipment: {
+            Status: { StatusType: 'PU' },
+            Scans: [],
+          },
+        }],
+      }),
+    })
+    const res = await GET(makeGet({ poll: 'ph-1' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pickup_status).toBe('picked_up')
+    expect(body.updated).toBe(false)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('resolves ambiguous PP status via scan activity and updates when picked up activity found', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'ph-1', awbs: ['AWB123'], pickup_status: 'pending' } as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({
+        ShipmentData: [{
+          Shipment: {
+            Status: { StatusType: 'PP' },
+            Scans: [
+              { ScanDetail: { ScanType: null, Scan: 'shipment picked up from shipper' } },
+            ],
+          },
+        }],
+      }),
+    })
+    mockQuery.mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeGet({ poll: 'ph-1' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pickup_status).toBe('picked_up')
+    expect(body.updated).toBe(true)
   })
 })
 
@@ -169,6 +303,13 @@ describe('PATCH /api/admin/delhivery/pickup-request', () => {
     const res = await PATCH(makePatch({ id: 'ph-1', add_awb_order_id: 'ord-ineligible' }))
     expect(res.status).toBe(422)
     expect((await res.json()).error).toBe('Order not eligible to add to pickup')
+  })
+
+  it('returns 500 on unexpected DB error in PATCH', async () => {
+    mockQuery.mockRejectedValueOnce(new Error('Connection lost'))
+    const res = await PATCH(makePatch({ id: 'ph-1', pickup_status: 'pending' }))
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).toBe('Connection lost')
   })
 })
 
@@ -266,5 +407,67 @@ describe('POST /api/admin/delhivery/pickup-request', () => {
     const res = await POST(makePost({ orderIds: ['ord-1'], pickupDate: '2024-01-20' }))
     expect(res.status).toBe(500)
     expect((await res.json()).error).toBe('Unexpected DB error')
+  })
+
+  it('returns 422 when Delhivery response is ok but contains data.error', async () => {
+    mockQueryMany.mockResolvedValueOnce(sampleOrders as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ error: 'Duplicate pickup request' }),
+    })
+    const res = await POST(makePost({ orderIds: ['ord-1'], pickupDate: '2024-01-20' }))
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toBe('Delhivery rejected the pickup request')
+    expect(body.details).toBe('Duplicate pickup request')
+  })
+
+  it('uses data.prepaid as details fallback when data.error is absent', async () => {
+    mockQueryMany.mockResolvedValueOnce(sampleOrders as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: () => Promise.resolve({ prepaid: 'prepaid error message' }),
+    })
+    const res = await POST(makePost({ orderIds: ['ord-1'], pickupDate: '2024-01-20' }))
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.details).toBe('prepaid error message')
+  })
+
+  it('happy path with multiple eligible orders updates each order and returns all AWBs', async () => {
+    const multiOrders = [
+      { id: 'ord-1', awb_number: 'AWB111' },
+      { id: 'ord-2', awb_number: 'AWB222' },
+      { id: 'ord-3', awb_number: 'AWB333' },
+    ]
+    mockQueryMany.mockResolvedValueOnce(multiOrders as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ pickup_id: 'PU-MULTI' }),
+    })
+    mockQuery.mockResolvedValue({ rows: [] } as any)
+
+    const res = await POST(makePost({ orderIds: ['ord-1', 'ord-2', 'ord-3'], pickupDate: '2024-02-10' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pickupId).toBe('PU-MULTI')
+    expect(body.orderCount).toBe(3)
+    expect(body.awbs).toEqual(['AWB111', 'AWB222', 'AWB333'])
+    // One INSERT + one UPDATE per order = 4 query calls
+    expect(mockQuery).toHaveBeenCalledTimes(4)
+  })
+
+  it('handles pickup_id being absent in Delhivery response (stores null)', async () => {
+    mockQueryMany.mockResolvedValueOnce(sampleOrders as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: () => Promise.resolve({ some_field: 'value' }), // no pickup_id key
+    })
+    mockQuery.mockResolvedValue({ rows: [] } as any)
+
+    const res = await POST(makePost({ orderIds: ['ord-1'], pickupDate: '2024-01-20' }))
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.pickupId).toBeNull()
   })
 })
