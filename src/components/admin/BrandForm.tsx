@@ -9,9 +9,10 @@ import AIEnrichButton from './AIEnrichButton'
 interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
   brand?: any
+  backUrl?: string
 }
 
-export default function BrandForm({ action, brand }: BrandFormProps) {
+export default function BrandForm({ action, brand, backUrl }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>(brand?.name || '')
@@ -43,6 +44,7 @@ export default function BrandForm({ action, brand }: BrandFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+      {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
         {error && (
           <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">

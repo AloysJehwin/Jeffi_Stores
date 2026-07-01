@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { Star, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
@@ -63,6 +64,7 @@ interface ProductFormProps {
   action: (formData: FormData) => Promise<void>
   product?: any
   productId?: string
+  backUrl?: string
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
@@ -194,7 +196,8 @@ function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: (
   )
 }
 
-export default function ProductForm({ categories, brands, action, product, productId }: ProductFormProps) {
+export default function ProductForm({ categories, brands, action, product, productId, backUrl }: ProductFormProps) {
+  const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [productName, setProductName] = useState<string>(product?.name || '')
@@ -210,6 +213,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [tempProductId] = useState<string>(productId || `temp-${Date.now()}`)
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantPopupId, setVariantPopupId] = useState<string | null>(null)
+  const pendingPopupVariantIdRef = useRef<string | null>(null)
   const [popupUnitKey, setPopupUnitKey] = useState<string>('')
   const [popupUnitInfo, setPopupUnitInfo] = useState<UnitLoadedInfo | null>(null)
   const [variantImagesMap, setVariantImagesMap] = useState<Record<string, any[]>>(() => {
@@ -380,6 +384,16 @@ export default function ProductForm({ categories, brands, action, product, produ
     setPopupUnitKey('')
     setPopupUnitInfo(null)
   }, [variantPopupId])
+
+  // Auto-open variant popup from ?popup= query param (set after draft-stay save)
+  useEffect(() => {
+    const popupId = searchParams.get('popup')
+    if (popupId && variants.length > 0) {
+      const match = variants.find(v => v.id === popupId)
+      if (match) setVariantPopupId(popupId)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // Auto-regenerate SKU when name/brand/category change (only if not manually edited)
   useEffect(() => {
@@ -723,6 +737,10 @@ export default function ProductForm({ categories, brands, action, product, produ
     try {
       const formData = new FormData(e.currentTarget)
 
+      if (pendingPopupVariantIdRef.current) {
+        formData.set('popup_variant_id', pendingPopupVariantIdRef.current)
+      }
+
       imageFiles.forEach((file, index) => {
         formData.append(`image_${index}`, file)
       })
@@ -770,6 +788,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
       await action(formData)
       localStorage.removeItem(draftKey)
+      pendingPopupVariantIdRef.current = null
     } catch (err: any) {
       if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
       setError(err?.message || 'Failed to save product. Please try again.')
@@ -781,6 +800,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+      {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
         {hasDraft && (
           <div className="mb-4 px-4 py-3 bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm">
@@ -1360,7 +1380,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       <p className="text-xs text-foreground-secondary">Pricing managed by sub-variants. Open this variant to add or edit sub-variants.</p>
                                     </div>
                                     <div>
-                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Listed Stock (from sub-variants)</label>
+                                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Stock Status (from sub-variants)</label>
                                       <input type="number" value={sumSubVariantStock(subVariantsMap[variant.id || ''])} readOnly className={`${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} placeholder="0" />
                                     </div>
                                     <div>
@@ -1542,7 +1562,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">MRP (incl)</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Price (incl) *</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Price (Ex)</th>
-                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Listed Stock *</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Stock Status *</th>
                               <th className="py-2 px-3 w-16"></th>
                             </tr>
                           </thead>
@@ -2131,8 +2151,18 @@ export default function ProductForm({ categories, brands, action, product, produ
                       )}
                     </div>
                     {variantPopupId.startsWith('temp-') && (
-                      <div className="mb-3 rounded-lg border border-dashed border-amber-400/60 bg-amber-50 dark:bg-amber-900/20 p-3">
+                      <div className="mb-3 rounded-lg border border-dashed border-amber-400/60 bg-amber-50 dark:bg-amber-900/20 p-3 flex items-center justify-between gap-3">
                         <p className="text-xs text-amber-700 dark:text-amber-300">Save the product first to add sub-variants for this variant.</p>
+                        <button
+                          type="submit"
+                          name="intent"
+                          value="draft-stay"
+                          disabled={isSubmitting}
+                          onClick={() => { setIsActive(false); pendingPopupVariantIdRef.current = variantPopupId }}
+                          className="shrink-0 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
+                        >
+                          {isSubmitting ? 'Saving...' : 'Save (draft)'}
+                        </button>
                       </div>
                     )}
                     {(subVariantsMap[variantPopupId] || []).length > 0 && (
@@ -2183,17 +2213,23 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   {/* Price (Ex. GST) — locked */}
                                   <td className="py-1 pr-1"><input type="number" step="0.01" value={ed.price_ex_gst} readOnly className={`${svInputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`} /></td>
                                   <td className="py-1 pr-1">
-                                    <AdminSelect
-                                      value={ed.stock}
-                                      onChange={v => setSubVariantEditDraft(d => d && ({ ...d, stock: v }))}
-                                      xs
-                                      className="w-28"
-                                      options={[
-                                        { value: 'In Stock', label: 'In Stock' },
-                                        { value: 'Low Stock', label: 'Low Stock' },
-                                        { value: 'Out of Stock', label: 'Out of Stock' },
-                                      ]}
-                                    />
+                                    <div className="flex items-center border border-border-secondary rounded bg-surface overflow-hidden w-28 h-[26px]">
+                                      <button type="button" onClick={() => {
+                                        const opts = ['In Stock', 'Low Stock', 'Out of Stock']
+                                        const i = opts.indexOf(ed.stock || 'In Stock')
+                                        setSubVariantEditDraft(d => d && ({ ...d, stock: opts[(i - 1 + opts.length) % opts.length] }))
+                                      }} className="px-1 h-full text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors shrink-0">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                                      </button>
+                                      <span className="flex-1 text-center text-xs text-foreground truncate px-0.5">{ed.stock || 'In Stock'}</span>
+                                      <button type="button" onClick={() => {
+                                        const opts = ['In Stock', 'Low Stock', 'Out of Stock']
+                                        const i = opts.indexOf(ed.stock || 'In Stock')
+                                        setSubVariantEditDraft(d => d && ({ ...d, stock: opts[(i + 1) % opts.length] }))
+                                      }} className="px-1 h-full text-foreground-muted hover:text-foreground hover:bg-surface-secondary transition-colors shrink-0">
+                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                      </button>
+                                    </div>
                                   </td>
                                   <td className="py-1 pr-1"><input type="text" value={ed.sku} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, sku: e.target.value }))} className={`${svInputCls} w-20`} /></td>
                                   <td className="py-1 pl-1 flex items-center gap-1">
@@ -2250,7 +2286,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     {(() => {
                       const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'' }
                       const setD = (field: string, val: string) => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, [field]: val } }))
-                      const inputCls = "field-xs border border-border-secondary bg-surface text-foreground focus:ring-1 focus:ring-accent-500"
+                      const inputCls = "field-normal border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                       const lockedCls = `${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`
                       return (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
@@ -2290,8 +2326,18 @@ export default function ProductForm({ categories, brands, action, product, produ
                             <input type="number" step="0.01" value={d.price_ex_gst} readOnly className={`${lockedCls} w-full`} placeholder="Auto-calculated" />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">Listed Stock</label>
-                            <input type="number" step="1" min="0" placeholder="0" value={d.stock} onChange={(e) => setD('stock', e.target.value)} className={`${inputCls} w-full`} />
+                            <label className="block text-xs text-foreground-muted mb-0.5">Stock Status</label>
+                            <AdminSelect
+                              value={d.stock || 'In Stock'}
+                              onChange={v => setD('stock', v)}
+                              className="w-full"
+                              md
+                              options={[
+                                { value: 'In Stock', label: 'In Stock' },
+                                { value: 'Low Stock', label: 'Low Stock' },
+                                { value: 'Out of Stock', label: 'Out of Stock' },
+                              ]}
+                            />
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">SKU (auto)</label>

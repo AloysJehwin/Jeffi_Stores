@@ -20,7 +20,7 @@ interface Brand {
   replacement_window_days: number
 }
 
-export default function BrandTableRow({ brand }: { brand: Brand }) {
+export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { brand: Brand; backUrl?: string }) {
   const [open, setOpen] = useState(false)
   const [isActive, setIsActive] = useState(brand.is_active)
   const [toggling, setToggling] = useState(false)
@@ -121,7 +121,7 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
               </div>
               <div className="flex gap-3 pt-1 border-t border-border-default">
                 <Link
-                  href={ap(`/admin/brands/edit/${brand.id}`)}
+                  href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
                   onClick={() => setOpen(false)}
                 >
@@ -138,7 +138,7 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
           <HoverCard
             trigger={
               <Link
-                href={ap(`/admin/brands/edit/${brand.id}`)}
+                href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)}
                 className="text-sm font-semibold text-foreground hover:text-accent-500 transition-colors"
                 onClick={e => e.stopPropagation()}
               >
@@ -206,7 +206,7 @@ export default function BrandTableRow({ brand }: { brand: Brand }) {
           </button>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
-          <Link href={ap(`/admin/brands/edit/${brand.id}`)} className="text-accent-500 hover:text-accent-600 mr-4">
+          <Link href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 hover:text-accent-600 mr-4">
             Edit
           </Link>
           <DeleteBrandButton brandId={brand.id} brandName={brand.name} />

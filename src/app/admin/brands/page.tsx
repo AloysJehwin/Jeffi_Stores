@@ -63,6 +63,15 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
     return ap(`/admin/brands${qs ? `?${qs}` : ''}`, host)
   }
 
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    return `/admin/brands${qs ? `?${qs}` : ''}`
+  })()
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
@@ -143,7 +152,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
                 </div>
               )}
               <div className="flex items-center justify-end gap-3 text-sm">
-                <Link href={ap(`/admin/brands/edit/${brand.id}`, host)} className="text-accent-500 font-medium">
+                <Link href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">
                   Edit
                 </Link>
                 <DeleteBrandButton brandId={brand.id} brandName={brand.name} />
@@ -173,7 +182,7 @@ export default async function BrandsPage({ searchParams }: { searchParams: Promi
             <tbody className="divide-y divide-border-default">
               {brands && brands.length > 0 ? (
                 brands.map((brand: any) => (
-                  <BrandTableRow key={brand.id} brand={brand} />
+                  <BrandTableRow key={brand.id} brand={brand} backUrl={currentListUrl} />
                 ))
               ) : (
                 <tr>
