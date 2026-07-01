@@ -358,7 +358,14 @@ export async function PATCH(
                 `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
                 [orderId]
               )
-              sendPaymentStatusUpdate(currentOrder.user_id, orderId, 'refunded').catch(() => {})
+              sendPaymentStatusUpdate(
+                currentOrder.customer_email,
+                currentOrder.customer_name,
+                currentOrder.order_number,
+                orderId,
+                'refunded',
+                parseFloat(currentOrder.total_amount)
+              ).catch(() => {})
               logActivity({
                 userId: currentOrder.user_id,
                 actorId: admin.adminId,

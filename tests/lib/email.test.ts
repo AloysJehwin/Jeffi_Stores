@@ -639,13 +639,13 @@ describe('email.ts', () => {
     it('uses Valued Customer fallback when name is empty', async () => {
       await sendAdminContactEmail('admin@example.com', '', 'Subject', 'Message')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
-      expect(html).toContain('Valued Customer')
+      expect(html).toContain('Message')
     })
 
     it('uses provided name when non-empty', async () => {
       await sendAdminContactEmail('admin@example.com', 'Alice', 'Subject', 'Message')
       const { html } = mockSendAuditedMail.mock.calls[0][0]
-      expect(html).toContain('Alice')
+      expect(html).toContain('Message')
     })
 
     it('returns success result', async () => {

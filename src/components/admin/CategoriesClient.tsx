@@ -44,11 +44,12 @@ interface Category {
   subCount?: number
 }
 
-function ViewModal({ category, subCount, productCount, onClose }: {
+function ViewModal({ category, subCount, productCount, onClose, backUrl = '/admin/categories' }: {
   category: Category
   subCount?: number
   productCount?: number
   onClose: () => void
+  backUrl?: string
 }) {
   return createPortal(
     <div className="fixed inset-0 z-[300] flex items-center justify-center p-4" onClick={onClose}>

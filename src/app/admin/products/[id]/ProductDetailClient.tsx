@@ -295,7 +295,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
   const displayImg = images[selectedImage] || primaryImg
 
   const inventoryQty = p.has_variants
-    ? Number(p.variant_stock_total || 0)
+    ? Number(p.variant_inventory_total || 0)
     : Number(p.inventory_quantity || 0)
   const listedQty = p.has_variants
     ? Number(p.variant_stock_total || 0)
@@ -553,7 +553,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">Ex-GST</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">MRP</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Inventory</th>
-                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">Listed</th>
+                  <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">Stock Status</th>
                   {hasVariantShelf && (
                     <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden xl:table-cell">Shelf</th>
                   )}
@@ -564,8 +564,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 {variants.map((v: any) => {
                   const subVariants: any[] = v.sub_variants || []
                   const hasSubs = subVariants.length > 0
-                  const vInventory = hasSubs ? Number(v.sub_variant_stock_total || 0) : Number(v.inventory_quantity || 0)
-                  const vListed = hasSubs ? Number(v.sub_variant_stock_total || 0) : (v.stock_status !== 'Out of Stock' ? 1 : 0)
+                  const vInventory = hasSubs ? Number(v.sub_variant_inventory_total || 0) : Number(v.inventory_quantity || 0)
+                  const vListed = hasSubs ? (v.stock_status || '—') : (v.stock_status || '—')
                   const vStockColor = vInventory === 0 ? 'text-red-600 dark:text-red-400' : v.stock_status === 'Low Stock' ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'
                   const vMinPrice = hasSubs ? Number(v.sub_variant_min_price || 0) : Number(v.price || 0)
                   const vShelf = hasSubs ? [] : shelfFor(v.id, null)
@@ -643,8 +643,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
                         </td>
                       )}
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${v.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-secondary'}`}>
-                          {v.is_active ? 'Active' : 'Inactive'}
+                        <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${(!p.is_active || !v.is_active) ? 'bg-surface-secondary text-foreground-secondary' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
+                          {(!p.is_active || !v.is_active) ? 'Inactive' : 'Active'}
                         </span>
                       </td>
                     </tr>
@@ -668,8 +668,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
                             </td>
                           )}
                           <td className="px-4 py-2 text-center">
-                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${sv.is_active ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-secondary'}`}>
-                              {sv.is_active ? 'Active' : 'Inactive'}
+                            <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${(!p.is_active || !v.is_active || !sv.is_active) ? 'bg-surface-secondary text-foreground-secondary' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'}`}>
+                              {(!p.is_active || !v.is_active || !sv.is_active) ? 'Inactive' : 'Active'}
                             </span>
                           </td>
                         </tr>

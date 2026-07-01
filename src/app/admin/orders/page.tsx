@@ -16,16 +16,16 @@ const PAGE_SIZE = 25
 export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
   const resolvedSearchParams = await searchParams
   const host = await getHost()
-  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
-  const sort = resolvedSearchParams.sort
-  const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
-
+  const sp = (key: string) => { const v = resolvedSearchParams[key]; return Array.isArray(v) ? v[0] : v }
+  const page = Math.max(1, parseInt(sp('page') || '1', 10))
+  const sort = sp('sort')
+  const dir = sp('dir') as 'asc' | 'desc' | undefined
   const [{ orders, total }, allStats] = await Promise.all([
     getFilteredOrders({
-      status: resolvedSearchParams.status,
-      payment_status: resolvedSearchParams.payment_status,
-      source: resolvedSearchParams.source,
-      search: resolvedSearchParams.search,
+      status: sp('status'),
+      payment_status: sp('payment_status'),
+      source: sp('source'),
+      search: sp('search'),
       page,
       limit: PAGE_SIZE,
       sort,
@@ -43,10 +43,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
-    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status as string)
-    if (resolvedSearchParams.payment_status) params.set('payment_status', resolvedSearchParams.payment_status as string)
-    if (resolvedSearchParams.source) params.set('source', resolvedSearchParams.source as string)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search as string)
+    if (sp('status')) params.set('status', sp('status')!)
+    if (sp('payment_status')) params.set('payment_status', sp('payment_status')!)
+    if (sp('source')) params.set('source', sp('source')!)
+    if (sp('search')) params.set('search', sp('search')!)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
@@ -56,10 +56,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   const currentListUrl = (() => {
     const params = new URLSearchParams()
-    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status as string)
-    if (resolvedSearchParams.payment_status) params.set('payment_status', resolvedSearchParams.payment_status as string)
-    if (resolvedSearchParams.source) params.set('source', resolvedSearchParams.source as string)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search as string)
+    if (sp('status')) params.set('status', sp('status')!)
+    if (sp('payment_status')) params.set('payment_status', sp('payment_status')!)
+    if (sp('source')) params.set('source', sp('source')!)
+    if (sp('search')) params.set('search', sp('search')!)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (page > 1) params.set('page', String(page))

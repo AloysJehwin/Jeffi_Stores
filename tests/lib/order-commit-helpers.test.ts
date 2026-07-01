@@ -42,6 +42,7 @@ function makeProduct(overrides: Partial<CartLine['products']> = {}): CartLine['p
     hsn_code: '8443',
     category_id: null,
     mrp: null,
+    extra_delivery_days: null,
     ...overrides,
   }
 }

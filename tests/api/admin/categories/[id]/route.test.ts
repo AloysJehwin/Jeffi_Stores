@@ -55,7 +55,7 @@ describe('PATCH /api/admin/categories/[id]', () => {
     vi.resetAllMocks()
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
-    mockQuery.mockResolvedValue({ rowCount: 1 } as any)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockQueryOne
       .mockResolvedValueOnce(UPDATED_CAT as any)  // before (SELECT)
       .mockResolvedValueOnce(UPDATED_CAT as any)  // after (SELECT)

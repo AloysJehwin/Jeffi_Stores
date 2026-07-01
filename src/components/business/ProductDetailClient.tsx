@@ -10,13 +10,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
 
-function UnitLabel({ label }: { label: string | null | undefined }) {
-  if (!label) return null
-  const match = label.match(/^(.+?)2$/)
-  if (match) return <>{match[1]}<sup>2</sup></>
-  return <>{label}</>
-}
-
 interface ProductImage {
   id: string
   image_url: string
@@ -69,6 +62,7 @@ interface ProductDetailClientProps {
     has_variants: boolean
     variant_type?: string | null
     discount_pct?: number | null
+    extra_delivery_days?: number | null
     weight?: number | null
     dimensions?: string | null
     brands?: {
@@ -314,94 +308,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             </button>
           </div>
         </div>
-
-        {/* Price & Stock — inline for non-variant products */}
-        {!hasVariants && (
-          <>
-            <div className="bg-surface rounded-lg p-4 sm:p-6 mb-6">
-              {businessDiscountPct > 0 ? (
-                <>
-                  <div className="flex items-baseline gap-3 mb-1 flex-wrap">
-                    <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                      Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="text-sm text-foreground-secondary">
-                      / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
-                    </span>
-                    {mrp && mrp > displayPrice && (
-                      <span className="text-xl text-foreground-muted line-through tabular-nums">
-                        Rs.&nbsp;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                    )}
-                  </div>
-                  {mrp && mrp > displayPrice && (
-                    <div className="flex items-center gap-2 mb-2 flex-wrap">
-                      <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
-                        {mrpDiscount}% off
-                      </span>
-                      <span className="text-sm text-foreground-secondary">
-                        You save Rs.&nbsp;{(mrp - displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                      </span>
-                      {mrp > baseDisplayPrice && (
-                        <span className="text-xs text-foreground-muted">
-                          ({Math.round(((mrp - baseDisplayPrice) / mrp) * 100)}% MRP discount + {businessDiscountPct}% business discount)
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </>
-              ) : (
-                <div className="flex items-baseline gap-3 mb-2 flex-wrap">
-                  <span className="text-3xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                    Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                  <span className="text-sm text-foreground-secondary">
-                    / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
-                  </span>
-                  {mrp && mrp > displayPrice && (
-                    <span className="text-lg text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </span>
-                  )}
-                </div>
-              )}
-              {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 && (
-                <div className="mb-2">
-                  <span className="text-base font-semibold text-foreground">
-                    Rs.&nbsp;{(displayPrice * selectedUnit.factor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />
-                  </span>
-                  <span className="text-xs text-foreground-muted ml-2">
-                    (1 <UnitLabel label={selectedUnit.label ?? selectedUnit.key} /> = {selectedUnit.factor} pc × Rs.&nbsp;{displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
-                  </span>
-                </div>
-              )}
-              <p className="text-xs text-foreground-muted">
-                Inclusive of all taxes
-                {product.gst_percentage ? ` (${parseFloat(String(product.gst_percentage))}% GST)` : ''}
-              </p>
-            </div>
-
-            <div className="mb-6">
-              {product.stock_status !== 'Out of Stock' ? (
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-green-700 dark:text-green-400 font-semibold">
-                    In Stock
-                  </span>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <svg className="w-5 h-5 text-red-600" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-red-700 dark:text-red-400 font-semibold">Out of Stock</span>
-                </div>
-              )}
-            </div>
-          </>
-        )}
 
         <ProductActions
           productId={product.id}

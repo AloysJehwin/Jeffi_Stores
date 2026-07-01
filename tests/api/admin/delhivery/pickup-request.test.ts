@@ -248,7 +248,7 @@ describe('POST /api/admin/delhivery/pickup-request', () => {
     mockQueryMany.mockResolvedValueOnce(sampleOrders as any)
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: () => Promise.resolve({ id: 'PU-001' }),
+      json: () => Promise.resolve({ pickup_id: 'PU-001' }),
     })
     mockQuery.mockResolvedValue({ rows: [] } as any)
 

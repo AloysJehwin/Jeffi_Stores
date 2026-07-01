@@ -11,13 +11,6 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 
-function UnitLabel({ label }: { label: string | null | undefined }) {
-  if (!label) return null
-  const match = label.match(/^(.+?)2$/)
-  if (match) return <>{match[1]}<sup>2</sup></>
-  return <>{label}</>
-}
-
 interface ProductImage {
   id: string
   image_url: string
@@ -70,6 +63,7 @@ interface ProductDetailClientProps {
     has_variants: boolean
     variant_type?: string | null
     discount_pct?: number | null
+    extra_delivery_days?: number | null
     weight?: number | null
     dimensions?: string | null
     material?: string | null
@@ -447,55 +441,6 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
         </div>
 
 
-        {/* Price & Stock — inline for non-variant products */}
-        {!hasVariants && (
-          <>
-            <div className="bg-surface rounded-lg p-4 sm:p-6 mb-6">
-              {/* Per-base-unit price (e.g. Rs. 424.80 / pc) */}
-              <div className="flex items-baseline gap-3 flex-wrap mb-1">
-                <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                  Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-                <span className="text-sm text-foreground-secondary">
-                  / {selectedUnit.dimension === 'count' && selectedUnit.factor > 1 ? 'pc' : <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />}
-                </span>
-                {mrp && mrp > displayPrice && (
-                  <span className="text-xl text-foreground-muted line-through">
-                    Rs. {mrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                )}
-              </div>
-              {/* Per-sell-unit price when factor > 1 (e.g. Rs. 31,860 / pack) */}
-              {selectedUnit.dimension === 'count' && selectedUnit.factor !== 1 && (
-                <div className="mb-1">
-                  <span className="text-base font-semibold text-foreground">
-                    Rs. {(displayPrice * selectedUnit.factor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={selectedUnit.label ?? selectedUnit.key} />
-                  </span>
-                  <span className="text-xs text-foreground-muted ml-2">
-                    (1 <UnitLabel label={selectedUnit.label ?? selectedUnit.key} /> = {selectedUnit.factor} pc × Rs. {displayPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
-                  </span>
-                </div>
-              )}
-              {mrpDiscount > 0 && (
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
-                    {mrpDiscount}% off
-                  </span>
-                  <span className="text-sm text-foreground-secondary">
-                    You save Rs. {(mrp! - displayPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
-                </div>
-              )}
-              <p className="text-xs text-foreground-muted">
-                Inclusive of all taxes
-                {product.gst_percentage ? ` (${parseFloat(String(product.gst_percentage))}% GST)` : ''}
-              </p>
-              <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />
-            </div>
-
-          </>
-        )}
-
         {/* Low stock urgency + notify me for out-of-stock */}
         <div className="mb-4">
           {product.stock_status === 'Low Stock' && (
@@ -530,6 +475,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             </div>
           )}
         </div>
+
+        {!hasVariants && <BusinessPriceBadge price={displayPrice} categoryId={product.categories?.id} />}
 
         <ProductActions
           productId={product.id}

@@ -22,6 +22,15 @@ vi.mock('@/lib/validate', () => ({
   zNonEmpty: { optional: vi.fn() },
 }))
 
+vi.mock('@/lib/mail-audit', () => ({
+  sendAuditedMail: vi.fn().mockResolvedValue({ messageId: 'msg-1' }),
+}))
+
+vi.mock('@/lib/razorpay', () => ({
+  isRazorpayEnabled: vi.fn().mockReturnValue(false),
+  getRazorpayInstance: vi.fn(),
+}))
+
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
 import { GET, PATCH } from '@/app/api/admin/orders/[id]/route'
@@ -165,7 +174,8 @@ describe('PATCH /api/admin/orders/[id]', () => {
   it('returns ok on valid status update', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    mockParseBody.mockReturnValue({ ok: true } as any)
+    mockParseBody.mockReturnValue({ ok: true, data: { status: 'shipped' } } as any)
+    mockQueryOne.mockResolvedValue(null)
 
     const req = makeRequest('PATCH', 'order-1', { status: 'shipped' })
     const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })
@@ -177,7 +187,8 @@ describe('PATCH /api/admin/orders/[id]', () => {
   it('returns ok on awb_number update', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
-    mockParseBody.mockReturnValue({ ok: true } as any)
+    mockParseBody.mockReturnValue({ ok: true, data: { awb_number: 'AWB123456' } } as any)
+    mockQueryOne.mockResolvedValue(null)
 
     const req = makeRequest('PATCH', 'order-1', { awb_number: 'AWB123456' })
     const res = await PATCH(req, { params: Promise.resolve({ id: 'order-1' }) })

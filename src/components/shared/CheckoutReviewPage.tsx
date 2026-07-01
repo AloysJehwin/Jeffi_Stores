@@ -106,6 +106,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     gstPercentage: number | null
     brandName: string | null
     imageUrl: string | null
+    extraDeliveryDays: number
   } | null>(null)
 
   useEffect(() => {
@@ -171,6 +172,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
             gstPercentage: d.gstPercentage != null ? Number(d.gstPercentage) : null,
             brandName: d.brandName || null,
             imageUrl: null,
+            extraDeliveryDays: Number(d.extraDeliveryDays ?? 0),
           })
           if (d.businessDiscount != null && Number(d.businessDiscount) > 0) {
             setBusinessDiscountAmount(round2(Number(d.businessDiscount)))
@@ -278,6 +280,23 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       .catch(() => setShippingError('Could not fetch rate'))
       .finally(() => setIsLoadingShipping(false))
   }, [selectedAddress?.postal_code, cartSubtotal])
+
+  const [edd, setEdd] = useState<string | null>(null)
+  const [isLoadingEdd, setIsLoadingEdd] = useState(false)
+
+  useEffect(() => {
+    const pin = selectedAddress?.postal_code
+    if (!pin) { setEdd(null); return }
+    const extraDays = isBuyNow
+      ? (buyNowItem?.extraDeliveryDays ?? 0)
+      : Math.max(0, ...cartItems.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
+    setIsLoadingEdd(true)
+    fetch(`/api/products/edd?pin=${pin}&extraDays=${extraDays}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.edd) setEdd(data.edd) })
+      .catch(() => {})
+      .finally(() => setIsLoadingEdd(false))
+  }, [selectedAddress?.postal_code, isBuyNow, buyNowItem?.extraDeliveryDays, cartItems])
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return
@@ -774,7 +793,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                         const lineTotal = buyNowItem.price * effectiveQty
                         const displayUnit = buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit' ? buyNowItem.buyUnit : (buyNowItem.buyMode !== 'unit' ? buyNowItem.buyMode : null)
                         return (
-                          <div className="flex items-center justify-between mt-2">
+                          <div className="mt-2">
                             <p className="text-sm text-foreground-secondary">
                               ₹{buyNowItem.price.toLocaleString('en-IN', { minimumFractionDigits: 2 })} × {isFractional ? <>{Number(Number(buyNowItem.qty).toFixed(6)).toString()}{displayUnit ? <> <UnitLabel label={displayUnit} /></> : ''}</> : effectiveQty}
                               {buyNowItem.mrp != null && buyNowItem.mrp > buyNowItem.price && (
@@ -784,7 +803,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                                 </>
                               )}
                             </p>
-                            <p className="text-sm font-semibold text-foreground">
+                            <p className="text-sm font-semibold text-foreground mt-0.5">
                               ₹{lineTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </p>
                           </div>
@@ -853,7 +872,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                               </span>
                             )}
                           </div>
-                          <div className="flex items-center justify-between mt-2">
+                          <div className="mt-2">
                             <p className="text-sm text-foreground-secondary">
                               ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? <> / <UnitLabel label={unitLabel ?? item.buy_unit} /></> : (showUnitLabel ? <> / <UnitLabel label={unitLabel} /></> : '')} × {isCustomQty ? <>{Number(Number(item.quantity).toFixed(6)).toString()}{unitLabel || item.buy_unit ? <> <UnitLabel label={unitLabel ?? item.buy_unit} /></> : ''}</> : <>{effectiveQty}{showUnitLabel ? <> <UnitLabel label={unitLabel} /></> : ''}</>}
                               {showMrp && (
@@ -863,7 +882,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                                 </>
                               )}
                             </p>
-                            <p className="text-sm font-semibold text-foreground">
+                            <p className="text-sm font-semibold text-foreground mt-0.5">
                               ₹{itemTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                             </p>
                           </div>
@@ -884,6 +903,32 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                   ← Modify Cart
                 </Link>
               )}
+            </div>
+
+            {/* Expected Delivery Date */}
+            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6">
+              <div className="flex items-start gap-4">
+                <svg className="w-8 h-8 text-accent-500 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2.293 2.293a1 1 0 001.414 0L9 16h4zm0 0l1-4 3 1 1 3M13 6h5l3 4v6h-2" />
+                </svg>
+                <div className="flex-1">
+                  {!selectedAddress ? (
+                    <p className="text-sm text-foreground-muted">Select a delivery address to see expected delivery date</p>
+                  ) : isLoadingEdd ? (
+                    <div className="h-5 w-48 bg-border-default rounded animate-pulse" />
+                  ) : edd ? (
+                    <>
+                      <p className="text-sm text-foreground-secondary">Expected Delivery</p>
+                      <p className="text-lg font-semibold text-foreground">
+                        {new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-foreground-muted">Delivery date unavailable for this pincode</p>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* Delivery Promise */}

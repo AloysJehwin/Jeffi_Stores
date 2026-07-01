@@ -93,6 +93,7 @@ export async function POST(request: NextRequest) {
 
         const rawType: string = (shipment.Status?.StatusType ?? '').toUpperCase()
         const statusDateTime: string | null = shipment.Status?.StatusDateTime ?? null
+        const delhiveryEdd: string | null = shipment.ExpectedDeliveryDate ?? null
 
         const rawScans: any[] = shipment.Scans ?? []
         const scans = rawScans.map((s: any) => ({
@@ -164,6 +165,10 @@ export async function POST(request: NextRequest) {
             ? `shipped_at = LEAST(COALESCE(shipped_at, $2::timestamptz), $2::timestamptz)`
             : `shipped_at = COALESCE(shipped_at, NOW())`
           )
+          // Write Delhivery EDD when first shipping — only if not already set
+          if (delhiveryEdd) {
+            setClauses.push(`estimated_delivery_date = COALESCE(estimated_delivery_date, '${delhiveryEdd}'::date)`)
+          }
         }
         if (syncRule.setDeliveredAt) {
           setClauses.push(statusDateTime
