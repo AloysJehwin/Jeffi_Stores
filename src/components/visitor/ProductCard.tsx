@@ -32,6 +32,27 @@ export default function ProductCard({
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
   const [showQuickView, setShowQuickView] = useState(false)
+  const [edd, setEdd] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!user) {
+      fetch('/api/products/edd')
+        .then(r => r.ok ? r.json() : null)
+        .then(d => { if (d?.edd) setEdd(d.edd) })
+        .catch(() => {})
+      return
+    }
+    fetch('/api/user/addresses')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const list = d?.addresses ?? []
+        const pin = list.find((a: any) => a.is_default)?.postal_code ?? list[0]?.postal_code ?? null
+        return fetch(`/api/products/edd${pin ? '?pin=' + pin : ''}`)
+      })
+      .then(r => r?.ok ? r.json() : null)
+      .then(d => { if (d?.edd) setEdd(d.edd) })
+      .catch(() => {})
+  }, [user])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
@@ -212,6 +233,11 @@ export default function ProductCard({
                   View Details &#x2192;
                 </span>
               </div>
+              {edd && effectiveStock > 0 && (
+                <p className="text-[10px] text-foreground-muted mt-0.5">
+                  Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
+                </p>
+              )}
             </div>
           </div>
         </div>
