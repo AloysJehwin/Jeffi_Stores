@@ -31,7 +31,8 @@ function addBusinessDays(from: Date, days: number): Date {
   let added = 0
   while (added < days) {
     d.setDate(d.getDate() + 1)
-    if (d.getDay() !== 0) added++
+    const day = d.getDay()
+    if (day !== 0 && day !== 6) added++
   }
   return d
 }
