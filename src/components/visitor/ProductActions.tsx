@@ -592,7 +592,7 @@ export default function ProductActions({
                   <div className="relative">
                     <p className="text-xs text-foreground-secondary whitespace-nowrap">
                       Deliver by <span className="font-medium text-foreground">{new Date(edd + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-                      {selectedPin && (
+                      {user && selectedPin && (
                         <> · <span className="font-medium">{selectedPin}</span>
                           {addresses.length > 0 && (
                             <button
