@@ -26,20 +26,15 @@ function getTat(pin: string): number {
   return 14
 }
 
-function addBusinessDays(from: Date, days: number): Date {
+function addDays(from: Date, days: number): Date {
   const d = new Date(from)
-  let added = 0
-  while (added < days) {
-    d.setDate(d.getDate() + 1)
-    const day = d.getDay()
-    if (day !== 0 && day !== 6) added++
-  }
+  d.setDate(d.getDate() + days)
   return d
 }
 
 export async function GET(request: NextRequest) {
   const pin = request.nextUrl.searchParams.get('pin') ?? ''
   const tat = /^\d{6}$/.test(pin) ? getTat(pin) : 14
-  const edd = addBusinessDays(new Date(), tat).toISOString().slice(0, 10)
+  const edd = addDays(new Date(), tat).toISOString().slice(0, 10)
   return NextResponse.json({ edd })
 }
