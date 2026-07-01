@@ -113,8 +113,14 @@ export default function ProductActions({
   const { user } = useAuth()
   const [edd, setEdd] = useState<string | null>(null)
   useEffect(() => {
-    fetch('/api/products/edd')
+    fetch('/api/user/addresses')
       .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        const pin = d?.addresses?.find((a: any) => a.is_default)?.postal_code
+          ?? d?.addresses?.[0]?.postal_code
+        return fetch(`/api/products/edd${pin ? '?pin=' + pin : ''}`)
+      })
+      .then(r => r?.ok ? r.json() : null)
       .then(d => { if (d?.edd) setEdd(d.edd) })
       .catch(() => {})
   }, [])
