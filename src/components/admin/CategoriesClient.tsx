@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -123,7 +123,7 @@ function ViewModal({ category, subCount, productCount, onClose }: {
           </div>
           <div className="flex gap-3 pt-1 border-t border-border-default">
             <Link
-              href={ap(`/admin/categories/edit/${category.id}`)}
+              href={ap(`/admin/categories/edit/${category.id}?back=${encodeURIComponent(backUrl)}`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
               onClick={onClose}
             >
@@ -297,6 +297,7 @@ function SortableRow({
   policyOpen,
   onTogglePolicy,
   onToggleStatus,
+  backUrl = '/admin/categories',
 }: {
   category: Category
   isSubcat: boolean
@@ -309,6 +310,7 @@ function SortableRow({
   policyOpen?: boolean
   onTogglePolicy?: () => void
   onToggleStatus?: () => void
+  backUrl?: string
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
@@ -366,7 +368,7 @@ function SortableRow({
             trigger={
               <div onClick={e => e.stopPropagation()}>
                 <Link
-                  href={ap(`/admin/categories/edit/${category.id}`)}
+                  href={ap(`/admin/categories/edit/${category.id}?back=${encodeURIComponent(backUrl)}`)}
                   className={`text-sm hover:text-accent-500 transition-colors cursor-pointer ${isSubcat ? 'text-foreground' : 'font-semibold text-foreground'}`}
                   onClick={e => e.stopPropagation()}
                 >
@@ -468,7 +470,7 @@ function SortableRow({
         >
           Policy
         </button>
-        <Link href={ap(`/admin/categories/edit/${category.id}`)} className="text-accent-500 hover:text-accent-600 mr-4">
+        <Link href={ap(`/admin/categories/edit/${category.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 hover:text-accent-600 mr-4">
           Edit
         </Link>
         <DeleteCategoryButton categoryId={category.id} categoryName={category.name} onDeleted={onDeleted} />
@@ -482,11 +484,13 @@ export default function CategoriesClient({
   productCounts = {},
   initialSearch = '',
   initialType = '',
+  backUrl = '/admin/categories',
 }: {
   initialCategories: Category[]
   productCounts?: Record<string, number>
   initialSearch?: string
   initialType?: string
+  backUrl?: string
 }) {
   const [categories, setCategories] = useState<Category[]>(initialCategories)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
@@ -708,6 +712,7 @@ export default function CategoriesClient({
                           policyOpen={policyOpenId === sub.id}
                           onTogglePolicy={() => setPolicyOpenId(policyOpenId === sub.id ? null : sub.id)}
                           onToggleStatus={() => handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub)}
+                          backUrl={backUrl}
                         />
                         {policyOpenId === sub.id && (
                           <PolicyExpandRow
@@ -732,7 +737,7 @@ export default function CategoriesClient({
                     ? subcats.filter(s => s.name.toLowerCase().includes(q) || s.slug.toLowerCase().includes(q))
                     : subcats
                   return (
-                    <>
+                    <Fragment key={cat.id}>
                       <SortableRow
                         key={cat.id}
                         category={cat}
@@ -746,6 +751,7 @@ export default function CategoriesClient({
                         policyOpen={policyOpenId === cat.id}
                         onTogglePolicy={() => setPolicyOpenId(policyOpenId === cat.id ? null : cat.id)}
                         onToggleStatus={() => handleToggleStatus(categories.find(c => c.id === cat.id) ?? cat)}
+                        backUrl={backUrl}
                       />
                       {policyOpenId === cat.id && (
                         <PolicyExpandRow
@@ -756,7 +762,7 @@ export default function CategoriesClient({
                         />
                       )}
                       {!isCollapsed && visibleSubcats.map(sub => (
-                        <>
+                        <Fragment key={sub.id}>
                           <SortableRow
                             key={sub.id}
                             category={sub}
@@ -767,6 +773,7 @@ export default function CategoriesClient({
                             policyOpen={policyOpenId === sub.id}
                             onTogglePolicy={() => setPolicyOpenId(policyOpenId === sub.id ? null : sub.id)}
                             onToggleStatus={() => handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub)}
+                            backUrl={backUrl}
                           />
                           {policyOpenId === sub.id && (
                             <PolicyExpandRow
@@ -777,9 +784,9 @@ export default function CategoriesClient({
                               onClose={() => setPolicyOpenId(null)}
                             />
                           )}
-                        </>
+                        </Fragment>
                       ))}
-                    </>
+                    </Fragment>
                   )
                 }) : (
                   <tr>
@@ -833,7 +840,7 @@ export default function CategoriesClient({
                   <span>Order: {sub.display_order}</span>
                 </div>
                 <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                  <Link href={ap(`/admin/categories/edit/${sub.id}`)} className="text-accent-500 font-medium">Edit</Link>
+                  <Link href={ap(`/admin/categories/edit/${sub.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 font-medium">Edit</Link>
                   <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                 </div>
               </div>
@@ -881,7 +888,7 @@ export default function CategoriesClient({
                     <span>Order: {cat.display_order}</span>
                   </div>
                   <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                    <Link href={ap(`/admin/categories/edit/${cat.id}`)} className="text-accent-500 font-medium">Edit</Link>
+                    <Link href={ap(`/admin/categories/edit/${cat.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 font-medium">Edit</Link>
                     <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} onDeleted={() => handleCategoryDeleted(cat.id)} />
                   </div>
                 </div>
@@ -911,7 +918,7 @@ export default function CategoriesClient({
                       <span>Order: {sub.display_order}</span>
                     </div>
                     <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                      <Link href={ap(`/admin/categories/edit/${sub.id}`)} className="text-accent-500 font-medium">Edit</Link>
+                      <Link href={ap(`/admin/categories/edit/${sub.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 font-medium">Edit</Link>
                       <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                     </div>
                   </div>

@@ -52,6 +52,20 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     ]
   })
 
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.category_id) params.set('category_id', resolvedSearchParams.category_id)
+    if (resolvedSearchParams.brand_id) params.set('brand_id', resolvedSearchParams.brand_id)
+    if (resolvedSearchParams.is_active) params.set('is_active', resolvedSearchParams.is_active)
+    if (resolvedSearchParams.stock) params.set('stock', resolvedSearchParams.stock)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    return `/admin/products${qs ? `?${qs}` : ''}`
+  })()
+
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
     if (resolvedSearchParams.category_id) params.set('category_id', resolvedSearchParams.category_id)
@@ -122,7 +136,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           products.map((product: any) => {
             const stock = product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)
             const listedStock = product.has_variants ? Number(product.variant_stock_total) : null
-            const isLow = product.stock_status === 'Low Stock' || (product.has_variants && stock > 0 && stock <= 3)
+            const stockStatus: string = product.stock_status || 'In Stock'
+            const isOut = stock === 0 || stockStatus === 'Out of Stock'
+            const isLow = !isOut && (stockStatus === 'Low Stock' || (product.has_variants && stock > 0 && stock <= 3))
             return (
               <div
                 key={product.id}
@@ -173,18 +189,32 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                       </div>
                     )}
                   </div>
-                  <span className="text-sm text-foreground">
-                    Inv: {stock}
-                    {isLow && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Low</span>}
-                    {stock === 0 && <span className="ml-1 text-xs text-red-600 dark:text-red-400 font-semibold">Out</span>}
-                    {listedStock !== null && listedStock !== stock && <span className="ml-1 text-xs text-foreground-muted">/ {listedStock}</span>}
-                  </span>
+                  <div className="space-y-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-foreground-muted w-10">Inv</span>
+                      <span className={`text-sm font-semibold ${isOut ? 'text-red-600 dark:text-red-400' : isLow ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'}`}>{stock}</span>
+                    </div>
+                    {listedStock !== null && (
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs text-foreground-muted w-10">Listed</span>
+                        <span className="text-sm text-foreground">{listedStock}</span>
+                      </div>
+                    )}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs text-foreground-muted w-10">Online</span>
+                      <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
+                        isOut ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                        : isLow ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                        : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                      }`}>{isOut ? 'Out' : isLow ? 'Low' : 'In Stock'}</span>
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between text-xs text-foreground-muted">
                   <span>{product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}</span>
                   <div className="flex items-center gap-3">
                     <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
-                    <Link href={ap(`/admin/products/edit/${product.id}`, host)} className="text-accent-500 font-medium">Edit</Link>
+                    <Link href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">Edit</Link>
                     <DownloadAdButton productId={product.id} productName={product.name} />
                     <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
                   </div>
@@ -210,12 +240,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
                 <SortableHeader label="Category" column="category" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[9%]" />
                 <SortableHeader label="Brand" column="brand" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[7%]" />
                 <SortableHeader label="Price" column="price" options={sortOptions('number')} currentSort={sort} currentDir={dir} className="w-[10%]" />
-                <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={sort} currentDir={dir} className="w-[7%]" />
+                <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={sort} currentDir={dir} className="w-[9%]" />
                 <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[20%]" />
                 <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[16%]">Actions</th>
               </tr>
             </thead>
-            <ProductsTableClient products={products || []} featuredCount={featuredCount} />
+            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} />
           </table>
         </div>
       </div>
