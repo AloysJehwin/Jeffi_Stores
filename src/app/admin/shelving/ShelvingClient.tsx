@@ -90,7 +90,7 @@ export default function ShelvingClient() {
   const loadStock = useCallback(async (locationId: string) => {
     setStockLoading(true)
     try {
-      const res = await fetch(`/api/admin/shelving/stock?location_id=${locationId}`)
+      const res = await fetch(`/api/admin/shelving/stock?location_id=${locationId}`, { credentials: 'include' })
       if (!res.ok) throw new Error('Failed to load')
       const data = await res.json()
       setStock(data.stock || [])

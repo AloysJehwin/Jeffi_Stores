@@ -359,7 +359,7 @@ export function AssignStockForm({ location, onSave, onCancel }: {
           ...(productId ? { product_id: productId } : {}),
           ...(variantId ? { variant_id: variantId } : {}),
           ...(subVariantId ? { sub_variant_id: subVariantId } : {}),
-        })}`),
+        })}`, { credentials: 'include' }),
         resolvedProductId
           ? fetch(`/api/admin/products/${resolvedProductId}/units${variantId ? `?variant_id=${variantId}` : ''}`)
           : null,
