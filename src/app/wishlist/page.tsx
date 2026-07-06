@@ -116,10 +116,17 @@ function WishlistInner() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-foreground-secondary">Loading...</p>
+      <div className="container mx-auto px-4 py-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 animate-pulse">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden" style={{ animationDelay: `${i * 70}ms` }}>
+              <div className="aspect-square bg-surface-secondary" />
+              <div className="p-3 space-y-2">
+                <div className="h-3 bg-surface-secondary rounded w-3/4" />
+                <div className="h-4 bg-surface-secondary rounded w-1/2" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )

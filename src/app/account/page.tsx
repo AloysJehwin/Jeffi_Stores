@@ -264,7 +264,7 @@ export default function AccountPage() {
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={avatarUploading}
-            className="relative w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 group ring-2 ring-white/30"
+            className="relative w-16 h-16 rounded-2xl overflow-hidden flex-shrink-0 group"
             aria-label="Change profile photo"
           >
             {avatarUrl ? (
@@ -318,11 +318,11 @@ export default function AccountPage() {
         </div>
       </div>
 
-      <div className="lg:hidden relative z-10 -mt-8">
+      <div className="lg:hidden relative z-10 -mt-12">
         <AccountMobileTabBar />
       </div>
 
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 pb-8">
 
         <div className="pt-2 pb-4 space-y-4 max-w-3xl lg:max-w-none">
 

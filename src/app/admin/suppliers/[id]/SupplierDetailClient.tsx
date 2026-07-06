@@ -63,7 +63,56 @@ export default function SupplierDetailClient({ id }: { id: string }) {
   }
 
   if (loading || !data?.supplier) {
-    return null
+    return (
+      <div className="p-4 sm:p-6 space-y-6 animate-fade-in">
+        {/* Breadcrumb */}
+        <div className="h-4 w-40 bg-surface-secondary rounded animate-pulse" />
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-40 bg-surface-secondary rounded animate-pulse" />
+          </div>
+          <div className="h-8 w-28 bg-surface-secondary rounded-lg animate-pulse" />
+        </div>
+        {/* Info cards — 3-col grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3" style={{ animationDelay: `${i * 60}ms` }}>
+              <div className="h-3 w-24 bg-surface-secondary rounded animate-pulse" />
+              <div className="space-y-2">
+                {Array.from({ length: 5 }).map((_, j) => (
+                  <div key={j} className="flex justify-between gap-4 animate-pulse" style={{ animationDelay: `${j * 40}ms` }}>
+                    <div className="h-3.5 w-20 bg-surface-secondary rounded shrink-0" />
+                    <div className="h-3.5 bg-surface-secondary rounded flex-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Tabs */}
+        <div>
+          <div className="flex gap-4 border-b border-border-default mb-4">
+            <div className="h-8 w-40 bg-surface-secondary rounded animate-pulse" />
+            <div className="h-8 w-44 bg-surface-secondary rounded animate-pulse" />
+          </div>
+          {/* Tab content table */}
+          <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+            <div className="p-4 space-y-3">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <div key={i} className="flex gap-4 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+                  <div className="h-4 w-24 bg-surface-secondary rounded shrink-0" />
+                  <div className="h-4 w-20 bg-surface-secondary rounded shrink-0" />
+                  <div className="h-4 w-20 bg-surface-secondary rounded shrink-0" />
+                  <div className="h-4 bg-surface-secondary rounded flex-1" />
+                  <div className="h-4 w-16 bg-surface-secondary rounded shrink-0" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const s = data.supplier

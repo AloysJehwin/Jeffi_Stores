@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
@@ -8,6 +8,11 @@ interface Category {
   id: string
   name: string
   parent_category_id: string | null
+}
+
+interface Brand {
+  id: string
+  name: string
 }
 
 interface PriceSnapshot {
@@ -75,11 +80,12 @@ function fmt(val: number | null): string {
   return `₹${val.toFixed(2)}`
 }
 
-export default function InflationClient({ categories }: { categories: Category[] }) {
+export default function InflationClient({ categories, brands }: { categories: Category[]; brands: Brand[] }) {
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null)
   const [percentage, setPercentage] = useState('')
-  const [productList, setProductList] = useState<{ id: string; name: string }[]>([])
+  const [productList, setProductList] = useState<{ id: string; name: string; brand_id: string | null; brand_name: string | null }[]>([])
   const [selectedProductIds, setSelectedProductIds] = useState<Set<string>>(new Set())
+  const [selectedBrandId, setSelectedBrandId] = useState<string>('')
   const [productListLoading, setProductListLoading] = useState(false)
   const [preview, setPreview] = useState<PreviewProduct[] | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
@@ -103,15 +109,16 @@ export default function InflationClient({ categories }: { categories: Category[]
     [logs, logsPage]
   )
 
-  async function loadProducts(category: Category) {
+  async function loadProducts(category: Category, brandId?: string) {
     setProductListLoading(true)
     setProductList([])
     setSelectedProductIds(new Set())
     setPreview(null)
     try {
-      const res = await fetch(`/api/admin/inflation/products?category_id=${category.id}`)
+      const url = `/api/admin/inflation/products?category_id=${category.id}${brandId ? `&brand_id=${brandId}` : ''}`
+      const res = await fetch(url)
       const data = await res.json()
-      const list: { id: string; name: string }[] = data.products || []
+      const list: { id: string; name: string; brand_id: string | null; brand_name: string | null }[] = data.products || []
       setProductList(list)
       setSelectedProductIds(new Set(list.map(p => p.id)))
     } catch {}
@@ -128,11 +135,14 @@ export default function InflationClient({ categories }: { categories: Category[]
   }
 
   function toggleSelectAll() {
-    if (selectedProductIds.size === productList.length) {
-      setSelectedProductIds(new Set())
-    } else {
-      setSelectedProductIds(new Set(productList.map(p => p.id)))
-    }
+    const allFiltered = filteredProductList.map(p => p.id)
+    const allSelected = allFiltered.every(id => selectedProductIds.has(id))
+    setSelectedProductIds(prev => {
+      const next = new Set(prev)
+      if (allSelected) { allFiltered.forEach(id => next.delete(id)) }
+      else { allFiltered.forEach(id => next.add(id)) }
+      return next
+    })
     setPreview(null)
   }
 
@@ -173,6 +183,23 @@ export default function InflationClient({ categories }: { categories: Category[]
       ...subs.map(s => ({ value: s.id, label: s.name, group: parent.name, indent: true })),
     ]
   })
+
+  // Brands that actually appear in the loaded product list
+  const availableBrands = useMemo(() => {
+    const seen = new Map<string, string>()
+    productList.forEach(p => { if (p.brand_id && p.brand_name) seen.set(p.brand_id, p.brand_name) })
+    return Array.from(seen.entries()).map(([id, name]) => ({ id, name })).sort((a, b) => a.name.localeCompare(b.name))
+  }, [productList])
+
+  const brandOptions: SelectOption[] = [
+    { value: '', label: 'All Brands' },
+    ...brands.map(b => ({ value: b.id, label: b.name })),
+  ]
+
+  const filteredProductList = useMemo(
+    () => selectedBrandId ? productList.filter(p => p.brand_id === selectedBrandId) : productList,
+    [productList, selectedBrandId]
+  )
 
   const fetchLogs = useCallback(() => {
     setLogsLoading(true)
@@ -253,7 +280,7 @@ export default function InflationClient({ categories }: { categories: Category[]
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 space-y-5">
         <h2 className="text-lg font-semibold text-foreground">Apply Inflation</h2>
 
-        <div className="grid grid-cols-1 sm:grid-cols-[1fr_200px] gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_200px] gap-4">
           <div>
             <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Category *</label>
             <AdminSelect
@@ -264,8 +291,22 @@ export default function InflationClient({ categories }: { categories: Category[]
                 const cat = categories.find(c => c.id === val) || null
                 setSelectedCategory(cat)
                 setPreview(null)
-                if (cat) loadProducts(cat)
+                if (cat) loadProducts(cat, selectedBrandId || undefined)
                 else { setProductList([]); setSelectedProductIds(new Set()) }
+              }}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-foreground-secondary mb-1.5">Brand</label>
+            <AdminSelect
+              value={selectedBrandId}
+              placeholder="All Brands"
+              options={brandOptions}
+              onChange={val => {
+                setSelectedBrandId(val)
+                setPreview(null)
+                if (selectedCategory) loadProducts(selectedCategory, val || undefined)
               }}
             />
           </div>
@@ -287,25 +328,47 @@ export default function InflationClient({ categories }: { categories: Category[]
 
         {(productListLoading || productList.length > 0) && (
           <div className="border border-border-default rounded-lg overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 bg-surface border-b border-border-default">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-surface border-b border-border-default gap-3 flex-wrap">
               <p className="text-sm font-medium text-foreground">
                 {productListLoading
                   ? 'Loading products…'
                   : `${selectedProductIds.size} of ${productList.length} product${productList.length !== 1 ? 's' : ''} selected`}
               </p>
-              {!productListLoading && productList.length > 0 && (
-                <button
-                  type="button"
-                  onClick={toggleSelectAll}
-                  className="text-xs font-medium text-accent-500 hover:text-accent-600 transition-colors"
-                >
-                  {selectedProductIds.size === productList.length ? 'Deselect All' : 'Select All'}
-                </button>
-              )}
+              <div className="flex items-center gap-3">
+                {!productListLoading && availableBrands.length > 1 && (
+                  <div className="w-48">
+                    <AdminSelect
+                      value={selectedBrandId}
+                      placeholder="All Brands"
+                      options={brandOptions}
+                      onChange={val => { setSelectedBrandId(val); setPreview(null) }}
+                    />
+                  </div>
+                )}
+                {!productListLoading && filteredProductList.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={toggleSelectAll}
+                    className="text-xs font-medium text-accent-500 hover:text-accent-600 transition-colors whitespace-nowrap"
+                  >
+                    {filteredProductList.every(p => selectedProductIds.has(p.id)) ? 'Deselect All' : 'Select All'}
+                  </button>
+                )}
+              </div>
             </div>
-            {!productListLoading && (
+            {productListLoading ? (
               <div className="max-h-72 overflow-y-auto divide-y divide-border-default">
-                {productList.map(p => (
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="flex items-center gap-3 px-4 py-2.5 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+                    <div className="w-4 h-4 rounded bg-surface-secondary shrink-0" />
+                    <div className="h-3.5 bg-surface-secondary rounded flex-1" />
+                    <div className="h-3 bg-surface-secondary rounded w-16" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="max-h-72 overflow-y-auto divide-y divide-border-default">
+                {filteredProductList.map(p => (
                   <label key={p.id} className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-surface transition-colors">
                     <input
                       type="checkbox"
@@ -314,8 +377,12 @@ export default function InflationClient({ categories }: { categories: Category[]
                       className="w-4 h-4 accent-accent-500 rounded"
                     />
                     <span className="text-sm text-foreground">{p.name}</span>
+                    {p.brand_name && <span className="text-xs text-foreground-muted ml-auto">{p.brand_name}</span>}
                   </label>
                 ))}
+                {filteredProductList.length === 0 && (
+                  <p className="px-4 py-3 text-sm text-foreground-muted">No products for this brand in the selected category.</p>
+                )}
               </div>
             )}
           </div>
@@ -430,9 +497,8 @@ export default function InflationClient({ categories }: { categories: Category[]
               </thead>
               <tbody className="divide-y divide-border-default">
                 {pagedLogs.map(log => (
-                  <>
+                  <Fragment key={log.id}>
                     <tr
-                      key={log.id}
                       onClick={() => setExpandedLogId(expandedLogId === log.id ? null : log.id)}
                       className={`transition-colors cursor-pointer ${log.snapshot ? 'hover:bg-surface' : ''} ${expandedLogId === log.id ? 'bg-surface' : ''} ${log.rolled_back_at ? 'opacity-60' : ''}`}
                     >
@@ -528,7 +594,7 @@ export default function InflationClient({ categories }: { categories: Category[]
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

@@ -698,7 +698,9 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                             {row.message_id && <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">Message-ID</dt><dd className="text-foreground font-mono text-[10px] break-all">{row.message_id}</dd></div>}
                           </dl>
                           <div className="p-3 sm:p-4">
-                            {body?.loading ? (
+                            {row.kind === 'otp' ? (
+                              <p className="text-xs text-foreground-muted italic">Body redacted — OTP emails are not stored for security.</p>
+                            ) : body?.loading ? (
                               <div className="flex items-center justify-center py-10"><RefreshCw className="w-4 h-4 animate-spin text-foreground-muted" /></div>
                             ) : body?.html ? (
                               <iframe

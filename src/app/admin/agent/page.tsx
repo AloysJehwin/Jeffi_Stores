@@ -561,9 +561,12 @@ export default function AdminAgentPage() {
                 </div>
               ))}
               {loading && (
-                <div className="flex items-center gap-2 text-sm text-foreground-muted">
-                  <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>Thinking, calling tools…</span>
+                <div className="animate-pulse space-y-1">
+                  <div className="max-w-[85%] rounded-lg px-3 py-2 bg-surface-secondary space-y-2">
+                    <div className="h-3 w-48 bg-surface-elevated rounded" style={{ animationDelay: '0ms' }} />
+                    <div className="h-3 w-64 bg-surface-elevated rounded" style={{ animationDelay: '50ms' }} />
+                    <div className="h-3 w-40 bg-surface-elevated rounded" style={{ animationDelay: '100ms' }} />
+                  </div>
                 </div>
               )}
             </div>

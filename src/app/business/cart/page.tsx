@@ -92,10 +92,18 @@ export default function CartPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center">
-          <div role="status" aria-label="Loading" className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-foreground-secondary">Loading cart...</p>
+      <div className="container mx-auto px-4 py-6">
+        <div className="animate-pulse space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4 flex gap-4" style={{ animationDelay: `${i * 80}ms` }}>
+              <div className="w-20 h-20 bg-surface-secondary rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-surface-secondary rounded w-3/4" />
+                <div className="h-3 bg-surface-secondary rounded w-1/2" />
+                <div className="h-4 bg-surface-secondary rounded w-24" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )

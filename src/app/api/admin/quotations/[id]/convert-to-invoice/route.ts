@@ -253,7 +253,7 @@ export async function POST(
           $19, $20
         ) RETURNING id, order_number`,
         [
-          'OFF-' + Date.now(),
+          (quotation.from_rfq ? 'BUS-' : 'OFF-') + Date.now(),
           orderStatus,
           isPaid ? 'paid' : 'unpaid',
           paymentMode,

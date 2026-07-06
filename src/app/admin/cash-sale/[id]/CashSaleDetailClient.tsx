@@ -41,7 +41,64 @@ export default function CashSaleDetailClient({ id }: { id: string }) {
   }
 
   if (loading || !data?.sale) {
-    return null
+    return (
+      <div className="p-4 sm:p-6 space-y-6 animate-fade-in">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <div className="h-7 w-36 bg-surface-secondary rounded animate-pulse" />
+            <div className="h-5 w-18 bg-surface-secondary rounded-full animate-pulse" />
+            <div className="h-5 w-12 bg-surface-secondary rounded-full animate-pulse" />
+          </div>
+          <div className="h-8 w-28 bg-surface-secondary rounded-lg animate-pulse" />
+        </div>
+        {/* Info cards — 2-col grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3" style={{ animationDelay: `${i * 60}ms` }}>
+              <div className="h-3 w-24 bg-surface-secondary rounded animate-pulse" />
+              <div className="space-y-2">
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <div key={j} className="flex justify-between gap-4 animate-pulse" style={{ animationDelay: `${j * 40}ms` }}>
+                    <div className="h-3.5 w-16 bg-surface-secondary rounded shrink-0" />
+                    <div className="h-3.5 bg-surface-secondary rounded flex-1" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+        {/* Line items table */}
+        <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+          <div className="px-4 py-3 border-b border-border-default">
+            <div className="h-4 w-20 bg-surface-secondary rounded animate-pulse" />
+          </div>
+          <div className="p-4 space-y-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="flex gap-4 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+                <div className="h-4 bg-surface-secondary rounded flex-1" />
+                <div className="h-4 w-10 bg-surface-secondary rounded shrink-0" />
+                <div className="h-4 w-10 bg-surface-secondary rounded shrink-0" />
+                <div className="h-4 w-16 bg-surface-secondary rounded shrink-0" />
+                <div className="h-4 w-14 bg-surface-secondary rounded shrink-0" />
+                <div className="h-4 w-14 bg-surface-secondary rounded shrink-0" />
+                <div className="h-4 w-20 bg-surface-secondary rounded shrink-0" />
+              </div>
+            ))}
+          </div>
+          <div className="border-t border-border-default px-4 py-3">
+            <div className="ml-auto max-w-xs space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex justify-between gap-8 animate-pulse">
+                  <div className="h-3.5 w-24 bg-surface-secondary rounded" />
+                  <div className="h-3.5 w-20 bg-surface-secondary rounded" />
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const s = data.sale

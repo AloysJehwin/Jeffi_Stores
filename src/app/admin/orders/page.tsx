@@ -165,9 +165,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
                     <span className={`px-1.5 py-0.5 text-xs font-medium rounded ${
                       order.source === 'online'
                         ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                        : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                        : order.source === 'business'
+                          ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                          : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
                     }`}>
-                      {order.source === 'online' ? 'Online' : 'Offline'}
+                      {order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : 'Offline'}
                     </span>
                   </div>
                   <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${

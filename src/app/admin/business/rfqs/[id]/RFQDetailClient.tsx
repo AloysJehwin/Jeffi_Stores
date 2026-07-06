@@ -81,6 +81,10 @@ const STATUS_LABEL: Record<string, string> = {
   rejected:       'Rejected',
 }
 
+function fmt2(n: number) {
+  return Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) +
     ', ' + new Date(iso).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
@@ -285,7 +289,26 @@ export default function RFQDetailClient({ id }: { id: string }) {
   // For header stat: prefer selling total, fallback to MRP total
   const totalCatalog = totalSelling > 0 ? totalSelling : totalMrp
 
-  if (loading) return null
+  if (loading) return (
+    <div className="p-4 sm:p-6 max-w-full space-y-5">
+      <div className="animate-pulse space-y-4">
+        <div className="h-7 w-48 bg-surface-secondary rounded" />
+        <div className="h-4 w-64 bg-surface-secondary rounded" />
+      </div>
+      <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
+        <div className="p-4 space-y-2">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="flex items-center gap-3 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+              <div className="h-4 flex-1 bg-surface-secondary rounded" />
+              <div className="h-4 w-20 bg-surface-secondary rounded" />
+              <div className="h-4 w-20 bg-surface-secondary rounded" />
+              <div className="h-4 w-16 bg-surface-secondary rounded" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
 
   if (!rfq) return <div className="p-6 text-center text-foreground-muted">RFQ not found.</div>
 
@@ -383,8 +406,8 @@ export default function RFQDetailClient({ id }: { id: string }) {
         <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Items', value: String(items.length) },
-            { label: 'Customer Price Total', value: totalCatalog > 0 ? `₹${totalCatalog.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—' },
-            { label: 'Requested Value', value: totalRequested > 0 ? `₹${totalRequested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}` : '—' },
+            { label: 'Customer Price Total', value: totalCatalog > 0 ? `₹${fmt2(totalCatalog)}` : '—' },
+            { label: 'Requested Value', value: totalRequested > 0 ? `₹${fmt2(totalRequested)}` : '—' },
             { label: 'GST Number', value: rfq.gst_number || '—' },
           ].map(({ label, value }) => (
             <div key={label} className="bg-white/5 rounded-xl p-3.5 border border-white/10">
@@ -612,7 +635,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                               <div>
                                 <p className="text-[10px] text-foreground-muted uppercase tracking-wide">MRP</p>
                                 <p className="text-sm text-foreground-muted line-through decoration-foreground-muted/50">
-                                  ₹{mrpPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{fmt2(mrpPrice)}
                                 </p>
                               </div>
                             )}
@@ -621,7 +644,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                               <div>
                                 <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Customer Price</p>
                                 <p className="text-sm font-medium text-foreground">
-                                  ₹{sellingPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{fmt2(sellingPrice)}
                                   <span className="text-foreground-muted text-[10px] ml-0.5">/unit</span>
                                 </p>
                               </div>
@@ -633,7 +656,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                                   Business Price <span className="normal-case">({businessDiscountPct}% off)</span>
                                 </p>
                                 <p className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                                  ₹{businessPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{fmt2(businessPrice)}
                                   <span className="text-foreground-muted text-[10px] ml-0.5">/unit</span>
                                 </p>
                               </div>
@@ -643,7 +666,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                               <div>
                                 <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Requested</p>
                                 <p className="text-sm font-bold text-accent-500">
-                                  ₹{requestedInclGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{fmt2(requestedInclGst)}
                                   <span className="text-foreground-muted font-normal text-[10px] ml-0.5">/unit</span>
                                 </p>
                               </div>
@@ -663,7 +686,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                               <div className="text-xs text-foreground-muted">
                                 Customer price total:&nbsp;
                                 <span className="text-foreground font-medium">
-                                  ₹{itemSellingTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{fmt2(itemSellingTotal)}
                                 </span>
                               </div>
                             )}
@@ -671,7 +694,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                               <div className="text-xs text-foreground-muted">
                                 Requested total:&nbsp;
                                 <span className="font-semibold text-accent-500">
-                                  ₹{itemRequestedTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{fmt2(itemRequestedTotal)}
                                 </span>
                               </div>
                             )}
@@ -688,7 +711,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                               if (savesBase != null && effectiveTotal != null && savesBase > effectiveTotal) {
                                 return (
                                   <div className="ml-auto text-xs text-green-600 dark:text-green-400 font-medium">
-                                    Saves ₹{(savesBase - effectiveTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    Saves ₹{fmt2(savesBase - effectiveTotal)}
                                   </div>
                                 )
                               }
@@ -710,25 +733,25 @@ export default function RFQDetailClient({ id }: { id: string }) {
               {totalMrp > 0 && (
                 <div>
                   <p className="text-xs text-foreground-muted mb-0.5">Total MRP</p>
-                  <p className="font-medium text-foreground-secondary line-through decoration-foreground-muted/50">₹{totalMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-medium text-foreground-secondary line-through decoration-foreground-muted/50">₹{fmt2(totalMrp)}</p>
                 </div>
               )}
               {totalSelling > 0 && (
                 <div>
                   <p className="text-xs text-foreground-muted mb-0.5">Total Customer Price</p>
-                  <p className="font-semibold text-foreground">₹{totalSelling.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-semibold text-foreground">₹{fmt2(totalSelling)}</p>
                 </div>
               )}
               {totalBusinessPrice > 0 && totalBusinessPrice !== totalSelling && (
                 <div>
                   <p className="text-xs text-foreground-muted mb-0.5">Total Business Price</p>
-                  <p className="font-semibold text-blue-600 dark:text-blue-400">₹{totalBusinessPrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-semibold text-blue-600 dark:text-blue-400">₹{fmt2(totalBusinessPrice)}</p>
                 </div>
               )}
               {totalRequested > 0 && (
                 <div>
                   <p className="text-xs text-foreground-muted mb-0.5">Total Requested</p>
-                  <p className="font-bold text-accent-500">₹{totalRequested.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+                  <p className="font-bold text-accent-500">₹{fmt2(totalRequested)}</p>
                 </div>
               )}
               {totalSellingForDiscountedItems > 0 && totalRequested > 0 && (
@@ -737,7 +760,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                     <div className="text-right">
                       <p className="text-xs text-foreground-muted mb-0.5">Discount off Customer Price</p>
                       <p className="font-bold text-green-600 dark:text-green-400">
-                        ₹{(totalSellingForDiscountedItems - totalBusinessPriceForRequestedItems).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹{fmt2(totalSellingForDiscountedItems - totalBusinessPriceForRequestedItems)}
                         <span className="text-xs font-normal text-foreground-muted ml-1">
                           ({Math.round(((totalSellingForDiscountedItems - totalBusinessPriceForRequestedItems) / totalSellingForDiscountedItems) * 100)}%)
                         </span>
@@ -748,7 +771,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                     <div className="text-right">
                       <p className="text-xs text-foreground-muted mb-0.5">Discount off Customer Price</p>
                       <p className="font-bold text-green-600 dark:text-green-400">
-                        ₹{(totalSellingForDiscountedItems - totalRequested).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹{fmt2(totalSellingForDiscountedItems - totalRequested)}
                         <span className="text-xs font-normal text-foreground-muted ml-1">
                           ({Math.round(((totalSellingForDiscountedItems - totalRequested) / totalSellingForDiscountedItems) * 100)}%)
                         </span>
@@ -759,7 +782,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                     <div className="text-right">
                       <p className="text-xs text-foreground-muted mb-0.5">Discount off Business Price</p>
                       <p className="font-bold text-blue-500 dark:text-blue-400">
-                        ₹{(totalBusinessPriceForRequestedItems - totalRequested).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        ₹{fmt2(totalBusinessPriceForRequestedItems - totalRequested)}
                         <span className="text-xs font-normal text-foreground-muted ml-1">
                           ({Math.round(((totalBusinessPriceForRequestedItems - totalRequested) / totalBusinessPriceForRequestedItems) * 100)}%)
                         </span>
@@ -897,7 +920,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                             return (
                               <div key={ci.rfq_item_id} className="flex items-center justify-between gap-2 text-xs">
                                 <span className="text-foreground-secondary truncate">{item?.description || ci.rfq_item_id}</span>
-                                <span className="font-semibold text-purple-300 shrink-0">₹{Number(ci.offered_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/unit</span>
+                                <span className="font-semibold text-purple-300 shrink-0">₹{fmt2(Number(ci.offered_price))}/unit</span>
                               </div>
                             )
                           })}

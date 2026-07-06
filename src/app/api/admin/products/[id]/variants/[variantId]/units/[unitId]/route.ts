@@ -132,10 +132,10 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ unit: updated })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    if (msg.includes('duplicate key')) {
+    if (msg.includes('duplicate key') && msg.includes('unit')) {
       return NextResponse.json({ error: 'A unit with this name already exists for this variant' }, { status: 409 })
     }
-    return NextResponse.json({ error: 'Failed to update unit' }, { status: 500 })
+    return NextResponse.json({ error: msg || 'Failed to update unit' }, { status: 500 })
   }
 }
 

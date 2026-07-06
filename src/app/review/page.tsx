@@ -99,8 +99,13 @@ export default function ReviewPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-accent-400 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen bg-surface px-4 py-12">
+        <div className="max-w-lg mx-auto animate-pulse space-y-4">
+          <div className="h-6 bg-surface-elevated rounded w-48 mx-auto" />
+          <div className="h-4 bg-surface-elevated rounded w-64 mx-auto" />
+          <div className="h-40 bg-surface-elevated rounded-xl" />
+          <div className="h-24 bg-surface-elevated rounded-xl" />
+        </div>
       </div>
     )
   }

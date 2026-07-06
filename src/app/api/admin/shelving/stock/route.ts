@@ -6,12 +6,8 @@ import { queryOne } from '@/lib/db'
 
 async function getInventoryQuantity(productId: string, variantId: string | null, subVariantId: string | null): Promise<number> {
   if (subVariantId) {
-    // sub_variants don't track inventory_quantity — they share the variant's quantity
     const row = await queryOne<{ q: string }>(
-      `SELECT COALESCE(pv.inventory_quantity, 0)::text AS q
-       FROM product_sub_variants ps
-       JOIN product_variants pv ON pv.id = ps.variant_id
-       WHERE ps.id = $1`,
+      `SELECT COALESCE(inventory_quantity, 0)::text AS q FROM product_sub_variants WHERE id = $1`,
       [subVariantId]
     )
     return Number(row?.q ?? 0)

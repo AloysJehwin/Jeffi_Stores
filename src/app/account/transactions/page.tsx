@@ -62,6 +62,7 @@ export default function TransactionsPage() {
   const router = useRouter()
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
   const [pageSize, setPageSize] = useState(10)
@@ -105,15 +106,26 @@ export default function TransactionsPage() {
     } catch {
     } finally {
       setLoading(false)
+      setInitialLoading(false)
     }
   }
 
-  if (authLoading || loading) {
+  if (authLoading || initialLoading) {
     return (
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-foreground-secondary">Loading...</p>
+      <div className="container mx-auto px-4 pt-4 pb-8">
+        <div className="space-y-3 animate-pulse">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4" style={{ animationDelay: `${i * 70}ms` }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-3 bg-surface-secondary rounded w-32" />
+                <div className="h-5 bg-surface-secondary rounded-full w-16" />
+              </div>
+              <div className="flex items-center justify-between">
+                <div className="h-4 bg-surface-secondary rounded w-24" />
+                <div className="h-4 bg-surface-secondary rounded w-20" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -127,7 +139,7 @@ export default function TransactionsPage() {
       {/* Mobile header */}
       <AccountMobileHeader />
 
-      <div className="container mx-auto px-4 pt-4">
+      <div className="container mx-auto px-4 pt-4 pb-8">
 
         {/* Filters */}
         {transactions.length > 0 && (
@@ -163,7 +175,7 @@ export default function TransactionsPage() {
         )}
 
         <div>
-            {transactions.length === 0 ? (
+            {transactions.length === 0 && !loading ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg
                   className="w-16 h-16 text-foreground-muted mx-auto mb-4"
@@ -188,6 +200,31 @@ export default function TransactionsPage() {
                 >
                   Browse Products
                 </Link>
+              </div>
+            ) : loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5 animate-pulse"
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex-1 min-w-0 space-y-2">
+                        <div className="flex gap-2">
+                          <div className="h-5 w-20 bg-surface-secondary rounded-full" />
+                          <div className="h-5 w-24 bg-surface-secondary rounded-full" />
+                        </div>
+                        <div className="h-5 w-32 bg-surface-secondary rounded" />
+                        <div className="h-3 w-48 bg-surface-secondary rounded" />
+                      </div>
+                      <div className="space-y-1.5 sm:text-right flex-shrink-0">
+                        <div className="h-4 w-24 bg-surface-secondary rounded" />
+                        <div className="h-3 w-16 bg-surface-secondary rounded" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="space-y-4">

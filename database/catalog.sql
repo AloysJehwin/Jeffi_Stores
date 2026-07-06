@@ -305,3 +305,5 @@ CREATE TABLE public.variant_images (
 
 -- Live migration (idempotent)
 ALTER TABLE products ADD COLUMN IF NOT EXISTS extra_delivery_days integer DEFAULT 0 NOT NULL;
+-- Drop stale non-partial unique constraint superseded by partial indexes uniq_product_units_product_unit + uniq_product_units_variant_unit
+ALTER TABLE product_units DROP CONSTRAINT IF EXISTS product_units_product_id_unit_key;

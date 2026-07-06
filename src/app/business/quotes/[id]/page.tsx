@@ -97,6 +97,10 @@ function fmtTime(iso: string) {
   })
 }
 
+function fmt(n: number | string | null | undefined): string {
+  return Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 export default function BusinessRFQDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [rfq, setRfq] = useState<RFQ | null>(null)
@@ -563,18 +567,18 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                             <div className="bg-surface-secondary rounded-xl px-3 py-2.5">
                               <p className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide mb-1">Our Price</p>
                               <p className="text-sm font-bold text-foreground leading-none">
-                                ₹{Number(shownCatalogPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                ₹{fmt(shownCatalogPrice)}
                               </p>
                               <div className="mt-1 flex flex-wrap gap-1">
                                 {/* MRP strikethrough */}
                                 {businessUnitPrice && catalogUnit && (
                                   <span className="text-[10px] text-foreground-muted line-through">
-                                    ₹{Number(catalogUnit).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                                    ₹{fmt(catalogUnit)}
                                   </span>
                                 )}
                                 {!businessUnitPrice && catalogMrp && catalogMrp > Number(catalogUnit ?? 0) && (
                                   <span className="text-[10px] text-foreground-muted line-through">
-                                    MRP ₹{Number(catalogMrp).toLocaleString('en-IN', { minimumFractionDigits: 0 })}
+                                    MRP ₹{fmt(catalogMrp)}
                                   </span>
                                 )}
                                 {discountPct > 0 && (
@@ -592,7 +596,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                             {targetPrice != null ? (
                               <>
                                 <p className="text-sm font-bold text-amber-700 dark:text-amber-400 leading-none">
-                                  ₹{Number(targetPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{fmt(targetPrice)}
                                 </p>
                                 {reqDiscountPct != null && reqDiscountPct > 0 && (
                                   <p className="text-[10px] font-semibold text-amber-600 dark:text-amber-500 mt-1">
@@ -613,7 +617,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                             {hasOffer ? (
                               <>
                                 <p className="text-sm font-bold text-purple-700 dark:text-purple-300 leading-none">
-                                  ₹{Number(offeredPrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                  ₹{fmt(offeredPrice)}
                                 </p>
                                 {offeredDiscountPct != null && offeredDiscountPct > 0 && (
                                   <p className="text-[10px] font-semibold text-purple-600 dark:text-purple-400 mt-1">
@@ -651,7 +655,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                   {totalRequested > 0 && (
                     <div className="px-5 py-3 bg-surface-secondary/40 flex items-center justify-between">
                       <span className="text-sm font-semibold text-foreground-secondary">Total Target Value</span>
-                      <span className="font-bold text-foreground">₹{totalRequested.toLocaleString('en-IN')}</span>
+                      <span className="font-bold text-foreground">₹{fmt(totalRequested)}</span>
                     </div>
                   )}
                 </div>
@@ -738,7 +742,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                                     <div key={ci.rfq_item_id} className="flex items-center justify-between gap-3 text-xs">
                                       <span className="text-foreground-secondary truncate">{item?.description || ci.rfq_item_id}</span>
                                       <span className="font-semibold text-purple-600 dark:text-purple-400 shrink-0">
-                                        ₹{Number(ci.offered_price).toLocaleString('en-IN')}
+                                        ₹{fmt(ci.offered_price)}
                                       </span>
                                     </div>
                                   )
@@ -815,7 +819,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                                     </span>
                                   )}
                                   <span className="text-sm font-bold text-foreground">
-                                    ₹{Number(ci.offered_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                    ₹{fmt(ci.offered_price)}
                                   </span>
                                 </div>
                               </div>
@@ -868,7 +872,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                                   <div key={ci.rfq_item_id} className="flex items-center justify-between gap-3 bg-white dark:bg-zinc-800 rounded-lg px-3 py-2 border border-border-secondary">
                                     <div className="min-w-0 flex-1">
                                       <span className="text-xs text-foreground-secondary truncate block">{item?.description || 'Item'}</span>
-                                      <span className="text-[10px] text-foreground-muted">Admin offered ₹{Number(ci.offered_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                                      <span className="text-[10px] text-foreground-muted">Admin offered ₹{fmt(ci.offered_price)}</span>
                                     </div>
                                     <div className="flex items-center gap-1 shrink-0">
                                       <span className="text-xs text-foreground-secondary">₹</span>

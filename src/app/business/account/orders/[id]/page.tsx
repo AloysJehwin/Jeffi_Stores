@@ -337,9 +337,59 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
 
   if (authLoading || loading) {
     return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto" />
-        <p className="mt-4 text-foreground-secondary">Loading...</p>
+      <div className="bg-surface min-h-screen">
+        <div className="container mx-auto px-4">
+          <div className="py-4 sm:py-6 space-y-4 sm:space-y-6 animate-pulse">
+            {/* Order header skeleton */}
+            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="space-y-2">
+                  <div className="h-6 w-48 bg-surface-secondary rounded" />
+                  <div className="h-4 w-64 bg-surface-secondary rounded" />
+                </div>
+                <div className="flex gap-2">
+                  <div className="h-6 w-20 bg-surface-secondary rounded-full" />
+                  <div className="h-6 w-24 bg-surface-secondary rounded-full" />
+                </div>
+              </div>
+            </div>
+            {/* Order items skeleton */}
+            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 space-y-4">
+              <div className="h-5 w-36 bg-surface-secondary rounded" />
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex gap-4 pb-4 border-b border-border-default last:border-b-0" style={{ animationDelay: `${i * 60}ms` }}>
+                  <div className="w-20 h-20 bg-surface-secondary rounded-lg shrink-0" />
+                  <div className="flex-1 space-y-2">
+                    <div className="h-4 bg-surface-secondary rounded w-3/4" />
+                    <div className="h-3 bg-surface-secondary rounded w-1/4" />
+                    <div className="h-3 bg-surface-secondary rounded w-1/2" />
+                  </div>
+                </div>
+              ))}
+              {/* Totals skeleton — business has an extra Business Discount row */}
+              <div className="pt-4 border-t-2 border-border-default space-y-2">
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <div key={i} className="flex justify-between" style={{ animationDelay: `${i * 50}ms` }}>
+                    <div className="h-4 w-24 bg-surface-secondary rounded" />
+                    <div className="h-4 w-24 bg-surface-secondary rounded" />
+                  </div>
+                ))}
+                <div className="flex justify-between pt-2">
+                  <div className="h-6 w-12 bg-surface-secondary rounded" />
+                  <div className="h-7 w-28 bg-surface-secondary rounded" />
+                </div>
+              </div>
+            </div>
+            {/* Shipping address skeleton */}
+            <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 space-y-3">
+              <div className="h-5 w-40 bg-surface-secondary rounded" />
+              <div className="h-4 w-32 bg-surface-secondary rounded" />
+              <div className="h-4 w-56 bg-surface-secondary rounded" />
+              <div className="h-4 w-44 bg-surface-secondary rounded" />
+              <div className="h-4 w-36 bg-surface-secondary rounded" />
+            </div>
+          </div>
+        </div>
       </div>
     )
   }
@@ -368,7 +418,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
   return (
     <div className="bg-surface min-h-screen">
       <BusinessAccountMobileHeader />
-      <div className="container mx-auto px-4">
+      <div className="container mx-auto px-4 pb-8">
         <div className="py-4 sm:py-6 space-y-4 sm:space-y-6">
             {/* Order Header */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">

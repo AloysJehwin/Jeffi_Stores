@@ -580,7 +580,18 @@ export default function CashSaleClient() {
 
       <div className="bg-surface-elevated border border-border-default rounded-xl overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-foreground-muted text-sm">Loading cash sales…</div>
+          <div className="p-4 space-y-2">
+            {[...Array(8)].map((_, i) => (
+              <div key={i} className="flex items-center gap-3 px-2 py-1 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+                <div className="h-4 w-24 bg-surface-secondary rounded" />
+                <div className="h-4 w-20 bg-surface-secondary rounded" />
+                <div className="h-4 flex-1 bg-surface-secondary rounded" />
+                <div className="h-4 w-20 bg-surface-secondary rounded" />
+                <div className="h-4 w-16 bg-surface-secondary rounded" />
+                <div className="h-4 w-16 bg-surface-secondary rounded" />
+              </div>
+            ))}
+          </div>
         ) : sales.length === 0 ? (
           <div className="p-12 text-center text-foreground-muted text-sm">No cash sales found.</div>
         ) : (
