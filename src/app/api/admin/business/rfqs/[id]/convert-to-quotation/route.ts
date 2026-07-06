@@ -68,7 +68,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
      LEFT JOIN products p ON p.id = ri.product_id
      LEFT JOIN product_variants pv ON pv.id = ri.variant_id
      LEFT JOIN product_sub_variants psv ON psv.id = ri.sub_variant_id
-     LEFT JOIN LATERAL (SELECT factor FROM product_units WHERE product_id = ri.product_id AND unit = ri.unit LIMIT 1) pu ON true
+     LEFT JOIN LATERAL (SELECT factor, display_label FROM product_units WHERE product_id = ri.product_id AND unit = ri.unit LIMIT 1) pu ON true
      WHERE ri.rfq_id = $1
      ORDER BY ri.position, ri.created_at`,
     [id]
