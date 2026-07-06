@@ -570,9 +570,9 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                 <div>
                   <label className={labelCls}>GST %</label>
                   <AdminSelect
+                    sm
                     value={item.gst_rate}
                     onChange={v => updateItem(item.id, 'gst_rate', v)}
-                    className="[&_button]:!bg-surface-secondary [&_button]:!border-border-default [&_button]:!rounded [&_button]:!py-1.5 [&_button]:!px-2 [&_button]:!text-sm [&_button]:!w-full"
                     options={[
                       { value: '0', label: '0%' }, { value: '5', label: '5%' },
                       { value: '12', label: '12%' }, { value: '18', label: '18%' },
@@ -666,6 +666,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                       const selectedKey = item.selected_unit_key || countUnits[0].unit
                       return (
                         <AdminSelect
+                          sm
                           value={selectedKey}
                           onChange={v => {
                             const picked = item.available_units.find(u => u.unit === v)
@@ -678,7 +679,6 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                               unit: picked.display_label.toUpperCase(),
                             }))
                           }}
-                          className="[&_button]:!bg-surface-secondary [&_button]:!border-border-default [&_button]:!rounded [&_button]:!py-1.5 [&_button]:!px-2 [&_button]:!text-sm [&_button]:!w-full"
                           options={countUnits.map(u => ({
                             value: u.unit,
                             label: u.display_label + (u.factor > 1 ? ` (${u.factor} pcs)` : ''),

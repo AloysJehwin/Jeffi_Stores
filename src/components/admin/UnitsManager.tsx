@@ -243,6 +243,8 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
     const key = draftUnit.trim()
     if (!key) { showToast('Unit name is required', 'error'); return }
 
+    const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
+
     let factorNum: number
     let conversionMeta: object | null = null
 
@@ -264,7 +266,6 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
     if (maxQty !== null && (!Number.isFinite(maxQty) || maxQty < minQty)) { showToast('Max qty must be ≥ min qty', 'error'); return }
     if (!Number.isFinite(qtyStep) || qtyStep <= 0) { showToast('Qty step must be a positive number', 'error'); return }
 
-    const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
     const payload = { unit: key, factor: factorNum, dimension: draftDimension, display_label: draftLabel || null, conversion_meta: conversionMeta, min_qty: minQty, max_qty: maxQty, qty_step: qtyStep }
 
     setSaving(true)
@@ -282,6 +283,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   async function handleSaveExtra() {
     const key = extraUnit.trim()
     if (!key) { showToast('Unit name is required', 'error'); return }
+
     const factorNum = parseFloat(extraFactor)
     if (!Number.isFinite(factorNum) || factorNum <= 0) { showToast('Enter a valid pcs count (e.g. 12 for dozen)', 'error'); return }
     const minQty = parseFloat(extraMinQty)

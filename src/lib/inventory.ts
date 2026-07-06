@@ -358,6 +358,14 @@ export async function getStockValuation(filters: {
     )
   `
 
+  // All distinct categories and brands (unfiltered, for dropdown population)
+  const filterMeta = await queryMany<{ category_name: string | null; brand_name: string | null }>(
+    `${baseQuery} SELECT DISTINCT rows.category_name, rows.brand_name FROM rows ORDER BY rows.category_name, rows.brand_name`,
+    []
+  )
+  const allCategories = [...new Set(filterMeta.map(r => r.category_name).filter(Boolean))].sort() as string[]
+  const allBrands = [...new Set(filterMeta.map(r => r.brand_name).filter(Boolean))].sort() as string[]
+
   // Count filtered rows
   const countRow = await queryOne<{ total: number; total_value: string }>(
     `${baseQuery} SELECT COUNT(*)::int AS total, SUM(rows.stock_value)::text AS total_value FROM rows ${whereClause}`,
@@ -377,5 +385,7 @@ export async function getStockValuation(filters: {
     products: products || [],
     total,
     totalValue: round2(totalValue),
+    allCategories,
+    allBrands,
   }
 }

@@ -108,7 +108,7 @@ export default function ScanClient() {
     if (!product) { setShelfLocations([]); return }
     const params = new URLSearchParams({ product_id: product.product_id })
     if (product.variant_id) params.set('variant_id', product.variant_id)
-    fetch(`/api/admin/shelving/stock?${params}`)
+    fetch(`/api/admin/shelving/stock?${params}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setShelfLocations(d?.locations ?? []))
       .catch(() => setShelfLocations([]))

@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useState, useRef, useEffect, useCallback } from 'react'
+import { useState, useRef, useEffect, useCallback, useTransition } from 'react'
 
 const SORT_OPTIONS = [
   { value: 'created_at', label: 'Newest First' },
@@ -15,6 +15,7 @@ export default function SortDropdown({ basePath = '/products' }: { basePath?: st
   const searchParams = useSearchParams()
   const [isOpen, setIsOpen] = useState(false)
   const [highlightedIndex, setHighlightedIndex] = useState(-1)
+  const [isPending, startTransition] = useTransition()
   const containerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
 
@@ -44,7 +45,9 @@ export default function SortDropdown({ basePath = '/products' }: { basePath?: st
       params.delete('order')
     }
 
-    router.replace(basePath + `?${params.toString()}`)
+    startTransition(() => {
+      router.replace(basePath + `?${params.toString()}`)
+    })
     setIsOpen(false)
   }, [searchParams, router])
 
@@ -120,7 +123,8 @@ export default function SortDropdown({ basePath = '/products' }: { basePath?: st
             }
           }}
           onKeyDown={handleKeyDown}
-          className={`px-4 py-2 bg-surface-elevated border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center gap-2 min-w-[190px]
+      className={`px-4 py-2 bg-surface-elevated border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center gap-2 min-w-[190px]
+            ${isPending ? 'opacity-60' : ''}
             ${isOpen ? 'border-accent-500 ring-2 ring-accent-500/20' : 'border-border-secondary hover:border-gray-400'}
           `}
         >

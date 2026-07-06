@@ -523,16 +523,26 @@ function CheckoutPage() {
 
   if (authLoading || cartLoading || isLoadingAddress) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full"></div>
+      <div className="min-h-screen bg-surface px-4 py-8">
+        <div className="max-w-2xl mx-auto animate-pulse space-y-4">
+          <div className="h-6 bg-surface-elevated rounded w-40" />
+          <div className="h-32 bg-surface-elevated rounded-lg" />
+          <div className="h-48 bg-surface-elevated rounded-lg" />
+          <div className="h-24 bg-surface-elevated rounded-lg" />
+        </div>
       </div>
     )
   }
 
   if (!user || (!isBuyNow && cartCount === 0) || !address) {
     return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full"></div>
+      <div className="min-h-screen bg-surface px-4 py-8">
+        <div className="max-w-2xl mx-auto animate-pulse space-y-4">
+          <div className="h-6 bg-surface-elevated rounded w-40" />
+          <div className="h-32 bg-surface-elevated rounded-lg" />
+          <div className="h-48 bg-surface-elevated rounded-lg" />
+          <div className="h-24 bg-surface-elevated rounded-lg" />
+        </div>
       </div>
     )
   }

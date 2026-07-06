@@ -431,7 +431,9 @@ describe('getStockValuation', () => {
 
   it('returns empty products array when queryMany returns null', async () => {
     mockQueryOne.mockResolvedValue({ total: 0, total_value: '0' } as any)
-    mockQueryMany.mockResolvedValue(null as any)
+    // filterMeta call (allCategories/allBrands) comes first, then the paginated products call
+    mockQueryMany.mockResolvedValueOnce([] as any) // filterMeta
+    mockQueryMany.mockResolvedValueOnce(null as any) // products
 
     const result = await getStockValuation()
     expect(result.products).toEqual([])
@@ -443,7 +445,8 @@ describe('getStockValuation', () => {
 
     await getStockValuation({ limit: 10, offset: 30 })
 
-    const pageParams = mockQueryMany.mock.calls[0][1] as any[]
+    // calls[0] = filterMeta, calls[1] = paginated products
+    const pageParams = mockQueryMany.mock.calls[1][1] as any[]
     expect(pageParams.slice(-2)).toEqual([10, 30])
   })
 })

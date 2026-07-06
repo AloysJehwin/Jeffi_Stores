@@ -58,8 +58,8 @@ const STATUS_COLORS: Record<string, string> = {
   final: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
 }
 
-function fmt2(n: number) {
-  return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+function fmt2(n: number | string) {
+  return Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function fmtDate(d: string) {
@@ -640,7 +640,18 @@ export default function QuotationsClient() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={6} className="px-4 py-8 text-center text-foreground-secondary">Loading…</td></tr>
+                  <>
+                    {[...Array(8)].map((_, i) => (
+                      <tr key={i} className="border-b border-border-default animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+                        <td className="px-4 py-3"><div className="h-4 w-24 bg-surface-secondary rounded" /></td>
+                        <td className="px-4 py-3"><div className="h-4 w-20 bg-surface-secondary rounded" /></td>
+                        <td className="px-4 py-3"><div className="h-4 w-32 bg-surface-secondary rounded" /></td>
+                        <td className="px-4 py-3"><div className="h-4 w-16 bg-surface-secondary rounded" /></td>
+                        <td className="px-4 py-3"><div className="h-5 w-16 bg-surface-secondary rounded-full" /></td>
+                        <td className="px-4 py-3"><div className="h-4 w-12 bg-surface-secondary rounded ml-auto" /></td>
+                      </tr>
+                    ))}
+                  </>
                 ) : quotations.length === 0 ? (
                   <tr><td colSpan={6} className="px-4 py-12 text-center text-foreground-secondary">No quotations found. Create your first one.</td></tr>
                 ) : sortedQuotations.map(q => (
@@ -1373,20 +1384,20 @@ function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => voi
           <div className="grid grid-cols-3 gap-3 p-3 rounded-lg bg-surface-secondary">
             <div>
               <p className="text-xs text-foreground-muted">Subtotal</p>
-              <p className="text-sm font-semibold text-foreground">₹{Number(q.subtotal || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              <p className="text-sm font-semibold text-foreground">₹{fmt2(Number(q.subtotal || 0))}</p>
             </div>
             <div>
               <p className="text-xs text-foreground-muted">CGST + SGST</p>
               <p className="text-sm font-semibold text-foreground">
                 {(Number(q.cgst_amount) > 0 || Number(q.sgst_amount) > 0)
-                  ? `₹${Number(q.cgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })} + ₹${Number(q.sgst_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+                  ? `₹${fmt2(Number(q.cgst_amount))} + ₹${fmt2(Number(q.sgst_amount))}`
                   : '—'
                 }
               </p>
             </div>
             <div>
               <p className="text-xs text-foreground-muted">Total</p>
-              <p className="text-sm font-bold text-foreground">₹{Number(q.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</p>
+              <p className="text-sm font-bold text-foreground">₹{fmt2(Number(q.total_amount))}</p>
             </div>
           </div>
 

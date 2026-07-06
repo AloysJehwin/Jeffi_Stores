@@ -135,7 +135,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (msg.includes('duplicate key')) {
       return NextResponse.json({ error: 'A unit with this name already exists for this variant' }, { status: 409 })
     }
-    return NextResponse.json({ error: 'Failed to update unit' }, { status: 500 })
+    return NextResponse.json({ error: msg || 'Failed to update unit' }, { status: 500 })
   }
 }
 

@@ -23,14 +23,28 @@ export async function OPTIONS(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const origin = req.headers.get('origin')
 
-  let body: { token?: string; rating?: number; comment?: string; title?: string; tags?: string[] }
-  try {
-    body = await req.json()
-  } catch {
-    return ampResponse({ error: 'Invalid request' }, origin, 400)
-  }
+  let token: string | undefined
+  let rating: number | undefined
+  let comment: string | undefined
+  let title: string | undefined
+  let tags: string[] | undefined
 
-  const { token, rating, comment, title, tags } = body
+  const ct = req.headers.get('content-type') || ''
+  if (ct.includes('application/json')) {
+    let body: { token?: string; rating?: number; comment?: string; title?: string; tags?: string[] }
+    try { body = await req.json() } catch { return ampResponse({ error: 'Invalid request' }, origin, 400) }
+    token = body.token; rating = body.rating ? Number(body.rating) : undefined
+    comment = body.comment; title = body.title; tags = body.tags
+  } else {
+    let form: FormData
+    try { form = await req.formData() } catch { return ampResponse({ error: 'Invalid request' }, origin, 400) }
+    token = form.get('token')?.toString()
+    rating = form.get('rating') ? Number(form.get('rating')) : undefined
+    comment = form.get('comment')?.toString()
+    title = form.get('title')?.toString()
+    const tagsRaw = form.get('tags')?.toString()
+    tags = tagsRaw ? tagsRaw.split(',') : undefined
+  }
 
   if (!token) return ampResponse({ error: 'Missing token' }, origin, 400)
   if (!rating || rating < 1 || rating > 5) return ampResponse({ error: 'Invalid rating' }, origin, 400)

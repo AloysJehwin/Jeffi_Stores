@@ -66,6 +66,7 @@ export default function ShelvingClient() {
   const [labelCopies, setLabelCopies] = useState('1')
   const [generatingLabels, setGeneratingLabels] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [locationsLoading, setLocationsLoading] = useState(false)
   const [stockLoading, setStockLoading] = useState(false)
   const [error, setError] = useState('')
 
@@ -79,18 +80,19 @@ export default function ShelvingClient() {
   }, [])
 
   const loadLocations = useCallback(async (warehouseId: string) => {
+    setLocationsLoading(true)
     try {
       const res = await fetch(`/api/admin/shelving/locations?warehouse_id=${warehouseId}`)
       if (!res.ok) throw new Error('Failed to load')
       const data = await res.json()
       setLocations(data.locations || [])
-    } catch { setError('Failed to load locations') }
+    } catch { setError('Failed to load locations') } finally { setLocationsLoading(false) }
   }, [])
 
   const loadStock = useCallback(async (locationId: string) => {
     setStockLoading(true)
     try {
-      const res = await fetch(`/api/admin/shelving/stock?location_id=${locationId}`)
+      const res = await fetch(`/api/admin/shelving/stock?location_id=${locationId}`, { credentials: 'include' })
       if (!res.ok) throw new Error('Failed to load')
       const data = await res.json()
       setStock(data.stock || [])
@@ -271,6 +273,7 @@ export default function ShelvingClient() {
             expandedAisles={expandedAisles} setExpandedAisles={setExpandedAisles}
             expandedRacks={expandedRacks} setExpandedRacks={setExpandedRacks}
             selectedWarehouse={selectedWarehouse} mobilePanel={mobilePanel}
+            loading={locationsLoading}
             onDownloadLabel={(ids, filename) => downloadLabels(ids, 1, filename)}
             onDownloadSynthetic={(displayCode, warehouseName, filename) => downloadSyntheticLabel(displayCode, warehouseName, filename)}
           />
@@ -391,7 +394,7 @@ function LabelButton({ onClick, title }: { onClick: (e: React.MouseEvent) => voi
   )
 }
 
-function LocationPanel({ tree, locations, selected, onSelect, onAdd, onEdit, onDelete, showForm, editTarget, locationFormPrefill, onFormSave, onFormCancel, expandedAisles, setExpandedAisles, expandedRacks, setExpandedRacks, selectedWarehouse, mobilePanel, onDownloadLabel, onDownloadSynthetic }: {
+function LocationPanel({ tree, locations, selected, onSelect, onAdd, onEdit, onDelete, showForm, editTarget, locationFormPrefill, onFormSave, onFormCancel, expandedAisles, setExpandedAisles, expandedRacks, setExpandedRacks, selectedWarehouse, mobilePanel, loading, onDownloadLabel, onDownloadSynthetic }: {
   tree: ReturnType<typeof groupLocations>; locations: ShelfLocation[]; selected: string | null
   onSelect: (id: string) => void
   onAdd: (prefill?: { aisle?: string; rack?: string }) => void
@@ -402,6 +405,7 @@ function LocationPanel({ tree, locations, selected, onSelect, onAdd, onEdit, onD
   expandedAisles: Record<string, boolean>; setExpandedAisles: (v: any) => void
   expandedRacks: Record<string, boolean>; setExpandedRacks: (v: any) => void
   selectedWarehouse: string | null; mobilePanel: Panel
+  loading?: boolean
   onDownloadLabel: (locationIds: string[], filename: string) => void
   onDownloadSynthetic: (displayCode: string, warehouseName: string, filename: string) => void
 }) {
@@ -452,13 +456,23 @@ function LocationPanel({ tree, locations, selected, onSelect, onAdd, onEdit, onD
             <p className="text-xs text-foreground-muted mt-1">← Pick a warehouse first</p>
           </div>
         )}
-        {selectedWarehouse && locations.length === 0 && (
+        {selectedWarehouse && loading && (
+          <div className="divide-y divide-border-default">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-2.5 px-4 py-3 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+                <div className="w-10 h-4 bg-surface-secondary rounded shrink-0" />
+                <div className="h-3.5 bg-surface-secondary rounded flex-1" />
+              </div>
+            ))}
+          </div>
+        )}
+        {selectedWarehouse && !loading && locations.length === 0 && (
           <div className="py-12 text-center px-4">
             <p className="text-sm text-foreground-secondary">No locations yet</p>
             <p className="text-xs text-foreground-muted mt-1">Add a location above</p>
           </div>
         )}
-        {Object.entries(tree).sort(([a], [b]) => a.localeCompare(b)).map(([aisle, racks]) => (
+        {!loading && Object.entries(tree).sort(([a], [b]) => a.localeCompare(b)).map(([aisle, racks]) => (
           <div key={aisle}>
             <div className="group flex items-center gap-2 px-4 py-2.5 border-b border-border-default/40">
               <button
