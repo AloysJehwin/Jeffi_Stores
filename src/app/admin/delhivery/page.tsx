@@ -235,8 +235,32 @@ export default function DelhiveryPickupPage() {
         </div>
 
         {loading ? (
-          <div className="p-8 flex justify-center">
-            <div className="animate-spin w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full" />
+          <div className="p-4 animate-pulse">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-border-default bg-surface-secondary">
+                    <th className="px-4 py-3 w-8"><div className="h-4 w-4 bg-surface-elevated rounded" /></th>
+                    {['Order', 'AWB', 'Customer', 'Destination', 'Placed', 'Status'].map((_, i) => (
+                      <th key={i} className="px-4 py-3"><div className="h-3 bg-surface-elevated rounded w-16" style={{ animationDelay: `${i * 40}ms` }} /></th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {[...Array(6)].map((_, i) => (
+                    <tr key={i} className="border-b border-border-default" style={{ animationDelay: `${i * 60}ms` }}>
+                      <td className="px-4 py-3"><div className="h-4 w-4 bg-surface-secondary rounded" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-20 bg-surface-secondary rounded" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-28 bg-surface-secondary rounded" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-32 bg-surface-secondary rounded" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-36 bg-surface-secondary rounded" /></td>
+                      <td className="px-4 py-3"><div className="h-4 w-24 bg-surface-secondary rounded" /></td>
+                      <td className="px-4 py-3"><div className="h-5 w-16 bg-surface-secondary rounded-full" /></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
         ) : orders.length === 0 ? (
           <div className="p-8 text-center text-foreground-muted">

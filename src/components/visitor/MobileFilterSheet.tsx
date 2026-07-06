@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
 type Category = {
@@ -39,6 +39,7 @@ export default function MobileFilterSheet({
 
   const [open, setOpen] = useState(false)
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
+  const [isPending, startTransition] = useTransition()
 
   const currentCategory = searchParams.get('category') || ''
   const currentBrand    = searchParams.get('brand') || ''
@@ -73,7 +74,9 @@ export default function MobileFilterSheet({
     if (pendingOrder)             params.set('order',    pendingOrder)
     const search = searchParams.get('search')
     if (search) params.set('search', search)
-    router.push(basePath + (params.toString() ? `?${params.toString()}` : ''))
+    startTransition(() => {
+      router.push(basePath + (params.toString() ? `?${params.toString()}` : ''))
+    })
     setOpen(false)
   }
 

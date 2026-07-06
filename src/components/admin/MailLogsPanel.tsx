@@ -155,16 +155,18 @@ export default function MailLogsPanel({ orderId }: Props) {
                         <p className="text-xs text-red-500 mt-1 line-clamp-2">{log.error}</p>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleBody(log.id)}
-                      className="shrink-0 text-xs text-accent-500 hover:text-accent-600 font-medium mt-0.5"
-                    >
-                      {expandedId === log.id ? 'Hide' : 'Preview'}
-                    </button>
+                    {log.kind !== 'otp' && (
+                      <button
+                        type="button"
+                        onClick={() => toggleBody(log.id)}
+                        className="shrink-0 text-xs text-accent-500 hover:text-accent-600 font-medium mt-0.5"
+                      >
+                        {expandedId === log.id ? 'Hide' : 'Preview'}
+                      </button>
+                    )}
                   </div>
 
-                  {expandedId === log.id && (
+                  {log.kind === 'otp' ? null : expandedId === log.id && (
                     <div className="border-t border-border-default bg-white dark:bg-gray-950">
                       {bodyLoading === log.id ? (
                         <div className="flex items-center gap-2 text-xs text-foreground-muted p-4">

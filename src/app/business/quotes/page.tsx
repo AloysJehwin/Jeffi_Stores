@@ -41,6 +41,7 @@ export default function MyQuotesPage() {
   const router = useRouter()
   const [rfqs, setRfqs] = useState<RFQ[]>([])
   const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -64,15 +65,24 @@ export default function MyQuotesPage() {
     setLoading(true)
     fetch(`/api/business/rfqs?page=${page}`, { credentials: 'include' })
       .then(r => r.json())
-      .then(d => { setRfqs(d.rfqs || []); setTotal(d.total || 0); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(d => { setRfqs(d.rfqs || []); setTotal(d.total || 0); setLoading(false); setInitialLoading(false) })
+      .catch(() => { setLoading(false); setInitialLoading(false) })
   }, [user, page])
 
-  if (isLoading || loading) {
+  if (isLoading || initialLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full" />
+      <div className="container mx-auto px-4 pt-4 pb-8">
+        <div className="space-y-3 animate-pulse">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4" style={{ animationDelay: `${i * 80}ms` }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="h-4 bg-surface-secondary rounded w-36" />
+                <div className="h-5 bg-surface-secondary rounded-full w-20" />
+              </div>
+              <div className="h-3 bg-surface-secondary rounded w-48 mb-1" />
+              <div className="h-3 bg-surface-secondary rounded w-24" />
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -104,7 +114,7 @@ export default function MyQuotesPage() {
         )}
 
         <div>
-          {rfqs.length === 0 ? (
+          {rfqs.length === 0 && !loading ? (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
               <svg className="w-16 h-16 mx-auto text-foreground-muted mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2" />
@@ -114,6 +124,30 @@ export default function MyQuotesPage() {
               <Link href={bp('/business/products')} className="mt-4 inline-block text-sm font-medium text-accent-600 dark:text-accent-400 hover:text-accent-700">
                 Browse Products
               </Link>
+            </div>
+          ) : loading ? (
+            <div className="space-y-3">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-5 animate-pulse"
+                  style={{ animationDelay: `${i * 50}ms` }}
+                >
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="space-y-2 flex-1 min-w-0">
+                      <div className="h-4 w-36 bg-surface-secondary rounded" />
+                      <div className="flex gap-2">
+                        <div className="h-5 w-16 bg-surface-secondary rounded-full" />
+                      </div>
+                    </div>
+                    <div className="h-8 w-20 bg-surface-secondary rounded flex-shrink-0" />
+                  </div>
+                  <div className="h-3 w-40 bg-surface-secondary rounded mb-3" />
+                  <div className="flex gap-2">
+                    <div className="h-8 w-24 bg-surface-secondary rounded-lg" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : (
             <div className="space-y-3">

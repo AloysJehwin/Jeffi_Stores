@@ -288,7 +288,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                             const displayUnit = (item.buy_unit && item.buy_unit !== 'unit') ? item.buy_unit : (item.buy_mode !== 'unit' ? item.buy_mode : null)
                             const qty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
                             const qtyStr = isFractional ? qty.toFixed(qty % 1 === 0 ? 0 : 3).replace(/\.?0+$/, '') : String(qty)
-                            const priceStr = Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                            const priceStr = Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                             return displayUnit
                               ? <>{qtyStr} <UnitLabel label={displayUnit} /> × Rs. {priceStr}/<UnitLabel label={displayUnit} /></>
                               : <>Quantity: {qtyStr} × Rs. {priceStr}</>
@@ -297,7 +297,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                       </div>
                       <div className="text-right shrink-0">
                         <p className="font-semibold text-foreground">
-                          Rs. {Number(item.total_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          Rs. {Number(item.total_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </p>
                       </div>
                     </div>
@@ -310,25 +310,25 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
               <div className="mt-6 pt-6 border-t border-border-default space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-foreground-secondary">Subtotal</span>
-                  <span className="text-foreground">Rs. {Number(order.subtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground">Rs. {Number(order.subtotal).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 {order.discount_amount > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-foreground-secondary">Discount</span>
-                    <span className="text-green-600 dark:text-green-400">-Rs. {Number(order.discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-green-600 dark:text-green-400">-Rs. {Number(order.discount_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                   </div>
                 )}
                 <div className="flex justify-between text-sm">
                   <span className="text-foreground-secondary">GST (incl.)</span>
-                  <span className="text-foreground">Rs. {Number(order.tax_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground">Rs. {Number(order.tax_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-foreground-secondary">Shipping</span>
-                  <span className="text-foreground">Rs. {Number(order.shipping_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-foreground">Rs. {Number(order.shipping_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-border-default">
                   <span className="text-foreground">Total</span>
-                  <span className="text-primary-500">Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  <span className="text-primary-500">Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
             </div>
@@ -469,7 +469,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
           </div>
           )}
 
-          {(order.status === 'cancelled' || order.status === 'returned') && order.payment_status === 'paid' && returnRequest?.type !== 'replacement' && (
+          {(order.status === 'cancelled' || order.status === 'returned' || order.status === 'cancel_requested') && order.payment_status === 'paid' && returnRequest?.type !== 'replacement' && (
             <InitiateRefundButton
               orderId={order.id}
               orderNumber={order.order_number || order.id.slice(0, 8)}
@@ -587,8 +587,8 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                   <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
                   <p>{order.shipping_address.country || 'India'}</p>
                   {order.shipping_address.phone && <p className="mt-2">Phone: +91 {order.shipping_address.phone.replace(/^\+91|^91/, '')}</p>}
-                  {edd && (
-                    <div className="mt-4 px-4 py-3 rounded-xl border border-border-default bg-surface">
+                  <div className="mt-4 px-4 py-3 rounded-xl border border-border-default bg-surface">
+                    {edd ? (
                       <div className="flex items-center gap-3">
                         <svg className="w-8 h-8 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
@@ -599,9 +599,11 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                           <p className="font-bold text-foreground">{edd}</p>
                         </div>
                       </div>
-                      {order.status !== 'delivered' && <ExtendEddButton orderId={order.id} currentEdd={rawEdd} />}
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-xs text-foreground-muted">No expected delivery date set</p>
+                    )}
+                    {order.status !== 'delivered' && <ExtendEddButton orderId={order.id} currentEdd={rawEdd} />}
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-foreground-muted">No shipping address</p>
@@ -643,7 +645,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                     )}
                     <div className="flex justify-between">
                       <span className="text-foreground-secondary">Amount</span>
-                      <span className="text-foreground font-semibold">Rs. {Number(order.payments[0].amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      <span className="text-foreground font-semibold">Rs. {Number(order.payments[0].amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </>
                 )}

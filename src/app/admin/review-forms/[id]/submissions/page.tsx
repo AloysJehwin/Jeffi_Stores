@@ -114,8 +114,20 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16">
-          <div className="animate-spin w-8 h-8 border-2 border-accent-500 border-t-transparent rounded-full" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-pulse">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden" style={{ animationDelay: `${i * 60}ms` }}>
+              <div className="aspect-video bg-surface-secondary" />
+              <div className="p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="h-4 w-32 bg-surface-secondary rounded" />
+                  <div className="h-5 w-16 bg-surface-secondary rounded-full" />
+                </div>
+                <div className="h-3 w-24 bg-surface-secondary rounded" />
+                <div className="h-3 w-28 bg-surface-secondary rounded" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : submissions.length === 0 ? (
         <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">

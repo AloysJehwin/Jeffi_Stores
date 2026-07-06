@@ -808,7 +808,7 @@ function StockTab() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
-  const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number } | null>(null)
+  const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number; allCategories?: string[]; allBrands?: string[] } | null>(null)
   const [valPage, setValPage] = useState(1)
   const [valSearch, setValSearch] = useState(searchParams.get('val_search') || '')
   const [valCategory, setValCategory] = useState(searchParams.get('val_category') || '')
@@ -909,8 +909,8 @@ function StockTab() {
   const allValRows = valuation?.products || []
   const valTotal = valuation?.total || 0
 
-  const valCategories = [...new Set(allValRows.map(p => p.category_name).filter(Boolean))].sort() as string[]
-  const valBrands = [...new Set(allValRows.map(p => p.brand_name).filter(Boolean))].sort() as string[]
+  const valCategories = (valuation?.allCategories || [...new Set(allValRows.map((p: any) => p.category_name).filter(Boolean))]).sort() as string[]
+  const valBrands = (valuation?.allBrands || [...new Set(allValRows.map((p: any) => p.brand_name).filter(Boolean))]).sort() as string[]
 
   const VAL_SORT_KEYS: Record<string, string> = {
     product: 'name', variant: 'variant_name', sku: 'sku',

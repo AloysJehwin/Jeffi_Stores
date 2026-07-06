@@ -140,8 +140,68 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center py-24">
-        <div className="animate-spin w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full" />
+      <div className="p-4 sm:p-6 max-w-full space-y-5 animate-fade-in">
+        {/* Breadcrumb */}
+        <div className="h-4 w-48 bg-surface-secondary rounded animate-pulse" />
+        {/* Header card */}
+        <div className="bg-surface-elevated rounded-2xl border border-border-default p-6 space-y-5">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="w-14 h-14 rounded-xl bg-surface-secondary animate-pulse shrink-0" />
+            <div className="flex-1 space-y-2">
+              <div className="h-6 w-48 bg-surface-secondary rounded animate-pulse" />
+              <div className="h-4 w-36 bg-surface-secondary rounded animate-pulse" />
+            </div>
+            <div className="space-y-1 text-right">
+              <div className="h-3 w-12 bg-surface-secondary rounded animate-pulse" />
+              <div className="h-4 w-24 bg-surface-secondary rounded animate-pulse" />
+            </div>
+          </div>
+          {/* Stats row */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {Array.from({ length: 4 }).map((_, i) => (
+              <div key={i} className="rounded-xl border border-border-default p-3.5 space-y-2 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+                <div className="h-3 w-16 bg-surface-secondary rounded" />
+                <div className="h-4 w-20 bg-surface-secondary rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+        {/* Main grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="lg:col-span-2 space-y-5">
+            {/* Business profile card */}
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
+              <div className="h-3 w-28 bg-surface-secondary rounded animate-pulse" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-4">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div key={i} className="space-y-1 animate-pulse" style={{ animationDelay: `${i * 40}ms` }}>
+                    <div className="h-3 w-20 bg-surface-secondary rounded" />
+                    <div className="h-4 w-32 bg-surface-secondary rounded" />
+                  </div>
+                ))}
+              </div>
+            </div>
+            {/* Discounts card */}
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
+              <div className="h-3 w-36 bg-surface-secondary rounded animate-pulse" />
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className="flex items-center justify-between py-3 border-b border-border-default animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+                  <div className="h-4 w-32 bg-surface-secondary rounded" />
+                  <div className="h-8 w-24 bg-surface-secondary rounded-lg" />
+                </div>
+              ))}
+            </div>
+          </div>
+          {/* Approval card */}
+          <div>
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
+              <div className="h-3 w-20 bg-surface-secondary rounded animate-pulse" />
+              <div className="h-16 bg-surface-secondary rounded-lg animate-pulse" />
+              <div className="h-9 bg-surface-secondary rounded-lg animate-pulse" />
+              <div className="h-9 bg-surface-secondary rounded-lg animate-pulse" />
+            </div>
+          </div>
+        </div>
       </div>
     )
   }

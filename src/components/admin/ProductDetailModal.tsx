@@ -16,7 +16,7 @@ function ShelfLocationsSection({ productId }: { productId: string }) {
   const [locations, setLocations] = useState<{ location_display_code: string; quantity: number }[] | null>(null)
 
   useEffect(() => {
-    fetch(`/api/admin/shelving/stock?product_id=${productId}`)
+    fetch(`/api/admin/shelving/stock?product_id=${productId}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setLocations(d?.locations ?? []))
       .catch(() => setLocations([]))

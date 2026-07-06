@@ -30,8 +30,12 @@ export default function GoogleCallbackPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface text-foreground">
       <div className="text-center">
-        <div className="animate-spin w-10 h-10 border-4 border-accent-500 border-t-transparent rounded-full mx-auto" />
-        <p className="mt-4 text-foreground-secondary text-sm">Completing sign-in…</p>
+        <div className="flex items-center justify-center gap-1.5 mb-4">
+          {[0, 1, 2].map(i => (
+            <div key={i} className="w-2.5 h-2.5 bg-accent-500 rounded-full animate-pulse" style={{ animationDelay: `${i * 150}ms` }} />
+          ))}
+        </div>
+        <p className="text-foreground-secondary text-sm">Completing sign-in…</p>
       </div>
     </div>
   )

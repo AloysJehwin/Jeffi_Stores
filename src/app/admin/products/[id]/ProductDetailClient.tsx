@@ -269,7 +269,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
   useEffect(() => { loadProduct() }, [loadProduct])
 
   useEffect(() => {
-    fetch(`/api/admin/shelving/stock?product_id=${id}`)
+    fetch(`/api/admin/shelving/stock?product_id=${id}`, { credentials: 'include' })
       .then(r => r.ok ? r.json() : null)
       .then(d => setShelfStock(d?.locations ?? []))
       .catch(() => {})
@@ -285,7 +285,22 @@ export default function ProductDetailClient({ id }: { id: string }) {
   }
 
   if (loading || !product) {
-    return null
+    return (
+      <div className="p-4 sm:p-6 space-y-5">
+        <div className="animate-pulse space-y-3">
+          <div className="h-7 w-56 bg-surface-secondary rounded" />
+          <div className="h-4 w-40 bg-surface-secondary rounded" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+          <div className="h-64 bg-surface-secondary rounded-xl animate-pulse" />
+          <div className="lg:col-span-2 space-y-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-4 bg-surface-secondary rounded animate-pulse" style={{ animationDelay: `${i * 50}ms` }} />
+            ))}
+          </div>
+        </div>
+      </div>
+    )
   }
 
   const p = product

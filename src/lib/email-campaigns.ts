@@ -51,6 +51,7 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
       const subject = data.subject || 'How was your order? Share your thoughts ⭐'
       const items: Array<{ name: string; imageUrl: string | null; starLinks: string[]; productUrl?: string }> = JSON.parse(data.itemsJson || '[]')
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://jeffistores.in'
+      const ampBaseUrl = 'https://jeffistores.in'
 
       // Fallback HTML: one link per product to its detail page (non-Gmail clients)
       const fallbackLinks = items.map(item => {
@@ -90,19 +91,17 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
             ${img ? `<td width="68" style="vertical-align:top;padding-right:12px;">${img}</td>` : ''}
             <td style="vertical-align:top;">
               <p style="margin:0 0 10px;font-size:14px;font-weight:600;color:#1a3a4a;">${item.name}</p>
-              <amp-form method="POST"
-                action="${appUrl}/api/reviews/amp"
-                action-xhr="${appUrl}/api/reviews/amp"
-                id="review-form-${idx}"
-                on="submit-success:review-form-${idx}.hide,review-thanks-${idx}.show">
+              <form method="POST"
+                action-xhr="https://jeffistores.in/api/reviews/amp"
+                id="review-form-${idx}">
                 <input type="hidden" name="token" value="${token}">
                 <div style="margin-bottom:10px;">
                   <amp-selector name="rating" layout="container">
-                    <span option="1" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
-                    <span option="2" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
-                    <span option="3" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
-                    <span option="4" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
-                    <span option="5" style="font-size:28px;cursor:pointer;color:#ddd;" selected-style="color:#e07b3f;">★</span>
+                    <span option="1">★</span>
+                    <span option="2">★</span>
+                    <span option="3">★</span>
+                    <span option="4">★</span>
+                    <span option="5">★</span>
                   </amp-selector>
                 </div>
                 <textarea name="comment" placeholder="Tell us what you think…" rows="3"
@@ -112,11 +111,13 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
                   <input type="submit" value="Submit Review"
                     style="background:#e07b3f;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
                 </div>
-                <div submit-error style="color:#e53e3e;font-size:12px;margin-top:6px;">
-                  <template type="amp-mustache">Something went wrong. <a href="${item.productUrl || appUrl + '/products'}">Open in browser</a></template>
+                <div submit-success>
+                  <template type="amp-mustache"><p style="color:#22863a;font-size:14px;font-weight:600;margin:8px 0;">✓ Thanks for your review!</p></template>
                 </div>
-              </amp-form>
-              <div id="review-thanks-${idx}" hidden style="color:#22863a;font-size:14px;font-weight:600;padding:8px 0;">✓ Thanks for your review!</div>
+                <div submit-error>
+                  <template type="amp-mustache">Something went wrong. <a href="${item.productUrl || ampBaseUrl + '/products'}">Open in browser</a></template>
+                </div>
+              </form>
             </td>
           </tr></table>
         </div>`
@@ -128,7 +129,7 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
         ${data.discountPercent ? `<p style="font-size:13px;color:#888;">${data.discountPercent}% off your next purchase</p>` : ''}` : ''
 
       const ampHtml = `<!doctype html>
-<html amp4email>
+<html amp4email data-css-strict>
 <head>
   <meta charset="utf-8">
   <script async src="https://cdn.ampproject.org/v0.js"></script>
@@ -142,14 +143,14 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
     .header { background:#1a3a4a; padding:20px 32px; }
     .header a { color:#fff; font-size:20px; font-weight:700; text-decoration:none; }
     .body { padding:28px 32px; }
-    amp-selector [option] { cursor:pointer; }
-    amp-selector [selected] { color:#e07b3f !important; }
+    amp-selector [option] { cursor:pointer; color:#ddd; font-size:28px; }
+    amp-selector [selected] { color:#e07b3f; }
     amp-selector [option]:focus { outline:none; }
   </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="header"><a href="${appUrl}">Jeffi Store's</a></div>
+  <div class="header"><a href="${ampBaseUrl}">Jeffi Store's</a></div>
   <div class="body">
     <p style="font-size:16px;color:#333;margin:0 0 12px;">Hi ${data.firstName || 'there'},</p>
     <h2 style="font-size:22px;color:#1a3a4a;margin:0 0 8px;">How did we do?</h2>

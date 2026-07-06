@@ -86,7 +86,10 @@ export async function GET(request: NextRequest) {
              'display_label', pu.display_label,
              'factor', pu.factor,
              'is_base', pu.is_base,
-             'dimension', pu.dimension
+             'dimension', pu.dimension,
+             'min_qty', pu.min_qty,
+             'max_qty', pu.max_qty,
+             'qty_step', pu.qty_step
            )
            FROM product_units pu
            WHERE pu.product_id = ci.product_id

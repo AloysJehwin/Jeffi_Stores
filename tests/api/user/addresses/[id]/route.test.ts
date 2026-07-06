@@ -208,6 +208,16 @@ describe('DELETE /api/user/addresses/[id]', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.message).toMatch(/deleted successfully/i)
+    // null out FK references first (2 UPDATE calls), then DELETE
+    expect(db.query).toHaveBeenCalledTimes(3)
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining('shipping_address_id = NULL'),
+      ['addr-42']
+    )
+    expect(db.query).toHaveBeenCalledWith(
+      expect.stringContaining('billing_address_id = NULL'),
+      ['addr-42']
+    )
     expect(db.query).toHaveBeenCalledWith(
       expect.stringContaining('DELETE FROM addresses'),
       expect.arrayContaining(['addr-42', 'user-1'])

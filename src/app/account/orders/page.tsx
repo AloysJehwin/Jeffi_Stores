@@ -48,6 +48,10 @@ interface Order {
   order_items: OrderItem[]
 }
 
+function fmt(n: number | string | null | undefined): string {
+  return Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+
 function resolveOrderEdd(order: Order): string | null {
   if (!order.estimated_delivery_date) return null
   return new Date(order.estimated_delivery_date + 'T00:00:00Z').toLocaleDateString('en-IN', { timeZone: 'Asia/Kolkata', day: 'numeric', month: 'short', year: 'numeric' })
@@ -103,6 +107,7 @@ export default function OrdersPage() {
   const confirm = useConfirm()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
+  const [initialLoading, setInitialLoading] = useState(true)
   const [cancellingOrderId, setCancellingOrderId] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [total, setTotal] = useState(0)
@@ -154,6 +159,7 @@ export default function OrdersPage() {
     } catch {
     } finally {
       setLoading(false)
+      setInitialLoading(false)
     }
   }
 
@@ -176,12 +182,26 @@ export default function OrdersPage() {
     }
   }
 
-  if (isLoading || loading) {
+  if (isLoading || initialLoading) {
     return (
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center">
-          <div className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-foreground-secondary">Loading...</p>
+      <div className="container mx-auto px-4 pt-4 pb-8">
+        <div className="space-y-3 animate-pulse">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4" style={{ animationDelay: `${i * 80}ms` }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="h-4 bg-surface-secondary rounded w-40" />
+                <div className="h-5 bg-surface-secondary rounded-full w-20" />
+              </div>
+              <div className="h-3 bg-surface-secondary rounded w-32 mb-3" />
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-surface-secondary rounded-lg flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-3 bg-surface-secondary rounded w-3/4" />
+                  <div className="h-3 bg-surface-secondary rounded w-1/2" />
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -197,9 +217,9 @@ export default function OrdersPage() {
       {/* Mobile header */}
       <AccountMobileHeader />
 
-      <div className="container mx-auto px-4 pt-4">
+      <div className="container mx-auto px-4 pt-4 pb-8">
         <div>
-            {filteredOrders.length === 0 ? (
+            {filteredOrders.length === 0 && !loading ? (
               <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-12 text-center">
                 <svg
                   className="w-16 h-16 text-foreground-muted mx-auto mb-4"
@@ -222,6 +242,42 @@ export default function OrdersPage() {
                 >
                   Start Shopping
                 </Link>
+              </div>
+            ) : loading ? (
+              <div className="space-y-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden animate-pulse"
+                    style={{ animationDelay: `${i * 50}ms` }}
+                  >
+                    {/* Header row */}
+                    <div className="bg-surface border-b border-border-default px-4 sm:px-6 py-3 sm:py-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="flex flex-wrap items-center gap-4 sm:gap-6">
+                          <div className="h-4 w-28 bg-surface-secondary rounded" />
+                          <div className="h-4 w-20 bg-surface-secondary rounded" />
+                          <div className="h-4 w-16 bg-surface-secondary rounded" />
+                        </div>
+                        <div className="h-5 w-20 bg-surface-secondary rounded-full" />
+                      </div>
+                    </div>
+                    {/* Item row */}
+                    <div className="p-4 sm:p-6">
+                      <div className="flex gap-4">
+                        <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-surface-secondary rounded-lg" />
+                        <div className="flex-1 space-y-2 py-1">
+                          <div className="h-4 w-3/4 bg-surface-secondary rounded" />
+                          <div className="h-3 w-1/3 bg-surface-secondary rounded" />
+                          <div className="h-3 w-1/4 bg-surface-secondary rounded" />
+                        </div>
+                      </div>
+                      <div className="mt-4 pt-4 border-t border-border-default flex items-center justify-between">
+                        <div className="h-4 w-28 bg-surface-secondary rounded" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="space-y-4">
@@ -251,7 +307,7 @@ export default function OrdersPage() {
                         <div className="flex items-center gap-3 text-xs text-foreground-secondary">
                           <span>{orderDate}</span>
                           <span className="w-px h-3 bg-border-default" />
-                          <span className="font-semibold text-foreground">₹{order.total_amount.toLocaleString('en-IN')}</span>
+                          <span className="font-semibold text-foreground">₹{fmt(order.total_amount)}</span>
                           {(() => { const e = resolveOrderEdd(order); return e && !['cancelled', 'returned'].includes(order.status) ? (
                             <>
                               <span className="w-px h-3 bg-border-default" />
@@ -324,7 +380,7 @@ export default function OrdersPage() {
                             </div>
                             <div>
                               <p className="text-xs text-foreground-muted mb-1">Total</p>
-                              <p className="text-sm font-semibold text-foreground">₹{order.total_amount.toLocaleString('en-IN')}</p>
+                              <p className="text-sm font-semibold text-foreground">₹{fmt(order.total_amount)}</p>
                             </div>
                             {(() => { const e = resolveOrderEdd(order); return e && !['cancelled', 'returned'].includes(order.status) ? (
                               <div>
@@ -361,7 +417,7 @@ export default function OrdersPage() {
                                   </Link>
                                   <p className="text-sm text-foreground-secondary">Quantity: {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))}</p>
                                   <p className="text-sm font-semibold text-foreground mt-1">
-                                    ₹{item.unit_price.toLocaleString('en-IN')} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))} = ₹{item.total_price.toLocaleString('en-IN')}
+                                    ₹{fmt(item.unit_price)} × {item.buy_mode === 'weight' || item.buy_mode === 'length' ? `${Number(item.quantity).toFixed(3)} ${item.buy_unit ?? ''}` : Math.round(Number(item.quantity))} = ₹{fmt(item.total_price)}
                                   </p>
                                 </div>
                               </div>

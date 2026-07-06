@@ -661,21 +661,31 @@ export default function ProductActions({
           <div className="bg-surface rounded-lg p-6">
             <div className="flex items-baseline gap-2 flex-wrap mb-1">
               <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
-              {effectiveMrp && effectiveMrp > effectivePrice && (
+              {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
                 <span className="text-xl text-foreground-muted line-through">
-                  Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  Rs. {(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               )}
+              {effectiveUnitLabel && (
+                <span className="text-lg text-foreground-muted">/ <UnitLabel label={effectiveUnitLabel} /></span>
+              )}
             </div>
+            {showPerBasePrice && (
+              <div className="mb-1">
+                <span className="text-xs text-foreground-muted">
+                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                </span>
+              </div>
+            )}
             {mrpDiscount > 0 && (
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
                   {mrpDiscount}% off
                 </span>
                 <span className="text-sm text-foreground-secondary">
-                  You save Rs. {((effectiveMrp! - effectivePrice) * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  You save Rs. {((effectiveMrp! - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               </div>
             )}

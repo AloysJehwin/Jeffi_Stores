@@ -96,10 +96,18 @@ export default function CartPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-16">
-        <div className="text-center">
-          <div role="status" aria-label="Loading" className="animate-spin w-12 h-12 border-4 border-accent-500 border-t-transparent rounded-full mx-auto"></div>
-          <p className="mt-4 text-foreground-secondary">Loading cart...</p>
+      <div className="container mx-auto px-4 py-6">
+        <div className="animate-pulse space-y-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4 flex gap-4" style={{ animationDelay: `${i * 80}ms` }}>
+              <div className="w-20 h-20 bg-surface-secondary rounded-lg flex-shrink-0" />
+              <div className="flex-1 space-y-2">
+                <div className="h-4 bg-surface-secondary rounded w-3/4" />
+                <div className="h-3 bg-surface-secondary rounded w-1/2" />
+                <div className="h-4 bg-surface-secondary rounded w-24" />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     )
@@ -181,21 +189,25 @@ export default function CartPage() {
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
               {cartItems.map((item) => {
                 const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || !!(item.buy_mode && item.buy_mode !== 'unit')
+                const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count')
+                const unitFactor = (!isCustomQty && item.cart_item_unit?.factor) ? Number(item.cart_item_unit.factor) : 1
                 const price = isCustomQty
                   ? item.price_at_addition
-                  : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+                  : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * unitFactor
                 const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
                 const isOutOfStock = (item.sub_variant?.stock_status ?? item.variant?.stock_status ?? item.products.stock_status) === 'Out of Stock'
                 const itemTotal = isCustomQty
                   ? item.price_at_addition * Number(item.quantity)
                   : price * Math.round(Number(item.quantity))
                 const isUpdating = updatingItems.has(item.id)
-                const showMrp = !isCustomQty && mrp !== null && Number(mrp) > Number(price)
-                const discountPct = showMrp ? Math.round(((Number(mrp) - Number(price)) / Number(mrp)) * 100) : 0
+                const showMrp = !isCustomQty && mrp !== null && Number(mrp) * unitFactor > Number(price)
+                const discountPct = showMrp ? Math.round(((Number(mrp) * unitFactor - Number(price)) / (Number(mrp) * unitFactor)) * 100) : 0
                 const sku = item.sub_variant?.sku || item.variant?.sku || item.products.sku
                 const unitLabel = (item.cart_item_unit?.display_label ?? item.buy_unit) || ''
                 const showUnitLabel = !!item.buy_unit && item.buy_unit !== 'unit'
+                const qtyMin = isCustomQty ? (item.cart_item_unit?.min_qty ?? 0.001) : (item.cart_item_unit?.min_qty ?? 1)
+                const qtyMax = item.cart_item_unit?.max_qty ?? undefined
+                const qtyStep = isCustomQty ? (item.cart_item_unit?.qty_step ?? 0.001) : (item.cart_item_unit?.qty_step ?? 1)
 
                 return (
                   <div key={item.id} className="p-4 sm:p-6 border-b border-border-default last:border-b-0">
@@ -251,10 +263,15 @@ export default function CartPage() {
                           <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
                             ₹{price.toLocaleString('en-IN', { minimumFractionDigits: 2 })}{isCustomQty ? <>/&thinsp;<UnitLabel label={unitLabel || item.buy_unit || ''} /></> : (showUnitLabel ? <>/&thinsp;<UnitLabel label={unitLabel} /></> : '')}
                           </span>
+                          {!isCustomQty && unitFactor > 1 && (
+                            <span className="text-xs text-foreground-muted">
+                              ₹{(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price).toLocaleString('en-IN', { minimumFractionDigits: 2 })}/pc
+                            </span>
+                          )}
                           {showMrp && (
                             <>
                               <span className="text-sm text-foreground-muted line-through">
-                                ₹{Number(mrp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                ₹{(Number(mrp) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                               </span>
                               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">
                                 {discountPct}% off
@@ -264,20 +281,26 @@ export default function CartPage() {
                         </div>
 
                         {/* Quantity Controls */}
-                        <div className="mt-4 flex items-center gap-3 flex-wrap">
+                        <div className="mt-4">
+                          <div className="flex items-center gap-3 flex-wrap">
                           {isCustomQty ? (
                             <div className="flex items-center gap-2">
                               <input
                                 type="number"
-                                min="0.001"
-                                step="0.001"
+                                min={qtyMin}
+                                max={qtyMax}
+                                step={qtyStep}
                                 defaultValue={Number(Number(item.quantity).toFixed(6)).toString()}
                                 onBlur={(e) => {
                                   const val = parseFloat(e.target.value)
-                                  if (!isNaN(val) && val > 0 && val !== Number(item.quantity)) {
-                                    handleQuantityChange(item.id, val)
-                                  } else {
-                                    e.target.value = Number(Number(item.quantity).toFixed(6)).toString()
+                                  let safe = !isNaN(val) ? val : qtyMin
+                                  safe = Math.round(safe / qtyStep) * qtyStep
+                                  if (safe < qtyMin) safe = qtyMin
+                                  if (qtyMax !== undefined && safe > qtyMax) safe = qtyMax
+                                  safe = parseFloat(safe.toFixed(6))
+                                  e.target.value = String(safe)
+                                  if (safe !== Number(item.quantity)) {
+                                    handleQuantityChange(item.id, safe)
                                   }
                                 }}
                                 onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
@@ -290,8 +313,8 @@ export default function CartPage() {
                           ) : (
                             <div className="flex items-center border border-border-secondary rounded-lg">
                               <button
-                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) - 1)}
-                                disabled={isUpdating || Number(item.quantity) <= 1}
+                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) - qtyStep)}
+                                disabled={isUpdating || Number(item.quantity) <= qtyMin}
                                 aria-label={`Decrease quantity for ${item.products.name}`}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
@@ -306,11 +329,16 @@ export default function CartPage() {
                               ) : (
                                 <input
                                   type="number"
-                                  min="1"
+                                  min={qtyMin}
+                                  max={qtyMax}
+                                  step={qtyStep}
                                   defaultValue={Math.round(Number(item.quantity))}
                                   onBlur={(e) => {
                                     const val = parseInt(e.target.value, 10)
-                                    const safe = !isNaN(val) && val >= 1 ? val : 1
+                                    let safe = !isNaN(val) ? val : qtyMin
+                                    safe = Math.round(safe / qtyStep) * qtyStep
+                                    if (safe < qtyMin) safe = qtyMin
+                                    if (qtyMax !== undefined && safe > qtyMax) safe = qtyMax
                                     e.target.value = String(safe)
                                     if (safe !== Math.round(Number(item.quantity))) {
                                       handleQuantityChange(item.id, safe)
@@ -321,8 +349,8 @@ export default function CartPage() {
                                 />
                               )}
                               <button
-                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) + 1)}
-                                disabled={isUpdating}
+                                onClick={() => handleQuantityChange(item.id, Number(item.quantity) + qtyStep)}
+                                disabled={isUpdating || (qtyMax !== undefined && Number(item.quantity) >= qtyMax)}
                                 aria-label={`Increase quantity for ${item.products.name}`}
                                 className="px-3 py-2 hover:bg-surface-secondary transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
@@ -359,6 +387,16 @@ export default function CartPage() {
                           >
                             Remove
                           </button>
+                          </div>
+                          {(() => {
+                            const hintParts: string[] = []
+                            if (qtyMin > (isCustomQty ? 0 : 1)) hintParts.push(`Min: ${qtyMin}`)
+                            if (qtyMax != null) hintParts.push(`Max: ${qtyMax}`)
+                            const defaultStep = isCustomQty ? 0.001 : 1
+                            if (qtyStep !== defaultStep) hintParts.push(`Step: ${qtyStep}`)
+                            if (hintParts.length === 0) return null
+                            return <p className="text-xs text-foreground-muted mt-1">{hintParts.join(' · ')}{unitLabel ? ` ${unitLabel}` : ''}</p>
+                          })()}
                         </div>
 
                         {/* Item Total */}
@@ -386,7 +424,7 @@ export default function CartPage() {
                 <div className="divide-y divide-border-default">
                   {savedItems.map((item) => {
                     const primaryImage = item.products.product_images?.find(img => img.is_primary) || item.products.product_images?.[0]
-                    const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count') || !!(item.buy_mode && item.buy_mode !== 'unit')
+                    const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count')
                     const price = isCustomQty
                       ? item.price_at_addition
                       : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)

@@ -93,7 +93,22 @@ export default function CampaignsListClient() {
     return `${((num / den) * 100).toFixed(1)}%`
   }
 
-  if (loading) return <p className="text-sm text-foreground-muted">Loading campaigns…</p>
+  if (loading) return (
+    <div className="space-y-3">
+      {[...Array(4)].map((_, i) => (
+        <div key={i} className="bg-surface-elevated rounded-xl border border-border-default p-5 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 space-y-2">
+              <div className="h-5 w-40 bg-surface-secondary rounded" />
+              <div className="h-3 w-56 bg-surface-secondary rounded" />
+              <div className="h-3 w-32 bg-surface-secondary rounded" />
+            </div>
+            <div className="h-8 w-20 bg-surface-secondary rounded-lg" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div className="space-y-3">

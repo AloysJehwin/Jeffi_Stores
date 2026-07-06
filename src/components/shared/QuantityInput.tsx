@@ -14,6 +14,20 @@ function UnitLabel({ label }: { label: string | null | undefined }) {
   return <>{label}</>
 }
 
+function QtyHint({ qtyMin, qtyMax, qtyStep, unitLabel, defaultStep = 1 }: {
+  qtyMin: number; qtyMax?: number; qtyStep: number; unitLabel?: string | null; defaultStep?: number
+}) {
+  const parts: string[] = []
+  if (qtyMin > 0) parts.push(`Min: ${fmtQty(qtyMin)}`)
+  if (qtyMax != null) parts.push(`Max: ${fmtQty(qtyMax)}`)
+  if (qtyStep !== defaultStep) parts.push(`Step: ${fmtQty(qtyStep)}`)
+  if (parts.length === 0) return null
+  const unit = unitLabel ? ` ${unitLabel}` : ''
+  return (
+    <p className="text-xs text-foreground-muted mt-1">{parts.join(' · ')}{unit}</p>
+  )
+}
+
 interface QuantityInputProps {
   dimension: string // 'count' | 'length' | 'weight' | 'area' | 'volume' | other
   quantity: number
@@ -28,7 +42,7 @@ interface QuantityInputProps {
 }
 
 // ─── Count stepper ─────────────────────────────────────────────────────────
-function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStock, qtyMin, qtyMax, onChange }: QuantityInputProps) {
+function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStock, qtyMin, qtyMax, qtyStep, onChange }: QuantityInputProps) {
   const ceiling = Math.min(effectiveStock, qtyMax ?? effectiveStock)
   return (
     <div className="space-y-1">
@@ -76,7 +90,9 @@ function CountStepper({ quantity, quantityRaw, unitLabel, unitKey, effectiveStoc
             </svg>
           </button>
         </div>
+        {unitLabel && <span className="text-sm text-foreground-muted"><UnitLabel label={unitLabel} /></span>}
       </div>
+      <QtyHint qtyMin={qtyMin} qtyMax={qtyMax} qtyStep={qtyStep} unitLabel={unitLabel} defaultStep={1} />
     </div>
   )
 }
@@ -350,6 +366,7 @@ function LengthRuler({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtyS
       </div>
 
       <p className="text-xs text-foreground-muted">Swipe the tape or hold ‹ › to adjust</p>
+      <QtyHint qtyMin={qtyMin} qtyMax={qtyMax} qtyStep={qtyStep} unitLabel={unitLabel} defaultStep={0.001} />
     </div>
   )
 }
@@ -368,38 +385,43 @@ function SliderInput({ quantity, quantityRaw, unitLabel, effectiveStock, qtyMax,
   }
 
   return (
-    <div className="flex items-center gap-2">
-      <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden">
-        <button
-          type="button"
-          onClick={dec}
-          disabled={quantity <= qtyMin}
-          className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-        >−</button>
-        <input
-          type="text"
-          inputMode="decimal"
-          value={quantityRaw}
-          onChange={e => {
-            const raw = e.target.value
-            const v = parseFloat(raw)
-            onChange(isNaN(v) ? quantity : Math.min(ceiling, Math.max(qtyMin, v)), raw)
-          }}
-          onBlur={e => {
-            const v = parseFloat(e.target.value)
-            const clamped = isNaN(v) || v < qtyMin ? qtyMin : Math.min(ceiling, v)
-            onChange(clamped, fmtQty(clamped))
-          }}
-          className="w-20 sm:w-24 min-h-[44px] border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none text-base"
-        />
-        <button
-          type="button"
-          onClick={inc}
-          disabled={quantity >= ceiling}
-          className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
-        >+</button>
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden">
+          <button
+            type="button"
+            onClick={dec}
+            disabled={quantity <= qtyMin}
+            className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >−</button>
+          <input
+            type="text"
+            inputMode="decimal"
+            value={quantityRaw}
+            onChange={e => {
+              const raw = e.target.value
+              const v = parseFloat(raw)
+              onChange(isNaN(v) ? quantity : Math.min(ceiling, Math.max(qtyMin, v)), raw)
+            }}
+            onBlur={e => {
+              const v = parseFloat(e.target.value)
+              let clamped = isNaN(v) || v < qtyMin ? qtyMin : Math.min(ceiling, v)
+              clamped = Math.round((clamped - qtyMin) / qtyStep) * qtyStep + qtyMin
+              clamped = Math.max(qtyMin, Math.min(ceiling, parseFloat(clamped.toFixed(6))))
+              onChange(clamped, fmtQty(clamped))
+            }}
+            className="w-20 sm:w-24 min-h-[44px] border-x border-border-secondary text-center font-semibold bg-surface text-foreground focus:outline-none text-base"
+          />
+          <button
+            type="button"
+            onClick={inc}
+            disabled={quantity >= ceiling}
+            className="min-w-[44px] min-h-[44px] px-3 flex items-center justify-center text-lg hover:bg-surface-secondary transition-all active:scale-90 disabled:opacity-50 disabled:cursor-not-allowed"
+          >+</button>
+        </div>
+        {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
       </div>
-      {unitLabel && <span className="text-sm text-foreground-secondary">{unitLabel}</span>}
+      <QtyHint qtyMin={qtyMin} qtyMax={qtyMax} qtyStep={qtyStep} unitLabel={unitLabel} defaultStep={0.001} />
     </div>
   )
 }
@@ -533,6 +555,7 @@ function AreaInput({ quantity, unitLabel, effectiveStock, qtyMin, qtyMax, qtySte
       <p className="text-sm text-foreground-secondary">
         Area: <span className="font-semibold text-foreground">{fmtQty(quantity)} {linearUnit ? <>{linearUnit}<sup>2</sup></> : unitLabel}</span>
       </p>
+      <QtyHint qtyMin={qtyMin} qtyMax={qtyMax} qtyStep={qtyStep} unitLabel={unitLabel} defaultStep={0.001} />
     </div>
   )
 }

@@ -65,8 +65,21 @@ export default function AgentLogsPage() {
       </div>
 
       {loading && toolLogs.length === 0 ? (
-        <div className="space-y-3">
-          {[1, 2, 3].map(i => <div key={i} className="h-20 rounded-lg bg-surface-secondary animate-pulse" />)}
+        <div className="space-y-2 animate-pulse">
+          {[...Array(8)].map((_, i) => (
+            <div key={i} className="bg-surface-elevated border border-border-default rounded-lg px-4 py-3 flex items-start gap-3" style={{ animationDelay: `${i * 60}ms` }}>
+              <div className="w-8 h-8 rounded-full bg-surface-secondary shrink-0" />
+              <div className="flex-1 min-w-0 space-y-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <div className="h-3 w-20 bg-surface-secondary rounded" />
+                  <div className="h-3 w-12 bg-surface-secondary rounded" />
+                  <div className="h-3 w-16 bg-surface-secondary rounded" />
+                </div>
+                <div className="h-3 w-3/4 bg-surface-secondary rounded" />
+              </div>
+              <div className="h-3 w-4 bg-surface-secondary rounded shrink-0" />
+            </div>
+          ))}
         </div>
       ) : toolLogs.length === 0 ? (
         <p className="text-sm text-foreground-muted italic">No tool calls logged yet.</p>

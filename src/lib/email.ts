@@ -125,6 +125,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
       html,
       kind: 'otp',
       templateName: 'otp',
+      redactBody: true,
       entityType: null,
       entityId: null,
     })

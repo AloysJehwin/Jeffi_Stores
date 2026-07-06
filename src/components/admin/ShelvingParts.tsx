@@ -339,7 +339,7 @@ export function AssignStockForm({ location, onSave, onCancel }: {
     let productId = '', variantId: string | null = null, subVariantId: string | null = null
     if (rawId.startsWith('product:')) productId = rawId.slice(8)
     else if (rawId.startsWith('variant:')) { variantId = rawId.slice(8); productId = '' }
-    else if (rawId.startsWith('subvariant:')) { subVariantId = rawId.slice(11); productId = '' }
+    else if (rawId.startsWith('subvariant:')) { subVariantId = rawId.slice(11); productId = ''; variantId = parts[14] || null }
     const inventoryQty = parseInt(parts[11] || '0') || 0  // base units
     const resolvedProductId = parts[12] || productId
 
@@ -359,7 +359,7 @@ export function AssignStockForm({ location, onSave, onCancel }: {
           ...(productId ? { product_id: productId } : {}),
           ...(variantId ? { variant_id: variantId } : {}),
           ...(subVariantId ? { sub_variant_id: subVariantId } : {}),
-        })}`),
+        })}`, { credentials: 'include' }),
         resolvedProductId
           ? fetch(`/api/admin/products/${resolvedProductId}/units${variantId ? `?variant_id=${variantId}` : ''}`)
           : null,
