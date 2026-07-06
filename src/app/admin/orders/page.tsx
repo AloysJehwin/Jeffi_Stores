@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { getFilteredOrders } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
@@ -7,46 +8,42 @@ import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | string[] | undefined }> }) {
-  const resolvedSearchParams = await searchParams
-  const host = await getHost()
-  const sp = (key: string) => { const v = resolvedSearchParams[key]; return Array.isArray(v) ? v[0] : v }
-  const page = Math.max(1, parseInt(sp('page') || '1', 10))
-  const sort = sp('sort')
-  const dir = sp('dir') as 'asc' | 'desc' | undefined
-  const [{ orders, total }, allStats] = await Promise.all([
-    getFilteredOrders({
-      status: sp('status'),
-      payment_status: sp('payment_status'),
-      source: sp('source'),
-      search: sp('search'),
-      page,
-      limit: PAGE_SIZE,
-      sort,
-      dir }),
-    getFilteredOrders({}),
-  ])
+type SP = { [key: string]: string | string[] | undefined }
+function sp(resolvedSearchParams: SP, key: string) {
+  const v = resolvedSearchParams[key]
+  return Array.isArray(v) ? v[0] : v
+}
 
-  const totalOrders = allStats.total
-  const pendingOrders = allStats.orders?.filter((o: any) => o.status === 'pending').length || 0
-  const processingOrders = allStats.orders?.filter((o: any) => o.status === 'processing').length || 0
-  const completedOrders = allStats.orders?.filter((o: any) => o.status === 'delivered').length || 0
-  const totalRevenue = allStats.orders?.reduce((sum: number, order: any) => {
-    return order.payment_status === 'paid' ? sum + Number(order.total_amount) : sum
-  }, 0) || 0
+async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
+  const host = await getHost()
+  const page = Math.max(1, parseInt(sp(resolvedSearchParams, 'page') || '1', 10))
+  const sort = sp(resolvedSearchParams, 'sort')
+  const dir = sp(resolvedSearchParams, 'dir') as 'asc' | 'desc' | undefined
+
+  const { orders, total } = await getFilteredOrders({
+    status: sp(resolvedSearchParams, 'status'),
+    payment_status: sp(resolvedSearchParams, 'payment_status'),
+    source: sp(resolvedSearchParams, 'source'),
+    search: sp(resolvedSearchParams, 'search'),
+    page,
+    limit: PAGE_SIZE,
+    sort,
+    dir,
+  })
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
-    if (sp('status')) params.set('status', sp('status')!)
-    if (sp('payment_status')) params.set('payment_status', sp('payment_status')!)
-    if (sp('source')) params.set('source', sp('source')!)
-    if (sp('search')) params.set('search', sp('search')!)
+    if (sp(resolvedSearchParams, 'status')) params.set('status', sp(resolvedSearchParams, 'status')!)
+    if (sp(resolvedSearchParams, 'payment_status')) params.set('payment_status', sp(resolvedSearchParams, 'payment_status')!)
+    if (sp(resolvedSearchParams, 'source')) params.set('source', sp(resolvedSearchParams, 'source')!)
+    if (sp(resolvedSearchParams, 'search')) params.set('search', sp(resolvedSearchParams, 'search')!)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (p > 1) params.set('page', String(p))
@@ -56,10 +53,10 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   const currentListUrl = (() => {
     const params = new URLSearchParams()
-    if (sp('status')) params.set('status', sp('status')!)
-    if (sp('payment_status')) params.set('payment_status', sp('payment_status')!)
-    if (sp('source')) params.set('source', sp('source')!)
-    if (sp('search')) params.set('search', sp('search')!)
+    if (sp(resolvedSearchParams, 'status')) params.set('status', sp(resolvedSearchParams, 'status')!)
+    if (sp(resolvedSearchParams, 'payment_status')) params.set('payment_status', sp(resolvedSearchParams, 'payment_status')!)
+    if (sp(resolvedSearchParams, 'source')) params.set('source', sp(resolvedSearchParams, 'source')!)
+    if (sp(resolvedSearchParams, 'search')) params.set('search', sp(resolvedSearchParams, 'search')!)
     if (sort) params.set('sort', sort)
     if (dir) params.set('dir', dir)
     if (page > 1) params.set('page', String(page))
@@ -68,87 +65,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   })()
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Orders</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
-        </div>
-        <Link
-          href={ap('/admin/orders/new', host)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Offline Order
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total Orders</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalOrders}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Pending</p>
-          <p className="text-2xl sm:text-3xl font-bold text-orange-500 mt-2">{pendingOrders}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Processing</p>
-          <p className="text-2xl sm:text-3xl font-bold text-blue-500 mt-2">{processingOrders}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Completed</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-500 mt-2">{completedOrders}</p>
-        </div>
-      </div>
-
-      <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm mb-6">
-        <p className="text-white text-sm">Total Revenue</p>
-        <p className="text-3xl sm:text-4xl font-bold text-white mt-2">
-          Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-        </p>
-      </div>
-
-      <AdminFilters
-        filters={[
-          {
-            name: 'source',
-            label: 'Source',
-            options: [
-              { value: 'online', label: 'Online' },
-              { value: 'offline', label: 'Offline' },
-            ] },
-          {
-            name: 'status',
-            label: 'Order Status',
-            options: [
-              { value: 'pending', label: 'Pending' },
-              { value: 'confirmed', label: 'Confirmed' },
-              { value: 'processing', label: 'Processing' },
-              { value: 'shipped', label: 'Shipped' },
-              { value: 'out_for_delivery', label: 'Out for Delivery' },
-              { value: 'delivered', label: 'Delivered' },
-              { value: 'cancel_requested', label: 'Cancel Requested' },
-              { value: 'cancelled', label: 'Cancelled' },
-            ] },
-          {
-            name: 'payment_status',
-            label: 'Payment Status',
-            options: [
-              { value: 'pending', label: 'Pending' },
-              { value: 'paid', label: 'Paid' },
-              { value: 'failed', label: 'Failed' },
-              { value: 'refunded', label: 'Refunded' },
-              { value: 'unpaid', label: 'Unpaid' },
-            ] },
-        ]}
-        searchPlaceholder="Search by order number or customer..."
-        searchParam="search"
-        suggestType="orders"
-      />
-
+    <>
       <div className="md:hidden space-y-3">
         {orders && orders.length > 0 ? (
           orders.map((order: any) => (
@@ -283,6 +200,108 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
       <div className="hidden md:block px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
         <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
+    </>
+  )
+}
+
+export default async function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const resolvedSearchParams = await searchParams
+  const host = await getHost()
+  const allStats = await getFilteredOrders({})
+
+  const totalOrders = allStats.total
+  const pendingOrders = allStats.orders?.filter((o: any) => o.status === 'pending').length || 0
+  const processingOrders = allStats.orders?.filter((o: any) => o.status === 'processing').length || 0
+  const completedOrders = allStats.orders?.filter((o: any) => o.status === 'delivered').length || 0
+  const totalRevenue = allStats.orders?.reduce((sum: number, order: any) => {
+    return order.payment_status === 'paid' ? sum + Number(order.total_amount) : sum
+  }, 0) || 0
+
+  return (
+    <div className="p-4 sm:p-6">
+      <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Orders</h1>
+          <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
+        </div>
+        <Link
+          href={ap('/admin/orders/new', host)}
+          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          New Offline Order
+        </Link>
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Total Orders</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalOrders}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Pending</p>
+          <p className="text-2xl sm:text-3xl font-bold text-orange-500 mt-2">{pendingOrders}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Processing</p>
+          <p className="text-2xl sm:text-3xl font-bold text-blue-500 mt-2">{processingOrders}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Completed</p>
+          <p className="text-2xl sm:text-3xl font-bold text-green-500 mt-2">{completedOrders}</p>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm mb-6">
+        <p className="text-white text-sm">Total Revenue</p>
+        <p className="text-3xl sm:text-4xl font-bold text-white mt-2">
+          Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+        </p>
+      </div>
+
+      <AdminFilters
+        filters={[
+          {
+            name: 'source',
+            label: 'Source',
+            options: [
+              { value: 'online', label: 'Online' },
+              { value: 'offline', label: 'Offline' },
+            ] },
+          {
+            name: 'status',
+            label: 'Order Status',
+            options: [
+              { value: 'pending', label: 'Pending' },
+              { value: 'confirmed', label: 'Confirmed' },
+              { value: 'processing', label: 'Processing' },
+              { value: 'shipped', label: 'Shipped' },
+              { value: 'out_for_delivery', label: 'Out for Delivery' },
+              { value: 'delivered', label: 'Delivered' },
+              { value: 'cancel_requested', label: 'Cancel Requested' },
+              { value: 'cancelled', label: 'Cancelled' },
+            ] },
+          {
+            name: 'payment_status',
+            label: 'Payment Status',
+            options: [
+              { value: 'pending', label: 'Pending' },
+              { value: 'paid', label: 'Paid' },
+              { value: 'failed', label: 'Failed' },
+              { value: 'refunded', label: 'Refunded' },
+              { value: 'unpaid', label: 'Unpaid' },
+            ] },
+        ]}
+        searchPlaceholder="Search by order number or customer..."
+        searchParam="search"
+        suggestType="orders"
+      />
+
+      <Suspense fallback={<AdminSkeleton variant="list" showStats={false} />}>
+        <OrdersListContent resolvedSearchParams={resolvedSearchParams} />
+      </Suspense>
     </div>
   )
 }
