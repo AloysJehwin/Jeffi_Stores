@@ -124,7 +124,7 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
                   <span className="text-foreground-muted">Payment</span>
                   <span className={`font-medium ${order.payment_status === 'paid' ? 'text-green-600 dark:text-green-400' : order.payment_status === 'pending' ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'}`}>{order.payment_status}</span>
                   <span className="text-foreground-muted">Source</span>
-                  <span className="text-foreground">{order.source === 'online' ? 'Online' : 'Offline'}</span>
+                  <span className="text-foreground">{order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : 'Offline'}</span>
                 </div>
               </div>
             </HoverCard>
@@ -133,9 +133,11 @@ export default function OrdersTableRows({ orders, backUrl = '/admin/orders' }: {
             <span className={`px-2 py-0.5 text-xs font-medium rounded-full ${
               order.source === 'online'
                 ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-                : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
+                : order.source === 'business'
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
             }`}>
-              {order.source === 'online' ? 'Online' : 'Offline'}
+              {order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : 'Offline'}
             </span>
           </td>
           <td className="px-6 py-4 whitespace-nowrap">

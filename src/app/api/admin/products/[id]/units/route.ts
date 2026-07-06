@@ -100,7 +100,20 @@ export async function POST(request: NextRequest, { params }: Params) {
         `INSERT INTO product_units (
            product_id, variant_id, unit, factor, dimension, conversion_meta,
            is_base, display_label, notes, min_qty, max_qty, qty_step
-         ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *`,
+         ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+         ON CONFLICT (product_id, unit) WHERE variant_id IS NULL
+         DO UPDATE SET
+           factor = EXCLUDED.factor,
+           dimension = EXCLUDED.dimension,
+           conversion_meta = EXCLUDED.conversion_meta,
+           is_base = EXCLUDED.is_base,
+           display_label = EXCLUDED.display_label,
+           notes = EXCLUDED.notes,
+           min_qty = EXCLUDED.min_qty,
+           max_qty = EXCLUDED.max_qty,
+           qty_step = EXCLUDED.qty_step,
+           updated_at = NOW()
+         RETURNING *`,
         [
           id,
           unit, factor, dimension,
@@ -119,9 +132,6 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ unit: inserted })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    if (msg.includes('uniq_product_units_product_unit') || msg.includes('duplicate key')) {
-      return NextResponse.json({ error: 'A unit with this name already exists for this product' }, { status: 409 })
-    }
-    return NextResponse.json({ error: 'Failed to create unit' }, { status: 500 })
+    return NextResponse.json({ error: msg || 'Failed to create unit' }, { status: 500 })
   }
 }

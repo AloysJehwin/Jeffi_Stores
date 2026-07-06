@@ -18,6 +18,9 @@ interface CartItem {
     factor: number
     is_base: boolean
     dimension: string | null
+    min_qty?: number | null
+    max_qty?: number | null
+    qty_step?: number | null
   } | null
   products: {
     id: string
@@ -166,6 +169,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }
 
   const updateQuantity = async (cartItemId: string, quantity: number) => {
+    setCartItems(prev => prev.map(item =>
+      item.id === cartItemId ? { ...item, quantity } : item
+    ))
     try {
       const response = await fetch('/api/cart', {
         method: 'PATCH',
@@ -175,9 +181,10 @@ export function CartProvider({ children }: { children: ReactNode }) {
       })
 
       if (response.ok) {
-        await fetchCart()
+        fetchCart()
       } else {
         const data = await response.json()
+        await fetchCart()
         throw new Error(data.error || 'Failed to update quantity')
       }
     } catch (error) {
@@ -229,18 +236,22 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const getCartTotal = () => {
     return cartItems.reduce((total, item) => {
-      const price = item.price_at_addition > 0
+      const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count')
+      const unitFactor = (!isCustomQty && item.cart_item_unit?.factor) ? Number(item.cart_item_unit.factor) : 1
+      const price = isCustomQty
         ? item.price_at_addition
-        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * unitFactor
       return total + price * item.quantity
     }, 0)
   }
 
   const getCartTax = () => {
     return cartItems.reduce((tax, item) => {
-      const price = item.price_at_addition > 0
+      const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count')
+      const unitFactor = (!isCustomQty && item.cart_item_unit?.factor) ? Number(item.cart_item_unit.factor) : 1
+      const price = isCustomQty
         ? item.price_at_addition
-        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * unitFactor
       const gstRate = item.products.gst_percentage || 0
       const itemTotal = price * item.quantity
       const itemTax = itemTotal - (itemTotal / (1 + gstRate / 100))

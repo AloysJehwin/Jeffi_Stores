@@ -191,11 +191,32 @@ export default function GSTPage() {
           </div>
           <button onClick={handleFetch} disabled={loading}
             className="px-4 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium disabled:opacity-50 transition-colors">
-            {loading ? 'Loading…' : 'Fetch Report'}
+            {loading ? (
+              <span className="flex items-center gap-1.5">
+                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                </svg>
+                Fetching…
+              </span>
+            ) : 'Fetch Report'}
           </button>
         </div>
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
       </div>
+
+      {loading && (
+        <div className="animate-pulse space-y-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-surface-elevated rounded-lg border border-border-default p-4 shadow-sm space-y-2" style={{ animationDelay: `${i * 50}ms` }}>
+                <div className="h-3 w-20 bg-surface-secondary rounded" />
+                <div className="h-5 w-24 bg-surface-secondary rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {gstr1Summary && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -223,7 +244,35 @@ export default function GSTPage() {
         </div>
 
         <div className="p-4 sm:p-6">
-          {tab === 'gstr1' && (
+          {loading && (
+            <div className="animate-pulse space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="h-5 w-36 bg-surface-secondary rounded" />
+                <div className="h-8 w-28 bg-surface-secondary rounded-lg" />
+              </div>
+              <div className="rounded-lg border border-border-default overflow-hidden">
+                <div className="bg-surface-secondary px-4 py-2.5 flex gap-4">
+                  {[...Array(9)].map((_, i) => (
+                    <div key={i} className="h-3 bg-surface-elevated rounded flex-1" style={{ animationDelay: `${i * 40}ms` }} />
+                  ))}
+                </div>
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="px-4 py-3 border-t border-border-default flex gap-4" style={{ animationDelay: `${i * 60}ms` }}>
+                    <div className="h-4 w-24 bg-surface-secondary rounded" />
+                    <div className="h-4 w-20 bg-surface-secondary rounded" />
+                    <div className="h-4 flex-1 bg-surface-secondary rounded" />
+                    <div className="h-4 w-16 bg-surface-secondary rounded" />
+                    <div className="h-4 w-16 bg-surface-secondary rounded" />
+                    <div className="h-4 w-16 bg-surface-secondary rounded" />
+                    <div className="h-4 w-16 bg-surface-secondary rounded" />
+                    <div className="h-4 w-20 bg-surface-secondary rounded" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!loading && tab === 'gstr1' && (
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-foreground">Outward Supplies</h2>
@@ -333,7 +382,7 @@ export default function GSTPage() {
             </div>
           )}
 
-          {tab === 'gstr3b' && (
+          {!loading && tab === 'gstr3b' && (
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-foreground">GSTR-3B Summary</h2>
@@ -418,7 +467,7 @@ export default function GSTPage() {
             </div>
           )}
 
-          {tab === 'irn' && (
+          {!loading && tab === 'irn' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-foreground">
@@ -469,7 +518,7 @@ export default function GSTPage() {
             </div>
           )}
 
-          {tab === 'itc' && (
+          {!loading && tab === 'itc' && (
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <h2 className="font-semibold text-foreground">Input Tax Credit Ledger</h2>

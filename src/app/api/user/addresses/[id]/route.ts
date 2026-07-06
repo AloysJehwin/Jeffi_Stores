@@ -90,7 +90,6 @@ export async function PATCH(
 
     return NextResponse.json({ address })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -125,6 +124,16 @@ export async function DELETE(
       )
     }
 
+    // Null out FK references in orders — snapshot columns preserve the actual address data
+    await query(
+      'UPDATE orders SET shipping_address_id = NULL WHERE shipping_address_id = $1',
+      [addressId]
+    )
+    await query(
+      'UPDATE orders SET billing_address_id = NULL WHERE billing_address_id = $1',
+      [addressId]
+    )
+
     await query(
       'DELETE FROM addresses WHERE id = $1 AND user_id = $2',
       [addressId, userId]
@@ -140,7 +149,6 @@ export async function DELETE(
 
     return NextResponse.json({ message: 'Address deleted successfully' })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

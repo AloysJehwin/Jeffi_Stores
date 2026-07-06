@@ -283,8 +283,12 @@ export async function POST(req: NextRequest) {
       messages.push({ role: 'user', content: toolOutputs.join('\n') + '\n\nNow apply the RELEVANCE CHECK and respond to the customer in plain text. If results are unrelated you may call one more tool with a refined query, otherwise give your final answer now.' })
     }
   } catch (err: any) {
-    const msg = err instanceof AiClientError ? err.message : String(err?.message || 'AI request failed')
-    return NextResponse.json({ error: msg }, { status: 502 })
+    return NextResponse.json({
+      message: "I'm having trouble responding right now. Please try again in a moment.",
+      toolCalls: toolCallRecords,
+      provider,
+      model,
+    })
   }
 
   if (!finalText) {

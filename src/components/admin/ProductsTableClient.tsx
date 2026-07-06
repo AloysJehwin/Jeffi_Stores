@@ -7,7 +7,6 @@ import { ap } from '@/lib/admin-path'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
-import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import ProductDetailModal from '@/components/admin/ProductDetailModal'
 import ProductLabelModal from '@/components/admin/ProductLabelModal'
 import HoverCard from '@/components/ui/HoverCard'
@@ -21,6 +20,22 @@ interface Props {
 export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products' }: Props) {
   const [selected, setSelected] = useState<any>(null)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
+  const [activeStates, setActiveStates] = useState<Record<string, boolean>>({})
+
+  async function handleToggleActive(productId: string, currentActive: boolean) {
+    const next = !currentActive
+    setActiveStates(prev => ({ ...prev, [productId]: next }))
+    try {
+      const res = await fetch(`/api/products/${productId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: next }),
+      })
+      if (!res.ok) setActiveStates(prev => ({ ...prev, [productId]: currentActive }))
+    } catch {
+      setActiveStates(prev => ({ ...prev, [productId]: currentActive }))
+    }
+  }
 
   return (
     <>
@@ -154,9 +169,6 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                         <p className="text-xs text-accent-500 font-medium">Click row to view full details →</p>
                       </div>
                     </HoverCard>
-                    {product.is_featured && (
-                      <div className="text-xs text-yellow-600 dark:text-yellow-400 font-medium mt-0.5 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</div>
-                    )}
                   </div>
                 </div>
               </td>
@@ -276,13 +288,16 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
               </td>
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
-                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full shrink-0 ${
-                    product.is_active
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                      : 'bg-surface-secondary text-foreground'
-                  }`}>
-                    {product.is_active ? 'Active' : 'Inactive'}
-                  </span>
+                  <button
+                    onClick={() => handleToggleActive(product.id, activeStates[product.id] ?? product.is_active)}
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full shrink-0 hover:opacity-75 transition-opacity ${
+                      (activeStates[product.id] ?? product.is_active)
+                        ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                        : 'bg-surface-secondary text-foreground'
+                    }`}
+                  >
+                    {(activeStates[product.id] ?? product.is_active) ? 'Active' : 'Inactive'}
+                  </button>
                   <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
                 </div>
               </td>
@@ -316,7 +331,6 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                     </svg>
                   </button>
                   <DownloadAdButton productId={product.id} productName={product.name} productSlug={product.slug} />
-                  <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
                 </div>
               </td>
             </tr>

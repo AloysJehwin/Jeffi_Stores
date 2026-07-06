@@ -719,21 +719,31 @@ export default function ProductActions({
               <>
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  {effectiveMrp && effectiveMrp > effectivePrice && (
+                  {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      Rs.&nbsp;{(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   )}
+                  {effectiveUnitLabel && (
+                    <span className="text-lg text-foreground-muted">/ <UnitLabel label={effectiveUnitLabel} /></span>
+                  )}
                 </div>
-                {effectiveMrp && effectiveMrp > effectivePrice && (
+                {showPerBasePrice && (
+                  <div className="mb-1">
+                    <span className="text-xs text-foreground-muted">
+                      (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                    </span>
+                  </div>
+                )}
+                {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
                       {mrpDiscount}% off
                     </span>
                     <span className="text-sm text-foreground-secondary">
-                      You save Rs.&nbsp;{(effectiveMrp - effectivePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      You save Rs.&nbsp;{((effectiveMrp - effectivePrice) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                     <span className="text-xs text-foreground-muted">
                       ({Math.round(((effectiveMrp - rawEffectivePrice) / effectiveMrp) * 100)}% MRP discount + {businessDiscountPct}% business discount)
@@ -745,21 +755,31 @@ export default function ProductActions({
               <>
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  {effectiveMrp && effectiveMrp > effectivePrice && (
+                  {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      Rs.&nbsp;{(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   )}
+                  {effectiveUnitLabel && (
+                    <span className="text-lg text-foreground-muted">/ <UnitLabel label={effectiveUnitLabel} /></span>
+                  )}
                 </div>
-                {effectiveMrp && effectiveMrp > effectivePrice && (
+                {showPerBasePrice && (
+                  <div className="mb-1">
+                    <span className="text-xs text-foreground-muted">
+                      (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                    </span>
+                  </div>
+                )}
+                {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
                       {mrpDiscount}% off
                     </span>
                     <span className="text-sm text-foreground-secondary">
-                      You save Rs.&nbsp;{(effectiveMrp - effectivePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      You save Rs.&nbsp;{((effectiveMrp - effectivePrice) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}

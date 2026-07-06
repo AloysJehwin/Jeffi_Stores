@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const qrImageUrl = await cropRazorpayQr(qr.image_url)
 
     await query(
-      `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, updated_at = NOW() WHERE id = $3`,
+      `UPDATE orders SET razorpay_qr_id = $1, razorpay_qr_image_url = $2, payment_mode = 'upi_qr', updated_at = NOW() WHERE id = $3`,
       [qr.id, qrImageUrl, orderId]
     )
 

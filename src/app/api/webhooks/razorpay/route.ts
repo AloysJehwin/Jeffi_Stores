@@ -70,7 +70,9 @@ async function handlePaymentCaptured(payment: any) {
 
   await withTransaction(async (client) => {
     await client.query(
-      `UPDATE orders SET payment_status = 'paid', status = 'confirmed', updated_at = NOW()
+      `UPDATE orders SET payment_status = 'paid',
+        status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
+        updated_at = NOW()
        WHERE id = $1 AND payment_status != 'paid'`,
       [orderId]
     )
@@ -163,7 +165,7 @@ async function handlePaymentLinkPaid(paymentLink: any) {
     await client.query(
       `UPDATE orders SET
         payment_status = 'paid',
-        status = 'confirmed',
+        status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
         payment_link_status = 'paid',
         updated_at = NOW()
        WHERE id = $1 AND payment_status != 'paid'`,
@@ -198,11 +200,26 @@ async function handlePaymentLinkPaid(paymentLink: any) {
 async function handleQrCodeCredited(qrCode: any) {
   const qrId = qrCode?.id
   if (!qrId) return
-  await query(
-    `UPDATE orders SET payment_status = 'paid', updated_at = NOW()
-     WHERE razorpay_qr_id = $1 AND payment_status != 'paid'`,
+
+  const order = await queryOne<{ id: string; payment_status: string; total_amount: string }>(
+    `SELECT id, payment_status, total_amount FROM orders WHERE razorpay_qr_id = $1`,
     [qrId]
   )
+  if (!order || order.payment_status === 'paid') return
+
+  await withTransaction(async (client) => {
+    await client.query(
+      `UPDATE orders SET payment_status = 'paid', updated_at = NOW()
+       WHERE razorpay_qr_id = $1 AND payment_status != 'paid'`,
+      [qrId]
+    )
+    await client.query(
+      `INSERT INTO payments (order_id, payment_gateway, transaction_id, amount, status, gateway_response)
+       VALUES ($1, 'razorpay_qr', $2, $3, 'completed', $4)
+       ON CONFLICT DO NOTHING`,
+      [order.id, qrCode.payments?.[0]?.razorpay_payment_id || qrId, parseFloat(order.total_amount), JSON.stringify(qrCode)]
+    )
+  })
 }
 
 async function handlePaymentLinkExpired(paymentLink: any) {

@@ -28,6 +28,9 @@ export interface SendAuditedMailOptions {
   userId?: string | null
   templateName?: string | null
   metadata?: Record<string, unknown> | null
+  // When true the body (html + text) is not written to email_logs. Use for
+  // sensitive mails like OTP where storing the body would be a security risk.
+  redactBody?: boolean
 }
 
 const DEFAULT_FROM = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL || 'noreply@jeffistores.in'}>`
@@ -125,8 +128,8 @@ export async function sendAuditedMail(o: SendAuditedMailOptions): Promise<{ mess
       cc,
       bcc,
       subject: o.subject,
-      html: o.html ?? null,
-      text: o.text ?? null,
+      html: o.redactBody ? null : (o.html ?? null),
+      text: o.redactBody ? null : (o.text ?? null),
       kind: o.kind,
       entityType: o.entityType ?? null,
       entityId: o.entityId ?? null,
@@ -146,8 +149,8 @@ export async function sendAuditedMail(o: SendAuditedMailOptions): Promise<{ mess
       cc,
       bcc,
       subject: o.subject,
-      html: o.html ?? null,
-      text: o.text ?? null,
+      html: o.redactBody ? null : (o.html ?? null),
+      text: o.redactBody ? null : (o.text ?? null),
       kind: o.kind,
       entityType: o.entityType ?? null,
       entityId: o.entityId ?? null,

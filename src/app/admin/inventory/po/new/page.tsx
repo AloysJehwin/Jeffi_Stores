@@ -263,7 +263,7 @@ export default function NewPOPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className={labelCls}>Supplier <span className="text-red-500">*</span></label>
-              <AdminSelect
+              <AdminSelect sm
                 value={form.supplier_id}
                 onChange={v => setForm(p => ({ ...p, supplier_id: v }))}
                 placeholder="Select supplier"
@@ -280,7 +280,7 @@ export default function NewPOPage() {
             </div>
             <div>
               <label className={labelCls}>Status</label>
-              <AdminSelect
+              <AdminSelect sm
                 value={form.status}
                 onChange={v => setForm(p => ({ ...p, status: v }))}
                 options={[{ value: 'draft', label: 'Draft' }, { value: 'sent', label: 'Sent to Supplier' }]}
@@ -369,7 +369,7 @@ export default function NewPOPage() {
                       {mode === 'category' && (
                         <div className="flex gap-2">
                           <div className="flex-1">
-                            <AdminSelect value={categoryIds[it.id] ?? ''} onChange={v => setCategoryIds(p => ({ ...p, [it.id]: v }))}
+                            <AdminSelect sm value={categoryIds[it.id] ?? ''} onChange={v => setCategoryIds(p => ({ ...p, [it.id]: v }))}
                               placeholder="— Select category —"
                               options={categories.map(c => ({ value: c.id, label: c.name }))} />
                           </div>
@@ -383,7 +383,7 @@ export default function NewPOPage() {
                     </div>
                   )}
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                     <div>
                       <label className={labelCls}>HSN Code</label>
                       <input type="text" value={it.hsn_code}
@@ -392,7 +392,7 @@ export default function NewPOPage() {
                     </div>
                     <div>
                       <label className={labelCls}>Tax %</label>
-                      <AdminSelect value={it.tax_rate}
+                      <AdminSelect sm value={it.tax_rate}
                         onChange={v => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, tax_rate: v }))}
                         options={[{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }]} />
                     </div>
@@ -419,7 +419,7 @@ export default function NewPOPage() {
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                           <div>
                             <label className={labelCls}>Purchase Unit</label>
-                            <AdminSelect
+                            <AdminSelect sm
                               value={it.purchase_unit}
                               onChange={v => setLineItems(items => items.map(r => r.id !== it.id ? r : { ...r, purchase_unit: v }))}
                               options={PURCHASE_UNITS}
