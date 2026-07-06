@@ -587,8 +587,8 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                   <p>{order.shipping_address.city}, {order.shipping_address.state} {order.shipping_address.postal_code}</p>
                   <p>{order.shipping_address.country || 'India'}</p>
                   {order.shipping_address.phone && <p className="mt-2">Phone: +91 {order.shipping_address.phone.replace(/^\+91|^91/, '')}</p>}
-                  {edd && (
-                    <div className="mt-4 px-4 py-3 rounded-xl border border-border-default bg-surface">
+                  <div className="mt-4 px-4 py-3 rounded-xl border border-border-default bg-surface">
+                    {edd ? (
                       <div className="flex items-center gap-3">
                         <svg className="w-8 h-8 text-green-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
@@ -599,9 +599,11 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                           <p className="font-bold text-foreground">{edd}</p>
                         </div>
                       </div>
-                      {order.status !== 'delivered' && <ExtendEddButton orderId={order.id} currentEdd={rawEdd} />}
-                    </div>
-                  )}
+                    ) : (
+                      <p className="text-xs text-foreground-muted">No expected delivery date set</p>
+                    )}
+                    {order.status !== 'delivered' && <ExtendEddButton orderId={order.id} currentEdd={rawEdd} />}
+                  </div>
                 </div>
               ) : (
                 <p className="text-sm text-foreground-muted">No shipping address</p>
