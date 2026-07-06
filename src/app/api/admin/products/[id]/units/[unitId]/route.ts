@@ -100,7 +100,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ unit: updated })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
-    if (msg.includes('duplicate key') && msg.includes('unit')) {
+    if (msg.includes('duplicate key')) {
       return NextResponse.json({ error: 'A unit with this name already exists for this product' }, { status: 409 })
     }
     return NextResponse.json({ error: msg || 'Failed to update unit' }, { status: 500 })

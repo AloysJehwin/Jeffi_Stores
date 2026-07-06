@@ -214,6 +214,8 @@ describe('POST /api/webhooks/razorpay', () => {
   })
 
   it('handles qr_code.credited — with qr id', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'ord1', payment_status: 'unpaid', total_amount: '500' } as any)
+    mockQuery.mockResolvedValueOnce(undefined as any)
     mockQuery.mockResolvedValueOnce(undefined as any)
     const body = {
       event: 'qr_code.credited',

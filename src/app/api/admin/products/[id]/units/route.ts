@@ -132,6 +132,9 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ unit: inserted })
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Unknown error'
+    if (msg.includes('duplicate key')) {
+      return NextResponse.json({ error: 'A unit with this name already exists for this product' }, { status: 409 })
+    }
     return NextResponse.json({ error: msg || 'Failed to create unit' }, { status: 500 })
   }
 }

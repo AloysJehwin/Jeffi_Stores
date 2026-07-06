@@ -43,7 +43,6 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ status: 'ok' })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ status: 'ok' })
   }
 }
@@ -207,19 +206,17 @@ async function handleQrCodeCredited(qrCode: any) {
   )
   if (!order || order.payment_status === 'paid') return
 
-  await withTransaction(async (client) => {
-    await client.query(
-      `UPDATE orders SET payment_status = 'paid', updated_at = NOW()
-       WHERE razorpay_qr_id = $1 AND payment_status != 'paid'`,
-      [qrId]
-    )
-    await client.query(
-      `INSERT INTO payments (order_id, payment_gateway, transaction_id, amount, status, gateway_response)
-       VALUES ($1, 'razorpay_qr', $2, $3, 'completed', $4)
-       ON CONFLICT DO NOTHING`,
-      [order.id, qrCode.payments?.[0]?.razorpay_payment_id || qrId, parseFloat(order.total_amount), JSON.stringify(qrCode)]
-    )
-  })
+  await query(
+    `UPDATE orders SET payment_status = 'paid', updated_at = NOW()
+     WHERE razorpay_qr_id = $1 AND payment_status != 'paid'`,
+    [qrId]
+  )
+  await query(
+    `INSERT INTO payments (order_id, payment_gateway, transaction_id, amount, status, gateway_response)
+     VALUES ($1, 'razorpay_qr', $2, $3, 'completed', $4)
+     ON CONFLICT DO NOTHING`,
+    [order.id, qrCode.payments?.[0]?.razorpay_payment_id || qrId, parseFloat(order.total_amount), JSON.stringify(qrCode)]
+  )
 }
 
 async function handlePaymentLinkExpired(paymentLink: any) {
