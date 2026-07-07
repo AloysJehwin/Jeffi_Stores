@@ -767,7 +767,7 @@ export default function ProductActions({
       <div className="space-y-3">
         <button
           onClick={handleBuyNow}
-          disabled={effectiveStock === 0 || isBuyingNow}
+          disabled={!is_active || effectiveStock === 0 || isBuyingNow}
           className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isBuyingNow ? (
@@ -779,7 +779,7 @@ export default function ProductActions({
 
         <button
           onClick={handleAddToCart}
-          disabled={effectiveStock === 0 || isAddingToCart}
+          disabled={!is_active || effectiveStock === 0 || isAddingToCart}
           className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isAddingToCart ? (
