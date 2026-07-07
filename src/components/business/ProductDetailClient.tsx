@@ -100,6 +100,33 @@ interface ProductDetailClientProps {
       qty_step?: number | null
     }>
     sell_unit_id?: string | null
+    // Identification & Compliance
+    barcode?: string | null
+    isbn?: string | null
+    asin?: string | null
+    brand_part_number?: string | null
+    country_of_origin?: string | null
+    // Physical Attributes
+    color?: string | null
+    color_hex?: string | null
+    volume_ml?: number | null
+    net_weight_grams?: number | null
+    fragile?: boolean | null
+    hazardous?: boolean | null
+    flammable?: boolean | null
+    // Certifications & Standards
+    certifications?: string[] | null
+    compliance_standard?: string | null
+    safety_rating?: string | null
+    warranty_months?: number | null
+    warranty_type?: string | null
+    // Condition & Lifecycle
+    condition?: string | null
+    // Age & Audience
+    age_min?: number | null
+    age_max?: number | null
+    target_gender?: string | null
+    target_audience?: string[] | null
   }
   initialSkuParam?: string
 }
@@ -369,35 +396,90 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
         <RazorpayOffers />
 
         {/* Product Specifications */}
-        <div className="mt-6 pt-6 border-t border-border-default">
-          <h3 className="font-semibold text-foreground mb-3">Product Specifications</h3>
-          <dl className="grid grid-cols-2 gap-3 text-sm">
-            {product.weight && (
-              <>
-                <dt className="text-foreground-secondary">Weight:</dt>
-                <dd className="font-medium text-foreground">{product.weight} kg</dd>
-              </>
-            )}
-            {product.dimensions && (
-              <>
-                <dt className="text-foreground-secondary">Dimensions:</dt>
-                <dd className="font-medium text-foreground">{product.dimensions} cm</dd>
-              </>
-            )}
-            {product.categories && (
-              <>
-                <dt className="text-foreground-secondary">Category:</dt>
-                <dd className="font-medium text-foreground">{product.categories.name}</dd>
-              </>
-            )}
-            {product.brands && (
-              <>
-                <dt className="text-foreground-secondary">Brand:</dt>
-                <dd className="font-medium text-foreground">{product.brands.name}</dd>
-              </>
-            )}
-          </dl>
-        </div>
+        {(() => {
+          const p = product
+          const hasHazard = p.fragile || p.hazardous || p.flammable
+          const hasSpecs = p.weight || p.dimensions || p.material
+            || p.color || p.volume_ml || p.net_weight_grams
+            || p.country_of_origin || p.barcode || p.isbn || p.asin || p.brand_part_number
+            || p.certifications?.length || p.compliance_standard || p.safety_rating
+            || p.warranty_months || p.warranty_type
+            || p.age_min || p.age_max || p.target_gender || p.target_audience?.length
+            || p.categories || p.brands || hasHazard
+          if (!hasSpecs) return null
+          return (
+            <div className="mt-6 pt-6 border-t border-border-default">
+              <h3 className="font-semibold text-foreground mb-4">Product Specifications</h3>
+
+              {hasHazard && (
+                <div className="flex flex-wrap gap-2 mb-4">
+                  {p.fragile && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">⚠ Fragile</span>}
+                  {p.hazardous && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">☢ Hazardous</span>}
+                  {p.flammable && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">🔥 Flammable</span>}
+                </div>
+              )}
+
+              <dl className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                {p.weight && <><dt className="text-foreground-secondary">Weight</dt><dd className="font-medium text-foreground">{p.weight} kg</dd></>}
+                {p.net_weight_grams && <><dt className="text-foreground-secondary">Net Weight</dt><dd className="font-medium text-foreground">{p.net_weight_grams} g</dd></>}
+                {p.dimensions && <><dt className="text-foreground-secondary">Dimensions</dt><dd className="font-medium text-foreground">{p.dimensions}</dd></>}
+                {p.volume_ml && <><dt className="text-foreground-secondary">Volume</dt><dd className="font-medium text-foreground">{p.volume_ml} ml</dd></>}
+                {p.material && <><dt className="text-foreground-secondary">Material</dt><dd className="font-medium text-foreground">{p.material}</dd></>}
+                {p.color && (
+                  <><dt className="text-foreground-secondary">Color</dt>
+                  <dd className="font-medium text-foreground flex items-center gap-2">
+                    {p.color_hex && <span className="inline-block w-4 h-4 rounded-full border border-border-default" style={{ backgroundColor: p.color_hex }} />}
+                    {p.color}
+                  </dd></>
+                )}
+                {p.categories && <><dt className="text-foreground-secondary">Category</dt><dd className="font-medium text-foreground">{p.categories.name}</dd></>}
+                {p.brands && <><dt className="text-foreground-secondary">Brand</dt><dd className="font-medium text-foreground">{p.brands.name}</dd></>}
+                {p.country_of_origin && <><dt className="text-foreground-secondary">Origin</dt><dd className="font-medium text-foreground">{p.country_of_origin}</dd></>}
+                {p.warranty_months && (
+                  <><dt className="text-foreground-secondary">Warranty</dt>
+                  <dd className="font-medium text-foreground">
+                    {p.warranty_months} month{p.warranty_months > 1 ? 's' : ''}{p.warranty_type ? ` (${p.warranty_type})` : ''}
+                  </dd></>
+                )}
+                {p.compliance_standard && <><dt className="text-foreground-secondary">Compliance</dt><dd className="font-medium text-foreground">{p.compliance_standard}</dd></>}
+                {p.safety_rating && <><dt className="text-foreground-secondary">Safety Rating</dt><dd className="font-medium text-foreground">{p.safety_rating}</dd></>}
+                {p.brand_part_number && <><dt className="text-foreground-secondary">Part Number</dt><dd className="font-medium text-foreground">{p.brand_part_number}</dd></>}
+                {p.barcode && <><dt className="text-foreground-secondary">Barcode</dt><dd className="font-medium text-foreground">{p.barcode}</dd></>}
+                {p.isbn && <><dt className="text-foreground-secondary">ISBN</dt><dd className="font-medium text-foreground">{p.isbn}</dd></>}
+                {p.asin && <><dt className="text-foreground-secondary">ASIN</dt><dd className="font-medium text-foreground">{p.asin}</dd></>}
+                {(p.age_min || p.age_max) && (
+                  <><dt className="text-foreground-secondary">Age Range</dt>
+                  <dd className="font-medium text-foreground">
+                    {p.age_min && p.age_max ? `${p.age_min}–${p.age_max} years` : p.age_min ? `${p.age_min}+ years` : `Up to ${p.age_max} years`}
+                  </dd></>
+                )}
+                {p.target_gender && p.target_gender !== 'unisex' && <><dt className="text-foreground-secondary">For</dt><dd className="font-medium text-foreground capitalize">{p.target_gender}</dd></>}
+              </dl>
+
+              {p.certifications && p.certifications.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-sm text-foreground-secondary mb-2">Certifications</p>
+                  <div className="flex flex-wrap gap-2">
+                    {p.certifications.map((c, i) => (
+                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-raised border border-border-default text-foreground">{c}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {p.target_audience && p.target_audience.length > 0 && (
+                <div className="mt-3">
+                  <p className="text-sm text-foreground-secondary mb-2">Target Audience</p>
+                  <div className="flex flex-wrap gap-2">
+                    {p.target_audience.map((a, i) => (
+                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-raised border border-border-default text-foreground">{a}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       <div className="order-3 lg:hidden">
