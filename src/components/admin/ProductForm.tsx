@@ -1486,19 +1486,19 @@ export default function ProductForm({ categories, brands, action, product, produ
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border">
                     <div>
                       <label className="block text-xs font-medium text-foreground-muted mb-1">Download URL</label>
-                      <input type="url" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)} placeholder="https://..." className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                      <input type="url" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)} placeholder="https://..." className={inputCls} />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-muted mb-1">License Type</label>
-                      <input type="text" value={licenseType} onChange={e => setLicenseType(e.target.value)} placeholder="e.g. MIT, Commercial" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                      <input type="text" value={licenseType} onChange={e => setLicenseType(e.target.value)} placeholder="e.g. MIT, Commercial" className={inputCls} />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-muted mb-1">File Format</label>
-                      <input type="text" value={fileFormat} onChange={e => setFileFormat(e.target.value)} placeholder="e.g. PDF, ZIP, EXE" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                      <input type="text" value={fileFormat} onChange={e => setFileFormat(e.target.value)} placeholder="e.g. PDF, ZIP, EXE" className={inputCls} />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-muted mb-1">Platform Compatibility <span className="text-foreground-muted/60">(comma-separated)</span></label>
-                      <input type="text" value={platformCompatibility} onChange={e => setPlatformCompatibility(e.target.value)} placeholder="e.g. Windows, macOS, Linux" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                      <input type="text" value={platformCompatibility} onChange={e => setPlatformCompatibility(e.target.value)} placeholder="e.g. Windows, macOS, Linux" className={inputCls} />
                     </div>
                   </div>
                 )}
@@ -1510,7 +1510,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-muted mb-1">Subscription Price (₹)</label>
-                      <input type="number" min="0" step="0.01" value={subscriptionPrice} onChange={e => setSubscriptionPrice(e.target.value)} className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                      <input type="number" min="0" step="0.01" value={subscriptionPrice} onChange={e => setSubscriptionPrice(e.target.value)} className={inputCls} />
                     </div>
                   </div>
                 )}
@@ -1533,7 +1533,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-foreground-muted mb-1">Customs Tariff Code</label>
-                    <input type="text" value={customsTariffCode} onChange={e => setCustomsTariffCode(e.target.value)} placeholder="e.g. 8302.41" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                    <input type="text" value={customsTariffCode} onChange={e => setCustomsTariffCode(e.target.value)} placeholder="e.g. 8302.41" className={inputCls} />
                   </div>
                 </div>
                 <Toggle id="inclusive_tax" checked={inclusiveTax} onChange={setInclusiveTax} label="Price includes tax (inclusive tax)" />
@@ -1553,9 +1553,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                   <div>
                     <label className="block text-xs font-medium text-foreground-muted mb-1">Age Range</label>
                     <div className="flex items-center gap-2">
-                      <input type="number" min="0" value={ageMin} onChange={e => setAgeMin(e.target.value)} placeholder="Min" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                      <input type="number" min="0" value={ageMin} onChange={e => setAgeMin(e.target.value)} placeholder="Min" className={inputCls} />
                       <span className="text-foreground-muted text-sm">–</span>
-                      <input type="number" min="0" value={ageMax} onChange={e => setAgeMax(e.target.value)} placeholder="Max" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                      <input type="number" min="0" value={ageMax} onChange={e => setAgeMax(e.target.value)} placeholder="Max" className={inputCls} />
                     </div>
                   </div>
                   <div>
@@ -1564,7 +1564,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-medium text-foreground-muted mb-1">Target Audience <span className="text-foreground-muted/60">(comma-separated)</span></label>
-                    <input type="text" value={targetAudience} onChange={e => setTargetAudience(e.target.value)} placeholder="e.g. professionals, students, DIY" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                    <input type="text" value={targetAudience} onChange={e => setTargetAudience(e.target.value)} placeholder="e.g. professionals, students, DIY" className={inputCls} />
                   </div>
                 </div>
               </div>
@@ -1584,18 +1584,18 @@ export default function ProductForm({ categories, brands, action, product, produ
                     <span>Meta Title</span>
                     <span className={metaTitle.length > 160 ? 'text-red-500' : 'text-foreground-muted/60'}>{metaTitle.length}/160</span>
                   </label>
-                  <input type="text" maxLength={160} value={metaTitle} onChange={e => setMetaTitle(e.target.value)} placeholder="SEO page title" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                  <input type="text" maxLength={160} value={metaTitle} onChange={e => setMetaTitle(e.target.value)} placeholder="SEO page title" className={inputCls} />
                 </div>
                 <div>
                   <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
                     <span>Meta Description</span>
                     <span className={metaDescription.length > 320 ? 'text-red-500' : 'text-foreground-muted/60'}>{metaDescription.length}/320</span>
                   </label>
-                  <textarea maxLength={320} rows={3} value={metaDescription} onChange={e => setMetaDescription(e.target.value)} placeholder="SEO page description" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none" />
+                  <textarea maxLength={320} rows={3} value={metaDescription} onChange={e => setMetaDescription(e.target.value)} placeholder="SEO page description" className={`${inputCls} resize-none`} />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-foreground-muted mb-1">Meta Keywords <span className="text-foreground-muted/60">(comma-separated)</span></label>
-                  <input type="text" value={metaKeywords} onChange={e => setMetaKeywords(e.target.value)} placeholder="e.g. bolt, fastener, stainless" className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm" />
+                  <input type="text" value={metaKeywords} onChange={e => setMetaKeywords(e.target.value)} placeholder="e.g. bolt, fastener, stainless" className={inputCls} />
                 </div>
                 <Toggle id="is_searchable" checked={isSearchable} onChange={setIsSearchable} label="Searchable (show in search results)" />
               </div>
