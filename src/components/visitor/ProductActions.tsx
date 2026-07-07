@@ -108,7 +108,7 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onUnitChange, productUnits: productUnitsProp, sellUnitId,
-  extraDeliveryDays = 0,
+  extraDeliveryDays = 0, is_active = true,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
