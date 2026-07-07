@@ -55,7 +55,8 @@ export async function POST(request: NextRequest) {
           'stock_status', p.stock_status, 'inventory_quantity', p.inventory_quantity,
           'is_active', p.is_active,
           'category_id', p.category_id, 'discount_pct', p.discount_pct,
-          'extra_delivery_days', p.extra_delivery_days
+          'extra_delivery_days', p.extra_delivery_days,
+          'handling_days', p.handling_days
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
@@ -147,8 +148,9 @@ export async function POST(request: NextRequest) {
       return 14
     }
     const _eddPin = String(destinationPin || '')
+    const _eddHandling = Math.max(2, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 2)))
     const _eddExtra = Math.max(0, ...cartItems.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
-    const _eddTat = (/^\d{6}$/.test(_eddPin) ? _getTat(_eddPin) : 7) + _eddExtra
+    const _eddTat = _eddHandling + (/^\d{6}$/.test(_eddPin) ? _getTat(_eddPin) : 7) + _eddExtra
     const _edd = new Date(Date.now() + _eddTat * 86400000).toISOString().slice(0, 10)
 
     const order = await withTransaction(async (client) => {
