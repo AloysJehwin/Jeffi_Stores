@@ -1431,13 +1431,13 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
 
           {/* Identification & Compliance */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
             <button type="button" onClick={() => setIdentificationExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
               <span>Identification &amp; Compliance</span>
               <svg className={`w-4 h-4 text-foreground-muted transition-transform ${identificationExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
             </button>
             {identificationExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
+              <div className="p-4 space-y-4 border-t border-border-default">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-2">Barcode (EAN/UPC)</label>
@@ -1470,20 +1470,20 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
 
           {/* Digital & Subscription */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
             <button type="button" onClick={() => setDigitalExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
               <span>Digital &amp; Subscription</span>
               <svg className={`w-4 h-4 text-foreground-muted transition-transform ${digitalExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
             </button>
             {digitalExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
+              <div className="p-4 space-y-4 border-t border-border-default">
                 <div className="flex flex-wrap gap-6">
                   <Toggle id="is_digital" checked={isDigital} onChange={setIsDigital} label="Digital Product" />
                   <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
                   <Toggle id="is_subscription" checked={isSubscription} onChange={setIsSubscription} label="Subscription" />
                 </div>
                 {isDigital && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
                     <div>
                       <label className="block text-xs font-medium text-foreground-muted mb-1">Download URL</label>
                       <input type="url" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)} placeholder="https://..." className={inputCls} />
@@ -1503,7 +1503,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </div>
                 )}
                 {isSubscription && (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
                     <div>
                       <label className="block text-xs font-medium text-foreground-muted mb-1">Subscription Interval</label>
                       <AdminSelect value={subscriptionInterval} onChange={e => setSubscriptionInterval(e.target.value)} className="w-full" options={[{ value: '', label: '— select —' }, { value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' }, { value: 'yearly', label: 'Yearly' }]} />
@@ -1519,13 +1519,13 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
 
           {/* Tax & Finance */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
             <button type="button" onClick={() => setTaxExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
               <span>Tax &amp; Finance</span>
               <svg className={`w-4 h-4 text-foreground-muted transition-transform ${taxExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
             </button>
             {taxExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
+              <div className="p-4 space-y-4 border-t border-border-default">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-foreground-muted mb-1">Tax Class</label>
@@ -1542,13 +1542,13 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
 
           {/* Age & Audience */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
             <button type="button" onClick={() => setAgeExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
               <span>Age &amp; Audience</span>
               <svg className={`w-4 h-4 text-foreground-muted transition-transform ${ageExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
             </button>
             {ageExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
+              <div className="p-4 space-y-4 border-t border-border-default">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-foreground-muted mb-1">Age Range</label>
@@ -1572,13 +1572,13 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
 
           {/* SEO */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
             <button type="button" onClick={() => setSeoExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
               <span>SEO &amp; Discoverability</span>
               <svg className={`w-4 h-4 text-foreground-muted transition-transform ${seoExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
             </button>
             {seoExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
+              <div className="p-4 space-y-4 border-t border-border-default">
                 <div>
                   <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
                     <span>Meta Title</span>
@@ -1603,13 +1603,13 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
 
           {/* Product Details (grouped accordion) */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
             <button type="button" onClick={() => setPhysicalExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
               <span>Product Details</span>
               <svg className={`w-4 h-4 text-foreground-muted transition-transform ${physicalExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
             </button>
             {physicalExpanded && (
-              <div className="border-t border-border divide-y divide-border">
+              <div className="border-t border-border-default divide-y divide-border-default">
 
                 {/* Physical Attributes */}
                 <div>
@@ -1937,7 +1937,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 </div>
                               </div>
                               )}
-                              <div className="pt-2 border-t border-border-default space-y-2">
+                              <div className="pt-2 border-t border-border-default-default space-y-2">
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
@@ -1983,7 +1983,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 </div>
                               )}
                               {variant.id && (
-                                <div className="pt-2 border-t border-border-default">
+                                <div className="pt-2 border-t border-border-default-default">
                                   <button
                                     type="button"
                                     onClick={() => openVariantPopup(variant.id!)}
@@ -2117,7 +2117,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
 
                       {/* Add variant to group */}
-                      <div className="px-4 py-3 border-t border-border-default bg-surface">
+                      <div className="px-4 py-3 border-t border-border-default-default bg-surface">
                         <button
                           type="button"
                           onClick={() => addVariantToGroup(group.pricing_type, group.unit)}
@@ -2141,7 +2141,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
       {/* Selling Units (product-level — applies to every variant) */}
       {productId && (
-        <div className="px-4 sm:px-6 py-4 border-t border-border-default">
+        <div className="px-4 sm:px-6 py-4 border-t border-border-default-default">
           <h3 className="text-sm font-semibold text-foreground mb-3">Selling Units &amp; Conversions</h3>
           <p className="text-xs text-foreground-muted mb-4">
             Configure alternate units (e.g. box of 100, sheet of 4&apos;×8&apos;, tin of 5 L). The pricing engine
@@ -2157,7 +2157,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       )}
 
       {/* Form Actions */}
-      <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+      <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
         <Link
           href={ap('/admin/products')}
           className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors text-center"
@@ -2557,7 +2557,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           )
                         })()}
                       </div>
-                      <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
+                      <div className="px-6 py-4 border-t border-border-default-default flex justify-end gap-3">
                         <button
                           type="button"
                           onClick={() => { setVariantGalleryOpen(false); setVariantGallerySelected([]) }}
@@ -2802,7 +2802,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               </div>
 
               {variantPopupId && variantPopupId.startsWith('temp-') && (
-                <div className="px-5 pb-4 border-t border-border-default pt-4 mt-0">
+                <div className="px-5 pb-4 border-t border-border-default-default pt-4 mt-0">
                   <p className="text-xs text-foreground-muted italic">Save the product first to configure selling units for this variant.</p>
                 </div>
               )}
@@ -2817,7 +2817,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 </div>
               )}
 
-              <div className="px-5 py-4 border-t border-border-default flex justify-end">
+              <div className="px-5 py-4 border-t border-border-default-default flex justify-end">
                 <button type="button" onClick={() => setVariantPopupId(null)} className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Done</button>
               </div>
             </div>
