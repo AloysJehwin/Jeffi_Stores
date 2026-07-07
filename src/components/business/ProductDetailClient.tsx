@@ -461,7 +461,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                   <p className="text-sm text-foreground-secondary mb-2">Certifications</p>
                   <div className="flex flex-wrap gap-2">
                     {p.certifications.map((c, i) => (
-                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-raised border border-border-default text-foreground">{c}</span>
+                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground">{c}</span>
                     ))}
                   </div>
                 </div>
@@ -472,7 +472,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
                   <p className="text-sm text-foreground-secondary mb-2">Target Audience</p>
                   <div className="flex flex-wrap gap-2">
                     {p.target_audience.map((a, i) => (
-                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-raised border border-border-default text-foreground">{a}</span>
+                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground">{a}</span>
                     ))}
                   </div>
                 </div>
