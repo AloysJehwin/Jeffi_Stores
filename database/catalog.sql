@@ -297,12 +297,12 @@ CREATE TABLE public.products (
     warranty_type character varying(30),
     -- Condition & Lifecycle
     condition character varying(20) DEFAULT 'new' NOT NULL,
-    is_cod_allowed boolean DEFAULT true NOT NULL,
+    is_cod_allowed boolean DEFAULT false NOT NULL,
     launch_date date,
     discontinue_date date,
     sort_order integer DEFAULT 0 NOT NULL,
     -- Shipping & Logistics
-    handling_days integer DEFAULT 1 NOT NULL,
+    handling_days integer DEFAULT 2 NOT NULL,
     shipping_class character varying(30) DEFAULT 'standard' NOT NULL,
     is_oversized boolean DEFAULT false NOT NULL,
     volumetric_weight_grams integer,
@@ -389,11 +389,11 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS safety_rating character varying(10
 ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_months integer;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_type character varying(30);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS condition character varying(20) DEFAULT 'new' NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS is_cod_allowed boolean DEFAULT true NOT NULL;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS is_cod_allowed boolean DEFAULT false NOT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS launch_date date;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS discontinue_date date;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS sort_order integer DEFAULT 0 NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS handling_days integer DEFAULT 1 NOT NULL;
+ALTER TABLE products ADD COLUMN IF NOT EXISTS handling_days integer DEFAULT 2 NOT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS shipping_class character varying(30) DEFAULT 'standard' NOT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_oversized boolean DEFAULT false NOT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS volumetric_weight_grams integer;
@@ -433,3 +433,7 @@ CREATE TABLE IF NOT EXISTS public.product_batches (
     created_at       timestamp with time zone DEFAULT now() NOT NULL,
     updated_at       timestamp with time zone DEFAULT now() NOT NULL
 );
+
+-- Update column defaults for is_cod_allowed and handling_days
+ALTER TABLE products ALTER COLUMN is_cod_allowed SET DEFAULT false;
+ALTER TABLE products ALTER COLUMN handling_days SET DEFAULT 2;
