@@ -1625,14 +1625,15 @@ export default function ProductForm({ categories, brands, action, product, produ
                     value={subscriptionInterval}
                     onChange={e => setSubscriptionInterval(e.target.value)}
                     className="w-full"
-                  >
-                    <option value="">— select —</option>
-                    <option value="daily">Daily</option>
-                    <option value="weekly">Weekly</option>
-                    <option value="monthly">Monthly</option>
-                    <option value="quarterly">Quarterly</option>
-                    <option value="yearly">Yearly</option>
-                  </AdminSelect>
+                    options={[
+                      { value: '', label: '— select —' },
+                      { value: 'daily', label: 'Daily' },
+                      { value: 'weekly', label: 'Weekly' },
+                      { value: 'monthly', label: 'Monthly' },
+                      { value: 'quarterly', label: 'Quarterly' },
+                      { value: 'yearly', label: 'Yearly' },
+                    ]}
+                  />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-foreground-muted mb-1">Subscription Price (₹)</label>
@@ -1659,12 +1660,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                   value={taxClass}
                   onChange={e => setTaxClass(e.target.value)}
                   className="w-full"
-                >
-                  <option value="standard">Standard</option>
-                  <option value="reduced">Reduced</option>
-                  <option value="zero">Zero</option>
-                  <option value="exempt">Exempt</option>
-                </AdminSelect>
+                  options={[
+                    { value: 'standard', label: 'Standard' },
+                    { value: 'reduced', label: 'Reduced' },
+                    { value: 'zero', label: 'Zero' },
+                    { value: 'exempt', label: 'Exempt' },
+                  ]}
+                />
               </div>
               <div>
                 <label className="block text-xs font-medium text-foreground-muted mb-1">Customs Tariff Code</label>
@@ -1712,12 +1714,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                   value={targetGender}
                   onChange={e => setTargetGender(e.target.value)}
                   className="w-full"
-                >
-                  <option value="">— any —</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="unisex">Unisex</option>
-                </AdminSelect>
+                  options={[
+                    { value: '', label: '— any —' },
+                    { value: 'male', label: 'Male' },
+                    { value: 'female', label: 'Female' },
+                    { value: 'unisex', label: 'Unisex' },
+                  ]}
+                />
               </div>
               <div className="sm:col-span-2">
                 <label className="block text-xs font-medium text-foreground-muted mb-1">Target Audience <span className="text-foreground-muted/60">(comma-separated)</span></label>
