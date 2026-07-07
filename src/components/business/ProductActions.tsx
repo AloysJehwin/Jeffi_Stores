@@ -82,6 +82,7 @@ interface ProductActionsProps {
   productUnits?: ProductUnit[]
   sellUnitId?: string | null
   extraDeliveryDays?: number
+  handlingDays?: number
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -111,7 +112,7 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onSelectionChange, onUnitChange, categoryId,
-  productUnits: productUnitsProp, sellUnitId, extraDeliveryDays = 0, is_active = true,
+  productUnits: productUnitsProp, sellUnitId, extraDeliveryDays = 0, handlingDays = 2, is_active = true,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -123,7 +124,7 @@ export default function ProductActions({
   const [showAddressPicker, setShowAddressPicker] = useState(false)
   useEffect(() => {
     if (!user) {
-      resolveEdd(false, extraDeliveryDays, 'business').then(v => { if (v) setEdd(v) })
+      resolveEdd(false, handlingDays, extraDeliveryDays, 'business').then(v => { if (v) setEdd(v) })
       return
     }
     fetch('/api/user/addresses', { headers: { 'X-Auth-Portal': 'business' } })
@@ -133,7 +134,7 @@ export default function ProductActions({
         setAddresses(list)
         const pin = list.find((a: any) => a.is_default)?.postal_code ?? list[0]?.postal_code ?? null
         setSelectedPin(pin)
-        return resolveEdd(true, extraDeliveryDays, 'business')
+        return resolveEdd(true, handlingDays, extraDeliveryDays, 'business')
       })
       .then(v => { if (v) setEdd(v) })
       .catch(() => {})
@@ -141,7 +142,7 @@ export default function ProductActions({
   function pickAddress(pin: string) {
     setSelectedPin(pin)
     setShowAddressPicker(false)
-    fetch(`/api/products/edd?pin=${pin}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`)
+    fetch(`/api/products/edd?pin=${pin}&handlingDays=${handlingDays}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.edd) setEdd(d.edd) })
       .catch(() => {})

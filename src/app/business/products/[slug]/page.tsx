@@ -696,6 +696,7 @@ export default async function ProductDetailPage({
                     categoryName={relatedProduct.categories?.name || null}
                     categoryId={relatedProduct.categories?.id || null}
                     extraDeliveryDays={Number(relatedProduct.extra_delivery_days ?? 0)}
+                    handlingDays={Number(relatedProduct.handling_days ?? 2)}
                   />
                 )
               })}

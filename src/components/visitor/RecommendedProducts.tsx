@@ -75,6 +75,7 @@ export default function RecommendedProducts({ title = 'You Might Also Like', lim
               categoryName={product.categories?.name || null}
               discountPct={Number(product.discount_pct ?? 0)}
               extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+              handlingDays={Number((product as any).handling_days ?? 2)}
             />
           )
         })}
