@@ -661,20 +661,22 @@ export default function ProductActions({
           <div className="bg-surface rounded-lg p-6">
             <div className="flex items-baseline gap-2 flex-wrap mb-1">
               <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
-              {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
+              <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
+              {effectiveMrp && effectiveMrp > effectivePrice && (
                 <span className="text-xl text-foreground-muted line-through">
-                  Rs. {(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               )}
-              {effectiveUnitLabel && (
-                <span className="text-lg text-foreground-muted">/ <UnitLabel label={effectiveUnitLabel} /></span>
-              )}
             </div>
+            {/* Selling unit price (e.g. per pair/box) on its own line */}
             {showPerBasePrice && (
               <div className="mb-1">
-                <span className="text-xs text-foreground-muted">
+                <span className="text-base font-semibold text-foreground">
+                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                </span>
+                <span className="text-xs text-foreground-muted ml-2">
                   (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                 </span>
               </div>
