@@ -554,7 +554,7 @@ export default function ProductActions({
                   Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                 </span>
                 <span className="text-xs text-foreground-muted ml-2">
-                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                 </span>
               </div>
             )}
@@ -562,7 +562,7 @@ export default function ProductActions({
             {/* Total = selling unit price × qty */}
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm text-foreground-secondary">
-                Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
+                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />):
               </span>
               <span className="text-base font-semibold text-foreground">
                 Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -677,7 +677,7 @@ export default function ProductActions({
                   Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                 </span>
                 <span className="text-xs text-foreground-muted ml-2">
-                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                 </span>
               </div>
             )}
@@ -685,7 +685,7 @@ export default function ProductActions({
             {/* Total = selling unit price × qty */}
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm text-foreground-secondary">
-                Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
+                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />):
               </span>
               <span className="text-base font-semibold text-foreground">
                 Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
