@@ -679,6 +679,17 @@ export default function ProductActions({
                 </span>
               </div>
             )}
+
+            {/* Total = selling unit price × qty */}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm text-foreground-secondary">
+                Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
+              </span>
+              <span className="text-base font-semibold text-foreground">
+                Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+
             {mrpDiscount > 0 && (
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
@@ -696,7 +707,7 @@ export default function ProductActions({
 
           <div>
             <div className="flex items-center justify-between gap-4 mb-2">
-              <label className="text-sm font-medium text-foreground-secondary">Quantity</label>
+              <label className="text-sm font-medium text-foreground-secondary">Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}</label>
               <div className="text-right">
                 {effectiveStock > 0 ? (
                   <div className="flex items-center justify-end gap-2">
