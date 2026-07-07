@@ -22,12 +22,13 @@ interface ProductCardProps {
   categoryName?: string | null
   discountPct?: number
   extraDeliveryDays?: number
+  handlingDays?: number
 }
 
 export default function ProductCard({
   id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
   effectiveStock, primaryImage, brandName, categoryName, discountPct = 0,
-  extraDeliveryDays = 0,
+  extraDeliveryDays = 0, handlingDays = 2,
 }: ProductCardProps) {
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
@@ -38,8 +39,8 @@ export default function ProductCard({
   const [edd, setEdd] = useState<string | null>(null)
 
   useEffect(() => {
-    resolveEdd(!!user, extraDeliveryDays).then(v => { if (v) setEdd(v) })
-  }, [user, extraDeliveryDays])
+    resolveEdd(!!user, handlingDays, extraDeliveryDays).then(v => { if (v) setEdd(v) })
+  }, [user, handlingDays, extraDeliveryDays])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)

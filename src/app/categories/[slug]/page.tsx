@@ -176,6 +176,7 @@ export default async function CategoryDetailPage({
                     categoryName={product.categories?.name || null}
                     discountPct={Number(product.discount_pct ?? 0)}
                     extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+                    handlingDays={Number(product.handling_days ?? 2)}
                   />
                 )
               })}
