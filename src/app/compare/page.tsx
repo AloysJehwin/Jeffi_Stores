@@ -65,18 +65,31 @@ const SPEC_ROWS: { label: string; key: (p: any) => string | null }[] = [
   { label: 'Finish',          key: p => p.finish ?? null },
   { label: 'Variant Type',    key: p => p.variant_type ?? null },
   { label: 'Sub-Variant',     key: p => p.sub_variant_type ?? null },
+  { label: 'Condition',       key: p => p.condition ?? null },
+  { label: 'Color',           key: p => p.color ?? null },
   { label: 'Weight',          key: p => p.weight != null ? `${p.weight} ${p.weight_unit ?? 'kg'}` : null },
+  { label: 'Net Weight',      key: p => p.net_weight_grams != null ? `${p.net_weight_grams} g` : null },
+  { label: 'Volume',          key: p => p.volume_ml != null ? `${p.volume_ml} ml` : null },
   { label: 'Package Dims',    key: p => {
     const parts = [p.length_cm, p.breadth_cm, p.height_cm].filter((v: any) => v != null)
     if (!parts.length) return null
     return parts.join(' × ') + ` ${p.length_unit ?? 'cm'}`
   }},
   { label: 'Package Type',    key: p => p.package_type ?? null },
+  { label: 'Origin',          key: p => p.country_of_origin ?? null },
+  { label: 'Warranty',        key: p => p.warranty_months != null ? `${p.warranty_months} month${p.warranty_months !== 1 ? 's' : ''}${p.warranty_type ? ` (${p.warranty_type})` : ''}` : null },
+  { label: 'Compliance',      key: p => p.compliance_standard ?? null },
+  { label: 'Safety Rating',   key: p => p.safety_rating ?? null },
+  { label: 'Certifications',  key: p => (p.certifications as string[] | null)?.join(', ') || null },
+  { label: 'Hazards',         key: p => [p.fragile && 'Fragile', p.hazardous && 'Hazardous', p.flammable && 'Flammable'].filter(Boolean).join(', ') || null },
   { label: 'HSN Code',        key: p => p.hsn_code ?? null },
   { label: 'GST',             key: p => p.gst_percentage != null ? `${parseFloat(String(p.gst_percentage))}%` : null },
   { label: 'MPN',             key: p => p.mpn ?? null },
   { label: 'GTIN / EAN',      key: p => p.gtin ?? null },
   { label: 'SKU',             key: p => p.sku ?? null },
+  { label: 'Barcode',         key: p => p.barcode ?? null },
+  { label: 'ISBN',            key: p => p.isbn ?? null },
+  { label: 'ASIN',            key: p => p.asin ?? null },
 ]
 
 export default async function ComparePage({

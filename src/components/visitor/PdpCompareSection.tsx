@@ -25,20 +25,43 @@ const SPEC_KEYS: { label: string; key: keyof CompareProduct | ((p: any) => strin
 
 // Compact spec rows from raw product data passed as extraData
 const EXTRA_SPEC_ROWS: { label: string; key: (p: any) => string | null }[] = [
-  { label: 'Material',   key: p => p.material ?? null },
-  { label: 'Finish',     key: p => p.finish ?? null },
-  { label: 'Variant',    key: p => p.variant_type ?? null },
-  { label: 'Weight',     key: p => p.weight != null ? `${p.weight} ${p.weight_unit ?? 'kg'}` : null },
-  { label: 'HSN Code',   key: p => p.hsn_code ?? null },
-  { label: 'GST',        key: p => p.gst_percentage != null ? `${parseFloat(String(p.gst_percentage))}%` : null },
+  { label: 'Material',       key: p => p.material ?? null },
+  { label: 'Finish',         key: p => p.finish ?? null },
+  { label: 'Variant',        key: p => p.variant_type ?? null },
+  { label: 'Condition',      key: p => p.condition ?? null },
+  { label: 'Color',          key: p => p.color ?? null },
+  { label: 'Weight',         key: p => p.weight != null ? `${p.weight} ${p.weight_unit ?? 'kg'}` : null },
+  { label: 'Net Weight',     key: p => p.net_weight_grams != null ? `${p.net_weight_grams} g` : null },
+  { label: 'Volume',         key: p => p.volume_ml != null ? `${p.volume_ml} ml` : null },
+  { label: 'Origin',         key: p => p.country_of_origin ?? null },
+  { label: 'Warranty',       key: p => p.warranty_months != null ? `${p.warranty_months} month${p.warranty_months !== 1 ? 's' : ''}${p.warranty_type ? ` (${p.warranty_type})` : ''}` : null },
+  { label: 'Compliance',     key: p => p.compliance_standard ?? null },
+  { label: 'Safety Rating',  key: p => p.safety_rating ?? null },
+  { label: 'Certifications', key: p => (p.certifications as string[] | null)?.join(', ') || null },
+  { label: 'Hazards',        key: p => [p.fragile && 'Fragile', p.hazardous && 'Hazardous', p.flammable && 'Flammable'].filter(Boolean).join(', ') || null },
+  { label: 'HSN Code',       key: p => p.hsn_code ?? null },
+  { label: 'GST',            key: p => p.gst_percentage != null ? `${parseFloat(String(p.gst_percentage))}%` : null },
 ]
 
 interface FullProduct extends CompareProduct {
   material?: string | null
   finish?: string | null
   variant_type?: string | null
+  condition?: string | null
+  color?: string | null
   weight?: number | null
   weight_unit?: string | null
+  net_weight_grams?: number | null
+  volume_ml?: number | null
+  country_of_origin?: string | null
+  warranty_months?: number | null
+  warranty_type?: string | null
+  compliance_standard?: string | null
+  safety_rating?: string | null
+  certifications?: string[] | null
+  fragile?: boolean | null
+  hazardous?: boolean | null
+  flammable?: boolean | null
   hsn_code?: string | null
   gst_percentage?: number | string | null
 }
