@@ -294,12 +294,12 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [warrantyType, setWarrantyType] = useState(product?.warranty_type || '')
   // Condition & Lifecycle
   const [condition, setCondition] = useState(product?.condition || 'new')
-  const [isCodAllowed, setIsCodAllowed] = useState(product?.is_cod_allowed ?? true)
+  const [isCodAllowed, setIsCodAllowed] = useState(product?.is_cod_allowed ?? false)
   const [launchDate, setLaunchDate] = useState(product?.launch_date ? String(product.launch_date).slice(0, 10) : '')
   const [discontinueDate, setDiscontinueDate] = useState(product?.discontinue_date ? String(product.discontinue_date).slice(0, 10) : '')
   const [sortOrderVal, setSortOrderVal] = useState(product?.sort_order != null ? String(product.sort_order) : '0')
   // Shipping & Logistics
-  const [handlingDays, setHandlingDays] = useState(product?.handling_days != null ? String(product.handling_days) : '1')
+  const [handlingDays, setHandlingDays] = useState(product?.handling_days != null ? String(product.handling_days) : '2')
   const [shippingClass, setShippingClass] = useState(product?.shipping_class || 'standard')
   const [isOversized, setIsOversized] = useState(product?.is_oversized ?? false)
   const [volumetricWeightGrams, setVolumetricWeightGrams] = useState(product?.volumetric_weight_grams != null ? String(product.volumetric_weight_grams) : '')
