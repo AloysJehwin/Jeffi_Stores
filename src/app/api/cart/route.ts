@@ -57,6 +57,7 @@ export async function GET(request: NextRequest) {
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst, 'mrp', p.mrp,
           'gst_percentage', p.gst_percentage,
           'stock_status', p.stock_status,
+          'is_active', p.is_active,
           'brand_name', b.name, 'category_id', p.category_id,
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'image_url', pi.image_url, 'is_primary', pi.is_primary))
@@ -124,7 +125,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ items: cartItems || [] })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to fetch cart' }, { status: 500 })
   }
 }
@@ -139,10 +139,11 @@ export async function POST(request: NextRequest) {
     const { userId } = await resolveUserId(request)
 
     const product = await queryOne(
-      'SELECT id, name, base_price, price_ex_gst FROM products WHERE id = $1',
+      'SELECT id, name, base_price, price_ex_gst, is_active FROM products WHERE id = $1',
       [productId]
     )
     if (!productId || !product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+    if (!product.is_active) return NextResponse.json({ error: 'This product is no longer available' }, { status: 410 })
 
     let priceAtAddition: number
 
@@ -237,7 +238,6 @@ export async function POST(request: NextRequest) {
       quantity: newQuantity,
     })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to add to cart' }, { status: 500 })
   }
 }
@@ -275,7 +275,6 @@ export async function PATCH(request: NextRequest) {
 
     return NextResponse.json({ error: 'No valid update fields provided' }, { status: 400 })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to update cart' }, { status: 500 })
   }
 }
@@ -309,7 +308,6 @@ export async function DELETE(request: NextRequest) {
 
     return NextResponse.json({ message: 'Item removed from cart' })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to remove from cart' }, { status: 500 })
   }
 }

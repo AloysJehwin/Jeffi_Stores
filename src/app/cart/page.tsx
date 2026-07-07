@@ -25,6 +25,7 @@ function UnitLabel({ label }: { label: string }) {
 
 export default function CartPage() {
   const { cartItems, savedItems, cartCount, isLoading, removeFromCart, updateQuantity, saveForLater, moveToCart, getCartTotal, getCartTax } = useCart()
+  const hasInactiveItems = cartItems.some((item: any) => item.products?.is_active === false)
   const { user } = useAuth()
   const { showToast } = useToast()
   const confirm = useConfirm()
@@ -196,6 +197,7 @@ export default function CartPage() {
                   : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * unitFactor
                 const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
                 const isOutOfStock = (item.sub_variant?.stock_status ?? item.variant?.stock_status ?? item.products.stock_status) === 'Out of Stock'
+                const isInactive = item.products?.is_active === false
                 const itemTotal = isCustomQty
                   ? item.price_at_addition * Number(item.quantity)
                   : price * Math.round(Number(item.quantity))
@@ -244,6 +246,11 @@ export default function CartPage() {
                           )}
                           {sku && (
                             <span className="text-xs text-foreground-muted font-mono">SKU: {sku}</span>
+                          )}
+                          {isInactive && (
+                            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
+                              Unavailable
+                            </span>
                           )}
                         </div>
                         <div className="flex flex-wrap gap-1 mt-1">
@@ -587,10 +594,10 @@ export default function CartPage() {
                 <button
                   type="button"
                   onClick={proceedToCheckout}
-                  disabled={proceedingToCheckout || cartCount === 0}
+                  disabled={proceedingToCheckout || cartCount === 0 || hasInactiveItems}
                   className="w-full bg-accent-500 hover:bg-accent-600 disabled:opacity-60 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors flex items-center justify-center"
                 >
-                  {proceedingToCheckout ? 'Starting…' : 'Proceed to Checkout'}
+                  {proceedingToCheckout ? 'Starting…' : hasInactiveItems ? 'Remove unavailable items to checkout' : 'Proceed to Checkout'}
                   <svg aria-hidden="true" className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                   </svg>

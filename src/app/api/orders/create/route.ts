@@ -53,6 +53,7 @@ export async function POST(request: NextRequest) {
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
           'stock_status', p.stock_status, 'inventory_quantity', p.inventory_quantity,
+          'is_active', p.is_active,
           'category_id', p.category_id, 'discount_pct', p.discount_pct,
           'extra_delivery_days', p.extra_delivery_days
         ) AS products,
@@ -81,6 +82,15 @@ export async function POST(request: NextRequest) {
 
     if (!cartItems || cartItems.length === 0) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
+    }
+
+    const inactiveItems = cartItems.filter((item: any) => item.products?.is_active === false)
+    if (inactiveItems.length > 0) {
+      const names = inactiveItems.map((item: any) => item.products?.name || 'Unknown').join(', ')
+      return NextResponse.json({
+        error: `Some items in your cart are no longer available: ${names}. Please remove them before placing your order.`,
+        inactiveProductIds: inactiveItems.map((item: any) => item.product_id),
+      }, { status: 422 })
     }
 
     const subtotal: number = cartItems.reduce((sum: number, item: any) => {
