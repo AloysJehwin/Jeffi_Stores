@@ -88,6 +88,17 @@ This document tracks which fields need service-layer integration (not just stora
 
 ---
 
+### 10. Sort Order on Storefront & Admin Listings  *(display/UX)*
+**Fields:** `sort_order`  
+**What:** Use `sort_order` (integer, lower = first) as the default ordering in category/storefront product queries and admin product list. Currently products are ordered by `created_at` or name. This allows manual curation of display order within a category.  
+**Touch:**
+- `src/app/products/` category/listing queries — add `ORDER BY sort_order ASC, created_at DESC`
+- `src/app/business/products/` — same
+- `src/app/admin/products/page.tsx` — expose sort_order as a sortable column
+- `src/app/api/admin/products/` listing route — include sort_order in default ORDER BY
+
+---
+
 ## Excluded / Out of Scope
 - `is_digital`, `download_url` — digital goods delivery not yet planned
 - `is_subscription`, `subscription_price` — subscription billing not yet planned  
@@ -98,6 +109,6 @@ This document tracks which fields need service-layer integration (not just stora
 ---
 
 ## Implementation Order
-1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9
+1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → 10
 
-Features 1–3 are independent. Feature 4 must land before 6 & 7.
+Features 1–3 and 10 are independent. Feature 4 must land before 6 & 7.
