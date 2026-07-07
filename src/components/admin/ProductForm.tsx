@@ -270,6 +270,67 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [extraDeliveryDays, setExtraDeliveryDays] = useState(
     product?.extra_delivery_days != null ? String(product.extra_delivery_days) : '0'
   )
+  // Identification & Compliance
+  const [barcode, setBarcode] = useState(product?.barcode || '')
+  const [isbn, setIsbn] = useState(product?.isbn || '')
+  const [asin, setAsin] = useState(product?.asin || '')
+  const [brandPartNumber, setBrandPartNumber] = useState(product?.brand_part_number || '')
+  const [countryOfOrigin, setCountryOfOrigin] = useState(product?.country_of_origin || '')
+  const [shelfLifeDays, setShelfLifeDays] = useState(product?.shelf_life_days != null ? String(product.shelf_life_days) : '')
+  // Physical Attributes
+  const [color, setColor] = useState(product?.color || '')
+  const [colorHex, setColorHex] = useState(product?.color_hex || '#000000')
+  const [volumeMl, setVolumeMl] = useState(product?.volume_ml != null ? String(product.volume_ml) : '')
+  const [netWeightGrams, setNetWeightGrams] = useState(product?.net_weight_grams != null ? String(product.net_weight_grams) : '')
+  const [fragile, setFragile] = useState(product?.fragile ?? false)
+  const [hazardous, setHazardous] = useState(product?.hazardous ?? false)
+  const [flammable, setFlammable] = useState(product?.flammable ?? false)
+  const [perishable, setPerishable] = useState(product?.perishable ?? false)
+  // Certifications & Standards
+  const [certifications, setCertifications] = useState(Array.isArray(product?.certifications) ? product.certifications.join(', ') : '')
+  const [complianceStandard, setComplianceStandard] = useState(product?.compliance_standard || '')
+  const [safetyRating, setSafetyRating] = useState(product?.safety_rating || '')
+  const [warrantyMonths, setWarrantyMonths] = useState(product?.warranty_months != null ? String(product.warranty_months) : '')
+  const [warrantyType, setWarrantyType] = useState(product?.warranty_type || '')
+  // Condition & Lifecycle
+  const [condition, setCondition] = useState(product?.condition || 'new')
+  const [isCodAllowed, setIsCodAllowed] = useState(product?.is_cod_allowed ?? true)
+  const [launchDate, setLaunchDate] = useState(product?.launch_date ? String(product.launch_date).slice(0, 10) : '')
+  const [discontinueDate, setDiscontinueDate] = useState(product?.discontinue_date ? String(product.discontinue_date).slice(0, 10) : '')
+  const [sortOrderVal, setSortOrderVal] = useState(product?.sort_order != null ? String(product.sort_order) : '0')
+  // Shipping & Logistics
+  const [handlingDays, setHandlingDays] = useState(product?.handling_days != null ? String(product.handling_days) : '1')
+  const [shippingClass, setShippingClass] = useState(product?.shipping_class || 'standard')
+  const [isOversized, setIsOversized] = useState(product?.is_oversized ?? false)
+  const [volumetricWeightGrams, setVolumetricWeightGrams] = useState(product?.volumetric_weight_grams != null ? String(product.volumetric_weight_grams) : '')
+  // Digital / Content
+  const [isDigital, setIsDigital] = useState(product?.is_digital ?? false)
+  const [downloadUrl, setDownloadUrl] = useState(product?.download_url || '')
+  const [licenseType, setLicenseType] = useState(product?.license_type || '')
+  const [fileFormat, setFileFormat] = useState(product?.file_format || '')
+  const [platformCompatibility, setPlatformCompatibility] = useState(Array.isArray(product?.platform_compatibility) ? product.platform_compatibility.join(', ') : '')
+  // Subscriptions
+  const [isSubscription, setIsSubscription] = useState(product?.is_subscription ?? false)
+  const [subscriptionInterval, setSubscriptionInterval] = useState(product?.subscription_interval || '')
+  const [subscriptionPrice, setSubscriptionPrice] = useState(product?.subscription_price != null ? String(product.subscription_price) : '')
+  // Bundling
+  const [isBundle, setIsBundle] = useState(product?.is_bundle ?? false)
+  // SEO
+  const [seoExpanded, setSeoExpanded] = useState(false)
+  const [metaTitle, setMetaTitle] = useState(product?.meta_title || '')
+  const [metaDescription, setMetaDescription] = useState(product?.meta_description || '')
+  const [metaKeywords, setMetaKeywords] = useState(Array.isArray(product?.meta_keywords) ? product.meta_keywords.join(', ') : '')
+  const [isSearchable, setIsSearchable] = useState(product?.is_searchable ?? true)
+  // Tax & Finance
+  const [taxClass, setTaxClass] = useState(product?.tax_class || 'standard')
+  const [customsTariffCode, setCustomsTariffCode] = useState(product?.customs_tariff_code || '')
+  const [inclusiveTax, setInclusiveTax] = useState(product?.inclusive_tax ?? false)
+  // Age / Audience
+  const [ageMin, setAgeMin] = useState(product?.age_min != null ? String(product.age_min) : '')
+  const [ageMax, setAgeMax] = useState(product?.age_max != null ? String(product.age_max) : '')
+  const [targetGender, setTargetGender] = useState(product?.target_gender || '')
+  const [targetAudience, setTargetAudience] = useState(Array.isArray(product?.target_audience) ? product.target_audience.join(', ') : '')
+
   const [mrp, setMrp] = useState(product?.mrp != null ? String(product.mrp) : '')
   const [mrpExGst, setMrpExGst] = useState(() => {
     if (product?.mrp_ex_gst != null) return String(product.mrp_ex_gst)
@@ -765,6 +826,65 @@ export default function ProductForm({ categories, brands, action, product, produ
       }
       formData.set('cost_price', costPrice || '0')
       formData.set('extra_delivery_days', extraDeliveryDays || '0')
+      // Identification & Compliance
+      formData.set('barcode', barcode)
+      formData.set('isbn', isbn)
+      formData.set('asin', asin)
+      formData.set('brand_part_number', brandPartNumber)
+      formData.set('country_of_origin', countryOfOrigin.slice(0, 2).toUpperCase())
+      formData.set('shelf_life_days', shelfLifeDays)
+      // Physical Attributes
+      formData.set('color', color)
+      formData.set('color_hex', colorHex)
+      formData.set('volume_ml', volumeMl)
+      formData.set('net_weight_grams', netWeightGrams)
+      formData.set('fragile', String(fragile))
+      formData.set('hazardous', String(hazardous))
+      formData.set('flammable', String(flammable))
+      formData.set('perishable', String(perishable))
+      // Certifications & Standards
+      formData.set('certifications', certifications)
+      formData.set('compliance_standard', complianceStandard)
+      formData.set('safety_rating', safetyRating)
+      formData.set('warranty_months', warrantyMonths)
+      formData.set('warranty_type', warrantyType)
+      // Condition & Lifecycle
+      formData.set('condition', condition)
+      formData.set('is_cod_allowed', String(isCodAllowed))
+      formData.set('launch_date', launchDate)
+      formData.set('discontinue_date', discontinueDate)
+      formData.set('sort_order', sortOrderVal)
+      // Shipping & Logistics
+      formData.set('handling_days', handlingDays)
+      formData.set('shipping_class', shippingClass)
+      formData.set('is_oversized', String(isOversized))
+      formData.set('volumetric_weight_grams', volumetricWeightGrams)
+      // Digital / Content
+      formData.set('is_digital', String(isDigital))
+      formData.set('download_url', downloadUrl)
+      formData.set('license_type', licenseType)
+      formData.set('file_format', fileFormat)
+      formData.set('platform_compatibility', platformCompatibility)
+      // Subscriptions
+      formData.set('is_subscription', String(isSubscription))
+      formData.set('subscription_interval', subscriptionInterval)
+      formData.set('subscription_price', subscriptionPrice)
+      // Bundling
+      formData.set('is_bundle', String(isBundle))
+      // SEO
+      formData.set('meta_title', metaTitle)
+      formData.set('meta_description', metaDescription)
+      formData.set('meta_keywords', metaKeywords)
+      formData.set('is_searchable', String(isSearchable))
+      // Tax & Finance
+      formData.set('tax_class', taxClass)
+      formData.set('customs_tariff_code', customsTariffCode)
+      formData.set('inclusive_tax', String(inclusiveTax))
+      // Age / Audience
+      formData.set('age_min', ageMin)
+      formData.set('age_max', ageMax)
+      formData.set('target_gender', targetGender)
+      formData.set('target_audience', targetAudience)
 
       if (hasVariants) {
         const convertedVariants = variants.map(v => {
@@ -921,6 +1041,149 @@ export default function ProductForm({ categories, brands, action, product, produ
             <p className="text-xs text-foreground-muted mt-1">Used in Google Shopping feed</p>
           </div>
           )}
+
+          {/* Identification & Compliance */}
+          <div className="md:col-span-2 border border-border-default rounded-lg p-4 bg-surface-elevated space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Identification &amp; Compliance</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Barcode (EAN/UPC)</label>
+                <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} className={inputCls} placeholder="e.g. 8901234567890" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">ISBN</label>
+                <input type="text" value={isbn} onChange={e => setIsbn(e.target.value)} className={inputCls} placeholder="For books" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">ASIN</label>
+                <input type="text" value={asin} onChange={e => setAsin(e.target.value)} className={inputCls} placeholder="Amazon reference" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Brand Part Number</label>
+                <input type="text" value={brandPartNumber} onChange={e => setBrandPartNumber(e.target.value)} className={inputCls} placeholder="Manufacturer's part no." />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Country of Origin</label>
+                <input type="text" maxLength={2} value={countryOfOrigin} onChange={e => setCountryOfOrigin(e.target.value.toUpperCase())} className={inputCls} placeholder="IN" />
+                <p className="text-xs text-foreground-muted mt-1">ISO 3166 2-letter code</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Shelf Life (days)</label>
+                <input type="number" min="0" step="1" value={shelfLifeDays} onChange={e => setShelfLifeDays(e.target.value)} className={inputCls} placeholder="e.g. 365" />
+              </div>
+            </div>
+          </div>
+
+          {/* Physical Attributes */}
+          <div className="md:col-span-2 border border-border-default rounded-lg p-4 bg-surface-elevated space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Physical Attributes</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Color</label>
+                <input type="text" value={color} onChange={e => setColor(e.target.value)} className={inputCls} placeholder="e.g. Stainless Silver" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Color Hex</label>
+                <div className="flex gap-2 items-center">
+                  <input type="color" value={colorHex} onChange={e => setColorHex(e.target.value)} className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface" />
+                  <input type="text" value={colorHex} onChange={e => setColorHex(e.target.value)} className={inputCls} placeholder="#000000" maxLength={7} />
+                </div>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Volume (ml)</label>
+                <input type="number" min="0" step="0.01" value={volumeMl} onChange={e => setVolumeMl(e.target.value)} className={inputCls} placeholder="For liquids/paints" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Net Weight (g)</label>
+                <input type="number" min="0" step="1" value={netWeightGrams} onChange={e => setNetWeightGrams(e.target.value)} className={inputCls} placeholder="Product without packaging" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+              {([['fragile', fragile, setFragile], ['hazardous', hazardous, setHazardous], ['flammable', flammable, setFlammable], ['perishable', perishable, setPerishable]] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
+                <label key={label} className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)} className="rounded border-border-secondary text-accent-500 focus:ring-accent-500" />
+                  <span className="text-sm text-foreground capitalize">{label}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Certifications & Standards */}
+          <div className="md:col-span-2 border border-border-default rounded-lg p-4 bg-surface-elevated space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Certifications &amp; Standards</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="sm:col-span-2">
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Certifications</label>
+                <input type="text" value={certifications} onChange={e => setCertifications(e.target.value)} className={inputCls} placeholder="BIS, CE, RoHS, ISO9001, FSSAI (comma-separated)" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Compliance Standard</label>
+                <input type="text" value={complianceStandard} onChange={e => setComplianceStandard(e.target.value)} className={inputCls} placeholder="e.g. DIN, ISO, IS, ASTM" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Safety Rating</label>
+                <input type="text" value={safetyRating} onChange={e => setSafetyRating(e.target.value)} className={inputCls} placeholder="e.g. IP65, Class I" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty (months)</label>
+                <input type="number" min="0" step="1" value={warrantyMonths} onChange={e => setWarrantyMonths(e.target.value)} className={inputCls} placeholder="e.g. 12" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty Type</label>
+                <AdminSelect value={warrantyType} onChange={setWarrantyType} options={[{ value: '', label: 'None' }, { value: 'manufacturer', label: 'Manufacturer' }, { value: 'seller', label: 'Seller' }]} placeholder="Select type" />
+              </div>
+            </div>
+          </div>
+
+          {/* Condition & Lifecycle */}
+          <div className="md:col-span-2 border border-border-default rounded-lg p-4 bg-surface-elevated space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Condition &amp; Lifecycle</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Condition</label>
+                <AdminSelect value={condition} onChange={setCondition} options={[{ value: 'new', label: 'New' }, { value: 'refurbished', label: 'Refurbished' }, { value: 'used', label: 'Used' }, { value: 'open_box', label: 'Open Box' }]} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Sort Order</label>
+                <input type="number" step="1" value={sortOrderVal} onChange={e => setSortOrderVal(e.target.value)} className={inputCls} placeholder="0" />
+                <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Launch Date</label>
+                <input type="date" value={launchDate} onChange={e => setLaunchDate(e.target.value)} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Discontinue Date</label>
+                <input type="date" value={discontinueDate} onChange={e => setDiscontinueDate(e.target.value)} className={inputCls} />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Toggle id="is_cod_allowed" checked={isCodAllowed} onChange={setIsCodAllowed} label="COD Allowed" />
+            </div>
+          </div>
+
+          {/* Shipping & Logistics */}
+          <div className="md:col-span-2 border border-border-default rounded-lg p-4 bg-surface-elevated space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Shipping &amp; Logistics</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Handling Days</label>
+                <input type="number" min="0" step="1" value={handlingDays} onChange={e => setHandlingDays(e.target.value)} className={inputCls} placeholder="1" />
+                <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Shipping Class</label>
+                <AdminSelect value={shippingClass} onChange={setShippingClass} options={[{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }, { value: 'cold_chain', label: 'Cold Chain' }]} />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-2">Volumetric Weight (g)</label>
+                <input type="number" min="0" step="1" value={volumetricWeightGrams} onChange={e => setVolumetricWeightGrams(e.target.value)} className={inputCls} placeholder="For courier billing" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 pt-1">
+              <Toggle id="is_oversized" checked={isOversized} onChange={setIsOversized} label="Oversized / Freight" />
+            </div>
+          </div>
 
           {/* Category */}
           <AdminSelect
@@ -1300,6 +1563,233 @@ export default function ProductForm({ categories, brands, action, product, produ
               <Toggle id="is_featured" checked={isFeatured} onChange={setIsFeatured} label="Featured Product" />
             </div>
             <Toggle id="has_variants_toggle" checked={hasVariants} onChange={setHasVariants} label="This product has variants" />
+          </div>
+
+          {/* Digital & Subscription */}
+          <div className="md:col-span-2 border border-border rounded-lg p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Digital &amp; Subscription</h3>
+            <div className="flex flex-wrap gap-6">
+              <Toggle id="is_digital" checked={isDigital} onChange={setIsDigital} label="Digital Product" />
+              <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
+              <Toggle id="is_subscription" checked={isSubscription} onChange={setIsSubscription} label="Subscription" />
+            </div>
+            {isDigital && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border">
+                <div>
+                  <label className="block text-xs font-medium text-foreground-muted mb-1">Download URL</label>
+                  <input
+                    type="url"
+                    value={downloadUrl}
+                    onChange={e => setDownloadUrl(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-muted mb-1">License Type</label>
+                  <input
+                    type="text"
+                    value={licenseType}
+                    onChange={e => setLicenseType(e.target.value)}
+                    placeholder="e.g. MIT, Commercial"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-muted mb-1">File Format</label>
+                  <input
+                    type="text"
+                    value={fileFormat}
+                    onChange={e => setFileFormat(e.target.value)}
+                    placeholder="e.g. PDF, ZIP, EXE"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-muted mb-1">Platform Compatibility <span className="text-foreground-muted/60">(comma-separated)</span></label>
+                  <input
+                    type="text"
+                    value={platformCompatibility}
+                    onChange={e => setPlatformCompatibility(e.target.value)}
+                    placeholder="e.g. Windows, macOS, Linux"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+            {isSubscription && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border">
+                <div>
+                  <label className="block text-xs font-medium text-foreground-muted mb-1">Subscription Interval</label>
+                  <AdminSelect
+                    value={subscriptionInterval}
+                    onChange={e => setSubscriptionInterval(e.target.value)}
+                    className="w-full"
+                  >
+                    <option value="">— select —</option>
+                    <option value="daily">Daily</option>
+                    <option value="weekly">Weekly</option>
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="yearly">Yearly</option>
+                  </AdminSelect>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-muted mb-1">Subscription Price (₹)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={subscriptionPrice}
+                    onChange={e => setSubscriptionPrice(e.target.value)}
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Tax & Finance */}
+          <div className="md:col-span-2 border border-border rounded-lg p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Tax &amp; Finance</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-foreground-muted mb-1">Tax Class</label>
+                <AdminSelect
+                  value={taxClass}
+                  onChange={e => setTaxClass(e.target.value)}
+                  className="w-full"
+                >
+                  <option value="standard">Standard</option>
+                  <option value="reduced">Reduced</option>
+                  <option value="zero">Zero</option>
+                  <option value="exempt">Exempt</option>
+                </AdminSelect>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground-muted mb-1">Customs Tariff Code</label>
+                <input
+                  type="text"
+                  value={customsTariffCode}
+                  onChange={e => setCustomsTariffCode(e.target.value)}
+                  placeholder="e.g. 8302.41"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+            <Toggle id="inclusive_tax" checked={inclusiveTax} onChange={setInclusiveTax} label="Price includes tax (inclusive tax)" />
+          </div>
+
+          {/* Age & Audience */}
+          <div className="md:col-span-2 border border-border rounded-lg p-4 space-y-4">
+            <h3 className="text-sm font-semibold text-foreground">Age &amp; Audience</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-foreground-muted mb-1">Age Range</label>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={ageMin}
+                    onChange={e => setAgeMin(e.target.value)}
+                    placeholder="Min"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                  <span className="text-foreground-muted text-sm">–</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={ageMax}
+                    onChange={e => setAgeMax(e.target.value)}
+                    placeholder="Max"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-foreground-muted mb-1">Target Gender</label>
+                <AdminSelect
+                  value={targetGender}
+                  onChange={e => setTargetGender(e.target.value)}
+                  className="w-full"
+                >
+                  <option value="">— any —</option>
+                  <option value="male">Male</option>
+                  <option value="female">Female</option>
+                  <option value="unisex">Unisex</option>
+                </AdminSelect>
+              </div>
+              <div className="sm:col-span-2">
+                <label className="block text-xs font-medium text-foreground-muted mb-1">Target Audience <span className="text-foreground-muted/60">(comma-separated)</span></label>
+                <input
+                  type="text"
+                  value={targetAudience}
+                  onChange={e => setTargetAudience(e.target.value)}
+                  placeholder="e.g. professionals, students, DIY"
+                  className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* SEO */}
+          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setSeoExpanded(v => !v)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors"
+            >
+              <span>SEO &amp; Discoverability</span>
+              <svg
+                className={`w-4 h-4 text-foreground-muted transition-transform ${seoExpanded ? 'rotate-180' : ''}`}
+                fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {seoExpanded && (
+              <div className="p-4 space-y-4 border-t border-border">
+                <div>
+                  <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
+                    <span>Meta Title</span>
+                    <span className={metaTitle.length > 160 ? 'text-red-500' : 'text-foreground-muted/60'}>{metaTitle.length}/160</span>
+                  </label>
+                  <input
+                    type="text"
+                    maxLength={160}
+                    value={metaTitle}
+                    onChange={e => setMetaTitle(e.target.value)}
+                    placeholder="SEO page title"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
+                    <span>Meta Description</span>
+                    <span className={metaDescription.length > 320 ? 'text-red-500' : 'text-foreground-muted/60'}>{metaDescription.length}/320</span>
+                  </label>
+                  <textarea
+                    maxLength={320}
+                    rows={3}
+                    value={metaDescription}
+                    onChange={e => setMetaDescription(e.target.value)}
+                    placeholder="SEO page description"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm resize-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-foreground-muted mb-1">Meta Keywords <span className="text-foreground-muted/60">(comma-separated)</span></label>
+                  <input
+                    type="text"
+                    value={metaKeywords}
+                    onChange={e => setMetaKeywords(e.target.value)}
+                    placeholder="e.g. bolt, fastener, stainless"
+                    className="w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                  />
+                </div>
+                <Toggle id="is_searchable" checked={isSearchable} onChange={setIsSearchable} label="Searchable (show in search results)" />
+              </div>
+            )}
           </div>
 
           {/* Variant Management Section */}

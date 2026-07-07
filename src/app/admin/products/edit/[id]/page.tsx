@@ -171,6 +171,99 @@ async function updateProduct(productId: string, formData: FormData) {
     const extraDeliveryDays = parseInt(formData.get('extra_delivery_days') as string || '0') || 0
     setClauses.push(`extra_delivery_days = $${params.length + 1}`)
     params.push(extraDeliveryDays)
+
+    // Identification & Compliance
+    const barcode = (formData.get('barcode') as string) || null
+    const isbn = (formData.get('isbn') as string) || null
+    const asin = (formData.get('asin') as string) || null
+    const brandPartNumber = (formData.get('brand_part_number') as string) || null
+    const countryOfOrigin = ((formData.get('country_of_origin') as string) || '').slice(0, 2).toUpperCase() || null
+    const shelfLifeDays = formData.get('shelf_life_days') ? parseInt(formData.get('shelf_life_days') as string) : null
+    setClauses.push(`barcode = $${params.length + 1}`, `isbn = $${params.length + 2}`, `asin = $${params.length + 3}`, `brand_part_number = $${params.length + 4}`, `country_of_origin = $${params.length + 5}`, `shelf_life_days = $${params.length + 6}`)
+    params.push(barcode, isbn, asin, brandPartNumber, countryOfOrigin, shelfLifeDays)
+
+    // Physical Attributes
+    const color = (formData.get('color') as string) || null
+    const colorHex = (formData.get('color_hex') as string) || null
+    const volumeMl = formData.get('volume_ml') ? parseFloat(formData.get('volume_ml') as string) : null
+    const netWeightGrams = formData.get('net_weight_grams') ? parseInt(formData.get('net_weight_grams') as string) : null
+    const fragile = formData.get('fragile') === 'true'
+    const hazardous = formData.get('hazardous') === 'true'
+    const flammable = formData.get('flammable') === 'true'
+    const perishable = formData.get('perishable') === 'true'
+    setClauses.push(`color = $${params.length + 1}`, `color_hex = $${params.length + 2}`, `volume_ml = $${params.length + 3}`, `net_weight_grams = $${params.length + 4}`, `fragile = $${params.length + 5}`, `hazardous = $${params.length + 6}`, `flammable = $${params.length + 7}`, `perishable = $${params.length + 8}`)
+    params.push(color, colorHex, volumeMl, netWeightGrams, fragile, hazardous, flammable, perishable)
+
+    // Certifications & Standards
+    const certifications = (formData.get('certifications') as string) ? (formData.get('certifications') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+    const complianceStandard = (formData.get('compliance_standard') as string) || null
+    const safetyRating = (formData.get('safety_rating') as string) || null
+    const warrantyMonths = formData.get('warranty_months') ? parseInt(formData.get('warranty_months') as string) : null
+    const warrantyType = (formData.get('warranty_type') as string) || null
+    setClauses.push(`certifications = $${params.length + 1}`, `compliance_standard = $${params.length + 2}`, `safety_rating = $${params.length + 3}`, `warranty_months = $${params.length + 4}`, `warranty_type = $${params.length + 5}`)
+    params.push(certifications, complianceStandard, safetyRating, warrantyMonths, warrantyType)
+
+    // Condition & Lifecycle
+    const condition = (formData.get('condition') as string) || 'new'
+    const isCodAllowed = formData.get('is_cod_allowed') !== 'false'
+    const launchDate = (formData.get('launch_date') as string) || null
+    const discontinueDate = (formData.get('discontinue_date') as string) || null
+    const sortOrderVal = formData.get('sort_order') ? parseInt(formData.get('sort_order') as string) : 0
+    setClauses.push(`condition = $${params.length + 1}`, `is_cod_allowed = $${params.length + 2}`, `launch_date = $${params.length + 3}`, `discontinue_date = $${params.length + 4}`, `sort_order = $${params.length + 5}`)
+    params.push(condition, isCodAllowed, launchDate, discontinueDate, sortOrderVal)
+
+    // Shipping & Logistics
+    const handlingDays = formData.get('handling_days') ? parseInt(formData.get('handling_days') as string) : 1
+    const shippingClass = (formData.get('shipping_class') as string) || 'standard'
+    const isOversized = formData.get('is_oversized') === 'true'
+    const volumetricWeightGrams = formData.get('volumetric_weight_grams') ? parseInt(formData.get('volumetric_weight_grams') as string) : null
+    setClauses.push(`handling_days = $${params.length + 1}`, `shipping_class = $${params.length + 2}`, `is_oversized = $${params.length + 3}`, `volumetric_weight_grams = $${params.length + 4}`)
+    params.push(handlingDays, shippingClass, isOversized, volumetricWeightGrams)
+
+    // Digital / Content
+    const isDigital = formData.get('is_digital') === 'true'
+    const downloadUrl = (formData.get('download_url') as string) || null
+    const licenseType = (formData.get('license_type') as string) || null
+    const fileFormat = (formData.get('file_format') as string) || null
+    const platformCompatibility = (formData.get('platform_compatibility') as string) ? (formData.get('platform_compatibility') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+    setClauses.push(`is_digital = $${params.length + 1}`, `download_url = $${params.length + 2}`, `license_type = $${params.length + 3}`, `file_format = $${params.length + 4}`, `platform_compatibility = $${params.length + 5}`)
+    params.push(isDigital, downloadUrl, licenseType, fileFormat, platformCompatibility)
+
+    // Subscriptions
+    const isSubscription = formData.get('is_subscription') === 'true'
+    const subscriptionInterval = (formData.get('subscription_interval') as string) || null
+    const subscriptionPrice = formData.get('subscription_price') ? round2(parseFloat(formData.get('subscription_price') as string)) : null
+    setClauses.push(`is_subscription = $${params.length + 1}`, `subscription_interval = $${params.length + 2}`, `subscription_price = $${params.length + 3}`)
+    params.push(isSubscription, subscriptionInterval, subscriptionPrice)
+
+    // Bundling
+    const isBundle = formData.get('is_bundle') === 'true'
+    setClauses.push(`is_bundle = $${params.length + 1}`)
+    params.push(isBundle)
+
+    // SEO & Merchandising
+    const metaTitle = (formData.get('meta_title') as string) || null
+    const metaDescription = (formData.get('meta_description') as string) || null
+    const metaKeywords = (formData.get('meta_keywords') as string) ? (formData.get('meta_keywords') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+    const isSearchable = formData.get('is_searchable') !== 'false'
+    setClauses.push(`meta_title = $${params.length + 1}`, `meta_description = $${params.length + 2}`, `meta_keywords = $${params.length + 3}`, `is_searchable = $${params.length + 4}`)
+    params.push(metaTitle, metaDescription, metaKeywords, isSearchable)
+
+    // Tax & Finance
+    const taxClass = (formData.get('tax_class') as string) || 'standard'
+    const customsTariffCode = (formData.get('customs_tariff_code') as string) || null
+    const inclusiveTax = formData.get('inclusive_tax') === 'true'
+    setClauses.push(`tax_class = $${params.length + 1}`, `customs_tariff_code = $${params.length + 2}`, `inclusive_tax = $${params.length + 3}`)
+    params.push(taxClass, customsTariffCode, inclusiveTax)
+
+    // Age / Audience
+    const ageMin = formData.get('age_min') ? parseInt(formData.get('age_min') as string) : null
+    const ageMax = formData.get('age_max') ? parseInt(formData.get('age_max') as string) : null
+    const targetGender = (formData.get('target_gender') as string) || null
+    const targetAudience = (formData.get('target_audience') as string) ? (formData.get('target_audience') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+    setClauses.push(`age_min = $${params.length + 1}`, `age_max = $${params.length + 2}`, `target_gender = $${params.length + 3}`, `target_audience = $${params.length + 4}`)
+    params.push(ageMin, ageMax, targetGender, targetAudience)
+
     params.push(productId)
     await query(
       `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
