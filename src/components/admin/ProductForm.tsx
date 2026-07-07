@@ -1430,141 +1430,6 @@ export default function ProductForm({ categories, brands, action, product, produ
             <Toggle id="has_variants_toggle" checked={hasVariants} onChange={setHasVariants} label="This product has variants" />
           </div>
 
-          {/* Physical Attributes */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
-            <button type="button" onClick={() => setPhysicalExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
-              <span>Physical Attributes</span>
-              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${physicalExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {physicalExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Color</label>
-                    <input type="text" value={color} onChange={e => setColor(e.target.value)} className={inputCls} placeholder="e.g. Stainless Silver" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Color Hex</label>
-                    <div className="flex gap-2 items-center">
-                      <input type="color" value={colorHex} onChange={e => setColorHex(e.target.value)} className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface" />
-                      <input type="text" value={colorHex} onChange={e => setColorHex(e.target.value)} className={inputCls} placeholder="#000000" maxLength={7} />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Volume (ml)</label>
-                    <input type="number" min="0" step="0.01" value={volumeMl} onChange={e => setVolumeMl(e.target.value)} className={inputCls} placeholder="For liquids/paints" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Net Weight (g)</label>
-                    <input type="number" min="0" step="1" value={netWeightGrams} onChange={e => setNetWeightGrams(e.target.value)} className={inputCls} placeholder="Product without packaging" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                  {([['fragile', fragile, setFragile], ['hazardous', hazardous, setHazardous], ['flammable', flammable, setFlammable], ['perishable', perishable, setPerishable]] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
-                    <label key={label} className="flex items-center gap-2 cursor-pointer select-none">
-                      <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)} className="rounded border-border-secondary text-accent-500 focus:ring-accent-500" />
-                      <span className="text-sm text-foreground capitalize">{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Certifications & Standards */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
-            <button type="button" onClick={() => setCertificationsExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
-              <span>Certifications &amp; Standards</span>
-              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${certificationsExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {certificationsExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Certifications</label>
-                    <input type="text" value={certifications} onChange={e => setCertifications(e.target.value)} className={inputCls} placeholder="BIS, CE, RoHS, ISO9001, FSSAI (comma-separated)" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Compliance Standard</label>
-                    <input type="text" value={complianceStandard} onChange={e => setComplianceStandard(e.target.value)} className={inputCls} placeholder="e.g. DIN, ISO, IS, ASTM" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Safety Rating</label>
-                    <input type="text" value={safetyRating} onChange={e => setSafetyRating(e.target.value)} className={inputCls} placeholder="e.g. IP65, Class I" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty (months)</label>
-                    <input type="number" min="0" step="1" value={warrantyMonths} onChange={e => setWarrantyMonths(e.target.value)} className={inputCls} placeholder="e.g. 12" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty Type</label>
-                    <AdminSelect value={warrantyType} onChange={setWarrantyType} options={[{ value: '', label: 'None' }, { value: 'manufacturer', label: 'Manufacturer' }, { value: 'seller', label: 'Seller' }]} placeholder="Select type" />
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {/* Condition & Lifecycle */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
-            <button type="button" onClick={() => setConditionExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
-              <span>Condition &amp; Lifecycle</span>
-              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${conditionExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {conditionExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Condition</label>
-                    <AdminSelect value={condition} onChange={setCondition} options={[{ value: 'new', label: 'New' }, { value: 'refurbished', label: 'Refurbished' }, { value: 'used', label: 'Used' }, { value: 'open_box', label: 'Open Box' }]} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Sort Order</label>
-                    <input type="number" step="1" value={sortOrderVal} onChange={e => setSortOrderVal(e.target.value)} className={inputCls} placeholder="0" />
-                    <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Launch Date</label>
-                    <input type="date" value={launchDate} onChange={e => setLaunchDate(e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Discontinue Date</label>
-                    <input type="date" value={discontinueDate} onChange={e => setDiscontinueDate(e.target.value)} className={inputCls} />
-                  </div>
-                </div>
-                <Toggle id="is_cod_allowed" checked={isCodAllowed} onChange={setIsCodAllowed} label="COD Allowed" />
-              </div>
-            )}
-          </div>
-
-          {/* Shipping & Logistics */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
-            <button type="button" onClick={() => setShippingExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
-              <span>Shipping &amp; Logistics</span>
-              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${shippingExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {shippingExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Handling Days</label>
-                    <input type="number" min="0" step="1" value={handlingDays} onChange={e => setHandlingDays(e.target.value)} className={inputCls} placeholder="1" />
-                    <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Shipping Class</label>
-                    <AdminSelect value={shippingClass} onChange={setShippingClass} options={[{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }, { value: 'cold_chain', label: 'Cold Chain' }]} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Volumetric Weight (g)</label>
-                    <input type="number" min="0" step="1" value={volumetricWeightGrams} onChange={e => setVolumetricWeightGrams(e.target.value)} className={inputCls} placeholder="For courier billing" />
-                  </div>
-                </div>
-                <Toggle id="is_oversized" checked={isOversized} onChange={setIsOversized} label="Oversized / Freight" />
-              </div>
-            )}
-          </div>
-
           {/* Identification & Compliance */}
           <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
             <button type="button" onClick={() => setIdentificationExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
@@ -1737,137 +1602,150 @@ export default function ProductForm({ categories, brands, action, product, produ
             )}
           </div>
 
-          {/* Variant Management Section */}
+          {/* Product Details (grouped accordion) */}
           <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
             <button type="button" onClick={() => setPhysicalExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
-              <span>Physical Attributes</span>
+              <span>Product Details</span>
               <svg className={`w-4 h-4 text-foreground-muted transition-transform ${physicalExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
             </button>
             {physicalExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Color</label>
-                    <input type="text" value={color} onChange={e => setColor(e.target.value)} className={inputCls} placeholder="e.g. Stainless Silver" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Color Hex</label>
-                    <div className="flex gap-2 items-center">
-                      <input type="color" value={colorHex} onChange={e => setColorHex(e.target.value)} className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface" />
-                      <input type="text" value={colorHex} onChange={e => setColorHex(e.target.value)} className={inputCls} placeholder="#000000" maxLength={7} />
+              <div className="border-t border-border divide-y divide-border">
+
+                {/* Physical Attributes */}
+                <div>
+                  <button type="button" onClick={() => setCertificationsExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors">
+                    <span>Physical Attributes</span>
+                    <svg className={`w-3.5 h-3.5 text-foreground-muted transition-transform ${certificationsExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {certificationsExpanded && (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Color</label>
+                          <input type="text" value={color} onChange={e => setColor(e.target.value)} className={inputCls} placeholder="e.g. Stainless Silver" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Color Hex</label>
+                          <div className="flex gap-2 items-center">
+                            <input type="color" value={colorHex} onChange={e => setColorHex(e.target.value)} className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface" />
+                            <input type="text" value={colorHex} onChange={e => setColorHex(e.target.value)} className={inputCls} placeholder="#000000" maxLength={7} />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Volume (ml)</label>
+                          <input type="number" min="0" step="0.01" value={volumeMl} onChange={e => setVolumeMl(e.target.value)} className={inputCls} placeholder="For liquids/paints" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Net Weight (g)</label>
+                          <input type="number" min="0" step="1" value={netWeightGrams} onChange={e => setNetWeightGrams(e.target.value)} className={inputCls} placeholder="Product without packaging" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                        {([['fragile', fragile, setFragile], ['hazardous', hazardous, setHazardous], ['flammable', flammable, setFlammable], ['perishable', perishable, setPerishable]] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
+                          <label key={label} className="flex items-center gap-2 cursor-pointer select-none">
+                            <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)} className="rounded border-border-secondary text-accent-500 focus:ring-accent-500" />
+                            <span className="text-sm text-foreground capitalize">{label}</span>
+                          </label>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Volume (ml)</label>
-                    <input type="number" min="0" step="0.01" value={volumeMl} onChange={e => setVolumeMl(e.target.value)} className={inputCls} placeholder="For liquids/paints" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Net Weight (g)</label>
-                    <input type="number" min="0" step="1" value={netWeightGrams} onChange={e => setNetWeightGrams(e.target.value)} className={inputCls} placeholder="Product without packaging" />
-                  </div>
+                  )}
                 </div>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                  {([['fragile', fragile, setFragile], ['hazardous', hazardous, setHazardous], ['flammable', flammable, setFlammable], ['perishable', perishable, setPerishable]] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
-                    <label key={label} className="flex items-center gap-2 cursor-pointer select-none">
-                      <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)} className="rounded border-border-secondary text-accent-500 focus:ring-accent-500" />
-                      <span className="text-sm text-foreground capitalize">{label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
 
-          {/* Certifications & Standards */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
-            <button type="button" onClick={() => setCertificationsExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
-              <span>Certifications &amp; Standards</span>
-              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${certificationsExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {certificationsExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="sm:col-span-2">
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Certifications</label>
-                    <input type="text" value={certifications} onChange={e => setCertifications(e.target.value)} className={inputCls} placeholder="BIS, CE, RoHS, ISO9001, FSSAI (comma-separated)" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Compliance Standard</label>
-                    <input type="text" value={complianceStandard} onChange={e => setComplianceStandard(e.target.value)} className={inputCls} placeholder="e.g. DIN, ISO, IS, ASTM" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Safety Rating</label>
-                    <input type="text" value={safetyRating} onChange={e => setSafetyRating(e.target.value)} className={inputCls} placeholder="e.g. IP65, Class I" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty (months)</label>
-                    <input type="number" min="0" step="1" value={warrantyMonths} onChange={e => setWarrantyMonths(e.target.value)} className={inputCls} placeholder="e.g. 12" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty Type</label>
-                    <AdminSelect value={warrantyType} onChange={setWarrantyType} options={[{ value: '', label: 'None' }, { value: 'manufacturer', label: 'Manufacturer' }, { value: 'seller', label: 'Seller' }]} placeholder="Select type" />
-                  </div>
+                {/* Certifications & Standards */}
+                <div>
+                  <button type="button" onClick={() => setConditionExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors">
+                    <span>Certifications &amp; Standards</span>
+                    <svg className={`w-3.5 h-3.5 text-foreground-muted transition-transform ${conditionExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {conditionExpanded && (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Certifications</label>
+                          <input type="text" value={certifications} onChange={e => setCertifications(e.target.value)} className={inputCls} placeholder="BIS, CE, RoHS, ISO9001, FSSAI (comma-separated)" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Compliance Standard</label>
+                          <input type="text" value={complianceStandard} onChange={e => setComplianceStandard(e.target.value)} className={inputCls} placeholder="e.g. DIN, ISO, IS, ASTM" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Safety Rating</label>
+                          <input type="text" value={safetyRating} onChange={e => setSafetyRating(e.target.value)} className={inputCls} placeholder="e.g. IP65, Class I" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty (months)</label>
+                          <input type="number" min="0" step="1" value={warrantyMonths} onChange={e => setWarrantyMonths(e.target.value)} className={inputCls} placeholder="e.g. 12" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty Type</label>
+                          <AdminSelect value={warrantyType} onChange={setWarrantyType} options={[{ value: '', label: 'None' }, { value: 'manufacturer', label: 'Manufacturer' }, { value: 'seller', label: 'Seller' }]} placeholder="Select type" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
-              </div>
-            )}
-          </div>
 
-          {/* Condition & Lifecycle */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
-            <button type="button" onClick={() => setConditionExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
-              <span>Condition &amp; Lifecycle</span>
-              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${conditionExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {conditionExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Condition</label>
-                    <AdminSelect value={condition} onChange={setCondition} options={[{ value: 'new', label: 'New' }, { value: 'refurbished', label: 'Refurbished' }, { value: 'used', label: 'Used' }, { value: 'open_box', label: 'Open Box' }]} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Sort Order</label>
-                    <input type="number" step="1" value={sortOrderVal} onChange={e => setSortOrderVal(e.target.value)} className={inputCls} placeholder="0" />
-                    <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Launch Date</label>
-                    <input type="date" value={launchDate} onChange={e => setLaunchDate(e.target.value)} className={inputCls} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Discontinue Date</label>
-                    <input type="date" value={discontinueDate} onChange={e => setDiscontinueDate(e.target.value)} className={inputCls} />
-                  </div>
+                {/* Condition & Lifecycle */}
+                <div>
+                  <button type="button" onClick={() => setShippingExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors">
+                    <span>Condition &amp; Lifecycle</span>
+                    <svg className={`w-3.5 h-3.5 text-foreground-muted transition-transform ${shippingExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {shippingExpanded && (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Condition</label>
+                          <AdminSelect value={condition} onChange={setCondition} options={[{ value: 'new', label: 'New' }, { value: 'refurbished', label: 'Refurbished' }, { value: 'used', label: 'Used' }, { value: 'open_box', label: 'Open Box' }]} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Sort Order</label>
+                          <input type="number" step="1" value={sortOrderVal} onChange={e => setSortOrderVal(e.target.value)} className={inputCls} placeholder="0" />
+                          <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Launch Date</label>
+                          <input type="date" value={launchDate} onChange={e => setLaunchDate(e.target.value)} className={inputCls} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Discontinue Date</label>
+                          <input type="date" value={discontinueDate} onChange={e => setDiscontinueDate(e.target.value)} className={inputCls} />
+                        </div>
+                      </div>
+                      <Toggle id="is_cod_allowed" checked={isCodAllowed} onChange={setIsCodAllowed} label="COD Allowed" />
+                    </div>
+                  )}
                 </div>
-                <Toggle id="is_cod_allowed" checked={isCodAllowed} onChange={setIsCodAllowed} label="COD Allowed" />
-              </div>
-            )}
-          </div>
 
-          {/* Shipping & Logistics */}
-          <div className="md:col-span-2 border border-border rounded-lg overflow-hidden">
-            <button type="button" onClick={() => setShippingExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
-              <span>Shipping &amp; Logistics</span>
-              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${shippingExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {shippingExpanded && (
-              <div className="p-4 space-y-4 border-t border-border">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Handling Days</label>
-                    <input type="number" min="0" step="1" value={handlingDays} onChange={e => setHandlingDays(e.target.value)} className={inputCls} placeholder="1" />
-                    <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Shipping Class</label>
-                    <AdminSelect value={shippingClass} onChange={setShippingClass} options={[{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }, { value: 'cold_chain', label: 'Cold Chain' }]} />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Volumetric Weight (g)</label>
-                    <input type="number" min="0" step="1" value={volumetricWeightGrams} onChange={e => setVolumetricWeightGrams(e.target.value)} className={inputCls} placeholder="For courier billing" />
-                  </div>
+                {/* Shipping & Logistics */}
+                <div>
+                  <button type="button" onClick={() => setIdentificationExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors">
+                    <span>Shipping &amp; Logistics</span>
+                    <svg className={`w-3.5 h-3.5 text-foreground-muted transition-transform ${identificationExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {identificationExpanded && (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Handling Days</label>
+                          <input type="number" min="0" step="1" value={handlingDays} onChange={e => setHandlingDays(e.target.value)} className={inputCls} placeholder="1" />
+                          <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Shipping Class</label>
+                          <AdminSelect value={shippingClass} onChange={setShippingClass} options={[{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }, { value: 'cold_chain', label: 'Cold Chain' }]} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Volumetric Weight (g)</label>
+                          <input type="number" min="0" step="1" value={volumetricWeightGrams} onChange={e => setVolumetricWeightGrams(e.target.value)} className={inputCls} placeholder="For courier billing" />
+                        </div>
+                      </div>
+                      <Toggle id="is_oversized" checked={isOversized} onChange={setIsOversized} label="Oversized / Freight" />
+                    </div>
+                  )}
                 </div>
-                <Toggle id="is_oversized" checked={isOversized} onChange={setIsOversized} label="Oversized / Freight" />
+
               </div>
             )}
           </div>
