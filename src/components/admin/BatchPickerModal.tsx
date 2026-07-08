@@ -216,7 +216,17 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
                                     disabled={qty <= 1}
                                     className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
                                   >‹</button>
-                                  <span className="w-8 text-center text-xs font-medium text-foreground tabular-nums">{qty}</span>
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={batch.quantity_remaining}
+                                    value={qty}
+                                    onChange={e => {
+                                      const v = parseInt(e.target.value)
+                                      if (!isNaN(v)) setQty(item.order_item_id, batch.id, v, batch.quantity_remaining)
+                                    }}
+                                    className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-accent-500"
+                                  />
                                   <button
                                     type="button"
                                     onClick={() => setQty(item.order_item_id, batch.id, qty + 1, batch.quantity_remaining)}
