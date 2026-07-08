@@ -906,10 +906,9 @@ function StockTab() {
   const [search, setSearch] = useState(searchParams.get('ledger_search') || '')
   const [from, setFrom] = useState(searchParams.get('ledger_from') || '')
   const [to, setTo] = useState(searchParams.get('ledger_to') || '')
-  const [view, setView] = useState<'ledger' | 'valuation' | 'batch_breakdown'>((searchParams.get('stock_view') as 'ledger' | 'valuation' | 'batch_breakdown') || 'ledger')
-  const [batchData, setBatchData] = useState<any[] | null>(null)
-  const [batchSearch, setBatchSearch] = useState(searchParams.get('batch_search') || '')
-  const [batchStockStatus, setBatchStockStatus] = useState(searchParams.get('batch_stock') || '')
+  const [view, setView] = useState<'ledger' | 'valuation'>((searchParams.get('stock_view') as 'ledger' | 'valuation') || 'ledger')
+  const [expandedValRows, setExpandedValRows] = useState<Record<string, any[] | null>>({})
+  const [loadingBatchRow, setLoadingBatchRow] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editQty, setEditQty] = useState('')
   const [editNotes, setEditNotes] = useState('')
@@ -924,6 +923,21 @@ function StockTab() {
       if (next.has(refId)) next.delete(refId); else next.add(refId)
       return next
     })
+  }
+
+  async function toggleValBatch(rowId: string, productId: string, variantId: string | null, subVariantId: string | null) {
+    if (expandedValRows[rowId] !== undefined) {
+      setExpandedValRows(prev => { const n = { ...prev }; delete n[rowId]; return n })
+      return
+    }
+    setLoadingBatchRow(rowId)
+    const params = new URLSearchParams({ view: 'batch_valuation', product_id: productId })
+    if (variantId) params.set('variant_id', variantId)
+    if (subVariantId) params.set('sub_variant_id', subVariantId)
+    const res = await fetch(`/api/admin/inventory/stock?${params}`)
+    const json = await res.json()
+    setExpandedValRows(prev => ({ ...prev, [rowId]: json?.batches || [] }))
+    setLoadingBatchRow(null)
   }
 
   function syncUrl(patch: Record<string, string>) {
@@ -992,22 +1006,10 @@ function StockTab() {
     setLoading(false)
   }, [valSearch, valCategory, valBrand, valStockStatus, valPage])
 
-  const loadBatches = useCallback(async () => {
-    setLoading(true)
-    const params = new URLSearchParams({ view: 'batch_valuation' })
-    if (batchSearch) params.set('search', batchSearch)
-    if (batchStockStatus) params.set('stock_status', batchStockStatus)
-    const res = await fetch(`/api/admin/inventory/stock?${params}`)
-    const json = await res.json()
-    setBatchData(json?.batches || [])
-    setLoading(false)
-  }, [batchSearch, batchStockStatus])
-
   useEffect(() => {
     if (view === 'ledger') loadLedger(txPage)
-    else if (view === 'valuation') loadValuation(valPage)
-    else loadBatches()
-  }, [view, loadLedger, loadValuation, loadBatches, txPage, valPage])
+    else loadValuation(valPage)
+  }, [view, loadLedger, loadValuation, txPage, valPage])
 
   const allValRows = valuation?.products || []
   const valTotal = valuation?.total || 0
@@ -1115,10 +1117,10 @@ function StockTab() {
   return (
     <div className="space-y-5">
       <div className="flex gap-1 border-b border-border-default">
-        {(['ledger', 'valuation', 'batch_breakdown'] as const).map(v => (
+        {(['ledger', 'valuation'] as const).map(v => (
           <button key={v} onClick={() => { setView(v); syncUrl({ stock_view: v }) }}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${view === v ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}>
-            {v === 'ledger' ? 'Stock Ledger' : v === 'valuation' ? 'Valuation' : 'Batch Breakdown'}
+            {v === 'ledger' ? 'Stock Ledger' : 'Valuation'}
           </button>
         ))}
       </div>
@@ -1470,7 +1472,8 @@ function StockTab() {
                         const rowId = p.sub_variant_id || p.variant_id || p.id
                         const isEditing = editingId === rowId
                         return (
-                          <tr key={rowId} className={`hover:bg-surface-secondary/50 transition-colors ${isEditing ? 'bg-secondary-50/50 dark:bg-secondary-900/10' : ''}`}>
+                          <React.Fragment key={rowId}>
+                          <tr className={`hover:bg-surface-secondary/50 transition-colors ${isEditing ? 'bg-secondary-50/50 dark:bg-secondary-900/10' : ''}`}>
                             <td className="px-4 py-3 font-medium text-foreground">
                               <HoverCard
                                 trigger={
@@ -1607,13 +1610,69 @@ function StockTab() {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                       </svg>
                                     </button>
+                                    <button
+                                      onClick={() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)}
+                                      title="Batch details"
+                                      className={`p-1.5 rounded-lg hover:bg-surface-secondary transition-colors ${expandedValRows[rowId] !== undefined ? 'text-secondary-500' : 'text-foreground-secondary hover:text-secondary-500'}`}
+                                    >
+                                      {loadingBatchRow === rowId
+                                        ? <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                                        : <svg className={`w-4 h-4 transition-transform ${expandedValRows[rowId] !== undefined ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                                      }
+                                    </button>
                                   </>
                                 )}
                               </div>
                             </td>
                           </tr>
-                        )
-                      })}
+                          {expandedValRows[rowId] !== undefined && (
+                            <tr className="bg-surface-secondary/30">
+                              <td colSpan={10} className="px-4 py-3">
+                                {expandedValRows[rowId]!.length === 0 ? (
+                                  <p className="text-xs text-foreground-muted italic">No batches with remaining stock for this product.</p>
+                                ) : (
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="text-foreground-secondary">
+                                        <th className="pb-1.5 text-left font-medium pr-4">Lot / Batch</th>
+                                        <th className="pb-1.5 text-left font-medium pr-4">Expiry</th>
+                                        <th className="pb-1.5 text-left font-medium pr-4 hidden sm:table-cell">Mfg Date</th>
+                                        <th className="pb-1.5 text-left font-medium pr-4 hidden md:table-cell">Location</th>
+                                        <th className="pb-1.5 text-right font-medium pr-4">Qty Remaining</th>
+                                        <th className="pb-1.5 text-right font-medium">Batch Value</th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border-default/50">
+                                      {expandedValRows[rowId]!.map((b: any) => {
+                                        const d = b.expiry_date ? new Date(b.expiry_date) : null
+                                        const diffDays = d ? Math.floor((d.getTime() - Date.now()) / 86400000) : null
+                                        const expiryCls = diffDays === null ? 'text-foreground-muted' : diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                        const qty = parseFloat(b.quantity_remaining || '0')
+                                        const batchValue = qty * parseFloat(b.unit_cost || '0')
+                                        return (
+                                          <tr key={b.batch_id}>
+                                            <td className="py-1.5 pr-4 font-mono text-foreground-secondary">{b.lot_number || '—'}</td>
+                                            <td className="py-1.5 pr-4">
+                                              {b.expiry_date
+                                                ? <span className={`inline-flex px-1.5 py-0.5 rounded font-medium ${expiryCls}`}>{formatDate(b.expiry_date)}</span>
+                                                : <span className="text-foreground-muted">—</span>}
+                                            </td>
+                                            <td className="py-1.5 pr-4 text-foreground-secondary hidden sm:table-cell">{b.manufacture_date ? formatDate(b.manufacture_date) : '—'}</td>
+                                            <td className="py-1.5 pr-4 text-foreground-secondary hidden md:table-cell">{b.location || '—'}</td>
+                                            <td className="py-1.5 pr-4 text-right font-medium text-foreground">{qty}</td>
+                                            <td className="py-1.5 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
+                                          </tr>
+                                        )
+                                      })}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      )
+                    })}
                     </tbody>
                   </table>
                 </div>
@@ -1626,99 +1685,6 @@ function StockTab() {
         </div>
       )}
 
-      {view === 'batch_breakdown' && (
-        <div className="space-y-4">
-          <div className="flex flex-wrap gap-3 items-end">
-            <div className="flex-1 min-w-[200px]">
-              <label className={labelCls}>Search product / lot</label>
-              <input className={inputCls} placeholder="Product name, SKU, lot number…" value={batchSearch}
-                onChange={e => { setBatchSearch(e.target.value); syncUrl({ batch_search: e.target.value }) }} />
-            </div>
-            <div>
-              <label className={labelCls}>Stock status</label>
-              <AdminSelect
-                value={batchStockStatus}
-                onChange={v => { setBatchStockStatus(v); syncUrl({ batch_stock: v }) }}
-                compact
-                className="w-40"
-                options={[
-                  { value: '', label: 'All batches' },
-                  { value: 'expiring_soon', label: 'Expiring soon' },
-                  { value: 'expired', label: 'Expired' },
-                ]}
-              />
-            </div>
-          </div>
-
-          {loading ? (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
-              <div className="h-5 w-32 bg-surface-secondary rounded animate-pulse" />
-              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
-            </div>
-          ) : batchData ? (
-            <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead className="bg-surface-secondary border-b border-border-default">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Product</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Lot / Batch</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Expiry</th>
-                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden md:table-cell">Location</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Qty Remaining</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Unit Cost</th>
-                      <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Batch Value</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border-default">
-                    {batchData.length === 0 && (
-                      <tr><td colSpan={7} className="py-12 text-center text-foreground-secondary text-sm">
-                        {batchSearch || batchStockStatus ? 'No batches match your filters' : 'No batches with remaining stock'}
-                      </td></tr>
-                    )}
-                    {batchData.map((b: any) => {
-                      const d = b.expiry_date ? new Date(b.expiry_date) : null
-                      const now = new Date()
-                      const diffDays = d ? Math.floor((d.getTime() - now.getTime()) / 86400000) : null
-                      const expiryCls = diffDays === null ? '' : diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                      const qty = parseFloat(b.quantity_remaining || '0')
-                      const unitCost = parseFloat(b.unit_cost || '0')
-                      const batchValue = qty * unitCost
-                      return (
-                        <tr key={b.batch_id} className="hover:bg-surface-secondary/50 transition-colors">
-                          <td className="px-4 py-3 font-medium text-foreground">
-                            <Link href={ap(`/admin/products/${b.product_id}`)} className="hover:text-accent-500 hover:underline underline-offset-2">
-                              {b.product_name}
-                            </Link>
-                            {b.variant_name && <p className="text-xs text-foreground-secondary mt-0.5">{b.variant_name}</p>}
-                            {b.product_sku && <p className="text-xs font-mono text-foreground-muted mt-0.5">{b.product_sku}</p>}
-                          </td>
-                          <td className="px-4 py-3 font-mono text-foreground-secondary text-xs hidden sm:table-cell">
-                            {b.lot_number || '—'}
-                          </td>
-                          <td className="px-4 py-3">
-                            {b.expiry_date
-                              ? <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${expiryCls}`}>{formatDate(b.expiry_date)}</span>
-                              : <span className="text-foreground-muted text-xs">—</span>}
-                          </td>
-                          <td className="px-4 py-3 text-xs text-foreground-secondary hidden md:table-cell">
-                            {b.location || '—'}
-                          </td>
-                          <td className="px-4 py-3 text-right font-medium text-foreground">{qty}</td>
-                          <td className="px-4 py-3 text-right text-foreground-secondary hidden sm:table-cell">{formatINR(unitCost)}</td>
-                          <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          ) : null}
-        </div>
-      )}
     </div>
   )
 }

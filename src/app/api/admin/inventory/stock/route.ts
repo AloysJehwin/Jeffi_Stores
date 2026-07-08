@@ -34,9 +34,15 @@ export async function GET(request: NextRequest) {
     if (view === 'batch_valuation') {
       const search = searchParams.get('search') || ''
       const stockStatus = searchParams.get('stock_status') || ''
+      const productId = searchParams.get('product_id') || ''
+      const variantId = searchParams.get('variant_id') || ''
+      const subVariantId = searchParams.get('sub_variant_id') || ''
       const conditions: string[] = ['pb.quantity_remaining > 0']
       const params: any[] = []
       let i = 1
+      if (productId) { conditions.push(`pb.product_id = $${i++}`); params.push(productId) }
+      if (variantId) { conditions.push(`pb.variant_id = $${i++}`); params.push(variantId) }
+      if (subVariantId) { conditions.push(`pb.sub_variant_id = $${i++}`); params.push(subVariantId) }
       if (search) {
         conditions.push(`(p.name ILIKE $${i} OR p.sku ILIKE $${i} OR pv.variant_name ILIKE $${i} OR pb.lot_number ILIKE $${i})`)
         params.push(`%${search}%`); i++
