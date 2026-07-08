@@ -886,6 +886,7 @@ type StockTransaction = {
   variant_id: string | null; variant_name: string | null
   sub_variant_id: string | null; sub_variant_name: string | null
   reference_label: string | null
+  batch_id: string | null; lot_number: string | null; expiry_date: string | null
 }
 
 function StockTab() {
@@ -905,7 +906,10 @@ function StockTab() {
   const [search, setSearch] = useState(searchParams.get('ledger_search') || '')
   const [from, setFrom] = useState(searchParams.get('ledger_from') || '')
   const [to, setTo] = useState(searchParams.get('ledger_to') || '')
-  const [view, setView] = useState<'ledger' | 'valuation'>((searchParams.get('stock_view') as 'ledger' | 'valuation') || 'ledger')
+  const [view, setView] = useState<'ledger' | 'valuation' | 'batch_breakdown'>((searchParams.get('stock_view') as 'ledger' | 'valuation' | 'batch_breakdown') || 'ledger')
+  const [batchData, setBatchData] = useState<any[] | null>(null)
+  const [batchSearch, setBatchSearch] = useState(searchParams.get('batch_search') || '')
+  const [batchStockStatus, setBatchStockStatus] = useState(searchParams.get('batch_stock') || '')
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editQty, setEditQty] = useState('')
   const [editNotes, setEditNotes] = useState('')
@@ -988,10 +992,22 @@ function StockTab() {
     setLoading(false)
   }, [valSearch, valCategory, valBrand, valStockStatus, valPage])
 
+  const loadBatches = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams({ view: 'batch_valuation' })
+    if (batchSearch) params.set('search', batchSearch)
+    if (batchStockStatus) params.set('stock_status', batchStockStatus)
+    const res = await fetch(`/api/admin/inventory/stock?${params}`)
+    const json = await res.json()
+    setBatchData(json?.batches || [])
+    setLoading(false)
+  }, [batchSearch, batchStockStatus])
+
   useEffect(() => {
     if (view === 'ledger') loadLedger(txPage)
-    else loadValuation(valPage)
-  }, [view, loadLedger, loadValuation, txPage, valPage])
+    else if (view === 'valuation') loadValuation(valPage)
+    else loadBatches()
+  }, [view, loadLedger, loadValuation, loadBatches, txPage, valPage])
 
   const allValRows = valuation?.products || []
   const valTotal = valuation?.total || 0
@@ -1099,10 +1115,10 @@ function StockTab() {
   return (
     <div className="space-y-5">
       <div className="flex gap-1 border-b border-border-default">
-        {(['ledger', 'valuation'] as const).map(v => (
+        {(['ledger', 'valuation', 'batch_breakdown'] as const).map(v => (
           <button key={v} onClick={() => { setView(v); syncUrl({ stock_view: v }) }}
             className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${view === v ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}>
-            {v === 'ledger' ? 'Stock Ledger' : 'Valuation'}
+            {v === 'ledger' ? 'Stock Ledger' : v === 'valuation' ? 'Valuation' : 'Batch Breakdown'}
           </button>
         ))}
       </div>
@@ -1146,11 +1162,12 @@ function StockTab() {
                       <SortableHeader label="Change" column="change" options={sortOptions('number')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} align="right" />
                       <SortableHeader label="Balance" column="balance" options={sortOptions('number')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} align="right" />
                       <SortableHeader label="Reference" column="reference" options={sortOptions('text')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} className="hidden md:table-cell" />
+                      <th className="px-4 py-3 text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden md:table-cell">Batch</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default">
                     {transactions.length === 0 && (
-                      <tr><td colSpan={6} className="py-12 text-center text-foreground-secondary text-sm">
+                      <tr><td colSpan={7} className="py-12 text-center text-foreground-secondary text-sm">
                         {search || from || to ? 'No transactions match your filters' : 'No stock transactions yet'}
                       </td></tr>
                     )}
@@ -1236,6 +1253,20 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{Number(tx.quantity_after)}</td>
                             <td className="px-4 py-3 text-xs hidden md:table-cell">{refLink}</td>
+                            <td className="px-4 py-3 text-xs hidden md:table-cell">
+                              {tx.lot_number ? (
+                                <div className="space-y-0.5">
+                                  <span className="font-mono text-foreground-secondary">{tx.lot_number}</span>
+                                  {tx.expiry_date && (() => {
+                                    const d = new Date(tx.expiry_date)
+                                    const now = new Date()
+                                    const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                                    const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                    return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                                  })()}
+                                </div>
+                              ) : '—'}
+                            </td>
                           </tr>
                         )
                       }
@@ -1275,6 +1306,7 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-2.5 text-right text-foreground-muted text-xs font-mono">—</td>
                             <td className="px-4 py-2.5 text-xs hidden md:table-cell">{refLink}</td>
+                            <td className="px-4 py-2.5 hidden md:table-cell" />
                           </tr>
 
                           {/* Expanded product rows */}
@@ -1300,6 +1332,20 @@ function StockTab() {
                                 </td>
                                 <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">{Number(tx.quantity_after)}</td>
                                 <td className="px-4 py-2.5 text-xs hidden md:table-cell" />
+                                <td className="px-4 py-2.5 text-xs hidden md:table-cell">
+                                  {tx.lot_number ? (
+                                    <div className="space-y-0.5">
+                                      <span className="font-mono text-foreground-secondary">{tx.lot_number}</span>
+                                      {tx.expiry_date && (() => {
+                                        const d = new Date(tx.expiry_date)
+                                        const now = new Date()
+                                        const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                                        const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                        return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                                      })()}
+                                    </div>
+                                  ) : '—'}
+                                </td>
                               </tr>
                             )
                           })}
@@ -1576,6 +1622,100 @@ function StockTab() {
                 </div>
               </div>
             </>
+          ) : null}
+        </div>
+      )}
+
+      {view === 'batch_breakdown' && (
+        <div className="space-y-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="flex-1 min-w-[200px]">
+              <label className={labelCls}>Search product / lot</label>
+              <input className={inputCls} placeholder="Product name, SKU, lot number…" value={batchSearch}
+                onChange={e => { setBatchSearch(e.target.value); syncUrl({ batch_search: e.target.value }) }} />
+            </div>
+            <div>
+              <label className={labelCls}>Stock status</label>
+              <AdminSelect
+                value={batchStockStatus}
+                onChange={v => { setBatchStockStatus(v); syncUrl({ batch_stock: v }) }}
+                compact
+                className="w-40"
+                options={[
+                  { value: '', label: 'All batches' },
+                  { value: 'expiring_soon', label: 'Expiring soon' },
+                  { value: 'expired', label: 'Expired' },
+                ]}
+              />
+            </div>
+          </div>
+
+          {loading ? (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-3">
+              <div className="h-5 w-32 bg-surface-secondary rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+              <div className="h-12 w-full bg-surface-secondary rounded animate-pulse" />
+            </div>
+          ) : batchData ? (
+            <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-surface-secondary border-b border-border-default">
+                    <tr>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Product</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Lot / Batch</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Expiry</th>
+                      <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden md:table-cell">Location</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Qty Remaining</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden sm:table-cell">Unit Cost</th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Batch Value</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-default">
+                    {batchData.length === 0 && (
+                      <tr><td colSpan={7} className="py-12 text-center text-foreground-secondary text-sm">
+                        {batchSearch || batchStockStatus ? 'No batches match your filters' : 'No batches with remaining stock'}
+                      </td></tr>
+                    )}
+                    {batchData.map((b: any) => {
+                      const d = b.expiry_date ? new Date(b.expiry_date) : null
+                      const now = new Date()
+                      const diffDays = d ? Math.floor((d.getTime() - now.getTime()) / 86400000) : null
+                      const expiryCls = diffDays === null ? '' : diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      const qty = parseFloat(b.quantity_remaining || '0')
+                      const unitCost = parseFloat(b.unit_cost || '0')
+                      const batchValue = qty * unitCost
+                      return (
+                        <tr key={b.batch_id} className="hover:bg-surface-secondary/50 transition-colors">
+                          <td className="px-4 py-3 font-medium text-foreground">
+                            <Link href={ap(`/admin/products/${b.product_id}`)} className="hover:text-accent-500 hover:underline underline-offset-2">
+                              {b.product_name}
+                            </Link>
+                            {b.variant_name && <p className="text-xs text-foreground-secondary mt-0.5">{b.variant_name}</p>}
+                            {b.product_sku && <p className="text-xs font-mono text-foreground-muted mt-0.5">{b.product_sku}</p>}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-foreground-secondary text-xs hidden sm:table-cell">
+                            {b.lot_number || '—'}
+                          </td>
+                          <td className="px-4 py-3">
+                            {b.expiry_date
+                              ? <span className={`inline-flex px-2 py-0.5 rounded text-xs font-medium ${expiryCls}`}>{formatDate(b.expiry_date)}</span>
+                              : <span className="text-foreground-muted text-xs">—</span>}
+                          </td>
+                          <td className="px-4 py-3 text-xs text-foreground-secondary hidden md:table-cell">
+                            {b.location || '—'}
+                          </td>
+                          <td className="px-4 py-3 text-right font-medium text-foreground">{qty}</td>
+                          <td className="px-4 py-3 text-right text-foreground-secondary hidden sm:table-cell">{formatINR(unitCost)}</td>
+                          <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : null}
         </div>
       )}

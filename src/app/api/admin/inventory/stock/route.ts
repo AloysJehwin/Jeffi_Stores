@@ -31,6 +31,44 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const view = searchParams.get('view') || 'ledger'
 
+    if (view === 'batch_valuation') {
+      const search = searchParams.get('search') || ''
+      const stockStatus = searchParams.get('stock_status') || ''
+      const conditions: string[] = ['pb.quantity_remaining > 0']
+      const params: any[] = []
+      let i = 1
+      if (search) {
+        conditions.push(`(p.name ILIKE $${i} OR p.sku ILIKE $${i} OR pv.variant_name ILIKE $${i} OR pb.lot_number ILIKE $${i})`)
+        params.push(`%${search}%`); i++
+      }
+      if (stockStatus === 'expired') conditions.push(`pb.expiry_date < CURRENT_DATE`)
+      if (stockStatus === 'expiring_soon') conditions.push(`pb.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`)
+      const where = conditions.join(' AND ')
+      const rows = await import('@/lib/db').then(m => m.queryMany<any>(`
+        SELECT
+          pb.id AS batch_id,
+          pb.lot_number,
+          pb.expiry_date,
+          pb.manufacture_date,
+          pb.quantity_remaining,
+          pb.created_at,
+          p.id AS product_id,
+          p.name AS product_name,
+          p.sku AS product_sku,
+          COALESCE(p.weighted_avg_cost, p.cost_price, 0) AS unit_cost,
+          pv.id AS variant_id,
+          pv.variant_name,
+          sl.display_code AS location
+        FROM product_batches pb
+        JOIN products p ON p.id = pb.product_id
+        LEFT JOIN product_variants pv ON pv.id = pb.variant_id
+        LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
+        WHERE ${where}
+        ORDER BY pb.expiry_date ASC NULLS LAST, p.name, pv.variant_name
+      `, params))
+      return NextResponse.json({ batches: rows || [] })
+    }
+
     if (view === 'valuation') {
       const valPage = Math.max(1, parseInt(searchParams.get('page') || '1'))
       const valLimit = parseInt(searchParams.get('limit') || '50')
