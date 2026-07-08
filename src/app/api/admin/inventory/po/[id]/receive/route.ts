@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
+import { adjustStock } from '@/lib/shelf'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/validate'
@@ -197,6 +198,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
 
       await client.query('COMMIT')
+
+      // Update shelf_stock for any item that had a location assigned
+      for (const item of items) {
+        if (!item.location_id) continue
+        const factor = item.purchase_unit_factor ?? 1
+        const qtyReceived = item.quantity_received * factor
+        if (qtyReceived <= 0) continue
+        try {
+          await adjustStock(
+            item.location_id,
+            item.product_id,
+            item.variant_id || null,
+            item.sub_variant_id || null,
+            qtyReceived,
+            `GRN receive — PO ${po.po_number}`,
+            admin.id,
+          )
+        } catch (_) {}
+      }
 
       if (receivedAmount > 0) {
         const expClient = await getClient()
