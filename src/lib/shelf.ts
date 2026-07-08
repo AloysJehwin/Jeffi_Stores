@@ -1,4 +1,4 @@
-import { query, queryMany, queryOne } from '@/lib/db'
+import { query, queryMany, queryOne, getClient } from '@/lib/db'
 
 export interface Warehouse {
   id: string
@@ -226,20 +226,14 @@ async function syncCentralInventory(
   variantId: string | null,
   subVariantId: string | null
 ): Promise<void> {
-  // Perishable products track stock via product_batches only — never update inventory_quantity
-  const perishableRow = await client.query<{ perishable: boolean }>(
-    'SELECT perishable FROM products WHERE id = $1', [productId]
-  )
-  if (perishableRow.rows[0]?.perishable) return
-
   const totalRow = await client.query(
-    `SELECT COALESCE(SUM(quantity), 0)::int AS total FROM shelf_stock
+    `SELECT COALESCE(SUM(quantity), 0)::numeric AS total FROM shelf_stock
      WHERE product_id = $1
        AND ($2::uuid IS NULL OR variant_id = $2)
        AND ($3::uuid IS NULL OR sub_variant_id = $3)`,
     [productId, variantId, subVariantId]
   )
-  const total = totalRow.rows[0].total
+  const total = parseFloat(totalRow.rows[0].total) || 0
 
   if (subVariantId) {
     await client.query(`UPDATE product_sub_variants SET stock_status = $1, updated_at = now() WHERE id = $2`, [total > 0 ? 'In Stock' : 'Out of Stock', subVariantId])
@@ -247,6 +241,76 @@ async function syncCentralInventory(
     await client.query(`UPDATE product_variants SET inventory_quantity = $1, updated_at = now() WHERE id = $2`, [total, variantId])
   } else {
     await client.query(`UPDATE products SET inventory_quantity = $1, updated_at = now() WHERE id = $2`, [total, productId])
+  }
+}
+
+// For perishable products: recompute shelf_stock per location from product_batches,
+// then sync inventory_quantity from the updated shelf_stock totals.
+export async function syncPerishableStock(
+  clientIn: any | null,
+  productId: string,
+  variantId: string | null,
+  subVariantId: string | null
+): Promise<void> {
+  const ownClient = !clientIn
+  const client = clientIn ?? await getClient()
+  try {
+    if (ownClient) await client.query('BEGIN')
+  // Sum quantity_remaining per location from all batches for this product/variant
+  const batchTotals = await client.query<{ location_id: string | null; total: string }>(
+    `SELECT location_id, COALESCE(SUM(quantity_remaining), 0) AS total
+     FROM product_batches
+     WHERE product_id = $1
+       AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+       AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))
+     GROUP BY location_id`,
+    [productId, variantId, subVariantId]
+  )
+
+  // Get all existing shelf_stock location rows for this product/variant
+  const existing = await client.query<{ id: string; location_id: string }>(
+    `SELECT id, location_id FROM shelf_stock
+     WHERE product_id = $1
+       AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+       AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))`,
+    [productId, variantId, subVariantId]
+  )
+  const existingMap = new Map<string | null, string>(existing.rows.map(r => [r.location_id, r.id]))
+
+  for (const row of batchTotals.rows) {
+    const qty = parseFloat(row.total) || 0
+    const locId = row.location_id
+    if (!locId) continue // skip batches with no location
+
+    if (existingMap.has(locId)) {
+      if (qty === 0) {
+        await client.query('DELETE FROM shelf_stock WHERE id = $1', [existingMap.get(locId)])
+      } else {
+        await client.query('UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2', [qty, existingMap.get(locId)])
+      }
+      existingMap.delete(locId)
+    } else if (qty > 0) {
+      await client.query(
+        `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [locId, productId, variantId, subVariantId, qty]
+      )
+    }
+  }
+
+  // Remove shelf_stock rows for locations no longer in any batch
+  for (const [, stockId] of existingMap) {
+    await client.query('DELETE FROM shelf_stock WHERE id = $1', [stockId])
+  }
+
+  // Sync inventory_quantity from updated shelf_stock
+  await syncCentralInventory(client, productId, variantId, subVariantId)
+  if (ownClient) await client.query('COMMIT')
+  } catch (err) {
+    if (ownClient) { try { await client.query('ROLLBACK') } catch (_) {} }
+    throw err
+  } finally {
+    if (ownClient) client.release()
   }
 }
 

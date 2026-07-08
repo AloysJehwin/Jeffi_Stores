@@ -4,7 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
-import { adjustStock } from '@/lib/shelf'
+import { adjustStock, syncPerishableStock } from '@/lib/shelf'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/validate'
@@ -85,6 +85,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
          notes || null]
       )
       const grnId = grnRow.rows[0].id
+      const perishableProductIds = new Set<string>()
 
       for (const item of items) {
         const factor = item.purchase_unit_factor ?? 1
@@ -112,6 +113,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           [productId]
         )
         const isPerishable = productRow.rows[0]?.perishable ?? false
+        if (isPerishable) perishableProductIds.add(productId)
 
         let stockBefore = 0
         let newBatchId: string | null = null
@@ -214,22 +216,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
       await client.query('COMMIT')
 
-      // Update shelf_stock for any item that had a location assigned
+      // Update shelf_stock for any item that had a location assigned.
+      // Perishable: recompute shelf_stock from product_batches then sync inventory_quantity.
+      // Non-perishable: increment shelf_stock directly via adjustStock.
+      const syncedPerishable = new Set<string>()
       for (const item of items) {
-        if (!item.location_id) continue
         const factor = item.purchase_unit_factor ?? 1
         const qtyReceived = item.quantity_received * factor
         if (qtyReceived <= 0) continue
         try {
-          await adjustStock(
-            item.location_id,
-            item.product_id,
-            item.variant_id || null,
-            item.sub_variant_id || null,
-            qtyReceived,
-            `GRN receive — PO ${po.po_number}`,
-            admin.id,
-          )
+          if (perishableProductIds.has(item.product_id)) {
+            const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
+            if (!syncedPerishable.has(key)) {
+              syncedPerishable.add(key)
+              await syncPerishableStock(null, item.product_id, item.variant_id || null, item.sub_variant_id || null)
+            }
+          } else if (item.location_id) {
+            await adjustStock(
+              item.location_id,
+              item.product_id,
+              item.variant_id || null,
+              item.sub_variant_id || null,
+              qtyReceived,
+              `GRN receive — PO ${po.po_number}`,
+              admin.id,
+            )
+          }
         } catch (_) {}
       }
 
