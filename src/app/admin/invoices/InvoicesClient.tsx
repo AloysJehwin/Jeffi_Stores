@@ -412,7 +412,9 @@ export default function InvoicesClient() {
             buy_unit: it.buy_unit || null,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
+            temp_id: it.id,
           })),
+          batch_assignments: Object.entries(batchAssignments).map(([order_item_id, batch_id]) => ({ order_item_id, batch_id })),
         }),
       })
       const data = await res.json()

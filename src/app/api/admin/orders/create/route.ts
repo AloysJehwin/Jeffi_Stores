@@ -24,6 +24,7 @@ const orderItemSchema = z.object({
   quantity: z.coerce.number().positive(),
   buy_unit: z.string().nullish(),
   buy_mode: z.string().nullish(),
+  temp_id: z.string().nullish(),
 })
 
 const createOrderSchema = z.object({
@@ -48,6 +49,7 @@ export async function POST(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const body = await request.json()
+    const batchAssignments: { order_item_id: string; batch_id: string }[] = Array.isArray(body?.batch_assignments) ? body.batch_assignments : []
 
     const parsed = parseBody(createOrderSchema, body, 'POST /api/admin/orders/create')
     if (!parsed.ok) return parsed.response
@@ -109,6 +111,7 @@ export async function POST(request: NextRequest) {
         sgst_amount: round2(gst.sgst),
         igst_amount: round2(gst.igst),
         tax_amount: round2(gst.cgst + gst.sgst + gst.igst),
+        temp_id: item.temp_id || null,
       }
     })
 
@@ -145,15 +148,24 @@ export async function POST(request: NextRequest) {
           ? item.quantity * parseFloat(u.factor)
           : item.quantity
 
+        const assignedBatchId = batchAssignments.find(a => a.order_item_id === item.temp_id)?.batch_id ?? null
+        let batchQty = 0
+        if (assignedBatchId) {
+          const br = await client.query<{ quantity_remaining: string }>(
+            `SELECT quantity_remaining FROM product_batches WHERE id = $1`, [assignedBatchId]
+          )
+          batchQty = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
+        }
+
         if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: string }>(
             `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
             [item.sub_variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock < baseQty) {
+          if (stock + batchQty < baseQty) {
             insufficientItems.push(
-              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock + batchQty}, required: ${baseQty})`
             )
           }
         } else if (item.variant_id) {
@@ -162,9 +174,9 @@ export async function POST(request: NextRequest) {
             [item.variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock < baseQty) {
+          if (stock + batchQty < baseQty) {
             insufficientItems.push(
-              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock + batchQty}, required: ${baseQty})`
             )
           }
         } else {
@@ -173,8 +185,8 @@ export async function POST(request: NextRequest) {
             [item.product_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock < baseQty) {
-            insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
+          if (stock + batchQty < baseQty) {
+            insufficientItems.push(`${item.product_name} (available: ${stock + batchQty}, required: ${baseQty})`)
           }
         }
       }
