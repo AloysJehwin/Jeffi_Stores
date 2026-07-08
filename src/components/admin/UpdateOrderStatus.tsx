@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSelect from './AdminSelect'
+import BatchPickerModal, { BatchPickerItem, BatchAssignment } from './BatchPickerModal'
 
 interface UpdateOrderStatusProps {
   orderId: string
@@ -67,6 +68,8 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [paymentAutoResetNote, setPaymentAutoResetNote] = useState<string | null>(null)
+  const [batchPickerItems, setBatchPickerItems] = useState<BatchPickerItem[] | null>(null)
+  const [pendingPaymentStatus, setPendingPaymentStatus] = useState<string | null>(null)
   const router = useRouter()
 
   const allowedStatuses = [currentStatus, ...(VALID_STATUS_TRANSITIONS[currentStatus] ?? [])]
@@ -101,12 +104,41 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       return
     }
 
+    // When moving to processing, check for perishable items needing batch assignment
+    if (status === 'processing' && currentStatus !== 'processing') {
+      setIsUpdating(true)
+      setError(null)
+      try {
+        const res = await fetch(`/api/admin/inventory/batches/available?order_id=${orderId}`)
+        if (!res.ok) throw new Error('Failed to load batch information')
+        const data = await res.json()
+        if (data.items && data.items.length > 0) {
+          setPendingPaymentStatus(paymentStatus)
+          setBatchPickerItems(data.items)
+          setIsUpdating(false)
+          return
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to check batch availability')
+        setIsUpdating(false)
+        return
+      }
+      setIsUpdating(false)
+    }
+
+    await submitUpdate(null)
+  }
+
+  async function submitUpdate(batchAssignments: BatchAssignment[] | null) {
     setIsUpdating(true)
     setError(null)
     setSuccess(null)
 
     try {
-      const body: Record<string, string> = { status, payment_status: paymentStatus }
+      const body: Record<string, any> = { status, payment_status: pendingPaymentStatus ?? paymentStatus }
+      if (batchAssignments && batchAssignments.length > 0) {
+        body.batch_assignments = batchAssignments
+      }
 
       const response = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
@@ -133,6 +165,7 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
 
       setSuccess(successMessage)
       setPaymentAutoResetNote(null)
+      setPendingPaymentStatus(null)
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Failed to update order. Please try again.')
@@ -153,7 +186,23 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
   }
 
   return (
-    <div className="space-y-4">
+    <>
+      {batchPickerItems && (
+        <BatchPickerModal
+          items={batchPickerItems}
+          onConfirm={(assignments) => {
+            setBatchPickerItems(null)
+            submitUpdate(assignments)
+          }}
+          onCancel={() => {
+            setBatchPickerItems(null)
+            setPendingPaymentStatus(null)
+            setIsUpdating(false)
+          }}
+        />
+      )}
+
+      <div className="space-y-4">
       {error && (
         <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
           {error}
@@ -205,5 +254,6 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
         {isUpdating ? 'Updating...' : 'Update Order'}
       </button>
     </div>
+    </>
   )
 }

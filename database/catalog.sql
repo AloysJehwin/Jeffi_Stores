@@ -437,3 +437,14 @@ CREATE TABLE IF NOT EXISTS public.product_batches (
 -- Update column defaults for is_cod_allowed and handling_days
 ALTER TABLE products ALTER COLUMN is_cod_allowed SET DEFAULT false;
 ALTER TABLE products ALTER COLUMN handling_days SET DEFAULT 2;
+
+-- product_batches: add grn traceability, FIFO remaining qty, and shelf location
+ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS grn_id uuid REFERENCES grns(id);
+ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS quantity_remaining numeric(14,3) NOT NULL DEFAULT 0;
+ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS location_id uuid REFERENCES shelf_locations(id);
+
+-- order_items: link to assigned batch (set at stock deduction time)
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id);
+
+-- inventory_transactions: full batch audit trail
+ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id);

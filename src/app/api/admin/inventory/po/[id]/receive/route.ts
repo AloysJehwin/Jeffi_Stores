@@ -21,6 +21,10 @@ const postSchema = z.object({
         quantity_received: z.coerce.number().positive(),
         unit_cost: z.coerce.number().min(0),
         purchase_unit_factor: z.coerce.number().positive().default(1),
+        lot_number: z.string().nullish(),
+        manufacture_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+        expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+        location_id: zUuid.nullish(),
       })
     )
     .min(1, 'At least one item is required'),
@@ -144,6 +148,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           referenceId: grnId,
           currentStock: stockBefore,
         })
+
+        // Batch capture for perishable products — mandatory expiry_date required
+        const productRow = await client.query<{ perishable: boolean }>(
+          'SELECT perishable FROM products WHERE id = $1',
+          [productId]
+        )
+        if (productRow.rows[0]?.perishable) {
+          if (!item.expiry_date) {
+            throw new Error(`Product ${productId} is perishable — expiry_date is required for GRN receive`)
+          }
+          await client.query(
+            `INSERT INTO product_batches
+               (product_id, variant_id, sub_variant_id, grn_id, lot_number, manufacture_date, expiry_date, quantity, quantity_remaining, location_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9)`,
+            [
+              productId, variantId, subVariantId, grnId,
+              item.lot_number || null,
+              item.manufacture_date || null,
+              item.expiry_date,
+              qtyReceived,
+              item.location_id || null,
+            ]
+          )
+        }
 
         await client.query(
           `UPDATE purchase_order_items

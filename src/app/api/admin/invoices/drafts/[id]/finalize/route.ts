@@ -16,6 +16,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
+    let batchAssignments: { order_item_id: string; batch_id: string }[] = []
+    try {
+      const body = await request.json()
+      if (Array.isArray(body?.batch_assignments)) batchAssignments = body.batch_assignments
+    } catch (_) {}
+
     const order = await queryOne<any>(
       `SELECT id, status, source, customer_name, customer_email, total_amount, order_number FROM orders WHERE id = $1`,
       [id]
@@ -67,6 +73,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const effectiveQty = (unit?.dimension === 'count' && unit?.factor)
           ? qty * parseFloat(unit.factor)
           : qty
+
+        const assignedBatchId = batchAssignments.find(
+          a => a.order_item_id === item.id
+        )?.batch_id ?? null
 
         let stockBefore = 0
 
@@ -137,6 +147,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           )
         }
 
+        if (assignedBatchId) {
+          await client.query(
+            `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2`,
+            [effectiveQty, assignedBatchId]
+          )
+          await client.query(
+            `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
+            [assignedBatchId, item.id]
+          )
+        }
+
         await logStockMovement(client, {
           productId: item.product_id,
           variantId: item.variant_id || null,
@@ -146,6 +167,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           referenceType: 'order',
           referenceId: id,
           currentStock: stockBefore,
+          batchId: assignedBatchId,
         })
       }
 
