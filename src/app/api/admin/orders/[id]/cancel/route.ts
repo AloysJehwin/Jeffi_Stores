@@ -60,6 +60,7 @@ export async function POST(
           batchQty = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
         }
 
+        let stockBefore = 0
         // When batch assigned, stockBefore is batch qty only; inventory_quantity is untouched
         if (batchId) {
           stockBefore = batchQty
