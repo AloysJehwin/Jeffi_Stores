@@ -49,21 +49,42 @@ export async function POST(
           ? rawQty * parseFloat(u.factor)
           : rawQty
 
-        const batchId: string | null = item.batch_id || null
-
-        // Fetch current batch qty for stockBefore calculation (if batch assigned)
-        let batchQty = 0
-        if (batchId) {
-          const br = await client.query<{ quantity_remaining: string }>(
-            `SELECT quantity_remaining FROM product_batches WHERE id = $1`, [batchId]
-          )
-          batchQty = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
-        }
+        // Find all batch deductions logged for this order item
+        const batchMovements = await client.query<{ batch_id: string; quantity_change: string }>(
+          `SELECT batch_id, quantity_change FROM inventory_transactions
+           WHERE reference_type = 'order' AND reference_id = $1
+             AND product_id = $2
+             AND (variant_id = $3 OR ($3 IS NULL AND variant_id IS NULL))
+             AND batch_id IS NOT NULL
+             AND transaction_type = 'sale'`,
+          [id, item.product_id, item.variant_id || null]
+        )
 
         let stockBefore = 0
-        // When batch assigned, stockBefore is batch qty only; inventory_quantity is untouched
-        if (batchId) {
-          stockBefore = batchQty
+        if (batchMovements.rows.length > 0) {
+          // Restore each batch individually
+          for (const mv of batchMovements.rows) {
+            const restoreQty = Math.abs(parseFloat(mv.quantity_change))
+            const br = await client.query<{ quantity_remaining: string }>(
+              `SELECT quantity_remaining FROM product_batches WHERE id = $1 FOR UPDATE`, [mv.batch_id]
+            )
+            stockBefore = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
+            await client.query(
+              `UPDATE product_batches SET quantity_remaining = quantity_remaining + $1, updated_at = NOW() WHERE id = $2`,
+              [restoreQty, mv.batch_id]
+            )
+            await logStockMovement(client, {
+              productId: item.product_id,
+              variantId: item.variant_id || null,
+              subVariantId: item.sub_variant_id || null,
+              transactionType: 'return',
+              quantityChange: restoreQty,
+              referenceType: 'order',
+              referenceId: id,
+              currentStock: stockBefore,
+              batchId: mv.batch_id,
+            })
+          }
         } else if (item.sub_variant_id) {
           const row = await client.query<{ inventory_quantity: string }>(
             `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
@@ -96,24 +117,18 @@ export async function POST(
           )
         }
 
-        if (batchId) {
-          await client.query(
-            `UPDATE product_batches SET quantity_remaining = quantity_remaining + $1, updated_at = NOW() WHERE id = $2`,
-            [qty, batchId]
-          )
+        if (batchMovements.rows.length === 0) {
+          await logStockMovement(client, {
+            productId: item.product_id,
+            variantId: item.variant_id || null,
+            subVariantId: item.sub_variant_id || null,
+            transactionType: 'return',
+            quantityChange: qty,
+            referenceType: 'order',
+            referenceId: id,
+            currentStock: stockBefore,
+          })
         }
-
-        await logStockMovement(client, {
-          productId: item.product_id,
-          variantId: item.variant_id || null,
-          subVariantId: item.sub_variant_id || null,
-          transactionType: 'return',
-          quantityChange: qty,
-          referenceType: 'order',
-          referenceId: id,
-          currentStock: stockBefore,
-          batchId,
-        })
       }
 
       await client.query(

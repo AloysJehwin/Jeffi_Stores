@@ -16,7 +16,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'invoices:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    let batchAssignments: { order_item_id: string; batch_id: string }[] = []
+    let batchAssignments: { order_item_id: string; batch_id: string; qty: number }[] = []
     try {
       const body = await request.json()
       if (Array.isArray(body?.batch_assignments)) batchAssignments = body.batch_assignments
@@ -74,27 +74,55 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           ? qty * parseFloat(unit.factor)
           : qty
 
-        const assignedBatchId = batchAssignments.find(
-          a => a.order_item_id === item.id
-        )?.batch_id ?? null
-
-        let batchQty = 0
-        if (assignedBatchId) {
-          const br = await client.query<{ quantity_remaining: string }>(
-            `SELECT quantity_remaining FROM product_batches WHERE id = $1`, [assignedBatchId]
-          )
-          batchQty = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
-        }
+        const itemBatches = batchAssignments.filter(a => a.order_item_id === item.id)
+        const totalBatchQty = itemBatches.reduce((s, a) => s + (a.qty || 0), 0)
 
         let stockBefore = 0
-        // When batch assigned, only check/use batch qty — inventory_quantity is untouched
-        if (assignedBatchId) {
-          if (batchQty < effectiveQty) {
+        if (itemBatches.length > 0) {
+          // Validate each batch has enough and total covers requirement
+          for (const a of itemBatches) {
+            const br = await client.query<{ quantity_remaining: string }>(
+              `SELECT quantity_remaining FROM product_batches WHERE id = $1 FOR UPDATE`, [a.batch_id]
+            )
+            const avail = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
+            if (avail < a.qty) {
+              throw new Error(
+                `Insufficient batch stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — batch available: ${avail}, taking: ${a.qty}`
+              )
+            }
+          }
+          if (totalBatchQty < effectiveQty) {
             throw new Error(
-              `Insufficient batch stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — batch available: ${batchQty}, required: ${effectiveQty}`
+              `Batch total (${totalBatchQty}) is less than required (${effectiveQty}) for "${item.product_name}"`
             )
           }
-          stockBefore = batchQty
+          // Deduct from each batch and log one movement per batch
+          for (const a of itemBatches) {
+            const br = await client.query<{ quantity_remaining: string }>(
+              `SELECT quantity_remaining FROM product_batches WHERE id = $1`, [a.batch_id]
+            )
+            stockBefore = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
+            await client.query(
+              `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2`,
+              [a.qty, a.batch_id]
+            )
+            await logStockMovement(client, {
+              productId: item.product_id,
+              variantId: item.variant_id || null,
+              subVariantId: item.sub_variant_id || null,
+              transactionType: 'sale',
+              quantityChange: -a.qty,
+              referenceType: 'order',
+              referenceId: id,
+              currentStock: stockBefore,
+              batchId: a.batch_id,
+            })
+          }
+          // Tag order_item with first batch for display
+          await client.query(
+            `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
+            [itemBatches[0].batch_id, item.id]
+          )
         } else if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: number }>(
             `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
@@ -162,28 +190,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           )
         }
 
-        if (assignedBatchId) {
-          await client.query(
-            `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2`,
-            [effectiveQty, assignedBatchId]
-          )
-          await client.query(
-            `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
-            [assignedBatchId, item.id]
-          )
+        if (itemBatches.length === 0) {
+          await logStockMovement(client, {
+            productId: item.product_id,
+            variantId: item.variant_id || null,
+            subVariantId: item.sub_variant_id || null,
+            transactionType: 'sale',
+            quantityChange: -effectiveQty,
+            referenceType: 'order',
+            referenceId: id,
+            currentStock: stockBefore,
+          })
         }
-
-        await logStockMovement(client, {
-          productId: item.product_id,
-          variantId: item.variant_id || null,
-          subVariantId: item.sub_variant_id || null,
-          transactionType: 'sale',
-          quantityChange: -effectiveQty,
-          referenceType: 'order',
-          referenceId: id,
-          currentStock: stockBefore,
-          batchId: assignedBatchId,
-        })
       }
 
       const isGSTEnabled = process.env.ENABLE_GST === 'true'
