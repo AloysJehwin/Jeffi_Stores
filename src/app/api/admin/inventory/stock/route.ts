@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
           p.id AS product_id,
           p.name AS product_name,
           p.sku AS product_sku,
-          COALESCE(p.weighted_avg_cost, p.cost_price, 0) AS unit_cost,
+          COALESCE(p.cost_price, 0) AS unit_cost,
           pv.id AS variant_id,
           pv.variant_name,
           sl.display_code AS location
