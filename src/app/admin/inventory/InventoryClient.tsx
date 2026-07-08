@@ -262,6 +262,7 @@ type POItem = {
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
   purchase_unit: string | null; purchase_unit_factor: string | null
   sell_unit_label: string | null; sell_unit_dimension: string | null
+  perishable: boolean
 }
 
 /** For count-dimension products stock is always in pc; for others use sell_unit_label */
@@ -287,6 +288,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
   const [receiveItems, setReceiveItems] = useState<any[]>([])
   const [receiveNotes, setReceiveNotes] = useState('')
   const [receiveSaving, setReceiveSaving] = useState(false)
+  const [shelfLocations, setShelfLocations] = useState<{ id: string; display_code: string }[]>([])
   const [poSortCol, setPoSortCol] = useState<string | undefined>(undefined)
   const [poSortDir, setPoSortDir] = useState<SortDir | undefined>(undefined)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
@@ -368,20 +370,42 @@ function POTab({ initialPO }: { initialPO?: string }) {
         receive_qty: String(factor > 1 ? Math.round((remaining / factor) * 1000) / 1000 : remaining),
         receive_cost: it.unit_cost,
         purchase_unit_factor: factor,
+        lot_number: '',
+        expiry_date: '',
+        manufacture_date: '',
+        location_id: '',
       }
     })
     setReceiveMode({ po: json.purchase_order })
     setReceiveItems(items)
     setReceiveNotes('')
+    // Fetch shelf locations for the location picker
+    const slRes = await fetch('/api/admin/shelving/locations').catch(() => null)
+    if (slRes?.ok) {
+      const slJson = await slRes.json()
+      setShelfLocations(slJson?.locations || [])
+    }
   }
 
   async function submitReceive() {
     if (!receiveMode) return
+    // Validate perishable items have expiry_date
+    const missing = receiveItems.filter(it => parseFloat(it.receive_qty) > 0 && it.perishable && !it.expiry_date)
+    if (missing.length > 0) {
+      showToast(`Expiry date required for: ${missing.map((it: any) => it.product_name + (it.variant_name ? ' / ' + it.variant_name : '')).join(', ')}`, 'error')
+      return
+    }
     setReceiveSaving(true)
     const items = receiveItems.filter(it => parseFloat(it.receive_qty) > 0).map(it => ({
       po_item_id: it.id, product_id: it.product_id, variant_id: it.variant_id || null,
       quantity_received: parseFloat(it.receive_qty), unit_cost: parseFloat(it.receive_cost),
       purchase_unit_factor: parseFloat(it.purchase_unit_factor || '1'),
+      ...(it.perishable ? {
+        lot_number: it.lot_number || null,
+        expiry_date: it.expiry_date || null,
+        manufacture_date: it.manufacture_date || null,
+        location_id: it.location_id || null,
+      } : {}),
     }))
     const res = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -390,6 +414,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
     const json = await res.json()
     setReceiveSaving(false)
     if (json.success) { setReceiveMode(null); load(page) }
+    else showToast(json.error || 'Failed to receive goods', 'error')
   }
 
   async function sendPO(id: string) {
@@ -465,6 +490,9 @@ function POTab({ initialPO }: { initialPO?: string }) {
                       {it.purchase_unit && factor > 1 && (
                         <p className="text-xs text-foreground-muted mt-0.5">1 {it.purchase_unit} = {factor} {baseLabel}</p>
                       )}
+                      {it.perishable && (
+                        <span className="mt-1 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">Perishable</span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-right text-foreground-secondary">
                       {orderedInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
@@ -483,6 +511,39 @@ function POTab({ initialPO }: { initialPO?: string }) {
                           <span className="text-xs text-foreground-muted">
                             = {Math.round(parseFloat(it.receive_qty) * factor * 1000) / 1000} {baseLabel}
                           </span>
+                        )}
+                        {it.perishable && (
+                          <div className="mt-2 flex flex-col gap-1.5 items-end w-full min-w-[220px]">
+                            <div className="flex items-center gap-1.5 w-full justify-end">
+                              <label className="text-xs text-foreground-muted whitespace-nowrap">Expiry <span className="text-red-500">*</span></label>
+                              <input type="date" className="field-compact border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                value={it.expiry_date}
+                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, expiry_date: e.target.value } : r))} />
+                            </div>
+                            <div className="flex items-center gap-1.5 w-full justify-end">
+                              <label className="text-xs text-foreground-muted whitespace-nowrap">Mfg. Date</label>
+                              <input type="date" className="field-compact border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                value={it.manufacture_date}
+                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, manufacture_date: e.target.value } : r))} />
+                            </div>
+                            <div className="flex items-center gap-1.5 w-full justify-end">
+                              <label className="text-xs text-foreground-muted whitespace-nowrap">Lot #</label>
+                              <input type="text" placeholder="optional" className="w-28 field-compact border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                value={it.lot_number}
+                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: e.target.value } : r))} />
+                            </div>
+                            <div className="flex items-center gap-1.5 w-full justify-end">
+                              <label className="text-xs text-foreground-muted whitespace-nowrap">Location</label>
+                              <select className="field-compact border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                value={it.location_id}
+                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, location_id: e.target.value } : r))}>
+                                <option value="">— none —</option>
+                                {shelfLocations.map(sl => (
+                                  <option key={sl.id} value={sl.id}>{sl.display_code}</option>
+                                ))}
+                              </select>
+                            </div>
+                          </div>
                         )}
                       </div>
                     </td>
