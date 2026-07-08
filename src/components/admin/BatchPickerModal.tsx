@@ -94,7 +94,7 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
       } else {
         const alreadyAllocated = Object.values(prev).reduce((a, b) => a + b, 0)
         const still_needed = Math.max(0, required - alreadyAllocated)
-        prev[batchId] = Math.min(maxAvail, still_needed || maxAvail)
+        prev[batchId] = Math.min(maxAvail, still_needed > 0 ? still_needed : required)
       }
       return { ...s, [itemId]: prev }
     })
