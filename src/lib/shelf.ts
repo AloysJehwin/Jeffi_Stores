@@ -256,56 +256,58 @@ export async function syncPerishableStock(
   const client = clientIn ?? await getClient()
   try {
     if (ownClient) await client.query('BEGIN')
-  // Sum quantity_remaining per location from all batches for this product/variant
-  const batchTotals = await client.query<{ location_id: string | null; total: string }>(
-    `SELECT location_id, COALESCE(SUM(quantity_remaining), 0) AS total
-     FROM product_batches
-     WHERE product_id = $1
-       AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
-       AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))
-     GROUP BY location_id`,
-    [productId, variantId, subVariantId]
-  )
 
-  // Get all existing shelf_stock location rows for this product/variant
-  const existing = await client.query<{ id: string; location_id: string }>(
-    `SELECT id, location_id FROM shelf_stock
-     WHERE product_id = $1
-       AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
-       AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))`,
-    [productId, variantId, subVariantId]
-  )
-  const existingMap = new Map<string | null, string>(existing.rows.map(r => [r.location_id, r.id]))
+    // Sum quantity_remaining per location from all batches for this product/variant
+    const batchTotals = await client.query<{ location_id: string | null; total: string }>(
+      `SELECT location_id, COALESCE(SUM(quantity_remaining), 0) AS total
+       FROM product_batches
+       WHERE product_id = $1
+         AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+         AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))
+       GROUP BY location_id`,
+      [productId, variantId, subVariantId]
+    )
 
-  for (const row of batchTotals.rows) {
-    const qty = parseFloat(row.total) || 0
-    const locId = row.location_id
-    if (!locId) continue // skip batches with no location
+    // Get all existing shelf_stock rows for this product/variant
+    const existing = await client.query<{ id: string; location_id: string }>(
+      `SELECT id, location_id FROM shelf_stock
+       WHERE product_id = $1
+         AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+         AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))`,
+      [productId, variantId, subVariantId]
+    )
+    const existingMap = new Map<string | null, string>(existing.rows.map(r => [r.location_id, r.id]))
 
-    if (existingMap.has(locId)) {
-      if (qty === 0) {
-        await client.query('DELETE FROM shelf_stock WHERE id = $1', [existingMap.get(locId)])
-      } else {
-        await client.query('UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2', [qty, existingMap.get(locId)])
+    for (const row of batchTotals.rows) {
+      const qty = parseFloat(row.total) || 0
+      const locId = row.location_id
+      if (!locId) continue
+
+      if (existingMap.has(locId)) {
+        if (qty === 0) {
+          await client.query('DELETE FROM shelf_stock WHERE id = $1', [existingMap.get(locId)])
+        } else {
+          await client.query('UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2', [qty, existingMap.get(locId)])
+        }
+        existingMap.delete(locId)
+      } else if (qty > 0) {
+        await client.query(
+          `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [locId, productId, variantId, subVariantId, qty]
+        )
       }
-      existingMap.delete(locId)
-    } else if (qty > 0) {
-      await client.query(
-        `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [locId, productId, variantId, subVariantId, qty]
-      )
     }
-  }
 
-  // Remove shelf_stock rows for locations no longer in any batch
-  for (const [, stockId] of existingMap) {
-    await client.query('DELETE FROM shelf_stock WHERE id = $1', [stockId])
-  }
+    // Remove shelf_stock rows for locations no longer in any batch
+    for (const [, stockId] of existingMap) {
+      await client.query('DELETE FROM shelf_stock WHERE id = $1', [stockId])
+    }
 
-  // Sync inventory_quantity from updated shelf_stock
-  await syncCentralInventory(client, productId, variantId, subVariantId)
-  if (ownClient) await client.query('COMMIT')
+    // Sync inventory_quantity from updated shelf_stock
+    await syncCentralInventory(client, productId, variantId, subVariantId)
+
+    if (ownClient) await client.query('COMMIT')
   } catch (err) {
     if (ownClient) { try { await client.query('ROLLBACK') } catch (_) {} }
     throw err
