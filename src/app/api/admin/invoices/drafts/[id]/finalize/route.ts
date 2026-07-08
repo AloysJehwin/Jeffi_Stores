@@ -78,6 +78,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           a => a.order_item_id === item.id
         )?.batch_id ?? null
 
+        let batchQty = 0
+        if (assignedBatchId) {
+          const br = await client.query<{ quantity_remaining: string }>(
+            `SELECT quantity_remaining FROM product_batches WHERE id = $1`, [assignedBatchId]
+          )
+          batchQty = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
+        }
+
         let stockBefore = 0
 
         if (item.sub_variant_id) {
@@ -87,9 +95,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
           stockBefore = stock
-          if (stock < effectiveQty) {
+          if (stock + batchQty < effectiveQty) {
             throw new Error(
-              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${effectiveQty}`
+              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock + batchQty}, required: ${effectiveQty}`
             )
           }
           await client.query(
@@ -112,9 +120,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             stock = parseFloat(svStock.rows[0]?.total as any) || 0
           }
           stockBefore = stock
-          if (stock < effectiveQty) {
+          if (stock + batchQty < effectiveQty) {
             throw new Error(
-              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock}, required: ${effectiveQty}`
+              `Insufficient stock for "${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}" — available: ${stock + batchQty}, required: ${effectiveQty}`
             )
           }
           if (inv.rows[0]?.has_sub_variants) {
@@ -136,9 +144,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity as any) || 0
           stockBefore = stock
-          if (stock < effectiveQty) {
+          if (stock + batchQty < effectiveQty) {
             throw new Error(
-              `Insufficient stock for "${item.product_name}" — available: ${stock}, required: ${effectiveQty}`
+              `Insufficient stock for "${item.product_name}" — available: ${stock + batchQty}, required: ${effectiveQty}`
             )
           }
           await client.query(
