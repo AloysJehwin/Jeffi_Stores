@@ -179,6 +179,10 @@ export default function InvoicesClient() {
   const [batchAssignments, setBatchAssignments] = useState<Record<string, string>>({}) // lineItemId → batch_id
   const [assignedBatchLabels, setAssignedBatchLabels] = useState<Record<string, string>>({}) // lineItemId → lot label
 
+  // Draft-list finalize batch picker
+  const [draftFinalizeId, setDraftFinalizeId] = useState<string | null>(null)
+  const [draftBatchItems, setDraftBatchItems] = useState<BatchPickerItem[]>([])
+
   const totalPages = Math.ceil(total / 25)
 
   const INVOICE_SORT_KEYS: Record<string, keyof Invoice> = {
@@ -240,7 +244,31 @@ export default function InvoicesClient() {
   async function finalizeDraft(id: string) {
     setFinalizingId(id)
     try {
-      const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, { method: 'POST', credentials: 'include' })
+      // Check if any items are perishable and need batch assignment
+      const batchRes = await fetch(`/api/admin/inventory/batches/available?order_id=${id}`, { credentials: 'include' })
+      const batchData = await batchRes.json()
+      if (batchData.items?.length > 0) {
+        // Show batch picker — finalize will happen after confirmation
+        setDraftFinalizeId(id)
+        setDraftBatchItems(batchData.items)
+        setFinalizingId(null)
+        return
+      }
+      await doFinalizeDraft(id, [])
+    } catch {
+      showToast('Failed to finalize draft', 'error')
+      setFinalizingId(null)
+    }
+  }
+
+  async function doFinalizeDraft(id: string, batchAssignments: { order_item_id: string; batch_id: string }[]) {
+    setFinalizingId(id)
+    try {
+      const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_assignments: batchAssignments }),
+      })
       const data = await res.json()
       if (!res.ok) { showToast(data.error || 'Failed to finalize', 'error'); return }
       showToast(`Invoice ${data.invoiceNumber || ''} finalized`, 'success')
@@ -786,6 +814,18 @@ export default function InvoicesClient() {
 
   return (
     <>
+    {draftFinalizeId && draftBatchItems.length > 0 && (
+      <BatchPickerModal
+        items={draftBatchItems}
+        onConfirm={assignments => {
+          const id = draftFinalizeId
+          setDraftFinalizeId(null)
+          setDraftBatchItems([])
+          doFinalizeDraft(id, assignments)
+        }}
+        onCancel={() => { setDraftFinalizeId(null); setDraftBatchItems([]) }}
+      />
+    )}
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
         <div>
