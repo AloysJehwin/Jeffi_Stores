@@ -20,6 +20,8 @@ export async function DELETE(
     if (!batch) return NextResponse.json({ error: 'Batch not found' }, { status: 404 })
 
     await withTransaction(async (client) => {
+      // Null out ledger references before deleting to avoid FK violation
+      await client.query('UPDATE inventory_transactions SET batch_id = NULL WHERE batch_id = $1', [id])
       await client.query('DELETE FROM product_batches WHERE id = $1', [id])
     })
 
