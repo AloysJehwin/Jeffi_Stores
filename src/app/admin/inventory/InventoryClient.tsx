@@ -483,7 +483,8 @@ function POTab({ initialPO }: { initialPO?: string }) {
                   const orderedInPu = factor > 1 ? Math.round((parseFloat(it.quantity) / factor) * 1000) / 1000 : parseFloat(it.quantity)
                   const prevInPu = factor > 1 ? Math.round((parseFloat(it.quantity_received || '0') / factor) * 1000) / 1000 : parseFloat(it.quantity_received || '0')
                   return (
-                  <tr key={it.id} className="hover:bg-surface-secondary/50 transition-colors">
+                  <React.Fragment key={it.id}>
+                  <tr className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 text-foreground">
                       <p className="font-medium">{it.product_name}{it.variant_name && <span className="text-foreground-secondary font-normal"> / {it.variant_name}</span>}</p>
                       {it.sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{it.sku}</p>}
@@ -512,39 +513,6 @@ function POTab({ initialPO }: { initialPO?: string }) {
                             = {Math.round(parseFloat(it.receive_qty) * factor * 1000) / 1000} {baseLabel}
                           </span>
                         )}
-                        {it.perishable && (
-                          <div className="mt-2 flex flex-col gap-1.5 items-end w-full min-w-[220px]">
-                            <div className="flex items-center gap-1.5 w-full justify-end">
-                              <label className="text-xs text-foreground-muted whitespace-nowrap">Expiry <span className="text-red-500">*</span></label>
-                              <input type="date" className="field-compact border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                value={it.expiry_date}
-                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, expiry_date: e.target.value } : r))} />
-                            </div>
-                            <div className="flex items-center gap-1.5 w-full justify-end">
-                              <label className="text-xs text-foreground-muted whitespace-nowrap">Mfg. Date</label>
-                              <input type="date" className="field-compact border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                value={it.manufacture_date}
-                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, manufacture_date: e.target.value } : r))} />
-                            </div>
-                            <div className="flex items-center gap-1.5 w-full justify-end">
-                              <label className="text-xs text-foreground-muted whitespace-nowrap">Lot #</label>
-                              <input type="text" placeholder="optional" className="w-28 field-compact border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                value={it.lot_number}
-                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: e.target.value } : r))} />
-                            </div>
-                            <div className="flex items-center gap-1.5 w-full justify-end">
-                              <label className="text-xs text-foreground-muted whitespace-nowrap">Location</label>
-                              <select className="field-compact border border-border-default bg-surface text-foreground text-xs focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                value={it.location_id}
-                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, location_id: e.target.value } : r))}>
-                                <option value="">— none —</option>
-                                {shelfLocations.map(sl => (
-                                  <option key={sl.id} value={sl.id}>{sl.display_code}</option>
-                                ))}
-                              </select>
-                            </div>
-                          </div>
-                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-right align-top">
@@ -552,6 +520,51 @@ function POTab({ initialPO }: { initialPO?: string }) {
                         onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_cost: e.target.value } : r))} />
                     </td>
                   </tr>
+                  {it.perishable && (
+                    <tr className="bg-orange-50/60 dark:bg-orange-900/10 border-t border-orange-100 dark:border-orange-900/30">
+                      <td colSpan={5} className="px-4 py-3">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <label className={labelCls}>Expiry Date <span className="text-red-500">*</span></label>
+                            <DatePicker
+                              value={it.expiry_date}
+                              onChange={v => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, expiry_date: v } : r))}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Manufacture Date</label>
+                            <DatePicker
+                              value={it.manufacture_date}
+                              onChange={v => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, manufacture_date: v } : r))}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Lot Number</label>
+                            <input
+                              type="text"
+                              placeholder="optional"
+                              className={inputCls}
+                              value={it.lot_number}
+                              onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: e.target.value } : r))}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Shelf Location</label>
+                            <AdminSelect
+                              id={`location-${idx}`}
+                              value={it.location_id}
+                              onChange={v => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, location_id: v } : r))}
+                              options={[
+                                { value: '', label: '— none —' },
+                                ...shelfLocations.map(sl => ({ value: sl.id, label: sl.display_code })),
+                              ]}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                   )
                 })}
               </tbody>
