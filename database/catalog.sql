@@ -448,3 +448,15 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES produc
 
 -- inventory_transactions: full batch audit trail
 ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id);
+
+-- product_batches: FK to products with cascade delete to prevent orphaned rows
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints
+    WHERE constraint_name = 'product_batches_product_id_fkey'
+      AND table_name = 'product_batches'
+  ) THEN
+    ALTER TABLE product_batches ADD CONSTRAINT product_batches_product_id_fkey
+      FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE;
+  END IF;
+END $$;
