@@ -202,13 +202,14 @@ export async function PATCH(
 
       await client.query(`DELETE FROM order_items WHERE order_id = $1`, [id])
 
+      const savedItemIds: { product_id: string; variant_id: string | null; order_item_id: string }[] = []
       for (const item of processedItems) {
-        await client.query(
+        const inserted = await client.query<{ id: string }>(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, buy_unit, unit_price, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
           [
             id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
@@ -216,6 +217,7 @@ export async function PATCH(
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
           ]
         )
+        savedItemIds.push({ product_id: item.product_id, variant_id: item.variant_id ?? null, order_item_id: inserted.rows[0].id })
       }
 
       if (!moveToDraft) {
@@ -307,7 +309,7 @@ export async function PATCH(
       } catch (_) {}
     }
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, savedItemIds })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

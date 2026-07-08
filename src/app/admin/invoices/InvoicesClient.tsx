@@ -540,22 +540,16 @@ export default function InvoicesClient() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           batch_assignments: Object.keys(batchAssignments).length > 0
-            ? await (async () => {
-                // Resolve lineItemId → order_item_id using saved order items
-                const oiRes = await fetch(`/api/admin/invoices/${editId}`, { credentials: 'include' })
-                const oiData = await oiRes.json()
-                const orderItems: any[] = oiData.items || []
-                return items
-                  .filter(li => batchAssignments[li.id])
-                  .map(li => {
-                    const oi = orderItems.find((o: any) =>
-                      o.product_id === li.product_id &&
-                      (o.variant_id || null) === (li.variant_id || null)
-                    )
-                    return oi ? { order_item_id: oi.id, batch_id: batchAssignments[li.id] } : null
-                  })
-                  .filter(Boolean)
-              })()
+            ? items
+                .filter(li => batchAssignments[li.id])
+                .map(li => {
+                  const saved = (saveData.savedItemIds || []).find((s: any) =>
+                    s.product_id === li.product_id &&
+                    (s.variant_id || null) === (li.variant_id || null)
+                  )
+                  return saved ? { order_item_id: saved.order_item_id, batch_id: batchAssignments[li.id] } : null
+                })
+                .filter(Boolean)
             : [],
         }),
       })
