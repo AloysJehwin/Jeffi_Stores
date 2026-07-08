@@ -226,6 +226,12 @@ async function syncCentralInventory(
   variantId: string | null,
   subVariantId: string | null
 ): Promise<void> {
+  // Perishable products track stock via product_batches only — never update inventory_quantity
+  const perishableRow = await client.query<{ perishable: boolean }>(
+    'SELECT perishable FROM products WHERE id = $1', [productId]
+  )
+  if (perishableRow.rows[0]?.perishable) return
+
   const totalRow = await client.query(
     `SELECT COALESCE(SUM(quantity), 0)::int AS total FROM shelf_stock
      WHERE product_id = $1
