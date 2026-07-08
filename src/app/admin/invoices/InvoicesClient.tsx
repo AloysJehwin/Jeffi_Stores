@@ -177,6 +177,7 @@ export default function InvoicesClient() {
   // Batch picker for perishable line items
   const [batchPickerItem, setBatchPickerItem] = useState<BatchPickerItem | null>(null)
   const [batchAssignments, setBatchAssignments] = useState<Record<string, string>>({}) // lineItemId → batch_id
+  const [assignedBatchLabels, setAssignedBatchLabels] = useState<Record<string, string>>({}) // lineItemId → lot label
 
   const totalPages = Math.ceil(total / 25)
 
@@ -578,8 +579,14 @@ export default function InvoicesClient() {
           items={[batchPickerItem]}
           onConfirm={assignments => {
             const map: Record<string, string> = { ...batchAssignments }
-            for (const a of assignments) map[a.order_item_id] = a.batch_id
+            const labelMap: Record<string, string> = { ...assignedBatchLabels }
+            for (const a of assignments) {
+              map[a.order_item_id] = a.batch_id
+              const batch = batchPickerItem?.batches.find(b => b.id === a.batch_id)
+              labelMap[a.order_item_id] = batch?.lot_number || a.batch_id.slice(0, 8)
+            }
             setBatchAssignments(map)
+            setAssignedBatchLabels(labelMap)
             setBatchPickerItem(null)
           }}
           onCancel={() => setBatchPickerItem(null)}
@@ -699,7 +706,7 @@ export default function InvoicesClient() {
           </div>
 
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} />
+            <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} />
           </div>
 
 

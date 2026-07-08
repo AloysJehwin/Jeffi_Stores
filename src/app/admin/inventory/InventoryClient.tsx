@@ -1440,8 +1440,8 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(valuation?.totalValue || 0)} accent sub={`${valTotal} SKUs`} />
-                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub="this page" />
+                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(allValRows.reduce((s, p) => { const qty = p.perishable ? parseFloat(p.batch_qty_total || '0') + parseFloat(p.inventory_quantity || '0') : parseFloat(p.inventory_quantity || '0'); return s + qty * parseFloat(p.cost_price || '0') }, 0))} accent sub={`${valTotal} SKUs`} />
+                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => { const qty = p.perishable ? parseFloat(p.batch_qty_total || '0') + parseFloat(p.inventory_quantity || '0') : parseFloat(p.inventory_quantity || '0'); return s + qty * parseFloat(p.selling_price || '0') }, 0))} accent sub="this page" />
                 <SummaryCard label="Total SKUs" value={String(valTotal)} sub="across all products" />
                 <SummaryCard label="In Stock" value={String(allValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="on this page" />
               </div>
@@ -1492,7 +1492,7 @@ function StockTab() {
                                   <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Stock</span>
-                                      <span className="font-semibold text-foreground">{p.perishable && parseFloat(p.batch_qty_total || '0') > 0 ? parseFloat(p.batch_qty_total) : parseFloat(p.inventory_quantity || '0')}</span>
+                                      <span className="font-semibold text-foreground">{p.perishable ? parseFloat(p.batch_qty_total || '0') + parseFloat(p.inventory_quantity || '0') : parseFloat(p.inventory_quantity || '0')}</span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Price ex-GST</span>
@@ -1500,7 +1500,7 @@ function StockTab() {
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Stock Value</span>
-                                      <span className="font-semibold text-foreground">{formatINR(parseFloat(p.stock_value || '0'))}</span>
+                                      <span className="font-semibold text-foreground">{formatINR((() => { const qty = p.perishable ? parseFloat(p.batch_qty_total || '0') + parseFloat(p.inventory_quantity || '0') : parseFloat(p.inventory_quantity || '0'); return qty * parseFloat(p.cost_price || '0') })())}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -1546,8 +1546,8 @@ function StockTab() {
                                 </div>
                               ) : (
                                 (() => {
-                                  const displayQty = p.perishable && parseFloat(p.batch_qty_total || '0') > 0
-                                    ? parseFloat(p.batch_qty_total)
+                                  const displayQty = p.perishable
+                                    ? parseFloat(p.batch_qty_total || '0') + parseFloat(p.inventory_quantity || '0')
                                     : parseFloat(p.inventory_quantity || '0')
                                   return (
                                     <span className={`font-medium ${displayQty === 0 ? 'text-red-600 dark:text-red-400' : displayQty <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
@@ -1569,8 +1569,8 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
                             <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
-                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.stock_value || '0'))}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'))}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR((() => { const qty = p.perishable ? parseFloat(p.batch_qty_total || '0') + parseFloat(p.inventory_quantity || '0') : parseFloat(p.inventory_quantity || '0'); return qty * parseFloat(p.cost_price || '0') })())}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR((() => { const qty = p.perishable ? parseFloat(p.batch_qty_total || '0') + parseFloat(p.inventory_quantity || '0') : parseFloat(p.inventory_quantity || '0'); return qty * parseFloat(p.selling_price || '0') })())}</td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1">
                                 {isEditing ? (
@@ -1671,6 +1671,16 @@ function StockTab() {
                                           </tr>
                                         )
                                       })}
+                                      {parseFloat(p.inventory_quantity || '0') > 0 && (
+                                        <tr key="default-stock" className="border-t border-border-default/50">
+                                          <td className="py-1.5 pr-4 text-foreground-muted italic">Default stock</td>
+                                          <td className="py-1.5 pr-4 text-foreground-muted">—</td>
+                                          <td className="py-1.5 pr-4 text-foreground-muted hidden sm:table-cell">—</td>
+                                          <td className="py-1.5 pr-4 text-foreground-muted hidden md:table-cell">—</td>
+                                          <td className="py-1.5 pr-4 text-right font-medium text-foreground">{parseFloat(p.inventory_quantity || '0')}</td>
+                                          <td className="py-1.5 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</td>
+                                        </tr>
+                                      )}
                                     </tbody>
                                   </table>
                                 )}

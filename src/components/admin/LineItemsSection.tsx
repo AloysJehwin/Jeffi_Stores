@@ -176,9 +176,10 @@ interface LineItemsSectionProps {
   items: LineItem[]
   onChange: (items: LineItem[]) => void
   onStockBadgeClick?: (item: LineItem) => void
+  assignedBatchLabels?: Record<string, string>
 }
 
-export default function LineItemsSection({ items, onChange, onStockBadgeClick }: LineItemsSectionProps) {
+export default function LineItemsSection({ items, onChange, onStockBadgeClick, assignedBatchLabels }: LineItemsSectionProps) {
   const [searchModes, setSearchModes] = useState<Record<string, SearchMode>>({})
   const [nameInputs, setNameInputs] = useState<Record<string, string>>({})
   const [skuInputs, setSkuInputs] = useState<Record<string, string>>({})
@@ -426,7 +427,11 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick }:
                       <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {item.product_sku && <p className="text-xs text-foreground-muted font-mono">{item.product_sku}</p>}
-                        {item.inventory_quantity !== null && (() => {
+                        {assignedBatchLabels?.[item.id] ? (
+                          <button type="button" onClick={() => onStockBadgeClick?.(item)} className="text-xs font-medium px-1.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                            Batch: {assignedBatchLabels[item.id]}
+                          </button>
+                        ) : item.inventory_quantity !== null && (() => {
                           const su = getSelectedUnit(item)
                           const factor = (su && su.dimension === 'count' && su.factor > 1) ? su.factor : 1
                           const stockInUnits = factor > 1 ? Math.floor(item.inventory_quantity / factor) : item.inventory_quantity
