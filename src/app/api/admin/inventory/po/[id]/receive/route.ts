@@ -106,37 +106,75 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         await updateWeightedAvgCost(client, { productId, variantId, qtyReceived, unitCost })
 
+        // Fetch perishable flag first — perishable products track stock via batches only
+        const productRow = await client.query<{ perishable: boolean }>(
+          'SELECT perishable FROM products WHERE id = $1',
+          [productId]
+        )
+        const isPerishable = productRow.rows[0]?.perishable ?? false
+
         let stockBefore = 0
-        if (subVariantId) {
-          const row = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
-            [subVariantId]
+        let newBatchId: string | null = null
+
+        if (isPerishable) {
+          if (!item.expiry_date) {
+            throw new Error(`Product ${productId} is perishable — expiry_date is required for GRN receive`)
+          }
+          // Stock lives only in product_batches; read current batch total for ledger
+          const batchStockRow = await client.query<{ total: string }>(
+            `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches
+             WHERE product_id = $1
+               AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+               AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))`,
+            [productId, variantId, subVariantId]
           )
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-          await client.query(
-            `UPDATE product_sub_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
-            [qtyReceived, subVariantId]
+          stockBefore = parseFloat(batchStockRow.rows[0]?.total ?? '0') || 0
+          const batchInsert = await client.query<{ id: string }>(
+            `INSERT INTO product_batches
+               (product_id, variant_id, sub_variant_id, grn_id, lot_number, manufacture_date, expiry_date, quantity, quantity_remaining, location_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9) RETURNING id`,
+            [
+              productId, variantId, subVariantId, grnId,
+              item.lot_number || null,
+              item.manufacture_date || null,
+              item.expiry_date,
+              qtyReceived,
+              item.location_id || null,
+            ]
           )
-        } else if (variantId) {
-          const row = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
-            [variantId]
-          )
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-          await client.query(
-            `UPDATE product_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
-            [qtyReceived, variantId]
-          )
+          newBatchId = batchInsert.rows[0].id
         } else {
-          const row = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
-            [productId]
-          )
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-          await client.query(
-            `UPDATE products SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
-            [qtyReceived, productId]
-          )
+          if (subVariantId) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+              [subVariantId]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              `UPDATE product_sub_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
+              [qtyReceived, subVariantId]
+            )
+          } else if (variantId) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+              [variantId]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              `UPDATE product_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
+              [qtyReceived, variantId]
+            )
+          } else {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
+              [productId]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              `UPDATE products SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
+              [qtyReceived, productId]
+            )
+          }
         }
 
         await logStockMovement(client, {
@@ -148,31 +186,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           referenceType: 'grn',
           referenceId: grnId,
           currentStock: stockBefore,
+          ...(newBatchId ? { batchId: newBatchId } : {}),
         })
-
-        // Batch capture for perishable products — mandatory expiry_date required
-        const productRow = await client.query<{ perishable: boolean }>(
-          'SELECT perishable FROM products WHERE id = $1',
-          [productId]
-        )
-        if (productRow.rows[0]?.perishable) {
-          if (!item.expiry_date) {
-            throw new Error(`Product ${productId} is perishable — expiry_date is required for GRN receive`)
-          }
-          await client.query(
-            `INSERT INTO product_batches
-               (product_id, variant_id, sub_variant_id, grn_id, lot_number, manufacture_date, expiry_date, quantity, quantity_remaining, location_id)
-             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9)`,
-            [
-              productId, variantId, subVariantId, grnId,
-              item.lot_number || null,
-              item.manufacture_date || null,
-              item.expiry_date,
-              qtyReceived,
-              item.location_id || null,
-            ]
-          )
-        }
 
         await client.query(
           `UPDATE purchase_order_items
