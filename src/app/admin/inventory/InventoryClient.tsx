@@ -473,6 +473,8 @@ function POTab({ initialPO }: { initialPO?: string }) {
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Prev. Received</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Receive Now</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Unit Cost (₹)</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Tax %</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Line Total (₹)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
@@ -502,16 +504,12 @@ function POTab({ initialPO }: { initialPO?: string }) {
                       {prevInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
                     </td>
                     <td className="px-4 py-3 text-right align-middle">
-                      <div className="inline-flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-1.5">
-                          <input type="number" min="0" step="0.001" className="w-24 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
-                            onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_qty: e.target.value } : r))} />
-                          {puLabel && <span className="text-xs text-foreground-muted">{puLabel}</span>}
-                        </div>
+                      <div className="flex items-center justify-end gap-1.5">
+                        <input type="number" min="0" step="0.001" className="w-24 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
+                          onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_qty: e.target.value } : r))} />
+                        {puLabel && <span className="text-xs text-foreground-muted">{puLabel}</span>}
                         {factor > 1 && parseFloat(it.receive_qty) > 0 && (
-                          <span className="text-xs text-foreground-muted">
-                            = {Math.round(parseFloat(it.receive_qty) * factor * 1000) / 1000} {baseLabel}
-                          </span>
+                          <span className="text-xs text-foreground-muted">= {Math.round(parseFloat(it.receive_qty) * factor * 1000) / 1000} {baseLabel}</span>
                         )}
                       </div>
                     </td>
@@ -519,10 +517,23 @@ function POTab({ initialPO }: { initialPO?: string }) {
                       <input type="number" min="0" step="0.01" className="w-28 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_cost}
                         onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_cost: e.target.value } : r))} />
                     </td>
+                    <td className="px-4 py-3 text-right text-foreground-secondary align-middle">
+                      {parseFloat(it.tax_rate || '0') > 0 ? `${it.tax_rate}%` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right text-foreground align-middle">
+                      {(() => {
+                        const qty = parseFloat(it.receive_qty) || 0
+                        const cost = parseFloat(it.receive_cost) || 0
+                        const tax = parseFloat(it.tax_rate || '0')
+                        if (!qty || !cost) return '—'
+                        const lineTotal = qty * cost * (1 + tax / 100)
+                        return formatINR(lineTotal)
+                      })()}
+                    </td>
                   </tr>
                   {it.perishable && (
                     <tr className="bg-orange-50/60 dark:bg-orange-900/10 border-t border-orange-100 dark:border-orange-900/30">
-                      <td colSpan={5} className="px-4 py-3">
+                      <td colSpan={7} className="px-4 py-3">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
                           <div>
                             <label className={labelCls}>Expiry Date <span className="text-red-500">*</span></label>
