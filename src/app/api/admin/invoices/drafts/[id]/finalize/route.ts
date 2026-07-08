@@ -86,6 +86,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           batchQty = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
         }
 
+        let stockBefore = 0
         // When batch assigned, only check/use batch qty — inventory_quantity is untouched
         if (assignedBatchId) {
           if (batchQty < effectiveQty) {
