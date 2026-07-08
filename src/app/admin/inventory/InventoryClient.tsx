@@ -894,6 +894,7 @@ function StockTab() {
   const router = useRouter()
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
   const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number; allCategories?: string[]; allBrands?: string[] } | null>(null)
