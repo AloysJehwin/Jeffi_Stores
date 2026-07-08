@@ -526,7 +526,8 @@ function POTab({ initialPO }: { initialPO?: string }) {
                         const cost = parseFloat(it.receive_cost) || 0
                         const tax = parseFloat(it.tax_rate || '0')
                         if (!qty || !cost) return '—'
-                        const lineTotal = qty * cost * (1 + tax / 100)
+                        const baseQty = qty * factor
+                        const lineTotal = baseQty * cost * (1 + tax / 100)
                         return formatINR(lineTotal)
                       })()}
                     </td>
