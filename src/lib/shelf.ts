@@ -39,6 +39,18 @@ export interface ShelfStock {
   unit_label?: string | null
   unit_factor?: number | null
   unit_dimension?: string | null
+  perishable?: boolean
+}
+
+export interface LocationBatch {
+  id: string
+  product_id: string
+  variant_id: string | null
+  sub_variant_id: string | null
+  lot_number: string | null
+  manufacture_date: string | null
+  expiry_date: string | null
+  quantity_remaining: number
 }
 
 function buildDisplayCode(warehouseCode: string, aisle: string, rack: string, shelf: string, bin?: string | null): string {
@@ -191,6 +203,7 @@ export async function getStockAtLocation(locationId: string): Promise<ShelfStock
     `SELECT ss.id, ss.location_id, ss.product_id, ss.variant_id, ss.sub_variant_id,
             ss.quantity, ss.updated_at,
             p.name AS product_name,
+            p.perishable,
             COALESCE(ps.sub_variant_name || ' (' || pv.variant_name || ')', pv.variant_name) AS variant_name,
             COALESCE(ps.sku, pv.sku, p.sku) AS sku,
             COALESCE(pu.display_label, pu.unit) AS unit_label,
@@ -203,6 +216,17 @@ export async function getStockAtLocation(locationId: string): Promise<ShelfStock
      LEFT JOIN product_units pu ON pu.id = COALESCE(pv.sell_unit_id, p.sell_unit_id)
      WHERE ss.location_id = $1
      ORDER BY p.name, variant_name NULLS FIRST`,
+    [locationId]
+  )
+}
+
+export async function getBatchesAtLocation(locationId: string): Promise<LocationBatch[]> {
+  return queryMany<LocationBatch>(
+    `SELECT id, product_id, variant_id, sub_variant_id,
+            lot_number, manufacture_date, expiry_date, quantity_remaining
+     FROM product_batches
+     WHERE location_id = $1 AND quantity_remaining > 0
+     ORDER BY expiry_date ASC NULLS LAST, manufacture_date ASC NULLS LAST`,
     [locationId]
   )
 }
