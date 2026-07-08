@@ -1646,7 +1646,8 @@ function StockTab() {
                                         <th className="pb-1.5 text-left font-medium pr-4 hidden sm:table-cell">Mfg Date</th>
                                         <th className="pb-1.5 text-left font-medium pr-4 hidden md:table-cell">Location</th>
                                         <th className="pb-1.5 text-right font-medium pr-4">Qty Remaining</th>
-                                        <th className="pb-1.5 text-right font-medium">Batch Value</th>
+                                        <th className="pb-1.5 text-right font-medium pr-4">Batch Value</th>
+                                        <th className="pb-1.5 w-8"></th>
                                       </tr>
                                     </thead>
                                     <tbody className="divide-y divide-border-default/50">
@@ -1667,7 +1668,22 @@ function StockTab() {
                                             <td className="py-1.5 pr-4 text-foreground-secondary hidden sm:table-cell">{b.manufacture_date ? formatDate(b.manufacture_date) : '—'}</td>
                                             <td className="py-1.5 pr-4 text-foreground-secondary hidden md:table-cell">{b.location || '—'}</td>
                                             <td className="py-1.5 pr-4 text-right font-medium text-foreground">{qty}</td>
-                                            <td className="py-1.5 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
+                                            <td className="py-1.5 pr-4 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
+                                            <td className="py-1.5 text-right">
+                                              <button
+                                                onClick={async () => {
+                                                  if (!confirm(qty > 0 ? `This batch still has ${qty} units remaining. Are you sure you want to remove it?` : 'Remove this batch?')) return
+                                                  const res = await fetch(`/api/admin/inventory/batches/${b.batch_id}`, { method: 'DELETE' })
+                                                  const json = await res.json()
+                                                  if (!res.ok) { showToast(json.error || 'Failed to remove batch', 'error'); return }
+                                                  showToast('Batch removed', 'success')
+                                                  toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)
+                                                  setTimeout(() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null), 100)
+                                                }}
+                                                className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                title="Remove batch"
+                                              >Remove</button>
+                                            </td>
                                           </tr>
                                         )
                                       })}
