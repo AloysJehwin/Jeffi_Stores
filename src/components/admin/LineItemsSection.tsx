@@ -175,9 +175,10 @@ const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 interface LineItemsSectionProps {
   items: LineItem[]
   onChange: (items: LineItem[]) => void
+  onStockBadgeClick?: (item: LineItem) => void
 }
 
-export default function LineItemsSection({ items, onChange }: LineItemsSectionProps) {
+export default function LineItemsSection({ items, onChange, onStockBadgeClick }: LineItemsSectionProps) {
   const [searchModes, setSearchModes] = useState<Record<string, SearchMode>>({})
   const [nameInputs, setNameInputs] = useState<Record<string, string>>({})
   const [skuInputs, setSkuInputs] = useState<Record<string, string>>({})
@@ -432,7 +433,15 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                           const unitLabel = factor > 1 ? (su?.display_label ?? item.buy_unit ?? 'units') : 'pcs'
                           const isOut = stockInUnits === 0
                           const isLow = !isOut && stockInUnits <= 5
-                          return (
+                          return onStockBadgeClick && !isOut ? (
+                            <button type="button" onClick={() => onStockBadgeClick(item)} className={`text-xs font-medium px-1.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
+                              isLow
+                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            }`}>
+                              {`Stock: ${stockInUnits} ${unitLabel}`}
+                            </button>
+                          ) : (
                             <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
                               isOut
                                 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'

@@ -12,7 +12,43 @@ export async function GET(request: NextRequest) {
     if (!hasScope(admin.role, admin.scopes, 'orders:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
     const orderId = request.nextUrl.searchParams.get('order_id')
-    if (!orderId) return NextResponse.json({ error: 'order_id required' }, { status: 400 })
+    const productId = request.nextUrl.searchParams.get('product_id')
+    const variantId = request.nextUrl.searchParams.get('variant_id') || null
+    const subVariantId = request.nextUrl.searchParams.get('sub_variant_id') || null
+    const lineItemId = request.nextUrl.searchParams.get('line_item_id') || 'item'
+    const qty = parseFloat(request.nextUrl.searchParams.get('qty') || '1')
+
+    // Direct product lookup (invoice create — no order yet)
+    if (productId) {
+      const perishable = await queryOne<{ perishable: boolean }>(`SELECT perishable FROM products WHERE id = $1`, [productId])
+      if (!perishable?.perishable) return NextResponse.json({ items: [] })
+
+      const batches = await queryMany<any>(`
+        SELECT pb.id, pb.lot_number, pb.manufacture_date, pb.expiry_date, pb.quantity_remaining,
+               sl.display_code AS location
+        FROM product_batches pb
+        LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
+        WHERE pb.product_id = $1
+          AND (pb.variant_id = $2 OR ($2::uuid IS NULL AND pb.variant_id IS NULL))
+          AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
+          AND pb.quantity_remaining > 0
+        ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
+      `, [productId, variantId, subVariantId])
+
+      const productRow = await queryOne<{ name: string }>(`SELECT name FROM products WHERE id = $1`, [productId])
+      const variantRow = variantId ? await queryOne<{ variant_name: string }>(`SELECT variant_name FROM product_variants WHERE id = $1`, [variantId]) : null
+
+      return NextResponse.json({ items: [{
+        order_item_id: lineItemId,
+        product_name: productRow?.name || '',
+        variant_name: variantRow?.variant_name || null,
+        required_qty: qty,
+        already_assigned: false,
+        batches,
+      }] })
+    }
+
+    if (!orderId) return NextResponse.json({ error: 'order_id or product_id required' }, { status: 400 })
 
     // Get order items where the product is perishable
     const items = await queryMany<any>(`

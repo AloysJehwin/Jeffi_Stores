@@ -11,6 +11,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, { newLineItem, type LineItem as LILineItem } from '@/components/admin/LineItemsSection'
+import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import DatePicker from '@/components/ui/DatePicker'
 
@@ -173,6 +174,10 @@ export default function InvoicesClient() {
   const [finalizingId, setFinalizingId] = useState<string | null>(null)
   const [editIsDraft, setEditIsDraft] = useState(false)
 
+  // Batch picker for perishable line items
+  const [batchPickerItem, setBatchPickerItem] = useState<BatchPickerItem | null>(null)
+  const [batchAssignments, setBatchAssignments] = useState<Record<string, string>>({}) // lineItemId → batch_id
+
   const totalPages = Math.ceil(total / 25)
 
   const INVOICE_SORT_KEYS: Record<string, keyof Invoice> = {
@@ -281,6 +286,7 @@ export default function InvoicesClient() {
     setEditId(null)
     setEditIsDraft(false)
     setCustSearch(''); setCustResults([]); setShowCustDrop(false)
+    setBatchAssignments({})
   }
 
   async function openEdit(inv: Invoice) {
@@ -476,6 +482,20 @@ export default function InvoicesClient() {
     }
   }
 
+  async function handleStockBadgeClick(item: LILineItem) {
+    if (!item.product_id) return
+    const params = new URLSearchParams({
+      product_id: item.product_id,
+      line_item_id: item.id,
+      qty: String(Number(item.quantity) || 1),
+    })
+    if (item.variant_id) params.set('variant_id', item.variant_id)
+    if (item.sub_variant_id) params.set('sub_variant_id', item.sub_variant_id)
+    const res = await fetch(`/api/admin/inventory/batches/available?${params}`, { credentials: 'include' })
+    const data = await res.json()
+    if (data.items?.length > 0) setBatchPickerItem(data.items[0])
+  }
+
   async function handleFinalizeEdit(e: React.FormEvent) {
     e.preventDefault()
     if (!editId) return
@@ -515,7 +535,30 @@ export default function InvoicesClient() {
         return
       }
 
-      const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, { method: 'POST', credentials: 'include' })
+      const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batch_assignments: Object.keys(batchAssignments).length > 0
+            ? await (async () => {
+                // Resolve lineItemId → order_item_id using saved order items
+                const oiRes = await fetch(`/api/admin/invoices/${editId}`, { credentials: 'include' })
+                const oiData = await oiRes.json()
+                const orderItems: any[] = oiData.items || []
+                return items
+                  .filter(li => batchAssignments[li.id])
+                  .map(li => {
+                    const oi = orderItems.find((o: any) =>
+                      o.product_id === li.product_id &&
+                      (o.variant_id || null) === (li.variant_id || null)
+                    )
+                    return oi ? { order_item_id: oi.id, batch_id: batchAssignments[li.id] } : null
+                  })
+                  .filter(Boolean)
+              })()
+            : [],
+        }),
+      })
       const finalData = await finalRes.json()
       if (!finalRes.ok) { setFormError(finalData.error || 'Failed to finalize'); return }
       showToast(`Invoice ${finalData.invoiceNumber || ''} finalized`, 'success')
@@ -649,7 +692,7 @@ export default function InvoicesClient() {
           </div>
 
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <LineItemsSection items={items} onChange={setItems} />
+            <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} />
           </div>
 
 
@@ -725,6 +768,19 @@ export default function InvoicesClient() {
     : renderForm(true)
 
   return (
+    <>
+    {batchPickerItem && (
+      <BatchPickerModal
+        items={[batchPickerItem]}
+        onConfirm={assignments => {
+          const map: Record<string, string> = { ...batchAssignments }
+          for (const a of assignments) map[a.order_item_id] = a.batch_id
+          setBatchAssignments(map)
+          setBatchPickerItem(null)
+        }}
+        onCancel={() => setBatchPickerItem(null)}
+      />
+    )}
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
         <div>
@@ -1276,6 +1332,7 @@ export default function InvoicesClient() {
       )}
       {selectedInvoice && <InvoiceDetailModal inv={selectedInvoice} onClose={() => setSelectedInvoice(null)} />}
     </div>
+    </>
   )
 }
 
