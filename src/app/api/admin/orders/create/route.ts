@@ -5,6 +5,7 @@ import { withTransaction } from '@/lib/db'
 import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, round2 } from '@/lib/gst'
 import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
+import { syncPerishableStock } from '@/lib/shelf'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { z } from 'zod'
 import { parseBody, zUuid, zNonEmpty } from '@/lib/validate'
@@ -351,6 +352,20 @@ export async function POST(request: NextRequest) {
               currentStock: stockBefore,
             })
           }
+        }
+
+        // Sync shelf_stock + inventory_quantity for any perishable product touched
+        const synced = new Set<string>()
+        for (const item of processedItems) {
+          if (!item.product_id) continue
+          const perishRow = await client.query<{ perishable: boolean }>(
+            'SELECT perishable FROM products WHERE id = $1', [item.product_id]
+          )
+          if (!perishRow.rows[0]?.perishable) continue
+          const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
+          if (synced.has(key)) continue
+          synced.add(key)
+          await syncPerishableStock(client, item.product_id, item.variant_id || null, item.sub_variant_id || null)
         }
 
         const isGSTEnabled = process.env.ENABLE_GST === 'true'

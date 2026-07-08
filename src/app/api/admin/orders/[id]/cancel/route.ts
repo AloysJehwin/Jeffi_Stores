@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction } from '@/lib/db'
 import { logStockMovement } from '@/lib/inventory'
+import { syncPerishableStock } from '@/lib/shelf'
 
 export async function POST(
   request: NextRequest,
@@ -129,6 +130,20 @@ export async function POST(
             currentStock: stockBefore,
           })
         }
+      }
+
+      // Sync shelf_stock + inventory_quantity for any perishable product touched
+      const synced = new Set<string>()
+      for (const item of itemsResult.rows) {
+        if (!item.product_id) continue
+        const perishRow = await client.query<{ perishable: boolean }>(
+          'SELECT perishable FROM products WHERE id = $1', [item.product_id]
+        )
+        if (!perishRow.rows[0]?.perishable) continue
+        const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
+        if (synced.has(key)) continue
+        synced.add(key)
+        await syncPerishableStock(client, item.product_id, item.variant_id || null, item.sub_variant_id || null)
       }
 
       await client.query(
