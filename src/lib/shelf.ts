@@ -426,59 +426,121 @@ export async function moveStock(
   try {
     await client.query('BEGIN')
 
-    const fromRow = await client.query(
-      `SELECT id, quantity FROM shelf_stock
-       WHERE location_id = $1 AND product_id = $2
-         AND ($3::uuid IS NULL OR variant_id = $3) AND (variant_id IS NULL OR $3::uuid IS NOT NULL)
-         AND ($4::uuid IS NULL OR sub_variant_id = $4) AND (sub_variant_id IS NULL OR $4::uuid IS NOT NULL)`,
-      [fromLocationId, productId, variantId, subVariantId]
+    // Check if product is perishable
+    const perishRow = await client.query<{ perishable: boolean }>(
+      'SELECT perishable FROM products WHERE id = $1', [productId]
     )
-    if (!fromRow.rows.length || fromRow.rows[0].quantity < qty) {
-      throw new Error('Insufficient stock at source location')
-    }
+    const isPerishable = perishRow.rows[0]?.perishable ?? false
 
-    const newFromQty = fromRow.rows[0].quantity - qty
-    if (newFromQty === 0) {
-      await client.query(`DELETE FROM shelf_stock WHERE id = $1`, [fromRow.rows[0].id])
-    } else {
-      await client.query(
-        `UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`,
-        [newFromQty, fromRow.rows[0].id]
+    if (isPerishable) {
+      // For perishable products: move batch records FIFO, then resync shelf_stock at both locations
+      const batchRows = await client.query<{ id: string; quantity_remaining: string }>(
+        `SELECT id, quantity_remaining FROM product_batches
+         WHERE location_id = $1 AND product_id = $2
+           AND (variant_id = $3 OR ($3 IS NULL AND variant_id IS NULL))
+           AND (sub_variant_id = $4 OR ($4 IS NULL AND sub_variant_id IS NULL))
+           AND quantity_remaining > 0
+         ORDER BY expiry_date ASC NULLS LAST, manufacture_date ASC NULLS LAST, created_at ASC`,
+        [fromLocationId, productId, variantId, subVariantId]
       )
-    }
-    await client.query(
-      `INSERT INTO shelf_stock_transactions (location_id, product_id, variant_id, sub_variant_id, quantity_change, quantity_after, reason, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, 'move_out', $7)`,
-      [fromLocationId, productId, variantId, subVariantId, -qty, newFromQty, createdBy ?? null]
-    )
 
-    const toRow = await client.query(
-      `SELECT id, quantity FROM shelf_stock
-       WHERE location_id = $1 AND product_id = $2
-         AND ($3::uuid IS NULL OR variant_id = $3) AND (variant_id IS NULL OR $3::uuid IS NOT NULL)
-         AND ($4::uuid IS NULL OR sub_variant_id = $4) AND (sub_variant_id IS NULL OR $4::uuid IS NOT NULL)`,
-      [toLocationId, productId, variantId, subVariantId]
-    )
-    let newToQty: number
-    if (toRow.rows.length > 0) {
-      newToQty = toRow.rows[0].quantity + qty
+      const totalAvail = batchRows.rows.reduce((s, r) => s + parseFloat(r.quantity_remaining), 0)
+      if (totalAvail < qty) throw new Error('Insufficient stock at source location')
+
+      let remaining = qty
+      for (const batch of batchRows.rows) {
+        if (remaining <= 0) break
+        const avail = parseFloat(batch.quantity_remaining)
+        const take = Math.min(avail, remaining)
+        remaining -= take
+
+        if (take === avail) {
+          // Move entire batch to destination
+          await client.query(
+            'UPDATE product_batches SET location_id = $1, updated_at = now() WHERE id = $2',
+            [toLocationId, batch.id]
+          )
+        } else {
+          // Split: reduce source batch, insert new batch at destination
+          await client.query(
+            'UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = now() WHERE id = $2',
+            [take, batch.id]
+          )
+          // Copy batch metadata to new destination batch
+          await client.query(
+            `INSERT INTO product_batches (product_id, variant_id, sub_variant_id, location_id, lot_number, manufacture_date, expiry_date, quantity_remaining, notes)
+             SELECT product_id, variant_id, sub_variant_id, $1, lot_number, manufacture_date, expiry_date, $2, notes
+             FROM product_batches WHERE id = $3`,
+            [toLocationId, take, batch.id]
+          )
+        }
+      }
+
+      // Log transactions
       await client.query(
-        `UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`,
-        [newToQty, toRow.rows[0].id]
+        `INSERT INTO shelf_stock_transactions (location_id, product_id, variant_id, sub_variant_id, quantity_change, quantity_after, reason, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, 'move_out', $7)`,
+        [fromLocationId, productId, variantId, subVariantId, -qty, totalAvail - qty, createdBy ?? null]
       )
+
+      // Resync shelf_stock at both locations from updated batches
+      await syncPerishableStock(client, productId, variantId, subVariantId)
     } else {
-      newToQty = qty
+      // Non-perishable: move shelf_stock directly
+      const fromRow = await client.query(
+        `SELECT id, quantity FROM shelf_stock
+         WHERE location_id = $1 AND product_id = $2
+           AND ($3::uuid IS NULL OR variant_id = $3) AND (variant_id IS NULL OR $3::uuid IS NOT NULL)
+           AND ($4::uuid IS NULL OR sub_variant_id = $4) AND (sub_variant_id IS NULL OR $4::uuid IS NOT NULL)`,
+        [fromLocationId, productId, variantId, subVariantId]
+      )
+      if (!fromRow.rows.length || fromRow.rows[0].quantity < qty) {
+        throw new Error('Insufficient stock at source location')
+      }
+
+      const newFromQty = fromRow.rows[0].quantity - qty
+      if (newFromQty === 0) {
+        await client.query(`DELETE FROM shelf_stock WHERE id = $1`, [fromRow.rows[0].id])
+      } else {
+        await client.query(
+          `UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`,
+          [newFromQty, fromRow.rows[0].id]
+        )
+      }
       await client.query(
-        `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
-         VALUES ($1, $2, $3, $4, $5)`,
-        [toLocationId, productId, variantId, subVariantId, newToQty]
+        `INSERT INTO shelf_stock_transactions (location_id, product_id, variant_id, sub_variant_id, quantity_change, quantity_after, reason, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, 'move_out', $7)`,
+        [fromLocationId, productId, variantId, subVariantId, -qty, newFromQty, createdBy ?? null]
+      )
+
+      const toRow = await client.query(
+        `SELECT id, quantity FROM shelf_stock
+         WHERE location_id = $1 AND product_id = $2
+           AND ($3::uuid IS NULL OR variant_id = $3) AND (variant_id IS NULL OR $3::uuid IS NOT NULL)
+           AND ($4::uuid IS NULL OR sub_variant_id = $4) AND (sub_variant_id IS NULL OR $4::uuid IS NOT NULL)`,
+        [toLocationId, productId, variantId, subVariantId]
+      )
+      let newToQty: number
+      if (toRow.rows.length > 0) {
+        newToQty = toRow.rows[0].quantity + qty
+        await client.query(
+          `UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`,
+          [newToQty, toRow.rows[0].id]
+        )
+      } else {
+        newToQty = qty
+        await client.query(
+          `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
+           VALUES ($1, $2, $3, $4, $5)`,
+          [toLocationId, productId, variantId, subVariantId, newToQty]
+        )
+      }
+      await client.query(
+        `INSERT INTO shelf_stock_transactions (location_id, product_id, variant_id, sub_variant_id, quantity_change, quantity_after, reason, created_by)
+         VALUES ($1, $2, $3, $4, $5, $6, 'move_in', $7)`,
+        [toLocationId, productId, variantId, subVariantId, qty, newToQty, createdBy ?? null]
       )
     }
-    await client.query(
-      `INSERT INTO shelf_stock_transactions (location_id, product_id, variant_id, sub_variant_id, quantity_change, quantity_after, reason, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, 'move_in', $7)`,
-      [toLocationId, productId, variantId, subVariantId, qty, newToQty, createdBy ?? null]
-    )
 
     await client.query('COMMIT')
   } catch (e) {
