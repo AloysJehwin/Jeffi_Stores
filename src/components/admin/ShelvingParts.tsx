@@ -268,21 +268,20 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
               <button onClick={saveQty} disabled={saving} aria-label="Save" className="w-7 h-7 flex items-center justify-center rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>
               <button onClick={() => setEditing(false)} aria-label="Cancel" className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-default hover:bg-surface-secondary text-foreground-secondary transition-colors"><X className="w-3.5 h-3.5" /></button>
             </div>
+          ) : row.perishable && batches.length > 0 ? (
+            <button
+              onClick={() => setBatchesOpen(o => !o)}
+              className="flex items-center gap-1 text-sm font-bold tabular-nums text-foreground hover:text-secondary-500 dark:hover:text-secondary-400 transition-colors min-w-[2rem] text-right"
+            >
+              {displayQty} <span className="text-xs font-normal text-foreground-muted">{unitLabel}</span>
+              <svg className={`w-3 h-3 ml-0.5 transition-transform text-foreground-muted ${batchesOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
           ) : (
             <button
               onClick={() => { setNewQty(displayQty); setEditing(true) }}
               className="text-sm font-bold tabular-nums text-foreground hover:text-secondary-500 dark:hover:text-secondary-400 transition-colors min-w-[2rem] text-right"
             >
               {displayQty} <span className="text-xs font-normal text-foreground-muted">{unitLabel}</span>
-            </button>
-          )}
-          {row.perishable && batches.length > 0 && (
-            <button
-              onClick={() => setBatchesOpen(o => !o)}
-              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors flex items-center gap-1"
-            >
-              <span>{batches.length} batch{batches.length !== 1 ? 'es' : ''}</span>
-              <svg className={`w-3 h-3 transition-transform ${batchesOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
           )}
           <button
