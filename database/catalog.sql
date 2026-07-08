@@ -444,10 +444,10 @@ ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS quantity_remaining numeric(
 ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS location_id uuid REFERENCES shelf_locations(id);
 
 -- order_items: link to assigned batch (set at stock deduction time)
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id);
+ALTER TABLE order_items ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id) ON DELETE SET NULL;
 
 -- inventory_transactions: full batch audit trail
-ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id);
+ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id) ON DELETE SET NULL;
 
 -- product_batches: FK to products with cascade delete to prevent orphaned rows
 DO $$ BEGIN
