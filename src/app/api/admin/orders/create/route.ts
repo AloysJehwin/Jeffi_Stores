@@ -157,15 +157,22 @@ export async function POST(request: NextRequest) {
           batchQty = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
         }
 
-        if (item.sub_variant_id) {
+        // When a batch is assigned, only that batch's qty counts — don't mix with inventory_quantity
+        if (assignedBatchId) {
+          if (batchQty < baseQty) {
+            insufficientItems.push(
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (batch available: ${batchQty}, required: ${baseQty})`
+            )
+          }
+        } else if (item.sub_variant_id) {
           const inv = await client.query<{ inventory_quantity: string }>(
             `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
             [item.sub_variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock + batchQty < baseQty) {
+          if (stock < baseQty) {
             insufficientItems.push(
-              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock + batchQty}, required: ${baseQty})`
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`
             )
           }
         } else if (item.variant_id) {
@@ -174,9 +181,9 @@ export async function POST(request: NextRequest) {
             [item.variant_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock + batchQty < baseQty) {
+          if (stock < baseQty) {
             insufficientItems.push(
-              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock + batchQty}, required: ${baseQty})`
+              `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} (available: ${stock}, required: ${baseQty})`
             )
           }
         } else {
@@ -185,8 +192,8 @@ export async function POST(request: NextRequest) {
             [item.product_id]
           )
           const stock = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
-          if (stock + batchQty < baseQty) {
-            insufficientItems.push(`${item.product_name} (available: ${stock + batchQty}, required: ${baseQty})`)
+          if (stock < baseQty) {
+            insufficientItems.push(`${item.product_name} (available: ${stock}, required: ${baseQty})`)
           }
         }
       }
@@ -273,43 +280,39 @@ export async function POST(request: NextRequest) {
             batchQtyForLog = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
           }
 
-          let stockBefore = 0
-          if (item.sub_variant_id) {
+          // When batch assigned, stockBefore is the batch qty only (inventory_quantity is untouched)
+          if (assignedBatchId) {
+            stockBefore = batchQtyForLog
+          } else if (item.sub_variant_id) {
             const row = await client.query<{ inventory_quantity: string }>(
               `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
               [item.sub_variant_id]
             )
-            stockBefore = (parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0) + batchQtyForLog
-            if (!assignedBatchId) {
-              await client.query(
-                `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-                [qty, item.sub_variant_id]
-              )
-            }
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+              [qty, item.sub_variant_id]
+            )
           } else if (item.variant_id) {
             const row = await client.query<{ inventory_quantity: string }>(
               `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
               [item.variant_id]
             )
-            stockBefore = (parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0) + batchQtyForLog
-            if (!assignedBatchId) {
-              await client.query(
-                `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-                [qty, item.variant_id]
-              )
-            }
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+              [qty, item.variant_id]
+            )
           } else {
             const row = await client.query<{ inventory_quantity: string }>(
               `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
               [item.product_id]
             )
-            stockBefore = (parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0) + batchQtyForLog
-            if (!assignedBatchId) {
-              await client.query(
-                `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-                [qty, item.product_id]
-              )
-            }
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+              [qty, item.product_id]
+            )
           }
           if (assignedBatchId) {
             await client.query(
