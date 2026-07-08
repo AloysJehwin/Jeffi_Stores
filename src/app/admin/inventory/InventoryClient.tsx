@@ -501,7 +501,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     <td className="px-4 py-3 text-right text-foreground-secondary">
                       {prevInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
                     </td>
-                    <td className="px-4 py-3 text-right align-top">
+                    <td className="px-4 py-3 text-right align-middle">
                       <div className="inline-flex flex-col items-end gap-1">
                         <div className="flex items-center gap-1.5">
                           <input type="number" min="0" step="0.001" className="w-24 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
@@ -515,7 +515,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right align-top">
+                    <td className="px-4 py-3 text-right align-middle">
                       <input type="number" min="0" step="0.01" className="w-28 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_cost}
                         onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_cost: e.target.value } : r))} />
                     </td>
@@ -523,7 +523,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                   {it.perishable && (
                     <tr className="bg-orange-50/60 dark:bg-orange-900/10 border-t border-orange-100 dark:border-orange-900/30">
                       <td colSpan={5} className="px-4 py-3">
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
                           <div>
                             <label className={labelCls}>Expiry Date <span className="text-red-500">*</span></label>
                             <DatePicker
@@ -548,7 +548,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                               onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: e.target.value } : r))}
                             />
                           </div>
-                          <div>
+                          <div className="self-start">
                             <label className={labelCls}>Shelf Location</label>
                             <AdminSelect
                               id={`location-${idx}`}
