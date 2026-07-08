@@ -578,6 +578,19 @@ export default function InvoicesClient() {
 
   function renderForm(isEdit: boolean) {
     return (
+      <>
+      {batchPickerItem && (
+        <BatchPickerModal
+          items={[batchPickerItem]}
+          onConfirm={assignments => {
+            const map: Record<string, string> = { ...batchAssignments }
+            for (const a of assignments) map[a.order_item_id] = a.batch_id
+            setBatchAssignments(map)
+            setBatchPickerItem(null)
+          }}
+          onCancel={() => setBatchPickerItem(null)}
+        />
+      )}
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <button
@@ -753,6 +766,7 @@ export default function InvoicesClient() {
           </div>
         </form>
       </div>
+      </>
     )
   }
 
@@ -769,18 +783,6 @@ export default function InvoicesClient() {
 
   return (
     <>
-    {batchPickerItem && (
-      <BatchPickerModal
-        items={[batchPickerItem]}
-        onConfirm={assignments => {
-          const map: Record<string, string> = { ...batchAssignments }
-          for (const a of assignments) map[a.order_item_id] = a.batch_id
-          setBatchAssignments(map)
-          setBatchPickerItem(null)
-        }}
-        onCancel={() => setBatchPickerItem(null)}
-      />
-    )}
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
         <div>
