@@ -22,6 +22,7 @@ export async function logStockMovement(
     unitLabel?: string | null
     unitFactor?: number | null
     quantityInUnit?: number | null
+    batchId?: string | null
   }
 ) {
   const { productId, variantId, subVariantId, transactionType, quantityChange, referenceType, referenceId, notes } = params
@@ -48,14 +49,15 @@ export async function logStockMovement(
 
   const sql = `INSERT INTO inventory_transactions
     (product_id, variant_id, sub_variant_id, transaction_type, quantity_change, quantity_after,
-     reference_type, reference_id, notes, unit_id, unit_label, unit_factor, quantity_in_unit)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`
+     reference_type, reference_id, notes, unit_id, unit_label, unit_factor, quantity_in_unit, batch_id)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`
   const values = [
     productId, variantId, subVariantId || null,
     transactionType, qtyChange, quantityAfter,
     referenceType, referenceId, notes || null,
     params.unitId || null, params.unitLabel || null,
     params.unitFactor || null, params.quantityInUnit || null,
+    params.batchId || null,
   ]
 
   if (client) {

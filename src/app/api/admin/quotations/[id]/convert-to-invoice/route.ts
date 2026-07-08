@@ -46,6 +46,9 @@ export async function POST(
     const body = await request.json().catch(() => ({}))
     const paymentMode: string = body.paymentMode || 'cash'
     const enableDelivery: boolean = !!body.enableDelivery
+    const batchAssignments: { order_item_id: string; batch_id: string }[] = Array.isArray(body.batch_assignments)
+      ? body.batch_assignments
+      : []
 
     const isBuyerSame = quotation.buyer_same !== false
     const buyerState = isBuyerSame ? quotation.consignee_state : (quotation.buyer_state || quotation.consignee_state)
@@ -295,14 +298,18 @@ export async function POST(
         )
       }
 
+      // quotation_item_id → newly created order_item_id (for batch assignment linking)
+      const itemIdMap = new Map<string, string>()
+
       for (const item of processedItems) {
-        await client.query(
+        const oir = await client.query<{ id: string }>(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, buy_unit, buy_mode, mrp, unit_price, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount,
             sold_unit, sold_unit_factor, base_quantity
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)
+          RETURNING id`,
           [
             newOrder.id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
@@ -312,6 +319,7 @@ export async function POST(
             item.sell_unit, item.unit_factor, item.base_qty,
           ]
         )
+        if (item.id && oir.rows[0]?.id) itemIdMap.set(item.id, oir.rows[0].id)
       }
 
       if (!saveAsDraft) {
@@ -319,6 +327,11 @@ export async function POST(
           if (!item.product_id) continue
           // base_qty already resolved from unitFactorMap in processedItems (handles NULL buy_unit)
           const qty = item.base_qty
+
+          const assignedBatchId = batchAssignments.find(
+            a => a.order_item_id === item.id
+          )?.batch_id ?? null
+
           let stockBefore = 0
           if (item.sub_variant_id) {
             const row = await client.query<{ inventory_quantity: string }>(
@@ -351,6 +364,19 @@ export async function POST(
               [qty, item.product_id]
             )
           }
+
+          const orderItemId = itemIdMap.get(item.id)
+          if (assignedBatchId && orderItemId) {
+            await client.query(
+              `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2`,
+              [qty, assignedBatchId]
+            )
+            await client.query(
+              `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
+              [assignedBatchId, orderItemId]
+            )
+          }
+
           await logStockMovement(client, {
             productId: item.product_id,
             variantId: item.variant_id || null,
@@ -360,6 +386,7 @@ export async function POST(
             referenceType: 'order',
             referenceId: newOrder.id,
             currentStock: stockBefore,
+            batchId: assignedBatchId,
           })
         }
       }

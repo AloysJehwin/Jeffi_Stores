@@ -15,6 +15,10 @@ import { parseBody } from '@/lib/validate'
 const OrderPatchSchema = z.object({
   status: z.string().nullish(),
   payment_status: z.string().nullish(),
+  batch_assignments: z.array(z.object({
+    order_item_id: z.string().uuid(),
+    batch_id: z.string().uuid(),
+  })).nullish(),
 })
 
 export async function GET(
@@ -192,7 +196,7 @@ export async function PATCH(
     const body = await request.json()
     const parsed = parseBody(OrderPatchSchema, body)
     if (!parsed.ok) return parsed.response
-    const { status, payment_status } = parsed.data
+    const { status, payment_status, batch_assignments } = parsed.data
 
     const currentOrder = await queryOne(`
       SELECT
@@ -451,7 +455,7 @@ export async function PATCH(
 
     if (statusChanged && status === 'processing') {
       const items = await queryMany<any>(
-        `SELECT oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.buy_unit
+        `SELECT oi.id AS order_item_id, oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.buy_unit
          FROM order_items oi WHERE oi.order_id = $1`,
         [orderId]
       )
@@ -470,6 +474,11 @@ export async function PATCH(
           const qty = (u?.dimension === 'count' && u?.factor)
             ? rawQty * parseFloat(u.factor)
             : rawQty
+
+          // Resolve assigned batch for this item (if any)
+          const assignedBatchId = batch_assignments?.find(
+            a => a.order_item_id === item.order_item_id
+          )?.batch_id ?? null
 
           let stockBefore = 0
           if (item.sub_variant_id) {
@@ -503,6 +512,19 @@ export async function PATCH(
               [qty, item.product_id]
             )
           }
+
+          // Apply batch assignment: deduct quantity_remaining and link order_item → batch
+          if (assignedBatchId) {
+            await client.query(
+              `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2`,
+              [qty, assignedBatchId]
+            )
+            await client.query(
+              `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
+              [assignedBatchId, item.order_item_id]
+            )
+          }
+
           await logStockMovement(client, {
             productId: item.product_id,
             variantId: item.variant_id || null,
@@ -512,6 +534,7 @@ export async function PATCH(
             referenceType: 'order',
             referenceId: orderId,
             currentStock: stockBefore,
+            batchId: assignedBatchId,
           })
         }
       })
