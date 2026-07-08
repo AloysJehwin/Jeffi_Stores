@@ -480,8 +480,6 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
           </div>
         </div>
       )}
-        </div>
-      )}
     </div>
   )
 }
