@@ -245,7 +245,11 @@ export async function getStockValuation(filters: {
         su.display_label AS sell_unit_label,
         su.dimension AS sell_unit_dimension,
         su.factor AS sell_unit_factor,
-        bu.display_label AS base_unit_label
+        bu.display_label AS base_unit_label,
+        p.perishable,
+        (SELECT COALESCE(SUM(pb2.quantity_remaining), 0) FROM product_batches pb2
+         WHERE pb2.product_id = p.id AND pb2.variant_id IS NULL AND pb2.sub_variant_id IS NULL
+           AND pb2.quantity_remaining > 0) AS batch_qty_total
       FROM products p
       LEFT JOIN categories c ON c.id = p.category_id
       LEFT JOIN brands b ON b.id = p.brand_id
@@ -280,7 +284,11 @@ export async function getStockValuation(filters: {
         su.display_label AS sell_unit_label,
         su.dimension AS sell_unit_dimension,
         su.factor AS sell_unit_factor,
-        bu.display_label AS base_unit_label
+        bu.display_label AS base_unit_label,
+        p.perishable,
+        (SELECT COALESCE(SUM(pb2.quantity_remaining), 0) FROM product_batches pb2
+         WHERE pb2.product_id = p.id AND pb2.variant_id = pv.id AND pb2.sub_variant_id IS NULL
+           AND pb2.quantity_remaining > 0) AS batch_qty_total
       FROM product_variants pv
       JOIN products p ON p.id = pv.product_id
       LEFT JOIN categories c ON c.id = p.category_id
@@ -317,7 +325,11 @@ export async function getStockValuation(filters: {
         su.display_label AS sell_unit_label,
         su.dimension AS sell_unit_dimension,
         su.factor AS sell_unit_factor,
-        bu.display_label AS base_unit_label
+        bu.display_label AS base_unit_label,
+        p.perishable,
+        (SELECT COALESCE(SUM(pb2.quantity_remaining), 0) FROM product_batches pb2
+         WHERE pb2.product_id = p.id AND pb2.variant_id = pv.id AND pb2.sub_variant_id = sv.id
+           AND pb2.quantity_remaining > 0) AS batch_qty_total
       FROM product_sub_variants sv
       JOIN product_variants pv ON pv.id = sv.variant_id
       JOIN products p ON p.id = pv.product_id

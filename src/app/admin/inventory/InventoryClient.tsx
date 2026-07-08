@@ -1492,7 +1492,7 @@ function StockTab() {
                                   <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Stock</span>
-                                      <span className="font-semibold text-foreground">{parseFloat(p.inventory_quantity || '0')}</span>
+                                      <span className="font-semibold text-foreground">{p.perishable && parseFloat(p.batch_qty_total || '0') > 0 ? parseFloat(p.batch_qty_total) : parseFloat(p.inventory_quantity || '0')}</span>
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Price ex-GST</span>
@@ -1545,9 +1545,16 @@ function StockTab() {
                                   })()}
                                 </div>
                               ) : (
-                                <span className={`font-medium ${parseFloat(p.inventory_quantity || '0') === 0 ? 'text-red-600 dark:text-red-400' : parseFloat(p.inventory_quantity || '0') <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
-                                  {parseFloat(p.inventory_quantity || '0')}
-                                </span>
+                                (() => {
+                                  const displayQty = p.perishable && parseFloat(p.batch_qty_total || '0') > 0
+                                    ? parseFloat(p.batch_qty_total)
+                                    : parseFloat(p.inventory_quantity || '0')
+                                  return (
+                                    <span className={`font-medium ${displayQty === 0 ? 'text-red-600 dark:text-red-400' : displayQty <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
+                                      {displayQty}
+                                    </span>
+                                  )
+                                })()
                               )}
                             </td>
                             <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
