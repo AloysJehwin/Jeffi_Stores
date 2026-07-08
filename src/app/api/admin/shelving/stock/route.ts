@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getStockAtLocation, getStockForProduct, adjustStock, moveStock } from '@/lib/shelf'
+import { getStockAtLocation, getStockForProduct, adjustStock, moveStock, getBatchesAtLocation } from '@/lib/shelf'
 import { queryOne } from '@/lib/db'
 
 async function getInventoryQuantity(productId: string, variantId: string | null, subVariantId: string | null): Promise<number> {
@@ -79,8 +79,20 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ locations })
     }
     if (!locationId) return NextResponse.json({ error: 'location_id or product_id required' }, { status: 400 })
-    const stock = await getStockAtLocation(locationId)
-    return NextResponse.json({ stock })
+    const [stock, batches] = await Promise.all([
+      getStockAtLocation(locationId),
+      getBatchesAtLocation(locationId),
+    ])
+    // attach batches to matching stock rows
+    const stockWithBatches = stock.map(s => ({
+      ...s,
+      batches: batches.filter(b =>
+        b.product_id === s.product_id &&
+        (b.variant_id ?? null) === (s.variant_id ?? null) &&
+        (b.sub_variant_id ?? null) === (s.sub_variant_id ?? null)
+      ),
+    }))
+    return NextResponse.json({ stock: stockWithBatches })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
   }
