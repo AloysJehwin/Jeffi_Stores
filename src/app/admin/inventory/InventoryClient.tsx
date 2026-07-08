@@ -554,6 +554,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                               id={`location-${idx}`}
                               value={it.location_id}
                               onChange={v => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, location_id: v } : r))}
+                              sm
                               options={[
                                 { value: '', label: '— none —' },
                                 ...shelfLocations.map(sl => ({ value: sl.id, label: sl.display_code })),
