@@ -193,6 +193,7 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
   const [moveQty, setMoveQty] = useState(toSell(Math.min(factor, row.quantity)))
   // batch move selections: batchId → qty in base units
   const [batchMoveQtys, setBatchMoveQtys] = useState<Record<string, number>>({})
+  const [batchMoveRaw, setBatchMoveRaw] = useState<Record<string, string>>({})
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [batchesOpen, setBatchesOpen] = useState(false)
@@ -205,6 +206,7 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
     const init: Record<string, number> = {}
     for (const b of batches) init[b.id] = b.quantity_remaining
     setBatchMoveQtys(init)
+    setBatchMoveRaw({})
   }
 
   const totalBatchMoveQty = Object.values(batchMoveQtys).reduce((s, q) => s + q, 0)
@@ -391,14 +393,14 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
                     return (
                       <tr key={b.id} className={`transition-colors ${checked ? 'bg-secondary-50 dark:bg-secondary-900/10' : 'hover:bg-surface-secondary/50 cursor-pointer'}`}
                         onClick={() => {
-                          if (checked) setBatchMoveQtys(s => { const n = { ...s }; delete n[b.id]; return n })
+                          if (checked) { setBatchMoveQtys(s => { const n = { ...s }; delete n[b.id]; return n }); setBatchMoveRaw(s => { const n = { ...s }; delete n[b.id]; return n }) }
                           else setBatchMoveQtys(s => ({ ...s, [b.id]: b.quantity_remaining }))
                         }}
                       >
                         <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
                           <input type="checkbox" checked={checked}
                             onChange={() => {
-                              if (checked) setBatchMoveQtys(s => { const n = { ...s }; delete n[b.id]; return n })
+                              if (checked) { setBatchMoveQtys(s => { const n = { ...s }; delete n[b.id]; return n }); setBatchMoveRaw(s => { const n = { ...s }; delete n[b.id]; return n }) }
                               else setBatchMoveQtys(s => ({ ...s, [b.id]: b.quantity_remaining }))
                             }}
                             className="accent-secondary-500"
@@ -422,8 +424,18 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
                                 disabled={bQty <= 1}
                                 className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
                               >‹</button>
-                              <input type="number" min={1} max={b.quantity_remaining} value={bQty}
-                                onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v)) setBatchMoveQtys(s => ({ ...s, [b.id]: Math.min(Math.max(1, v), b.quantity_remaining) })) }}
+                              <input type="text" inputMode="numeric" value={batchMoveRaw[b.id] ?? String(bQty)}
+                                onChange={e => {
+                                  const raw = e.target.value.replace(/[^0-9]/g, '')
+                                  setBatchMoveRaw(s => ({ ...s, [b.id]: raw }))
+                                  const v = parseInt(raw)
+                                  if (!isNaN(v) && v >= 1) setBatchMoveQtys(s => ({ ...s, [b.id]: Math.min(v, b.quantity_remaining) }))
+                                }}
+                                onBlur={() => {
+                                  const clamped = Math.min(Math.max(1, batchMoveQtys[b.id] ?? 1), b.quantity_remaining)
+                                  setBatchMoveQtys(s => ({ ...s, [b.id]: clamped }))
+                                  setBatchMoveRaw(s => ({ ...s, [b.id]: String(clamped) }))
+                                }}
                                 className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-secondary-500"
                               />
                               <button type="button"
