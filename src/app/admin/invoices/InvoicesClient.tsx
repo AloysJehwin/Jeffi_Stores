@@ -176,8 +176,8 @@ export default function InvoicesClient() {
 
   // Batch picker for perishable line items
   const [batchPickerItem, setBatchPickerItem] = useState<BatchPickerItem | null>(null)
-  const [batchAssignments, setBatchAssignments] = useState<Record<string, string>>({}) // lineItemId → batch_id
-  const [assignedBatchLabels, setAssignedBatchLabels] = useState<Record<string, string>>({}) // lineItemId → lot label
+  const [batchAssignments, setBatchAssignments] = useState<Record<string, { batch_id: string; qty: number }[]>>({}) // lineItemId → [{batch_id, qty}]
+  const [assignedBatchLabels, setAssignedBatchLabels] = useState<Record<string, string>>({}) // lineItemId → lot label(s)
 
   // Draft-list finalize batch picker
   const [draftFinalizeId, setDraftFinalizeId] = useState<string | null>(null)
@@ -261,7 +261,7 @@ export default function InvoicesClient() {
     }
   }
 
-  async function doFinalizeDraft(id: string, batchAssignments: { order_item_id: string; batch_id: string }[]) {
+  async function doFinalizeDraft(id: string, batchAssignments: { order_item_id: string; batch_id: string; qty: number }[]) {
     setFinalizingId(id)
     try {
       const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, {
@@ -442,7 +442,9 @@ export default function InvoicesClient() {
             discount_pct: Number(it.discount_pct) || 0,
             temp_id: it.id,
           })),
-          batch_assignments: Object.entries(batchAssignments).map(([order_item_id, batch_id]) => ({ order_item_id, batch_id })),
+          batch_assignments: Object.entries(batchAssignments).flatMap(([order_item_id, batches]) =>
+            batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
+          ),
         }),
       })
       const data = await res.json()
@@ -572,15 +574,19 @@ export default function InvoicesClient() {
         body: JSON.stringify({
           batch_assignments: Object.keys(batchAssignments).length > 0
             ? items
-                .filter(li => batchAssignments[li.id])
-                .map(li => {
+                .filter(li => batchAssignments[li.id]?.length > 0)
+                .flatMap(li => {
                   const saved = (saveData.savedItemIds || []).find((s: any) =>
                     s.product_id === li.product_id &&
                     (s.variant_id || null) === (li.variant_id || null)
                   )
-                  return saved ? { order_item_id: saved.order_item_id, batch_id: batchAssignments[li.id] } : null
+                  if (!saved) return []
+                  return (batchAssignments[li.id] || []).map(b => ({
+                    order_item_id: saved.order_item_id,
+                    batch_id: b.batch_id,
+                    qty: b.qty,
+                  }))
                 })
-                .filter(Boolean)
             : [],
         }),
       })
@@ -608,12 +614,21 @@ export default function InvoicesClient() {
         <BatchPickerModal
           items={[batchPickerItem]}
           onConfirm={assignments => {
-            const map: Record<string, string> = { ...batchAssignments }
+            const map: Record<string, { batch_id: string; qty: number }[]> = { ...batchAssignments }
             const labelMap: Record<string, string> = { ...assignedBatchLabels }
+            // Group assignments by order_item_id
+            const byItem: Record<string, typeof assignments> = {}
             for (const a of assignments) {
-              map[a.order_item_id] = a.batch_id
-              const batch = batchPickerItem?.batches.find(b => b.id === a.batch_id)
-              labelMap[a.order_item_id] = batch?.lot_number || a.batch_id.slice(0, 8)
+              if (!byItem[a.order_item_id]) byItem[a.order_item_id] = []
+              byItem[a.order_item_id].push(a)
+            }
+            for (const [order_item_id, itemAssignments] of Object.entries(byItem)) {
+              map[order_item_id] = itemAssignments.map(a => ({ batch_id: a.batch_id, qty: a.qty }))
+              const lots = itemAssignments.map(a => {
+                const batch = batchPickerItem?.batches.find(b => b.id === a.batch_id)
+                return batch?.lot_number || a.batch_id.slice(0, 8)
+              })
+              labelMap[order_item_id] = lots.join(', ')
             }
             setBatchAssignments(map)
             setAssignedBatchLabels(labelMap)
