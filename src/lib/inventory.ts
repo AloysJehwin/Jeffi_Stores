@@ -158,6 +158,9 @@ export async function getStockLedger(filters: {
       it.unit_label,
       it.unit_factor,
       it.quantity_in_unit,
+      it.batch_id,
+      pb.lot_number,
+      pb.expiry_date,
       p.id AS product_id,
       p.name AS product_name,
       p.sku AS product_sku,
@@ -177,6 +180,7 @@ export async function getStockLedger(filters: {
     JOIN products p ON p.id = it.product_id
     LEFT JOIN product_variants pv ON pv.id = it.variant_id
     LEFT JOIN product_sub_variants sv ON sv.id = it.sub_variant_id
+    LEFT JOIN product_batches pb ON pb.id = it.batch_id
     LEFT JOIN orders o  ON it.reference_type = 'order'     AND o.id  = it.reference_id
     LEFT JOIN cash_sales cs ON it.reference_type = 'cash_sale' AND cs.id = it.reference_id
     LEFT JOIN grns g    ON it.reference_type = 'grn'       AND g.id  = it.reference_id
