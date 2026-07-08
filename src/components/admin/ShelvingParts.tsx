@@ -191,11 +191,23 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
   const [moving, setMoving] = useState(false)
   const [destId, setDestId] = useState('')
   const [moveQty, setMoveQty] = useState(toSell(Math.min(factor, row.quantity)))
+  // batch move selections: batchId → qty in base units
+  const [batchMoveQtys, setBatchMoveQtys] = useState<Record<string, number>>({})
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const [batchesOpen, setBatchesOpen] = useState(false)
 
   const batches = row.batches ?? []
+  const isPerishableWithBatches = row.perishable && batches.length > 0
+
+  function initBatchMove() {
+    // pre-select all batches with their full qty
+    const init: Record<string, number> = {}
+    for (const b of batches) init[b.id] = b.quantity_remaining
+    setBatchMoveQtys(init)
+  }
+
+  const totalBatchMoveQty = Object.values(batchMoveQtys).reduce((s, q) => s + q, 0)
 
   function expiryColor(expiry: string | null): string {
     if (!expiry) return 'text-foreground-muted'
@@ -224,10 +236,16 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
 
   async function doMove() {
     if (!destId) { setErr('Select destination'); return }
-    const sellVal = isContinuous ? parseFloat(moveQty) : parseInt(moveQty)
-    if (!sellVal || sellVal <= 0) { setErr('Enter valid quantity'); return }
-    const qty = toBase(sellVal)
-    if (qty <= 0) { setErr('Enter valid quantity'); return }
+    let qty: number
+    if (isPerishableWithBatches) {
+      qty = totalBatchMoveQty
+      if (qty <= 0) { setErr('Select at least one batch to move'); return }
+    } else {
+      const sellVal = isContinuous ? parseFloat(moveQty) : parseInt(moveQty)
+      if (!sellVal || sellVal <= 0) { setErr('Enter valid quantity'); return }
+      qty = toBase(sellVal)
+      if (qty <= 0) { setErr('Enter valid quantity'); return }
+    }
     setSaving(true); setErr('')
     try {
       const res = await fetch('/api/admin/shelving/stock', {
@@ -285,7 +303,7 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
             </button>
           )}
           <button
-            onClick={() => setMoving(!moving)}
+            onClick={() => { if (isPerishableWithBatches) initBatchMove(); setMoving(!moving) }}
             className="px-2.5 py-1 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
           >
             Move
@@ -337,8 +355,9 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
         </div>
       )}
       {moving && (
-        <div className="mt-3 pt-3 border-t border-border-default flex flex-wrap gap-2 items-end">
-          <div className="flex-1 min-w-32">
+        <div className="mt-3 pt-3 border-t border-border-default space-y-3">
+          {/* Destination picker */}
+          <div>
             <label className={labelCls}>To location</label>
             <AdminSelect
               options={[
@@ -351,31 +370,116 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
               sm
             />
           </div>
-          <div className="w-24">
-            <label className={labelCls}>Qty ({unitLabel})</label>
-            <input
-              type="number"
-              value={moveQty}
-              onChange={e => setMoveQty(e.target.value)}
-              className="w-full px-2 py-2 rounded-lg border border-border-default bg-surface text-foreground text-xs text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors"
-              min={unitStep}
-              step={unitStep}
-              max={Number(maxSellQty)}
-            />
+
+          {isPerishableWithBatches ? (
+            /* Batch picker for perishable products */
+            <div className="rounded-lg border border-border-default overflow-hidden">
+              <table className="w-full text-xs">
+                <thead className="bg-surface border-b border-border-default">
+                  <tr>
+                    <th className="px-3 py-1.5 w-7"></th>
+                    <th className="px-3 py-1.5 text-left font-medium text-foreground-muted">Lot</th>
+                    <th className="px-3 py-1.5 text-left font-medium text-foreground-muted">Expiry</th>
+                    <th className="px-3 py-1.5 text-left font-medium text-foreground-muted">Avail</th>
+                    <th className="px-3 py-1.5 text-left font-medium text-foreground-muted">Move qty</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {batches.map((b, idx) => {
+                    const checked = (batchMoveQtys[b.id] ?? 0) > 0
+                    const bQty = batchMoveQtys[b.id] ?? 0
+                    return (
+                      <tr key={b.id} className={`transition-colors ${checked ? 'bg-secondary-50 dark:bg-secondary-900/10' : 'hover:bg-surface-secondary/50 cursor-pointer'}`}
+                        onClick={() => {
+                          if (checked) setBatchMoveQtys(s => { const n = { ...s }; delete n[b.id]; return n })
+                          else setBatchMoveQtys(s => ({ ...s, [b.id]: b.quantity_remaining }))
+                        }}
+                      >
+                        <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                          <input type="checkbox" checked={checked}
+                            onChange={() => {
+                              if (checked) setBatchMoveQtys(s => { const n = { ...s }; delete n[b.id]; return n })
+                              else setBatchMoveQtys(s => ({ ...s, [b.id]: b.quantity_remaining }))
+                            }}
+                            className="accent-secondary-500"
+                          />
+                        </td>
+                        <td className="px-3 py-2 font-mono text-foreground">
+                          {b.lot_number || <span className="text-foreground-muted">—</span>}
+                          {idx === 0 && <span className="ml-1.5 text-[10px] bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400 px-1 py-0.5 rounded font-medium">FIFO</span>}
+                        </td>
+                        <td className={`px-3 py-2 ${expiryColor(b.expiry_date)}`}>
+                          {b.expiry_date
+                            ? new Date(b.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                            : <span className="text-foreground-muted">—</span>}
+                        </td>
+                        <td className="px-3 py-2 text-foreground">{toSell(b.quantity_remaining)}</td>
+                        <td className="px-3 py-2" onClick={e => e.stopPropagation()}>
+                          {checked ? (
+                            <div className="flex items-center gap-1">
+                              <button type="button"
+                                onClick={() => setBatchMoveQtys(s => ({ ...s, [b.id]: Math.max(1, bQty - 1) }))}
+                                disabled={bQty <= 1}
+                                className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                              >‹</button>
+                              <input type="number" min={1} max={b.quantity_remaining} value={bQty}
+                                onChange={e => { const v = parseInt(e.target.value); if (!isNaN(v)) setBatchMoveQtys(s => ({ ...s, [b.id]: Math.min(Math.max(1, v), b.quantity_remaining) })) }}
+                                className="w-12 text-center text-xs font-medium text-foreground tabular-nums border border-border-default rounded bg-surface px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-secondary-500"
+                              />
+                              <button type="button"
+                                onClick={() => setBatchMoveQtys(s => ({ ...s, [b.id]: Math.min(b.quantity_remaining, bQty + 1) }))}
+                                disabled={bQty >= b.quantity_remaining}
+                                className="w-6 h-6 flex items-center justify-center rounded border border-border-default bg-surface text-foreground hover:bg-surface-elevated disabled:opacity-30 text-xs font-bold transition-colors"
+                              >›</button>
+                            </div>
+                          ) : (
+                            <span className="text-foreground-muted">—</span>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              {totalBatchMoveQty > 0 && (
+                <div className="px-3 py-2 bg-surface border-t border-border-default text-xs text-foreground-muted text-right">
+                  Total to move: <span className="font-semibold text-foreground">{toSell(totalBatchMoveQty)} {unitLabel}</span>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* Plain qty input for non-perishable */
+            <div className="w-24">
+              <label className={labelCls}>Qty ({unitLabel})</label>
+              <input
+                type="number"
+                value={moveQty}
+                onChange={e => setMoveQty(e.target.value)}
+                className="w-full px-2 py-2 rounded-lg border border-border-default bg-surface text-foreground text-xs text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors"
+                min={unitStep}
+                step={unitStep}
+                max={Number(maxSellQty)}
+              />
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <button
+              onClick={doMove}
+              disabled={saving || (isPerishableWithBatches ? totalBatchMoveQty === 0 : false)}
+              className="px-4 py-2 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50"
+            >
+              {saving ? '…' : 'Move'}
+            </button>
+            <button
+              onClick={() => setMoving(false)}
+              className="px-3 py-2 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary transition-colors"
+            >
+              Cancel
+            </button>
           </div>
-          <button
-            onClick={doMove}
-            disabled={saving}
-            className="px-4 py-2 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50"
-          >
-            {saving ? '…' : 'Move'}
-          </button>
-          <button
-            onClick={() => setMoving(false)}
-            className="px-3 py-2 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary transition-colors"
-          >
-            Cancel
-          </button>
+        </div>
+      )}
         </div>
       )}
     </div>
