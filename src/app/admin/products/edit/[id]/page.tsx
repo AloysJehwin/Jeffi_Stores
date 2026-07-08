@@ -4,6 +4,7 @@ import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
+import { syncPerishableStock } from '@/lib/shelf'
 import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
@@ -265,10 +266,17 @@ async function updateProduct(productId: string, formData: FormData) {
     params.push(ageMin, ageMax, targetGender, targetAudience)
 
     params.push(productId)
+    const prevRow = await queryOne<{ perishable: boolean }>('SELECT perishable FROM products WHERE id = $1', [productId])
     await query(
       `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
       params
     )
+    // If perishable was toggled OFF, clean up orphaned batch + shelf_stock rows
+    if (prevRow?.perishable && !perishable) {
+      await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
+      await query('DELETE FROM shelf_stock WHERE product_id = $1', [productId])
+      await query('UPDATE products SET inventory_quantity = 0 WHERE id = $1', [productId])
+    }
 
     if (imageCount > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
       const allExistingImages = await queryMany(
