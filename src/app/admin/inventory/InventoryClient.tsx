@@ -892,8 +892,8 @@ type StockTransaction = {
 function StockTab() {
   const searchParams = useSearchParams()
   const router = useRouter()
-
-  const [transactions, setTransactions] = useState<StockTransaction[]>([])
+  const { showToast } = useToast()
+  const confirm = useConfirm()
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
   const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number; allCategories?: string[]; allBrands?: string[] } | null>(null)
@@ -1672,7 +1672,15 @@ function StockTab() {
                                             <td className="py-1.5 text-right">
                                               <button
                                                 onClick={async () => {
-                                                  if (!confirm(qty > 0 ? `This batch still has ${qty} units remaining. Are you sure you want to remove it?` : 'Remove this batch?')) return
+                                                  const ok = await confirm({
+                                                    title: 'Remove Batch',
+                                                    message: qty > 0
+                                                      ? `This batch still has ${qty} units remaining. Are you sure you want to remove it?`
+                                                      : 'Remove this batch?',
+                                                    confirmLabel: 'Remove',
+                                                    variant: 'danger',
+                                                  })
+                                                  if (!ok) return
                                                   const res = await fetch(`/api/admin/inventory/batches/${b.batch_id}`, { method: 'DELETE' })
                                                   const json = await res.json()
                                                   if (!res.ok) { showToast(json.error || 'Failed to remove batch', 'error'); return }
