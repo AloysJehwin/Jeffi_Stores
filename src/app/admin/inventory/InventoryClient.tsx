@@ -619,8 +619,9 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     const serials: string[] = Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []
                     const entered = serials.filter(Boolean).length
                     const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+                    const dtStamp = () => new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
                     const randSuffix = () => Math.random().toString(36).slice(2, 8).toUpperCase()
-                    const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${randSuffix()}`
+                    const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${dtStamp()}-${randSuffix()}`
                     const updateSerial = (slotIdx: number, val: string) =>
                       setReceiveItems(items => items.map((r, i) => {
                         if (i !== idx) return r
