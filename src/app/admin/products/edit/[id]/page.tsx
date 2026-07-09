@@ -272,15 +272,14 @@ async function updateProduct(productId: string, formData: FormData) {
       `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
       params
     )
-    // If perishable was toggled OFF, convert batch stock to inventory_quantity then clean up
+    // If perishable was toggled OFF, roll up remaining batch qty into inventory_quantity
+    // Do NOT delete batches or shelf_stock — those are ledger records and must be preserved
     if (prevRow?.perishable && !perishable) {
       const batchSum = await queryOne<{ total: string }>(
         `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches WHERE product_id = $1`,
         [productId]
       )
       const converted = parseFloat(batchSum?.total ?? '0') || 0
-      await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
-      await query('DELETE FROM shelf_stock WHERE product_id = $1', [productId])
       await query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [converted, productId])
     }
 
