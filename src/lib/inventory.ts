@@ -169,7 +169,7 @@ export async function getStockLedger(filters: {
       it.serial_number,
       p.id AS product_id,
       p.name AS product_name,
-      p.sku AS product_sku,
+      COALESCE(sv.sku, pv.sku, p.sku) AS product_sku,
       p.cost_price AS product_cost_price,
       pv.id AS variant_id,
       pv.variant_name,
