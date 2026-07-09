@@ -262,7 +262,7 @@ type POItem = {
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
   purchase_unit: string | null; purchase_unit_factor: string | null
   sell_unit_label: string | null; sell_unit_dimension: string | null
-  perishable: boolean
+  perishable: boolean; serialized: boolean
 }
 
 /** For count-dimension products stock is always in pc; for others use sell_unit_label */
@@ -379,6 +379,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
         expiry_date: '',
         manufacture_date: '',
         location_id: '',
+        serial_numbers: '',
       }
     })
     setReceiveMode({ po: json.purchase_order })
@@ -400,6 +401,16 @@ function POTab({ initialPO }: { initialPO?: string }) {
       showToast(`Expiry date required for: ${missing.map((it: any) => it.product_name + (it.variant_name ? ' / ' + it.variant_name : '')).join(', ')}`, 'error')
       return
     }
+    // Validate serialized items have the right number of serial numbers
+    const missingSerials = receiveItems.filter(it => {
+      if (!it.serialized || parseFloat(it.receive_qty) <= 0) return false
+      const serials = (it.serial_numbers as string).split('\n').map((s: string) => s.trim()).filter(Boolean)
+      return serials.length !== Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
+    })
+    if (missingSerials.length > 0) {
+      showToast(`Serial numbers count must match received qty for: ${missingSerials.map((it: any) => it.product_name + (it.variant_name ? ' / ' + it.variant_name : '')).join(', ')}`, 'error')
+      return
+    }
     setReceiveSaving(true)
     const items = receiveItems.filter(it => parseFloat(it.receive_qty) > 0).map(it => ({
       po_item_id: it.id, product_id: it.product_id, variant_id: it.variant_id || null,
@@ -410,6 +421,9 @@ function POTab({ initialPO }: { initialPO?: string }) {
         expiry_date: it.expiry_date || null,
         manufacture_date: it.manufacture_date || null,
         location_id: it.location_id || null,
+      } : {}),
+      ...(it.serialized ? {
+        serial_numbers: (it.serial_numbers as string).split('\n').map((s: string) => s.trim()).filter(Boolean),
       } : {}),
     }))
     const res = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive`, {
@@ -500,6 +514,9 @@ function POTab({ initialPO }: { initialPO?: string }) {
                       )}
                       {it.perishable && (
                         <span className="mt-1 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">Perishable</span>
+                      )}
+                      {it.serialized && (
+                        <span className="mt-1 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Serialized</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-foreground-secondary">
@@ -593,6 +610,36 @@ function POTab({ initialPO }: { initialPO?: string }) {
                               ]}
                             />
                           </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {it.serialized && parseFloat(it.receive_qty) > 0 && (
+                    <tr className="bg-blue-50/60 dark:bg-blue-900/10 border-t border-blue-100 dark:border-blue-900/30">
+                      <td colSpan={7} className="px-4 py-3">
+                        <div>
+                          <label className={labelCls}>
+                            Serial Numbers
+                            <span className="ml-1 text-foreground-muted font-normal">
+                              (one per line — need {Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))})
+                            </span>
+                          </label>
+                          <textarea
+                            rows={Math.min(8, Math.max(3, Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))))}
+                            placeholder={"SN-0001\nSN-0002\nSN-0003"}
+                            className={inputCls + ' font-mono text-xs'}
+                            value={it.serial_numbers}
+                            onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, serial_numbers: e.target.value } : r))}
+                          />
+                          <p className="text-xs text-foreground-muted mt-1">
+                            {(() => {
+                              const entered = (it.serial_numbers as string).split('\n').map((s: string) => s.trim()).filter(Boolean).length
+                              const needed = Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
+                              return entered === needed
+                                ? <span className="text-green-600 dark:text-green-400">{entered}/{needed} serials entered ✓</span>
+                                : <span className="text-amber-600 dark:text-amber-400">{entered}/{needed} serials entered</span>
+                            })()}
+                          </p>
                         </div>
                       </td>
                     </tr>
