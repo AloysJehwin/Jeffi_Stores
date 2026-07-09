@@ -448,3 +448,27 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES produc
 
 -- inventory_transactions: full batch audit trail
 ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id) ON DELETE SET NULL;
+
+-- serialized flag: products whose individual units get unique serial numbers
+ALTER TABLE products ADD COLUMN IF NOT EXISTS serialized boolean DEFAULT false NOT NULL;
+
+-- product_serials: unique unit tracking per serialized product
+CREATE TABLE IF NOT EXISTS public.product_serials (
+    id               uuid DEFAULT gen_random_uuid() NOT NULL,
+    product_id       uuid NOT NULL,
+    variant_id       uuid,
+    sub_variant_id   uuid,
+    batch_id         uuid REFERENCES product_batches(id) ON DELETE SET NULL,
+    grn_id           uuid REFERENCES grns(id) ON DELETE SET NULL,
+    serial_number    character varying(100) NOT NULL,
+    status           character varying(20) DEFAULT 'in_stock' NOT NULL,
+    order_id         uuid,
+    order_item_id    uuid,
+    notes            text,
+    received_at      timestamp with time zone DEFAULT now() NOT NULL,
+    sold_at          timestamp with time zone,
+    returned_at      timestamp with time zone,
+    created_at       timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at       timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_serials_status_check CHECK (status = ANY (ARRAY['in_stock', 'sold', 'returned', 'damaged', 'lost']))
+);

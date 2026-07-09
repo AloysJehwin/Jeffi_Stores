@@ -192,8 +192,9 @@ async function updateProduct(productId: string, formData: FormData) {
     const hazardous = formData.get('hazardous') === 'true'
     const flammable = formData.get('flammable') === 'true'
     const perishable = formData.get('perishable') === 'true'
-    setClauses.push(`color = $${params.length + 1}`, `color_hex = $${params.length + 2}`, `volume_ml = $${params.length + 3}`, `net_weight_grams = $${params.length + 4}`, `fragile = $${params.length + 5}`, `hazardous = $${params.length + 6}`, `flammable = $${params.length + 7}`, `perishable = $${params.length + 8}`)
-    params.push(color, colorHex, volumeMl, netWeightGrams, fragile, hazardous, flammable, perishable)
+    const serialized = formData.get('serialized') === 'true'
+    setClauses.push(`color = $${params.length + 1}`, `color_hex = $${params.length + 2}`, `volume_ml = $${params.length + 3}`, `net_weight_grams = $${params.length + 4}`, `fragile = $${params.length + 5}`, `hazardous = $${params.length + 6}`, `flammable = $${params.length + 7}`, `perishable = $${params.length + 8}`, `serialized = $${params.length + 9}`)
+    params.push(color, colorHex, volumeMl, netWeightGrams, fragile, hazardous, flammable, perishable, serialized)
 
     // Certifications & Standards
     const certifications = (formData.get('certifications') as string) ? (formData.get('certifications') as string).split(',').map(s => s.trim()).filter(Boolean) : null

@@ -288,6 +288,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [hazardous, setHazardous] = useState(product?.hazardous ?? false)
   const [flammable, setFlammable] = useState(product?.flammable ?? false)
   const [perishable, setPerishable] = useState(product?.perishable ?? false)
+  const [serialized, setSerialized] = useState(product?.serialized ?? false)
   // Certifications & Standards
   const [certifications, setCertifications] = useState(Array.isArray(product?.certifications) ? product.certifications.join(', ') : '')
   const [complianceStandard, setComplianceStandard] = useState(product?.compliance_standard || '')
@@ -852,6 +853,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       formData.set('hazardous', String(hazardous))
       formData.set('flammable', String(flammable))
       formData.set('perishable', String(perishable))
+      formData.set('serialized', String(serialized))
       // Certifications & Standards
       formData.set('certifications', certifications)
       formData.set('compliance_standard', complianceStandard)
@@ -1654,6 +1656,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           }
                           setPerishable(next)
                         }} label="Perishable" />
+                        <Toggle id="serialized" checked={serialized} onChange={setSerialized} label="Serialized" />
                       </div>
                     </div>
                   )}
