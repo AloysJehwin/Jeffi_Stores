@@ -193,30 +193,45 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           }
         }
 
-        await logStockMovement(client, {
-          productId,
-          variantId,
-          subVariantId,
-          transactionType: 'purchase',
-          quantityChange: qtyReceived,
-          referenceType: 'grn',
-          referenceId: grnId,
-          currentStock: stockBefore,
-          ...(newBatchId ? { batchId: newBatchId } : {}),
-          lotNumber: item.lot_number || null,
-          expiryDate: item.expiry_date || null,
-        })
-
-        // Insert product_serials rows for serialized products
+        // Insert product_serials rows + one ledger entry per serial unit
         if (isSerialised && serials.length > 0) {
-          for (const sn of serials) {
+          for (let si = 0; si < serials.length; si++) {
+            const sn = serials[si]
             await client.query(
               `INSERT INTO product_serials
                  (product_id, variant_id, sub_variant_id, batch_id, grn_id, serial_number, status)
                VALUES ($1,$2,$3,$4,$5,$6,'in_stock')`,
               [productId, variantId, subVariantId, newBatchId, grnId, sn]
             )
+            await logStockMovement(client, {
+              productId,
+              variantId,
+              subVariantId,
+              transactionType: 'purchase',
+              quantityChange: 1,
+              referenceType: 'grn',
+              referenceId: grnId,
+              currentStock: stockBefore + si,
+              ...(newBatchId ? { batchId: newBatchId } : {}),
+              lotNumber: item.lot_number || null,
+              expiryDate: item.expiry_date || null,
+              serialNumber: sn,
+            })
           }
+        } else {
+          await logStockMovement(client, {
+            productId,
+            variantId,
+            subVariantId,
+            transactionType: 'purchase',
+            quantityChange: qtyReceived,
+            referenceType: 'grn',
+            referenceId: grnId,
+            currentStock: stockBefore,
+            ...(newBatchId ? { batchId: newBatchId } : {}),
+            lotNumber: item.lot_number || null,
+            expiryDate: item.expiry_date || null,
+          })
         }
 
         await client.query(
