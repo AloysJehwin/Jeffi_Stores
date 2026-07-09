@@ -412,7 +412,7 @@ export async function POST(
               )
             }
           } else if (itemSerials.length > 0) {
-            // Serialized product with no batch — deduct inventory and log one row per serial
+            // Serialized product — serials carry their own batch_id; deduct per batch then log per serial
             const invRow = item.sub_variant_id
               ? await client.query<{ inventory_quantity: string }>(`SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`, [item.sub_variant_id])
               : item.variant_id
@@ -428,15 +428,27 @@ export async function POST(
             }
             for (let si = 0; si < itemSerials.length; si++) {
               const sn = itemSerials[si].serial_number
-              const serialRow = await client.query<{ id: string }>(
-                `SELECT id FROM product_serials WHERE product_id = $1 AND serial_number = $2 AND status = 'in_stock' FOR UPDATE`,
+              const serialRow = await client.query<{ id: string; batch_id: string | null }>(
+                `SELECT id, batch_id FROM product_serials WHERE product_id = $1 AND serial_number = $2 AND status = 'in_stock' FOR UPDATE`,
                 [item.product_id, sn]
               )
+              let batchId: string | null = null
+              let lotNumber: string | null = null
+              let expiryDate: string | null = null
               if (serialRow.rows.length) {
+                batchId = serialRow.rows[0].batch_id
                 await client.query(
                   `UPDATE product_serials SET status = 'sold', order_id = $1, sold_at = NOW(), updated_at = NOW() WHERE id = $2`,
                   [newOrder.id, serialRow.rows[0].id]
                 )
+                if (batchId) {
+                  const batchUpd = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
+                    `UPDATE product_batches SET quantity_remaining = quantity_remaining - 1, updated_at = NOW() WHERE id = $1 RETURNING lot_number, expiry_date`,
+                    [batchId]
+                  )
+                  lotNumber = batchUpd.rows[0]?.lot_number ?? null
+                  expiryDate = batchUpd.rows[0]?.expiry_date ?? null
+                }
               }
               await logStockMovement(client, {
                 productId: item.product_id,
@@ -447,6 +459,9 @@ export async function POST(
                 referenceType: 'order',
                 referenceId: newOrder.id,
                 currentStock: stockBefore - si,
+                batchId: batchId ?? undefined,
+                lotNumber: lotNumber ?? undefined,
+                expiryDate: expiryDate ?? undefined,
                 serialNumber: sn,
               })
             }
