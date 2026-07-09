@@ -1815,42 +1815,58 @@ function StockTab() {
                                         const expiryCls = diffDays === null ? 'text-foreground-muted' : diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                                         const qty = parseFloat(b.quantity_remaining || '0')
                                         const batchValue = qty * parseFloat(b.unit_cost || '0')
+                                        const serials: string[] = Array.isArray(b.serials) ? b.serials : []
                                         return (
-                                          <tr key={b.batch_id}>
-                                            <td className="py-1.5 pr-4 font-mono text-foreground-secondary">{b.lot_number || '—'}</td>
-                                            <td className="py-1.5 pr-4">
-                                              {b.expiry_date
-                                                ? <span className={`inline-flex px-1.5 py-0.5 rounded font-medium ${expiryCls}`}>{formatDate(b.expiry_date)}</span>
-                                                : <span className="text-foreground-muted">—</span>}
-                                            </td>
-                                            <td className="py-1.5 pr-4 text-foreground-secondary hidden sm:table-cell">{b.manufacture_date ? formatDate(b.manufacture_date) : '—'}</td>
-                                            <td className="py-1.5 pr-4 text-foreground-secondary hidden md:table-cell">{b.location || '—'}</td>
-                                            <td className="py-1.5 pr-4 text-right font-medium text-foreground">{qty}</td>
-                                            <td className="py-1.5 pr-4 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
-                                            <td className="py-1.5 text-right">
-                                              <button
-                                                onClick={async () => {
-                                                  const ok = await confirm({
-                                                    title: 'Remove Batch',
-                                                    message: qty > 0
-                                                      ? `This batch still has ${qty} units remaining. Are you sure you want to remove it?`
-                                                      : 'Remove this batch?',
-                                                    confirmLabel: 'Remove',
-                                                    variant: 'danger',
-                                                  })
-                                                  if (!ok) return
-                                                  const res = await fetch(`/api/admin/inventory/batches/${b.batch_id}`, { method: 'DELETE' })
-                                                  const json = await res.json()
-                                                  if (!res.ok) { showToast(json.error || 'Failed to remove batch', 'error'); return }
-                                                  showToast('Batch removed', 'success')
-                                                  toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)
-                                                  setTimeout(() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null), 100)
-                                                }}
-                                                className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                                title="Remove batch"
-                                              >Remove</button>
-                                            </td>
-                                          </tr>
+                                          <React.Fragment key={b.batch_id}>
+                                            <tr>
+                                              <td className="py-1.5 pr-4 font-mono text-foreground-secondary">{b.lot_number || '—'}</td>
+                                              <td className="py-1.5 pr-4">
+                                                {b.expiry_date
+                                                  ? <span className={`inline-flex px-1.5 py-0.5 rounded font-medium ${expiryCls}`}>{formatDate(b.expiry_date)}</span>
+                                                  : <span className="text-foreground-muted">—</span>}
+                                              </td>
+                                              <td className="py-1.5 pr-4 text-foreground-secondary hidden sm:table-cell">{b.manufacture_date ? formatDate(b.manufacture_date) : '—'}</td>
+                                              <td className="py-1.5 pr-4 text-foreground-secondary hidden md:table-cell">{b.location || '—'}</td>
+                                              <td className="py-1.5 pr-4 text-right font-medium text-foreground">{qty}</td>
+                                              <td className="py-1.5 pr-4 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
+                                              <td className="py-1.5 text-right">
+                                                <button
+                                                  onClick={async () => {
+                                                    const ok = await confirm({
+                                                      title: 'Remove Batch',
+                                                      message: qty > 0
+                                                        ? `This batch still has ${qty} units remaining. Are you sure you want to remove it?`
+                                                        : 'Remove this batch?',
+                                                      confirmLabel: 'Remove',
+                                                      variant: 'danger',
+                                                    })
+                                                    if (!ok) return
+                                                    const res = await fetch(`/api/admin/inventory/batches/${b.batch_id}`, { method: 'DELETE' })
+                                                    const json = await res.json()
+                                                    if (!res.ok) { showToast(json.error || 'Failed to remove batch', 'error'); return }
+                                                    showToast('Batch removed', 'success')
+                                                    toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)
+                                                    setTimeout(() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null), 100)
+                                                  }}
+                                                  className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                  title="Remove batch"
+                                                >Remove</button>
+                                              </td>
+                                            </tr>
+                                            {b.serialized && serials.length > 0 && (
+                                              <tr>
+                                                <td colSpan={7} className="pb-2 pt-0 px-0">
+                                                  <div className="ml-4 flex flex-wrap gap-1.5">
+                                                    {serials.map((sn: string) => (
+                                                      <span key={sn} className="inline-flex items-center px-2 py-0.5 rounded bg-secondary-50 dark:bg-secondary-900/20 text-xs font-mono text-secondary-700 dark:text-secondary-300 border border-secondary-200 dark:border-secondary-700">
+                                                        {sn}
+                                                      </span>
+                                                    ))}
+                                                  </div>
+                                                </td>
+                                              </tr>
+                                            )}
+                                          </React.Fragment>
                                         )
                                       })}
                                       {!p.perishable && parseFloat(p.inventory_quantity || '0') > 0 && (

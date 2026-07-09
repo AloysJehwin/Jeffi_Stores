@@ -61,10 +61,16 @@ export async function GET(request: NextRequest) {
           p.id AS product_id,
           p.name AS product_name,
           p.sku AS product_sku,
+          p.serialized,
           ROUND(COALESCE(pv.price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS unit_cost,
           pv.id AS variant_id,
           pv.variant_name,
-          sl.display_code AS location
+          sl.display_code AS location,
+          CASE WHEN p.serialized THEN (
+            SELECT COALESCE(json_agg(ps.serial_number ORDER BY ps.serial_number), '[]'::json)
+            FROM product_serials ps
+            WHERE ps.batch_id = pb.id AND ps.status = 'in_stock'
+          ) ELSE '[]'::json END AS serials
         FROM product_batches pb
         JOIN products p ON p.id = pb.product_id
         LEFT JOIN product_variants pv ON pv.id = pb.variant_id
