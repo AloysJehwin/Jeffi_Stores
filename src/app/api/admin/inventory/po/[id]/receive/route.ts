@@ -26,6 +26,7 @@ const postSchema = z.object({
         manufacture_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
         expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
         location_id: zUuid.nullish(),
+        serial_numbers: z.array(z.string().min(1)).nullish(),
       })
     )
     .min(1, 'At least one item is required'),
@@ -107,13 +108,26 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         await updateWeightedAvgCost(client, { productId, variantId, qtyReceived, unitCost })
 
-        // Fetch perishable flag first — perishable products track stock via batches only
-        const productRow = await client.query<{ perishable: boolean }>(
-          'SELECT perishable FROM products WHERE id = $1',
+        // Fetch perishable + serialized flags
+        const productRow = await client.query<{ perishable: boolean; serialized: boolean }>(
+          'SELECT perishable, serialized FROM products WHERE id = $1',
           [productId]
         )
         const isPerishable = productRow.rows[0]?.perishable ?? false
+        const isSerialised = productRow.rows[0]?.serialized ?? false
         if (isPerishable) perishableProductIds.add(productId)
+
+        // Validate serial numbers upfront (before any inserts)
+        const serials = item.serial_numbers ?? []
+        if (isSerialised && serials.length > 0) {
+          const dupeCheck = await client.query<{ serial_number: string }>(
+            `SELECT serial_number FROM product_serials WHERE product_id = $1 AND serial_number = ANY($2) AND status != 'sold'`,
+            [productId, serials]
+          )
+          if (dupeCheck.rows.length > 0) {
+            throw new Error(`Duplicate serial numbers already in stock: ${dupeCheck.rows.map(r => r.serial_number).join(', ')}`)
+          }
+        }
 
         let stockBefore = 0
         let newBatchId: string | null = null
@@ -190,6 +204,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           currentStock: stockBefore,
           ...(newBatchId ? { batchId: newBatchId } : {}),
         })
+
+        // Insert product_serials rows for serialized products
+        if (isSerialised && serials.length > 0) {
+          for (const sn of serials) {
+            await client.query(
+              `INSERT INTO product_serials
+                 (product_id, variant_id, sub_variant_id, batch_id, grn_id, serial_number, status)
+               VALUES ($1,$2,$3,$4,$5,$6,'in_stock')`,
+              [productId, variantId, subVariantId, newBatchId, grnId, sn]
+            )
+          }
+        }
 
         await client.query(
           `UPDATE purchase_order_items
