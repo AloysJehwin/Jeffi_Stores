@@ -665,6 +665,9 @@ export default function InvoicesClient() {
                 variant_name: lineItem.variant_name || null,
                 required_qty: totalQty,
                 already_assigned: false,
+                product_id: lineItem.product_id || undefined,
+                variant_id: lineItem.variant_id || null,
+                sub_variant_id: lineItem.sub_variant_id || null,
               }])
             }
           }}

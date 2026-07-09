@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 export interface SerialItem {
   order_item_id: string
@@ -8,11 +8,21 @@ export interface SerialItem {
   variant_name: string | null
   required_qty: number
   already_assigned: boolean
+  // optional — used to fetch available serials
+  product_id?: string
+  variant_id?: string | null
+  sub_variant_id?: string | null
 }
 
 export interface SerialAssignment {
   order_item_id: string
   serial_number: string
+}
+
+interface AvailableSerial {
+  serial_number: string
+  batch_id: string | null
+  lot_number: string | null
 }
 
 interface Props {
@@ -21,75 +31,163 @@ interface Props {
   onCancel: () => void
 }
 
-export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) {
-  // Map of order_item_id → newline-separated serial input
-  const [inputs, setInputs] = useState<Record<string, string>>(() =>
-    Object.fromEntries(items.map(i => [i.order_item_id, '']))
-  )
+function SerialPicker({
+  item,
+  selected,
+  onChange,
+}: {
+  item: SerialItem
+  selected: Set<string>
+  onChange: (next: Set<string>) => void
+}) {
+  const [available, setAvailable] = useState<AvailableSerial[]>([])
+  const [loading, setLoading] = useState(false)
+  const [search, setSearch] = useState('')
 
-  function getSerials(itemId: string): string[] {
-    return (inputs[itemId] || '').split('\n').map(s => s.trim()).filter(Boolean)
+  useEffect(() => {
+    if (!item.product_id) return
+    setLoading(true)
+    const params = new URLSearchParams({ product_id: item.product_id })
+    if (item.variant_id) params.set('variant_id', item.variant_id)
+    if (item.sub_variant_id) params.set('sub_variant_id', item.sub_variant_id)
+    fetch(`/api/admin/inventory/serials/available?${params}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(data => {
+        const list: AvailableSerial[] = data.serials || []
+        setAvailable(list)
+        // Auto-select first N
+        const autoSelected = new Set(list.slice(0, item.required_qty).map(s => s.serial_number))
+        onChange(autoSelected)
+      })
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item.product_id, item.variant_id, item.sub_variant_id])
+
+  function toggle(sn: string) {
+    const next = new Set(selected)
+    if (next.has(sn)) {
+      next.delete(sn)
+    } else {
+      if (next.size >= item.required_qty) return // don't exceed required
+      next.add(sn)
+    }
+    onChange(next)
   }
 
-  const canConfirm = items.every(item => {
-    if (item.already_assigned) return true
-    return getSerials(item.order_item_id).length === item.required_qty
-  })
+  const filtered = search
+    ? available.filter(s => s.serial_number.toLowerCase().includes(search.toLowerCase()) || (s.lot_number || '').toLowerCase().includes(search.toLowerCase()))
+    : available
+
+  const isOk = selected.size === item.required_qty
+  const isOver = selected.size > item.required_qty
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-2">
+        <p className="text-sm font-semibold text-foreground">
+          {item.product_name}{item.variant_name ? ` / ${item.variant_name}` : ''}
+        </p>
+        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+          isOver  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+          : isOk  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+        }`}>
+          {selected.size} / {item.required_qty} selected
+        </span>
+      </div>
+
+      {loading ? (
+        <div className="text-xs text-foreground-muted py-4 text-center">Loading serials…</div>
+      ) : available.length === 0 ? (
+        <div className="text-xs text-red-500 py-3 text-center">No in-stock serials found for this product</div>
+      ) : (
+        <>
+          {available.length > 8 && (
+            <input
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Filter serials…"
+              className="w-full mb-2 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface text-foreground focus:outline-none focus:ring-1 focus:ring-secondary-500 font-mono"
+            />
+          )}
+          <div className="max-h-56 overflow-y-auto rounded-lg border border-border-default divide-y divide-border-default">
+            {filtered.map(s => {
+              const checked = selected.has(s.serial_number)
+              const disabled = !checked && selected.size >= item.required_qty
+              return (
+                <label
+                  key={s.serial_number}
+                  className={`flex items-center gap-3 px-3 py-2 cursor-pointer transition-colors ${
+                    checked ? 'bg-secondary-50 dark:bg-secondary-900/20' : disabled ? 'opacity-40' : 'hover:bg-surface-secondary'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    disabled={disabled}
+                    onChange={() => toggle(s.serial_number)}
+                    className="accent-secondary-500 shrink-0"
+                  />
+                  <span className="text-sm font-mono text-foreground flex-1">{s.serial_number}</span>
+                  {s.lot_number && (
+                    <span className="text-xs text-foreground-muted shrink-0">Lot: {s.lot_number}</span>
+                  )}
+                </label>
+              )
+            })}
+          </div>
+          <p className="text-xs text-foreground-muted mt-1.5">
+            {available.length} serial{available.length !== 1 ? 's' : ''} in stock — select exactly {item.required_qty}
+          </p>
+        </>
+      )}
+    </div>
+  )
+}
+
+export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) {
+  const itemsNeedingEntry = items.filter(i => !i.already_assigned)
+
+  // Map of order_item_id → Set of selected serial numbers
+  const [selections, setSelections] = useState<Record<string, Set<string>>>(() =>
+    Object.fromEntries(itemsNeedingEntry.map(i => [i.order_item_id, new Set<string>()]))
+  )
+
+  const canConfirm = itemsNeedingEntry.every(item =>
+    selections[item.order_item_id]?.size === item.required_qty
+  )
 
   function handleConfirm() {
     const assignments: SerialAssignment[] = []
-    for (const item of items) {
-      if (item.already_assigned) continue
-      for (const sn of getSerials(item.order_item_id)) {
+    for (const item of itemsNeedingEntry) {
+      for (const sn of selections[item.order_item_id] || []) {
         assignments.push({ order_item_id: item.order_item_id, serial_number: sn })
       }
     }
     onConfirm(assignments)
   }
 
-  const itemsNeedingEntry = items.filter(i => !i.already_assigned)
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
       <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <div>
-            <h2 className="text-lg font-bold text-foreground">Enter Serial Numbers</h2>
-            <p className="text-sm text-foreground-muted mt-0.5">Scan or type the serial number(s) on the unit(s) being dispatched</p>
+            <h2 className="text-lg font-bold text-foreground">Select Serial Numbers</h2>
+            <p className="text-sm text-foreground-muted mt-0.5">Confirm the units being dispatched — top {itemsNeedingEntry[0]?.required_qty ?? 'N'} pre-selected</p>
           </div>
           <button onClick={onCancel} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
         </div>
 
-        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-5">
-          {itemsNeedingEntry.map(item => {
-            const entered = getSerials(item.order_item_id)
-            const isOk = entered.length === item.required_qty
-            const isOver = entered.length > item.required_qty
-            return (
-              <div key={item.order_item_id}>
-                <div className="flex items-center justify-between mb-1.5">
-                  <p className="text-sm font-semibold text-foreground">
-                    {item.product_name}{item.variant_name ? ` / ${item.variant_name}` : ''}
-                  </p>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                    isOver ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                    : isOk ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-                  }`}>
-                    {entered.length} / {item.required_qty}
-                  </span>
-                </div>
-                <textarea
-                  rows={Math.min(6, Math.max(2, item.required_qty))}
-                  placeholder={item.required_qty === 1 ? 'SN-0001' : 'SN-0001\nSN-0002\n...'}
-                  className="w-full rounded-lg border border-border-default bg-surface text-foreground text-sm font-mono px-3 py-2 focus:outline-none focus:ring-2 focus:ring-secondary-500 resize-none"
-                  value={inputs[item.order_item_id]}
-                  onChange={e => setInputs(s => ({ ...s, [item.order_item_id]: e.target.value }))}
-                />
-                <p className="text-xs text-foreground-muted mt-1">One serial per line — need {item.required_qty}</p>
-              </div>
-            )
-          })}
+        <div className="overflow-y-auto flex-1 px-6 py-4 space-y-6">
+          {itemsNeedingEntry.map(item => (
+            <SerialPicker
+              key={item.order_item_id}
+              item={item}
+              selected={selections[item.order_item_id] || new Set()}
+              onChange={next => setSelections(s => ({ ...s, [item.order_item_id]: next }))}
+            />
+          ))}
         </div>
 
         <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
