@@ -9,6 +9,7 @@ import { Star, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
 import Toggle from '@/components/ui/Toggle'
+import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
 import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
 import { applyDiscount } from '@/lib/pricing'
@@ -1642,29 +1643,17 @@ export default function ProductForm({ categories, brands, action, product, produ
                         </div>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                        {([['fragile', fragile, setFragile], ['hazardous', hazardous, setHazardous], ['flammable', flammable, setFlammable]] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
-                          <label key={label} className="flex items-center gap-2 cursor-pointer select-none">
-                            <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)} className="rounded border-border-secondary text-accent-500 focus:ring-accent-500" />
-                            <span className="text-sm text-foreground capitalize">{label}</span>
-                          </label>
-                        ))}
-                        <label className="flex items-center gap-2 cursor-pointer select-none">
-                          <input
-                            type="checkbox"
-                            checked={perishable}
-                            onChange={e => {
-                              const next = e.target.checked
-                              if (!next && perishableBatchTotal > 0) {
-                                if (!window.confirm(
-                                  `This product has ${perishableBatchTotal} unit(s) in batches.\n\nUnmarking as perishable will delete all batch records and convert them to default stock (${perishableBatchTotal} units).\n\nContinue?`
-                                )) return
-                              }
-                              setPerishable(next)
-                            }}
-                            className="rounded border-border-secondary text-accent-500 focus:ring-accent-500"
-                          />
-                          <span className="text-sm text-foreground capitalize">perishable</span>
-                        </label>
+                        <Toggle id="fragile" checked={fragile} onChange={setFragile} label="Fragile" />
+                        <Toggle id="hazardous" checked={hazardous} onChange={setHazardous} label="Hazardous" />
+                        <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
+                        <Toggle id="perishable" checked={perishable} onChange={next => {
+                          if (!next && perishableBatchTotal > 0) {
+                            if (!window.confirm(
+                              `This product has ${perishableBatchTotal} unit(s) in batches.\n\nUnmarking as perishable will delete all batch records and convert them to default stock (${perishableBatchTotal} units).\n\nContinue?`
+                            )) return
+                          }
+                          setPerishable(next)
+                        }} label="Perishable" />
                       </div>
                     </div>
                   )}
@@ -1724,11 +1713,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-foreground-secondary mb-2">Launch Date</label>
-                          <input type="date" value={launchDate} onChange={e => setLaunchDate(e.target.value)} className={inputCls} />
+                          <DatePicker value={launchDate} onChange={setLaunchDate} />
                         </div>
                         <div>
                           <label className="block text-sm font-medium text-foreground-secondary mb-2">Discontinue Date</label>
-                          <input type="date" value={discontinueDate} onChange={e => setDiscontinueDate(e.target.value)} className={inputCls} />
+                          <DatePicker value={discontinueDate} onChange={setDiscontinueDate} />
                         </div>
                       </div>
                       <Toggle id="is_cod_allowed" checked={isCodAllowed} onChange={setIsCodAllowed} label="COD Allowed" />
