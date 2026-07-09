@@ -203,6 +203,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           referenceId: grnId,
           currentStock: stockBefore,
           ...(newBatchId ? { batchId: newBatchId } : {}),
+          lotNumber: item.lot_number || null,
+          expiryDate: item.expiry_date || null,
         })
 
         // Insert product_serials rows for serialized products

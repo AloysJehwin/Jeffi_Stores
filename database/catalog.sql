@@ -449,6 +449,11 @@ ALTER TABLE order_items ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES produc
 -- inventory_transactions: full batch audit trail
 ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id) ON DELETE SET NULL;
 
+-- snapshot columns: store lot_number, expiry_date, serial_number at write time so ledger is immutable
+ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS lot_number varchar(100);
+ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS expiry_date date;
+ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS serial_number varchar(100);
+
 -- serialized flag: products whose individual units get unique serial numbers
 ALTER TABLE products ADD COLUMN IF NOT EXISTS serialized boolean DEFAULT false NOT NULL;
 

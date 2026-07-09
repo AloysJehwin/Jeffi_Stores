@@ -23,6 +23,9 @@ export async function logStockMovement(
     unitFactor?: number | null
     quantityInUnit?: number | null
     batchId?: string | null
+    lotNumber?: string | null
+    expiryDate?: string | null
+    serialNumber?: string | null
   }
 ) {
   const { productId, variantId, subVariantId, transactionType, quantityChange, referenceType, referenceId, notes } = params
@@ -49,8 +52,9 @@ export async function logStockMovement(
 
   const sql = `INSERT INTO inventory_transactions
     (product_id, variant_id, sub_variant_id, transaction_type, quantity_change, quantity_after,
-     reference_type, reference_id, notes, unit_id, unit_label, unit_factor, quantity_in_unit, batch_id)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`
+     reference_type, reference_id, notes, unit_id, unit_label, unit_factor, quantity_in_unit, batch_id,
+     lot_number, expiry_date, serial_number)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`
   const values = [
     productId, variantId, subVariantId || null,
     transactionType, qtyChange, quantityAfter,
@@ -58,6 +62,7 @@ export async function logStockMovement(
     params.unitId || null, params.unitLabel || null,
     params.unitFactor || null, params.quantityInUnit || null,
     params.batchId || null,
+    params.lotNumber || null, params.expiryDate || null, params.serialNumber || null,
   ]
 
   if (client) {
@@ -159,8 +164,9 @@ export async function getStockLedger(filters: {
       it.unit_factor,
       it.quantity_in_unit,
       it.batch_id,
-      pb.lot_number,
-      pb.expiry_date,
+      COALESCE(it.lot_number, pb.lot_number) AS lot_number,
+      COALESCE(it.expiry_date, pb.expiry_date) AS expiry_date,
+      it.serial_number,
       p.id AS product_id,
       p.name AS product_name,
       p.sku AS product_sku,
