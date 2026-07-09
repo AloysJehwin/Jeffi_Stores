@@ -296,10 +296,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       const synced = new Set<string>()
       for (const item of items) {
         if (!item.product_id) continue
-        const perishRow = await client.query<{ perishable: boolean }>(
-          'SELECT perishable FROM products WHERE id = $1', [item.product_id]
+        const perishRow = await client.query<{ perishable: boolean; serialized: boolean }>(
+          'SELECT perishable, serialized FROM products WHERE id = $1', [item.product_id]
         )
-        if (!perishRow.rows[0]?.perishable) continue
+        if (!perishRow.rows[0]?.perishable && !perishRow.rows[0]?.serialized) continue
         const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
         if (synced.has(key)) continue
         synced.add(key)

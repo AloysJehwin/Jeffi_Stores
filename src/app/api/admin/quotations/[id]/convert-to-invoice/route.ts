@@ -495,11 +495,11 @@ export async function POST(
             })
           }
 
-          // Sync shelf_stock for perishable products
-          const perishRow = await client.query<{ perishable: boolean }>(
-            'SELECT perishable FROM products WHERE id = $1', [item.product_id]
+          // Sync shelf_stock for perishable and serialized products
+          const perishRow = await client.query<{ perishable: boolean; serialized: boolean }>(
+            'SELECT perishable, serialized FROM products WHERE id = $1', [item.product_id]
           )
-          if (perishRow.rows[0]?.perishable) {
+          if (perishRow.rows[0]?.perishable || perishRow.rows[0]?.serialized) {
             const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
             if (!synced.has(key)) {
               synced.add(key)
