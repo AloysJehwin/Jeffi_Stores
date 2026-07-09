@@ -953,7 +953,7 @@ type StockTransaction = {
   variant_id: string | null; variant_name: string | null
   sub_variant_id: string | null; sub_variant_name: string | null
   reference_label: string | null
-  batch_id: string | null; lot_number: string | null; expiry_date: string | null
+  batch_id: string | null; lot_number: string | null; expiry_date: string | null; serial_number: string | null
 }
 
 function StockTab() {
@@ -1324,7 +1324,19 @@ function StockTab() {
                             <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{Number(tx.quantity_after)}</td>
                             <td className="px-4 py-3 text-xs hidden md:table-cell">{refLink}</td>
                             <td className="px-4 py-3 text-xs hidden md:table-cell">
-                              {tx.lot_number ? (
+                              {tx.serial_number ? (
+                                <div className="space-y-0.5">
+                                  <span className="font-mono text-foreground-secondary">{tx.serial_number}</span>
+                                  {tx.lot_number && <span className="block font-mono text-xs text-foreground-muted">{tx.lot_number}</span>}
+                                  {tx.expiry_date && (() => {
+                                    const d = new Date(tx.expiry_date)
+                                    const now = new Date()
+                                    const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                                    const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                    return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                                  })()}
+                                </div>
+                              ) : tx.lot_number ? (
                                 <div className="space-y-0.5">
                                   <span className="font-mono text-foreground-secondary">{tx.lot_number}</span>
                                   {tx.expiry_date && (() => {

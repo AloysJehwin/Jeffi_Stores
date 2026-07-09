@@ -366,11 +366,15 @@ export async function POST(
           }
 
           const orderItemId = itemIdMap.get(item.id)
+          let batchLotNumber: string | null = null
+          let batchExpiryDate: string | null = null
           if (assignedBatchId && orderItemId) {
-            await client.query(
-              `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2`,
+            const batchUpd = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
+              `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2 RETURNING lot_number, expiry_date`,
               [qty, assignedBatchId]
             )
+            batchLotNumber = batchUpd.rows[0]?.lot_number ?? null
+            batchExpiryDate = batchUpd.rows[0]?.expiry_date ?? null
             await client.query(
               `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
               [assignedBatchId, orderItemId]
@@ -387,6 +391,8 @@ export async function POST(
             referenceId: newOrder.id,
             currentStock: stockBefore,
             batchId: assignedBatchId,
+            lotNumber: batchLotNumber,
+            expiryDate: batchExpiryDate,
           })
         }
       }
