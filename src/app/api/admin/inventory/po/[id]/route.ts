@@ -39,6 +39,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       `SELECT poi.*,
               p.name AS product_name_current,
               p.perishable,
+              p.serialized,
               pv.variant_name,
               COALESCE(vsu.display_label, vsu.unit, psu.display_label, psu.unit) AS sell_unit_label,
               COALESCE(vsu.dimension, psu.dimension) AS sell_unit_dimension
