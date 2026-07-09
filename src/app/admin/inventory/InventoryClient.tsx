@@ -1246,6 +1246,12 @@ function StockTab() {
                       const expanded = expandedGroups.has(group.refId)
                       const totalChange = Math.round(group.txs.reduce((s, t) => s + Number(t.quantity_change), 0) * 1000) / 1000
                       const txType = group.txs[0].transaction_type
+                      const isSerialGroup = multi && group.txs.every(t => t.serial_number)
+                      const serialSummary = isSerialGroup ? (() => {
+                        const sns = group.txs.map(t => t.serial_number!)
+                        const preview = sns.slice(0, 2).join(', ')
+                        return sns.length > 2 ? `${preview} (+${sns.length - 2} more)` : preview
+                      })() : null
 
                       const refLink = group.refType === 'order' ? (
                         <Link href={ap(`/admin/invoices/${group.refId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
@@ -1372,7 +1378,7 @@ function StockTab() {
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                                 <span className="text-sm font-medium text-foreground">
-                                  {group.txs.length} items
+                                  {isSerialGroup ? `${group.txs.length} serials` : `${group.txs.length} items`}
                                 </span>
                                 <span className="text-xs text-foreground-muted">
                                   {expanded ? '(collapse)' : '(expand)'}
@@ -1388,7 +1394,11 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-2.5 text-right text-foreground-muted text-xs font-mono">—</td>
                             <td className="px-4 py-2.5 text-xs hidden md:table-cell">{refLink}</td>
-                            <td className="px-4 py-2.5 hidden md:table-cell" />
+                            <td className="px-4 py-2.5 hidden md:table-cell">
+                              {serialSummary && (
+                                <span className="font-mono text-xs text-foreground-secondary">{serialSummary}</span>
+                              )}
+                            </td>
                           </tr>
 
                           {/* Expanded product rows */}
@@ -1415,7 +1425,19 @@ function StockTab() {
                                 <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">{Number(tx.quantity_after)}</td>
                                 <td className="px-4 py-2.5 text-xs hidden md:table-cell" />
                                 <td className="px-4 py-2.5 text-xs hidden md:table-cell">
-                                  {tx.lot_number ? (
+                                  {tx.serial_number ? (
+                                    <div className="space-y-0.5">
+                                      <span className="font-mono text-foreground-secondary">{tx.serial_number}</span>
+                                      {tx.lot_number && <span className="block font-mono text-xs text-foreground-muted">{tx.lot_number}</span>}
+                                      {tx.expiry_date && (() => {
+                                        const d = new Date(tx.expiry_date)
+                                        const now = new Date()
+                                        const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                                        const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                        return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                                      })()}
+                                    </div>
+                                  ) : tx.lot_number ? (
                                     <div className="space-y-0.5">
                                       <span className="font-mono text-foreground-secondary">{tx.lot_number}</span>
                                       {tx.expiry_date && (() => {
