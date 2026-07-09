@@ -253,6 +253,7 @@ export async function getStockValuation(filters: {
         su.factor AS sell_unit_factor,
         bu.display_label AS base_unit_label,
         p.perishable,
+        p.serialized,
         (SELECT COALESCE(SUM(pb2.quantity_remaining), 0) FROM product_batches pb2
          WHERE pb2.product_id = p.id AND pb2.variant_id IS NULL AND pb2.sub_variant_id IS NULL
            AND pb2.quantity_remaining > 0) AS batch_qty_total
@@ -292,6 +293,7 @@ export async function getStockValuation(filters: {
         su.factor AS sell_unit_factor,
         bu.display_label AS base_unit_label,
         p.perishable,
+        p.serialized,
         (SELECT COALESCE(SUM(pb2.quantity_remaining), 0) FROM product_batches pb2
          WHERE pb2.product_id = p.id AND pb2.variant_id = pv.id AND pb2.sub_variant_id IS NULL
            AND pb2.quantity_remaining > 0) AS batch_qty_total
@@ -333,6 +335,7 @@ export async function getStockValuation(filters: {
         su.factor AS sell_unit_factor,
         bu.display_label AS base_unit_label,
         p.perishable,
+        p.serialized,
         (SELECT COALESCE(SUM(pb2.quantity_remaining), 0) FROM product_batches pb2
          WHERE pb2.product_id = p.id AND pb2.variant_id = pv.id AND pb2.sub_variant_id = sv.id
            AND pb2.quantity_remaining > 0) AS batch_qty_total
