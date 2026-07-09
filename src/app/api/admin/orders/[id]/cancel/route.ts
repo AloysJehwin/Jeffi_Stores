@@ -70,8 +70,8 @@ export async function POST(
               `SELECT quantity_remaining FROM product_batches WHERE id = $1 FOR UPDATE`, [mv.batch_id]
             )
             stockBefore = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
-            await client.query(
-              `UPDATE product_batches SET quantity_remaining = quantity_remaining + $1, updated_at = NOW() WHERE id = $2`,
+            const batchUpd = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
+              `UPDATE product_batches SET quantity_remaining = quantity_remaining + $1, updated_at = NOW() WHERE id = $2 RETURNING lot_number, expiry_date`,
               [restoreQty, mv.batch_id]
             )
             await logStockMovement(client, {
@@ -84,6 +84,8 @@ export async function POST(
               referenceId: id,
               currentStock: stockBefore,
               batchId: mv.batch_id,
+              lotNumber: batchUpd.rows[0]?.lot_number ?? null,
+              expiryDate: batchUpd.rows[0]?.expiry_date ?? null,
             })
           }
         } else if (item.sub_variant_id) {
