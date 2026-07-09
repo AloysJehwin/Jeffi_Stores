@@ -441,7 +441,7 @@ ALTER TABLE products ALTER COLUMN handling_days SET DEFAULT 2;
 -- product_batches: add grn traceability, FIFO remaining qty, and shelf location
 ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS grn_id uuid REFERENCES grns(id);
 ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS quantity_remaining numeric(14,3) NOT NULL DEFAULT 0;
-ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS location_id uuid REFERENCES shelf_locations(id);
+ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS location_id uuid REFERENCES shelf_locations(id) ON DELETE SET NULL;
 
 -- order_items: link to assigned batch (set at stock deduction time)
 ALTER TABLE order_items ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id) ON DELETE SET NULL;

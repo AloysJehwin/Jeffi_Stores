@@ -101,7 +101,7 @@ CREATE TABLE public.shelf_stock (
 
 CREATE TABLE public.shelf_stock_transactions (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
-    location_id uuid NOT NULL,
+    location_id uuid,
     product_id uuid NOT NULL,
     variant_id uuid,
     sub_variant_id uuid,

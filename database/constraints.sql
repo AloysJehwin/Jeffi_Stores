@@ -2543,7 +2543,7 @@ ALTER TABLE ONLY public.shelf_stock
 --
 
 ALTER TABLE ONLY public.shelf_stock_transactions
-    ADD CONSTRAINT shelf_stock_transactions_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.shelf_locations(id);
+    ADD CONSTRAINT shelf_stock_transactions_location_id_fkey FOREIGN KEY (location_id) REFERENCES public.shelf_locations(id) ON DELETE SET NULL;
 
 
 
