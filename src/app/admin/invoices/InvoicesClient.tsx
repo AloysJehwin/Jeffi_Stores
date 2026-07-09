@@ -532,7 +532,11 @@ export default function InvoicesClient() {
     if (item.sub_variant_id) params.set('sub_variant_id', item.sub_variant_id)
     const res = await fetch(`/api/admin/inventory/batches/available?${params}`, { credentials: 'include' })
     const data = await res.json()
-    if (data.items?.length > 0) setBatchPickerItem(data.items[0])
+    if (data.serialized_items?.length > 0) {
+      setSerialPickerItems(data.serialized_items)
+    } else if (data.items?.length > 0) {
+      setBatchPickerItem(data.items[0])
+    }
   }
 
   async function handleFinalizeEdit(e: React.FormEvent) {
