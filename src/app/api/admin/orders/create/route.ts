@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
     const batchAssignments: { order_item_id: string; batch_id: string; qty: number }[] = Array.isArray(body?.batch_assignments) ? body.batch_assignments : []
+    const serialAssignments: { order_item_id: string; serial_number: string }[] = Array.isArray(body?.serial_assignments) ? body.serial_assignments : []
 
     const parsed = parseBody(createOrderSchema, body, 'POST /api/admin/orders/create')
     if (!parsed.ok) return parsed.response
@@ -278,10 +279,11 @@ export async function POST(request: NextRequest) {
             : item.quantity
 
           const itemBatches = batchAssignments.filter(a => a.order_item_id === item.temp_id)
+          const itemSerials = serialAssignments.filter(a => a.order_item_id === item.temp_id)
 
           let stockBefore = 0
           if (itemBatches.length > 0) {
-            // Batch-sourced: deduct qty from each assigned batch, log one movement per batch
+            // Batch-sourced: deduct qty from each assigned batch
             for (const a of itemBatches) {
               const br = await client.query<{ quantity_remaining: string }>(
                 `SELECT quantity_remaining FROM product_batches WHERE id = $1 FOR UPDATE`, [a.batch_id]
@@ -291,19 +293,51 @@ export async function POST(request: NextRequest) {
                 `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2 RETURNING lot_number, expiry_date`,
                 [a.qty, a.batch_id]
               )
-              await logStockMovement(client, {
-                productId: item.product_id,
-                variantId: item.variant_id || null,
-                subVariantId: item.sub_variant_id || null,
-                transactionType: 'sale',
-                quantityChange: -a.qty,
-                referenceType: 'order',
-                referenceId: orderId,
-                currentStock: stockBefore,
-                batchId: a.batch_id,
-                lotNumber: batchUpd.rows[0]?.lot_number ?? null,
-                expiryDate: batchUpd.rows[0]?.expiry_date ?? null,
-              })
+              if (itemSerials.length > 0) {
+                // Serialized: one ledger row per serial, mark each sold
+                const batchSerials = itemSerials.slice(0, a.qty)
+                for (let si = 0; si < batchSerials.length; si++) {
+                  const sn = batchSerials[si].serial_number
+                  const serialRow = await client.query<{ id: string }>(
+                    `SELECT id FROM product_serials WHERE product_id = $1 AND serial_number = $2 AND status = 'in_stock' FOR UPDATE`,
+                    [item.product_id, sn]
+                  )
+                  if (serialRow.rows.length) {
+                    await client.query(
+                      `UPDATE product_serials SET status = 'sold', order_id = $1, sold_at = NOW(), updated_at = NOW() WHERE id = $2`,
+                      [orderId, serialRow.rows[0].id]
+                    )
+                  }
+                  await logStockMovement(client, {
+                    productId: item.product_id,
+                    variantId: item.variant_id || null,
+                    subVariantId: item.sub_variant_id || null,
+                    transactionType: 'sale',
+                    quantityChange: -1,
+                    referenceType: 'order',
+                    referenceId: orderId,
+                    currentStock: stockBefore - si,
+                    batchId: a.batch_id,
+                    lotNumber: batchUpd.rows[0]?.lot_number ?? null,
+                    expiryDate: batchUpd.rows[0]?.expiry_date ?? null,
+                    serialNumber: sn,
+                  })
+                }
+              } else {
+                await logStockMovement(client, {
+                  productId: item.product_id,
+                  variantId: item.variant_id || null,
+                  subVariantId: item.sub_variant_id || null,
+                  transactionType: 'sale',
+                  quantityChange: -a.qty,
+                  referenceType: 'order',
+                  referenceId: orderId,
+                  currentStock: stockBefore,
+                  batchId: a.batch_id,
+                  lotNumber: batchUpd.rows[0]?.lot_number ?? null,
+                  expiryDate: batchUpd.rows[0]?.expiry_date ?? null,
+                })
+              }
             }
             // Tag order_item with first batch_id for display
             await client.query(

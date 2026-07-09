@@ -61,15 +61,18 @@ export async function GET(request: NextRequest) {
         oi.variant_name,
         oi.quantity,
         oi.buy_unit,
-        oi.batch_id
+        oi.batch_id,
+        p.perishable,
+        p.serialized
       FROM order_items oi
       JOIN products p ON p.id = oi.product_id
-      WHERE oi.order_id = $1 AND p.perishable = true
+      WHERE oi.order_id = $1 AND (p.perishable = true OR p.serialized = true)
     `, [orderId])
 
-    if (!items.length) return NextResponse.json({ items: [] })
+    if (!items.length) return NextResponse.json({ items: [], serialized_items: [] })
 
     const result = []
+    const serializedResult = []
 
     for (const item of items) {
       // Resolve base qty (apply unit factor for count-dimension units)
@@ -86,35 +89,45 @@ export async function GET(request: NextRequest) {
         ? rawQty * parseFloat(unitRow.factor)
         : rawQty
 
-      // Available batches for this product/variant, FIFO by expiry then created_at
-      const batches = await queryMany<any>(`
-        SELECT
-          pb.id,
-          pb.lot_number,
-          pb.manufacture_date,
-          pb.expiry_date,
-          pb.quantity_remaining,
-          sl.display_code AS location
-        FROM product_batches pb
-        LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
-        WHERE pb.product_id = $1
-          AND (pb.variant_id = $2 OR ($2::uuid IS NULL AND pb.variant_id IS NULL))
-          AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
-          AND pb.quantity_remaining > 0
-        ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
-      `, [item.product_id, item.variant_id || null, item.sub_variant_id || null])
+      if (item.serialized) {
+        serializedResult.push({
+          order_item_id: item.order_item_id,
+          product_name: item.product_name,
+          variant_name: item.variant_name || null,
+          required_qty: requiredQty,
+          already_assigned: !!item.batch_id,
+        })
+      } else {
+        // Available batches for this product/variant, FIFO by expiry then created_at
+        const batches = await queryMany<any>(`
+          SELECT
+            pb.id,
+            pb.lot_number,
+            pb.manufacture_date,
+            pb.expiry_date,
+            pb.quantity_remaining,
+            sl.display_code AS location
+          FROM product_batches pb
+          LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
+          WHERE pb.product_id = $1
+            AND (pb.variant_id = $2 OR ($2::uuid IS NULL AND pb.variant_id IS NULL))
+            AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
+            AND pb.quantity_remaining > 0
+          ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
+        `, [item.product_id, item.variant_id || null, item.sub_variant_id || null])
 
-      result.push({
-        order_item_id: item.order_item_id,
-        product_name: item.product_name,
-        variant_name: item.variant_name || null,
-        required_qty: requiredQty,
-        already_assigned: !!item.batch_id,
-        batches,
-      })
+        result.push({
+          order_item_id: item.order_item_id,
+          product_name: item.product_name,
+          variant_name: item.variant_name || null,
+          required_qty: requiredQty,
+          already_assigned: !!item.batch_id,
+          batches,
+        })
+      }
     }
 
-    return NextResponse.json({ items: result })
+    return NextResponse.json({ items: result, serialized_items: serializedResult })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }

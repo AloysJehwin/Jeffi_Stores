@@ -41,6 +41,7 @@ export interface LineItem {
   discount_pct: number
   mrp: number
   inventory_quantity: number | null
+  serialized?: boolean
 }
 
 interface Suggestion {
@@ -58,6 +59,7 @@ interface Suggestion {
   hsn_code: string | null
   inventory_quantity: number | null
   discount_pct?: number | null
+  serialized?: boolean | null
 }
 
 interface Category {
@@ -288,6 +290,7 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
       discount_pct,
       mrp,
       inventory_quantity: s.inventory_quantity ?? null,
+      serialized: s.serialized ?? false,
       buy_unit: it.buy_unit,
       buy_mode: it.buy_mode,
       sell_unit_factor: it.sell_unit_factor,
