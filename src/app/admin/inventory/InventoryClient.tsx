@@ -619,8 +619,8 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     const serials: string[] = Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []
                     const entered = serials.filter(Boolean).length
                     const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
-                    const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '')
-                    const autoSerial = (n: number) => `${sku ? sku + '-' : 'SN-'}${ymd}-${String(n).padStart(3, '0')}`
+                    const randSuffix = () => Math.random().toString(36).slice(2, 8).toUpperCase()
+                    const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${randSuffix()}`
                     const updateSerial = (slotIdx: number, val: string) =>
                       setReceiveItems(items => items.map((r, i) => {
                         if (i !== idx) return r
@@ -645,19 +645,10 @@ function POTab({ initialPO }: { initialPO?: string }) {
                                 <button
                                   type="button"
                                   className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                                  onClick={async () => {
-                                    const prefix = `${sku ? sku + '-' : 'SN-'}${ymd}`
-                                    let startSeq = 1
-                                    try {
-                                      const r = await fetch(`/api/admin/inventory/serials/next-seq?prefix=${encodeURIComponent(prefix)}`, { credentials: 'include' })
-                                      const d = await r.json()
-                                      startSeq = d.next_seq ?? 1
-                                    } catch { /* fallback to 1 */ }
-                                    setReceiveItems(items => items.map((r, i) => {
-                                      if (i !== idx) return r
-                                      return { ...r, serial_numbers: Array.from({ length: needed }, (_, n) => autoSerial(startSeq + n)) }
-                                    }))
-                                  }}
+                                  onClick={() => setReceiveItems(items => items.map((r, i) => {
+                                    if (i !== idx) return r
+                                    return { ...r, serial_numbers: Array.from({ length: needed }, () => autoSerial()) }
+                                  }))}
                                 >
                                   Generate All
                                 </button>
@@ -668,7 +659,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                                 <div key={n} className="flex gap-1">
                                   <input
                                     type="text"
-                                    placeholder={autoSerial(n + 1)}
+                                    placeholder={autoSerial()}
                                     className={inputCls + ' font-mono text-xs flex-1 min-w-0'}
                                     value={serials[n] ?? ''}
                                     onChange={e => updateSerial(n, e.target.value)}
