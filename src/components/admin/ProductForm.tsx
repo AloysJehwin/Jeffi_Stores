@@ -1644,7 +1644,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           <input type="number" min="0" step="1" value={netWeightGrams} onChange={e => setNetWeightGrams(e.target.value)} className={inputCls} placeholder="Product without packaging" />
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
+                      <div className="grid grid-cols-5 gap-3 pt-1">
                         <Toggle id="fragile" checked={fragile} onChange={setFragile} label="Fragile" />
                         <Toggle id="hazardous" checked={hazardous} onChange={setHazardous} label="Hazardous" />
                         <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
