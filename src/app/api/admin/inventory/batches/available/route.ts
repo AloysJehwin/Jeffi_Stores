@@ -48,7 +48,83 @@ export async function GET(request: NextRequest) {
       }] })
     }
 
-    if (!orderId) return NextResponse.json({ error: 'order_id or product_id required' }, { status: 400 })
+    const quotationId = request.nextUrl.searchParams.get('quotation_id')
+
+    if (!orderId && !quotationId) return NextResponse.json({ error: 'order_id, quotation_id, or product_id required' }, { status: 400 })
+
+    // Quotation items path — used before order is created (quotation → invoice conversion)
+    if (quotationId) {
+      const qItems = await queryMany<any>(`
+        SELECT
+          qi.id AS order_item_id,
+          qi.product_id,
+          qi.variant_id,
+          qi.sub_variant_id,
+          qi.description AS product_name,
+          NULL AS variant_name,
+          qi.quantity,
+          qi.buy_unit,
+          NULL AS batch_id,
+          p.perishable,
+          p.serialized
+        FROM quotation_items qi
+        JOIN products p ON p.id = qi.product_id
+        WHERE qi.quotation_id = $1 AND qi.product_id IS NOT NULL AND (p.perishable = true OR p.serialized = true)
+      `, [quotationId])
+
+      if (!qItems.length) return NextResponse.json({ items: [], serialized_items: [] })
+
+      const qResult = []
+      const qSerializedResult = []
+
+      for (const item of qItems) {
+        const unitRow = await queryOne<{ factor: string; dimension: string }>(`
+          SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                 COALESCE(puv.dimension, pup.dimension) AS dimension
+          FROM (SELECT 1) x
+          LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+          LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL
+        `, [item.buy_unit, item.product_id, item.variant_id || null])
+
+        const rawQty = parseFloat(item.quantity)
+        const requiredQty = (unitRow?.dimension === 'count' && unitRow?.factor)
+          ? rawQty * parseFloat(unitRow.factor)
+          : rawQty
+
+        if (item.serialized) {
+          qSerializedResult.push({
+            order_item_id: item.order_item_id,
+            product_name: item.product_name,
+            variant_name: item.variant_name || null,
+            required_qty: requiredQty,
+            already_assigned: false,
+          })
+        } else {
+          const batches = await queryMany<any>(`
+            SELECT pb.id, pb.lot_number, pb.manufacture_date, pb.expiry_date, pb.quantity_remaining,
+                   sl.display_code AS location
+            FROM product_batches pb
+            LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
+            WHERE pb.product_id = $1
+              AND (pb.variant_id = $2 OR ($2::uuid IS NULL AND pb.variant_id IS NULL))
+              AND (pb.sub_variant_id = $3 OR ($3::uuid IS NULL AND pb.sub_variant_id IS NULL))
+              AND pb.quantity_remaining > 0
+            ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
+          `, [item.product_id, item.variant_id || null, item.sub_variant_id || null])
+
+          qResult.push({
+            order_item_id: item.order_item_id,
+            product_name: item.product_name,
+            variant_name: item.variant_name || null,
+            required_qty: requiredQty,
+            already_assigned: false,
+            batches,
+          })
+        }
+      }
+
+      return NextResponse.json({ items: qResult, serialized_items: qSerializedResult })
+    }
 
     // Get order items where the product is perishable
     const items = await queryMany<any>(`

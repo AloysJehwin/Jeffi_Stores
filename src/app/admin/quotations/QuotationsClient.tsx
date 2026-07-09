@@ -10,6 +10,8 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
+import BatchPickerModal, { type BatchPickerItem, type BatchAssignment } from '@/components/admin/BatchPickerModal'
+import SerialEntryModal, { type SerialItem, type SerialAssignment } from '@/components/admin/SerialEntryModal'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import DatePicker from '@/components/ui/DatePicker'
 import HoverCard from '@/components/ui/HoverCard'
@@ -154,6 +156,10 @@ export default function QuotationsClient() {
   const [convertSavedAsDraft, setConvertSavedAsDraft] = useState(false)
   const [convertInsufficientItems, setConvertInsufficientItems] = useState<string[]>([])
   const [convertHasStockIssue, setConvertHasStockIssue] = useState(false)
+  const [convertBatchPickerItems, setConvertBatchPickerItems] = useState<BatchPickerItem[] | null>(null)
+  const [convertSerialPickerItems, setConvertSerialPickerItems] = useState<SerialItem[] | null>(null)
+  const [pendingConvertArgs, setPendingConvertArgs] = useState<{ quoteId: string; paymentMode: string; enableDelivery: boolean } | null>(null)
+  const [pendingConvertBatchAssignments, setPendingConvertBatchAssignments] = useState<BatchAssignment[] | null>(null)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -314,13 +320,40 @@ export default function QuotationsClient() {
     }
   }
 
-  async function convertToInvoice(quoteId: string, paymentMode: string, enableDelivery: boolean) {
+  async function convertToInvoice(quoteId: string, paymentMode: string, enableDelivery: boolean, batchAssignments?: BatchAssignment[], serialAssignments?: SerialAssignment[]) {
+    // Before converting, check if any items need batch/serial selection
+    if (!batchAssignments && !serialAssignments) {
+      try {
+        const res = await fetch(`/api/admin/inventory/batches/available?quotation_id=${quoteId}`, { credentials: 'include' })
+        if (res.ok) {
+          const data = await res.json()
+          const hasBatch = data.items && data.items.length > 0
+          const hasSerial = data.serialized_items && data.serialized_items.length > 0
+          if (hasBatch || hasSerial) {
+            setPendingConvertArgs({ quoteId, paymentMode, enableDelivery })
+            if (hasBatch) {
+              setConvertBatchPickerItems(data.items)
+              if (hasSerial) setConvertSerialPickerItems(data.serialized_items)
+            } else {
+              setConvertSerialPickerItems(data.serialized_items)
+            }
+            return
+          }
+        }
+      } catch (_) {}
+    }
+
     setConvertingInvoice(true)
     try {
       const res = await fetch(`/api/admin/quotations/${quoteId}/convert-to-invoice`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ paymentMode, enableDelivery }),
+        body: JSON.stringify({
+          paymentMode,
+          enableDelivery,
+          ...(batchAssignments && batchAssignments.length > 0 ? { batch_assignments: batchAssignments } : {}),
+          ...(serialAssignments && serialAssignments.length > 0 ? { serial_assignments: serialAssignments } : {}),
+        }),
       })
       const data = await res.json()
       if (!res.ok) { showToast(data.error || 'Conversion failed', 'error'); return }
@@ -1315,8 +1348,42 @@ export default function QuotationsClient() {
       </div>
     )}
     </div>
+
+    {convertBatchPickerItems && (
+      <BatchPickerModal
+        items={convertBatchPickerItems}
+        onConfirm={batchAssignments => {
+          setConvertBatchPickerItems(null)
+          if (convertSerialPickerItems && convertSerialPickerItems.length > 0) {
+            setPendingConvertBatchAssignments(batchAssignments)
+          } else if (pendingConvertArgs) {
+            const args = pendingConvertArgs
+            setPendingConvertArgs(null)
+            convertToInvoice(args.quoteId, args.paymentMode, args.enableDelivery, batchAssignments)
+          }
+        }}
+        onCancel={() => { setConvertBatchPickerItems(null); setPendingConvertArgs(null) }}
+      />
+    )}
+
+    {convertSerialPickerItems && !convertBatchPickerItems && (
+      <SerialEntryModal
+        items={convertSerialPickerItems}
+        onConfirm={serialAssignments => {
+          setConvertSerialPickerItems(null)
+          if (pendingConvertArgs) {
+            const args = pendingConvertArgs
+            const batches = pendingConvertBatchAssignments
+            setPendingConvertArgs(null)
+            setPendingConvertBatchAssignments(null)
+            convertToInvoice(args.quoteId, args.paymentMode, args.enableDelivery, batches ?? undefined, serialAssignments)
+          }
+        }}
+        onCancel={() => { setConvertSerialPickerItems(null); setPendingConvertArgs(null); setPendingConvertBatchAssignments(null) }}
+      />
+    )}
+  </div>
   )
-}
 
 function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => void }) {
   if (typeof document === 'undefined') return null

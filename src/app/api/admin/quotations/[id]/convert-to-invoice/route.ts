@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
 import { isInterState, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear, round2 } from '@/lib/gst'
 import { logStockMovement } from '@/lib/inventory'
+import { syncPerishableStock } from '@/lib/shelf'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { sendBusinessInvoiceGeneratedEmail } from '@/lib/email-business'
 import { lineItemExGst } from '@/lib/pricing'
@@ -46,8 +47,11 @@ export async function POST(
     const body = await request.json().catch(() => ({}))
     const paymentMode: string = body.paymentMode || 'cash'
     const enableDelivery: boolean = !!body.enableDelivery
-    const batchAssignments: { order_item_id: string; batch_id: string }[] = Array.isArray(body.batch_assignments)
+    const batchAssignments: { order_item_id: string; batch_id: string; qty: number }[] = Array.isArray(body.batch_assignments)
       ? body.batch_assignments
+      : []
+    const serialAssignments: { order_item_id: string; serial_number: string }[] = Array.isArray(body.serial_assignments)
+      ? body.serial_assignments
       : []
 
     const isBuyerSame = quotation.buyer_same !== false
@@ -323,17 +327,82 @@ export async function POST(
       }
 
       if (!saveAsDraft) {
+        const synced = new Set<string>()
         for (const item of processedItems) {
           if (!item.product_id) continue
-          // base_qty already resolved from unitFactorMap in processedItems (handles NULL buy_unit)
           const qty = item.base_qty
 
-          const assignedBatchId = batchAssignments.find(
-            a => a.order_item_id === item.id
-          )?.batch_id ?? null
+          const itemBatches = batchAssignments.filter(a => a.order_item_id === item.id)
+          const itemSerials = serialAssignments.filter(a => a.order_item_id === item.id)
+          const orderItemId = itemIdMap.get(item.id)
 
           let stockBefore = 0
-          if (item.sub_variant_id) {
+
+          if (itemBatches.length > 0) {
+            // Multi-batch deduction
+            let serialOffset = 0
+            for (const a of itemBatches) {
+              const br = await client.query<{ quantity_remaining: string }>(
+                `SELECT quantity_remaining FROM product_batches WHERE id = $1 FOR UPDATE`, [a.batch_id]
+              )
+              stockBefore = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
+              const batchUpd = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
+                `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2 RETURNING lot_number, expiry_date`,
+                [a.qty, a.batch_id]
+              )
+              if (itemSerials.length > 0) {
+                const batchSerials = itemSerials.slice(serialOffset, serialOffset + a.qty)
+                serialOffset += a.qty
+                for (let si = 0; si < batchSerials.length; si++) {
+                  const sn = batchSerials[si].serial_number
+                  const serialRow = await client.query<{ id: string }>(
+                    `SELECT id FROM product_serials WHERE product_id = $1 AND serial_number = $2 AND status = 'in_stock' FOR UPDATE`,
+                    [item.product_id, sn]
+                  )
+                  if (serialRow.rows.length) {
+                    await client.query(
+                      `UPDATE product_serials SET status = 'sold', order_id = $1, sold_at = NOW(), updated_at = NOW() WHERE id = $2`,
+                      [newOrder.id, serialRow.rows[0].id]
+                    )
+                  }
+                  await logStockMovement(client, {
+                    productId: item.product_id,
+                    variantId: item.variant_id || null,
+                    subVariantId: item.sub_variant_id || null,
+                    transactionType: 'sale',
+                    quantityChange: -1,
+                    referenceType: 'order',
+                    referenceId: newOrder.id,
+                    currentStock: stockBefore - si,
+                    batchId: a.batch_id,
+                    lotNumber: batchUpd.rows[0]?.lot_number ?? null,
+                    expiryDate: batchUpd.rows[0]?.expiry_date ?? null,
+                    serialNumber: sn,
+                  })
+                }
+              } else {
+                await logStockMovement(client, {
+                  productId: item.product_id,
+                  variantId: item.variant_id || null,
+                  subVariantId: item.sub_variant_id || null,
+                  transactionType: 'sale',
+                  quantityChange: -a.qty,
+                  referenceType: 'order',
+                  referenceId: newOrder.id,
+                  currentStock: stockBefore,
+                  batchId: a.batch_id,
+                  lotNumber: batchUpd.rows[0]?.lot_number ?? null,
+                  expiryDate: batchUpd.rows[0]?.expiry_date ?? null,
+                })
+              }
+            }
+            if (orderItemId) {
+              await client.query(
+                `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
+                [itemBatches[0].batch_id, orderItemId]
+              )
+            }
+          } else if (item.sub_variant_id) {
             const row = await client.query<{ inventory_quantity: string }>(
               'SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE',
               [item.sub_variant_id]
@@ -365,35 +434,30 @@ export async function POST(
             )
           }
 
-          const orderItemId = itemIdMap.get(item.id)
-          let batchLotNumber: string | null = null
-          let batchExpiryDate: string | null = null
-          if (assignedBatchId && orderItemId) {
-            const batchUpd = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
-              `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2 RETURNING lot_number, expiry_date`,
-              [qty, assignedBatchId]
-            )
-            batchLotNumber = batchUpd.rows[0]?.lot_number ?? null
-            batchExpiryDate = batchUpd.rows[0]?.expiry_date ?? null
-            await client.query(
-              `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
-              [assignedBatchId, orderItemId]
-            )
+          if (itemBatches.length === 0) {
+            await logStockMovement(client, {
+              productId: item.product_id,
+              variantId: item.variant_id || null,
+              subVariantId: item.sub_variant_id || null,
+              transactionType: 'sale',
+              quantityChange: -qty,
+              referenceType: 'order',
+              referenceId: newOrder.id,
+              currentStock: stockBefore,
+            })
           }
 
-          await logStockMovement(client, {
-            productId: item.product_id,
-            variantId: item.variant_id || null,
-            subVariantId: item.sub_variant_id || null,
-            transactionType: 'sale',
-            quantityChange: -qty,
-            referenceType: 'order',
-            referenceId: newOrder.id,
-            currentStock: stockBefore,
-            batchId: assignedBatchId,
-            lotNumber: batchLotNumber,
-            expiryDate: batchExpiryDate,
-          })
+          // Sync shelf_stock for perishable products
+          const perishRow = await client.query<{ perishable: boolean }>(
+            'SELECT perishable FROM products WHERE id = $1', [item.product_id]
+          )
+          if (perishRow.rows[0]?.perishable) {
+            const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
+            if (!synced.has(key)) {
+              synced.add(key)
+              await syncPerishableStock(client, item.product_id, item.variant_id || null, item.sub_variant_id || null)
+            }
+          }
         }
       }
 
