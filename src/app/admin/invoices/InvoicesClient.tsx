@@ -12,6 +12,7 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, { newLineItem, type LineItem as LILineItem } from '@/components/admin/LineItemsSection'
 import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
+import SerialEntryModal, { type SerialItem, type SerialAssignment } from '@/components/admin/SerialEntryModal'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import DatePicker from '@/components/ui/DatePicker'
 
@@ -178,6 +179,8 @@ export default function InvoicesClient() {
   const [batchPickerItem, setBatchPickerItem] = useState<BatchPickerItem | null>(null)
   const [batchAssignments, setBatchAssignments] = useState<Record<string, { batch_id: string; qty: number }[]>>({}) // lineItemId → [{batch_id, qty}]
   const [assignedBatchLabels, setAssignedBatchLabels] = useState<Record<string, string>>({}) // lineItemId → lot label(s)
+  const [serialAssignments, setSerialAssignments] = useState<SerialAssignment[]>([])
+  const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
 
   // Draft-list finalize batch picker
   const [draftFinalizeId, setDraftFinalizeId] = useState<string | null>(null)
@@ -316,6 +319,8 @@ export default function InvoicesClient() {
     setEditIsDraft(false)
     setCustSearch(''); setCustResults([]); setShowCustDrop(false)
     setBatchAssignments({})
+    setSerialAssignments([])
+    setSerialPickerItems(null)
   }
 
   async function openEdit(inv: Invoice) {
@@ -445,6 +450,7 @@ export default function InvoicesClient() {
           batch_assignments: Object.entries(batchAssignments).flatMap(([order_item_id, batches]) =>
             batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
           ),
+          serial_assignments: serialAssignments,
         }),
       })
       const data = await res.json()
@@ -588,6 +594,17 @@ export default function InvoicesClient() {
                   }))
                 })
             : [],
+          serial_assignments: serialAssignments.length > 0
+            ? serialAssignments.map(sa => {
+                const li = items.find(it => it.id === sa.order_item_id)
+                if (!li) return sa
+                const saved = (saveData.savedItemIds || []).find((s: any) =>
+                  s.product_id === li.product_id &&
+                  (s.variant_id || null) === (li.variant_id || null)
+                )
+                return saved ? { ...sa, order_item_id: saved.order_item_id } : sa
+              })
+            : [],
         }),
       })
       const finalData = await finalRes.json()
@@ -613,7 +630,7 @@ export default function InvoicesClient() {
       {batchPickerItem && (
         <BatchPickerModal
           items={[batchPickerItem]}
-          onConfirm={assignments => {
+          onConfirm={async assignments => {
             const map: Record<string, { batch_id: string; qty: number }[]> = { ...batchAssignments }
             const labelMap: Record<string, string> = { ...assignedBatchLabels }
             // Group assignments by order_item_id
@@ -633,8 +650,34 @@ export default function InvoicesClient() {
             setBatchAssignments(map)
             setAssignedBatchLabels(labelMap)
             setBatchPickerItem(null)
+
+            // Check if this item is serialized — if so, prompt for serial numbers
+            const lineItem = items.find(it => it.id === Object.keys(byItem)[0])
+            if (lineItem?.serialized) {
+              const totalQty = assignments.reduce((s, a) => s + a.qty, 0)
+              setSerialPickerItems([{
+                order_item_id: lineItem.id,
+                product_name: lineItem.product_name,
+                variant_name: lineItem.variant_name || null,
+                required_qty: totalQty,
+                already_assigned: false,
+              }])
+            }
           }}
           onCancel={() => setBatchPickerItem(null)}
+        />
+      )}
+      {serialPickerItems && (
+        <SerialEntryModal
+          items={serialPickerItems}
+          onConfirm={assignments => {
+            setSerialAssignments(prev => {
+              const itemIds = new Set(assignments.map(a => a.order_item_id))
+              return [...prev.filter(a => !itemIds.has(a.order_item_id)), ...assignments]
+            })
+            setSerialPickerItems(null)
+          }}
+          onCancel={() => setSerialPickerItems(null)}
         />
       )}
       <div className="space-y-4">

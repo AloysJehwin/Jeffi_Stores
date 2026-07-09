@@ -379,7 +379,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
         expiry_date: '',
         manufacture_date: '',
         location_id: '',
-        serial_numbers: '',
+        serial_numbers: [] as string[],
       }
     })
     setReceiveMode({ po: json.purchase_order })
@@ -404,8 +404,8 @@ function POTab({ initialPO }: { initialPO?: string }) {
     // Validate serialized items have the right number of serial numbers
     const missingSerials = receiveItems.filter(it => {
       if (!it.serialized || parseFloat(it.receive_qty) <= 0) return false
-      const serials = (it.serial_numbers as string).split('\n').map((s: string) => s.trim()).filter(Boolean)
-      return serials.length !== Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
+      const serials = Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []
+      return serials.filter(Boolean).length !== Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
     })
     if (missingSerials.length > 0) {
       showToast(`Serial numbers count must match received qty for: ${missingSerials.map((it: any) => it.product_name + (it.variant_name ? ' / ' + it.variant_name : '')).join(', ')}`, 'error')
@@ -423,7 +423,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
         location_id: it.location_id || null,
       } : {}),
       ...(it.serialized ? {
-        serial_numbers: (it.serial_numbers as string).split('\n').map((s: string) => s.trim()).filter(Boolean),
+        serial_numbers: (Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []).filter(Boolean),
       } : {}),
     }))
     const res = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive`, {
@@ -614,36 +614,72 @@ function POTab({ initialPO }: { initialPO?: string }) {
                       </td>
                     </tr>
                   )}
-                  {it.serialized && parseFloat(it.receive_qty) > 0 && (
-                    <tr className="bg-blue-50/60 dark:bg-blue-900/10 border-t border-blue-100 dark:border-blue-900/30">
-                      <td colSpan={7} className="px-4 py-3">
-                        <div>
-                          <label className={labelCls}>
-                            Serial Numbers
-                            <span className="ml-1 text-foreground-muted font-normal">
-                              (one per line — need {Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))})
-                            </span>
-                          </label>
-                          <textarea
-                            rows={Math.min(8, Math.max(3, Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))))}
-                            placeholder={"SN-0001\nSN-0002\nSN-0003"}
-                            className={inputCls + ' font-mono text-xs'}
-                            value={it.serial_numbers}
-                            onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, serial_numbers: e.target.value } : r))}
-                          />
-                          <p className="text-xs text-foreground-muted mt-1">
-                            {(() => {
-                              const entered = (it.serial_numbers as string).split('\n').map((s: string) => s.trim()).filter(Boolean).length
-                              const needed = Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
-                              return entered === needed
-                                ? <span className="text-green-600 dark:text-green-400">{entered}/{needed} serials entered ✓</span>
-                                : <span className="text-amber-600 dark:text-amber-400">{entered}/{needed} serials entered</span>
-                            })()}
-                          </p>
-                        </div>
-                      </td>
-                    </tr>
-                  )}
+                  {it.serialized && parseFloat(it.receive_qty) > 0 && (() => {
+                    const needed = Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
+                    const serials: string[] = Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []
+                    const entered = serials.filter(Boolean).length
+                    const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+                    const ymd = new Date().toISOString().slice(0, 10).replace(/-/g, '')
+                    const autoSerial = (n: number) => `${sku ? sku + '-' : 'SN-'}${ymd}-${String(n).padStart(3, '0')}`
+                    const updateSerial = (slotIdx: number, val: string) =>
+                      setReceiveItems(items => items.map((r, i) => {
+                        if (i !== idx) return r
+                        const arr = [...(r.serial_numbers as string[])]
+                        arr[slotIdx] = val
+                        return { ...r, serial_numbers: arr }
+                      }))
+                    return (
+                      <tr className="bg-blue-50/60 dark:bg-blue-900/10 border-t border-blue-100 dark:border-blue-900/30">
+                        <td colSpan={7} className="px-4 py-3">
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label className={labelCls + ' mb-0'}>
+                                Serial Numbers
+                                <span className="ml-1 text-foreground-muted font-normal">({needed} required)</span>
+                              </label>
+                              <div className="flex items-center gap-2">
+                                {entered === needed
+                                  ? <span className="text-xs text-green-600 dark:text-green-400">{entered}/{needed} entered ✓</span>
+                                  : <span className="text-xs text-amber-600 dark:text-amber-400">{entered}/{needed} entered</span>
+                                }
+                                <button
+                                  type="button"
+                                  className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                  onClick={() => setReceiveItems(items => items.map((r, i) => {
+                                    if (i !== idx) return r
+                                    return { ...r, serial_numbers: Array.from({ length: needed }, (_, n) => autoSerial(n + 1)) }
+                                  }))}
+                                >
+                                  Generate All
+                                </button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                              {Array.from({ length: needed }, (_, n) => (
+                                <div key={n} className="flex gap-1">
+                                  <input
+                                    type="text"
+                                    placeholder={autoSerial(n + 1)}
+                                    className={inputCls + ' font-mono text-xs flex-1 min-w-0'}
+                                    value={serials[n] ?? ''}
+                                    onChange={e => updateSerial(n, e.target.value)}
+                                  />
+                                  <button
+                                    type="button"
+                                    title="Auto-generate"
+                                    className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                    onClick={() => updateSerial(n, autoSerial(n + 1))}
+                                  >
+                                    Auto
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })()}
                   </React.Fragment>
                   )
                 })}
@@ -984,6 +1020,15 @@ function StockTab() {
   const [editUnits, setEditUnits] = useState<{ id: string; unit: string; display_label: string | null; factor: number; dimension: string }[]>([])
   const [editUnitId, setEditUnitId] = useState<string>('')
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [expandedSerialProducts, setExpandedSerialProducts] = useState<Set<string>>(new Set())
+
+  function toggleSerialProduct(key: string) {
+    setExpandedSerialProducts(prev => {
+      const n = new Set(prev)
+      n.has(key) ? n.delete(key) : n.add(key)
+      return n
+    })
+  }
 
   function toggleGroup(refId: string) {
     setExpandedGroups(prev => {
@@ -1036,9 +1081,12 @@ function StockTab() {
   // Group by reference_id, preserving order of first appearance
   const ledgerGroups: { refId: string; refType: string; refLabel: string | null; date: string; txs: StockTransaction[] }[] = []
   for (const tx of sortedTransactions) {
-    const existing = ledgerGroups.find(g => g.refId === tx.reference_id)
+    // Group by reference_id so all products in one GRN/order collapse together.
+    // Fall back to tx.id for rows with no reference_id (legacy rows).
+    const groupKey = tx.reference_id || tx.id
+    const existing = ledgerGroups.find(g => g.refId === groupKey)
     if (existing) { existing.txs.push(tx) }
-    else { ledgerGroups.push({ refId: tx.reference_id, refType: tx.reference_type, refLabel: tx.reference_label, date: tx.created_at, txs: [tx] }) }
+    else { ledgerGroups.push({ refId: groupKey, refType: tx.reference_type, refLabel: tx.reference_label, date: tx.created_at, txs: [tx] }) }
   }
 
   function handleLedgerSort(col: string, dir: SortDir) { setLedgerSortCol(col); setLedgerSortDir(dir) }
@@ -1246,12 +1294,17 @@ function StockTab() {
                       const expanded = expandedGroups.has(group.refId)
                       const totalChange = Math.round(group.txs.reduce((s, t) => s + Number(t.quantity_change), 0) * 1000) / 1000
                       const txType = group.txs[0].transaction_type
-                      const isSerialGroup = multi && group.txs.every(t => t.serial_number)
-                      const serialSummary = isSerialGroup ? (() => {
-                        const sns = group.txs.map(t => t.serial_number!)
-                        const preview = sns.slice(0, 2).join(', ')
-                        return sns.length > 2 ? `${preview} (+${sns.length - 2} more)` : preview
-                      })() : null
+
+                      // Build per-product sub-groups within this reference group
+                      type ProductSubGroup = { key: string; productId: string; variantId: string | null; txs: StockTransaction[] }
+                      const productSubGroups: ProductSubGroup[] = []
+                      for (const tx of group.txs) {
+                        const pKey = `${tx.product_id}::${tx.variant_id || ''}`
+                        const existing = productSubGroups.find(g => g.key === pKey)
+                        if (existing) existing.txs.push(tx)
+                        else productSubGroups.push({ key: pKey, productId: tx.product_id, variantId: tx.variant_id, txs: [tx] })
+                      }
+                      const productCount = productSubGroups.length
 
                       const refLink = group.refType === 'order' ? (
                         <Link href={ap(`/admin/invoices/${group.refId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
@@ -1274,6 +1327,34 @@ function StockTab() {
                         return `${sign}${Math.abs(n)}`
                       }
 
+                      function BatchCell({ tx }: { tx: StockTransaction }) {
+                        if (tx.serial_number) return (
+                          <div className="space-y-0.5">
+                            <span className="font-mono text-foreground-secondary">{tx.serial_number}</span>
+                            {tx.lot_number && <span className="block font-mono text-xs text-foreground-muted">{tx.lot_number}</span>}
+                            {tx.expiry_date && (() => {
+                              const d = new Date(tx.expiry_date); const now = new Date()
+                              const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                              const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                            })()}
+                          </div>
+                        )
+                        if (tx.lot_number) return (
+                          <div className="space-y-0.5">
+                            <span className="font-mono text-foreground-secondary">{tx.lot_number}</span>
+                            {tx.expiry_date && (() => {
+                              const d = new Date(tx.expiry_date); const now = new Date()
+                              const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                              const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                            })()}
+                          </div>
+                        )
+                        return <span className="text-foreground-muted">—</span>
+                      }
+
+                      // Single-product, single-tx: flat row (no grouping chrome)
                       if (!multi) {
                         const tx = group.txs[0]
                         const chg = Number(tx.quantity_change)
@@ -1296,72 +1377,30 @@ function StockTab() {
                                   {tx.variant_name && <p className="text-xs text-foreground-secondary">{tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</p>}
                                   {tx.product_sku && <p className="text-xs font-mono text-foreground-muted">{tx.product_sku}</p>}
                                   <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
-                                    <div className="flex justify-between">
-                                      <span className="text-foreground-secondary">Type</span>
-                                      <span className={`px-1.5 py-0.5 rounded-full font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-foreground-secondary">Change</span>
-                                      <span className={`font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
-                                        {fmtChange(chg)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-foreground-secondary">Balance after</span>
-                                      <span className="font-mono font-medium text-foreground">{Number(tx.quantity_after)}</span>
-                                    </div>
+                                    <div className="flex justify-between"><span className="text-foreground-secondary">Type</span><span className={`px-1.5 py-0.5 rounded-full font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span></div>
+                                    <div className="flex justify-between"><span className="text-foreground-secondary">Change</span><span className={`font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>{fmtChange(chg)}</span></div>
+                                    <div className="flex justify-between"><span className="text-foreground-secondary">Balance after</span><span className="font-mono font-medium text-foreground">{Number(tx.quantity_after)}</span></div>
                                     {tx.notes && <div className="pt-1 border-t border-border-default"><p className="text-foreground-secondary leading-snug">{tx.notes}</p></div>}
                                   </div>
                                 </div>
                               </HoverCard>
                               {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
                             </td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
-                            </td>
+                            <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span></td>
                             <td className={`px-4 py-3 text-right font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
                               {fmtChange(chg)}
-                              {tx.quantity_in_unit != null && tx.unit_label && (
-                                <span className="block text-xs font-normal text-foreground-muted">
-                                  ({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})
-                                </span>
-                              )}
+                              {tx.quantity_in_unit != null && tx.unit_label && <span className="block text-xs font-normal text-foreground-muted">({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})</span>}
                             </td>
                             <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{Number(tx.quantity_after)}</td>
                             <td className="px-4 py-3 text-xs hidden md:table-cell">{refLink}</td>
-                            <td className="px-4 py-3 text-xs hidden md:table-cell">
-                              {tx.serial_number ? (
-                                <div className="space-y-0.5">
-                                  <span className="font-mono text-foreground-secondary">{tx.serial_number}</span>
-                                  {tx.lot_number && <span className="block font-mono text-xs text-foreground-muted">{tx.lot_number}</span>}
-                                  {tx.expiry_date && (() => {
-                                    const d = new Date(tx.expiry_date)
-                                    const now = new Date()
-                                    const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
-                                    const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                    return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
-                                  })()}
-                                </div>
-                              ) : tx.lot_number ? (
-                                <div className="space-y-0.5">
-                                  <span className="font-mono text-foreground-secondary">{tx.lot_number}</span>
-                                  {tx.expiry_date && (() => {
-                                    const d = new Date(tx.expiry_date)
-                                    const now = new Date()
-                                    const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
-                                    const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                    return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
-                                  })()}
-                                </div>
-                              ) : '—'}
-                            </td>
+                            <td className="px-4 py-3 text-xs hidden md:table-cell"><BatchCell tx={tx} /></td>
                           </tr>
                         )
                       }
 
                       return (
                         <React.Fragment key={`group-${group.refId}`}>
-                          {/* Group header row */}
+                          {/* Level-1: GRN / order header — collapses all products */}
                           <tr
                             className="bg-surface-secondary/60 hover:bg-surface-secondary cursor-pointer transition-colors select-none"
                             onClick={() => toggleGroup(group.refId)}
@@ -1371,86 +1410,103 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-2.5">
                               <div className="flex items-center gap-2">
-                                <svg
-                                  className={`w-3.5 h-3.5 text-foreground-secondary shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                >
+                                <svg className={`w-3.5 h-3.5 text-foreground-secondary shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                                 <span className="text-sm font-medium text-foreground">
-                                  {isSerialGroup ? `${group.txs.length} serials` : `${group.txs.length} items`}
-                                </span>
-                                <span className="text-xs text-foreground-muted">
-                                  {expanded ? '(collapse)' : '(expand)'}
+                                  {productCount === 1
+                                    ? <>{group.txs[0].product_name}{group.txs[0].variant_name && <span className="text-foreground-secondary font-normal"> / {group.txs[0].variant_name}</span>}</>
+                                    : `${productCount} products`
+                                  }
+                                  <span className="ml-2 text-xs text-foreground-muted font-normal">{group.txs.length} entries</span>
                                 </span>
                               </div>
                             </td>
-                            <td className="px-4 py-2.5">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[txType] || ''}`}>{txType}</span>
-                            </td>
+                            <td className="px-4 py-2.5"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[txType] || ''}`}>{txType}</span></td>
                             <td className={`px-4 py-2.5 text-right font-mono font-semibold ${totalChange > 0 ? 'text-green-600 dark:text-green-400' : totalChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
                               {fmtChange(totalChange)}
                               <span className="block text-xs font-normal text-foreground-muted">net total</span>
                             </td>
                             <td className="px-4 py-2.5 text-right text-foreground-muted text-xs font-mono">—</td>
                             <td className="px-4 py-2.5 text-xs hidden md:table-cell">{refLink}</td>
-                            <td className="px-4 py-2.5 hidden md:table-cell">
-                              {serialSummary && (
-                                <span className="font-mono text-xs text-foreground-secondary">{serialSummary}</span>
-                              )}
-                            </td>
+                            <td className="px-4 py-2.5 hidden md:table-cell" />
                           </tr>
 
-                          {/* Expanded product rows */}
-                          {expanded && group.txs.map(tx => {
-                            const chg = Number(tx.quantity_change)
+                          {/* Level-2: per-product rows (shown when level-1 expanded) */}
+                          {expanded && productSubGroups.map(pg => {
+                            const pgTotalChange = Math.round(pg.txs.reduce((s, t) => s + Number(t.quantity_change), 0) * 1000) / 1000
+                            const isSerialPg = pg.txs.length > 1 && pg.txs.every(t => t.serial_number)
+                            const serialKey = `${group.refId}::${pg.key}`
+                            const serialExpanded = expandedSerialProducts.has(serialKey)
+                            const repTx = pg.txs[pg.txs.length - 1] // last tx has final balance
+
                             return (
-                              <tr key={tx.id} className="bg-surface/40 hover:bg-surface-secondary/30 transition-colors border-l-2 border-accent-500/30">
-                                <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8" />
-                                <td className="px-4 py-2.5 pl-8 text-foreground">
-                                  <Link href={ap(`/admin/products/${tx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2">
-                                    {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
-                                  </Link>
-                                  {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
-                                </td>
-                                <td className="px-4 py-2.5" />
-                                <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
-                                  {fmtChange(chg)}
-                                  {tx.quantity_in_unit != null && tx.unit_label && (
-                                    <span className="block text-xs font-normal text-foreground-muted">
-                                      ({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">{Number(tx.quantity_after)}</td>
-                                <td className="px-4 py-2.5 text-xs hidden md:table-cell" />
-                                <td className="px-4 py-2.5 text-xs hidden md:table-cell">
-                                  {tx.serial_number ? (
-                                    <div className="space-y-0.5">
-                                      <span className="font-mono text-foreground-secondary">{tx.serial_number}</span>
-                                      {tx.lot_number && <span className="block font-mono text-xs text-foreground-muted">{tx.lot_number}</span>}
-                                      {tx.expiry_date && (() => {
-                                        const d = new Date(tx.expiry_date)
-                                        const now = new Date()
-                                        const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
-                                        const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                        return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
-                                      })()}
+                              <React.Fragment key={`pg-${pg.key}`}>
+                                {/* Product row — clickable only if it has serial sub-rows */}
+                                <tr
+                                  className={`bg-surface/40 transition-colors border-l-2 border-accent-500/30 ${isSerialPg ? 'cursor-pointer hover:bg-surface-secondary/30 select-none' : 'hover:bg-surface-secondary/20'}`}
+                                  onClick={isSerialPg ? () => toggleSerialProduct(serialKey) : undefined}
+                                >
+                                  <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8" />
+                                  <td className="px-4 py-2.5 pl-8 text-foreground">
+                                    <div className="flex items-center gap-2">
+                                      {isSerialPg && (
+                                        <svg className={`w-3 h-3 text-foreground-secondary shrink-0 transition-transform ${serialExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      )}
+                                      <div>
+                                        <Link href={ap(`/admin/products/${repTx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2" onClick={e => e.stopPropagation()}>
+                                          {repTx.product_name}{repTx.variant_name && <span className="text-foreground-secondary font-normal"> / {repTx.variant_name}{repTx.sub_variant_name ? ` / ${repTx.sub_variant_name}` : ''}</span>}
+                                        </Link>
+                                        {repTx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{repTx.product_sku}</p>}
+                                        {isSerialPg && <p className="text-xs text-foreground-muted mt-0.5">{pg.txs.length} serials · {serialExpanded ? 'collapse' : 'expand'}</p>}
+                                      </div>
                                     </div>
-                                  ) : tx.lot_number ? (
-                                    <div className="space-y-0.5">
-                                      <span className="font-mono text-foreground-secondary">{tx.lot_number}</span>
-                                      {tx.expiry_date && (() => {
-                                        const d = new Date(tx.expiry_date)
-                                        const now = new Date()
-                                        const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
-                                        const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                        return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
-                                      })()}
-                                    </div>
-                                  ) : '—'}
-                                </td>
-                              </tr>
+                                  </td>
+                                  <td className="px-4 py-2.5" />
+                                  <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${pgTotalChange > 0 ? 'text-green-600 dark:text-green-400' : pgTotalChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                                    {fmtChange(pgTotalChange)}
+                                    {isSerialPg && <span className="block text-xs font-normal text-foreground-muted">net total</span>}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">
+                                    {isSerialPg ? '—' : Number(repTx.quantity_after)}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-xs hidden md:table-cell" />
+                                  <td className="px-4 py-2.5 text-xs hidden md:table-cell">
+                                    {isSerialPg
+                                      ? <span className="font-mono text-xs text-foreground-secondary">{pg.txs.slice(0, 2).map(t => t.serial_number).join(', ')}{pg.txs.length > 2 ? ` (+${pg.txs.length - 2} more)` : ''}</span>
+                                      : <BatchCell tx={repTx} />
+                                    }
+                                  </td>
+                                </tr>
+
+                                {/* Level-3: individual serial rows */}
+                                {isSerialPg && serialExpanded && pg.txs.map(tx => {
+                                  const chg = Number(tx.quantity_change)
+                                  return (
+                                    <tr key={tx.id} className="bg-surface/20 hover:bg-surface-secondary/20 transition-colors border-l-4 border-accent-500/20">
+                                      <td className="px-4 py-2 text-foreground-secondary whitespace-nowrap text-xs pl-14" />
+                                      <td className="px-4 py-2 pl-14 text-foreground">
+                                        <span className="font-mono text-xs text-foreground-secondary">{tx.serial_number}</span>
+                                        {tx.lot_number && <span className="block font-mono text-xs text-foreground-muted">{tx.lot_number}</span>}
+                                      </td>
+                                      <td className="px-4 py-2" />
+                                      <td className={`px-4 py-2 text-right font-mono text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>{fmtChange(chg)}</td>
+                                      <td className="px-4 py-2 text-right font-mono text-foreground text-sm">{Number(tx.quantity_after)}</td>
+                                      <td className="px-4 py-2 hidden md:table-cell" />
+                                      <td className="px-4 py-2 text-xs hidden md:table-cell">
+                                        {tx.expiry_date && (() => {
+                                          const d = new Date(tx.expiry_date); const now = new Date()
+                                          const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                                          const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                          return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                                        })()}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </React.Fragment>
                             )
                           })}
                         </React.Fragment>
