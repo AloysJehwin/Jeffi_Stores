@@ -119,11 +119,11 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
         const hasSerialItems = data.serialized_items && data.serialized_items.length > 0
         if (hasBatchItems || hasSerialItems) {
           setPendingPaymentStatus(paymentStatus)
+          if (hasSerialItems) setSerialPickerItems(data.serialized_items)
           if (hasBatchItems) {
             setBatchPickerItems(data.items)
           } else {
-            // Only serialized — go straight to serial entry
-            setSerialPickerItems(data.serialized_items)
+            // Only serialized — go straight to serial entry (batch picker skipped)
           }
           setIsUpdating(false)
           return
