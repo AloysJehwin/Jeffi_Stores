@@ -365,12 +365,17 @@ function POTab({ initialPO }: { initialPO?: string }) {
     const items = (json.items || []).map((it: POItem) => {
       const factor = parseFloat(it.purchase_unit_factor || '1')
       const remaining = Math.max(0, parseFloat(it.quantity) - parseFloat(it.quantity_received || '0'))
+      const today = new Date()
+      const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+      const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
+      const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+      const autoLot = `LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`
       return {
         ...it,
         receive_qty: String(factor > 1 ? Math.round((remaining / factor) * 1000) / 1000 : remaining),
         receive_cost: it.unit_cost,
         purchase_unit_factor: factor,
-        lot_number: '',
+        lot_number: autoLot,
         expiry_date: '',
         manufacture_date: '',
         location_id: '',
@@ -552,13 +557,28 @@ function POTab({ initialPO }: { initialPO?: string }) {
                           </div>
                           <div>
                             <label className={labelCls}>Lot Number</label>
-                            <input
-                              type="text"
-                              placeholder="optional"
-                              className={inputCls}
-                              value={it.lot_number}
-                              onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: e.target.value } : r))}
-                            />
+                            <div className="flex gap-1">
+                              <input
+                                type="text"
+                                placeholder="optional"
+                                className={inputCls + ' flex-1'}
+                                value={it.lot_number}
+                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: e.target.value } : r))}
+                              />
+                              <button
+                                type="button"
+                                title="Regenerate lot number"
+                                onClick={() => {
+                                  const today = new Date()
+                                  const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+                                  const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
+                                  const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+                                  const autoLot = `LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`
+                                  setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: autoLot } : r))
+                                }}
+                                className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                              >↺</button>
+                            </div>
                           </div>
                           <div className="self-start">
                             <label className={labelCls}>Shelf Location</label>
