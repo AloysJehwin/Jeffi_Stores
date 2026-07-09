@@ -2672,6 +2672,15 @@ ALTER TABLE ONLY public.wishlist_items
     ADD CONSTRAINT wishlist_items_user_id_fkey FOREIGN KEY (user_id) REFERENCES public.users(id) ON DELETE CASCADE;
 
 
+-- Migrations: fix shelf_locations FK cascades
+
+ALTER TABLE shelf_stock_transactions ALTER COLUMN location_id DROP NOT NULL;
+ALTER TABLE shelf_stock_transactions DROP CONSTRAINT IF EXISTS shelf_stock_transactions_location_id_fkey;
+ALTER TABLE shelf_stock_transactions ADD CONSTRAINT shelf_stock_transactions_location_id_fkey FOREIGN KEY (location_id) REFERENCES shelf_locations(id) ON DELETE SET NULL;
+ALTER TABLE product_batches DROP CONSTRAINT IF EXISTS product_batches_location_id_fkey;
+ALTER TABLE product_batches ADD CONSTRAINT product_batches_location_id_fkey FOREIGN KEY (location_id) REFERENCES shelf_locations(id) ON DELETE SET NULL;
+
+
 --
 -- PostgreSQL database dump complete
 --

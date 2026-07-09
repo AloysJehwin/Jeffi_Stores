@@ -826,7 +826,10 @@ export default function ProductForm({ categories, brands, action, product, produ
     // Check if we need to show bootstrap modal before saving
     const wasPerishableOff = !(product?.perishable)
     const wasSerializedOff = !(product?.serialized)
-    const stockQty = parseFloat(product?.inventory_quantity ?? '0') || 0
+    const variantQtyForBootstrap = product?.has_variants && Array.isArray(product?.product_variants)
+      ? parseFloat(product.product_variants.find((v: any) => !v._isDeleted && v.inventory_quantity)?.inventory_quantity ?? '0') || 0
+      : null
+    const stockQty = variantQtyForBootstrap !== null ? variantQtyForBootstrap : (parseFloat(product?.inventory_quantity ?? '0') || 0)
     const needsBootstrap = stockQty > 0 && pendingBootstrapRef.current === null && (
       (perishable && wasPerishableOff && perishableBatchTotal === 0) ||
       (serialized && wasSerializedOff && serializedStockTotal === 0)
@@ -991,7 +994,10 @@ export default function ProductForm({ categories, brands, action, product, produ
   }
 
   function handleBootstrapContinue() {
-    const stockQty = parseFloat(product?.inventory_quantity ?? '0') || 0
+    const variantQty = product?.has_variants && Array.isArray(product?.product_variants)
+      ? parseFloat(product.product_variants.find((v: any) => !v._isDeleted && v.inventory_quantity)?.inventory_quantity ?? '0') || 0
+      : null
+    const stockQty = variantQty !== null ? variantQty : (parseFloat(product?.inventory_quantity ?? '0') || 0)
     if (perishable && !bsExpiryDate) { setBootstrapError('Expiry date is required'); return }
     const needed = Math.round(stockQty)
     if (serialized && bsSerials.filter(Boolean).length !== needed) {
@@ -1042,7 +1048,11 @@ export default function ProductForm({ categories, brands, action, product, produ
         </div>
       )}
       {showBootstrapModal && (() => {
-        const stockQty = parseFloat(product?.inventory_quantity ?? '0') || 0
+        // For variant products, use the first active variant's qty; otherwise product-level
+        const variantQty = product?.has_variants && Array.isArray(product?.product_variants)
+          ? parseFloat(product.product_variants.find((v: any) => !v._isDeleted && v.inventory_quantity)?.inventory_quantity ?? '0') || 0
+          : null
+        const stockQty = variantQty !== null ? variantQty : (parseFloat(product?.inventory_quantity ?? '0') || 0)
         const needed = Math.round(stockQty)
         const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
         const dtStamp = () => new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
@@ -1053,7 +1063,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           setBsSerials(arr => { const a = [...arr]; a[i] = val; return a })
         return (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 overflow-y-auto py-8">
-            <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-2xl mx-4 p-6 space-y-5">
+          <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-2xl mx-4 p-6 space-y-5 max-h-[90vh] overflow-y-auto">
               <div>
                 <h2 className="text-base font-bold text-foreground">Assign existing stock to batch/serials</h2>
                 <p className="text-sm text-foreground-secondary mt-1">
@@ -1133,7 +1143,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </button>
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
                     {Array.from({ length: needed }, (_, n) => (
                       <div key={n} className="flex gap-1">
                         <input
