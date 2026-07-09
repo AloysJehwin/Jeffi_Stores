@@ -20,8 +20,23 @@ export async function GET(request: NextRequest) {
 
     // Direct product lookup (invoice create — no order yet)
     if (productId) {
-      const perishable = await queryOne<{ perishable: boolean }>(`SELECT perishable FROM products WHERE id = $1`, [productId])
-      if (!perishable?.perishable) return NextResponse.json({ items: [] })
+      const productRow = await queryOne<{ name: string; perishable: boolean; serialized: boolean }>(`SELECT name, perishable, serialized FROM products WHERE id = $1`, [productId])
+      if (!productRow?.perishable && !productRow?.serialized) return NextResponse.json({ items: [], serialized_items: [] })
+
+      const variantRow = variantId ? await queryOne<{ variant_name: string }>(`SELECT variant_name FROM product_variants WHERE id = $1`, [variantId]) : null
+
+      if (productRow?.serialized) {
+        return NextResponse.json({
+          items: [],
+          serialized_items: [{
+            order_item_id: lineItemId,
+            product_name: productRow.name || '',
+            variant_name: variantRow?.variant_name || null,
+            required_qty: qty,
+            already_assigned: false,
+          }],
+        })
+      }
 
       const batches = await queryMany<any>(`
         SELECT pb.id, pb.lot_number, pb.manufacture_date, pb.expiry_date, pb.quantity_remaining,
@@ -35,9 +50,6 @@ export async function GET(request: NextRequest) {
         ORDER BY pb.expiry_date ASC NULLS LAST, pb.created_at ASC
       `, [productId, variantId, subVariantId])
 
-      const productRow = await queryOne<{ name: string }>(`SELECT name FROM products WHERE id = $1`, [productId])
-      const variantRow = variantId ? await queryOne<{ variant_name: string }>(`SELECT variant_name FROM product_variants WHERE id = $1`, [variantId]) : null
-
       return NextResponse.json({ items: [{
         order_item_id: lineItemId,
         product_name: productRow?.name || '',
@@ -45,7 +57,7 @@ export async function GET(request: NextRequest) {
         required_qty: qty,
         already_assigned: false,
         batches,
-      }] })
+      }], serialized_items: [] })
     }
 
     const quotationId = request.nextUrl.searchParams.get('quotation_id')
