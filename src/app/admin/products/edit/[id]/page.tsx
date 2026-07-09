@@ -271,11 +271,16 @@ async function updateProduct(productId: string, formData: FormData) {
       `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
       params
     )
-    // If perishable was toggled OFF, clean up orphaned batch + shelf_stock rows
+    // If perishable was toggled OFF, convert batch stock to inventory_quantity then clean up
     if (prevRow?.perishable && !perishable) {
+      const batchSum = await queryOne<{ total: string }>(
+        `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches WHERE product_id = $1`,
+        [productId]
+      )
+      const converted = parseFloat(batchSum?.total ?? '0') || 0
       await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
       await query('DELETE FROM shelf_stock WHERE product_id = $1', [productId])
-      await query('UPDATE products SET inventory_quantity = 0 WHERE id = $1', [productId])
+      await query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [converted, productId])
     }
 
     if (imageCount > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
@@ -533,6 +538,14 @@ export default async function EditProductPage({ params, searchParams }: { params
   const brands = await getAllBrands()
   const backUrl = back && back.startsWith('/admin/products') ? back : '/admin/products'
 
+  const batchSumRow = product.perishable
+    ? await queryOne<{ total: string }>(
+        `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches WHERE product_id = $1`,
+        [id]
+      )
+    : null
+  const perishableBatchTotal = parseFloat(batchSumRow?.total ?? '0') || 0
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
@@ -556,6 +569,7 @@ export default async function EditProductPage({ params, searchParams }: { params
         productId={id}
         action={updateProduct.bind(null, id)}
         backUrl={backUrl}
+        perishableBatchTotal={perishableBatchTotal}
       />
     </div>
   )

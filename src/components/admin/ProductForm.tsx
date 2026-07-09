@@ -65,6 +65,7 @@ interface ProductFormProps {
   product?: any
   productId?: string
   backUrl?: string
+  perishableBatchTotal?: number
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
@@ -196,7 +197,7 @@ function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: (
   )
 }
 
-export default function ProductForm({ categories, brands, action, product, productId, backUrl }: ProductFormProps) {
+export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0 }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1641,12 +1642,29 @@ export default function ProductForm({ categories, brands, action, product, produ
                         </div>
                       </div>
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-1">
-                        {([['fragile', fragile, setFragile], ['hazardous', hazardous, setHazardous], ['flammable', flammable, setFlammable], ['perishable', perishable, setPerishable]] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
+                        {([['fragile', fragile, setFragile], ['hazardous', hazardous, setHazardous], ['flammable', flammable, setFlammable]] as [string, boolean, (v: boolean) => void][]).map(([label, val, setter]) => (
                           <label key={label} className="flex items-center gap-2 cursor-pointer select-none">
                             <input type="checkbox" checked={val} onChange={e => setter(e.target.checked)} className="rounded border-border-secondary text-accent-500 focus:ring-accent-500" />
                             <span className="text-sm text-foreground capitalize">{label}</span>
                           </label>
                         ))}
+                        <label className="flex items-center gap-2 cursor-pointer select-none">
+                          <input
+                            type="checkbox"
+                            checked={perishable}
+                            onChange={e => {
+                              const next = e.target.checked
+                              if (!next && perishableBatchTotal > 0) {
+                                if (!window.confirm(
+                                  `This product has ${perishableBatchTotal} unit(s) in batches.\n\nUnmarking as perishable will delete all batch records and convert them to default stock (${perishableBatchTotal} units).\n\nContinue?`
+                                )) return
+                              }
+                              setPerishable(next)
+                            }}
+                            className="rounded border-border-secondary text-accent-500 focus:ring-accent-500"
+                          />
+                          <span className="text-sm text-foreground capitalize">perishable</span>
+                        </label>
                       </div>
                     </div>
                   )}
