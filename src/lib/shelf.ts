@@ -40,6 +40,7 @@ export interface ShelfStock {
   unit_factor?: number | null
   unit_dimension?: string | null
   perishable?: boolean
+  serialized?: boolean
 }
 
 export interface LocationBatch {
@@ -51,6 +52,7 @@ export interface LocationBatch {
   manufacture_date: string | null
   expiry_date: string | null
   quantity_remaining: number
+  serials?: string[]
 }
 
 function buildDisplayCode(warehouseCode: string, aisle: string, rack: string, shelf: string, bin?: string | null): string {
@@ -204,6 +206,7 @@ export async function getStockAtLocation(locationId: string): Promise<ShelfStock
             ss.quantity, ss.updated_at,
             p.name AS product_name,
             p.perishable,
+            p.serialized,
             COALESCE(ps.sub_variant_name || ' (' || pv.variant_name || ')', pv.variant_name) AS variant_name,
             COALESCE(ps.sku, pv.sku, p.sku) AS sku,
             COALESCE(pu.display_label, pu.unit) AS unit_label,
@@ -222,11 +225,17 @@ export async function getStockAtLocation(locationId: string): Promise<ShelfStock
 
 export async function getBatchesAtLocation(locationId: string): Promise<LocationBatch[]> {
   return queryMany<LocationBatch>(
-    `SELECT id, product_id, variant_id, sub_variant_id,
-            lot_number, manufacture_date, expiry_date, quantity_remaining
-     FROM product_batches
-     WHERE location_id = $1 AND quantity_remaining > 0
-     ORDER BY expiry_date ASC NULLS LAST, manufacture_date ASC NULLS LAST`,
+    `SELECT pb.id, pb.product_id, pb.variant_id, pb.sub_variant_id,
+            pb.lot_number, pb.manufacture_date, pb.expiry_date, pb.quantity_remaining,
+            CASE WHEN p.serialized THEN (
+              SELECT COALESCE(json_agg(ps.serial_number ORDER BY ps.serial_number), '[]'::json)
+              FROM product_serials ps
+              WHERE ps.batch_id = pb.id AND ps.status = 'in_stock'
+            ) ELSE '[]'::json END AS serials
+     FROM product_batches pb
+     JOIN products p ON p.id = pb.product_id
+     WHERE pb.location_id = $1 AND pb.quantity_remaining > 0
+     ORDER BY pb.expiry_date ASC NULLS LAST, pb.manufacture_date ASC NULLS LAST`,
     [locationId]
   )
 }

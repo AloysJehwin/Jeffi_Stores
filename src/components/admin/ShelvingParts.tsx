@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
@@ -43,12 +43,14 @@ export interface ShelfStock {
   unit_factor?: number | null
   unit_dimension?: string | null
   perishable?: boolean
+  serialized?: boolean
   batches?: {
     id: string
     lot_number: string | null
     manufacture_date: string | null
     expiry_date: string | null
     quantity_remaining: number
+    serials?: string[]
   }[]
 }
 
@@ -288,7 +290,7 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
               <button onClick={saveQty} disabled={saving} aria-label="Save" className="w-7 h-7 flex items-center justify-center rounded-lg bg-green-500 hover:bg-green-600 text-white transition-colors disabled:opacity-50"><Check className="w-3.5 h-3.5" /></button>
               <button onClick={() => setEditing(false)} aria-label="Cancel" className="w-7 h-7 flex items-center justify-center rounded-lg border border-border-default hover:bg-surface-secondary text-foreground-secondary transition-colors"><X className="w-3.5 h-3.5" /></button>
             </div>
-          ) : row.perishable && batches.length > 0 ? (
+          ) : (row.perishable || row.serialized) && batches.length > 0 ? (
             <button
               onClick={() => setBatchesOpen(o => !o)}
               className="flex items-center gap-1 text-sm font-bold tabular-nums text-foreground hover:text-secondary-500 dark:hover:text-secondary-400 transition-colors min-w-[2rem] text-right"
@@ -313,7 +315,7 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
         </div>
       </div>
 
-      {row.perishable && batchesOpen && batches.length > 0 && (
+      {(row.perishable || row.serialized) && batchesOpen && batches.length > 0 && (
         <div className="mt-2 rounded-lg border border-border-default overflow-hidden">
           <table className="w-full text-xs">
             <thead className="bg-surface border-b border-border-default">
@@ -325,27 +327,45 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {batches.map((b, idx) => (
-                <tr key={b.id} className="hover:bg-surface-secondary/50 transition-colors">
-                  <td className="px-3 py-2 font-mono text-foreground">
-                    {b.lot_number || <span className="text-foreground-muted">—</span>}
-                    {idx === 0 && <span className="ml-1.5 text-[10px] bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400 px-1 py-0.5 rounded font-medium">FIFO</span>}
-                  </td>
-                  <td className="px-3 py-2 text-foreground-muted">
-                    {b.manufacture_date
-                      ? new Date(b.manufacture_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                      : <span>—</span>}
-                  </td>
-                  <td className={`px-3 py-2 ${expiryColor(b.expiry_date)}`}>
-                    {b.expiry_date
-                      ? new Date(b.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
-                      : <span className="text-foreground-muted">—</span>}
-                  </td>
-                  <td className="px-3 py-2 text-right font-medium text-foreground tabular-nums">
-                    {toSell(b.quantity_remaining)} <span className="font-normal text-foreground-muted">{unitLabel}</span>
-                  </td>
-                </tr>
-              ))}
+              {batches.map((b, idx) => {
+                const serials: string[] = Array.isArray(b.serials) ? b.serials : []
+                return (
+                  <React.Fragment key={b.id}>
+                    <tr className="hover:bg-surface-secondary/50 transition-colors">
+                      <td className="px-3 py-2 font-mono text-foreground">
+                        {b.lot_number || <span className="text-foreground-muted">—</span>}
+                        {idx === 0 && <span className="ml-1.5 text-[10px] bg-accent-100 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400 px-1 py-0.5 rounded font-medium">FIFO</span>}
+                      </td>
+                      <td className="px-3 py-2 text-foreground-muted">
+                        {b.manufacture_date
+                          ? new Date(b.manufacture_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : <span>—</span>}
+                      </td>
+                      <td className={`px-3 py-2 ${expiryColor(b.expiry_date)}`}>
+                        {b.expiry_date
+                          ? new Date(b.expiry_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+                          : <span className="text-foreground-muted">—</span>}
+                      </td>
+                      <td className="px-3 py-2 text-right font-medium text-foreground tabular-nums">
+                        {toSell(b.quantity_remaining)} <span className="font-normal text-foreground-muted">{unitLabel}</span>
+                      </td>
+                    </tr>
+                    {row.serialized && serials.length > 0 && (
+                      <tr>
+                        <td colSpan={4} className="px-3 pb-2 pt-0">
+                          <div className="flex flex-wrap gap-1.5 mt-1">
+                            {serials.map(sn => (
+                              <span key={sn} className="inline-flex items-center px-2 py-0.5 rounded bg-secondary-50 dark:bg-secondary-900/20 text-xs font-mono text-secondary-700 dark:text-secondary-300 border border-secondary-200 dark:border-secondary-700">
+                                {sn}
+                              </span>
+                            ))}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
