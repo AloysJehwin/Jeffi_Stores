@@ -34,6 +34,9 @@ export async function GET(request: NextRequest) {
             variant_name: variantRow?.variant_name || null,
             required_qty: qty,
             already_assigned: false,
+            product_id: productId,
+            variant_id: variantId,
+            sub_variant_id: subVariantId,
           }],
         })
       }
@@ -110,6 +113,9 @@ export async function GET(request: NextRequest) {
             variant_name: item.variant_name || null,
             required_qty: requiredQty,
             already_assigned: false,
+            product_id: item.product_id,
+            variant_id: item.variant_id || null,
+            sub_variant_id: item.sub_variant_id || null,
           })
         } else {
           const batches = await queryMany<any>(`
@@ -184,6 +190,9 @@ export async function GET(request: NextRequest) {
           variant_name: item.variant_name || null,
           required_qty: requiredQty,
           already_assigned: !!item.batch_id,
+          product_id: item.product_id,
+          variant_id: item.variant_id || null,
+          sub_variant_id: item.sub_variant_id || null,
         })
       } else {
         // Available batches for this product/variant, FIFO by expiry then created_at
