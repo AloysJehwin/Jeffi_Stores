@@ -547,6 +547,14 @@ export default async function EditProductPage({ params, searchParams }: { params
     : null
   const perishableBatchTotal = parseFloat(batchSumRow?.total ?? '0') || 0
 
+  const serialCountRow = product.serialized
+    ? await queryOne<{ total: number }>(
+        `SELECT COUNT(*)::int AS total FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`,
+        [id]
+      )
+    : null
+  const serializedStockTotal = serialCountRow?.total ?? 0
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
@@ -571,6 +579,7 @@ export default async function EditProductPage({ params, searchParams }: { params
         action={updateProduct.bind(null, id)}
         backUrl={backUrl}
         perishableBatchTotal={perishableBatchTotal}
+        serializedStockTotal={serializedStockTotal}
       />
     </div>
   )
