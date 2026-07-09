@@ -288,6 +288,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [hazardous, setHazardous] = useState(product?.hazardous ?? false)
   const [flammable, setFlammable] = useState(product?.flammable ?? false)
   const [perishable, setPerishable] = useState(product?.perishable ?? false)
+  const [confirmUnperishable, setConfirmUnperishable] = useState(false)
   const [serialized, setSerialized] = useState(product?.serialized ?? false)
   // Certifications & Standards
   const [certifications, setCertifications] = useState(Array.isArray(product?.certifications) ? product.certifications.join(', ') : '')
@@ -931,7 +932,37 @@ export default function ProductForm({ categories, brands, action, product, produ
   const inputCls = 'field-normal w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+    <>
+      {confirmUnperishable && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-md mx-4 p-6">
+            <h2 className="text-base font-bold text-foreground mb-3">Remove Perishable Flag?</h2>
+            <p className="text-sm text-foreground-secondary mb-1">
+              This product has <span className="font-semibold">{perishableBatchTotal} unit(s)</span> in batches.
+            </p>
+            <p className="text-sm text-foreground-secondary mb-5">
+              Unmarking as perishable will delete all batch records and convert them to default stock ({perishableBatchTotal} units).
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmUnperishable(false)}
+                className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setConfirmUnperishable(false); setPerishable(false) }}
+                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Yes, Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
         {hasDraft && (
@@ -1650,9 +1681,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                         <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
                         <Toggle id="perishable" checked={perishable} onChange={next => {
                           if (!next && perishableBatchTotal > 0) {
-                            if (!window.confirm(
-                              `This product has ${perishableBatchTotal} unit(s) in batches.\n\nUnmarking as perishable will delete all batch records and convert them to default stock (${perishableBatchTotal} units).\n\nContinue?`
-                            )) return
+                            setConfirmUnperishable(true)
+                            return
                           }
                           setPerishable(next)
                         }} label="Perishable" />
@@ -2835,5 +2865,6 @@ export default function ProductForm({ categories, brands, action, product, produ
         )
       })()}
     </form>
+    </>
   )
 }

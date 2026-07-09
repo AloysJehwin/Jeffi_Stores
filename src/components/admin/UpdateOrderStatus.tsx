@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSelect from './AdminSelect'
 import BatchPickerModal, { BatchPickerItem, BatchAssignment } from './BatchPickerModal'
+import SerialEntryModal, { SerialItem, SerialAssignment } from './SerialEntryModal'
 
 interface UpdateOrderStatusProps {
   orderId: string
@@ -69,6 +70,8 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
   const [success, setSuccess] = useState<string | null>(null)
   const [paymentAutoResetNote, setPaymentAutoResetNote] = useState<string | null>(null)
   const [batchPickerItems, setBatchPickerItems] = useState<BatchPickerItem[] | null>(null)
+  const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
+  const [pendingBatchAssignments, setPendingBatchAssignments] = useState<BatchAssignment[] | null>(null)
   const [pendingPaymentStatus, setPendingPaymentStatus] = useState<string | null>(null)
   const router = useRouter()
 
@@ -112,9 +115,16 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
         const res = await fetch(`/api/admin/inventory/batches/available?order_id=${orderId}`)
         if (!res.ok) throw new Error('Failed to load batch information')
         const data = await res.json()
-        if (data.items && data.items.length > 0) {
+        const hasBatchItems = data.items && data.items.length > 0
+        const hasSerialItems = data.serialized_items && data.serialized_items.length > 0
+        if (hasBatchItems || hasSerialItems) {
           setPendingPaymentStatus(paymentStatus)
-          setBatchPickerItems(data.items)
+          if (hasBatchItems) {
+            setBatchPickerItems(data.items)
+          } else {
+            // Only serialized — go straight to serial entry
+            setSerialPickerItems(data.serialized_items)
+          }
           setIsUpdating(false)
           return
         }
@@ -129,7 +139,7 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
     await submitUpdate(null)
   }
 
-  async function submitUpdate(batchAssignments: BatchAssignment[] | null) {
+  async function submitUpdate(batchAssignments: BatchAssignment[] | null, serialAssignments?: SerialAssignment[] | null) {
     setIsUpdating(true)
     setError(null)
     setSuccess(null)
@@ -138,6 +148,9 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       const body: Record<string, any> = { status, payment_status: pendingPaymentStatus ?? paymentStatus }
       if (batchAssignments && batchAssignments.length > 0) {
         body.batch_assignments = batchAssignments
+      }
+      if (serialAssignments && serialAssignments.length > 0) {
+        body.serial_assignments = serialAssignments
       }
 
       const response = await fetch(`/api/orders/${orderId}`, {
@@ -192,11 +205,33 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
           items={batchPickerItems}
           onConfirm={(assignments) => {
             setBatchPickerItems(null)
-            submitUpdate(assignments)
+            if (serialPickerItems) {
+              // Chain: batch done → now collect serials
+              setPendingBatchAssignments(assignments)
+            } else {
+              submitUpdate(assignments)
+            }
           }}
           onCancel={() => {
             setBatchPickerItems(null)
             setPendingPaymentStatus(null)
+            setPendingBatchAssignments(null)
+            setIsUpdating(false)
+          }}
+        />
+      )}
+
+      {serialPickerItems && !batchPickerItems && (
+        <SerialEntryModal
+          items={serialPickerItems}
+          onConfirm={(assignments) => {
+            setSerialPickerItems(null)
+            submitUpdate(pendingBatchAssignments, assignments)
+          }}
+          onCancel={() => {
+            setSerialPickerItems(null)
+            setPendingPaymentStatus(null)
+            setPendingBatchAssignments(null)
             setIsUpdating(false)
           }}
         />
