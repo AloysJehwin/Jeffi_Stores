@@ -645,10 +645,19 @@ function POTab({ initialPO }: { initialPO?: string }) {
                                 <button
                                   type="button"
                                   className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                                  onClick={() => setReceiveItems(items => items.map((r, i) => {
-                                    if (i !== idx) return r
-                                    return { ...r, serial_numbers: Array.from({ length: needed }, (_, n) => autoSerial(n + 1)) }
-                                  }))}
+                                  onClick={async () => {
+                                    const prefix = `${sku ? sku + '-' : 'SN-'}${ymd}`
+                                    let startSeq = 1
+                                    try {
+                                      const r = await fetch(`/api/admin/inventory/serials/next-seq?prefix=${encodeURIComponent(prefix)}`, { credentials: 'include' })
+                                      const d = await r.json()
+                                      startSeq = d.next_seq ?? 1
+                                    } catch { /* fallback to 1 */ }
+                                    setReceiveItems(items => items.map((r, i) => {
+                                      if (i !== idx) return r
+                                      return { ...r, serial_numbers: Array.from({ length: needed }, (_, n) => autoSerial(startSeq + n)) }
+                                    }))
+                                  }}
                                 >
                                   Generate All
                                 </button>
