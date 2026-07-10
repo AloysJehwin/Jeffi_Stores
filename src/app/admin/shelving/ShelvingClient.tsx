@@ -228,7 +228,7 @@ export default function ShelvingClient() {
       ) : (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Chip bar */}
-          <div className="shrink-0 bg-surface border-b border-border-default px-4 sm:px-6 pt-8 pb-3 space-y-2.5 overflow-visible">
+          <div className="shrink-0 bg-surface border-b border-border-default px-4 sm:px-6 py-3 space-y-2.5 overflow-visible">
             {/* Warehouse chips */}
             <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
               <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 leading-7 self-center">Warehouse</span>
@@ -518,8 +518,8 @@ function WarehouseChip({ warehouse, selected, onSelect, onEdit, onDelete }: {
           <span className={`text-[9px] px-1 py-0.5 rounded-full ${selected ? 'bg-white/20 text-inherit' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'}`}>off</span>
         )}
       </button>
-      {/* Action buttons — float above chip on hover */}
-      <div className="hidden group-hover:flex absolute -top-7 left-0 z-20 items-center gap-0.5 bg-surface border border-border-default rounded-md shadow-sm px-0.5 py-0.5">
+      {/* Action buttons — float below chip on hover */}
+      <div className="hidden group-hover:flex absolute top-full left-0 mt-1 z-20 items-center gap-0.5 bg-surface border border-border-default rounded-md shadow-sm px-0.5 py-0.5">
         <button onClick={e => { e.stopPropagation(); onEdit() }}
           className="flex items-center justify-center w-5 h-5 rounded hover:bg-secondary-50 dark:hover:bg-secondary-900/20 text-foreground-muted hover:text-secondary-500 transition-colors">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -554,8 +554,8 @@ function LocationChip({ location, selected, onSelect, onEdit, onDelete, onLabel 
           </span>
         )}
       </button>
-      {/* Action buttons — float above chip on hover */}
-      <div className="hidden group-hover:flex absolute -top-7 left-0 z-20 items-center gap-0.5 bg-surface border border-border-default rounded-md shadow-sm px-0.5 py-0.5">
+      {/* Action buttons — float below chip on hover */}
+      <div className="hidden group-hover:flex absolute top-full left-0 mt-1 z-20 items-center gap-0.5 bg-surface border border-border-default rounded-md shadow-sm px-0.5 py-0.5">
         <button onClick={e => { e.stopPropagation(); onLabel() }}
           title="Print label"
           className="flex items-center justify-center w-5 h-5 rounded hover:bg-secondary-50 dark:hover:bg-secondary-900/20 text-foreground-muted hover:text-secondary-500 transition-colors">
