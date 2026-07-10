@@ -1184,11 +1184,22 @@ function StockTab() {
     setEditLocationId('')
     setEditLocations([])
 
-    // Fetch warehouses for shelf assignment
-    fetch('/api/admin/shelving/warehouses', { credentials: 'include' })
-      .then(r => r.json())
-      .then(j => setEditWarehouses(j.warehouses || []))
-      .catch(() => {})
+    // Fetch warehouses for shelf assignment, then pre-select existing shelf
+    const variantParam = p.sub_variant_id ? `&sub_variant_id=${p.sub_variant_id}` : p.variant_id ? `&variant_id=${p.variant_id}` : ''
+    Promise.all([
+      fetch('/api/admin/shelving/warehouses', { credentials: 'include' }).then(r => r.json()),
+      fetch(`/api/admin/shelving/stock?product_id=${p.id}${variantParam}`, { credentials: 'include' }).then(r => r.json()),
+    ]).then(([wj, sj]) => {
+      const warehouses = wj.warehouses || []
+      setEditWarehouses(warehouses)
+      const existing = (sj.locations || [])[0]
+      if (existing?.warehouse_id) {
+        setEditWarehouseId(existing.warehouse_id)
+        // editLocations will be populated by the useEffect on editWarehouseId;
+        // store the location_id so it can be selected after locations load
+        setEditLocationId(existing.location_id)
+      }
+    }).catch(() => {})
 
     // Build unit options from the valuation row data
     const sellFactor = parseFloat(p.sell_unit_factor || '1') || 1
@@ -1279,7 +1290,14 @@ function StockTab() {
     if (!editWarehouseId) { setEditLocations([]); setEditLocationId(''); return }
     fetch(`/api/admin/shelving/locations?warehouse_id=${editWarehouseId}`, { credentials: 'include' })
       .then(r => r.json())
-      .then(j => { setEditLocations(j.locations || []); setEditLocationId('') })
+      .then(j => {
+        setEditLocations(j.locations || [])
+        // Only reset location if not already pre-seeded by startEdit
+        setEditLocationId(prev => {
+          const locs: { id: string }[] = j.locations || []
+          return locs.some(l => l.id === prev) ? prev : ''
+        })
+      })
       .catch(() => {})
   }, [editWarehouseId])
 
