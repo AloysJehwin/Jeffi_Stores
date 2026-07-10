@@ -82,6 +82,7 @@ interface ProductActionsProps {
   handlingDays?: number
   launchDate?: string | null
   discontinueDate?: string | null
+  isCodAllowed?: boolean | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -598,11 +599,18 @@ export default function ProductActions({
               </label>
               <div className="text-right">
                 {effectiveStock > 0 ? (
-                  <div className="flex items-center justify-end gap-2">
-                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                    </div>
+                    {isCodAllowed && (
+                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                        COD
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center justify-end gap-2">
@@ -719,11 +727,18 @@ export default function ProductActions({
               <label className="text-sm font-medium text-foreground-secondary">Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}</label>
               <div className="text-right">
                 {effectiveStock > 0 ? (
-                  <div className="flex items-center justify-end gap-2">
-                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                    </div>
+                    {isCodAllowed && (
+                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                        COD
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center justify-end gap-2">
