@@ -379,7 +379,7 @@ export async function PATCH(
         }
       }
 
-      return { moveToDraft, insufficientItems }
+      return { moveToDraft, insufficientItems, savedItemIds }
     })
 
     if (result.moveToDraft) {
@@ -396,7 +396,7 @@ export async function PATCH(
       } catch (_) {}
     }
 
-    return NextResponse.json({ success: true, savedItemIds })
+    return NextResponse.json({ success: true, savedItemIds: result.savedItemIds })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
   }
