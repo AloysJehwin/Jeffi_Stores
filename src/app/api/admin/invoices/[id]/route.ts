@@ -72,6 +72,8 @@ export async function PATCH(
         gst_rate: gstRate,
         quantity: qty,
         buy_unit: item.buy_unit || null,
+        sold_unit_factor: item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : null,
+        base_quantity: item.sell_unit_factor && item.sell_unit_factor > 1 ? qty * item.sell_unit_factor : null,
         unit_price: unitPrice,
         total_price: lineTotal,
         taxable_amount: round2(gst.taxableAmount),
@@ -208,13 +210,15 @@ export async function PATCH(
         const inserted = await client.query<{ id: string }>(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, buy_unit, unit_price, total_price,
+            hsn_code, gst_rate, quantity, buy_unit, sold_unit_factor, base_quantity,
+            unit_price, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18) RETURNING id`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id`,
           [
             id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
-            item.quantity, item.buy_unit, item.unit_price, item.total_price,
+            item.quantity, item.buy_unit, item.sold_unit_factor ?? null, item.base_quantity ?? null,
+            item.unit_price, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
           ]
         )
