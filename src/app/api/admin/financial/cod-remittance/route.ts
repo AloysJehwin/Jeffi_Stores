@@ -11,18 +11,26 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const status = searchParams.get('status') || 'cod_collected' // cod_pending | cod_collected | paid
 
-  const orders = await queryMany(
-    `SELECT o.id, o.order_number, o.customer_name, o.customer_email,
-            o.total_amount, o.payment_status, o.payment_mode,
-            o.delivered_at, o.cod_remitted_at, o.updated_at,
-            o.status AS order_status
-     FROM orders o
-     WHERE o.payment_mode = 'cod'
-       AND ($1 = 'all' OR o.payment_status = $1)
-     ORDER BY o.delivered_at DESC NULLS LAST, o.updated_at DESC
-     LIMIT 500`,
-    [status]
-  )
+  const [orders, allCod] = await Promise.all([
+    queryMany(
+      `SELECT o.id, o.order_number, o.customer_name, o.customer_email,
+              o.total_amount, o.payment_status, o.payment_mode,
+              o.delivered_at, o.cod_remitted_at, o.updated_at,
+              o.status AS order_status
+       FROM orders o
+       WHERE o.payment_mode = 'cod'
+         AND ($1 = 'all' OR o.payment_status = $1)
+       ORDER BY o.delivered_at DESC NULLS LAST, o.updated_at DESC
+       LIMIT 500`,
+      [status]
+    ),
+    queryMany(
+      `SELECT payment_status, total_amount
+       FROM orders
+       WHERE payment_mode = 'cod'`,
+      []
+    ),
+  ])
 
   // Group cod_collected by delivery week
   const weeks: Record<string, { weekLabel: string; weekStart: string; orders: any[]; total: number }> = {}
@@ -48,10 +56,13 @@ export async function GET(request: NextRequest) {
   }
 
   const summary = {
-    cod_pending: orders.filter(o => o.payment_status === 'cod_pending').length,
-    cod_collected: orders.filter(o => o.payment_status === 'cod_collected').length,
-    cod_collected_amount: orders
+    cod_pending: allCod.filter(o => o.payment_status === 'cod_pending').length,
+    cod_collected: allCod.filter(o => o.payment_status === 'cod_collected').length,
+    cod_collected_amount: allCod
       .filter(o => o.payment_status === 'cod_collected')
+      .reduce((s, o) => s + parseFloat(o.total_amount), 0),
+    total_collected_amount: allCod
+      .filter(o => ['cod_collected', 'paid'].includes(o.payment_status))
       .reduce((s, o) => s + parseFloat(o.total_amount), 0),
   }
 
