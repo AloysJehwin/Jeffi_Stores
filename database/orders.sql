@@ -208,4 +208,9 @@ CREATE TABLE public.return_requests (
 
 -- Live migration (idempotent)
 ALTER TABLE orders ADD COLUMN IF NOT EXISTS estimated_delivery_date date;
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS image_urls text[] DEFAULT '{}';
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuation_status character varying(20) DEFAULT NULL;
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuation_condition character varying(20) DEFAULT NULL;
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuation_notes text DEFAULT NULL;
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuated_at timestamp with time zone DEFAULT NULL;
 
