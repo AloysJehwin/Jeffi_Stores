@@ -1685,7 +1685,7 @@ function CodRemittanceTab() {
           sub={`${formatINR(summary.cod_collected_amount ?? 0)} to remit`} />
         <SummaryCard
           label="Total Collected"
-          value={formatINR(summary.cod_collected_amount ?? 0)}
+          value={formatINR(summary.total_collected_amount ?? 0)}
           sub="across all collected orders" />
       </div>
 
