@@ -23,6 +23,8 @@ const orderItemSchema = z.object({
   gst_rate: z.coerce.number().min(0).default(18),
   unit_price: z.coerce.number().min(0),
   quantity: z.coerce.number().positive(),
+  discount_pct: z.coerce.number().min(0).max(100).default(0),
+  sell_unit_factor: z.coerce.number().min(1).default(1),
   buy_unit: z.string().nullish(),
   buy_mode: z.string().nullish(),
   temp_id: z.string().nullish(),
