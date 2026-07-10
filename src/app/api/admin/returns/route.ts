@@ -13,11 +13,15 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const status = searchParams.get('status') || 'all'
+    const historyFilter = searchParams.get('filter') || 'all' // for history tab: 'all' | 'approved' | 'rejected'
 
     let statusFilter = `rr.status NOT IN ('rejected', 'completed')`
     if (status === 'pending_approval') statusFilter = `rr.status = 'pending_approval'`
-    else if (status === 'approved') statusFilter = `rr.status IN ('approved', 'received')`
-    else if (status === 'history') statusFilter = `rr.status IN ('completed', 'rejected')`
+    else if (status === 'history') {
+      if (historyFilter === 'approved') statusFilter = `rr.status = 'completed'`
+      else if (historyFilter === 'rejected') statusFilter = `rr.status = 'rejected'`
+      else statusFilter = `rr.status IN ('completed', 'rejected')`
+    }
 
     const rows = await queryMany(
       `SELECT

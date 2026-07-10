@@ -178,6 +178,10 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     description?: string | null; admin_notes?: string | null;
     replacement_order_id?: string | null; replacement_order_number?: string | null;
     rvp_awb_number?: string | null;
+    items?: Array<{
+      id: string; product_name?: string | null; variant_name?: string | null;
+      quantity: number; unit_price: number; refund_amount: number;
+    }> | null;
   } | null>(null)
   const [monthlyLimitReached, setMonthlyLimitReached] = useState(false)
   const [showReturnForm, setShowReturnForm] = useState(false)
@@ -225,7 +229,9 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       const retRes = await fetch(`/api/orders/${id}/return`, { credentials: 'include' })
       if (retRes.ok) {
         const retData = await retRes.json()
-        setReturnRequest(retData.returnRequest || null)
+        setReturnRequest(retData.returnRequest
+          ? { ...retData.returnRequest, items: retData.returnItems || [] }
+          : null)
         setMonthlyLimitReached(!!retData.monthlyLimitReached)
       }
     } catch (err: any) {
@@ -851,6 +857,34 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     Your refund has been processed. It may take 5–7 business days to reflect in your account.
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* Returned Items Summary — shown whenever a return request exists */}
+            {returnRequest && returnRequest.items && returnRequest.items.length > 0 && RETURN_STATUSES.includes(order.status) && (
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+                <h3 className="text-base font-semibold text-foreground mb-3">
+                  {returnRequest.type === 'replacement' ? 'Items Requested for Replacement' : 'Items Being Returned'}
+                  <span className="ml-2 text-sm font-normal text-foreground-secondary">
+                    · ₹{returnRequest.items.reduce((s, i) => s + parseFloat(String(i.refund_amount)), 0).toLocaleString('en-IN')} {returnRequest.type === 'refund' ? 'refund' : 'value'}
+                  </span>
+                </h3>
+                <div className="divide-y divide-border-default border border-border-default rounded-lg overflow-hidden">
+                  {returnRequest.items.map((item, idx) => (
+                    <div key={item.id ?? idx} className="flex items-center justify-between px-3 py-2.5 bg-surface text-sm">
+                      <div className="min-w-0">
+                        <p className="font-medium text-foreground truncate">{item.product_name}</p>
+                        {item.variant_name && (
+                          <p className="text-xs text-foreground-secondary">{item.variant_name}</p>
+                        )}
+                      </div>
+                      <div className="text-right flex-shrink-0 ml-4">
+                        <p className="text-xs text-foreground-secondary">Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toLocaleString('en-IN')}</p>
+                        <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toLocaleString('en-IN')}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
 

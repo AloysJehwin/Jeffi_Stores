@@ -64,8 +64,8 @@ export async function POST(
 
       await withTransaction(async (client) => {
         await client.query(
-          `UPDATE return_requests SET status = 'approved', admin_notes = $1, updated_at = NOW() WHERE id = $2`,
-          [adminNotes?.trim() || null, returnRequest.id]
+          `UPDATE return_requests SET status = 'approved', admin_notes = $1, reviewed_by = $2, reviewed_at = NOW(), updated_at = NOW() WHERE id = $3`,
+          [adminNotes?.trim() || null, admin.adminId, returnRequest.id]
         )
         await client.query(
           `UPDATE orders SET status = 'return_approved', updated_at = NOW() WHERE id = $1`,
@@ -111,8 +111,8 @@ export async function POST(
 
       await withTransaction(async (client) => {
         await client.query(
-          `UPDATE return_requests SET status = 'rejected', admin_notes = $1, resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
-          [adminNotes.trim(), returnRequest.id]
+          `UPDATE return_requests SET status = 'rejected', admin_notes = $1, reviewed_by = $2, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $3`,
+          [adminNotes.trim(), admin.adminId, returnRequest.id]
         )
         await client.query(
           `UPDATE orders SET status = 'return_rejected', updated_at = NOW() WHERE id = $1`,
@@ -150,8 +150,8 @@ export async function POST(
 
       await withTransaction(async (client) => {
         await client.query(
-          `UPDATE return_requests SET status = 'received', return_tracking_number = $1, received_at = NOW(), updated_at = NOW() WHERE id = $2`,
-          [returnTrackingNumber?.trim() || null, returnRequest.id]
+          `UPDATE return_requests SET status = 'received', return_tracking_number = $1, reviewed_by = $2, reviewed_at = NOW(), received_at = NOW(), updated_at = NOW() WHERE id = $3`,
+          [returnTrackingNumber?.trim() || null, admin.adminId, returnRequest.id]
         )
         await client.query(
           `UPDATE orders SET status = 'return_received', updated_at = NOW() WHERE id = $1`,
@@ -280,8 +280,8 @@ export async function POST(
                   [JSON.stringify({ ...(typeof paymentRecord.gateway_response === 'string' ? JSON.parse(paymentRecord.gateway_response) : paymentRecord.gateway_response || {}), refund }), paymentRecord.id]
                 )
                 await client.query(
-                  `UPDATE return_requests SET status = 'completed', resolved_at = NOW(), updated_at = NOW() WHERE id = $1`,
-                  [returnRequest.id]
+                  `UPDATE return_requests SET status = 'completed', reviewed_by = $1, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
+                  [admin.adminId, returnRequest.id]
                 )
                 if (restock !== false) await restockItems(client)
               })
@@ -320,8 +320,8 @@ export async function POST(
             [orderId]
           )
           await client.query(
-            `UPDATE return_requests SET status = 'completed', resolved_at = NOW(), updated_at = NOW() WHERE id = $1`,
-            [returnRequest.id]
+            `UPDATE return_requests SET status = 'completed', reviewed_by = $1, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
+            [admin.adminId, returnRequest.id]
           )
           if (restock !== false) await restockItems(client)
         })
@@ -440,8 +440,8 @@ export async function POST(
           }
 
           await client.query(
-            `UPDATE return_requests SET status = 'completed', replacement_order_id = $1, resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
-            [newOrderId, returnRequest.id]
+            `UPDATE return_requests SET status = 'completed', replacement_order_id = $1, reviewed_by = $2, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $3`,
+            [newOrderId, admin.adminId, returnRequest.id]
           )
 
           await client.query(

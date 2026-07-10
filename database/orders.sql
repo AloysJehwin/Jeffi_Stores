@@ -233,3 +233,6 @@ CREATE TABLE IF NOT EXISTS public.return_request_items (
 CREATE INDEX IF NOT EXISTS idx_return_request_items_return_request_id ON public.return_request_items(return_request_id);
 CREATE INDEX IF NOT EXISTS idx_return_request_items_order_item_id ON public.return_request_items(order_item_id);
 
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES admins(id) ON DELETE SET NULL;
+ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS reviewed_at timestamp with time zone DEFAULT NULL;
+
