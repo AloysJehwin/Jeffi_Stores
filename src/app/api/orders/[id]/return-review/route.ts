@@ -4,6 +4,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { sendReturnStatusEmail, sendPaymentStatusUpdate } from '@/lib/email'
 import { logStockMovement } from '@/lib/inventory'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
+import { restoreOrderStock } from '@/lib/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { logActivity } from '@/lib/activity'
 
@@ -211,35 +212,6 @@ export async function POST(
         ? returnItems.reduce((sum: number, i: any) => sum + parseFloat(i.refund_amount), 0)
         : parseFloat(order.total_amount)
 
-      async function restockItems(client: any) {
-        const itemsToRestock = useItemLevel
-          ? returnItems
-          : (await client.query('SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1', [orderId])).rows
-
-        for (const item of itemsToRestock) {
-          const qty = parseFloat(useItemLevel ? item.quantity : item.quantity)
-          if (item.variant_id) {
-            await client.query(
-              'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-              [qty, item.variant_id]
-            )
-          } else {
-            await client.query(
-              'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-              [qty, item.product_id]
-            )
-          }
-          await logStockMovement(client, {
-            productId: item.product_id,
-            variantId: item.variant_id || null,
-            transactionType: 'return',
-            quantityChange: qty,
-            referenceType: 'order',
-            referenceId: orderId,
-          })
-        }
-      }
-
       if (returnRequest.type === 'refund') {
         let refundFailed = false
 
@@ -283,8 +255,9 @@ export async function POST(
                   `UPDATE return_requests SET status = 'completed', reviewed_by = $1, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
                   [admin.adminId, returnRequest.id]
                 )
-                if (restock !== false) await restockItems(client)
               })
+
+              if (restock !== false) restoreOrderStock(orderId).catch(() => {})
 
               if (userEmail && userName) {
                 sendPaymentStatusUpdate(
@@ -323,8 +296,9 @@ export async function POST(
             `UPDATE return_requests SET status = 'completed', reviewed_by = $1, reviewed_at = NOW(), resolved_at = NOW(), updated_at = NOW() WHERE id = $2`,
             [admin.adminId, returnRequest.id]
           )
-          if (restock !== false) await restockItems(client)
         })
+
+        if (restock !== false) restoreOrderStock(orderId).catch(() => {})
 
         completeAutoTask('inspect_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
 
@@ -448,9 +422,9 @@ export async function POST(
             `UPDATE orders SET status = 'returned', updated_at = NOW() WHERE id = $1`,
             [orderId]
           )
-
-          if (restock !== false) await restockItems(client)
         })
+
+        if (restock !== false) restoreOrderStock(orderId).catch(() => {})
 
         if (userEmail && userName) {
           sendReturnStatusEmail(userEmail, userName, order.order_number, orderId, 'replacement_created', {
