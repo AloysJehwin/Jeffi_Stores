@@ -332,23 +332,29 @@ export default function QuotationsClient() {
           const hasBatch = data.items && data.items.length > 0
           const hasSerial = data.serialized_items && data.serialized_items.length > 0
           if (hasBatch || hasSerial) {
-            setPendingConvertArgs({ quoteId, paymentMode, enableDelivery })
-            if (hasBatch) {
-              setConvertBatchPickerItems(data.items)
-              const init: Record<string, Record<string, number>> = {}
-              for (const item of data.items) {
-                if (!item.already_assigned) init[item.order_item_id] = initSelections(item)
+            // If any perishable item has less batch stock than required, skip assign step — server will draft
+            const anyShortBatch = hasBatch && data.items.some((i: BatchPickerItem) =>
+              !i.already_assigned && i.batches.reduce((s: number, b: BatchOption) => s + b.quantity_remaining, 0) < i.required_qty
+            )
+            if (!anyShortBatch) {
+              setPendingConvertArgs({ quoteId, paymentMode, enableDelivery })
+              if (hasBatch) {
+                setConvertBatchPickerItems(data.items)
+                const init: Record<string, Record<string, number>> = {}
+                for (const item of data.items) {
+                  if (!item.already_assigned) init[item.order_item_id] = initSelections(item)
+                }
+                setConvertBatchSelections(init)
               }
-              setConvertBatchSelections(init)
+              if (hasSerial) {
+                setConvertSerialPickerItems(data.serialized_items)
+                setConvertSerialSelections(Object.fromEntries(
+                  data.serialized_items.filter((i: SerialItem) => !i.already_assigned).map((i: SerialItem) => [i.order_item_id, new Set<string>()])
+                ))
+              }
+              setConvertStep('assign')
+              return
             }
-            if (hasSerial) {
-              setConvertSerialPickerItems(data.serialized_items)
-              setConvertSerialSelections(Object.fromEntries(
-                data.serialized_items.filter((i: SerialItem) => !i.already_assigned).map((i: SerialItem) => [i.order_item_id, new Set<string>()])
-              ))
-            }
-            setConvertStep('assign')
-            return
           }
         }
       } catch (_) {}
