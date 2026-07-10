@@ -32,7 +32,7 @@ interface Props {
   onCancel: () => void
 }
 
-function expiryColor(expiryDate: string | null): string {
+export function expiryColor(expiryDate: string | null): string {
   if (!expiryDate) return 'text-foreground-muted'
   const days = Math.round((new Date(expiryDate).getTime() - Date.now()) / 86400000)
   if (days < 0) return 'text-red-500 font-semibold'
@@ -42,9 +42,9 @@ function expiryColor(expiryDate: string | null): string {
 }
 
 // Per-item state: map of batch_id → qty allocated from that batch
-type ItemSelections = Record<string, number>
+export type ItemSelections = Record<string, number>
 
-function initSelections(item: BatchPickerItem): ItemSelections {
+export function initSelections(item: BatchPickerItem): ItemSelections {
   const sel: ItemSelections = {}
   let remaining = item.required_qty
   for (const b of item.batches) {

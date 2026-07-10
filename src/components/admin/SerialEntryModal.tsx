@@ -31,7 +31,7 @@ interface Props {
   onCancel: () => void
 }
 
-function SerialPicker({
+export function SerialPicker({
   item,
   selected,
   onChange,
