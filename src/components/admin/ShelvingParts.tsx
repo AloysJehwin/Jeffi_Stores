@@ -25,6 +25,7 @@ export interface ShelfLocation {
   display_code: string
   notes: string | null
   is_active: boolean
+  is_open_shelf: boolean
   stock_count: number
 }
 
@@ -131,6 +132,13 @@ export function LocationForm({ warehouseId, onSave, onCancel, initial }: {
     } catch (e: any) { setErr(e.message) } finally { setSaving(false) }
   }
 
+  const levels = [
+    { label: 'Aisle', placeholder: 'A', value: aisle, onChange: (v: string) => setAisle(v.toUpperCase()), required: true },
+    { label: 'Rack', placeholder: '01', value: rack, onChange: (v: string) => setRack(v), required: true },
+    { label: 'Shelf', placeholder: 'C', value: shelf, onChange: (v: string) => setShelf(v.toUpperCase()), required: true },
+    { label: 'Bin', placeholder: '02', value: bin, onChange: (v: string) => setBin(v), required: false },
+  ]
+
   return (
     <form onSubmit={submit} className="space-y-3">
       {err && (
@@ -138,23 +146,25 @@ export function LocationForm({ warehouseId, onSave, onCancel, initial }: {
           {err}
         </div>
       )}
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <label className={labelCls}>Aisle</label>
-          <input value={aisle} onChange={e => setAisle(e.target.value)} className={inputCls + ' font-mono'} placeholder="A" maxLength={10} />
-        </div>
-        <div>
-          <label className={labelCls}>Rack</label>
-          <input value={rack} onChange={e => setRack(e.target.value)} className={inputCls + ' font-mono'} placeholder="01" maxLength={10} />
-        </div>
-        <div>
-          <label className={labelCls}>Shelf</label>
-          <input value={shelf} onChange={e => setShelf(e.target.value)} className={inputCls + ' font-mono'} placeholder="C" maxLength={10} />
-        </div>
-        <div>
-          <label className={labelCls}>Bin (optional)</label>
-          <input value={bin} onChange={e => setBin(e.target.value)} className={inputCls + ' font-mono'} placeholder="02" maxLength={10} />
-        </div>
+      {/* Level-by-level inputs in a breadcrumb row */}
+      <div className="flex items-end gap-1.5 flex-wrap">
+        {levels.map((lvl, i) => (
+          <React.Fragment key={lvl.label}>
+            {i > 0 && <span className="text-foreground-muted text-sm pb-1.5">–</span>}
+            <div className="flex flex-col gap-1">
+              <span className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">
+                {lvl.label}{!lvl.required && <span className="normal-case font-normal ml-0.5">(opt)</span>}
+              </span>
+              <input
+                value={lvl.value}
+                onChange={e => lvl.onChange(e.target.value)}
+                className="w-16 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
+                placeholder={lvl.placeholder}
+                maxLength={10}
+              />
+            </div>
+          </React.Fragment>
+        ))}
       </div>
       <div>
         <label className={labelCls}>Notes (optional)</label>
