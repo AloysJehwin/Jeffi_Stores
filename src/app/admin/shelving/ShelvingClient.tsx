@@ -38,6 +38,9 @@ export default function ShelvingClient() {
   const [stock, setStock] = useState<ShelfStock[]>([])
   const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
+  const [selectedAisle, setSelectedAisle] = useState<string | null>(null)
+  const [selectedRack, setSelectedRack] = useState<string | null>(null)
+  const [selectedShelf, setSelectedShelf] = useState<string | null>(null)
 
   const [showWarehouseForm, setShowWarehouseForm] = useState(false)
   const [editWarehouse, setEditWarehouse] = useState<Warehouse | null>(null)
@@ -84,8 +87,11 @@ export default function ShelvingClient() {
 
   useEffect(() => { loadWarehouses().finally(() => setLoading(false)) }, [loadWarehouses])
   useEffect(() => {
-    if (selectedWarehouse) { loadLocations(selectedWarehouse); setSelectedLocation(null) }
-    else setLocations([])
+    if (selectedWarehouse) {
+      loadLocations(selectedWarehouse)
+      setSelectedLocation(null)
+      setSelectedAisle(null); setSelectedRack(null); setSelectedShelf(null)
+    } else setLocations([])
   }, [selectedWarehouse, loadLocations])
   useEffect(() => { if (selectedLocation) loadStock(selectedLocation); else setStock([]) }, [selectedLocation, loadStock])
 
@@ -257,50 +263,98 @@ export default function ShelvingClient() {
               </div>
             </div>
 
-            {/* Location chips */}
-            <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
-              <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0">Location</span>
-              <div className="flex items-center gap-1.5 flex-wrap flex-1">
-                {!selectedWarehouse ? (
-                  <span className="text-xs text-foreground-muted italic">Select a warehouse first</span>
-                ) : locationsLoading ? (
-                  <div className="flex gap-1.5">
-                    {[88, 104, 80, 96].map((w, i) => (
-                      <div key={i} className="h-7 rounded-full bg-surface-secondary animate-pulse" style={{ width: w }} />
-                    ))}
+            {/* Location drill-down — Aisle → Rack → Shelf/Bin */}
+            {(() => {
+              const aisles = Array.from(new Set(locations.map(l => l.aisle_code))).sort()
+              const racksForAisle = selectedAisle
+                ? Array.from(new Set(locations.filter(l => l.aisle_code === selectedAisle).map(l => l.rack_code))).sort()
+                : []
+              const shelfsForRack = selectedAisle && selectedRack
+                ? locations.filter(l => l.aisle_code === selectedAisle && l.rack_code === selectedRack)
+                : []
+              // Open shelf special: show at aisle level as its own chip row
+              const openShelf = locations.find(l => l.is_open_shelf)
+              const regularAisles = aisles.filter(a => {
+                const locs = locations.filter(l => l.aisle_code === a)
+                return !(locs.length === 1 && locs[0].is_open_shelf)
+              })
+
+              return (
+                <>
+                  {/* Row 1: Aisle */}
+                  <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
+                    <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0">Aisle</span>
+                    <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                      {!selectedWarehouse ? (
+                        <span className="text-xs text-foreground-muted italic">Select a warehouse first</span>
+                      ) : locationsLoading ? (
+                        <div className="flex gap-1.5">{[60,60,60].map((w,i) => <div key={i} className="h-7 rounded-full bg-surface-secondary animate-pulse" style={{width:w}} />)}</div>
+                      ) : (
+                        <>
+                          {regularAisles.map(a => (
+                            <LevelChip key={a} label={a} selected={selectedAisle === a}
+                              onSelect={() => { setSelectedAisle(selectedAisle === a ? null : a); setSelectedRack(null); setSelectedShelf(null); setSelectedLocation(null) }} />
+                          ))}
+                          {openShelf && (
+                            <LocationChip
+                              location={openShelf} selected={selectedLocation === openShelf.id}
+                              onSelect={() => { setSelectedLocation(selectedLocation === openShelf.id ? null : openShelf.id); setShowLocationForm(false); setShowAssignStock(false) }}
+                              onEdit={() => { setEditLocation(openShelf); setShowLocationForm(true); setShowWarehouseForm(false) }}
+                              onDelete={() => deleteLocation(openShelf.id)}
+                              onLabel={() => downloadSyntheticLabel(openShelf.display_code, activeWarehouse?.name || '', `shelf-label-${openShelf.display_code}.pdf`)}
+                            />
+                          )}
+                          {selectedWarehouse && (
+                            <button onClick={() => { setEditLocation(null); setShowLocationForm(!showLocationForm); setShowWarehouseForm(false) }}
+                              className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                              Add
+                            </button>
+                          )}
+                        </>
+                      )}
+                    </div>
                   </div>
-                ) : locations.length === 0 ? (
-                  <span className="text-xs text-foreground-muted italic">No locations yet</span>
-                ) : (
-                  locations.map(loc => (
-                    <LocationChip
-                      key={loc.id} location={loc} selected={selectedLocation === loc.id}
-                      onSelect={() => {
-                        setSelectedLocation(selectedLocation === loc.id ? null : loc.id)
-                        setShowLocationForm(false); setShowAssignStock(false)
-                      }}
-                      onEdit={() => { setEditLocation(loc); setShowLocationForm(true); setShowWarehouseForm(false) }}
-                      onDelete={() => deleteLocation(loc.id)}
-                      onLabel={() => {
-                        if (loc.is_open_shelf) {
-                          downloadSyntheticLabel(loc.display_code, activeWarehouse?.name || '', `shelf-label-${loc.display_code}.pdf`)
-                        } else {
-                          downloadLabels([loc.id], 1, `shelf-label-${loc.display_code}.pdf`)
-                        }
-                      }}
-                    />
-                  ))
-                )}
-                {selectedWarehouse && (
-                  <button
-                    onClick={() => { setEditLocation(null); setShowLocationForm(!showLocationForm); setShowWarehouseForm(false) }}
-                    className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    Add
-                  </button>
-                )}
-              </div>
-            </div>
+
+                  {/* Row 2: Rack (shown after aisle selected) */}
+                  {selectedAisle && racksForAisle.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
+                      <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 flex items-center gap-1">
+                        <svg className="w-3 h-3 text-foreground-muted/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+                        Rack
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                        {racksForAisle.map(r => (
+                          <LevelChip key={r} label={r} selected={selectedRack === r}
+                            onSelect={() => { setSelectedRack(selectedRack === r ? null : r); setSelectedShelf(null); setSelectedLocation(null) }} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Row 3: Shelf/Bin (shown after rack selected) */}
+                  {selectedAisle && selectedRack && shelfsForRack.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
+                      <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 flex items-center gap-1">
+                        <svg className="w-3 h-3 text-foreground-muted/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
+                        Shelf
+                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                        {shelfsForRack.map(loc => (
+                          <LocationChip
+                            key={loc.id} location={loc} selected={selectedLocation === loc.id}
+                            onSelect={() => { setSelectedLocation(selectedLocation === loc.id ? null : loc.id); setShowLocationForm(false); setShowAssignStock(false) }}
+                            onEdit={() => { setEditLocation(loc); setShowLocationForm(true); setShowWarehouseForm(false) }}
+                            onDelete={() => deleteLocation(loc.id)}
+                            onLabel={() => downloadLabels([loc.id], 1, `shelf-label-${loc.display_code}.pdf`)}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )
+            })()}
           </div>
 
           {/* Inline forms (warehouse or location, one at a time) */}
@@ -422,6 +476,23 @@ export default function ShelvingClient() {
         </div>
       )}
     </div>
+  )
+}
+
+function LevelChip({ label, selected, onSelect }: {
+  label: string; selected: boolean; onSelect: () => void
+}) {
+  return (
+    <button
+      onClick={onSelect}
+      className={`flex items-center h-7 px-3 rounded-full text-xs font-mono font-semibold transition-colors ${
+        selected
+          ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900'
+          : 'bg-surface-secondary border border-border-default text-foreground hover:bg-secondary-50 dark:hover:bg-secondary-900/20 hover:border-secondary-300 dark:hover:border-secondary-700'
+      }`}
+    >
+      {label}
+    </button>
   )
 }
 
