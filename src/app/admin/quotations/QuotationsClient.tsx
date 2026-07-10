@@ -1258,6 +1258,7 @@ export default function QuotationsClient() {
                 setConvertBatchPickerItems(null)
                 setConvertSerialPickerItems(null)
                 setShowConvertModal(true)
+              }}
               className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white disabled:opacity-50 transition-colors whitespace-nowrap">
               {convertingInvoice ? 'Converting…' : '→ Convert to Invoice'}
             </button>
@@ -1748,6 +1749,7 @@ export default function QuotationsClient() {
 
   </div>
   )
+}
 
 function QuotationDetailModal({ q, onClose }: { q: Quotation; onClose: () => void }) {
   if (typeof document === 'undefined') return null
