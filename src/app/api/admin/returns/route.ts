@@ -49,7 +49,8 @@ export async function GET(request: NextRequest) {
        FROM return_requests rr
        JOIN orders o ON o.id = rr.order_id
        LEFT JOIN users u ON u.id = rr.user_id
-       WHERE ${statusFilter}
+       WHERE rr.type = 'refund'
+         AND ${statusFilter}
        ORDER BY rr.created_at DESC`,
       []
     )
