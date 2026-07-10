@@ -114,6 +114,7 @@ export default function InvoicesClient() {
   function navigateView(next: View, id?: string) {
     setViewState(next)
     if (next === 'list') {
+      editIdRef.current = null
       router.back()
     } else {
       const params = new URLSearchParams(window.location.search)
@@ -376,6 +377,7 @@ export default function InvoicesClient() {
   }
 
   async function openEdit(inv: Invoice) {
+    editIdRef.current = inv.id
     setEditLoading(true)
     try {
       const res = await fetch(`/api/admin/orders/${inv.id}`, { credentials: 'include' })
