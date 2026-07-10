@@ -91,13 +91,22 @@ export default function ShelvingClient() {
     } catch { setError('Failed to load warehouses') }
   }, [])
 
-  const loadLocations = useCallback(async (warehouseId: string) => {
+  const loadLocations = useCallback(async (warehouseId: string, restoreLocId?: string | null) => {
     setLocationsLoading(true)
     try {
       const res = await fetch(`/api/admin/shelving/locations?warehouse_id=${warehouseId}`)
       if (!res.ok) throw new Error('Failed to load')
       const data = await res.json()
-      setLocations(data.locations || [])
+      const locs: ShelfLocation[] = data.locations || []
+      setLocations(locs)
+      // On initial mount restore: derive aisle/rack from the restored location
+      if (restoreLocId) {
+        const match = locs.find(l => l.id === restoreLocId)
+        if (match) {
+          setSelectedAisleState(match.aisle_code)
+          setSelectedRackState(match.rack_code)
+        }
+      }
     } catch { setError('Failed to load locations') } finally { setLocationsLoading(false) }
   }, [])
 
@@ -118,7 +127,7 @@ export default function ShelvingClient() {
       if (warehouseMountRef.current) {
         // Initial mount: load locations but keep URL-restored aisle/rack/loc
         warehouseMountRef.current = false
-        loadLocations(selectedWarehouse)
+        loadLocations(selectedWarehouse, selectedLocation)
       } else {
         // User switched warehouse: reset drill-down
         setSelectedLocationState(null)
