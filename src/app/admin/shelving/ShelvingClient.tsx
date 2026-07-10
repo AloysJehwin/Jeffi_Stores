@@ -46,6 +46,8 @@ export default function ShelvingClient() {
   const [editWarehouse, setEditWarehouse] = useState<Warehouse | null>(null)
   const [showLocationForm, setShowLocationForm] = useState(false)
   const [editLocation, setEditLocation] = useState<ShelfLocation | null>(null)
+  const [prefillLocation, setPrefillLocation] = useState<Partial<ShelfLocation>>({})
+  const [prefillLocked, setPrefillLocked] = useState<('aisle' | 'rack' | 'shelf')[]>([])
   const [showAssignStock, setShowAssignStock] = useState(false)
 
   const [labelSelections, setLabelSelections] = useState<string[]>([])
@@ -142,7 +144,7 @@ export default function ShelvingClient() {
       })
       if (!res.ok) throw new Error((await res.json()).error)
     }
-    setShowLocationForm(false); setEditLocation(null)
+    setShowLocationForm(false); setEditLocation(null); setPrefillLocation({}); setPrefillLocked([])
     await loadLocations(selectedWarehouse)
   }
 
@@ -305,7 +307,11 @@ export default function ShelvingClient() {
                             />
                           )}
                           {selectedWarehouse && (
-                            <button onClick={() => { setEditLocation(null); setShowLocationForm(!showLocationForm); setShowWarehouseForm(false) }}
+                            <button onClick={() => {
+                              setEditLocation(null)
+                              setPrefillLocation({}); setPrefillLocked([])
+                              setShowLocationForm(!showLocationForm); setShowWarehouseForm(false)
+                            }}
                               className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs">
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                               Add
@@ -316,8 +322,8 @@ export default function ShelvingClient() {
                     </div>
                   </div>
 
-                  {/* Row 2: Rack (shown after aisle selected) */}
-                  {selectedAisle && racksForAisle.length > 0 && (
+                  {/* Row 2: Rack (shown when aisle selected) */}
+                  {selectedAisle && (racksForAisle.length > 0 || selectedWarehouse) && (
                     <div className="flex items-center gap-3 flex-wrap min-h-[28px]">
                       <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-20 shrink-0 leading-7 self-center flex items-center gap-1">
                         <svg className="w-3 h-3 text-foreground-muted/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
@@ -328,12 +334,22 @@ export default function ShelvingClient() {
                           <LevelChip key={r} label={r} selected={selectedRack === r}
                             onSelect={() => { setSelectedRack(selectedRack === r ? null : r); setSelectedShelf(null); setSelectedLocation(null) }} />
                         ))}
+                        <button onClick={() => {
+                          setEditLocation(null)
+                          setPrefillLocation({ aisle_code: selectedAisle })
+                          setPrefillLocked(['aisle'])
+                          setShowLocationForm(true); setShowWarehouseForm(false)
+                        }}
+                          className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                          Add
+                        </button>
                       </div>
                     </div>
                   )}
 
-                  {/* Row 3: Shelf/Bin (shown after rack selected) */}
-                  {selectedAisle && selectedRack && shelfsForRack.length > 0 && (
+                  {/* Row 3: Shelf/Bin (shown when rack selected) */}
+                  {selectedAisle && selectedRack && (
                     <div className="flex items-center gap-3 flex-wrap min-h-[28px]">
                       <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-20 shrink-0 leading-7 self-center flex items-center gap-1">
                         <svg className="w-3 h-3 text-foreground-muted/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
@@ -349,6 +365,16 @@ export default function ShelvingClient() {
                             onLabel={() => downloadLabels([loc.id], 1, `shelf-label-${loc.display_code}.pdf`)}
                           />
                         ))}
+                        <button onClick={() => {
+                          setEditLocation(null)
+                          setPrefillLocation({ aisle_code: selectedAisle, rack_code: selectedRack })
+                          setPrefillLocked(['aisle', 'rack'])
+                          setShowLocationForm(true); setShowWarehouseForm(false)
+                        }}
+                          className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                          Add
+                        </button>
                       </div>
                     </div>
                   )}
@@ -380,8 +406,9 @@ export default function ShelvingClient() {
                   <LocationForm
                     warehouseId={selectedWarehouse}
                     onSave={saveLocation}
-                    onCancel={() => { setShowLocationForm(false); setEditLocation(null) }}
-                    initial={editLocation || undefined}
+                    onCancel={() => { setShowLocationForm(false); setEditLocation(null); setPrefillLocation({}); setPrefillLocked([]) }}
+                    initial={editLocation || prefillLocation}
+                    lockedLevels={editLocation ? [] : prefillLocked}
                   />
                 </>
               )}

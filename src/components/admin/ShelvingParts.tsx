@@ -109,11 +109,12 @@ export function WarehouseForm({ onSave, onCancel, initial }: {
   )
 }
 
-export function LocationForm({ warehouseId, onSave, onCancel, initial }: {
+export function LocationForm({ warehouseId, onSave, onCancel, initial, lockedLevels = [] }: {
   warehouseId: string
   onSave: (data: { aisle_code: string; rack_code: string; shelf_code: string; bin_code: string; notes: string }) => Promise<void>
   onCancel: () => void
   initial?: Partial<ShelfLocation>
+  lockedLevels?: ('aisle' | 'rack' | 'shelf')[]
 }) {
   const [aisle, setAisle] = useState(initial?.aisle_code || '')
   const [rack, setRack] = useState(initial?.rack_code || '')
@@ -133,10 +134,10 @@ export function LocationForm({ warehouseId, onSave, onCancel, initial }: {
   }
 
   const levels = [
-    { label: 'Aisle', placeholder: 'A', value: aisle, onChange: (v: string) => setAisle(v.toUpperCase()), required: true },
-    { label: 'Rack', placeholder: '01', value: rack, onChange: (v: string) => setRack(v), required: true },
-    { label: 'Shelf', placeholder: 'C', value: shelf, onChange: (v: string) => setShelf(v.toUpperCase()), required: true },
-    { label: 'Bin', placeholder: '02', value: bin, onChange: (v: string) => setBin(v), required: false },
+    { key: 'aisle' as const, label: 'Aisle', placeholder: 'A', value: aisle, onChange: (v: string) => setAisle(v.toUpperCase()), required: true },
+    { key: 'rack' as const, label: 'Rack', placeholder: '01', value: rack, onChange: (v: string) => setRack(v), required: true },
+    { key: 'shelf' as const, label: 'Shelf', placeholder: 'C', value: shelf, onChange: (v: string) => setShelf(v.toUpperCase()), required: true },
+    { key: 'bin' as const, label: 'Bin', placeholder: '02', value: bin, onChange: (v: string) => setBin(v), required: false },
   ]
 
   return (
@@ -148,23 +149,32 @@ export function LocationForm({ warehouseId, onSave, onCancel, initial }: {
       )}
       {/* Level-by-level inputs in a breadcrumb row */}
       <div className="flex items-end gap-1.5 flex-wrap">
-        {levels.map((lvl, i) => (
-          <React.Fragment key={lvl.label}>
-            {i > 0 && <span className="text-foreground-muted text-sm pb-1.5">–</span>}
-            <div className="flex flex-col gap-1">
-              <span className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">
-                {lvl.label}{!lvl.required && <span className="normal-case font-normal ml-0.5">(opt)</span>}
-              </span>
-              <input
-                value={lvl.value}
-                onChange={e => lvl.onChange(e.target.value)}
-                className="w-16 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
-                placeholder={lvl.placeholder}
-                maxLength={10}
-              />
-            </div>
-          </React.Fragment>
-        ))}
+        {levels.map((lvl, i) => {
+          const locked = lockedLevels.includes(lvl.key as any)
+          return (
+            <React.Fragment key={lvl.label}>
+              {i > 0 && <span className="text-foreground-muted text-sm pb-1.5">–</span>}
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] font-semibold text-foreground-muted uppercase tracking-wide">
+                  {lvl.label}{!lvl.required && <span className="normal-case font-normal ml-0.5">(opt)</span>}
+                </span>
+                {locked ? (
+                  <div className="w-16 px-2 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm font-mono text-center select-none text-foreground-muted">
+                    {lvl.value || '–'}
+                  </div>
+                ) : (
+                  <input
+                    value={lvl.value}
+                    onChange={e => lvl.onChange(e.target.value)}
+                    className="w-16 px-2 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm font-mono text-center focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted"
+                    placeholder={lvl.placeholder}
+                    maxLength={10}
+                  />
+                )}
+              </div>
+            </React.Fragment>
+          )
+        })}
       </div>
       <div>
         <label className={labelCls}>Notes (optional)</label>
