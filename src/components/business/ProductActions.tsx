@@ -114,6 +114,7 @@ export default function ProductActions({
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onSelectionChange, onUnitChange, categoryId,
   productUnits: productUnitsProp, sellUnitId, extraDeliveryDays = 0, handlingDays = 2, is_active = true,
+  isCodAllowed,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
