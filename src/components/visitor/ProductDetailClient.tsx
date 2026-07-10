@@ -530,6 +530,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
           handlingDays={Number(product.handling_days ?? 2)}
+          isCodAllowed={product.is_cod_allowed ?? false}
           onVariantChange={handleVariantChange}
           onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
           productUnits={product.product_units ?? []}
