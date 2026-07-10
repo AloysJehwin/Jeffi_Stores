@@ -25,22 +25,25 @@ const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
 }
 
 const VALID_PAYMENT_TRANSITIONS: Record<string, string[]> = {
-  pending:  ['paid', 'failed'],
-  paid:     ['refunded'],
-  failed:   ['paid', 'pending'],
-  refunded: [],
+  pending:       ['paid', 'failed'],
+  unpaid:        ['paid', 'failed'],
+  paid:          ['refunded'],
+  failed:        ['paid', 'pending'],
+  refunded:      [],
+  cod_pending:   ['cod_collected', 'failed'],
+  cod_collected: ['paid', 'refunded'],
 }
 
 const PAYMENT_ALLOWED_FOR_STATUS: Record<string, string[]> = {
-  pending:          ['pending', 'failed'],
-  confirmed:        ['pending', 'paid', 'failed'],
-  processing:       ['paid'],
-  shipped:          ['paid'],
-  out_for_delivery: ['paid'],
-  delivered:        ['paid'],
-  cancel_requested: ['pending', 'paid', 'failed'],
-  cancel_rejected:  ['pending', 'paid', 'failed'],
-  cancelled:        ['pending', 'failed', 'refunded'],
+  pending:          ['pending', 'unpaid', 'cod_pending', 'failed'],
+  confirmed:        ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
+  processing:       ['paid', 'unpaid', 'cod_pending'],
+  shipped:          ['paid', 'cod_pending', 'cod_collected'],
+  out_for_delivery: ['paid', 'cod_pending', 'cod_collected'],
+  delivered:        ['paid', 'cod_collected'],
+  cancel_requested: ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
+  cancel_rejected:  ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
+  cancelled:        ['pending', 'unpaid', 'failed', 'refunded'],
 }
 
 const ALL_STATUS_OPTIONS = [
@@ -56,10 +59,13 @@ const ALL_STATUS_OPTIONS = [
 ]
 
 const ALL_PAYMENT_OPTIONS = [
-  { value: 'pending',  label: 'Pending' },
-  { value: 'paid',     label: 'Paid' },
-  { value: 'failed',   label: 'Failed' },
-  { value: 'refunded', label: 'Refunded' },
+  { value: 'pending',       label: 'Pending' },
+  { value: 'unpaid',        label: 'Unpaid' },
+  { value: 'paid',          label: 'Paid' },
+  { value: 'failed',        label: 'Failed' },
+  { value: 'refunded',      label: 'Refunded' },
+  { value: 'cod_pending',   label: 'COD Pending' },
+  { value: 'cod_collected', label: 'COD Collected' },
 ]
 
 export default function UpdateOrderStatus({ orderId, currentStatus, currentPaymentStatus }: UpdateOrderStatusProps) {
