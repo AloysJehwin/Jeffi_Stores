@@ -227,14 +227,14 @@ export async function getStockAtLocation(locationId: string): Promise<ShelfStock
     `SELECT ss.id, ss.location_id, ss.product_id, ss.variant_id, ss.sub_variant_id,
             CASE
               WHEN p.perishable OR p.serialized THEN
-                COALESCE((
+                COALESCE(NULLIF((
                   SELECT SUM(pb.quantity_remaining)
                   FROM product_batches pb
                   WHERE pb.product_id = ss.product_id
                     AND pb.location_id = ss.location_id
                     AND (pb.variant_id = ss.variant_id OR (pb.variant_id IS NULL AND ss.variant_id IS NULL))
                     AND (pb.sub_variant_id = ss.sub_variant_id OR (pb.sub_variant_id IS NULL AND ss.sub_variant_id IS NULL))
-                ), 0)::numeric
+                ), 0), ss.quantity)::numeric
               ELSE ss.quantity
             END AS quantity,
             ss.updated_at,
