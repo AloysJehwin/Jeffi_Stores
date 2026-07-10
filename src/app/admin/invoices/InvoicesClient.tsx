@@ -101,13 +101,15 @@ export default function InvoicesClient() {
   }, [searchParams])
 
   // open editor directly when ?edit=<id>&view=edit is in the URL (reload or direct link)
+  const editIdRef = useRef<string | null>(null)
   useEffect(() => {
     const editParam = searchParams.get('edit')
-    if (editParam && searchParams.get('view') === 'edit' && editId !== editParam) {
+    if (editParam && searchParams.get('view') === 'edit' && editIdRef.current !== editParam) {
+      editIdRef.current = editParam
       openEdit({ id: editParam, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams])
+  }, [searchParams.toString()])
 
   function navigateView(next: View, id?: string) {
     setViewState(next)
