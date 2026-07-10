@@ -84,7 +84,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual'>('razorpay')
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual' | 'cod'>(isRazorpayEnabled ? 'razorpay' : 'manual')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
@@ -382,6 +382,10 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   }, [isBusiness, user, isBuyNow, buyNowItem, cartCount])
 
   const finalTotal = Math.max(0, cartSubtotal - discountAmount - businessDiscountAmount + (shippingCharge ?? 0))
+
+  const codAvailable = isBuyNow
+    ? true
+    : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false)
 
   // Load Razorpay script when razorpay payment method is selected
   useEffect(() => {
@@ -1090,10 +1094,10 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                 />
               </div>
 
-              {/* Payment Method — only for orders ≥ ₹1,00,000 */}
-              {finalTotal >= 100000 && (
-                <div className="mb-4 space-y-2">
-                  <p className="text-sm font-medium text-foreground-secondary">Payment Method</p>
+              {/* Payment Method */}
+              <div className="mb-4 space-y-2">
+                <p className="text-sm font-medium text-foreground-secondary">Payment Method</p>
+                {isRazorpayEnabled && (
                   <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
                     <input type="radio" name="paymentMethod" value="razorpay" checked={paymentMethod === 'razorpay'} onChange={() => setPaymentMethod('razorpay')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
                     <div>
@@ -1101,20 +1105,29 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                       <p className="text-xs text-foreground-secondary">UPI, Cards, Net Banking</p>
                     </div>
                   </label>
-                  <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                    <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                )}
+                {codAvailable && (
+                  <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'cod' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
+                    <input type="radio" name="paymentMethod" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Request Manual Payment</p>
-                      <p className="text-xs text-foreground-secondary">Our team will contact you</p>
+                      <p className="text-sm font-semibold text-foreground">Cash on Delivery</p>
+                      <p className="text-xs text-foreground-secondary">Pay when your order arrives</p>
                     </div>
                   </label>
-                  {paymentMethod === 'manual' && (
-                    <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-xs text-blue-800 dark:text-blue-300">
-                      Our team will contact you to confirm your order and provide payment details.
-                    </div>
-                  )}
-                </div>
-              )}
+                )}
+                <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
+                  <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Request Manual Payment</p>
+                    <p className="text-xs text-foreground-secondary">Our team will contact you</p>
+                  </div>
+                </label>
+                {paymentMethod === 'manual' && (
+                  <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-xs text-blue-800 dark:text-blue-300">
+                    Our team will contact you to confirm your order and provide payment details.
+                  </div>
+                )}
+              </div>
 
               {submitError && (
                 <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-3 py-2 rounded-lg text-sm">
@@ -1162,6 +1175,13 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
                       </svg>
                       Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </>
+                  ) : paymentMethod === 'cod' ? (
+                    <>
+                      Place Order — Pay on Delivery
+                      <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
                     </>
                   ) : (
                     <>
