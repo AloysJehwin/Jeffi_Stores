@@ -332,11 +332,11 @@ export default function QuotationsClient() {
           const hasBatch = data.items && data.items.length > 0
           const hasSerial = data.serialized_items && data.serialized_items.length > 0
           if (hasBatch || hasSerial) {
-            // If any perishable item has less batch stock than required, skip assign step — server will draft
+            // Skip assign step if any item has insufficient stock — server will save as draft
             const anyShortBatch = hasBatch && data.items.some((i: BatchPickerItem) =>
               !i.already_assigned && i.batches.reduce((s: number, b: BatchOption) => s + b.quantity_remaining, 0) < i.required_qty
             )
-            if (!anyShortBatch) {
+            if (!anyShortBatch && !convertHasStockIssue) {
               setPendingConvertArgs({ quoteId, paymentMode, enableDelivery })
               if (hasBatch) {
                 setConvertBatchPickerItems(data.items)
