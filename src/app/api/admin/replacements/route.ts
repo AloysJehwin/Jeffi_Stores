@@ -12,41 +12,48 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url)
-    const status = searchParams.get('status') || 'active'
+    const status = searchParams.get('status') || 'all'
+    const historyFilter = searchParams.get('filter') || 'all'
 
-    let statusFilter = `o.status NOT IN ('returned', 'cancelled', 'return_rejected')`
-    if (status === 'delivered') statusFilter = `o.status = 'delivered'`
-    else if (status === 'all') statusFilter = `1=1`
+    let statusFilter = `rr.status NOT IN ('rejected', 'completed')`
+    if (status === 'pending_approval') statusFilter = `rr.status = 'pending_approval'`
+    else if (status === 'history') {
+      if (historyFilter === 'approved') statusFilter = `rr.status = 'completed'`
+      else if (historyFilter === 'rejected') statusFilter = `rr.status = 'rejected'`
+      else statusFilter = `rr.status IN ('completed', 'rejected')`
+    }
 
     const rows = await queryMany(
       `SELECT
-         o.id, o.order_number, o.status, o.payment_status,
-         o.total_amount, o.created_at, o.shipped_at, o.delivered_at,
-         o.awb_number, o.shipment_status,
-         o.customer_name, o.customer_email,
-         o.original_order_id,
-         orig.order_number AS original_order_number,
+         rr.id, rr.order_id, rr.type, rr.status, rr.reason, rr.description,
+         rr.admin_notes, rr.return_tracking_number, rr.rvp_awb_number, rr.rvp_created_at,
+         rr.received_at, rr.image_urls, rr.valuation_status, rr.valuation_condition,
+         rr.valuation_notes, rr.valuated_at, rr.created_at, rr.replacement_order_id,
+         o.order_number, o.customer_name, o.customer_email, o.total_amount,
          u.first_name, u.last_name, u.email AS user_email,
-         rr.id AS return_request_id, rr.type AS return_type, rr.reason,
+         repl.order_number AS replacement_order_number,
          COALESCE(
            (SELECT json_agg(json_build_object(
-             'id', oi.id,
-             'product_name', oi.product_name,
-             'variant_name', oi.variant_name,
-             'quantity', oi.quantity,
-             'unit_price', oi.unit_price,
-             'total_price', oi.total_price
-           ) ORDER BY oi.created_at)
-           FROM order_items oi WHERE oi.order_id = o.id),
+             'id', rri.id,
+             'order_item_id', rri.order_item_id,
+             'product_id', rri.product_id,
+             'variant_id', rri.variant_id,
+             'quantity', rri.quantity,
+             'unit_price', rri.unit_price,
+             'refund_amount', rri.refund_amount,
+             'product_name', rri.product_name,
+             'variant_name', rri.variant_name
+           ) ORDER BY rri.created_at)
+           FROM return_request_items rri WHERE rri.return_request_id = rr.id),
            '[]'::json
          ) AS items
-       FROM orders o
-       JOIN orders orig ON orig.id = o.original_order_id
-       LEFT JOIN users u ON u.id = o.user_id
-       LEFT JOIN return_requests rr ON rr.replacement_order_id = o.id
-       WHERE o.original_order_id IS NOT NULL
+       FROM return_requests rr
+       JOIN orders o ON o.id = rr.order_id
+       LEFT JOIN users u ON u.id = rr.user_id
+       LEFT JOIN orders repl ON repl.id = rr.replacement_order_id
+       WHERE rr.type = 'replacement'
          AND ${statusFilter}
-       ORDER BY o.created_at DESC`,
+       ORDER BY rr.created_at DESC`,
       []
     )
 
