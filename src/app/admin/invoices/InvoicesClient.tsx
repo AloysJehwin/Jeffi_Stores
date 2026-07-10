@@ -15,6 +15,7 @@ import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/Batch
 import SerialEntryModal, { type SerialItem, type SerialAssignment } from '@/components/admin/SerialEntryModal'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import DatePicker from '@/components/ui/DatePicker'
+import Toggle from '@/components/ui/Toggle'
 
 interface Invoice {
   id: string
@@ -158,6 +159,22 @@ export default function InvoicesClient() {
   const [postalCode, setPostalCode] = useState('')
   const [buyerGstin, setBuyerGstin] = useState('')
   const [paymentMode, setPaymentMode] = useState('cash')
+
+  // Buyer (Bill to) — separate from consignee
+  const [buyerSame, setBuyerSame] = useState(true)
+  const [buyerSearch, setBuyerSearch] = useState('')
+  const [buyerResults, setBuyerResults] = useState<any[]>([])
+  const [showBuyerDrop, setShowBuyerDrop] = useState(false)
+  const buyerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [buyerName, setBuyerName] = useState('')
+  const [buyerPhone, setBuyerPhone] = useState('')
+  const [buyerEmail, setBuyerEmail] = useState('')
+  const [buyerAddr1, setBuyerAddr1] = useState('')
+  const [buyerAddr2, setBuyerAddr2] = useState('')
+  const [buyerCity, setBuyerCity] = useState('')
+  const [buyerStateVal, setBuyerStateVal] = useState('')
+  const [buyerPostalCode, setBuyerPostalCode] = useState('')
+  const [buyerGstinBill, setBuyerGstinBill] = useState('')
 
   const [custSearch, setCustSearch] = useState('')
   const [custResults, setCustResults] = useState<any[]>([])
@@ -310,6 +327,31 @@ export default function InvoicesClient() {
     setCustSearch(''); setCustResults([]); setShowCustDrop(false)
   }
 
+  function searchBuyers(q: string) {
+    setBuyerSearch(q)
+    if (buyerTimer.current) clearTimeout(buyerTimer.current)
+    if (q.length < 2) { setBuyerResults([]); setShowBuyerDrop(false); return }
+    buyerTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setBuyerResults(data.results || [])
+      setShowBuyerDrop(true)
+    }, 300)
+  }
+
+  function selectBuyer(c: any) {
+    setBuyerName(c.addr_name || c.full_name || '')
+    setBuyerPhone((c.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10))
+    setBuyerEmail(c.email || '')
+    setBuyerAddr1(c.address_line1 || '')
+    setBuyerAddr2(c.address_line2 || '')
+    setBuyerCity(c.city || '')
+    setBuyerStateVal(c.state || '')
+    setBuyerPostalCode(c.postal_code || '')
+    setBuyerGstinBill(c.gst_number || '')
+    setBuyerSearch(''); setBuyerResults([]); setShowBuyerDrop(false)
+  }
+
   function resetForm() {
     setCustomerName(''); setCustomerPhone(''); setCustomerEmail('')
     setAddressLine1(''); setAddressLine2(''); setCity(''); setState(''); setPostalCode('')
@@ -318,6 +360,9 @@ export default function InvoicesClient() {
     setEditId(null)
     setEditIsDraft(false)
     setCustSearch(''); setCustResults([]); setShowCustDrop(false)
+    setBuyerSame(true); setBuyerSearch(''); setBuyerResults([]); setShowBuyerDrop(false)
+    setBuyerName(''); setBuyerPhone(''); setBuyerEmail('')
+    setBuyerAddr1(''); setBuyerAddr2(''); setBuyerCity(''); setBuyerStateVal(''); setBuyerPostalCode(''); setBuyerGstinBill('')
     setBatchAssignments({})
     setSerialAssignments([])
     setSerialPickerItems(null)
@@ -346,6 +391,24 @@ export default function InvoicesClient() {
       setCity(addr.city || '')
       setState(addr.state || '')
       setPostalCode(addr.postal_code || '')
+
+      const billAddr = order.billing_address || {}
+      const hasSeparateBilling = !!(billAddr.address_line1 && (
+        billAddr.address_line1 !== addr.address_line1 ||
+        billAddr.city !== addr.city
+      ))
+      setBuyerSame(!hasSeparateBilling)
+      if (hasSeparateBilling) {
+        setBuyerName(billAddr.full_name || order.customer_name || '')
+        setBuyerPhone('')
+        setBuyerEmail('')
+        setBuyerAddr1(billAddr.address_line1 || '')
+        setBuyerAddr2(billAddr.address_line2 || '')
+        setBuyerCity(billAddr.city || '')
+        setBuyerStateVal(billAddr.state || '')
+        setBuyerPostalCode(billAddr.postal_code || '')
+        setBuyerGstinBill(order.buyer_gstin || '')
+      }
 
       setItems(orderItems.length > 0 ? orderItems.map((it: any) => ({
         id: it.id || Math.random().toString(36).slice(2),
@@ -715,99 +778,15 @@ export default function InvoicesClient() {
 
         <form onSubmit={isEdit ? handleEdit : handleCreate} className="space-y-4">
 
-          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <h2 className="text-sm font-semibold text-foreground mb-3">Customer Details</h2>
-            <div className="relative mb-3">
-              <input
-                type="text" value={custSearch} onChange={e => searchCustomers(e.target.value)}
-                placeholder="Search existing customer…" className={inputCls}
-              />
-              {showCustDrop && custResults.length > 0 && (
-                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {custResults.map(c => (
-                    <button key={c.id} onClick={() => selectCustomer(c)}
-                      className="w-full text-left px-3 py-2 hover:bg-surface-secondary transition-colors">
-                      <p className="text-sm font-medium text-foreground">{c.company_name || c.full_name}</p>
-                      <p className="text-xs text-foreground-secondary">{c.city}, {c.state}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Customer Name <span className="text-red-500">*</span></label>
-                <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} required
-                  className={inputCls} placeholder="Full name" />
-              </div>
-              <div>
-                <label className={labelCls}>Buyer GSTIN</label>
-                <input type="text" value={buyerGstin} onChange={e => setBuyerGstin(e.target.value.toUpperCase())} maxLength={15}
-                  className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Phone &amp; Email</label>
-                <div className="flex gap-2">
-                  <div className="flex flex-1 min-w-0">
-                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
-                    <input type="tel" inputMode="numeric" maxLength={10} value={customerPhone}
-                      onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      onBlur={async () => {
-                        if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
-                        const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
-                        const json = await res.json()
-                        if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
-                          setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
-                        } else {
-                          setCreditWarning(null)
-                        }
-                      }}
-                      className={inputCls + ' rounded-l-none min-w-0'} placeholder="XXXXXXXXXX" />
-                  </div>
-                  <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
-                    className={inputCls + ' flex-1 min-w-0'} placeholder="customer@example.com" />
-                </div>
-              </div>
-              {isEdit && (
-                <div>
-                  <label className={labelCls}>Invoice Date</label>
-                  <DatePicker value={invoiceDate} onChange={setInvoiceDate} />
-                </div>
-              )}
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Address Line 1</label>
-                <input type="text" value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
-                  className={inputCls} placeholder="Street address" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Address Line 2</label>
-                <input type="text" value={addressLine2} onChange={e => setAddressLine2(e.target.value)}
-                  className={inputCls} placeholder="Apt, area, landmark" />
-              </div>
-              <div>
-                <label className={labelCls}>City</label>
-                <input type="text" value={city} onChange={e => setCity(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>State</label>
-                <input type="text" value={state} onChange={e => setState(e.target.value)}
-                  className={inputCls} placeholder="Tamil Nadu" />
-              </div>
-              <div>
-                <label className={labelCls}>Postal Code</label>
-                <input type="text" value={postalCode} onChange={e => setPostalCode(e.target.value)} className={inputCls} />
-              </div>
-            </div>
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} />
-          </div>
-
-
-          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <h2 className="text-sm font-semibold text-foreground mb-3">Payment &amp; Notes</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Col 1 — Invoice Details */}
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-col gap-3">
+              <h2 className="text-sm font-semibold text-foreground">Invoice Details</h2>
+              <div>
+                <label className={labelCls}>Invoice Date</label>
+                <DatePicker value={invoiceDate} onChange={setInvoiceDate} />
+              </div>
               <div>
                 <label className={labelCls}>Payment Mode</label>
                 <div className="grid grid-cols-2 gap-2 mt-1">
@@ -838,7 +817,180 @@ export default function InvoicesClient() {
                   className={inputCls + ' resize-none'} placeholder="Any additional notes..." />
               </div>
             </div>
+
+            {/* Col 2 — Consignee (Ship to) */}
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-col gap-3">
+              <h2 className="text-sm font-semibold text-foreground">Consignee <span className="text-foreground-muted font-normal">(Ship to)</span></h2>
+              <div className="relative">
+                <input
+                  type="text" value={custSearch} onChange={e => searchCustomers(e.target.value)}
+                  placeholder="Search existing customer…" className={inputCls}
+                />
+                {showCustDrop && custResults.length > 0 && (
+                  <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {custResults.map(c => (
+                      <button key={c.id} type="button" onClick={() => selectCustomer(c)}
+                        className="w-full text-left px-3 py-2 hover:bg-surface-secondary transition-colors">
+                        <p className="text-sm font-medium text-foreground">{c.company_name || c.full_name}</p>
+                        <p className="text-xs text-foreground-secondary">{c.city}, {c.state}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className={labelCls}>Name <span className="text-red-500">*</span></label>
+                <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} required
+                  className={inputCls} placeholder="Full name or company" />
+              </div>
+              <div>
+                <label className={labelCls}>Phone &amp; Email</label>
+                <div className="flex gap-2">
+                  <div className="flex flex-1 min-w-0">
+                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
+                    <input type="tel" inputMode="numeric" maxLength={10} value={customerPhone}
+                      onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onBlur={async () => {
+                        if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
+                        const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
+                        const json = await res.json()
+                        if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
+                          setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
+                        } else {
+                          setCreditWarning(null)
+                        }
+                      }}
+                      className={inputCls + ' rounded-l-none min-w-0'} placeholder="XXXXXXXXXX" />
+                  </div>
+                  <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
+                    className={inputCls + ' flex-1 min-w-0'} placeholder="email" />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Address Line 1</label>
+                <input type="text" value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
+                  className={inputCls} placeholder="Street address" />
+              </div>
+              <div>
+                <label className={labelCls}>Address Line 2</label>
+                <input type="text" value={addressLine2} onChange={e => setAddressLine2(e.target.value)}
+                  className={inputCls} placeholder="Apt, area, landmark" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={labelCls}>City <span className="text-red-500">*</span></label>
+                  <input type="text" value={city} onChange={e => setCity(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>State</label>
+                  <input type="text" value={state} onChange={e => setState(e.target.value)}
+                    className={inputCls} placeholder="Tamil Nadu" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={labelCls}>Postal Code</label>
+                  <input type="text" value={postalCode} onChange={e => setPostalCode(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>GSTIN</label>
+                  <input type="text" value={buyerGstin} onChange={e => setBuyerGstin(e.target.value.toUpperCase())} maxLength={15}
+                    className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
+                </div>
+              </div>
+            </div>
+
+            {/* Col 3 — Buyer (Bill to) */}
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-foreground">Buyer <span className="text-foreground-muted font-normal">(Bill to)</span></h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-foreground-secondary">Same as consignee</span>
+                  <Toggle checked={buyerSame} onChange={setBuyerSame} />
+                </div>
+              </div>
+              {!buyerSame && (
+                <>
+                  <div className="relative">
+                    <input
+                      type="text" value={buyerSearch} onChange={e => searchBuyers(e.target.value)}
+                      placeholder="Search buyer…" className={inputCls}
+                    />
+                    {showBuyerDrop && buyerResults.length > 0 && (
+                      <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {buyerResults.map(c => (
+                          <button key={c.id} type="button" onClick={() => selectBuyer(c)}
+                            className="w-full text-left px-3 py-2 hover:bg-surface-secondary transition-colors">
+                            <p className="text-sm font-medium text-foreground">{c.company_name || c.full_name}</p>
+                            <p className="text-xs text-foreground-secondary">{c.city}, {c.state}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className={labelCls}>Name</label>
+                    <input type="text" value={buyerName} onChange={e => setBuyerName(e.target.value)}
+                      className={inputCls} placeholder="Buyer name or company" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Phone &amp; Email</label>
+                    <div className="flex gap-2">
+                      <div className="flex flex-1 min-w-0">
+                        <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
+                        <input type="tel" inputMode="numeric" maxLength={10} value={buyerPhone}
+                          onChange={e => setBuyerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                          className={inputCls + ' rounded-l-none min-w-0'} placeholder="XXXXXXXXXX" />
+                      </div>
+                      <input type="email" value={buyerEmail} onChange={e => setBuyerEmail(e.target.value)}
+                        className={inputCls + ' flex-1 min-w-0'} placeholder="email" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Address Line 1</label>
+                    <input type="text" value={buyerAddr1} onChange={e => setBuyerAddr1(e.target.value)}
+                      className={inputCls} placeholder="Street address" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Address Line 2</label>
+                    <input type="text" value={buyerAddr2} onChange={e => setBuyerAddr2(e.target.value)}
+                      className={inputCls} placeholder="Apt, area, landmark" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelCls}>City</label>
+                      <input type="text" value={buyerCity} onChange={e => setBuyerCity(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>State</label>
+                      <input type="text" value={buyerStateVal} onChange={e => setBuyerStateVal(e.target.value)}
+                        className={inputCls} placeholder="Tamil Nadu" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelCls}>Postal Code</label>
+                      <input type="text" value={buyerPostalCode} onChange={e => setBuyerPostalCode(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>GSTIN</label>
+                      <input type="text" value={buyerGstinBill} onChange={e => setBuyerGstinBill(e.target.value.toUpperCase())} maxLength={15}
+                        className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
+                    </div>
+                  </div>
+                </>
+              )}
+              {buyerSame && (
+                <p className="text-xs text-foreground-muted">Billing address same as shipping address.</p>
+              )}
+            </div>
+
           </div>
+
+          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
+            <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} />
+          </div>
+
 
           <div className="flex gap-3 pb-6">
             <button type="submit" disabled={submitting}
