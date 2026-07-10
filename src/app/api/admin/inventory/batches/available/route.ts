@@ -148,6 +148,7 @@ export async function GET(request: NextRequest) {
         oi.quantity,
         oi.buy_unit,
         oi.batch_id,
+        oi.sold_unit_factor,
         COALESCE(oi.base_quantity, oi.quantity) AS base_quantity,
         p.perishable,
         p.serialized
@@ -162,7 +163,10 @@ export async function GET(request: NextRequest) {
     const serializedResult = []
 
     for (const item of items) {
-      const requiredQty = parseFloat(item.base_quantity)
+      const soldFactor = item.sold_unit_factor ? parseFloat(item.sold_unit_factor) : 1
+      const requiredQty = soldFactor > 1
+        ? parseFloat(item.quantity) * soldFactor
+        : parseFloat(item.base_quantity)
 
       if (item.serialized) {
         serializedResult.push({
