@@ -322,7 +322,6 @@ const STATUS_TABS = [
   { key: 'all', label: 'All active' },
   { key: 'pending_approval', label: 'Pending approval' },
   { key: 'approved', label: 'Approved' },
-  { key: 'received', label: 'Received' },
   { key: 'history', label: 'History' },
 ]
 
