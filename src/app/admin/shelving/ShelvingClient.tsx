@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Warehouse, ShelfLocation, ShelfStock,
@@ -36,11 +36,35 @@ export default function ShelvingClient() {
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [locations, setLocations] = useState<ShelfLocation[]>([])
   const [stock, setStock] = useState<ShelfStock[]>([])
-  const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null)
-  const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
-  const [selectedAisle, setSelectedAisle] = useState<string | null>(null)
-  const [selectedRack, setSelectedRack] = useState<string | null>(null)
+  const [selectedWarehouse, setSelectedWarehouseState] = useState<string | null>(searchParams.get('wh'))
+  const [selectedLocation, setSelectedLocationState] = useState<string | null>(searchParams.get('loc'))
+  const [selectedAisle, setSelectedAisleState] = useState<string | null>(searchParams.get('aisle'))
+  const [selectedRack, setSelectedRackState] = useState<string | null>(searchParams.get('rack'))
   const [selectedShelf, setSelectedShelf] = useState<string | null>(null)
+
+  function pushParams(updates: Record<string, string | null>) {
+    const params = new URLSearchParams(searchParams.toString())
+    for (const [k, v] of Object.entries(updates)) {
+      if (v) params.set(k, v); else params.delete(k)
+    }
+    router.replace(ap(`/admin/shelving?${params.toString()}`), { scroll: false })
+  }
+  function setSelectedWarehouse(id: string | null) {
+    setSelectedWarehouseState(id)
+    pushParams({ wh: id, aisle: null, rack: null, loc: null })
+  }
+  function setSelectedAisle(a: string | null) {
+    setSelectedAisleState(a)
+    pushParams({ aisle: a, rack: null, loc: null })
+  }
+  function setSelectedRack(r: string | null) {
+    setSelectedRackState(r)
+    pushParams({ rack: r, loc: null })
+  }
+  function setSelectedLocation(id: string | null) {
+    setSelectedLocationState(id)
+    pushParams({ loc: id })
+  }
 
   const [showWarehouseForm, setShowWarehouseForm] = useState(false)
   const [editWarehouse, setEditWarehouse] = useState<Warehouse | null>(null)
@@ -88,11 +112,19 @@ export default function ShelvingClient() {
   }, [])
 
   useEffect(() => { loadWarehouses().finally(() => setLoading(false)) }, [loadWarehouses])
+  const warehouseMountRef = useRef(true)
   useEffect(() => {
     if (selectedWarehouse) {
-      loadLocations(selectedWarehouse)
-      setSelectedLocation(null)
-      setSelectedAisle(null); setSelectedRack(null); setSelectedShelf(null)
+      if (warehouseMountRef.current) {
+        // Initial mount: load locations but keep URL-restored aisle/rack/loc
+        warehouseMountRef.current = false
+        loadLocations(selectedWarehouse)
+      } else {
+        // User switched warehouse: reset drill-down
+        setSelectedLocationState(null)
+        setSelectedAisleState(null); setSelectedRackState(null); setSelectedShelf(null)
+        loadLocations(selectedWarehouse)
+      }
     } else setLocations([])
   }, [selectedWarehouse, loadLocations])
   useEffect(() => { if (selectedLocation) loadStock(selectedLocation); else setStock([]) }, [selectedLocation, loadStock])
