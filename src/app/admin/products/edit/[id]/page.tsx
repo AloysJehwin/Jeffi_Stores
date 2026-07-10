@@ -267,7 +267,7 @@ async function updateProduct(productId: string, formData: FormData) {
     params.push(ageMin, ageMax, targetGender, targetAudience)
 
     params.push(productId)
-    const prevRow = await queryOne<{ perishable: boolean }>('SELECT perishable FROM products WHERE id = $1', [productId])
+    const prevRow = await queryOne<{ perishable: boolean; serialized: boolean }>('SELECT perishable, serialized FROM products WHERE id = $1', [productId])
     await query(
       `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
       params
@@ -280,8 +280,68 @@ async function updateProduct(productId: string, formData: FormData) {
       )
       const converted = parseFloat(batchSum?.total ?? '0') || 0
       await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
-      await query('DELETE FROM shelf_stock WHERE product_id = $1', [productId])
       await query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [converted, productId])
+      // Keep shelf_stock rows — update total quantity across locations to match converted qty
+      const shelfRows = await queryOne<{ cnt: string }>(
+        `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`, [productId]
+      )
+      const shelfCount = parseInt(shelfRows?.cnt ?? '0') || 0
+      if (shelfCount === 1) {
+        await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [converted, productId])
+      } else if (shelfCount > 1) {
+        // Distribute proportionally; zero out if converted is 0
+        await query(
+          `UPDATE shelf_stock SET quantity = CASE WHEN $1::numeric = 0 THEN 0
+             ELSE ROUND(quantity / NULLIF((SELECT SUM(quantity) FROM shelf_stock WHERE product_id = $2), 0) * $1::numeric, 4)
+           END, updated_at = now() WHERE product_id = $2`,
+          [converted, productId]
+        )
+      }
+    }
+    // If serialized was toggled OFF, count in-stock serials → set as inventory_quantity, clean up serials + batches + shelf_stock
+    if (prevRow?.serialized && !serialized) {
+      const serialCount = await queryOne<{ total: string }>(
+        `SELECT COUNT(*)::text AS total FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`,
+        [productId]
+      )
+      const converted = parseInt(serialCount?.total ?? '0') || 0
+      await query(`DELETE FROM product_serials WHERE product_id = $1`, [productId])
+      // Only delete batches if NOT still perishable (perishable cleanup above handles that case)
+      if (!perishable) {
+        await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
+        // Keep shelf_stock — update qty to match converted count
+        const shelfRows = await queryOne<{ cnt: string }>(
+          `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`, [productId]
+        )
+        const shelfCount = parseInt(shelfRows?.cnt ?? '0') || 0
+        if (shelfCount === 1) {
+          await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [converted, productId])
+        } else if (shelfCount > 1) {
+          await query(
+            `UPDATE shelf_stock SET quantity = CASE WHEN $1::numeric = 0 THEN 0
+               ELSE ROUND(quantity / NULLIF((SELECT SUM(quantity) FROM shelf_stock WHERE product_id = $2), 0) * $1::numeric, 4)
+             END, updated_at = now() WHERE product_id = $2`,
+            [converted, productId]
+          )
+        }
+      }
+      await query(
+        `UPDATE products SET inventory_quantity = $1 WHERE id = $2`,
+        [converted, productId]
+      )
+      // Also update variant inventory_quantity if product has variants
+      await query(
+        `UPDATE product_variants pv
+         SET inventory_quantity = sub.cnt
+         FROM (
+           SELECT variant_id, COUNT(*)::numeric AS cnt
+           FROM product_serials
+           WHERE product_id = $1 AND status = 'in_stock'
+           GROUP BY variant_id
+         ) sub
+         WHERE pv.id = sub.variant_id`,
+        [productId]
+      )
     }
 
     if (imageCount > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
