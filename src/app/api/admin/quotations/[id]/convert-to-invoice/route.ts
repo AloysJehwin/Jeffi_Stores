@@ -161,6 +161,7 @@ export async function POST(
       const sellUnit = item.buy_unit || item.unit || null
 
       return {
+        id: item.id,
         product_id: item.product_id || null,
         product_name: item.description,
         product_sku: '',
