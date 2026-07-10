@@ -222,10 +222,10 @@ export default function ShelvingClient() {
       ) : (
         <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
           {/* Chip bar */}
-          <div className="shrink-0 bg-surface border-b border-border-default px-4 sm:px-6 py-3 space-y-2.5">
+          <div className="shrink-0 bg-surface border-b border-border-default px-4 sm:px-6 pt-8 pb-3 space-y-2.5 overflow-visible">
             {/* Warehouse chips */}
-            <div className="flex items-start gap-2 flex-wrap">
-              <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 mt-1.5">Warehouse</span>
+            <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
+              <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0">Warehouse</span>
               <div className="flex items-center gap-1.5 flex-wrap flex-1">
                 {loading ? (
                   <div className="flex gap-1.5">
@@ -258,8 +258,8 @@ export default function ShelvingClient() {
             </div>
 
             {/* Location chips */}
-            <div className="flex items-start gap-2 flex-wrap">
-              <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 mt-1.5">Location</span>
+            <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
+              <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0">Location</span>
               <div className="flex items-center gap-1.5 flex-wrap flex-1">
                 {!selectedWarehouse ? (
                   <span className="text-xs text-foreground-muted italic">Select a warehouse first</span>
@@ -430,10 +430,10 @@ function WarehouseChip({ warehouse, selected, onSelect, onEdit, onDelete }: {
   onSelect: () => void; onEdit: () => void; onDelete: () => void
 }) {
   return (
-    <div className="group relative flex items-center h-7 rounded-full overflow-hidden">
+    <div className="group relative inline-flex items-center">
       <button
         onClick={onSelect}
-        className={`flex items-center gap-1.5 h-full pl-2 pr-2 text-xs font-medium transition-colors ${
+        className={`flex items-center gap-1.5 h-7 pl-2 pr-2.5 rounded-full text-xs font-medium transition-colors ${
           selected
             ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900'
             : 'bg-surface-secondary border border-border-default text-foreground hover:bg-secondary-50 dark:hover:bg-secondary-900/20 hover:border-secondary-300 dark:hover:border-secondary-700'
@@ -447,14 +447,14 @@ function WarehouseChip({ warehouse, selected, onSelect, onEdit, onDelete }: {
           <span className={`text-[9px] px-1 py-0.5 rounded-full ${selected ? 'bg-white/20 text-inherit' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'}`}>off</span>
         )}
       </button>
-      {/* Edit/delete — appear on hover */}
-      <div className="hidden group-hover:flex items-center bg-surface border border-border-default border-l-0 h-full rounded-r-full overflow-hidden divide-x divide-border-default">
+      {/* Action buttons — float above chip on hover */}
+      <div className="hidden group-hover:flex absolute -top-7 left-0 z-20 items-center gap-0.5 bg-surface border border-border-default rounded-md shadow-sm px-0.5 py-0.5">
         <button onClick={e => { e.stopPropagation(); onEdit() }}
-          className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-secondary-500 hover:bg-secondary-50 dark:hover:bg-secondary-900/20 transition-colors">
+          className="flex items-center justify-center w-5 h-5 rounded hover:bg-secondary-50 dark:hover:bg-secondary-900/20 text-foreground-muted hover:text-secondary-500 transition-colors">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
         </button>
         <button onClick={e => { e.stopPropagation(); onDelete() }}
-          className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+          className="flex items-center justify-center w-5 h-5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-500 transition-colors">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
         </button>
       </div>
@@ -467,10 +467,10 @@ function LocationChip({ location, selected, onSelect, onEdit, onDelete, onLabel 
   onSelect: () => void; onEdit: () => void; onDelete: () => void; onLabel: () => void
 }) {
   return (
-    <div className="group relative flex items-center h-7 rounded-full overflow-hidden">
+    <div className="group relative inline-flex items-center">
       <button
         onClick={onSelect}
-        className={`flex items-center gap-1.5 h-full pl-2.5 pr-2.5 text-xs font-mono font-medium transition-colors ${
+        className={`flex items-center gap-1.5 h-7 pl-2.5 pr-2.5 rounded-full text-xs font-mono font-medium transition-colors ${
           selected
             ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900'
             : 'bg-surface-secondary border border-border-default text-foreground hover:bg-secondary-50 dark:hover:bg-secondary-900/20 hover:border-secondary-300 dark:hover:border-secondary-700'
@@ -483,22 +483,22 @@ function LocationChip({ location, selected, onSelect, onEdit, onDelete, onLabel 
           </span>
         )}
       </button>
-      {/* Edit/delete/label — appear on hover */}
-      <div className="hidden group-hover:flex items-center bg-surface border border-border-default border-l-0 h-full rounded-r-full overflow-hidden divide-x divide-border-default">
+      {/* Action buttons — float above chip on hover */}
+      <div className="hidden group-hover:flex absolute -top-7 left-0 z-20 items-center gap-0.5 bg-surface border border-border-default rounded-md shadow-sm px-0.5 py-0.5">
         <button onClick={e => { e.stopPropagation(); onLabel() }}
           title="Print label"
-          className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-secondary-500 hover:bg-secondary-50 dark:hover:bg-secondary-900/20 transition-colors">
+          className="flex items-center justify-center w-5 h-5 rounded hover:bg-secondary-50 dark:hover:bg-secondary-900/20 text-foreground-muted hover:text-secondary-500 transition-colors">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5l4.586 4.586a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-4-4a2 2 0 010-2.828L7 3z" /></svg>
         </button>
         {!location.is_open_shelf && (
           <button onClick={e => { e.stopPropagation(); onEdit() }}
-            className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-secondary-500 hover:bg-secondary-50 dark:hover:bg-secondary-900/20 transition-colors">
+            className="flex items-center justify-center w-5 h-5 rounded hover:bg-secondary-50 dark:hover:bg-secondary-900/20 text-foreground-muted hover:text-secondary-500 transition-colors">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
           </button>
         )}
         {!location.is_open_shelf && (
           <button onClick={e => { e.stopPropagation(); onDelete() }}
-            className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+            className="flex items-center justify-center w-5 h-5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-500 transition-colors">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           </button>
         )}
