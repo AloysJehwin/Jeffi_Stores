@@ -26,7 +26,22 @@ export async function GET(request: NextRequest) {
          rr.received_at, rr.image_urls, rr.valuation_status, rr.valuation_condition,
          rr.valuation_notes, rr.valuated_at, rr.created_at,
          o.order_number, o.customer_name, o.customer_email, o.total_amount,
-         u.first_name, u.last_name, u.email AS user_email
+         u.first_name, u.last_name, u.email AS user_email,
+         COALESCE(
+           (SELECT json_agg(json_build_object(
+             'id', rri.id,
+             'order_item_id', rri.order_item_id,
+             'product_id', rri.product_id,
+             'variant_id', rri.variant_id,
+             'quantity', rri.quantity,
+             'unit_price', rri.unit_price,
+             'refund_amount', rri.refund_amount,
+             'product_name', rri.product_name,
+             'variant_name', rri.variant_name
+           ) ORDER BY rri.created_at)
+           FROM return_request_items rri WHERE rri.return_request_id = rr.id),
+           '[]'::json
+         ) AS items
        FROM return_requests rr
        JOIN orders o ON o.id = rr.order_id
        LEFT JOIN users u ON u.id = rr.user_id

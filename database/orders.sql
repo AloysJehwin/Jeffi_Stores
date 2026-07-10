@@ -214,3 +214,22 @@ ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuation_condition charact
 ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuation_notes text DEFAULT NULL;
 ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuated_at timestamp with time zone DEFAULT NULL;
 
+CREATE TABLE IF NOT EXISTS public.return_request_items (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    return_request_id uuid NOT NULL,
+    order_item_id uuid NOT NULL,
+    product_id uuid,
+    variant_id uuid,
+    quantity numeric(10,3) NOT NULL,
+    unit_price numeric(12,2) NOT NULL,
+    refund_amount numeric(12,2) NOT NULL,
+    product_name character varying(255),
+    variant_name character varying(255),
+    created_at timestamp with time zone DEFAULT now(),
+    CONSTRAINT return_request_items_pkey PRIMARY KEY (id),
+    CONSTRAINT return_request_items_return_request_id_fkey FOREIGN KEY (return_request_id) REFERENCES return_requests(id) ON DELETE CASCADE,
+    CONSTRAINT return_request_items_order_item_id_fkey FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_return_request_items_return_request_id ON public.return_request_items(return_request_id);
+CREATE INDEX IF NOT EXISTS idx_return_request_items_order_item_id ON public.return_request_items(order_item_id);
+
