@@ -593,3 +593,32 @@ export async function moveStock(
     client.release()
   }
 }
+
+// Decrement shelf_stock for a non-perishable/non-serialized product after a sale.
+// Pass an active transaction client, or null to open its own connection.
+export async function decrementNonPerishableShelfStock(
+  txClient: any | null,
+  productId: string,
+  variantId: string | null,
+  subVariantId: string | null,
+  qty: number
+): Promise<void> {
+  if (qty <= 0) return
+  const run = async (c: any) => {
+    await c.query(
+      `UPDATE shelf_stock
+       SET quantity = GREATEST(0, quantity - $1), updated_at = now()
+       WHERE product_id = $2
+         AND (variant_id = $3 OR ($3 IS NULL AND variant_id IS NULL))
+         AND (sub_variant_id = $4 OR ($4 IS NULL AND sub_variant_id IS NULL))`,
+      [qty, productId, variantId, subVariantId]
+    )
+  }
+  if (txClient) {
+    await run(txClient)
+  } else {
+    const { getClient } = await import('@/lib/db')
+    const c = await getClient()
+    try { await run(c) } finally { c.release() }
+  }
+}

@@ -5,6 +5,7 @@ import { withTransaction, queryMany } from '@/lib/db'
 import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, round2 } from '@/lib/gst'
 import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
+import { decrementNonPerishableShelfStock, syncPerishableStock } from '@/lib/shelf'
 import { z } from 'zod'
 import { parseBody } from '@/lib/validate'
 
@@ -272,6 +273,23 @@ export async function POST(request: NextRequest) {
           referenceId: saleId,
           currentStock: stockBefore,
         })
+      }
+
+      // Sync shelf for perishable and decrement for non-perishable
+      for (const item of processedItems) {
+        if (!item.product_id) continue
+        const perishRow = await client.query<{ perishable: boolean; serialized: boolean }>(
+          'SELECT perishable, serialized FROM products WHERE id = $1', [item.product_id]
+        )
+        if (perishRow.rows[0]?.perishable || perishRow.rows[0]?.serialized) {
+          await syncPerishableStock(client, item.product_id, item.variant_id || null, item.sub_variant_id || null)
+        } else {
+          const unitInfo = unitFactorMap.get(`${item.product_id}:${item.variant_id ?? ''}:${item.buy_unit}`)
+          const baseQty = (unitInfo?.dimension === 'count' && unitInfo.factor > 1)
+            ? item.quantity * unitInfo.factor
+            : item.quantity
+          await decrementNonPerishableShelfStock(client, item.product_id, item.variant_id || null, item.sub_variant_id || null, baseQty)
+        }
       }
 
       return { invoiceNumber, saleId, saleNumber }

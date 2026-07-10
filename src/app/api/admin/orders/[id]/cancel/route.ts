@@ -3,7 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction } from '@/lib/db'
 import { logStockMovement } from '@/lib/inventory'
-import { syncPerishableStock } from '@/lib/shelf'
+import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/shelf'
 
 export async function POST(
   request: NextRequest,
@@ -146,6 +146,36 @@ export async function POST(
         if (synced.has(key)) continue
         synced.add(key)
         await syncPerishableStock(client, item.product_id, item.variant_id || null, item.sub_variant_id || null)
+      }
+
+      // Restore shelf_stock for non-perishable products (add back the cancelled quantity)
+      for (const item of itemsResult.rows) {
+        if (!item.product_id) continue
+        const perishRow = await client.query<{ perishable: boolean; serialized: boolean }>(
+          'SELECT perishable, serialized FROM products WHERE id = $1', [item.product_id]
+        )
+        if (perishRow.rows[0]?.perishable || perishRow.rows[0]?.serialized) continue
+        const unitRow = await client.query<{ factor: string; dimension: string }>(
+          `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                  COALESCE(puv.dimension, pup.dimension) AS dimension
+           FROM (SELECT 1) x
+           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+          [item.buy_unit, item.product_id, item.variant_id || null]
+        )
+        const u = unitRow.rows[0]
+        const baseQty = (u?.dimension === 'count' && u?.factor)
+          ? parseFloat(item.quantity) * parseFloat(u.factor)
+          : parseFloat(item.quantity)
+        // Add back to shelf_stock (cap at inventory_quantity to avoid over-restore)
+        await client.query(
+          `UPDATE shelf_stock
+           SET quantity = quantity + $1, updated_at = now()
+           WHERE product_id = $2
+             AND (variant_id = $3 OR ($3 IS NULL AND variant_id IS NULL))
+             AND (sub_variant_id = $4 OR ($4 IS NULL AND sub_variant_id IS NULL))`,
+          [baseQty, item.product_id, item.variant_id || null, item.sub_variant_id || null]
+        )
       }
 
       await client.query(
