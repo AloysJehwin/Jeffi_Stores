@@ -212,7 +212,7 @@ export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+    <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/50">
       <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-lg max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <div>
