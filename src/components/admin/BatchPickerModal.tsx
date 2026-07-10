@@ -116,8 +116,8 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
   })
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
-      <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-2xl max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-[500] flex items-center justify-center bg-black/50">
+      <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-4xl max-h-[90vh] flex flex-col">
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">Assign Batches</h2>
