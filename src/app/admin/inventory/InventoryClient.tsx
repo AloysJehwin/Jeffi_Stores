@@ -1508,21 +1508,23 @@ function StockTab() {
                           {expanded && productSubGroups.map(pg => {
                             const pgTotalChange = Math.round(pg.txs.reduce((s, t) => s + Number(t.quantity_change), 0) * 1000) / 1000
                             const isSerialPg = pg.txs.length > 1 && pg.txs.every(t => t.serial_number)
+                            const isBatchPg = !isSerialPg && pg.txs.length > 1 && pg.txs.some(t => t.lot_number || t.batch_id)
+                            const isExpandable = isSerialPg || isBatchPg
                             const serialKey = `${group.refId}::${pg.key}`
                             const serialExpanded = expandedSerialProducts.has(serialKey)
                             const repTx = pg.txs[pg.txs.length - 1] // last tx has final balance
 
                             return (
                               <React.Fragment key={`pg-${pg.key}`}>
-                                {/* Product row — clickable only if it has serial sub-rows */}
+                                {/* Product row — clickable if it has serial or batch sub-rows */}
                                 <tr
-                                  className={`bg-surface/40 transition-colors border-l-2 border-accent-500/30 ${isSerialPg ? 'cursor-pointer hover:bg-surface-secondary/30 select-none' : 'hover:bg-surface-secondary/20'}`}
-                                  onClick={isSerialPg ? () => toggleSerialProduct(serialKey) : undefined}
+                                  className={`bg-surface/40 transition-colors border-l-2 border-accent-500/30 ${isExpandable ? 'cursor-pointer hover:bg-surface-secondary/30 select-none' : 'hover:bg-surface-secondary/20'}`}
+                                  onClick={isExpandable ? () => toggleSerialProduct(serialKey) : undefined}
                                 >
                                   <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8" />
                                   <td className="px-4 py-2.5 pl-8 text-foreground">
                                     <div className="flex items-center gap-2">
-                                      {isSerialPg && (
+                                      {isExpandable && (
                                         <svg className={`w-3 h-3 text-foreground-secondary shrink-0 transition-transform ${serialExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                         </svg>
@@ -1533,22 +1535,25 @@ function StockTab() {
                                         </Link>
                                         {repTx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{repTx.product_sku}</p>}
                                         {isSerialPg && <p className="text-xs text-foreground-muted mt-0.5">{pg.txs.length} serials · {serialExpanded ? 'collapse' : 'expand'}</p>}
+                                        {isBatchPg && <p className="text-xs text-foreground-muted mt-0.5">{pg.txs.length} batches · {serialExpanded ? 'collapse' : 'expand'}</p>}
                                       </div>
                                     </div>
                                   </td>
                                   <td className="px-4 py-2.5" />
                                   <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${pgTotalChange > 0 ? 'text-green-600 dark:text-green-400' : pgTotalChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
                                     {fmtChange(pgTotalChange)}
-                                    {isSerialPg && <span className="block text-xs font-normal text-foreground-muted">net total</span>}
+                                    {isExpandable && <span className="block text-xs font-normal text-foreground-muted">net total</span>}
                                   </td>
                                   <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">
-                                    {isSerialPg ? '—' : Number(repTx.quantity_after)}
+                                    {isExpandable ? '—' : Number(repTx.quantity_after)}
                                   </td>
                                   <td className="px-4 py-2.5 text-xs hidden md:table-cell" />
                                   <td className="px-4 py-2.5 text-xs hidden md:table-cell">
                                     {isSerialPg
                                       ? <span className="font-mono text-xs text-foreground-secondary">{pg.txs.slice(0, 2).map(t => t.serial_number).join(', ')}{pg.txs.length > 2 ? ` (+${pg.txs.length - 2} more)` : ''}</span>
-                                      : <BatchCell tx={repTx} />
+                                      : isBatchPg
+                                        ? <span className="font-mono text-xs text-foreground-secondary">{pg.txs.slice(0, 2).map(t => t.lot_number).filter(Boolean).join(', ')}{pg.txs.length > 2 ? ` (+${pg.txs.length - 2} more)` : ''}</span>
+                                        : <BatchCell tx={repTx} />
                                     }
                                   </td>
                                 </tr>
@@ -1562,6 +1567,31 @@ function StockTab() {
                                       <td className="px-4 py-2 pl-14 text-foreground">
                                         <span className="font-mono text-xs text-foreground-secondary">{tx.serial_number}</span>
                                         {tx.lot_number && <span className="block font-mono text-xs text-foreground-muted">{tx.lot_number}</span>}
+                                      </td>
+                                      <td className="px-4 py-2" />
+                                      <td className={`px-4 py-2 text-right font-mono text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>{fmtChange(chg)}</td>
+                                      <td className="px-4 py-2 text-right font-mono text-foreground text-sm">{Number(tx.quantity_after)}</td>
+                                      <td className="px-4 py-2 hidden md:table-cell" />
+                                      <td className="px-4 py-2 text-xs hidden md:table-cell">
+                                        {tx.expiry_date && (() => {
+                                          const d = new Date(tx.expiry_date); const now = new Date()
+                                          const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                                          const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                          return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                                        })()}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+
+                                {/* Level-3: individual batch/lot rows */}
+                                {isBatchPg && serialExpanded && pg.txs.map(tx => {
+                                  const chg = Number(tx.quantity_change)
+                                  return (
+                                    <tr key={tx.id} className="bg-surface/20 hover:bg-surface-secondary/20 transition-colors border-l-4 border-accent-500/20">
+                                      <td className="px-4 py-2 text-foreground-secondary whitespace-nowrap text-xs pl-14" />
+                                      <td className="px-4 py-2 pl-14 text-foreground">
+                                        <span className="font-mono text-xs text-foreground-secondary">{tx.lot_number || '—'}</span>
                                       </td>
                                       <td className="px-4 py-2" />
                                       <td className={`px-4 py-2 text-right font-mono text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>{fmtChange(chg)}</td>
