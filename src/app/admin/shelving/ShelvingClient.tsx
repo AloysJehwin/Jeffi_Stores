@@ -341,7 +341,7 @@ export default function ShelvingClient() {
                           {openShelf && (
                             <LocationChip
                               location={openShelf} selected={selectedLocation === openShelf.id}
-                              onSelect={() => { setSelectedLocation(selectedLocation === openShelf.id ? null : openShelf.id); setShowLocationForm(false); setShowAssignStock(false) }}
+                              onSelect={() => { setSelectedLocation(selectedLocation === openShelf.id ? null : openShelf.id); setSelectedAisle(null); setSelectedRack(null); setShowLocationForm(false); setShowAssignStock(false) }}
                               onEdit={() => { setEditLocation(openShelf); setShowLocationForm(true); setShowWarehouseForm(false) }}
                               onDelete={() => deleteLocation(openShelf.id)}
                               onLabel={() => downloadSyntheticLabel(openShelf.display_code, activeWarehouse?.name || '', `shelf-label-${openShelf.display_code}.pdf`)}
