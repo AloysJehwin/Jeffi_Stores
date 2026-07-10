@@ -280,6 +280,11 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [brandPartNumber, setBrandPartNumber] = useState(product?.brand_part_number || '')
   const [countryOfOrigin, setCountryOfOrigin] = useState(product?.country_of_origin || '')
   const [shelfLifeDays, setShelfLifeDays] = useState(product?.shelf_life_days != null ? String(product.shelf_life_days) : '')
+  // Technical Specs
+  const [grade, setGrade] = useState(product?.grade || '')
+  const [specifications, setSpecifications] = useState<{key: string, value: string}[]>(
+    product?.specifications ? Object.entries(product.specifications as Record<string, string>).map(([key, value]) => ({ key, value })) : []
+  )
   // Physical Attributes
   const [color, setColor] = useState(product?.color || '')
   const [colorHex, setColorHex] = useState(product?.color_hex || '#000000')
@@ -291,9 +296,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [perishable, setPerishable] = useState(product?.perishable ?? false)
   const [confirmUnperishable, setConfirmUnperishable] = useState(false)
   const [serialized, setSerialized] = useState(product?.serialized ?? false)
-  // Bootstrap modal state
-  const [showBootstrapModal, setShowBootstrapModal] = useState(false)
-  const [bootstrapSaving, setBootstrapSaving] = useState(false)
+  const [confirmUnSerialized, setConfirmUnSerialized] = useState(false)
+  // Bootstrap inline section state
   const [bootstrapError, setBootstrapError] = useState<string | null>(null)
   const [bsExpiryDate, setBsExpiryDate] = useState('')
   const [bsManufactureDate, setBsManufactureDate] = useState('')
@@ -301,13 +305,6 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [bsLocationId, setBsLocationId] = useState('')
   const [bsSerials, setBsSerials] = useState<string[]>([])
   const [bsShelfLocations, setBsShelfLocations] = useState<{id:string;display_code:string}[]>([])
-  const pendingBootstrapRef = useRef<null | 'skip' | {
-    lot_number: string | null
-    manufacture_date: string | null
-    expiry_date: string | null
-    location_id: string | null
-    serial_numbers?: string[]
-  }>(null)
   // Certifications & Standards
   const [certifications, setCertifications] = useState(Array.isArray(product?.certifications) ? product.certifications.join(', ') : '')
   const [complianceStandard, setComplianceStandard] = useState(product?.compliance_standard || '')
@@ -317,14 +314,13 @@ export default function ProductForm({ categories, brands, action, product, produ
   // Condition & Lifecycle
   const [condition, setCondition] = useState(product?.condition || 'new')
   const [isCodAllowed, setIsCodAllowed] = useState(product?.is_cod_allowed ?? false)
-  const [launchDate, setLaunchDate] = useState(product?.launch_date ? String(product.launch_date).slice(0, 10) : '')
-  const [discontinueDate, setDiscontinueDate] = useState(product?.discontinue_date ? String(product.discontinue_date).slice(0, 10) : '')
+  const [launchDate, setLaunchDate] = useState(product?.launch_date ? new Date(product.launch_date).toISOString().slice(0, 10) : '')
+  const [discontinueDate, setDiscontinueDate] = useState(product?.discontinue_date ? new Date(product.discontinue_date).toISOString().slice(0, 10) : '')
   const [sortOrderVal, setSortOrderVal] = useState(product?.sort_order != null ? String(product.sort_order) : '0')
   // Shipping & Logistics
   const [handlingDays, setHandlingDays] = useState(product?.handling_days != null ? String(product.handling_days) : '2')
   const [shippingClass, setShippingClass] = useState(product?.shipping_class || 'standard')
   const [isOversized, setIsOversized] = useState(product?.is_oversized ?? false)
-  const [volumetricWeightGrams, setVolumetricWeightGrams] = useState(product?.volumetric_weight_grams != null ? String(product.volumetric_weight_grams) : '')
   // Digital / Content
   const [isDigital, setIsDigital] = useState(product?.is_digital ?? false)
   const [downloadUrl, setDownloadUrl] = useState(product?.download_url || '')
@@ -349,7 +345,6 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [seoExpanded, setSeoExpanded] = useState(false)
   const [metaTitle, setMetaTitle] = useState(product?.meta_title || '')
   const [metaDescription, setMetaDescription] = useState(product?.meta_description || '')
-  const [metaKeywords, setMetaKeywords] = useState(Array.isArray(product?.meta_keywords) ? product.meta_keywords.join(', ') : '')
   const [isSearchable, setIsSearchable] = useState(product?.is_searchable ?? true)
   // Tax & Finance
   const [taxClass, setTaxClass] = useState(product?.tax_class || 'standard')
@@ -524,6 +519,46 @@ export default function ProductForm({ categories, brands, action, product, produ
     topPriceLockSide, topMrpLockSide,
     gstRate, isActive, draftKey,
   ])
+
+  const wasPerishableOff = !(product?.perishable)
+  const wasSerializedOff = !(product?.serialized)
+  const _bsActiveVariant = product?.has_variants && Array.isArray(product?.product_variants)
+    ? product.product_variants.find((v: any) => !v._isDeleted && parseFloat(v.inventory_quantity) > 0) ?? null
+    : null
+  const _bsVariantId: string | null = _bsActiveVariant?.id ?? null
+  const _bsStockQty = _bsActiveVariant
+    ? parseFloat(_bsActiveVariant.inventory_quantity) || 0
+    : (parseFloat(product?.inventory_quantity ?? '0') || 0)
+  const showBootstrap = _bsStockQty > 0 && (
+    (perishable && wasPerishableOff && perishableBatchTotal === 0) ||
+    (serialized && wasSerializedOff && serializedStockTotal === 0)
+  )
+
+  useEffect(() => {
+    if (!showBootstrap) return
+    // auto-expand Physical Attributes section
+    setPhysicalExpanded(true)
+    // init lot number once
+    if (!bsLotNumber) {
+      const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+      const today = new Date()
+      const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+      const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
+      setBsLotNumber(`LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`)
+    }
+    // fetch shelf locations once, auto-select open shelf
+    if (bsShelfLocations.length === 0) {
+      fetch('/api/admin/shelving/locations').then(r => r.ok ? r.json() : null).then(j => {
+        if (j) {
+          const locs: {id:string;display_code:string;is_open_shelf?:boolean}[] = j.locations || []
+          setBsShelfLocations(locs)
+          const open = locs.find(l => l.is_open_shelf)
+          if (open && !bsLocationId) setBsLocationId(open.id)
+        }
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showBootstrap])
 
   function restoreDraft() {
     const saved = localStorage.getItem(draftKey)
@@ -823,35 +858,14 @@ export default function ProductForm({ categories, brands, action, product, produ
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    // Check if we need to show bootstrap modal before saving
-    const wasPerishableOff = !(product?.perishable)
-    const wasSerializedOff = !(product?.serialized)
-    const variantQtyForBootstrap = product?.has_variants && Array.isArray(product?.product_variants)
-      ? parseFloat(product.product_variants.find((v: any) => !v._isDeleted && v.inventory_quantity)?.inventory_quantity ?? '0') || 0
-      : null
-    const stockQty = variantQtyForBootstrap !== null ? variantQtyForBootstrap : (parseFloat(product?.inventory_quantity ?? '0') || 0)
-    const needsBootstrap = stockQty > 0 && pendingBootstrapRef.current === null && (
-      (perishable && wasPerishableOff && perishableBatchTotal === 0) ||
-      (serialized && wasSerializedOff && serializedStockTotal === 0)
-    )
-    if (needsBootstrap) {
-      const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
-      const today = new Date()
-      const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-      const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
-      setBsLotNumber(`LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`)
-      setBsSerials([])
-      setBsExpiryDate('')
-      setBsManufactureDate('')
-      setBsLocationId('')
-      setBsShelfLocations([])
-      setBootstrapError(null)
-      fetch('/api/admin/shelving/locations').then(r => r.ok ? r.json() : null).then(j => {
-        if (j) setBsShelfLocations(j.locations || [])
-      })
-      setShowBootstrapModal(true)
-      return
+    if (showBootstrap) {
+      if (perishable && !bsExpiryDate) { setBootstrapError('Expiry date is required'); return }
+      const needed = Math.round(_bsStockQty)
+      if (serialized && bsSerials.filter(Boolean).length !== needed) {
+        setBootstrapError(`Enter all ${needed} serial number${needed !== 1 ? 's' : ''}`); return
+      }
     }
+    setBootstrapError(null)
 
     setIsSubmitting(true)
     setError(null)
@@ -894,6 +908,10 @@ export default function ProductForm({ categories, brands, action, product, produ
       formData.set('brand_part_number', brandPartNumber)
       formData.set('country_of_origin', countryOfOrigin.slice(0, 2).toUpperCase())
       formData.set('shelf_life_days', shelfLifeDays)
+      // Technical Specs
+      formData.set('grade', grade)
+      const specsObj = specifications.reduce((acc, {key, value}) => key.trim() ? {...acc, [key.trim()]: value} : acc, {})
+      formData.set('specifications', JSON.stringify(specsObj))
       // Physical Attributes
       formData.set('color', color)
       formData.set('color_hex', colorHex)
@@ -920,7 +938,6 @@ export default function ProductForm({ categories, brands, action, product, produ
       formData.set('handling_days', handlingDays)
       formData.set('shipping_class', shippingClass)
       formData.set('is_oversized', String(isOversized))
-      formData.set('volumetric_weight_grams', volumetricWeightGrams)
       // Digital / Content
       formData.set('is_digital', String(isDigital))
       formData.set('download_url', downloadUrl)
@@ -936,7 +953,6 @@ export default function ProductForm({ categories, brands, action, product, produ
       // SEO
       formData.set('meta_title', metaTitle)
       formData.set('meta_description', metaDescription)
-      formData.set('meta_keywords', metaKeywords)
       formData.set('is_searchable', String(isSearchable))
       // Tax & Finance
       formData.set('tax_class', taxClass)
@@ -973,17 +989,22 @@ export default function ProductForm({ categories, brands, action, product, produ
       pendingPopupVariantIdRef.current = null
     } catch (err: any) {
       if (err?.digest?.startsWith('NEXT_REDIRECT')) {
-        const payload = pendingBootstrapRef.current
-        pendingBootstrapRef.current = null
-        if (payload && payload !== 'skip' && productId) {
+        if (showBootstrap && productId) {
           try {
             await fetch(`/api/admin/products/${productId}/bootstrap-stock`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify(payload),
+              body: JSON.stringify({
+                variant_id: _bsVariantId || null,
+                lot_number: bsLotNumber || null,
+                manufacture_date: bsManufactureDate || null,
+                expiry_date: bsExpiryDate || null,
+                location_id: bsLocationId || null,
+                ...(serialized ? { serial_numbers: bsSerials.filter(Boolean) } : {}),
+              }),
             })
           } catch {
-            // bootstrap failed silently — product was saved, stock not bootstrapped
+            // bootstrap failed silently — product was saved
           }
         }
         throw err
@@ -991,27 +1012,6 @@ export default function ProductForm({ categories, brands, action, product, produ
       setError(err?.message || 'Failed to save product. Please try again.')
       setIsSubmitting(false)
     }
-  }
-
-  function handleBootstrapContinue() {
-    const variantQty = product?.has_variants && Array.isArray(product?.product_variants)
-      ? parseFloat(product.product_variants.find((v: any) => !v._isDeleted && v.inventory_quantity)?.inventory_quantity ?? '0') || 0
-      : null
-    const stockQty = variantQty !== null ? variantQty : (parseFloat(product?.inventory_quantity ?? '0') || 0)
-    if (perishable && !bsExpiryDate) { setBootstrapError('Expiry date is required'); return }
-    const needed = Math.round(stockQty)
-    if (serialized && bsSerials.filter(Boolean).length !== needed) {
-      setBootstrapError(`Enter all ${needed} serial number${needed !== 1 ? 's' : ''}`); return
-    }
-    pendingBootstrapRef.current = {
-      lot_number: bsLotNumber || null,
-      manufacture_date: bsManufactureDate || null,
-      expiry_date: bsExpiryDate || null,
-      location_id: bsLocationId || null,
-      ...(serialized ? { serial_numbers: bsSerials.filter(Boolean) } : {}),
-    }
-    setShowBootstrapModal(false)
-    formRef.current?.requestSubmit()
   }
 
   const inputCls = 'field-normal w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent'
@@ -1047,155 +1047,35 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
         </div>
       )}
-      {showBootstrapModal && (() => {
-        // For variant products, use the first active variant's qty; otherwise product-level
-        const variantQty = product?.has_variants && Array.isArray(product?.product_variants)
-          ? parseFloat(product.product_variants.find((v: any) => !v._isDeleted && v.inventory_quantity)?.inventory_quantity ?? '0') || 0
-          : null
-        const stockQty = variantQty !== null ? variantQty : (parseFloat(product?.inventory_quantity ?? '0') || 0)
-        const needed = Math.round(stockQty)
-        const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
-        const dtStamp = () => new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
-        const randSuffix = () => Math.random().toString(36).slice(2, 8).toUpperCase()
-        const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${dtStamp()}-${randSuffix()}`
-        const entered = bsSerials.filter(Boolean).length
-        const updateSerial = (i: number, val: string) =>
-          setBsSerials(arr => { const a = [...arr]; a[i] = val; return a })
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 overflow-y-auto py-8">
-          <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-2xl mx-4 p-6 space-y-5 max-h-[90vh] overflow-y-auto">
-              <div>
-                <h2 className="text-base font-bold text-foreground">Assign existing stock to batch/serials</h2>
-                <p className="text-sm text-foreground-secondary mt-1">
-                  <span className="font-semibold">{stockQty} unit(s)</span> already in stock — assign them now so tracking is accurate.
-                </p>
-              </div>
-
-              {perishable && (
-                <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-900/10 p-4">
-                  <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">Batch Details</p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Expiry Date <span className="text-red-500">*</span></label>
-                      <DatePicker value={bsExpiryDate} onChange={setBsExpiryDate} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Manufacture Date</label>
-                      <DatePicker value={bsManufactureDate} onChange={setBsManufactureDate} />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Lot Number</label>
-                      <div className="flex gap-1">
-                        <input
-                          type="text"
-                          className="field-compact border border-border-default bg-surface text-foreground flex-1 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                          value={bsLotNumber}
-                          onChange={e => setBsLotNumber(e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          title="Regenerate"
-                          onClick={() => {
-                            const today = new Date()
-                            const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`
-                            const rand = Math.random().toString(36).substring(2,5).toUpperCase()
-                            setBsLotNumber(`LOT-${sku ? sku+'-' : ''}${ymd}-${rand}`)
-                          }}
-                          className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
-                        >↺</button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Shelf Location</label>
-                      <AdminSelect
-                        id="bs-location"
-                        value={bsLocationId}
-                        onChange={setBsLocationId}
-                        sm
-                        options={[
-                          { value: '', label: '— none —' },
-                          ...bsShelfLocations.map(sl => ({ value: sl.id, label: sl.display_code })),
-                        ]}
-                      />
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {serialized && (
-                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div>
-                      <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Serial Numbers</p>
-                      <span className="text-xs text-foreground-muted">({needed} required)</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {entered === needed
-                        ? <span className="text-xs text-green-600 dark:text-green-400">{entered}/{needed} entered ✓</span>
-                        : <span className="text-xs text-amber-600 dark:text-amber-400">{entered}/{needed} entered</span>
-                      }
-                      <button
-                        type="button"
-                        className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                        onClick={() => setBsSerials(Array.from({ length: needed }, () => autoSerial()))}
-                      >
-                        Generate All
-                      </button>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
-                    {Array.from({ length: needed }, (_, n) => (
-                      <div key={n} className="flex gap-1">
-                        <input
-                          type="text"
-                          placeholder={autoSerial()}
-                          className="field-compact border border-border-default bg-surface text-foreground font-mono text-xs flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                          value={bsSerials[n] ?? ''}
-                          onChange={e => updateSerial(n, e.target.value)}
-                        />
-                        <button
-                          type="button"
-                          title="Auto-generate"
-                          className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                          onClick={() => updateSerial(n, autoSerial())}
-                        >Auto</button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {bootstrapError && (
-                <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-sm">
-                  {bootstrapError}
-                </div>
-              )}
-
-              <div className="flex justify-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowBootstrapModal(false)
-                    pendingBootstrapRef.current = 'skip'
-                    formRef.current?.requestSubmit()
-                  }}
-                  className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
-                >
-                  Skip for now
-                </button>
-                <button
-                  type="button"
-                  onClick={handleBootstrapContinue}
-                  disabled={bootstrapSaving}
-                  className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors disabled:opacity-50"
-                >
-                  {bootstrapSaving ? 'Saving...' : 'Continue & Save'}
-                </button>
-              </div>
+      {confirmUnSerialized && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-md mx-4 p-6">
+            <h2 className="text-base font-bold text-foreground mb-3">Remove Serialized Flag?</h2>
+            <p className="text-sm text-foreground-secondary mb-1">
+              This product has <span className="font-semibold">{serializedStockTotal} serial(s)</span> in stock.
+            </p>
+            <p className="text-sm text-foreground-secondary mb-5">
+              Unmarking as serialized will delete all serial records and convert them to default stock ({serializedStockTotal} units).
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmUnSerialized(false)}
+                className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setConfirmUnSerialized(false); setSerialized(false) }}
+                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Yes, Remove
+              </button>
             </div>
           </div>
-        )
-      })()}
+        </div>
+      )}
       <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
@@ -1862,10 +1742,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </label>
                   <textarea maxLength={320} rows={3} value={metaDescription} onChange={e => setMetaDescription(e.target.value)} placeholder="SEO page description" className={`${inputCls} resize-none`} />
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-foreground-muted mb-1">Meta Keywords <span className="text-foreground-muted/60">(comma-separated)</span></label>
-                  <input type="text" value={metaKeywords} onChange={e => setMetaKeywords(e.target.value)} placeholder="e.g. bolt, fastener, stainless" className={inputCls} />
-                </div>
                 <Toggle id="is_searchable" checked={isSearchable} onChange={setIsSearchable} label="Searchable (show in search results)" />
               </div>
             )}
@@ -1888,6 +1764,25 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </button>
                   {certificationsExpanded && (
                     <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Grade</label>
+                          <input type="text" value={grade} onChange={e => setGrade(e.target.value)} className={inputCls} placeholder="e.g. 8.8, 10.9, 304, M2 HSS" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-foreground-secondary mb-2">Technical Specifications</label>
+                        <div className="space-y-2">
+                          {specifications.map((spec, i) => (
+                            <div key={i} className="flex gap-2">
+                              <input type="text" value={spec.key} onChange={e => setSpecifications(s => s.map((x, j) => j === i ? {...x, key: e.target.value} : x))} className={inputCls} placeholder="e.g. thread_type" />
+                              <input type="text" value={spec.value} onChange={e => setSpecifications(s => s.map((x, j) => j === i ? {...x, value: e.target.value} : x))} className={inputCls} placeholder="e.g. Metric" />
+                              <button type="button" onClick={() => setSpecifications(s => s.filter((_, j) => j !== i))} className="px-2 text-foreground-muted hover:text-red-500">✕</button>
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setSpecifications(s => [...s, {key: '', value: ''}])} className="text-xs text-accent-600 hover:text-accent-700 font-medium">+ Add specification</button>
+                        </div>
+                      </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                           <label className="block text-sm font-medium text-foreground-secondary mb-2">Color</label>
@@ -1920,8 +1815,133 @@ export default function ProductForm({ categories, brands, action, product, produ
                           }
                           setPerishable(next)
                         }} label="Perishable" />
-                        <Toggle id="serialized" checked={serialized} onChange={setSerialized} label="Serialized" />
+                        <Toggle id="serialized" checked={serialized} onChange={next => {
+                          if (!next && serializedStockTotal > 0) {
+                            setConfirmUnSerialized(true)
+                            return
+                          }
+                          setSerialized(next)
+                        }} label="Serialized" />
                       </div>
+
+                      {showBootstrap && (() => {
+                        const needed = Math.round(_bsStockQty)
+                        const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+                        const dtStamp = () => new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
+                        const randSuffix = () => Math.random().toString(36).slice(2, 8).toUpperCase()
+                        const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${dtStamp()}-${randSuffix()}`
+                        const entered = bsSerials.filter(Boolean).length
+                        const updateSerial = (i: number, val: string) =>
+                          setBsSerials(arr => { const a = [...arr]; a[i] = val; return a })
+                        return (
+                          <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10 p-4 space-y-4">
+                            <div>
+                              <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Assign Existing Stock</p>
+                              <p className="text-xs text-foreground-secondary mt-0.5">
+                                <span className="font-semibold">{_bsStockQty} unit(s)</span> already in stock — fill in details below so tracking is accurate.
+                              </p>
+                            </div>
+
+                            {perishable && wasPerishableOff && (
+                              <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-900/10 p-3">
+                                <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">Batch Details</p>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Expiry Date <span className="text-red-500">*</span></label>
+                                    <DatePicker value={bsExpiryDate} onChange={setBsExpiryDate} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Manufacture Date</label>
+                                    <DatePicker value={bsManufactureDate} onChange={setBsManufactureDate} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Lot Number</label>
+                                    <div className="flex gap-1">
+                                      <input
+                                        type="text"
+                                        className="field-compact border border-border-default bg-surface text-foreground flex-1 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                        value={bsLotNumber}
+                                        onChange={e => setBsLotNumber(e.target.value)}
+                                      />
+                                      <button
+                                        type="button"
+                                        title="Regenerate"
+                                        onClick={() => {
+                                          const today = new Date()
+                                          const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`
+                                          const rand = Math.random().toString(36).substring(2,5).toUpperCase()
+                                          setBsLotNumber(`LOT-${sku ? sku+'-' : ''}${ymd}-${rand}`)
+                                        }}
+                                        className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                                      >↺</button>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Shelf Location</label>
+                                    <AdminSelect
+                                      id="bs-location"
+                                      value={bsLocationId}
+                                      onChange={setBsLocationId}
+                                      sm
+                                      options={[
+                                        { value: '', label: '— none —' },
+                                        ...bsShelfLocations.map(sl => ({ value: sl.id, label: sl.display_code })),
+                                      ]}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {serialized && wasSerializedOff && (
+                              <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-3">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div>
+                                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Serial Numbers</p>
+                                    <span className="text-xs text-foreground-muted">({needed} required)</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {entered === needed
+                                      ? <span className="text-xs text-green-600 dark:text-green-400">{entered}/{needed} entered ✓</span>
+                                      : <span className="text-xs text-amber-600 dark:text-amber-400">{entered}/{needed} entered</span>
+                                    }
+                                    <button
+                                      type="button"
+                                      className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                      onClick={() => setBsSerials(Array.from({ length: needed }, () => autoSerial()))}
+                                    >Generate All</button>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                                  {Array.from({ length: needed }, (_, n) => (
+                                    <div key={n} className="flex gap-1">
+                                      <input
+                                        type="text"
+                                        placeholder={autoSerial()}
+                                        className="field-compact border border-border-default bg-surface text-foreground font-mono text-xs flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                        value={bsSerials[n] ?? ''}
+                                        onChange={e => updateSerial(n, e.target.value)}
+                                      />
+                                      <button
+                                        type="button"
+                                        title="Auto-generate"
+                                        className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                        onClick={() => updateSerial(n, autoSerial())}
+                                      >Auto</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {bootstrapError && (
+                              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs">
+                                {bootstrapError}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
                     </div>
                   )}
                 </div>
@@ -2009,10 +2029,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                         <div>
                           <label className="block text-sm font-medium text-foreground-secondary mb-2">Shipping Class</label>
                           <AdminSelect value={shippingClass} onChange={setShippingClass} options={[{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }, { value: 'cold_chain', label: 'Cold Chain' }]} />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Volumetric Weight (g)</label>
-                          <input type="number" min="0" step="1" value={volumetricWeightGrams} onChange={e => setVolumetricWeightGrams(e.target.value)} className={inputCls} placeholder="For courier billing" />
                         </div>
                       </div>
                       <Toggle id="is_oversized" checked={isOversized} onChange={setIsOversized} label="Oversized / Freight" />

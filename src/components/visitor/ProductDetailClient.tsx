@@ -135,6 +135,8 @@ interface ProductDetailClientProps {
     warranty_type?: string | null
     // Condition & Lifecycle
     condition?: string | null
+    launch_date?: string | null
+    discontinue_date?: string | null
     // Age & Audience
     age_min?: number | null
     age_max?: number | null
@@ -525,6 +527,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
           productUnits={product.product_units ?? []}
           sellUnitId={product.sell_unit_id ?? null}
+          launchDate={product.launch_date ?? null}
+          discontinueDate={product.discontinue_date ?? null}
         />
 
         <RazorpayOffers />
