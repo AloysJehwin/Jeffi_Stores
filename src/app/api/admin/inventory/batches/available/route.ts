@@ -79,13 +79,20 @@ export async function GET(request: NextRequest) {
           NULL AS variant_name,
           qi.quantity,
           qi.buy_unit,
-          qi.sold_unit_factor,
+          COALESCE(
+            qi.sold_unit_factor,
+            CASE WHEN puv.dimension = 'count' THEN puv.factor
+                 WHEN pup.dimension = 'count' THEN pup.factor
+            END
+          ) AS sold_unit_factor,
           COALESCE(qi.base_quantity, qi.quantity) AS base_quantity,
           NULL AS batch_id,
           p.perishable,
           p.serialized
         FROM quotation_items qi
         JOIN products p ON p.id = qi.product_id
+        LEFT JOIN product_units puv ON puv.unit = qi.buy_unit AND puv.product_id = qi.product_id AND puv.variant_id = qi.variant_id AND qi.buy_unit IS NOT NULL
+        LEFT JOIN product_units pup ON pup.unit = qi.buy_unit AND pup.product_id = qi.product_id AND pup.variant_id IS NULL AND qi.buy_unit IS NOT NULL AND puv.id IS NULL
         WHERE qi.quotation_id = $1 AND qi.product_id IS NOT NULL AND (p.perishable = true OR p.serialized = true)
       `, [quotationId])
 
@@ -150,12 +157,19 @@ export async function GET(request: NextRequest) {
         oi.quantity,
         oi.buy_unit,
         oi.batch_id,
-        oi.sold_unit_factor,
+        COALESCE(
+          oi.sold_unit_factor,
+          CASE WHEN puv.dimension = 'count' THEN puv.factor
+               WHEN pup.dimension = 'count' THEN pup.factor
+          END
+        ) AS sold_unit_factor,
         COALESCE(oi.base_quantity, oi.quantity) AS base_quantity,
         p.perishable,
         p.serialized
       FROM order_items oi
       JOIN products p ON p.id = oi.product_id
+      LEFT JOIN product_units puv ON puv.unit = oi.buy_unit AND puv.product_id = oi.product_id AND puv.variant_id = oi.variant_id AND oi.buy_unit IS NOT NULL
+      LEFT JOIN product_units pup ON pup.unit = oi.buy_unit AND pup.product_id = oi.product_id AND pup.variant_id IS NULL AND oi.buy_unit IS NOT NULL AND puv.id IS NULL
       WHERE oi.order_id = $1 AND (p.perishable = true OR p.serialized = true)
     `, [orderId])
 
