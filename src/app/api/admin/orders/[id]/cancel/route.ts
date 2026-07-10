@@ -134,14 +134,22 @@ export async function POST(
         }
       }
 
-      // Sync shelf_stock + inventory_quantity for any perishable product touched
+      // Reset serialized product serials back to in_stock
+      await client.query(
+        `UPDATE product_serials
+         SET status = 'in_stock', order_id = NULL, sold_at = NULL, updated_at = NOW()
+         WHERE order_id = $1`,
+        [id]
+      )
+
+      // Sync shelf_stock + inventory_quantity for any perishable or serialized product touched
       const synced = new Set<string>()
       for (const item of itemsResult.rows) {
         if (!item.product_id) continue
-        const perishRow = await client.query<{ perishable: boolean }>(
-          'SELECT perishable FROM products WHERE id = $1', [item.product_id]
+        const perishRow = await client.query<{ perishable: boolean; serialized: boolean }>(
+          'SELECT perishable, serialized FROM products WHERE id = $1', [item.product_id]
         )
-        if (!perishRow.rows[0]?.perishable) continue
+        if (!perishRow.rows[0]?.perishable && !perishRow.rows[0]?.serialized) continue
         const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
         if (synced.has(key)) continue
         synced.add(key)
