@@ -190,6 +190,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const [returnImages, setReturnImages] = useState<File[]>([])
   const [returnImagePreviews, setReturnImagePreviews] = useState<string[]>([])
   const [isUploadingImages, setIsUploadingImages] = useState(false)
+  const [returnSelectedItems, setReturnSelectedItems] = useState<Record<string, boolean>>({})
 
   const [reviewMap, setReviewMap] = useState<Record<string, { id: string; rating: number; title: string | null; comment: string; tags: string[]; image_urls: string[]; image_thumbnail_urls: string[] }>>({})
   const [showReviewModal, setShowReviewModal] = useState(false)
@@ -331,6 +332,17 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       setIsSubmittingReturn(false)
       return
     }
+    if (returnImages.length === 0) {
+      setReturnError('Please upload at least one photo of the item.')
+      setIsSubmittingReturn(false)
+      return
+    }
+    const selectedItemIds = Object.entries(returnSelectedItems).filter(([, v]) => v).map(([k]) => k)
+    if (selectedItemIds.length === 0) {
+      setReturnError('Please select at least one item to return.')
+      setIsSubmittingReturn(false)
+      return
+    }
     try {
       let uploadedUrls: string[] = []
       if (returnImages.length > 0) {
@@ -349,12 +361,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ type: returnType, reason: returnReason, description: returnDescription || undefined, image_urls: uploadedUrls }),
+        body: JSON.stringify({
+          type: returnType,
+          reason: returnReason,
+          description: returnDescription || undefined,
+          image_urls: uploadedUrls,
+          items: selectedItemIds.map(itemId => ({ order_item_id: itemId, quantity: order!.items.find(i => i.id === itemId)!.quantity })),
+        }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Failed to submit return request')
       setReturnSuccess('Your return request has been submitted. Our team will review it shortly.')
       setShowReturnForm(false)
+      setReturnSelectedItems({})
       await fetchOrder()
     } catch (err: any) {
       setReturnError(err.message)
@@ -867,6 +886,45 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     </div>
                   )}
                   <div>
+                    <p className="text-sm font-medium text-foreground-secondary mb-2">
+                      Select items to return <span className="text-red-500">*</span>
+                    </p>
+                    <div className="space-y-2">
+                      {order.items.map(item => {
+                        const checked = !!returnSelectedItems[item.id]
+                        const thumb = item.products?.product_images?.find(img => img.is_primary)?.thumbnail_url
+                          || item.products?.product_images?.[0]?.thumbnail_url
+                        return (
+                          <label
+                            key={item.id}
+                            className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
+                              checked
+                                ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
+                                : 'border-border-secondary bg-surface hover:border-accent-400'
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={e => setReturnSelectedItems(prev => ({ ...prev, [item.id]: e.target.checked }))}
+                              className="accent-accent-500 w-4 h-4 flex-shrink-0"
+                            />
+                            {thumb && (
+                              <img src={thumb} alt="" className="w-10 h-10 object-cover rounded-md flex-shrink-0" />
+                            )}
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium text-foreground truncate">{item.productName}</p>
+                              {item.variantName && (
+                                <p className="text-xs text-foreground-secondary">{item.variantName}{item.subVariantName ? ` / ${item.subVariantName}` : ''}</p>
+                              )}
+                              <p className="text-xs text-foreground-muted">Qty: {item.quantity} · ₹{item.unitPrice.toFixed(0)}</p>
+                            </div>
+                          </label>
+                        )
+                      })}
+                    </div>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-1">Reason</label>
                     <CustomSelect
                       value={returnReason}
@@ -895,7 +953,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-1">
-                      Photos <span className="text-foreground-muted">(optional, up to 3)</span>
+                      Photos <span className="text-red-500">*</span> <span className="text-foreground-muted">(required, up to 3)</span>
                     </label>
                     <div className="flex gap-2 flex-wrap">
                       {returnImagePreviews.map((src, i) => (
@@ -923,7 +981,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <button
                       type="button"
                       onClick={handleSubmitReturn}
-                      disabled={isSubmittingReturn}
+                      disabled={isSubmittingReturn || returnImages.length === 0}
                       className="flex-1 px-4 py-2.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
                     >
                       {isSubmittingReturn ? (
@@ -935,7 +993,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     </button>
                     <button
                       type="button"
-                      onClick={() => { setShowReturnForm(false); setReturnError(''); setReturnImages([]); setReturnImagePreviews([]) }}
+                      onClick={() => { setShowReturnForm(false); setReturnError(''); setReturnImages([]); setReturnImagePreviews([]); setReturnSelectedItems({}) }}
                       disabled={isSubmittingReturn}
                       className="px-4 py-2.5 bg-surface-elevated hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium text-sm border border-border-secondary transition-colors"
                     >

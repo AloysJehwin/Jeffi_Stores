@@ -19,6 +19,14 @@ interface ReturnRequest {
   valuation_condition?: string | null
   valuation_notes?: string | null
   created_at: string
+  items?: Array<{
+    id: string
+    product_name?: string | null
+    variant_name?: string | null
+    quantity: number
+    unit_price: number
+    refund_amount: number
+  }> | null
 }
 
 interface ReturnReviewProps {
@@ -144,8 +152,32 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         </div>
       </div>
 
-      {description && (
+      {returnRequest.items && returnRequest.items.length > 0 && (
         <div>
+          <p className="text-sm text-foreground-secondary mb-2">
+            Items being returned ·{' '}
+            <span className="font-medium text-foreground">
+              ₹{returnRequest.items.reduce((s, i) => s + parseFloat(String(i.refund_amount)), 0).toFixed(0)} refund
+            </span>
+          </p>
+          <div className="divide-y divide-border-default border border-border-default rounded-lg overflow-hidden">
+            {returnRequest.items.map(item => (
+              <div key={item.id} className="flex items-center justify-between px-3 py-2 bg-surface text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">{item.product_name}</p>
+                  {item.variant_name && <p className="text-xs text-foreground-secondary">{item.variant_name}</p>}
+                </div>
+                <div className="text-right flex-shrink-0 ml-4">
+                  <p className="text-xs text-foreground-secondary">Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}</p>
+                  <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toFixed(0)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {description && (        <div>
           <p className="text-sm text-foreground-secondary mb-1">Customer description</p>
           <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2">{description}</p>
         </div>

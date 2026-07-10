@@ -29,6 +29,17 @@ interface ReturnRow {
   last_name?: string | null
   user_email?: string | null
   total_amount?: number | null
+  items: Array<{
+    id: string
+    order_item_id: string
+    product_id?: string | null
+    variant_id?: string | null
+    quantity: number
+    unit_price: number
+    refund_amount: number
+    product_name?: string | null
+    variant_name?: string | null
+  }>
 }
 
 const STATUS_LABELS: Record<string, string> = {
@@ -153,9 +164,36 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
           )}
         </div>
 
-        {/* Customer description */}
-        {row.description && (
+        {/* Returned items */}
+        {row.items && row.items.length > 0 && (
           <div>
+            <p className="text-xs text-foreground-secondary mb-2">
+              Items being returned ({row.items.length}) ·{' '}
+              <span className="font-medium text-foreground">
+                Total refund: ₹{row.items.reduce((s, i) => s + parseFloat(String(i.refund_amount)), 0).toFixed(0)}
+              </span>
+            </p>
+            <div className="divide-y divide-border-default border border-border-default rounded-lg overflow-hidden">
+              {row.items.map(item => (
+                <div key={item.id} className="flex items-center justify-between px-3 py-2 bg-surface text-sm">
+                  <div className="min-w-0">
+                    <p className="font-medium text-foreground truncate">{item.product_name}</p>
+                    {item.variant_name && (
+                      <p className="text-xs text-foreground-secondary">{item.variant_name}</p>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0 ml-4">
+                    <p className="text-foreground-secondary text-xs">Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}</p>
+                    <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toFixed(0)}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Customer description */}
+        {row.description && (          <div>
             <p className="text-xs text-foreground-secondary mb-1">Customer description</p>
             <p className="text-sm text-foreground bg-surface-secondary rounded-lg border border-border-default px-3 py-2">
               {row.description}
