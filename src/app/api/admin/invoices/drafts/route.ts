@@ -100,7 +100,7 @@ export async function GET(request: NextRequest) {
           OR (o.status = 'confirmed' AND EXISTS (
                SELECT 1 FROM invoices i WHERE i.order_id = o.id AND i.status = 'draft'
              ))
-          OR (o.status = 'processing' AND o.source = 'business' AND o.invoice_number IS NULL)
+          OR (o.status = 'processing' AND o.source IN ('business', 'offline') AND o.invoice_number IS NULL)
        ORDER BY o.updated_at DESC
        LIMIT 100`
     )
