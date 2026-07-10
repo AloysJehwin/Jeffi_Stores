@@ -21,6 +21,7 @@ export interface ShelfLocation {
   display_code: string
   notes: string | null
   is_active: boolean
+  is_open_shelf?: boolean
   created_at: string
   stock_count?: number
 }

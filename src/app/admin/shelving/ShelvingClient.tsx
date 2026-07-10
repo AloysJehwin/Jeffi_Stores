@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   Warehouse, ShelfLocation, ShelfStock,
@@ -12,24 +12,10 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/admin-path'
 
 type Tab = 'locations' | 'labels'
-type Panel = 'warehouse' | 'location' | 'stock'
 
 const btnPrimary = 'px-4 py-1.5 rounded-lg text-sm font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors disabled:opacity-50'
 const btnSecondary = 'px-4 py-1.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors disabled:opacity-50'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
-const inputCls = 'w-full px-3 py-1.5 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
-
-function groupLocations(locs: ShelfLocation[]) {
-  const tree: Record<string, Record<string, Record<string, ShelfLocation[]>>> = {}
-  for (const loc of locs) {
-    if (!tree[loc.aisle_code]) tree[loc.aisle_code] = {}
-    if (!tree[loc.aisle_code][loc.rack_code]) tree[loc.aisle_code][loc.rack_code] = {}
-    const shelfKey = `${loc.shelf_code}${loc.bin_code ? '/' + loc.bin_code : ''}`
-    if (!tree[loc.aisle_code][loc.rack_code][shelfKey]) tree[loc.aisle_code][loc.rack_code][shelfKey] = []
-    tree[loc.aisle_code][loc.rack_code][shelfKey].push(loc)
-  }
-  return tree
-}
 
 export default function ShelvingClient() {
   const { showToast } = useToast()
@@ -46,22 +32,19 @@ export default function ShelvingClient() {
     params.set('tab', next)
     router.push(ap(`/admin/shelving?${params.toString()}`), { scroll: false })
   }
+
   const [warehouses, setWarehouses] = useState<Warehouse[]>([])
   const [locations, setLocations] = useState<ShelfLocation[]>([])
   const [stock, setStock] = useState<ShelfStock[]>([])
   const [selectedWarehouse, setSelectedWarehouse] = useState<string | null>(null)
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null)
-  const [expandedAisles, setExpandedAisles] = useState<Record<string, boolean>>({})
-  const [expandedRacks, setExpandedRacks] = useState<Record<string, boolean>>({})
 
   const [showWarehouseForm, setShowWarehouseForm] = useState(false)
   const [editWarehouse, setEditWarehouse] = useState<Warehouse | null>(null)
   const [showLocationForm, setShowLocationForm] = useState(false)
   const [editLocation, setEditLocation] = useState<ShelfLocation | null>(null)
-  const [locationFormPrefill, setLocationFormPrefill] = useState<{ aisle?: string; rack?: string }>({})
   const [showAssignStock, setShowAssignStock] = useState(false)
 
-  const [mobilePanel, setMobilePanel] = useState<Panel>('warehouse')
   const [labelSelections, setLabelSelections] = useState<string[]>([])
   const [labelCopies, setLabelCopies] = useState('1')
   const [generatingLabels, setGeneratingLabels] = useState(false)
@@ -100,28 +83,14 @@ export default function ShelvingClient() {
   }, [])
 
   useEffect(() => { loadWarehouses().finally(() => setLoading(false)) }, [loadWarehouses])
-  useEffect(() => { if (selectedWarehouse) loadLocations(selectedWarehouse); else setLocations([]) }, [selectedWarehouse, loadLocations])
+  useEffect(() => {
+    if (selectedWarehouse) { loadLocations(selectedWarehouse); setSelectedLocation(null) }
+    else setLocations([])
+  }, [selectedWarehouse, loadLocations])
   useEffect(() => { if (selectedLocation) loadStock(selectedLocation); else setStock([]) }, [selectedLocation, loadStock])
 
-  function selectWarehouse(id: string) {
-    setSelectedWarehouse(id); setSelectedLocation(null)
-    setExpandedAisles({}); setExpandedRacks({})
-    setMobilePanel('location')
-  }
-
-  function selectLocation(id: string) {
-    setSelectedLocation(id); setMobilePanel('stock'); setShowAssignStock(false)
-  }
-
-  const tree = useMemo(() => groupLocations(locations), [locations])
   const activeWarehouse = warehouses.find(w => w.id === selectedWarehouse)
   const activeLocation = locations.find(l => l.id === selectedLocation)
-
-  function openAddLocation(prefill: { aisle?: string; rack?: string } = {}) {
-    setEditLocation(null)
-    setLocationFormPrefill(prefill)
-    setShowLocationForm(true)
-  }
 
   async function saveWarehouse(data: { name: string; code: string; address: string }) {
     if (editWarehouse) {
@@ -167,7 +136,7 @@ export default function ShelvingClient() {
       })
       if (!res.ok) throw new Error((await res.json()).error)
     }
-    setShowLocationForm(false); setEditLocation(null); setLocationFormPrefill({})
+    setShowLocationForm(false); setEditLocation(null)
     await loadLocations(selectedWarehouse)
   }
 
@@ -216,14 +185,15 @@ export default function ShelvingClient() {
   }
 
   return (
-    <div className="space-y-0 h-full flex flex-col">
+    <div className="h-full flex flex-col">
+      {/* Page header + tabs */}
       <div className="px-4 sm:px-6 py-4 border-b border-border-default bg-surface shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h1 className="text-xl font-bold text-foreground">Shelving</h1>
-            <p className="text-xs text-foreground-muted mt-0.5">Warehouse → Aisle → Rack → Shelf → Bin</p>
+            <p className="text-xs text-foreground-muted mt-0.5">Warehouse → Location → Stock</p>
           </div>
-          <div className="flex gap-1 border-b-0">
+          <div className="flex gap-1">
             {(['locations', 'labels'] as Tab[]).map(t => (
               <button key={t} onClick={() => setTab(t)}
                 className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px capitalize ${tab === t ? 'border-secondary-500 dark:border-secondary-400 text-secondary-500 dark:text-secondary-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}>
@@ -235,7 +205,7 @@ export default function ShelvingClient() {
       </div>
 
       {error && (
-        <div className="mx-4 sm:mx-6 mt-3 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400 text-sm">
+        <div className="mx-4 sm:mx-6 mt-3 px-4 py-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 text-red-600 dark:text-red-400 text-sm shrink-0">
           {error}
         </div>
       )}
@@ -250,370 +220,289 @@ export default function ShelvingClient() {
           loadLocations={loadLocations}
         />
       ) : (
-        <div className="flex flex-1 min-h-0 overflow-hidden">
-          <MobileBackBar panel={mobilePanel} setPanel={setMobilePanel} activeWarehouse={activeWarehouse} activeLocation={activeLocation} />
+        <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          {/* Chip bar */}
+          <div className="shrink-0 bg-surface border-b border-border-default px-4 sm:px-6 py-3 space-y-2.5">
+            {/* Warehouse chips */}
+            <div className="flex items-start gap-2 flex-wrap">
+              <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 mt-1.5">Warehouse</span>
+              <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                {loading ? (
+                  <div className="flex gap-1.5">
+                    {[80, 96, 72].map(w => (
+                      <div key={w} className="h-7 rounded-full bg-surface-secondary animate-pulse" style={{ width: w }} />
+                    ))}
+                  </div>
+                ) : warehouses.length === 0 ? (
+                  <span className="text-xs text-foreground-muted italic">No warehouses yet</span>
+                ) : (
+                  warehouses.map(w => (
+                    <WarehouseChip
+                      key={w.id} warehouse={w} selected={selectedWarehouse === w.id}
+                      onSelect={() => {
+                        setSelectedWarehouse(selectedWarehouse === w.id ? null : w.id)
+                        setShowWarehouseForm(false); setShowLocationForm(false)
+                      }}
+                      onEdit={() => { setEditWarehouse(w); setShowWarehouseForm(true); setShowLocationForm(false) }}
+                      onDelete={() => deleteWarehouse(w.id)}
+                    />
+                  ))
+                )}
+                <button
+                  onClick={() => { setEditWarehouse(null); setShowWarehouseForm(!showWarehouseForm); setShowLocationForm(false) }}
+                  className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                  Add
+                </button>
+              </div>
+            </div>
 
-          <WarehousePanel
-            warehouses={warehouses} selected={selectedWarehouse}
-            onSelect={selectWarehouse} onAdd={() => { setEditWarehouse(null); setShowWarehouseForm(true) }}
-            onEdit={w => { setEditWarehouse(w); setShowWarehouseForm(true) }}
-            onDelete={deleteWarehouse} showForm={showWarehouseForm} editTarget={editWarehouse}
-            onFormSave={saveWarehouse} onFormCancel={() => { setShowWarehouseForm(false); setEditWarehouse(null) }}
-            mobilePanel={mobilePanel}
-          />
-
-          <LocationPanel
-            tree={tree} locations={locations} selected={selectedLocation}
-            onSelect={selectLocation}
-            onAdd={openAddLocation}
-            onEdit={loc => { setEditLocation(loc); setLocationFormPrefill({}); setShowLocationForm(true) }}
-            onDelete={deleteLocation} showForm={showLocationForm} editTarget={editLocation}
-            locationFormPrefill={locationFormPrefill}
-            onFormSave={saveLocation} onFormCancel={() => { setShowLocationForm(false); setEditLocation(null); setLocationFormPrefill({}) }}
-            expandedAisles={expandedAisles} setExpandedAisles={setExpandedAisles}
-            expandedRacks={expandedRacks} setExpandedRacks={setExpandedRacks}
-            selectedWarehouse={selectedWarehouse} mobilePanel={mobilePanel}
-            loading={locationsLoading}
-            onDownloadLabel={(ids, filename) => downloadLabels(ids, 1, filename)}
-            onDownloadSynthetic={(displayCode, warehouseName, filename) => downloadSyntheticLabel(displayCode, warehouseName, filename)}
-          />
-
-          <StockPanel
-            location={activeLocation} stock={stock} loading={stockLoading}
-            locations={locations} showAssign={showAssignStock} setShowAssign={setShowAssignStock}
-            onRefresh={() => selectedLocation && loadStock(selectedLocation)}
-            onPrintLabel={selectedLocation ? () => downloadLabels([selectedLocation], 1, `shelf-label-${activeLocation?.display_code}.pdf`) : undefined}
-            generating={generatingLabels} mobilePanel={mobilePanel}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
-function MobileBackBar({ panel, setPanel, activeWarehouse, activeLocation }: {
-  panel: Panel; setPanel: (p: Panel) => void
-  activeWarehouse?: Warehouse; activeLocation?: ShelfLocation
-}) {
-  if (panel === 'warehouse') return null
-  return (
-    <div className="lg:hidden fixed top-[96px] left-0 right-0 z-30 bg-surface border-b border-border-default px-4 py-2.5 flex items-center gap-2">
-      <button onClick={() => setPanel(panel === 'stock' ? 'location' : 'warehouse')}
-        className="flex items-center gap-1.5 text-sm font-medium text-secondary-500 dark:text-secondary-400 hover:text-secondary-600">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-        {panel === 'stock' ? (activeLocation?.display_code ?? 'Locations') : (activeWarehouse?.name ?? 'Warehouses')}
-      </button>
-    </div>
-  )
-}
-
-function WarehousePanel({ warehouses, selected, onSelect, onAdd, onEdit, onDelete, showForm, editTarget, onFormSave, onFormCancel, mobilePanel }: {
-  warehouses: Warehouse[]; selected: string | null
-  onSelect: (id: string) => void; onAdd: () => void
-  onEdit: (w: Warehouse) => void; onDelete: (id: string) => void
-  showForm: boolean; editTarget: Warehouse | null
-  onFormSave: (d: any) => Promise<void>; onFormCancel: () => void
-  mobilePanel: Panel
-}) {
-  const visible = mobilePanel === 'warehouse'
-  return (
-    <aside className={`${visible ? 'flex' : 'hidden'} lg:flex flex-col w-full lg:w-56 lg:max-w-56 shrink-0 border-r border-border-default bg-surface overflow-y-auto`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
-        <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Warehouses</span>
-        <button onClick={onAdd}
-          className="flex items-center gap-1 text-xs font-medium text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 transition-colors">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Add
-        </button>
-      </div>
-
-      {showForm && (
-        <div className="p-4 border-b border-border-default bg-surface-secondary shrink-0">
-          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
-            {editTarget ? 'Edit Warehouse' : 'New Warehouse'}
-          </p>
-          <WarehouseForm onSave={onFormSave} onCancel={onFormCancel} initial={editTarget || undefined} />
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto">
-        {warehouses.length === 0 && (
-          <div className="py-12 text-center">
-            <p className="text-sm text-foreground-secondary">No warehouses yet</p>
-            <p className="text-xs text-foreground-muted mt-1">Add one to get started</p>
-          </div>
-        )}
-        {warehouses.map(w => (
-          <div key={w.id} onClick={() => onSelect(w.id)}
-            className={`group flex items-center gap-2.5 px-4 py-3 cursor-pointer transition-colors border-b border-border-default/50 last:border-0 ${selected === w.id ? 'bg-secondary-50 dark:bg-secondary-900/20 border-r-2 border-r-secondary-500' : 'hover:bg-surface-secondary/60'}`}>
-            <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded shrink-0 ${selected === w.id ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900' : 'bg-surface-secondary text-foreground-secondary'}`}>
-              {w.code}
-            </span>
-            <span className="flex-1 text-sm font-medium text-foreground truncate">{w.name}</span>
-            {!w.is_active && (
-              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400 shrink-0">off</span>
-            )}
-            <div className="hidden group-hover:flex items-center gap-1 shrink-0">
-              <button onClick={e => { e.stopPropagation(); onEdit(w) }}
-                className="p-1 rounded hover:bg-surface-secondary text-foreground-secondary hover:text-secondary-500 transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-              </button>
-              <button onClick={e => { e.stopPropagation(); onDelete(w.id) }}
-                className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-secondary hover:text-red-500 transition-colors">
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              </button>
+            {/* Location chips */}
+            <div className="flex items-start gap-2 flex-wrap">
+              <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 mt-1.5">Location</span>
+              <div className="flex items-center gap-1.5 flex-wrap flex-1">
+                {!selectedWarehouse ? (
+                  <span className="text-xs text-foreground-muted italic">Select a warehouse first</span>
+                ) : locationsLoading ? (
+                  <div className="flex gap-1.5">
+                    {[88, 104, 80, 96].map((w, i) => (
+                      <div key={i} className="h-7 rounded-full bg-surface-secondary animate-pulse" style={{ width: w }} />
+                    ))}
+                  </div>
+                ) : locations.length === 0 ? (
+                  <span className="text-xs text-foreground-muted italic">No locations yet</span>
+                ) : (
+                  locations.map(loc => (
+                    <LocationChip
+                      key={loc.id} location={loc} selected={selectedLocation === loc.id}
+                      onSelect={() => {
+                        setSelectedLocation(selectedLocation === loc.id ? null : loc.id)
+                        setShowLocationForm(false); setShowAssignStock(false)
+                      }}
+                      onEdit={() => { setEditLocation(loc); setShowLocationForm(true); setShowWarehouseForm(false) }}
+                      onDelete={() => deleteLocation(loc.id)}
+                      onLabel={() => {
+                        if (loc.is_open_shelf) {
+                          downloadSyntheticLabel(loc.display_code, activeWarehouse?.name || '', `shelf-label-${loc.display_code}.pdf`)
+                        } else {
+                          downloadLabels([loc.id], 1, `shelf-label-${loc.display_code}.pdf`)
+                        }
+                      }}
+                    />
+                  ))
+                )}
+                {selectedWarehouse && (
+                  <button
+                    onClick={() => { setEditLocation(null); setShowLocationForm(!showLocationForm); setShowWarehouseForm(false) }}
+                    className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                    Add
+                  </button>
+                )}
+              </div>
             </div>
           </div>
-        ))}
-      </div>
-    </aside>
+
+          {/* Inline forms (warehouse or location, one at a time) */}
+          {(showWarehouseForm || showLocationForm) && (
+            <div className="shrink-0 px-4 sm:px-6 py-4 border-b border-border-default bg-surface-secondary">
+              {showWarehouseForm && (
+                <>
+                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
+                    {editWarehouse ? 'Edit Warehouse' : 'New Warehouse'}
+                  </p>
+                  <WarehouseForm
+                    onSave={saveWarehouse}
+                    onCancel={() => { setShowWarehouseForm(false); setEditWarehouse(null) }}
+                    initial={editWarehouse || undefined}
+                  />
+                </>
+              )}
+              {showLocationForm && selectedWarehouse && (
+                <>
+                  <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
+                    {editLocation ? 'Edit Location' : 'New Location'}
+                  </p>
+                  <LocationForm
+                    warehouseId={selectedWarehouse}
+                    onSave={saveLocation}
+                    onCancel={() => { setShowLocationForm(false); setEditLocation(null) }}
+                    initial={editLocation || undefined}
+                  />
+                </>
+              )}
+            </div>
+          )}
+
+          {/* Stock panel — full width */}
+          <div className="flex-1 flex flex-col bg-surface-secondary overflow-hidden">
+            {!activeLocation ? (
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <p className="text-sm font-medium text-foreground-secondary">No location selected</p>
+                  <p className="text-xs text-foreground-muted mt-1">Pick a location chip above to view stock</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border-default bg-surface shrink-0">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-mono font-bold text-secondary-500 dark:text-secondary-400 text-base">{activeLocation.display_code}</span>
+                      {!activeLocation.is_active && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">inactive</span>
+                      )}
+                    </div>
+                    {activeLocation.notes && <p className="text-xs text-foreground-muted mt-0.5">{activeLocation.notes}</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    {selectedLocation && (
+                      <button
+                        onClick={() => {
+                          if (activeLocation.is_open_shelf) {
+                            downloadSyntheticLabel(activeLocation.display_code, activeWarehouse?.name || '', `shelf-label-${activeLocation.display_code}.pdf`)
+                          } else {
+                            downloadLabels([selectedLocation], 1, `shelf-label-${activeLocation.display_code}.pdf`)
+                          }
+                        }}
+                        disabled={generatingLabels}
+                        className={btnSecondary + ' !px-3 text-xs'}>
+                        {generatingLabels ? 'Generating…' : 'Print Label'}
+                      </button>
+                    )}
+                    <button onClick={() => setShowAssignStock(!showAssignStock)} className={btnPrimary + ' !px-3 text-xs'}>
+                      + Assign Stock
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
+                  {showAssignStock && (
+                    <AssignStockForm
+                      location={activeLocation}
+                      onSave={() => { setShowAssignStock(false); selectedLocation && loadStock(selectedLocation) }}
+                      onCancel={() => setShowAssignStock(false)}
+                    />
+                  )}
+
+                  {stockLoading && (
+                    <div className="flex items-center justify-center py-16">
+                      <div className="w-6 h-6 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  )}
+
+                  {!stockLoading && stock.length === 0 && !showAssignStock && (
+                    <div className="bg-surface-elevated rounded-xl border border-border-default p-12 text-center">
+                      <p className="text-sm font-medium text-foreground-secondary">No stock assigned here yet</p>
+                      <p className="text-xs text-foreground-muted mt-1 mb-4">Use the button above to assign products to this location</p>
+                      <button onClick={() => setShowAssignStock(true)} className={btnPrimary + ' !px-4 text-xs'}>
+                        + Assign Stock
+                      </button>
+                    </div>
+                  )}
+
+                  {!stockLoading && stock.length > 0 && (
+                    <div className="bg-surface-elevated rounded-xl border border-border-default">
+                      <div className="px-4 py-3 border-b border-border-default flex items-center justify-between">
+                        <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
+                          Stock — {stock.length} SKU{stock.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
+                      <div className="divide-y divide-border-default">
+                        {stock.map(row => (
+                          <StockRow key={row.id} row={row} locationId={activeLocation.id} siblingLocations={locations} onRefresh={() => selectedLocation && loadStock(selectedLocation)} />
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
-function PlusButton({ onClick, title }: { onClick: (e: React.MouseEvent) => void; title: string }) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className="opacity-0 group-hover:opacity-100 ml-auto flex items-center justify-center w-5 h-5 rounded hover:bg-secondary-100 dark:hover:bg-secondary-900/30 text-secondary-500 dark:text-secondary-400 transition-all shrink-0"
-    >
-      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-    </button>
-  )
-}
-
-function LabelButton({ onClick, title }: { onClick: (e: React.MouseEvent) => void; title: string }) {
-  return (
-    <button
-      onClick={onClick}
-      title={title}
-      className="opacity-0 group-hover:opacity-100 flex items-center justify-center w-5 h-5 rounded hover:bg-secondary-100 dark:hover:bg-secondary-900/30 text-foreground-muted hover:text-secondary-500 dark:hover:text-secondary-400 transition-all shrink-0"
-    >
-      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5l4.586 4.586a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-4-4a2 2 0 010-2.828L7 3z" /></svg>
-    </button>
-  )
-}
-
-function LocationPanel({ tree, locations, selected, onSelect, onAdd, onEdit, onDelete, showForm, editTarget, locationFormPrefill, onFormSave, onFormCancel, expandedAisles, setExpandedAisles, expandedRacks, setExpandedRacks, selectedWarehouse, mobilePanel, loading, onDownloadLabel, onDownloadSynthetic }: {
-  tree: ReturnType<typeof groupLocations>; locations: ShelfLocation[]; selected: string | null
-  onSelect: (id: string) => void
-  onAdd: (prefill?: { aisle?: string; rack?: string }) => void
-  onEdit: (l: ShelfLocation) => void; onDelete: (id: string) => void
-  showForm: boolean; editTarget: ShelfLocation | null
-  locationFormPrefill: { aisle?: string; rack?: string }
-  onFormSave: (d: any) => Promise<void>; onFormCancel: () => void
-  expandedAisles: Record<string, boolean>; setExpandedAisles: (v: any) => void
-  expandedRacks: Record<string, boolean>; setExpandedRacks: (v: any) => void
-  selectedWarehouse: string | null; mobilePanel: Panel
-  loading?: boolean
-  onDownloadLabel: (locationIds: string[], filename: string) => void
-  onDownloadSynthetic: (displayCode: string, warehouseName: string, filename: string) => void
+function WarehouseChip({ warehouse, selected, onSelect, onEdit, onDelete }: {
+  warehouse: Warehouse; selected: boolean
+  onSelect: () => void; onEdit: () => void; onDelete: () => void
 }) {
-  const visible = mobilePanel === 'location'
-
-  const prefillInitial = editTarget ? undefined : {
-    aisle_code: locationFormPrefill.aisle || '',
-    rack_code: locationFormPrefill.rack || '',
-    shelf_code: '',
-    bin_code: null,
-    display_code: '',
-    notes: null,
-  } as Partial<import('@/components/admin/ShelvingParts').ShelfLocation>
-
   return (
-    <div className={`${visible ? 'flex' : 'hidden'} lg:flex flex-col flex-1 lg:flex-none lg:w-72 border-r border-border-default bg-surface overflow-hidden`}>
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border-default shrink-0">
-        <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Locations</span>
-        {selectedWarehouse && (
-          <button onClick={() => onAdd()}
-            className="flex items-center gap-1 text-xs font-medium text-secondary-500 dark:text-secondary-400 hover:text-secondary-600 transition-colors">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Add
+    <div className="group relative flex items-center h-7 rounded-full overflow-hidden">
+      <button
+        onClick={onSelect}
+        className={`flex items-center gap-1.5 h-full pl-2 pr-2 text-xs font-medium transition-colors ${
+          selected
+            ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900'
+            : 'bg-surface-secondary border border-border-default text-foreground hover:bg-secondary-50 dark:hover:bg-secondary-900/20 hover:border-secondary-300 dark:hover:border-secondary-700'
+        }`}
+      >
+        <span className={`text-[10px] font-mono font-bold px-1 py-0.5 rounded ${
+          selected ? 'bg-white/20 dark:bg-black/20 text-inherit' : 'bg-surface text-foreground-secondary'
+        }`}>{warehouse.code}</span>
+        <span>{warehouse.name}</span>
+        {!warehouse.is_active && (
+          <span className={`text-[9px] px-1 py-0.5 rounded-full ${selected ? 'bg-white/20 text-inherit' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400'}`}>off</span>
+        )}
+      </button>
+      {/* Edit/delete — appear on hover */}
+      <div className="hidden group-hover:flex items-center bg-surface border border-border-default border-l-0 h-full rounded-r-full overflow-hidden divide-x divide-border-default">
+        <button onClick={e => { e.stopPropagation(); onEdit() }}
+          className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-secondary-500 hover:bg-secondary-50 dark:hover:bg-secondary-900/20 transition-colors">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+        </button>
+        <button onClick={e => { e.stopPropagation(); onDelete() }}
+          className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function LocationChip({ location, selected, onSelect, onEdit, onDelete, onLabel }: {
+  location: ShelfLocation; selected: boolean
+  onSelect: () => void; onEdit: () => void; onDelete: () => void; onLabel: () => void
+}) {
+  return (
+    <div className="group relative flex items-center h-7 rounded-full overflow-hidden">
+      <button
+        onClick={onSelect}
+        className={`flex items-center gap-1.5 h-full pl-2.5 pr-2.5 text-xs font-mono font-medium transition-colors ${
+          selected
+            ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900'
+            : 'bg-surface-secondary border border-border-default text-foreground hover:bg-secondary-50 dark:hover:bg-secondary-900/20 hover:border-secondary-300 dark:hover:border-secondary-700'
+        } ${location.is_open_shelf ? 'italic' : ''}`}
+      >
+        {location.display_code}
+        {location.stock_count > 0 && (
+          <span className={`text-[10px] font-sans ${selected ? 'opacity-70' : 'text-foreground-muted'}`}>
+            {location.stock_count}
+          </span>
+        )}
+      </button>
+      {/* Edit/delete/label — appear on hover */}
+      <div className="hidden group-hover:flex items-center bg-surface border border-border-default border-l-0 h-full rounded-r-full overflow-hidden divide-x divide-border-default">
+        <button onClick={e => { e.stopPropagation(); onLabel() }}
+          title="Print label"
+          className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-secondary-500 hover:bg-secondary-50 dark:hover:bg-secondary-900/20 transition-colors">
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5l4.586 4.586a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-4-4a2 2 0 010-2.828L7 3z" /></svg>
+        </button>
+        {!location.is_open_shelf && (
+          <button onClick={e => { e.stopPropagation(); onEdit() }}
+            className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-secondary-500 hover:bg-secondary-50 dark:hover:bg-secondary-900/20 transition-colors">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+          </button>
+        )}
+        {!location.is_open_shelf && (
+          <button onClick={e => { e.stopPropagation(); onDelete() }}
+            className="flex items-center justify-center w-6 h-full text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
           </button>
         )}
       </div>
-
-      {showForm && (
-        <div className="p-4 border-b border-border-default bg-surface-secondary shrink-0">
-          <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">
-            {editTarget ? 'Edit Location' : locationFormPrefill.rack ? `New shelf in ${locationFormPrefill.aisle}-${locationFormPrefill.rack}` : locationFormPrefill.aisle ? `New rack in aisle ${locationFormPrefill.aisle}` : 'New Location'}
-          </p>
-          {selectedWarehouse && (
-            <LocationForm
-              warehouseId={selectedWarehouse}
-              onSave={onFormSave}
-              onCancel={onFormCancel}
-              initial={editTarget || prefillInitial}
-            />
-          )}
-        </div>
-      )}
-
-      <div className="flex-1 overflow-y-auto">
-        {!selectedWarehouse && (
-          <div className="py-12 text-center px-4">
-            <p className="text-sm text-foreground-secondary">No warehouse selected</p>
-            <p className="text-xs text-foreground-muted mt-1">← Pick a warehouse first</p>
-          </div>
-        )}
-        {selectedWarehouse && loading && (
-          <div className="divide-y divide-border-default">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="flex items-center gap-2.5 px-4 py-3 animate-pulse" style={{ animationDelay: `${i * 50}ms` }}>
-                <div className="w-10 h-4 bg-surface-secondary rounded shrink-0" />
-                <div className="h-3.5 bg-surface-secondary rounded flex-1" />
-              </div>
-            ))}
-          </div>
-        )}
-        {selectedWarehouse && !loading && locations.length === 0 && (
-          <div className="py-12 text-center px-4">
-            <p className="text-sm text-foreground-secondary">No locations yet</p>
-            <p className="text-xs text-foreground-muted mt-1">Add a location above</p>
-          </div>
-        )}
-        {!loading && Object.entries(tree).sort(([a], [b]) => a.localeCompare(b)).map(([aisle, racks]) => (
-          <div key={aisle}>
-            <div className="group flex items-center gap-2 px-4 py-2.5 border-b border-border-default/40">
-              <button
-                onClick={() => setExpandedAisles((p: any) => ({ ...p, [aisle]: !p[aisle] }))}
-                className="flex items-center gap-2 flex-1 min-w-0 hover:text-foreground text-left transition-colors"
-              >
-                <svg className={`w-3 h-3 transition-transform text-foreground-muted shrink-0 ${expandedAisles[aisle] ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                <span className="text-xs font-bold font-mono text-foreground">{aisle}</span>
-                <span className="text-[10px] font-medium text-foreground-muted uppercase tracking-wide">Aisle</span>
-              </button>
-              <LabelButton onClick={e => { e.stopPropagation(); onDownloadLabel(locations.filter(l => l.aisle_code === aisle).map(l => l.id), `aisle-${aisle}.pdf`) }} title={`Download labels for aisle ${aisle}`} />
-              <PlusButton onClick={e => { e.stopPropagation(); onAdd({ aisle }) }} title={`Add rack in aisle ${aisle}`} />
-            </div>
-            {expandedAisles[aisle] && Object.entries(racks).sort(([a], [b]) => a.localeCompare(b)).map(([rack, shelves]) => (
-              <div key={rack}>
-                <div className="group flex items-center gap-2 pl-8 pr-4 py-2 border-b border-border-default/30">
-                  <button
-                    onClick={() => setExpandedRacks((p: any) => ({ ...p, [`${aisle}-${rack}`]: !p[`${aisle}-${rack}`] }))}
-                    className="flex items-center gap-2 flex-1 min-w-0 hover:text-foreground text-left transition-colors"
-                  >
-                    <svg className={`w-3 h-3 transition-transform text-foreground-muted shrink-0 ${expandedRacks[`${aisle}-${rack}`] ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                    <span className="text-xs font-semibold font-mono text-foreground-secondary">{rack}</span>
-                    <span className="text-[10px] font-medium text-foreground-muted uppercase tracking-wide">Rack</span>
-                  </button>
-                  <LabelButton onClick={e => { e.stopPropagation(); onDownloadLabel(locations.filter(l => l.aisle_code === aisle && l.rack_code === rack).map(l => l.id), `rack-${aisle}-${rack}.pdf`) }} title={`Download labels for rack ${aisle}-${rack}`} />
-                  <PlusButton onClick={e => { e.stopPropagation(); onAdd({ aisle, rack }) }} title={`Add shelf in ${aisle}-${rack}`} />
-                </div>
-                {expandedRacks[`${aisle}-${rack}`] && Object.entries(shelves).sort(([a], [b]) => a.localeCompare(b)).map(([, locs]) => (
-                  locs.map(loc => (
-                    <div key={loc.id} onClick={() => onSelect(loc.id)}
-                      className={`group flex items-center gap-2 pl-14 pr-4 py-2 cursor-pointer transition-colors border-b border-border-default/20 last:border-0 ${selected === loc.id ? 'bg-secondary-50 dark:bg-secondary-900/20 border-r-2 border-r-secondary-500' : 'hover:bg-surface-secondary/60'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${selected === loc.id ? 'bg-secondary-500' : 'bg-foreground-muted/40'}`} />
-                      <span className="text-xs font-mono flex-1 text-foreground">{loc.display_code}</span>
-                      {loc.stock_count > 0 && (
-                        <span className="text-[10px] font-medium text-foreground-muted shrink-0">{loc.stock_count}</span>
-                      )}
-                      <div className="hidden group-hover:flex items-center gap-0.5 shrink-0">
-                        <LabelButton onClick={e => { e.stopPropagation(); onDownloadLabel([loc.id], `shelf-label-${loc.display_code}.pdf`) }} title={`Download label for ${loc.display_code}`} />
-                        <button onClick={e => { e.stopPropagation(); onEdit(loc) }}
-                          className="p-1 rounded hover:bg-surface text-foreground-muted hover:text-secondary-500 transition-colors">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                        </button>
-                        <button onClick={e => { e.stopPropagation(); onDelete(loc.id) }}
-                          className="p-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-500 transition-colors">
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                        </button>
-                      </div>
-                    </div>
-                  ))
-                ))}
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function StockPanel({ location, stock, loading, locations, showAssign, setShowAssign, onRefresh, onPrintLabel, generating, mobilePanel }: {
-  location?: ShelfLocation; stock: ShelfStock[]; loading: boolean
-  locations: ShelfLocation[]; showAssign: boolean; setShowAssign: (v: boolean) => void
-  onRefresh: () => void; onPrintLabel?: () => void; generating: boolean; mobilePanel: Panel
-}) {
-  const visible = mobilePanel === 'stock'
-  return (
-    <div className={`${visible ? 'flex' : 'hidden'} lg:flex flex-col flex-1 bg-surface-secondary overflow-hidden`}>
-      {!location ? (
-        <div className="flex-1 flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-sm font-medium text-foreground-secondary">No location selected</p>
-            <p className="text-xs text-foreground-muted mt-1">← Select a shelf location to view stock</p>
-          </div>
-        </div>
-      ) : (
-        <>
-          <div className="flex items-center justify-between px-4 sm:px-6 py-3 border-b border-border-default bg-surface shrink-0">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="font-mono font-bold text-secondary-500 dark:text-secondary-400 text-base">{location.display_code}</span>
-                {!location.is_active && (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400">inactive</span>
-                )}
-              </div>
-              {location.notes && <p className="text-xs text-foreground-muted mt-0.5">{location.notes}</p>}
-            </div>
-            <div className="flex items-center gap-2">
-              {onPrintLabel && (
-                <button onClick={onPrintLabel} disabled={generating} className={btnSecondary + ' !px-3 text-xs'}>
-                  {generating ? (
-                    <span className="flex items-center gap-1.5">
-                      <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" /></svg>
-                      Generating…
-                    </span>
-                  ) : 'Print Label'}
-                </button>
-              )}
-              <button onClick={() => setShowAssign(!showAssign)} className={btnPrimary + ' !px-3 text-xs'}>
-                + Assign Stock
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-3">
-            {showAssign && (
-              <AssignStockForm location={location} onSave={() => { setShowAssign(false); onRefresh() }} onCancel={() => setShowAssign(false)} />
-            )}
-
-            {loading && (
-              <div className="flex items-center justify-center py-16">
-                <div className="w-6 h-6 border-2 border-secondary-500 border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-
-            {!loading && stock.length === 0 && !showAssign && (
-              <div className="bg-surface-elevated rounded-xl border border-border-default p-12 text-center">
-                <p className="text-sm font-medium text-foreground-secondary">No stock assigned here yet</p>
-                <p className="text-xs text-foreground-muted mt-1 mb-4">Use the button above to assign products to this location</p>
-                <button onClick={() => setShowAssign(true)} className={btnPrimary + ' !px-4 text-xs'}>
-                  + Assign Stock
-                </button>
-              </div>
-            )}
-
-            {!loading && stock.length > 0 && (
-              <div className="bg-surface-elevated rounded-xl border border-border-default">
-                <div className="px-4 py-3 border-b border-border-default flex items-center justify-between">
-                  <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">
-                    Stock — {stock.length} SKU{stock.length !== 1 ? 's' : ''}
-                  </span>
-                </div>
-                <div className="divide-y divide-border-default">
-                  {stock.map(row => (
-                    <StockRow key={row.id} row={row} locationId={location.id} siblingLocations={locations} onRefresh={onRefresh} />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </>
-      )}
     </div>
   )
 }
@@ -657,7 +546,6 @@ function LabelsTab({ locations, warehouses, labelSelections, setLabelSelections,
 
   return (
     <div className="flex-1 flex min-h-0 overflow-hidden">
-      {/* Left — filters + location list */}
       <div className="flex flex-col w-72 xl:w-80 shrink-0 border-r border-border-default bg-surface overflow-hidden">
         <div className="px-4 py-3 border-b border-border-default shrink-0">
           <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Filter Locations</span>
@@ -744,7 +632,6 @@ function LabelsTab({ locations, warehouses, labelSelections, setLabelSelections,
         </div>
       </div>
 
-      {/* Right — selected preview + generate */}
       <div className="flex flex-col flex-1 bg-surface-secondary overflow-hidden">
         <div className="px-5 py-3 border-b border-border-default bg-surface shrink-0 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
