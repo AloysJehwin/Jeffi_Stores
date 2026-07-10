@@ -1112,9 +1112,10 @@ function StockTab() {
   // Group by reference_id, preserving order of first appearance
   const ledgerGroups: { refId: string; refType: string; refLabel: string | null; date: string; txs: StockTransaction[] }[] = []
   for (const tx of sortedTransactions) {
-    // Group by reference_id so all products in one GRN/order collapse together.
+    // Group by reference_id + transaction_type so sale and return events for the
+    // same order appear as separate groups instead of netting to 0.
     // Fall back to tx.id for rows with no reference_id (legacy rows).
-    const groupKey = tx.reference_id || tx.id
+    const groupKey = tx.reference_id ? `${tx.reference_id}::${tx.transaction_type}` : tx.id
     const existing = ledgerGroups.find(g => g.refId === groupKey)
     if (existing) { existing.txs.push(tx) }
     else { ledgerGroups.push({ refId: groupKey, refType: tx.reference_type, refLabel: tx.reference_label, date: tx.created_at, txs: [tx] }) }
