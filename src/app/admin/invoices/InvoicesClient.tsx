@@ -100,22 +100,24 @@ export default function InvoicesClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  // open editor directly when ?edit=<id> is in the URL (e.g. from detail page Edit button)
+  // open editor directly when ?edit=<id>&view=edit is in the URL (reload or direct link)
   useEffect(() => {
     const editParam = searchParams.get('edit')
-    if (editParam && searchParams.get('view') === 'edit') {
+    if (editParam && searchParams.get('view') === 'edit' && editId !== editParam) {
       openEdit({ id: editParam, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams])
 
-  function navigateView(next: View) {
+  function navigateView(next: View, id?: string) {
     setViewState(next)
     if (next === 'list') {
       router.back()
     } else {
       const params = new URLSearchParams(window.location.search)
       params.set('view', next)
+      if (id) params.set('edit', id)
+      else params.delete('edit')
       router.push(ap(`/admin/invoices?${params.toString()}`), { scroll: false })
     }
   }
@@ -439,7 +441,7 @@ export default function InvoicesClient() {
 
       setFormError('')
       setEditIsDraft(inv.status === 'draft')
-      navigateView('edit')
+      navigateView('edit', inv.id)
     } catch {
       showToast('Failed to load invoice for editing', 'error')
     } finally {
