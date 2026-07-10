@@ -95,8 +95,10 @@ export async function GET(request: NextRequest) {
       const qSerializedResult = []
 
       for (const item of qItems) {
-        const rawQty = parseFloat(item.quantity)
-        const requiredQty = item.base_quantity ? parseFloat(item.base_quantity) : rawQty
+        const soldFactor = item.sold_unit_factor ? parseFloat(item.sold_unit_factor) : 1
+        const requiredQty = soldFactor > 1
+          ? parseFloat(item.quantity) * soldFactor
+          : (item.base_quantity ? parseFloat(item.base_quantity) : parseFloat(item.quantity))
 
         if (item.serialized) {
           qSerializedResult.push({
