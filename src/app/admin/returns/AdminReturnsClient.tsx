@@ -321,12 +321,12 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
 const STATUS_TABS = [
   { key: 'all', label: 'All active' },
   { key: 'pending_approval', label: 'Pending approval' },
-  { key: 'approved', label: 'Approved' },
   { key: 'history', label: 'History' },
 ]
 
 export default function AdminReturnsClient() {
   const [activeTab, setActiveTab] = useState('all')
+  const [historyFilter, setHistoryFilter] = useState('all')
   const [returns, setReturns] = useState<ReturnRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -335,7 +335,10 @@ export default function AdminReturnsClient() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/admin/returns?status=${activeTab}`, { credentials: 'include' })
+      const url = activeTab === 'history'
+        ? `/api/admin/returns?status=history&filter=${historyFilter}`
+        : `/api/admin/returns?status=${activeTab}`
+      const res = await fetch(url, { credentials: 'include' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
       setReturns(data.returns)
@@ -344,28 +347,53 @@ export default function AdminReturnsClient() {
     } finally {
       setLoading(false)
     }
-  }, [activeTab])
+  }, [activeTab, historyFilter])
 
   useEffect(() => { load() }, [load])
 
   return (
     <div className="space-y-4">
       {/* Tabs */}
-      <div className="flex gap-1 bg-surface-secondary border border-border-default rounded-lg p-1 w-fit">
-        {STATUS_TABS.map(tab => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => setActiveTab(tab.key)}
-            className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
-              activeTab === tab.key
-                ? 'bg-surface text-foreground shadow-sm'
-                : 'text-foreground-secondary hover:text-foreground'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex gap-1 bg-surface-secondary border border-border-default rounded-lg p-1">
+          {STATUS_TABS.map(tab => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                activeTab === tab.key
+                  ? 'bg-surface text-foreground shadow-sm'
+                  : 'text-foreground-secondary hover:text-foreground'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        {activeTab === 'history' && (
+          <div className="flex gap-1 bg-surface-secondary border border-border-default rounded-lg p-1">
+            {[
+              { key: 'all', label: 'All' },
+              { key: 'approved', label: 'Approved' },
+              { key: 'rejected', label: 'Rejected' },
+            ].map(f => (
+              <button
+                key={f.key}
+                type="button"
+                onClick={() => setHistoryFilter(f.key)}
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors ${
+                  historyFilter === f.key
+                    ? 'bg-surface text-foreground shadow-sm'
+                    : 'text-foreground-secondary hover:text-foreground'
+                }`}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {error && (
@@ -382,7 +410,11 @@ export default function AdminReturnsClient() {
         </div>
       ) : returns.length === 0 ? (
         <div className="py-16 text-center text-foreground-muted text-sm">
-          {activeTab === 'history' ? 'No completed or rejected returns' : 'No active return requests'}
+          {activeTab === 'history'
+            ? historyFilter === 'approved' ? 'No approved returns'
+              : historyFilter === 'rejected' ? 'No rejected returns'
+              : 'No completed or rejected returns'
+            : 'No active return requests'}
         </div>
       ) : (
         <div className="space-y-3">
