@@ -41,9 +41,10 @@ export async function GET(
 
     const items = await queryMany<any>(`
       SELECT oi.id, oi.product_id, oi.product_name, oi.product_sku, oi.variant_id, oi.variant_name,
-             oi.sub_variant_id, oi.hsn_code, oi.gst_rate, oi.quantity, oi.unit_price, oi.total_price,
+             oi.sub_variant_id, oi.hsn_code, oi.gst_rate, oi.quantity, oi.unit_price, oi.mrp,
+             oi.discount_pct, oi.discount_amount, oi.total_price,
              oi.taxable_amount, oi.cgst_amount, oi.sgst_amount, oi.igst_amount, oi.tax_amount,
-             oi.buy_mode, oi.buy_unit,
+             oi.buy_mode, oi.buy_unit, oi.sold_unit_factor, oi.base_quantity,
              CASE WHEN psv.id IS NOT NULL THEN json_build_object(
                'id', psv.id,
                'sub_variant_name', psv.sub_variant_name,
