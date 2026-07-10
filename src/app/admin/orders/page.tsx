@@ -224,15 +224,6 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Orders</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage customer orders</p>
         </div>
-        <Link
-          href={ap('/admin/orders/new', host)}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          New Offline Order
-        </Link>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
@@ -268,7 +259,6 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             label: 'Source',
             options: [
               { value: 'online', label: 'Online' },
-              { value: 'offline', label: 'Offline' },
             ] },
           {
             name: 'status',
