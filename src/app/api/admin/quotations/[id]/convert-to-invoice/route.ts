@@ -134,7 +134,7 @@ export async function POST(
       // per-selling-unit rate (rate already incorporates the factor from the quotation)
       const baseQty = isCountWithFactor ? rawQty * factor : rawQty
       const rate = parseFloat(item.rate)
-      const exGstLineTotal = lineItemExGst(rawQty, rate, parseFloat(item.discount_pct) || 0)
+      const exGstLineTotal = lineItemExGst(baseQty, rate, parseFloat(item.discount_pct) || 0)
       const gstRate = parseFloat(item.gst_rate || '18')
 
       let cgst = 0, sgst = 0, igst = 0
