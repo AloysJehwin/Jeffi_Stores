@@ -42,11 +42,11 @@ export async function GET(request: NextRequest) {
            -- For perishable products, add batch quantity_remaining to inventory_quantity.
            CASE
              WHEN oi.sub_variant_id IS NOT NULL THEN COALESCE(psv.inventory_quantity, 0)
-               + CASE WHEN p.perishable THEN COALESCE((SELECT SUM(pb.quantity_remaining) FROM product_batches pb WHERE pb.product_id = oi.product_id AND pb.variant_id = oi.variant_id AND pb.sub_variant_id = oi.sub_variant_id AND pb.quantity_remaining > 0), 0) ELSE 0 END
+               + CASE WHEN p.perishable AND NOT p.serialized THEN COALESCE((SELECT SUM(pb.quantity_remaining) FROM product_batches pb WHERE pb.product_id = oi.product_id AND pb.variant_id = oi.variant_id AND pb.sub_variant_id = oi.sub_variant_id AND pb.quantity_remaining > 0), 0) ELSE 0 END
              WHEN oi.variant_id IS NOT NULL THEN COALESCE(pv.inventory_quantity, 0)
-               + CASE WHEN p.perishable THEN COALESCE((SELECT SUM(pb.quantity_remaining) FROM product_batches pb WHERE pb.product_id = oi.product_id AND pb.variant_id = oi.variant_id AND pb.sub_variant_id IS NULL AND pb.quantity_remaining > 0), 0) ELSE 0 END
+               + CASE WHEN p.perishable AND NOT p.serialized THEN COALESCE((SELECT SUM(pb.quantity_remaining) FROM product_batches pb WHERE pb.product_id = oi.product_id AND pb.variant_id = oi.variant_id AND pb.sub_variant_id IS NULL AND pb.quantity_remaining > 0), 0) ELSE 0 END
              ELSE COALESCE(p.inventory_quantity, 0)
-               + CASE WHEN p.perishable THEN COALESCE((SELECT SUM(pb.quantity_remaining) FROM product_batches pb WHERE pb.product_id = oi.product_id AND pb.variant_id IS NULL AND pb.sub_variant_id IS NULL AND pb.quantity_remaining > 0), 0) ELSE 0 END
+               + CASE WHEN p.perishable AND NOT p.serialized THEN COALESCE((SELECT SUM(pb.quantity_remaining) FROM product_batches pb WHERE pb.product_id = oi.product_id AND pb.variant_id IS NULL AND pb.sub_variant_id IS NULL AND pb.quantity_remaining > 0), 0) ELSE 0 END
            END::numeric                                            AS avail_qty,
            oi.product_id IS NOT NULL                               AS tracked
          FROM order_items oi
