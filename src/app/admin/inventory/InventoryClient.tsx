@@ -289,6 +289,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
   const [receiveNotes, setReceiveNotes] = useState('')
   const [receiveSaving, setReceiveSaving] = useState(false)
   const [receiveWarehouseId, setReceiveWarehouseId] = useState('')
+  const [editWarehouses, setEditWarehouses] = useState<{ id: string; name: string; code: string }[]>([])
   const [shelfLocations, setShelfLocations] = useState<{ id: string; display_code: string }[]>([])
   const [poSortCol, setPoSortCol] = useState<string | undefined>(undefined)
   const [poSortDir, setPoSortDir] = useState<SortDir | undefined>(undefined)
