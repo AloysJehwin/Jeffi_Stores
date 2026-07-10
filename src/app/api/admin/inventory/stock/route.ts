@@ -4,6 +4,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { getStockLedger, getStockValuation, logStockMovement } from '@/lib/inventory'
 import { getClient, queryOne } from '@/lib/db'
+import { getOrCreateOpenShelf } from '@/lib/shelf'
 import { logAdminAudit } from '@/lib/admin-audit'
 import { parseBody, zUuid } from '@/lib/validate'
 
@@ -16,6 +17,8 @@ const PatchSchema = z.object({
   unit_id: zUuid.nullish(),
   quantity_in_unit: z.coerce.number().positive().optional(),
   notes: z.string().nullish(),
+  warehouse_id: zUuid.nullish(),
+  location_id: zUuid.nullish(),
 }).refine(d => d.new_quantity !== undefined || (d.unit_id && d.quantity_in_unit !== undefined), {
   message: 'Provide either new_quantity or both unit_id and quantity_in_unit',
 })
@@ -197,6 +200,35 @@ export async function PATCH(request: NextRequest) {
       })
 
       await client.query('COMMIT')
+
+      // Assign to shelf when warehouse provided (non-perishable/serialized — those use syncPerishableStock)
+      if (parsed.data.warehouse_id) {
+        const wRow = await queryOne<{ code: string; perishable: boolean; serialized: boolean }>(
+          `SELECT w.code, p.perishable, p.serialized
+           FROM warehouses w, products p WHERE w.id = $1 AND p.id = $2`,
+          [parsed.data.warehouse_id, product_id]
+        )
+        if (wRow && !wRow.perishable && !wRow.serialized) {
+          const locationId = parsed.data.location_id ||
+            await getOrCreateOpenShelf(parsed.data.warehouse_id, wRow.code)
+          // Remove stock from any other locations for this product/variant (reassignment)
+          await queryOne(
+            `DELETE FROM shelf_stock
+             WHERE product_id = $1
+               AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+               AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))
+               AND location_id != $4`,
+            [product_id, variant_id ?? null, sub_variant_id ?? null, locationId]
+          )
+          await queryOne(
+            `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
+             VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT ON CONSTRAINT shelf_stock_unique
+             DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = now()`,
+            [locationId, product_id, variant_id ?? null, sub_variant_id ?? null, newQuantityBase]
+          )
+        }
+      }
 
       const product = await queryOne<{ name: string }>('SELECT name FROM products WHERE id = $1', [product_id])
       logAdminAudit({

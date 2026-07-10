@@ -274,9 +274,9 @@ export async function getBatchesAtLocation(locationId: string): Promise<Location
   )
 }
 
-export async function getStockForProduct(productId: string, variantId?: string | null, subVariantId?: string | null): Promise<{ location_display_code: string; quantity: number; variant_id: string | null; sub_variant_id: string | null }[]> {
+export async function getStockForProduct(productId: string, variantId?: string | null, subVariantId?: string | null): Promise<{ location_id: string; warehouse_id: string; location_display_code: string; quantity: number; variant_id: string | null; sub_variant_id: string | null }[]> {
   return queryMany(
-    `SELECT sl.display_code AS location_display_code, ss.quantity, ss.variant_id, ss.sub_variant_id
+    `SELECT ss.location_id, sl.warehouse_id, sl.display_code AS location_display_code, ss.quantity, ss.variant_id, ss.sub_variant_id
      FROM shelf_stock ss
      JOIN shelf_locations sl ON sl.id = ss.location_id
      WHERE ss.product_id = $1
