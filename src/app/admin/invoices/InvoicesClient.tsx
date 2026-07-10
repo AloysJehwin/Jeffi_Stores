@@ -199,9 +199,10 @@ export default function InvoicesClient() {
   const [serialAssignments, setSerialAssignments] = useState<SerialAssignment[]>([])
   const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
 
-  // Draft-list finalize batch picker
+  // Draft-list finalize batch/serial picker
   const [draftFinalizeId, setDraftFinalizeId] = useState<string | null>(null)
   const [draftBatchItems, setDraftBatchItems] = useState<BatchPickerItem[]>([])
+  const [draftSerialItems, setDraftSerialItems] = useState<SerialItem[]>([])
 
   const totalPages = Math.ceil(total / 25)
 
@@ -264,30 +265,32 @@ export default function InvoicesClient() {
   async function finalizeDraft(id: string) {
     setFinalizingId(id)
     try {
-      // Check if any items are perishable and need batch assignment
+      // Check if any items are perishable/serialized and need assignment
       const batchRes = await fetch(`/api/admin/inventory/batches/available?order_id=${id}`, { credentials: 'include' })
       const batchData = await batchRes.json()
-      if (batchData.items?.length > 0) {
-        // Show batch picker — finalize will happen after confirmation
+      const hasBatch = batchData.items?.length > 0
+      const hasSerial = batchData.serialized_items?.length > 0
+      if (hasBatch || hasSerial) {
         setDraftFinalizeId(id)
-        setDraftBatchItems(batchData.items)
+        if (hasBatch) setDraftBatchItems(batchData.items)
+        if (hasSerial) setDraftSerialItems(batchData.serialized_items)
         setFinalizingId(null)
         return
       }
-      await doFinalizeDraft(id, [])
+      await doFinalizeDraft(id, [], [])
     } catch {
       showToast('Failed to finalize draft', 'error')
       setFinalizingId(null)
     }
   }
 
-  async function doFinalizeDraft(id: string, batchAssignments: { order_item_id: string; batch_id: string; qty: number }[]) {
+  async function doFinalizeDraft(id: string, batchAssignments: { order_item_id: string; batch_id: string; qty: number }[], serialAssignmentsArg: { order_item_id: string; serial_number: string }[]) {
     setFinalizingId(id)
     try {
       const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ batch_assignments: batchAssignments }),
+        body: JSON.stringify({ batch_assignments: batchAssignments, serial_assignments: serialAssignmentsArg }),
       })
       const data = await res.json()
       if (!res.ok) { showToast(data.error || 'Failed to finalize', 'error'); return }
@@ -1038,9 +1041,21 @@ export default function InvoicesClient() {
           const id = draftFinalizeId
           setDraftFinalizeId(null)
           setDraftBatchItems([])
-          doFinalizeDraft(id, assignments)
+          doFinalizeDraft(id, assignments, [])
         }}
         onCancel={() => { setDraftFinalizeId(null); setDraftBatchItems([]) }}
+      />
+    )}
+    {draftFinalizeId && draftSerialItems.length > 0 && draftBatchItems.length === 0 && (
+      <SerialEntryModal
+        items={draftSerialItems}
+        onConfirm={assignments => {
+          const id = draftFinalizeId
+          setDraftFinalizeId(null)
+          setDraftSerialItems([])
+          doFinalizeDraft(id, [], assignments)
+        }}
+        onCancel={() => { setDraftFinalizeId(null); setDraftSerialItems([]) }}
       />
     )}
     <div className="space-y-4">
