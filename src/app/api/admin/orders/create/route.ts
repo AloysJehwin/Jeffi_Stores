@@ -106,6 +106,8 @@ export async function POST(request: NextRequest) {
         quantity: qty,
         buy_unit: item.buy_unit || null,
         buy_mode: item.buy_mode || 'unit',
+        sold_unit_factor: item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : null,
+        base_quantity: item.sell_unit_factor && item.sell_unit_factor > 1 ? qty * item.sell_unit_factor : null,
         unit_price: unitPrice,
         total_price: lineTotal,
         taxable_amount: round2(gst.taxableAmount),
@@ -245,13 +247,15 @@ export async function POST(request: NextRequest) {
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, buy_unit, buy_mode, unit_price, discount_amount, tax_amount,
+            hsn_code, gst_rate, quantity, buy_unit, buy_mode, sold_unit_factor, base_quantity,
+            unit_price, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,0,$14,$15,$16,$17,$18,$19)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,0,$16,$17,$18,$19,$20,$21)`,
           [
             orderId, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name,
             item.hsn_code, item.gst_rate, item.quantity, item.buy_unit, item.buy_mode,
+            item.sold_unit_factor ?? null, item.base_quantity ?? null,
             item.unit_price,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
