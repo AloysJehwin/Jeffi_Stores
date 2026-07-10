@@ -228,7 +228,7 @@ export default function CashSaleClient() {
     const params = new URLSearchParams({
       product_id: item.product_id,
       line_item_id: item.id,
-      qty: String(Number(item.quantity) || 1),
+      qty: String((Number(item.quantity) || 1) * (item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1)),
     })
     if (item.variant_id) params.set('variant_id', item.variant_id)
     if (item.sub_variant_id) params.set('sub_variant_id', item.sub_variant_id)
