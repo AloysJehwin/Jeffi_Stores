@@ -79,6 +79,8 @@ export async function GET(request: NextRequest) {
           NULL AS variant_name,
           qi.quantity,
           qi.buy_unit,
+          qi.sold_unit_factor,
+          COALESCE(qi.base_quantity, qi.quantity) AS base_quantity,
           NULL AS batch_id,
           p.perishable,
           p.serialized
@@ -93,18 +95,8 @@ export async function GET(request: NextRequest) {
       const qSerializedResult = []
 
       for (const item of qItems) {
-        const unitRow = await queryOne<{ factor: string; dimension: string }>(`
-          SELECT COALESCE(puv.factor, pup.factor) AS factor,
-                 COALESCE(puv.dimension, pup.dimension) AS dimension
-          FROM (SELECT 1) x
-          LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
-          LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL
-        `, [item.buy_unit, item.product_id, item.variant_id || null])
-
         const rawQty = parseFloat(item.quantity)
-        const requiredQty = (unitRow?.dimension === 'count' && unitRow?.factor)
-          ? rawQty * parseFloat(unitRow.factor)
-          : rawQty
+        const requiredQty = item.base_quantity ? parseFloat(item.base_quantity) : rawQty
 
         if (item.serialized) {
           qSerializedResult.push({
