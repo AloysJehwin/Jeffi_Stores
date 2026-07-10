@@ -51,8 +51,8 @@ export async function POST(
           : rawQty
 
         // Find all batch deductions logged for this order item
-        const batchMovements = await client.query<{ batch_id: string; quantity_change: string }>(
-          `SELECT batch_id, quantity_change FROM inventory_transactions
+        const batchMovements = await client.query<{ batch_id: string; quantity_change: string; serial_number: string | null }>(
+          `SELECT batch_id, quantity_change, serial_number FROM inventory_transactions
            WHERE reference_type = 'order' AND reference_id = $1
              AND product_id = $2
              AND (variant_id = $3 OR ($3 IS NULL AND variant_id IS NULL))
@@ -86,6 +86,7 @@ export async function POST(
               batchId: mv.batch_id,
               lotNumber: batchUpd.rows[0]?.lot_number ?? null,
               expiryDate: batchUpd.rows[0]?.expiry_date ?? null,
+              serialNumber: mv.serial_number ?? null,
             })
           }
         } else if (item.sub_variant_id) {
