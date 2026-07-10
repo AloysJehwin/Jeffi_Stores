@@ -16,8 +16,7 @@ export async function GET(request: NextRequest) {
 
     let statusFilter = `rr.status NOT IN ('rejected', 'completed')`
     if (status === 'pending_approval') statusFilter = `rr.status = 'pending_approval'`
-    else if (status === 'approved') statusFilter = `rr.status = 'approved'`
-    else if (status === 'received') statusFilter = `rr.status = 'received'`
+    else if (status === 'approved') statusFilter = `rr.status IN ('approved', 'received')`
     else if (status === 'history') statusFilter = `rr.status IN ('completed', 'rejected')`
 
     const rows = await queryMany(
