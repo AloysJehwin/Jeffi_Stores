@@ -323,6 +323,7 @@ const STATUS_TABS = [
   { key: 'pending_approval', label: 'Pending approval' },
   { key: 'approved', label: 'Approved' },
   { key: 'received', label: 'Received' },
+  { key: 'history', label: 'History' },
 ]
 
 export default function AdminReturnsClient() {
@@ -382,7 +383,7 @@ export default function AdminReturnsClient() {
         </div>
       ) : returns.length === 0 ? (
         <div className="py-16 text-center text-foreground-muted text-sm">
-          No active return requests
+          {activeTab === 'history' ? 'No completed or rejected returns' : 'No active return requests'}
         </div>
       ) : (
         <div className="space-y-3">
