@@ -5,7 +5,7 @@ import { withTransaction } from '@/lib/db'
 import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, round2 } from '@/lib/gst'
 import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
-import { syncPerishableStock } from '@/lib/shelf'
+import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/shelf'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { z } from 'zod'
 import { parseBody, zUuid, zNonEmpty } from '@/lib/validate'
@@ -465,6 +465,28 @@ export async function POST(request: NextRequest) {
           if (synced.has(key)) continue
           synced.add(key)
           await syncPerishableStock(client, item.product_id, item.variant_id || null, item.sub_variant_id || null)
+        }
+
+        // Decrement shelf_stock for non-perishable/non-serialized products
+        for (const item of processedItems) {
+          if (!item.product_id) continue
+          const perishRow = await client.query<{ perishable: boolean; serialized: boolean }>(
+            'SELECT perishable, serialized FROM products WHERE id = $1', [item.product_id]
+          )
+          if (perishRow.rows[0]?.perishable || perishRow.rows[0]?.serialized) continue
+          const unitRow = await client.query<{ factor: string; dimension: string }>(
+            `SELECT COALESCE(puv.factor, pup.factor) AS factor,
+                    COALESCE(puv.dimension, pup.dimension) AS dimension
+             FROM (SELECT 1) x
+             LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
+             LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
+            [item.buy_unit, item.product_id, item.variant_id || null]
+          )
+          const u = unitRow.rows[0]
+          const baseQty = (u?.dimension === 'count' && u?.factor)
+            ? item.quantity * parseFloat(u.factor)
+            : item.quantity
+          await decrementNonPerishableShelfStock(client, item.product_id, item.variant_id || null, item.sub_variant_id || null, baseQty)
         }
 
         const isGSTEnabled = process.env.ENABLE_GST === 'true'
