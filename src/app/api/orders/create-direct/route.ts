@@ -20,7 +20,7 @@ const DirectItemSchema = z.object({
 })
 
 const CreateDirectOrderSchema = z.object({
-  paymentMethod: z.enum(['razorpay', 'manual']),
+  paymentMethod: z.enum(['razorpay', 'manual', 'cod']),
   item: DirectItemSchema.optional(),
   intent: z.string().nullish(),
   shippingAddress: z.any().optional(),
@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response
     const { shippingAddress, notes, paymentMethod, couponId, addressId } = parsed.data
     const isRazorpayPayment = paymentMethod === 'razorpay'
-    const isCod = false
+    const isCod = paymentMethod === 'cod'
 
     // When an intent token is present, derive item from the server-signed intent
     // rather than trusting the raw client body — prevents qty/buyMode/buyUnit tampering.

@@ -44,9 +44,10 @@ export async function POST(request: NextRequest) {
   const orders = await queryMany<{
     id: string; awb_number: string; status: string; shipment_status: string | null
     order_number: string; customer_name: string; customer_email: string
-    user_id: string | null
+    user_id: string | null; payment_mode: string | null
   }>(
     `SELECT o.id, o.awb_number, o.status, o.shipment_status, o.order_number, o.user_id,
+            o.payment_mode,
             COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
             COALESCE(u.email, o.customer_email) AS customer_email
      FROM orders o
@@ -190,6 +191,14 @@ export async function POST(request: NextRequest) {
           `UPDATE orders SET ${setClauses.join(', ')} WHERE id = $1`,
           queryParams
         ).catch(() => {})
+
+        // COD orders: flip payment_status to cod_collected on delivery
+        if (syncRule.orderStatus === 'delivered' && order.payment_mode === 'cod') {
+          await query(
+            `UPDATE orders SET payment_status = 'cod_collected', updated_at = NOW() WHERE id = $1 AND payment_status = 'cod_pending'`,
+            [order.id]
+          ).catch(() => {})
+        }
 
         if (order.customer_email && order.customer_name) {
           sendOrderStatusUpdate(
