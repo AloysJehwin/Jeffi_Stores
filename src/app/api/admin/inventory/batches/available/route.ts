@@ -148,6 +148,7 @@ export async function GET(request: NextRequest) {
         oi.quantity,
         oi.buy_unit,
         oi.batch_id,
+        COALESCE(oi.base_quantity, oi.quantity) AS base_quantity,
         p.perishable,
         p.serialized
       FROM order_items oi
@@ -161,19 +162,7 @@ export async function GET(request: NextRequest) {
     const serializedResult = []
 
     for (const item of items) {
-      // Resolve base qty (apply unit factor for count-dimension units)
-      const unitRow = await queryOne<{ factor: string; dimension: string }>(`
-        SELECT COALESCE(puv.factor, pup.factor) AS factor,
-               COALESCE(puv.dimension, pup.dimension) AS dimension
-        FROM (SELECT 1) x
-        LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
-        LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL
-      `, [item.buy_unit, item.product_id, item.variant_id || null])
-
-      const rawQty = parseFloat(item.quantity)
-      const requiredQty = (unitRow?.dimension === 'count' && unitRow?.factor)
-        ? rawQty * parseFloat(unitRow.factor)
-        : rawQty
+      const requiredQty = parseFloat(item.base_quantity)
 
       if (item.serialized) {
         serializedResult.push({
