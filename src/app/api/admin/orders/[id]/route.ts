@@ -5,6 +5,7 @@ import { queryOne, queryMany } from '@/lib/db'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 import { sendAuditedMail } from '@/lib/mail-audit'
+import { restoreOrderStock } from '@/lib/order-stock'
 
 export const dynamic = 'force-dynamic'
 
@@ -103,6 +104,10 @@ export async function PATCH(
 
     values.push(id)
     await queryOne(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${values.length}`, values)
+
+    if (d.status === 'returned' || d.status === 'return_received') {
+      restoreOrderStock(id).catch(() => {})
+    }
 
     if (d.estimated_delivery_date !== undefined) {
       const order = await queryOne<any>(

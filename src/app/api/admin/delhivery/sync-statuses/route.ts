@@ -3,6 +3,7 @@ import { query, queryMany } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { resolveShipmentStatus, isAdvancement } from '@/lib/shipment-status'
+import { restoreOrderStock } from '@/lib/order-stock'
 
 export const dynamic = 'force-dynamic'
 
@@ -196,6 +197,10 @@ export async function POST(request: NextRequest) {
             order.order_number, order.id,
             syncRule.orderStatus, order.status
           ).catch(() => {})
+        }
+
+        if (syncRule.orderStatus === 'returned') {
+          restoreOrderStock(order.id).catch(() => {})
         }
 
         if (rawType.startsWith('RTO') && order.user_id) {

@@ -139,11 +139,19 @@ export async function POST(request: NextRequest) {
     const { userId } = await resolveUserId(request)
 
     const product = await queryOne(
-      'SELECT id, name, base_price, price_ex_gst, is_active FROM products WHERE id = $1',
+      'SELECT id, name, base_price, price_ex_gst, is_active, launch_date, discontinue_date FROM products WHERE id = $1',
       [productId]
     )
     if (!productId || !product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     if (!product.is_active) return NextResponse.json({ error: 'This product is no longer available' }, { status: 410 })
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    if (product.launch_date && new Date(product.launch_date) > today) {
+      return NextResponse.json({ error: 'This product is not yet available' }, { status: 410 })
+    }
+    if (product.discontinue_date && new Date(product.discontinue_date) <= today) {
+      return NextResponse.json({ error: 'This product has been discontinued' }, { status: 410 })
+    }
 
     let priceAtAddition: number
 
