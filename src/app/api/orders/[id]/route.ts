@@ -239,7 +239,7 @@ export async function PATCH(
       return NextResponse.json({ error: `Orders with status '${currentOrder.status}' cannot be modified` }, { status: 400 })
     }
 
-    const validPaymentStatuses = ['pending', 'paid', 'failed', 'refunded']
+    const validPaymentStatuses = ['pending', 'unpaid', 'paid', 'failed', 'refunded', 'cod_pending', 'cod_collected']
 
     if (status && status !== currentOrder.status) {
       const allowed = VALID_TRANSITIONS[currentOrder.status] ?? []
