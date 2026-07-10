@@ -50,9 +50,11 @@ export async function PATCH(
     const processedItems = items.map((item: any) => {
       const unitPrice = parseFloat(item.unit_price)
       const qty = parseFloat(item.quantity)
+      const factor = item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1
+      const baseQty = qty * factor
       const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
-      const lineTotal = round2(lineItemFromMrpIncl(qty, unitPrice, discPct, gstRate))
+      const lineTotal = round2(lineItemFromMrpIncl(baseQty, unitPrice, discPct, gstRate))
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
       subtotal += lineTotal
@@ -72,9 +74,11 @@ export async function PATCH(
         gst_rate: gstRate,
         quantity: qty,
         buy_unit: item.buy_unit || null,
-        sold_unit_factor: item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : null,
-        base_quantity: item.sell_unit_factor && item.sell_unit_factor > 1 ? qty * item.sell_unit_factor : null,
+        sold_unit_factor: factor > 1 ? factor : null,
+        base_quantity: factor > 1 ? baseQty : null,
         unit_price: unitPrice,
+        mrp: unitPrice,
+        discount_amount: discPct > 0 ? round2(baseQty * unitPrice / (1 + gstRate / 100) * (discPct / 100)) : 0,
         total_price: lineTotal,
         taxable_amount: round2(gst.taxableAmount),
         cgst_amount: round2(gst.cgst),
@@ -211,14 +215,14 @@ export async function PATCH(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
             hsn_code, gst_rate, quantity, buy_unit, sold_unit_factor, base_quantity,
-            unit_price, total_price,
+            unit_price, mrp, discount_amount, total_price,
             taxable_amount, cgst_amount, sgst_amount, igst_amount, tax_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22) RETURNING id`,
           [
             id, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name, item.hsn_code, item.gst_rate,
             item.quantity, item.buy_unit, item.sold_unit_factor ?? null, item.base_quantity ?? null,
-            item.unit_price, item.total_price,
+            item.unit_price, item.mrp, item.discount_amount, item.total_price,
             item.taxable_amount, item.cgst_amount, item.sgst_amount, item.igst_amount, item.tax_amount,
           ]
         )
