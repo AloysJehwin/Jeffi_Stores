@@ -231,7 +231,7 @@ export default function ShelvingClient() {
           <div className="shrink-0 bg-surface border-b border-border-default px-4 sm:px-6 pt-8 pb-3 space-y-2.5 overflow-visible">
             {/* Warehouse chips */}
             <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
-              <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0">Warehouse</span>
+              <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 leading-7 self-center">Warehouse</span>
               <div className="flex items-center gap-1.5 flex-wrap flex-1">
                 {loading ? (
                   <div className="flex gap-1.5">
@@ -283,7 +283,7 @@ export default function ShelvingClient() {
                 <>
                   {/* Row 1: Aisle */}
                   <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
-                    <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0">Aisle</span>
+                    <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 leading-7 self-center">Aisle</span>
                     <div className="flex items-center gap-1.5 flex-wrap flex-1">
                       {!selectedWarehouse ? (
                         <span className="text-xs text-foreground-muted italic">Select a warehouse first</span>
@@ -319,7 +319,7 @@ export default function ShelvingClient() {
                   {/* Row 2: Rack (shown after aisle selected) */}
                   {selectedAisle && racksForAisle.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
-                      <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 flex items-center gap-1">
+                      <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 leading-7 self-center flex items-center gap-1">
                         <svg className="w-3 h-3 text-foreground-muted/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
                         Rack
                       </span>
@@ -335,7 +335,7 @@ export default function ShelvingClient() {
                   {/* Row 3: Shelf/Bin (shown after rack selected) */}
                   {selectedAisle && selectedRack && shelfsForRack.length > 0 && (
                     <div className="flex items-center gap-2 flex-wrap min-h-[28px]">
-                      <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 flex items-center gap-1">
+                      <span className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide w-16 shrink-0 leading-7 self-center flex items-center gap-1">
                         <svg className="w-3 h-3 text-foreground-muted/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7"/></svg>
                         Shelf
                       </span>
