@@ -50,7 +50,7 @@ function CheckoutPage() {
   const [address, setAddress] = useState<any>(null)
   const [isLoadingAddress, setIsLoadingAddress] = useState(true)
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual'>('razorpay')
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual' | 'cod'>(isRazorpayEnabled ? 'razorpay' : 'manual')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
@@ -524,6 +524,11 @@ function CheckoutPage() {
   const finalTotal = Math.max(0, subtotal - discountAmount + (shippingCharge ?? 0))
   const displayItems = isBuyNow ? (buyNowItem ? [buyNowItem] : []) : cartItems
 
+  // COD is available if every item in the order allows it
+  const codAvailable = isBuyNow
+    ? true // buy-now: is_cod_allowed not in intent payload, allow by default; server will validate
+    : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false)
+
   return (
     <div className="bg-surface min-h-screen py-4 sm:py-6 lg:py-8">
       <div className="container mx-auto px-4">
@@ -725,37 +730,49 @@ function CheckoutPage() {
                 />
               </div>
 
-              {/* Payment Method — only shown for orders ≥ ₹1,00,000 */}
-              {finalTotal >= 100000 && (
-                <>
-                  <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-8">
-                    <h2 className="text-xl font-bold text-foreground mb-4">Payment Method</h2>
-                    <div className="space-y-3">
-                      <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                        <input type="radio" name="paymentMethod" value="razorpay" checked={paymentMethod === 'razorpay'} onChange={() => setPaymentMethod('razorpay')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
-                        <div className="flex-1">
-                          <p className="font-semibold text-foreground">Pay Online</p>
-                          <p className="text-sm text-foreground-secondary">UPI, Cards, Net Banking, Wallets</p>
-                        </div>
-                        <svg className="w-8 h-8 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                        </svg>
-                      </label>
-                      <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                        <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
-                        <div className="flex-1">
-                          <p className="font-semibold text-foreground">Request Manual Payment</p>
-                          <p className="text-sm text-foreground-secondary">Our team will contact you for payment details</p>
-                        </div>
-                        <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                        </svg>
-                      </label>
+              {/* Payment Method */}
+              <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-8">
+                <h2 className="text-xl font-bold text-foreground mb-4">Payment Method</h2>
+                <div className="space-y-3">
+                  {isRazorpayEnabled && (
+                    <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
+                      <input type="radio" name="paymentMethod" value="razorpay" checked={paymentMethod === 'razorpay'} onChange={() => setPaymentMethod('razorpay')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground">Pay Online</p>
+                        <p className="text-sm text-foreground-secondary">UPI, Cards, Net Banking, Wallets</p>
+                      </div>
+                      <svg className="w-8 h-8 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                      </svg>
+                    </label>
+                  )}
+                  {codAvailable && (
+                    <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'cod' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
+                      <input type="radio" name="paymentMethod" value="cod" checked={paymentMethod === 'cod'} onChange={() => setPaymentMethod('cod')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground">Cash on Delivery</p>
+                        <p className="text-sm text-foreground-secondary">Pay when your order arrives</p>
+                      </div>
+                      <svg className="w-8 h-8 text-green-600 dark:text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
+                    </label>
+                  )}
+                  <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
+                    <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                    <div className="flex-1">
+                      <p className="font-semibold text-foreground">Request Manual Payment</p>
+                      <p className="text-sm text-foreground-secondary">Our team will contact you for payment details</p>
                     </div>
-                  </div>
+                    <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                    </svg>
+                  </label>
+                </div>
+              </div>
 
-                  {paymentMethod === 'manual' && (
-                    <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 sm:p-6">
+              {paymentMethod === 'manual' && (
+                    <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 sm:p-6 mb-8">
                       <div className="flex gap-4">
                         <svg className="w-8 h-8 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -767,8 +784,6 @@ function CheckoutPage() {
                       </div>
                     </div>
                   )}
-                </>
-              )}
 
               {/* Trust & Security Strip */}
               <div className="mt-8 bg-surface-elevated rounded-lg border border-border-default p-4">
@@ -881,6 +896,13 @@ function CheckoutPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                       </svg>
                       Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </>
+                  ) : paymentMethod === 'cod' ? (
+                    <>
+                      Place Order — Pay on Delivery
+                      <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                      </svg>
                     </>
                   ) : (
                     <>

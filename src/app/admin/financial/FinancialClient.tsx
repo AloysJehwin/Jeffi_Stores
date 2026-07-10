@@ -9,7 +9,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
 
-type Tab = 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow'
+type Tab = 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow' | 'cod_remittance'
 
 const inputCls = 'w-full px-3 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500 dark:focus:ring-accent-400'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -1626,19 +1626,192 @@ function TransactionsTab({ initialData }: { initialData: any }) {
 
 // ── Root ──────────────────────────────────────────────────────────────────────
 
+function CodRemittanceTab() {
+  const [statusFilter, setStatusFilter] = useState<'cod_collected' | 'cod_pending' | 'paid' | 'all'>('cod_collected')
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [marking, setMarking] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/admin/financial/cod-remittance?status=${statusFilter}`)
+      .then(r => r.json())
+      .then(j => { setData(j); setSelected(new Set()) })
+      .finally(() => setLoading(false))
+  }, [statusFilter])
+
+  async function markRemitted(ids: string[]) {
+    setMarking(true)
+    setMsg(null)
+    const res = await fetch('/api/admin/financial/cod-remittance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderIds: ids }),
+    })
+    const j = await res.json()
+    setMarking(false)
+    if (j.success) {
+      setMsg(`Marked ${j.marked} order(s) as remitted.`)
+      setStatusFilter(f => f) // trigger reload via useEffect dep change workaround
+      fetch(`/api/admin/financial/cod-remittance?status=${statusFilter}`)
+        .then(r => r.json()).then(j => { setData(j); setSelected(new Set()) })
+    }
+  }
+
+  const orders: any[] = data?.orders ?? []
+  const summary = data?.summary ?? {}
+  const weeks: any[] = data?.weeks ?? []
+
+  return (
+    <div className="space-y-4">
+      {/* Summary cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div className="bg-surface-elevated rounded-lg border border-border-default p-3">
+          <div className="text-xs text-foreground-muted mb-1">Pending Collection</div>
+          <div className="text-xl font-bold text-yellow-600 dark:text-yellow-400">{summary.cod_pending ?? 0}</div>
+          <div className="text-xs text-foreground-muted">orders</div>
+        </div>
+        <div className="bg-surface-elevated rounded-lg border border-border-default p-3">
+          <div className="text-xs text-foreground-muted mb-1">Collected, Not Remitted</div>
+          <div className="text-xl font-bold text-blue-600 dark:text-blue-400">{summary.cod_collected ?? 0}</div>
+          <div className="text-xs text-foreground-muted">₹{(summary.cod_collected_amount ?? 0).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</div>
+        </div>
+      </div>
+
+      {/* Filter + bulk action */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex rounded-lg border border-border-default overflow-hidden text-sm">
+          {([['cod_collected', 'Collected'], ['cod_pending', 'Pending'], ['paid', 'Remitted'], ['all', 'All']] as const).map(([v, l]) => (
+            <button key={v} onClick={() => setStatusFilter(v)}
+              className={`px-3 py-1.5 transition-colors ${statusFilter === v ? 'bg-secondary-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+        {selected.size > 0 && (
+          <button onClick={() => markRemitted(Array.from(selected))} disabled={marking}
+            className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm rounded-lg disabled:opacity-50">
+            {marking ? 'Marking…' : `Mark ${selected.size} as Remitted`}
+          </button>
+        )}
+        {msg && <span className="text-sm text-green-600 dark:text-green-400">{msg}</span>}
+      </div>
+
+      {loading && <div className="text-sm text-foreground-muted py-4 text-center">Loading…</div>}
+
+      {/* Grouped by week (only for cod_collected) */}
+      {!loading && statusFilter === 'cod_collected' && weeks.length > 0 && (
+        <div className="space-y-4">
+          {weeks.map((week: any) => (
+            <div key={week.weekStart} className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-2 bg-surface-secondary border-b border-border-default">
+                <div className="font-medium text-sm">{week.weekLabel}</div>
+                <div className="flex items-center gap-3">
+                  <span className="text-sm text-foreground-muted">₹{week.total.toLocaleString('en-IN', { maximumFractionDigits: 0 })} · {week.orders.length} orders</span>
+                  <button onClick={() => {
+                    const ids = week.orders.map((o: any) => o.id)
+                    setSelected(prev => { const next = new Set(prev); ids.forEach((id: string) => next.add(id)); return next })
+                  }} className="text-xs text-secondary-500 hover:underline">Select all</button>
+                  <button onClick={() => markRemitted(week.orders.map((o: any) => o.id))} disabled={marking}
+                    className="text-xs px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded disabled:opacity-50">
+                    Mark week remitted
+                  </button>
+                </div>
+              </div>
+              <table className="w-full text-sm">
+                <thead className="bg-surface-secondary text-xs text-foreground-muted">
+                  <tr>
+                    <th className="px-3 py-2 w-8"><input type="checkbox"
+                      checked={week.orders.every((o: any) => selected.has(o.id))}
+                      onChange={e => {
+                        setSelected(prev => {
+                          const next = new Set(prev)
+                          week.orders.forEach((o: any) => e.target.checked ? next.add(o.id) : next.delete(o.id))
+                          return next
+                        })
+                      }} /></th>
+                    <th className="px-3 py-2 text-left">Order</th>
+                    <th className="px-3 py-2 text-left">Customer</th>
+                    <th className="px-3 py-2 text-right">Amount</th>
+                    <th className="px-3 py-2 text-left">Delivered</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border-default">
+                  {week.orders.map((o: any) => (
+                    <tr key={o.id} className="hover:bg-surface-secondary/50">
+                      <td className="px-3 py-2"><input type="checkbox" checked={selected.has(o.id)}
+                        onChange={e => setSelected(prev => { const next = new Set(prev); e.target.checked ? next.add(o.id) : next.delete(o.id); return next })} /></td>
+                      <td className="px-3 py-2"><Link href={`/admin/orders/${o.id}`} className="text-secondary-500 hover:underline font-mono text-xs">#{o.order_number}</Link></td>
+                      <td className="px-3 py-2 text-foreground-muted">{o.customer_name}</td>
+                      <td className="px-3 py-2 text-right font-medium">₹{parseFloat(o.total_amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                      <td className="px-3 py-2 text-foreground-muted text-xs">{o.delivered_at ? new Date(o.delivered_at).toLocaleDateString('en-IN') : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Flat table for other filters */}
+      {!loading && statusFilter !== 'cod_collected' && (
+        <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-secondary text-xs text-foreground-muted">
+              <tr>
+                <th className="px-3 py-2 text-left">Order</th>
+                <th className="px-3 py-2 text-left">Customer</th>
+                <th className="px-3 py-2 text-right">Amount</th>
+                <th className="px-3 py-2 text-left">Status</th>
+                <th className="px-3 py-2 text-left">Delivered</th>
+                <th className="px-3 py-2 text-left">Remitted</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border-default">
+              {orders.length === 0 && (
+                <tr><td colSpan={6} className="px-3 py-6 text-center text-foreground-muted">No orders</td></tr>
+              )}
+              {orders.map((o: any) => (
+                <tr key={o.id} className="hover:bg-surface-secondary/50">
+                  <td className="px-3 py-2"><Link href={`/admin/orders/${o.id}`} className="text-secondary-500 hover:underline font-mono text-xs">#{o.order_number}</Link></td>
+                  <td className="px-3 py-2 text-foreground-muted">{o.customer_name}</td>
+                  <td className="px-3 py-2 text-right font-medium">₹{parseFloat(o.total_amount).toLocaleString('en-IN', { maximumFractionDigits: 0 })}</td>
+                  <td className="px-3 py-2">
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                      o.payment_status === 'cod_pending' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' :
+                      o.payment_status === 'cod_collected' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' :
+                      'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                    }`}>{o.payment_status}</span>
+                  </td>
+                  <td className="px-3 py-2 text-foreground-muted text-xs">{o.delivered_at ? new Date(o.delivered_at).toLocaleDateString('en-IN') : '—'}</td>
+                  <td className="px-3 py-2 text-foreground-muted text-xs">{o.cod_remitted_at ? new Date(o.cod_remitted_at).toLocaleDateString('en-IN') : '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const TABS: { key: Tab; label: string }[] = [
   { key: 'receivables', label: 'Receivables' },
   { key: 'payables', label: 'Payables' },
   { key: 'transactions', label: 'Transactions' },
   { key: 'pl', label: 'P&L' },
   { key: 'cashflow', label: 'Cashflow' },
+  { key: 'cod_remittance', label: 'COD Remittance' },
 ]
 
 export default function FinancialClient() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const tabParam = searchParams.get('tab') as Tab | null
-  const validTabs: Tab[] = ['receivables', 'payables', 'transactions', 'pl', 'cashflow']
+  const validTabs: Tab[] = ['receivables', 'payables', 'transactions', 'pl', 'cashflow', 'cod_remittance']
   const [tab, setTab] = useState<Tab>(tabParam && validTabs.includes(tabParam) ? tabParam : 'receivables')
 
   const now = new Date()
@@ -1701,6 +1874,7 @@ export default function FinancialClient() {
         {tab === 'transactions' && <TransactionsTab initialData={allData.transactions ?? null} />}
         {tab === 'pl' && <PLTab initialData={allData.pl ?? null} />}
         {tab === 'cashflow' && <CashflowTab initialData={allData.cashflow ?? null} />}
+        {tab === 'cod_remittance' && <CodRemittanceTab />}
       </div>
     </div>
   )
