@@ -758,20 +758,22 @@ function CheckoutPage() {
                       </svg>
                     </label>
                   )}
-                  <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                    <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
-                    <div className="flex-1">
-                      <p className="font-semibold text-foreground">Request Manual Payment</p>
-                      <p className="text-sm text-foreground-secondary">Our team will contact you for payment details</p>
-                    </div>
-                    <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                    </svg>
-                  </label>
+                  {finalTotal >= 100000 && (
+                    <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
+                      <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                      <div className="flex-1">
+                        <p className="font-semibold text-foreground">Request Manual Payment</p>
+                        <p className="text-sm text-foreground-secondary">Our team will contact you for payment details</p>
+                      </div>
+                      <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                      </svg>
+                    </label>
+                  )}
                 </div>
               </div>
 
-              {paymentMethod === 'manual' && (
+              {paymentMethod === 'manual' && finalTotal >= 100000 && (
                     <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 sm:p-6 mb-8">
                       <div className="flex gap-4">
                         <svg className="w-8 h-8 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">

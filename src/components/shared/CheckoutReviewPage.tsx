@@ -387,6 +387,16 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     ? true
     : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false)
 
+  // Reset payment method if selected option becomes unavailable
+  useEffect(() => {
+    if (paymentMethod === 'manual' && finalTotal < 100000) {
+      setPaymentMethod(isRazorpayEnabled ? 'razorpay' : codAvailable ? 'cod' : 'manual')
+    }
+    if (paymentMethod === 'cod' && !codAvailable) {
+      setPaymentMethod(isRazorpayEnabled ? 'razorpay' : 'manual')
+    }
+  }, [finalTotal, codAvailable])
+
   // Load Razorpay script when razorpay payment method is selected
   useEffect(() => {
     if (!isRazorpayEnabled) return
@@ -1115,14 +1125,16 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                     </div>
                   </label>
                 )}
-                <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                  <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
-                  <div>
-                    <p className="text-sm font-semibold text-foreground">Request Manual Payment</p>
-                    <p className="text-xs text-foreground-secondary">Our team will contact you</p>
-                  </div>
-                </label>
-                {paymentMethod === 'manual' && (
+                {finalTotal >= 100000 && (
+                  <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
+                    <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                    <div>
+                      <p className="text-sm font-semibold text-foreground">Request Manual Payment</p>
+                      <p className="text-xs text-foreground-secondary">Our team will contact you</p>
+                    </div>
+                  </label>
+                )}
+                {paymentMethod === 'manual' && finalTotal >= 100000 && (
                   <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-xs text-blue-800 dark:text-blue-300">
                     Our team will contact you to confirm your order and provide payment details.
                   </div>
