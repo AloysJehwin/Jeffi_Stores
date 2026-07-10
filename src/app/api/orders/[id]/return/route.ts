@@ -35,7 +35,6 @@ export async function GET(
 
     return NextResponse.json({ returnRequest: returnRequest || null, monthlyLimitReached })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
@@ -49,7 +48,7 @@ export async function POST(
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { type, reason, description } = await request.json()
+    const { type, reason, description, image_urls } = await request.json()
 
     if (!['refund', 'replacement'].includes(type)) {
       return NextResponse.json({ error: 'Invalid type. Must be refund or replacement.' }, { status: 400 })
@@ -107,10 +106,10 @@ export async function POST(
     }
 
     const returnRequest = await queryOne(
-      `INSERT INTO return_requests (order_id, user_id, type, reason, description)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO return_requests (order_id, user_id, type, reason, description, image_urls)
+       VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [id, authUser.userId, type, reason, description || null]
+      [id, authUser.userId, type, reason, description || null, image_urls?.length > 0 ? image_urls : null]
     )
 
     await query(
