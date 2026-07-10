@@ -80,6 +80,8 @@ interface ProductActionsProps {
   sellUnitId?: string | null
   extraDeliveryDays?: number
   handlingDays?: number
+  launchDate?: string | null
+  discontinueDate?: string | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -110,7 +112,11 @@ export default function ProductActions({
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onUnitChange, productUnits: productUnitsProp, sellUnitId,
   extraDeliveryDays = 0, handlingDays = 2, is_active = true,
+  launchDate, discontinueDate,
 }: ProductActionsProps) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const isPreLaunch = !!launchDate && new Date(launchDate) > today
+  const isDiscontinued = !!discontinueDate && new Date(discontinueDate) <= today
   const { addToCart } = useCart()
   const { showToast } = useToast()
   const router = useRouter()
@@ -778,10 +784,21 @@ export default function ProductActions({
         </>
       )}
 
+      {isPreLaunch && launchDate && (
+        <div className="text-sm text-amber-600 dark:text-amber-400 font-medium py-2 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+          Coming Soon — Available from {new Date(launchDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+        </div>
+      )}
+      {isDiscontinued && (
+        <div className="text-sm text-gray-500 dark:text-gray-400 font-medium py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          This product has been discontinued
+        </div>
+      )}
+
       <div className="space-y-3">
         <button
           onClick={handleBuyNow}
-          disabled={!is_active || effectiveStock === 0 || isBuyingNow}
+          disabled={!is_active || effectiveStock === 0 || isBuyingNow || isPreLaunch || isDiscontinued}
           className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isBuyingNow ? (
@@ -793,7 +810,7 @@ export default function ProductActions({
 
         <button
           onClick={handleAddToCart}
-          disabled={!is_active || effectiveStock === 0 || isAddingToCart}
+          disabled={!is_active || effectiveStock === 0 || isAddingToCart || isPreLaunch || isDiscontinued}
           className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isAddingToCart ? (
