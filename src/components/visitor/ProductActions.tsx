@@ -113,7 +113,7 @@ export default function ProductActions({
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onUnitChange, productUnits: productUnitsProp, sellUnitId,
   extraDeliveryDays = 0, handlingDays = 2, is_active = true,
-  launchDate, discontinueDate,
+  launchDate, discontinueDate, isCodAllowed,
 }: ProductActionsProps) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const isPreLaunch = !!launchDate && new Date(launchDate) > today
