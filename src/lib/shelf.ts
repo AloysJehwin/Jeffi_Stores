@@ -120,13 +120,35 @@ export async function listLocations(warehouseId?: string): Promise<ShelfLocation
     `SELECT sl.id, sl.warehouse_id, w.name AS warehouse_name, w.code AS warehouse_code,
             sl.aisle_code, sl.rack_code, sl.shelf_code, sl.bin_code, sl.display_code,
             sl.notes, sl.is_active, sl.created_at,
-            COALESCE((SELECT COUNT(DISTINCT product_id) FROM shelf_stock WHERE location_id = sl.id AND quantity > 0),0)::int AS stock_count
+            COALESCE((SELECT COUNT(DISTINCT product_id) FROM shelf_stock WHERE location_id = sl.id AND quantity > 0),0)::int AS stock_count,
+            (sl.aisle_code = 'OPEN' AND sl.rack_code = 'SHELF' AND sl.shelf_code = '01' AND sl.bin_code IS NULL) AS is_open_shelf
      FROM shelf_locations sl
      JOIN warehouses w ON w.id = sl.warehouse_id
      ${where}
      ORDER BY sl.aisle_code, sl.rack_code, sl.shelf_code, sl.bin_code NULLS FIRST`,
     params
   )
+}
+
+export async function getOrCreateOpenShelf(
+  warehouseId: string,
+  warehouseCode: string
+): Promise<string> {
+  const existing = await queryOne<{ id: string }>(
+    `SELECT id FROM shelf_locations
+     WHERE warehouse_id = $1 AND aisle_code = 'OPEN' AND rack_code = 'SHELF'
+       AND shelf_code = '01' AND bin_code IS NULL`,
+    [warehouseId]
+  )
+  if (existing) return existing.id
+  const created = await queryOne<{ id: string }>(
+    `INSERT INTO shelf_locations
+       (warehouse_id, aisle_code, rack_code, shelf_code, bin_code, display_code, notes)
+     VALUES ($1, 'OPEN', 'SHELF', '01', NULL, $2, 'Default open shelf')
+     RETURNING id`,
+    [warehouseId, `${warehouseCode}-OPEN`]
+  )
+  return created!.id
 }
 
 export async function getLocation(id: string): Promise<ShelfLocation | null> {
@@ -203,7 +225,19 @@ export async function deleteLocation(id: string): Promise<void> {
 export async function getStockAtLocation(locationId: string): Promise<ShelfStock[]> {
   return queryMany<ShelfStock>(
     `SELECT ss.id, ss.location_id, ss.product_id, ss.variant_id, ss.sub_variant_id,
-            ss.quantity, ss.updated_at,
+            CASE
+              WHEN p.perishable OR p.serialized THEN
+                COALESCE((
+                  SELECT SUM(pb.quantity_remaining)
+                  FROM product_batches pb
+                  WHERE pb.product_id = ss.product_id
+                    AND pb.location_id = ss.location_id
+                    AND (pb.variant_id = ss.variant_id OR (pb.variant_id IS NULL AND ss.variant_id IS NULL))
+                    AND (pb.sub_variant_id = ss.sub_variant_id OR (pb.sub_variant_id IS NULL AND ss.sub_variant_id IS NULL))
+                ), 0)::numeric
+              ELSE ss.quantity
+            END AS quantity,
+            ss.updated_at,
             p.name AS product_name,
             p.perishable,
             p.serialized,

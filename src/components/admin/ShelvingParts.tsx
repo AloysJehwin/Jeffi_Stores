@@ -185,7 +185,8 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
     return isContinuous ? v.toFixed(3) : String(Math.floor(v))
   }
   function toBase(sellQty: number): number {
-    return Math.round(sellQty * factor)
+    const base = sellQty * factor
+    return isContinuous ? Math.round(base * 1000) / 1000 : Math.round(base)
   }
 
   const [editing, setEditing] = useState(false)

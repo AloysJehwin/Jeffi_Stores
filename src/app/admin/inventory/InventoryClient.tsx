@@ -288,6 +288,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
   const [receiveItems, setReceiveItems] = useState<any[]>([])
   const [receiveNotes, setReceiveNotes] = useState('')
   const [receiveSaving, setReceiveSaving] = useState(false)
+  const [receiveWarehouseId, setReceiveWarehouseId] = useState('')
   const [shelfLocations, setShelfLocations] = useState<{ id: string; display_code: string }[]>([])
   const [poSortCol, setPoSortCol] = useState<string | undefined>(undefined)
   const [poSortDir, setPoSortDir] = useState<SortDir | undefined>(undefined)
@@ -385,11 +386,22 @@ function POTab({ initialPO }: { initialPO?: string }) {
     setReceiveMode({ po: json.purchase_order })
     setReceiveItems(items)
     setReceiveNotes('')
-    // Fetch shelf locations for the location picker
-    const slRes = await fetch('/api/admin/shelving/locations').catch(() => null)
+    setReceiveWarehouseId('')
+    // Fetch shelf locations and warehouses for pickers
+    const [slRes, whRes] = await Promise.all([
+      fetch('/api/admin/shelving/locations').catch(() => null),
+      fetch('/api/admin/shelving/warehouses').catch(() => null),
+    ])
     if (slRes?.ok) {
       const slJson = await slRes.json()
       setShelfLocations(slJson?.locations || [])
+    }
+    if (whRes?.ok) {
+      const whJson = await whRes.json()
+      const whs: { id: string; name: string; code: string }[] = whJson?.warehouses || []
+      // Auto-select if only one warehouse
+      if (whs.length === 1) setReceiveWarehouseId(whs[0].id)
+      setEditWarehouses(whs)
     }
   }
 
@@ -428,7 +440,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
     }))
     const res = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items, notes: receiveNotes }),
+      body: JSON.stringify({ items, notes: receiveNotes, ...(receiveWarehouseId ? { warehouse_id: receiveWarehouseId } : {}) }),
     })
     const json = await res.json()
     setReceiveSaving(false)
@@ -688,6 +700,20 @@ function POTab({ initialPO }: { initialPO?: string }) {
             </table>
           </div>
         </div>
+        {editWarehouses.length > 0 && (
+          <div>
+            <label className={labelCls}>Warehouse <span className="text-foreground-muted font-normal">(stock destination)</span></label>
+            <AdminSelect
+              value={receiveWarehouseId}
+              onChange={setReceiveWarehouseId}
+              options={[
+                { value: '', label: '— none —' },
+                ...editWarehouses.map(w => ({ value: w.id, label: w.name })),
+              ]}
+            />
+            {receiveWarehouseId && <p className="mt-1 text-xs text-foreground-muted">Stock with no specific bin will land on the open shelf. Override per-item below.</p>}
+          </div>
+        )}
         <div>
           <label className={labelCls}>Notes</label>
           <textarea className={inputCls} rows={2} value={receiveNotes} onChange={e => setReceiveNotes(e.target.value)} />
@@ -1020,6 +1046,10 @@ function StockTab() {
   const [editSaving, setEditSaving] = useState(false)
   const [editUnits, setEditUnits] = useState<{ id: string; unit: string; display_label: string | null; factor: number; dimension: string }[]>([])
   const [editUnitId, setEditUnitId] = useState<string>('')
+  const [editWarehouses, setEditWarehouses] = useState<{ id: string; name: string; code: string }[]>([])
+  const [editWarehouseId, setEditWarehouseId] = useState('')
+  const [editLocationId, setEditLocationId] = useState('')
+  const [editLocations, setEditLocations] = useState<{ id: string; display_code: string; is_open_shelf: boolean }[]>([])
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [expandedSerialProducts, setExpandedSerialProducts] = useState<Set<string>>(new Set())
 
@@ -1150,6 +1180,15 @@ function StockTab() {
     const rowId = p.sub_variant_id || p.variant_id || p.id
     setEditingId(rowId)
     setEditNotes('')
+    setEditWarehouseId('')
+    setEditLocationId('')
+    setEditLocations([])
+
+    // Fetch warehouses for shelf assignment
+    fetch('/api/admin/shelving/warehouses', { credentials: 'include' })
+      .then(r => r.json())
+      .then(j => setEditWarehouses(j.warehouses || []))
+      .catch(() => {})
 
     // Build unit options from the valuation row data
     const sellFactor = parseFloat(p.sell_unit_factor || '1') || 1
@@ -1204,6 +1243,8 @@ function StockTab() {
       variant_id: p.variant_id || null,
       sub_variant_id: p.sub_variant_id || null,
       notes: editNotes || undefined,
+      ...(editWarehouseId ? { warehouse_id: editWarehouseId } : {}),
+      ...(editWarehouseId && editLocationId ? { location_id: editLocationId } : {}),
     }
     // Count-dimension units are always stored as raw pcs — never multiply via unit_id path
     const isCountUnit = !selectedUnit || selectedUnit.dimension === 'count' || selectedUnit.factor === 1
@@ -1229,7 +1270,18 @@ function StockTab() {
     setEditNotes('')
     setEditUnits([])
     setEditUnitId('')
+    setEditWarehouseId('')
+    setEditLocationId('')
+    setEditLocations([])
   }
+
+  useEffect(() => {
+    if (!editWarehouseId) { setEditLocations([]); setEditLocationId(''); return }
+    fetch(`/api/admin/shelving/locations?warehouse_id=${editWarehouseId}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(j => { setEditLocations(j.locations || []); setEditLocationId('') })
+      .catch(() => {})
+  }, [editWarehouseId])
 
   return (
     <div className="space-y-5">
@@ -1740,6 +1792,30 @@ function StockTab() {
                                       onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
                                       className="hidden lg:block field-xs w-32 border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500"
                                     />
+                                    {editWarehouses.length > 0 && (
+                                      <AdminSelect
+                                        value={editWarehouseId}
+                                        onChange={setEditWarehouseId}
+                                        xs
+                                        className="hidden lg:block w-36"
+                                        options={[
+                                          { value: '', label: '— warehouse —' },
+                                          ...editWarehouses.map(w => ({ value: w.id, label: w.name })),
+                                        ]}
+                                      />
+                                    )}
+                                    {editWarehouseId && (
+                                      <AdminSelect
+                                        value={editLocationId}
+                                        onChange={setEditLocationId}
+                                        xs
+                                        className="hidden lg:block w-40"
+                                        options={[
+                                          { value: '', label: '— open shelf —' },
+                                          ...editLocations.filter(l => !l.is_open_shelf).map(l => ({ value: l.id, label: l.display_code })),
+                                        ]}
+                                      />
+                                    )}
                                     <button
                                       onClick={() => saveEdit(p)}
                                       disabled={editSaving || editQty === ''}
