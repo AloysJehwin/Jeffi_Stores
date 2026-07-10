@@ -27,6 +27,7 @@ export interface InvoiceOrderItem {
   total_price: number
   discount_amount?: number
   mrp?: number | null
+  sold_unit_factor?: number | null
   taxable_amount: number
   cgst_amount: number
   sgst_amount: number
@@ -402,7 +403,9 @@ export async function generateInvoicePDF(
 
       let discPct = 0
       if (item.mrp != null && item.mrp > 0 && item.quantity > 0) {
-        const mrpTotal = item.mrp * item.quantity
+        const factor = item.sold_unit_factor && item.sold_unit_factor > 1 ? item.sold_unit_factor : 1
+        const baseQty = item.quantity * factor
+        const mrpTotal = item.mrp * baseQty
         discPct = mrpTotal > netSellingTotal ? ((mrpTotal - netSellingTotal) / mrpTotal) * 100 : 0
       } else {
         const totalDisc = (item.discount_amount || 0) + itemBizDiscount
