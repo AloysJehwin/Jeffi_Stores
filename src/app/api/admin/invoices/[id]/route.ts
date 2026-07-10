@@ -6,6 +6,7 @@ import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequen
 import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
+import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/shelf'
 
 export const dynamic = 'force-dynamic'
 
@@ -228,7 +229,6 @@ export async function PATCH(
           const rawExtra = item.quantity - previousQty
           if (rawExtra <= 0) continue
 
-          // Resolve unit factor: variant-scoped buy_unit → product-level buy_unit → sell_unit_id via variant → sell_unit_id via product
           const unitRow2 = await client.query<{ factor: string; dimension: string }>(
             `SELECT COALESCE(puv.factor, pup.factor, pu_sv.factor, pu_sp.factor)::text AS factor,
                     COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension
@@ -247,48 +247,135 @@ export async function PATCH(
             ? rawExtra * parseFloat(u2.factor)
             : rawExtra
 
+          const prodRow = await client.query<{ perishable: boolean; serialized: boolean }>(
+            `SELECT perishable, serialized FROM products WHERE id = $1`, [item.product_id]
+          )
+          const { perishable, serialized } = prodRow.rows[0] ?? { perishable: false, serialized: false }
+
           let stockBefore = 0
-          if (item.sub_variant_id) {
-            const row = await client.query<{ inventory_quantity: string }>(
-              `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
-              [item.sub_variant_id]
+
+          if (perishable) {
+            // Deduct from batches FIFO (earliest expiry first)
+            const batches = await client.query<{ id: string; quantity_remaining: string; lot_number: string | null; expiry_date: string | null }>(
+              `SELECT id, quantity_remaining, lot_number, expiry_date
+               FROM product_batches
+               WHERE product_id = $1
+                 AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+                 AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))
+                 AND quantity_remaining > 0
+               ORDER BY expiry_date ASC NULLS LAST, created_at ASC
+               FOR UPDATE`,
+              [item.product_id, item.variant_id || null, item.sub_variant_id || null]
             )
-            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-            await client.query(
-              `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-              [extraQty, item.sub_variant_id]
+            let remaining = extraQty
+            for (const batch of batches.rows) {
+              if (remaining <= 0) break
+              const avail = parseFloat(batch.quantity_remaining)
+              const take = Math.min(avail, remaining)
+              stockBefore = avail
+              await client.query(
+                `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2`,
+                [take, batch.id]
+              )
+              await logStockMovement(client, {
+                productId: item.product_id!,
+                variantId: item.variant_id || null,
+                subVariantId: item.sub_variant_id || null,
+                transactionType: 'sale',
+                quantityChange: -take,
+                referenceType: 'order',
+                referenceId: id,
+                currentStock: stockBefore,
+                batchId: batch.id,
+                lotNumber: batch.lot_number,
+                expiryDate: batch.expiry_date,
+              })
+              remaining -= take
+            }
+            await syncPerishableStock(client, item.product_id!, item.variant_id || null, item.sub_variant_id || null)
+          } else if (serialized) {
+            // Take available serials in order
+            const serials = await client.query<{ id: string; serial_number: string }>(
+              `SELECT id, serial_number FROM product_serials
+               WHERE product_id = $1
+                 AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+                 AND status = 'in_stock'
+               ORDER BY created_at ASC
+               LIMIT $3
+               FOR UPDATE`,
+              [item.product_id, item.variant_id || null, Math.ceil(extraQty)]
             )
-          } else if (item.variant_id) {
-            const row = await client.query<{ inventory_quantity: string }>(
-              `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
-              [item.variant_id]
+            const invRow = await client.query<{ inventory_quantity: string }>(
+              item.variant_id
+                ? `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`
+                : `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
+              [item.variant_id || item.product_id]
             )
-            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-            await client.query(
-              `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-              [extraQty, item.variant_id]
-            )
+            stockBefore = parseFloat(invRow.rows[0]?.inventory_quantity ?? '0') || 0
+            for (const serial of serials.rows) {
+              await client.query(
+                `UPDATE product_serials SET status = 'sold', order_id = $1, sold_at = NOW(), updated_at = NOW() WHERE id = $2`,
+                [id, serial.id]
+              )
+              await logStockMovement(client, {
+                productId: item.product_id!,
+                variantId: item.variant_id || null,
+                subVariantId: item.sub_variant_id || null,
+                transactionType: 'sale',
+                quantityChange: -1,
+                referenceType: 'order',
+                referenceId: id,
+                currentStock: stockBefore,
+                serialNumber: serial.serial_number,
+              })
+              stockBefore -= 1
+            }
+            await syncPerishableStock(client, item.product_id!, item.variant_id || null, item.sub_variant_id || null)
           } else {
-            const row = await client.query<{ inventory_quantity: string }>(
-              `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
-              [item.product_id]
-            )
-            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-            await client.query(
-              `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
-              [extraQty, item.product_id]
-            )
+            // Plain stock deduction
+            if (item.sub_variant_id) {
+              const row = await client.query<{ inventory_quantity: string }>(
+                `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+                [item.sub_variant_id]
+              )
+              stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+              await client.query(
+                `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+                [extraQty, item.sub_variant_id]
+              )
+            } else if (item.variant_id) {
+              const row = await client.query<{ inventory_quantity: string }>(
+                `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+                [item.variant_id]
+              )
+              stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+              await client.query(
+                `UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+                [extraQty, item.variant_id]
+              )
+            } else {
+              const row = await client.query<{ inventory_quantity: string }>(
+                `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
+                [item.product_id]
+              )
+              stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+              await client.query(
+                `UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`,
+                [extraQty, item.product_id]
+              )
+            }
+            await logStockMovement(client, {
+              productId: item.product_id!,
+              variantId: item.variant_id || null,
+              subVariantId: item.sub_variant_id || null,
+              transactionType: 'sale',
+              quantityChange: -extraQty,
+              referenceType: 'order',
+              referenceId: id,
+              currentStock: stockBefore,
+            })
+            await decrementNonPerishableShelfStock(client, item.product_id!, item.variant_id || null, item.sub_variant_id || null, extraQty)
           }
-          await logStockMovement(client, {
-            productId: item.product_id!,
-            variantId: item.variant_id || null,
-            subVariantId: item.sub_variant_id || null,
-            transactionType: 'sale',
-            quantityChange: -extraQty,
-            referenceType: 'order',
-            referenceId: id,
-            currentStock: stockBefore,
-          })
         }
       }
 
