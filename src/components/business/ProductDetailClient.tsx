@@ -127,6 +127,7 @@ interface ProductDetailClientProps {
     age_max?: number | null
     target_gender?: string | null
     target_audience?: string[] | null
+    is_cod_allowed?: boolean | null
   }
   initialSkuParam?: string
 }
@@ -136,9 +137,10 @@ interface PolicyProps {
   returnDays: number
   replacementAllowed: boolean
   replacementDays: number
+  isCodAllowed?: boolean
 }
 
-const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays }: PolicyProps) => {
+const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed }: PolicyProps) => {
   const items = [
     {
       icon: (
@@ -220,6 +222,11 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
               {m}
             </span>
           ))}
+          {isCodAllowed && (
+            <span className="text-[9px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1 py-0.5 rounded whitespace-nowrap">
+              Cash on Delivery
+            </span>
+          )}
         </div>
       </Link>
     </div>
@@ -273,7 +280,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const replacementDays = replacementAllowed
     ? (brand?.replacement_allowed === false ? (brand.replacement_window_days ?? 7) : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7))
     : 0
-  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays }
+  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed: product.is_cod_allowed ?? false }
 
   const handleShare = useCallback(async () => {
     const url = window.location.href
