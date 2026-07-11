@@ -551,9 +551,9 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
               <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
                 <div
                   onClick={() => setShowPrice(v => !v)}
-                  className={`relative w-10 h-5 rounded-full transition-colors ${showPrice ? 'bg-orange-500' : 'bg-border-strong'}`}
+                  className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${showPrice ? 'bg-orange-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
                 >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform ${showPrice ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${showPrice ? 'translate-x-5 border-orange-300' : 'translate-x-0.5'}`} />
                 </div>
                 <span className="text-sm text-foreground-secondary">{showPrice ? 'On' : 'Off'}</span>
               </label>
