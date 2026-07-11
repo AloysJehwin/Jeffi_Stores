@@ -40,6 +40,9 @@ export async function GET(request: NextRequest) {
           'variant_stock_total', ${VARIANT_STOCK_TOTAL_SQL},
           'variant_min_price', ${VARIANT_MIN_PRICE_INCL_GST_SQL},
           'variant_min_mrp', ${VARIANT_MIN_MRP_SQL},
+          'fragile', p.fragile,
+          'hazardous', p.hazardous,
+          'flammable', p.flammable,
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),

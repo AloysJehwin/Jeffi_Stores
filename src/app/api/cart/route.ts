@@ -59,6 +59,9 @@ export async function GET(request: NextRequest) {
           'stock_status', p.stock_status,
           'is_active', p.is_active,
           'is_cod_allowed', p.is_cod_allowed,
+          'fragile', p.fragile,
+          'hazardous', p.hazardous,
+          'flammable', p.flammable,
           'brand_name', b.name, 'category_id', p.category_id,
           'product_images', COALESCE(
             (SELECT json_agg(json_build_object('thumbnail_url', pi.thumbnail_url, 'image_url', pi.image_url, 'is_primary', pi.is_primary))

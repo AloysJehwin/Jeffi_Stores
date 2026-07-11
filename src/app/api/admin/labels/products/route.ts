@@ -79,7 +79,8 @@ export async function GET(request: NextRequest) {
            COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity,
            COALESCE(p.discount_pct, 0)::numeric AS discount_pct,
            COALESCE(su.display_label, su.unit) AS sell_unit_label,
-           p.serialized
+           p.serialized,
+           p.fragile, p.hazardous, p.flammable
          FROM products p
          LEFT JOIN brands b ON b.id = p.brand_id
          LEFT JOIN product_units su ON su.id = p.sell_unit_id
@@ -105,7 +106,8 @@ export async function GET(request: NextRequest) {
            COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity,
            COALESCE(pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
            COALESCE(vsu.display_label, vsu.unit, psu.display_label, psu.unit) AS sell_unit_label,
-           p.serialized
+           p.serialized,
+           p.fragile, p.hazardous, p.flammable
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id
@@ -134,7 +136,8 @@ export async function GET(request: NextRequest) {
            COALESCE(ps.inventory_quantity, 0)::numeric AS inventory_quantity,
            COALESCE(ps.discount_pct, pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
            COALESCE(vsu.display_label, vsu.unit, psu.display_label, psu.unit) AS sell_unit_label,
-           p.serialized
+           p.serialized,
+           p.fragile, p.hazardous, p.flammable
          FROM product_sub_variants ps
          JOIN product_variants pv ON pv.id = ps.variant_id
          JOIN products p ON p.id = pv.product_id

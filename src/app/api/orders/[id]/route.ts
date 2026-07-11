@@ -88,7 +88,9 @@ export async function GET(
     const orderItems = await queryMany(`
       SELECT oi.id, oi.product_id, oi.product_name, oi.product_sku, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price, oi.buy_mode, oi.buy_unit,
         psv.sub_variant_name, psv.sku AS sub_variant_sku,
-        json_build_object('slug', p.slug, 'extra_delivery_days', p.extra_delivery_days, 'product_images',
+        json_build_object('slug', p.slug, 'extra_delivery_days', p.extra_delivery_days,
+          'fragile', p.fragile, 'hazardous', p.hazardous, 'flammable', p.flammable,
+          'product_images',
           COALESCE(
             (SELECT json_agg(pi ORDER BY pi.display_order)
              FROM product_images pi WHERE pi.product_id = p.id),
