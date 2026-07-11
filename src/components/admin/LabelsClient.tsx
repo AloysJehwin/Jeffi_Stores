@@ -538,7 +538,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 {outputMode === 'thermal' ? 'One label per page — for thermal/label printers' : 'Multiple labels per A4 page with cut lines — for desktop printers'}
               </p>
             </div>
-            <div className="sm:w-32">
+            <div className="flex-1">
               <h2 className="text-sm font-semibold text-foreground mb-2">Copies per item</h2>
               <input
                 type="number" min={1} max={100} value={copies}
@@ -546,7 +546,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
               />
             </div>
-            <div className="sm:w-36">
+            <div className="flex-1">
               <h2 className="text-sm font-semibold text-foreground mb-2">Print Price</h2>
               <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
                 <div

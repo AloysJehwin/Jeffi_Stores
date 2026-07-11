@@ -133,7 +133,7 @@ function clip(text: string, maxPt: number, doc: any, font: string, size: number)
   return text
 }
 
-function drawWarningIcons(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number, iconSize = 6) {
+function drawWarningIcons(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number, iconSize = 9) {
   const icons: { color: string; draw: (ix: number, iy: number, s: number) => void }[] = []
 
   if (p.flammable) {
@@ -194,7 +194,7 @@ function drawWarningIcons(doc: any, p: LabelProduct, x: number, y: number, w: nu
   const gap = 1.5
   const totalW = icons.length * iconSize + (icons.length - 1) * gap
   let startX = x + w - totalW - 2
-  const startY = y + 2
+  const startY = y + h - 2 - iconSize * 2 - 2
 
   for (const icon of icons) {
     icon.draw(startX, startY, iconSize)

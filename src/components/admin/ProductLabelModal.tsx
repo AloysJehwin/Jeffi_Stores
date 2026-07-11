@@ -79,7 +79,7 @@ function QR({ size }: { size: number }) {
   )
 }
 
-function WarningIcons({ entry, size }: { entry: LabelEntry | null; size: number }) {
+function WarningIcons({ entry, size, barH, pad }: { entry: LabelEntry | null; size: number; barH: number; pad: number }) {
   if (!entry) return null
   const icons: React.ReactNode[] = []
   if (entry.flammable) icons.push(
@@ -101,7 +101,7 @@ function WarningIcons({ entry, size }: { entry: LabelEntry | null; size: number 
   )
   if (icons.length === 0) return null
   return (
-    <div style={{ position: 'absolute', top: 2, right: 2, display: 'flex', gap: 1.5 }}>
+    <div style={{ position: 'absolute', bottom: barH + pad + 2, right: pad, display: 'flex', gap: 1.5 }}>
       {icons}
     </div>
   )
@@ -148,7 +148,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(6 * scale)} />
+        <WarningIcons entry={entry} size={Math.round(10 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -174,7 +174,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(6 * scale)} />
+        <WarningIcons entry={entry} size={Math.round(10 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -197,7 +197,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(7 * scale)} />
+        <WarningIcons entry={entry} size={Math.round(11 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -222,7 +222,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(7 * scale)} />
+        <WarningIcons entry={entry} size={Math.round(11 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -254,7 +254,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(7 * scale)} />
+        <WarningIcons entry={entry} size={Math.round(11 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
