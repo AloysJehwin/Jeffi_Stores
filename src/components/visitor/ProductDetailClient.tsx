@@ -10,6 +10,7 @@ import RazorpayOffers from './RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductImage {
   id: string
@@ -454,8 +455,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1">
             {product.name}
           </h1>
-          <div className="flex items-center gap-2 shrink-0 mt-1">
-            <button
+          <div className="flex items-center gap-2 shrink-0 mt-1">            <button
               onClick={handleWishlist}
               disabled={wishlistLoading}
               aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
@@ -477,6 +477,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           </div>
         </div>
 
+        <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} />
 
         {/* Low stock urgency + notify me for out-of-stock */}
         <div className="mb-4">

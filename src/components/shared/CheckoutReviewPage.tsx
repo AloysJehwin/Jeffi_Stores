@@ -7,6 +7,7 @@ import Link from 'next/link'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressFormModal from '@/components/visitor/AddressFormModal'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { mrpDiscountPct } from '@/lib/pricing'
@@ -878,6 +879,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                               </span>
                             )}
                             {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
+                            <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
                           </div>
                           <div className="flex flex-wrap gap-1 mt-1">
                             {item.variant && (

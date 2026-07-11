@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import RecommendedProducts from '@/components/business/RecommendedProducts'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 import { mrpDiscountPct, applyDiscount } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
@@ -254,6 +255,7 @@ export default function CartPage() {
                           {sku && (
                             <span className="text-xs text-foreground-muted font-mono">SKU: {sku}</span>
                           )}
+                          <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
                         </div>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {item.variant && (
