@@ -10,7 +10,7 @@ export async function POST(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'labels:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const { product_ids, size, copies, sheet } = await request.json()
+    const { product_ids, size, copies, sheet, showPrice } = await request.json()
 
     if (!Array.isArray(product_ids) || product_ids.length === 0) {
       return NextResponse.json({ error: 'product_ids required' }, { status: 400 })
@@ -41,7 +41,8 @@ export async function POST(request: NextRequest) {
                 p.name, NULL AS variant_name,
                 p.sku, p.slug, p.mrp, p.price_ex_gst, p.base_price,
                 COALESCE(p.gst_percentage, 0) AS gst_percentage,
-                p.gtin, b.name AS brand_name
+                p.gtin, b.name AS brand_name,
+                p.fragile, p.hazardous, p.flammable
          FROM products p
          LEFT JOIN brands b ON b.id = p.brand_id
          WHERE p.id = ANY($1::uuid[])`,
@@ -63,7 +64,8 @@ export async function POST(request: NextRequest) {
                 COALESCE(pv.price, p.base_price) AS base_price,
                 COALESCE(p.gst_percentage, 0) AS gst_percentage,
                 COALESCE(pv.gtin, p.gtin) AS gtin,
-                b.name AS brand_name
+                b.name AS brand_name,
+                p.fragile, p.hazardous, p.flammable
          FROM product_variants pv
          JOIN products p ON p.id = pv.product_id
          LEFT JOIN brands b ON b.id = p.brand_id
@@ -85,7 +87,8 @@ export async function POST(request: NextRequest) {
                 COALESCE(ps.price, 0) AS base_price,
                 COALESCE(p.gst_percentage, 0) AS gst_percentage,
                 COALESCE(pv.gtin, p.gtin) AS gtin,
-                b.name AS brand_name
+                b.name AS brand_name,
+                p.fragile, p.hazardous, p.flammable
          FROM product_sub_variants ps
          JOIN product_variants pv ON pv.id = ps.variant_id
          JOIN products p ON p.id = pv.product_id
@@ -104,9 +107,11 @@ export async function POST(request: NextRequest) {
       .map(id => results.find(r => r.id === id))
       .filter(Boolean) as LabelProduct[]
 
+    const orderedWithPrice = ordered.map(p => ({ ...p, showPrice: showPrice === true }))
+
     const pdfBuffer = sheet
-      ? await generateLabelSheetPDF(ordered, size as LabelSize, copiesNum)
-      : await generateLabelPDF(ordered, size as LabelSize, copiesNum)
+      ? await generateLabelSheetPDF(orderedWithPrice, size as LabelSize, copiesNum)
+      : await generateLabelPDF(orderedWithPrice, size as LabelSize, copiesNum)
 
     const spec = LABEL_SIZES.find(s => s.size === size)!
     const filename = `labels-${spec.size}-${new Date().toISOString().slice(0, 10)}.pdf`

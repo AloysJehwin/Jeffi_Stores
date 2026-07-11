@@ -16,6 +16,10 @@ export interface LabelProduct {
   gst_percentage: number
   brand_name?: string | null
   gtin?: string | null
+  fragile?: boolean | null
+  hazardous?: boolean | null
+  flammable?: boolean | null
+  showPrice?: boolean
 }
 
 export type LabelSize = '30x20' | '30x50' | '40x60' | '50x50' | '80x20' | 'shelf-card'
@@ -56,8 +60,7 @@ async function makeBarcodeBuffer(text: string, heightMm: number): Promise<Buffer
       textxalign: 'center',
       textsize: 5,
     })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return null
   }
 }
@@ -130,6 +133,75 @@ function clip(text: string, maxPt: number, doc: any, font: string, size: number)
   return text
 }
 
+function drawWarningIcons(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number, iconSize = 6) {
+  const icons: { color: string; draw: (ix: number, iy: number, s: number) => void }[] = []
+
+  if (p.flammable) {
+    icons.push({ color: '#c0392b', draw: (ix, iy, s) => {
+      // Flame: simplified triangle + teardrop
+      doc.save().fillColor('#c0392b')
+      doc.moveTo(ix + s * 0.5, iy)
+        .lineTo(ix + s * 0.85, iy + s * 0.55)
+        .lineTo(ix + s * 0.7, iy + s * 0.45)
+        .lineTo(ix + s * 0.82, iy + s)
+        .lineTo(ix + s * 0.18, iy + s)
+        .lineTo(ix + s * 0.3, iy + s * 0.45)
+        .lineTo(ix + s * 0.15, iy + s * 0.55)
+        .closePath().fill()
+      doc.restore()
+    }})
+  }
+
+  if (p.hazardous) {
+    icons.push({ color: '#e67e22', draw: (ix, iy, s) => {
+      // Exclamation diamond
+      doc.save().fillColor('#e67e22')
+      doc.moveTo(ix + s * 0.5, iy)
+        .lineTo(ix + s, iy + s * 0.5)
+        .lineTo(ix + s * 0.5, iy + s)
+        .lineTo(ix, iy + s * 0.5)
+        .closePath().fill()
+      doc.fillColor('#ffffff')
+      doc.rect(ix + s * 0.44, iy + s * 0.28, s * 0.12, s * 0.32).fill()
+      doc.circle(ix + s * 0.5, iy + s * 0.74, s * 0.07).fill()
+      doc.restore()
+    }})
+  }
+
+  if (p.fragile) {
+    icons.push({ color: '#2980b9', draw: (ix, iy, s) => {
+      // Broken glass / wine glass silhouette
+      doc.save().fillColor('#2980b9')
+      doc.moveTo(ix + s * 0.2, iy)
+        .lineTo(ix + s * 0.8, iy)
+        .lineTo(ix + s * 0.65, iy + s * 0.45)
+        .lineTo(ix + s * 0.55, iy + s * 0.45)
+        .lineTo(ix + s * 0.55, iy + s * 0.75)
+        .lineTo(ix + s * 0.65, iy + s * 0.75)
+        .lineTo(ix + s * 0.65, iy + s)
+        .lineTo(ix + s * 0.35, iy + s)
+        .lineTo(ix + s * 0.35, iy + s * 0.75)
+        .lineTo(ix + s * 0.45, iy + s * 0.75)
+        .lineTo(ix + s * 0.45, iy + s * 0.45)
+        .lineTo(ix + s * 0.35, iy + s * 0.45)
+        .closePath().fill()
+      doc.restore()
+    }})
+  }
+
+  if (icons.length === 0) return
+
+  const gap = 1.5
+  const totalW = icons.length * iconSize + (icons.length - 1) * gap
+  let startX = x + w - totalW - 2
+  const startY = y + 2
+
+  for (const icon of icons) {
+    icon.draw(startX, startY, iconSize)
+    startX += iconSize + gap
+  }
+}
+
 async function render30x20(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
   const pad = 2.5
   const barcodeText = p.sku
@@ -148,12 +220,13 @@ async function render30x20(doc: any, p: LabelProduct, x: number, y: number, w: n
     doc.fillColor('#000000')
   }
 
-  drawPrice(doc, p, x + pad, cur, w - pad * 2, 5, 4)
+  if (p.showPrice !== false) drawPrice(doc, p, x + pad, cur, w - pad * 2, 5, 4)
 
   const barBuf = await makeBarcodeBuffer(barcodeText, 3)
   if (barBuf) {
     doc.image(barBuf, x + pad, y + h - pad - barH, { width: w - pad * 2, height: barH })
   }
+  drawWarningIcons(doc, p, x, y, w, h, 5)
 }
 
 async function render30x50(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
@@ -177,7 +250,7 @@ async function render30x50(doc: any, p: LabelProduct, x: number, y: number, w: n
     doc.fillColor('#000000')
   }
 
-  cursor = drawPrice(doc, p, x + pad, cursor, w - pad * 2, 7, 5.5)
+  if (p.showPrice !== false) cursor = drawPrice(doc, p, x + pad, cursor, w - pad * 2, 7, 5.5)
 
   doc.font('Helvetica').fontSize(5.5).fillColor('#666666')
   doc.text(p.sku, x + pad, y + h - pad - barcodeH - 9, { width: w - pad * 2, lineBreak: false })
@@ -187,6 +260,7 @@ async function render30x50(doc: any, p: LabelProduct, x: number, y: number, w: n
   if (barBuf) {
     doc.image(barBuf, x + pad, y + h - pad - barcodeH, { width: w - pad * 2, height: barcodeH })
   }
+  drawWarningIcons(doc, p, x, y, w, h, 6)
 }
 
 async function render40x60(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
@@ -217,7 +291,7 @@ async function render40x60(doc: any, p: LabelProduct, x: number, y: number, w: n
   doc.text(`SKU: ${p.sku}`, x + pad, midY, { width: textW, lineBreak: false })
   midY += 8
 
-  drawPrice(doc, p, x + pad, midY, textW, 8, 5.5)
+  if (p.showPrice !== false) drawPrice(doc, p, x + pad, midY, textW, 8, 5.5)
 
   if (qrBuf) {
     doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
@@ -227,6 +301,7 @@ async function render40x60(doc: any, p: LabelProduct, x: number, y: number, w: n
   if (barBuf) {
     doc.image(barBuf, x + pad, y + h - pad - barcodeH, { width: w - pad * 2, height: barcodeH })
   }
+  drawWarningIcons(doc, p, x, y, w, h, 7)
 }
 
 async function render50x50(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
@@ -266,7 +341,7 @@ async function render50x50(doc: any, p: LabelProduct, x: number, y: number, w: n
     doc.fillColor('#000000')
   }
 
-  drawPrice(doc, p, rightX, cur, rightW, 10, 6)
+  if (p.showPrice !== false) drawPrice(doc, p, rightX, cur, rightW, 10, 6)
 
   doc.fillColor('#000000').font('Helvetica').fontSize(5.5)
   doc.text(`SKU: ${p.sku}`, x + pad, y + h - pad - barcodeH - 8, { width: w - pad * 2, lineBreak: false })
@@ -274,6 +349,7 @@ async function render50x50(doc: any, p: LabelProduct, x: number, y: number, w: n
   if (barBuf) {
     doc.image(barBuf, x + pad, y + h - pad - barcodeH, { width: w - pad * 2, height: barcodeH })
   }
+  drawWarningIcons(doc, p, x, y, w, h, 7)
 }
 
 async function render80x20(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
@@ -297,12 +373,13 @@ async function render80x20(doc: any, p: LabelProduct, x: number, y: number, w: n
     doc.fillColor('#000000')
   }
 
-  drawPrice(doc, p, priceX, y + pad, priceColW, 7, 4.5)
+  if (p.showPrice !== false) drawPrice(doc, p, priceX, y + pad, priceColW, 7, 4.5)
 
   const barBuf = await makeBarcodeBuffer(barcodeText, 3)
   if (barBuf) {
     doc.image(barBuf, x + pad, y + h - pad - barH, { width: w - pad * 2, height: barH })
   }
+  drawWarningIcons(doc, p, x, y, w, h, 5)
 }
 
 type RenderFn = (doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) => Promise<void>
