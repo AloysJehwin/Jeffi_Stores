@@ -79,25 +79,41 @@ function QR({ size }: { size: number }) {
   )
 }
 
+const WarnFlame = () => (
+  <svg viewBox="0 0 10 14" fill="currentColor" style={{ width: '0.7em', height: '0.95em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}>
+    <path d="M5 0C5 0 2 4 2 7a3 3 0 006 0c0-.5-.1-1-.25-1.4.5.8.75 1.7.75 2.9a4 4 0 01-8 0C.5 5 5 0 5 0zm0 3C4.3 4.5 3.5 6 3.5 7.5a1.5 1.5 0 003 0C6.5 6.3 5.8 4.8 5 3z" />
+  </svg>
+)
+const WarnTriangle = () => (
+  <svg viewBox="0 0 12 12" fill="currentColor" style={{ width: '0.7em', height: '0.7em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}>
+    <path d="M6 1L11.5 11H.5L6 1zm0 2.5L2.2 10h7.6L6 3.5zM5.4 6h1.2v2.5H5.4V6zm0 3h1.2v1.2H5.4V9z" />
+  </svg>
+)
+const WarnDiamond = () => (
+  <svg viewBox="0 0 12 12" fill="currentColor" style={{ width: '0.7em', height: '0.7em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}>
+    <path d="M6 .5L11.5 6 6 11.5.5 6 6 .5zm0 2L2.5 6l1.8 1.8L5.5 6l1.5 2 1-2 .8 1.8L10.5 6 6 2.5z" />
+  </svg>
+)
+
 function WarningIcons({ entry, size, barH, pad }: { entry: LabelEntry | null; size: number; barH: number; pad: number }) {
   if (!entry) return null
-  const badges: { label: string; color: string; bg: string }[] = []
-  if (entry.flammable) badges.push({ label: '🔥 FLAMMABLE', color: '#fff', bg: '#c0392b' })
-  if (entry.hazardous) badges.push({ label: '⚠ HAZARDOUS', color: '#fff', bg: '#e67e22' })
-  if (entry.fragile) badges.push({ label: '🫙 FRAGILE', color: '#fff', bg: '#2980b9' })
+  const badges: { key: string; label: string; color: string; bg: string; Icon: () => JSX.Element }[] = []
+  if (entry.flammable) badges.push({ key: 'flammable', label: 'FLAMMABLE', color: '#fff', bg: '#c0392b', Icon: WarnFlame })
+  if (entry.hazardous) badges.push({ key: 'hazardous', label: 'HAZARDOUS', color: '#fff', bg: '#e67e22', Icon: WarnTriangle })
+  if (entry.fragile)   badges.push({ key: 'fragile',   label: 'FRAGILE',   color: '#fff', bg: '#2980b9', Icon: WarnDiamond })
   if (badges.length === 0) return null
   const fs = Math.max(5, Math.round(size * 0.55))
   return (
     <div style={{ position: 'absolute', bottom: barH + pad + 2, right: pad, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-      {badges.map(b => (
-        <div key={b.label} style={{
-          background: b.bg, color: b.color,
+      {badges.map(({ key, label, color, bg, Icon }) => (
+        <div key={key} style={{
+          background: bg, color,
           fontSize: fs, fontWeight: 700, fontFamily: 'Helvetica, Arial, sans-serif',
           padding: `1px ${Math.round(fs * 0.6)}px`,
           borderRadius: 2, lineHeight: 1.4, whiteSpace: 'nowrap',
-          letterSpacing: '0.02em',
+          letterSpacing: '0.02em', display: 'flex', alignItems: 'center',
         }}>
-          {b.label}
+          <Icon />{label}
         </div>
       ))}
     </div>
