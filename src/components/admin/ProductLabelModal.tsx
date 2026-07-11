@@ -148,7 +148,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(10 * scale)} barH={barH} pad={pad} />
+        <WarningIcons entry={entry} size={Math.round(16 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -174,7 +174,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(10 * scale)} barH={barH} pad={pad} />
+        <WarningIcons entry={entry} size={Math.round(16 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -197,7 +197,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(11 * scale)} barH={barH} pad={pad} />
+        <WarningIcons entry={entry} size={Math.round(18 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -222,7 +222,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(11 * scale)} barH={barH} pad={pad} />
+        <WarningIcons entry={entry} size={Math.round(18 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -254,7 +254,7 @@ function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entr
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
-        <WarningIcons entry={entry} size={Math.round(11 * scale)} barH={barH} pad={pad} />
+        <WarningIcons entry={entry} size={Math.round(18 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
