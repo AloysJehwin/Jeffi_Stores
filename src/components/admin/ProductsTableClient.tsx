@@ -171,6 +171,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                         <p className="text-xs text-accent-500 font-medium">Click row to view full details →</p>
                       </div>
                     </HoverCard>
+                    <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} size="xs" />
                   </div>
                 </div>
               </td>
