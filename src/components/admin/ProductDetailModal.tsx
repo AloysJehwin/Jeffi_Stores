@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Package, Star } from 'lucide-react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { ap } from '@/lib/admin-path'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface Props {
   product: any | null
@@ -177,6 +178,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                     <span className="px-2 py-0.5 text-xs font-semibold rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">Low Stock</span>
                   )}
                 </div>
+                <ProductWarningBadges fragile={p.fragile} hazardous={p.hazardous} flammable={p.flammable} />
 
                 {/* Price */}
                 <div>

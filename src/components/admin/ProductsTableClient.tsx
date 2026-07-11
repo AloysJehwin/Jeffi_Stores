@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { Star } from 'lucide-react'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { ap } from '@/lib/admin-path'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
@@ -88,6 +89,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                                 <span className="px-1.5 py-0.5 text-xs rounded-full font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
                               )}
                             </div>
+                            <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} size="xs" />
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs border-t border-border-default pt-2">
