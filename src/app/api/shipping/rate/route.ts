@@ -22,6 +22,7 @@ const DELHIVERY_API = 'https://track.delhivery.com/api/kinko/v1/invoice/charges/
 const ORIGIN_PIN = process.env.DELHIVERY_ORIGIN_PINCODE || '492001'
 const TOKEN = process.env.DELHIVERY_API_KEY
 const SHIPPING_MIN_CHARGE = parseFloat(process.env.SHIPPING_MIN_CHARGE || '0') || 0
+const SHIPPING_MAX_CHARGE = parseFloat(process.env.SHIPPING_MAX_CHARGE || '200') || 200
 const COD_SURCHARGE_FLAT = parseFloat(process.env.COD_SURCHARGE_FLAT || '40') || 40
 const COD_SURCHARGE_PCT = parseFloat(process.env.COD_SURCHARGE_PCT || '2') || 2
 
@@ -179,8 +180,7 @@ export async function POST(request: NextRequest) {
           zone = r.zone || zone
           cartonBreakdown.push({ weightGrams: c.chargedWeightGrams, charge: r.charge, zone: r.zone })
         }
-      } catch (err) {
-        console.error('[route]', err)
+      } catch {
         source = 'fallback'
         totalCharge = 0
         totalChargedWeight = 0
@@ -209,6 +209,10 @@ export async function POST(request: NextRequest) {
       totalCharge = SHIPPING_MIN_CHARGE
     }
 
+    if (SHIPPING_MAX_CHARGE > 0 && totalCharge > SHIPPING_MAX_CHARGE) {
+      totalCharge = SHIPPING_MAX_CHARGE
+    }
+
     if (isCod) {
       const codFee = typeof subtotal === 'number'
         ? Math.max(COD_SURCHARGE_FLAT, (COD_SURCHARGE_PCT / 100) * subtotal)
@@ -226,7 +230,7 @@ export async function POST(request: NextRequest) {
     const result: RateBreakdown = {
       charge: ruleResult.charge,
       zone,
-      source: ruleResult.source === 'as_is' || ruleResult.source === 'discounted' ? source : ruleResult.source,
+      source: ruleResult.source === 'as_is' ? source : ruleResult.source,
       chargedWeightGrams: totalChargedWeight,
       cartonCount: cartons.length,
       cartons: cartonBreakdown,
@@ -234,8 +238,7 @@ export async function POST(request: NextRequest) {
     if (deliverySettings.freeThreshold > 0) result.freeShippingThreshold = deliverySettings.freeThreshold
 
     return NextResponse.json(result)
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
