@@ -447,7 +447,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                 ))}
               </div>
             </div>
-            <div className="w-28">
+            <div className="flex-1">
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Copies each</p>
               <input
                 type="number" min={1} max={100} value={copies}
@@ -455,7 +455,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                 className="w-full px-2 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
               />
             </div>
-            <div className="w-28">
+            <div className="flex-1">
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Print Price</p>
               <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
                 <div
