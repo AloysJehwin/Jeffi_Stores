@@ -3,6 +3,7 @@
 import { useEffect, useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { ap } from '@/lib/admin-path'
 
 const METRO_PINS_3 = new Set([
@@ -239,6 +240,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                           {item.variant_name && (
                             <p className="text-xs text-foreground-muted truncate">{item.variant_name}</p>
                           )}
+                          <ProductWarningBadges fragile={item.fragile} hazardous={item.hazardous} flammable={item.flammable} size="xs" />
                         </td>
                         <td className="px-3 py-2 text-xs text-foreground-muted truncate">{item.product_sku || '—'}</td>
                         <td className="px-3 py-2 text-right text-foreground">{item.quantity}</td>
