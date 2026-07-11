@@ -134,72 +134,27 @@ function clip(text: string, maxPt: number, doc: any, font: string, size: number)
 }
 
 function drawWarningIcons(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number, iconSize = 12) {
-  const icons: { color: string; draw: (ix: number, iy: number, s: number) => void }[] = []
+  const badges: { label: string; color: string }[] = []
+  if (p.flammable) badges.push({ label: 'FLAMMABLE', color: '#c0392b' })
+  if (p.hazardous) badges.push({ label: 'HAZARDOUS', color: '#e67e22' })
+  if (p.fragile) badges.push({ label: 'FRAGILE', color: '#2980b9' })
+  if (badges.length === 0) return
 
-  if (p.flammable) {
-    icons.push({ color: '#c0392b', draw: (ix, iy, s) => {
-      // Flame: simplified triangle + teardrop
-      doc.save().fillColor('#c0392b')
-      doc.moveTo(ix + s * 0.5, iy)
-        .lineTo(ix + s * 0.85, iy + s * 0.55)
-        .lineTo(ix + s * 0.7, iy + s * 0.45)
-        .lineTo(ix + s * 0.82, iy + s)
-        .lineTo(ix + s * 0.18, iy + s)
-        .lineTo(ix + s * 0.3, iy + s * 0.45)
-        .lineTo(ix + s * 0.15, iy + s * 0.55)
-        .closePath().fill()
-      doc.restore()
-    }})
+  const fs = iconSize * 0.55
+  const badgeH = iconSize
+  const badgePad = iconSize * 0.35
+  doc.font('Helvetica-Bold').fontSize(fs)
+
+  let bx = x + w - 2
+  for (const b of badges) {
+    const tw = doc.widthOfString(b.label)
+    const bw = tw + badgePad * 2
+    bx -= bw + 2
+    const by = y + h - badgeH * 2 - 4
+    doc.rect(bx, by, bw, badgeH).fill(b.color)
+    doc.fillColor('#ffffff').text(b.label, bx + badgePad, by + (badgeH - fs) / 2, { lineBreak: false })
   }
-
-  if (p.hazardous) {
-    icons.push({ color: '#e67e22', draw: (ix, iy, s) => {
-      // Exclamation diamond
-      doc.save().fillColor('#e67e22')
-      doc.moveTo(ix + s * 0.5, iy)
-        .lineTo(ix + s, iy + s * 0.5)
-        .lineTo(ix + s * 0.5, iy + s)
-        .lineTo(ix, iy + s * 0.5)
-        .closePath().fill()
-      doc.fillColor('#ffffff')
-      doc.rect(ix + s * 0.44, iy + s * 0.28, s * 0.12, s * 0.32).fill()
-      doc.circle(ix + s * 0.5, iy + s * 0.74, s * 0.07).fill()
-      doc.restore()
-    }})
-  }
-
-  if (p.fragile) {
-    icons.push({ color: '#2980b9', draw: (ix, iy, s) => {
-      // Broken glass / wine glass silhouette
-      doc.save().fillColor('#2980b9')
-      doc.moveTo(ix + s * 0.2, iy)
-        .lineTo(ix + s * 0.8, iy)
-        .lineTo(ix + s * 0.65, iy + s * 0.45)
-        .lineTo(ix + s * 0.55, iy + s * 0.45)
-        .lineTo(ix + s * 0.55, iy + s * 0.75)
-        .lineTo(ix + s * 0.65, iy + s * 0.75)
-        .lineTo(ix + s * 0.65, iy + s)
-        .lineTo(ix + s * 0.35, iy + s)
-        .lineTo(ix + s * 0.35, iy + s * 0.75)
-        .lineTo(ix + s * 0.45, iy + s * 0.75)
-        .lineTo(ix + s * 0.45, iy + s * 0.45)
-        .lineTo(ix + s * 0.35, iy + s * 0.45)
-        .closePath().fill()
-      doc.restore()
-    }})
-  }
-
-  if (icons.length === 0) return
-
-  const gap = 1.5
-  const totalW = icons.length * iconSize + (icons.length - 1) * gap
-  let startX = x + w - totalW - 2
-  const startY = y + h - 2 - iconSize * 2 - 2
-
-  for (const icon of icons) {
-    icon.draw(startX, startY, iconSize)
-    startX += iconSize + gap
-  }
+  doc.fillColor('#000000')
 }
 
 async function render30x20(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {

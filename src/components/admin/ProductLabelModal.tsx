@@ -81,28 +81,25 @@ function QR({ size }: { size: number }) {
 
 function WarningIcons({ entry, size, barH, pad }: { entry: LabelEntry | null; size: number; barH: number; pad: number }) {
   if (!entry) return null
-  const icons: React.ReactNode[] = []
-  if (entry.flammable) icons.push(
-    <svg key="flame" width={size} height={size} viewBox="0 0 10 10">
-      <path d="M5 0.5 L8.5 5.5 L7 4.5 L8.2 10 L1.8 10 L3 4.5 L1.5 5.5 Z" fill="#c0392b"/>
-    </svg>
-  )
-  if (entry.hazardous) icons.push(
-    <svg key="haz" width={size} height={size} viewBox="0 0 10 10">
-      <polygon points="5,0 10,5 5,10 0,5" fill="#e67e22"/>
-      <rect x="4.4" y="2.8" width="1.2" height="3.2" fill="#fff"/>
-      <circle cx="5" cy="7.4" r="0.7" fill="#fff"/>
-    </svg>
-  )
-  if (entry.fragile) icons.push(
-    <svg key="frag" width={size} height={size} viewBox="0 0 10 10">
-      <path d="M2 0 L8 0 L6.5 4.5 L5.5 4.5 L5.5 7.5 L6.5 7.5 L6.5 10 L3.5 10 L3.5 7.5 L4.5 7.5 L4.5 4.5 L3.5 4.5 Z" fill="#2980b9"/>
-    </svg>
-  )
-  if (icons.length === 0) return null
+  const badges: { label: string; color: string; bg: string }[] = []
+  if (entry.flammable) badges.push({ label: '🔥 FLAMMABLE', color: '#fff', bg: '#c0392b' })
+  if (entry.hazardous) badges.push({ label: '⚠ HAZARDOUS', color: '#fff', bg: '#e67e22' })
+  if (entry.fragile) badges.push({ label: '🫙 FRAGILE', color: '#fff', bg: '#2980b9' })
+  if (badges.length === 0) return null
+  const fs = Math.max(5, Math.round(size * 0.55))
   return (
-    <div style={{ position: 'absolute', bottom: barH + pad + 2, right: pad, display: 'flex', gap: 1.5 }}>
-      {icons}
+    <div style={{ position: 'absolute', bottom: barH + pad + 2, right: pad, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+      {badges.map(b => (
+        <div key={b.label} style={{
+          background: b.bg, color: b.color,
+          fontSize: fs, fontWeight: 700, fontFamily: 'Helvetica, Arial, sans-serif',
+          padding: `1px ${Math.round(fs * 0.6)}px`,
+          borderRadius: 2, lineHeight: 1.4, whiteSpace: 'nowrap',
+          letterSpacing: '0.02em',
+        }}>
+          {b.label}
+        </div>
+      ))}
     </div>
   )
 }
