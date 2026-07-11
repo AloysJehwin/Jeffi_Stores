@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { bp } from '@/lib/business-path'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
@@ -553,6 +554,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                             {item.subVariantName}
                           </span>
                         )}
+                        <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
                         {(() => {
                           const isFractional = item.buyUnit
                             ? CONTINUOUS_UNITS.has(item.buyUnit.toLowerCase())

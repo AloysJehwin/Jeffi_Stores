@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface AppliedCoupon {
   couponId: string
@@ -252,6 +253,7 @@ export default function CartPage() {
                               Unavailable
                             </span>
                           )}
+                          <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
                         </div>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {item.variant && (

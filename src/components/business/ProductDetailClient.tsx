@@ -9,6 +9,7 @@ import RazorpayOffers from '@/components/visitor/RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductImage {
   id: string
@@ -342,6 +343,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             </button>
           </div>
         </div>
+
+        <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} />
 
         <ProductActions
           productId={product.id}

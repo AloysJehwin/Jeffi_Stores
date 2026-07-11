@@ -8,6 +8,7 @@ import { useCart } from '@/contexts/CartContext'
 import { navItems } from '@/components/visitor/AccountSidebar'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ReviewModal from '@/components/shared/ReviewModal'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
@@ -1129,6 +1130,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                             {item.subVariantName}
                           </span>
                         )}
+                        <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
                         {(() => {
                           const isFractional = (item.buyMode && item.buyMode !== 'unit') || (item.buyUnit && item.buyUnit !== 'unit')
                           const unitLabel = item.buyUnit && item.buyUnit !== 'unit' ? item.buyUnit : (item.buyMode && item.buyMode !== 'unit' ? item.buyMode : null)

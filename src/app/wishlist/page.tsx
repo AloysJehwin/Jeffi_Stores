@@ -10,6 +10,7 @@ import { AccountNavBar } from '@/components/visitor/AccountSidebar'
 import AccountMobileHeader from '@/components/visitor/AccountMobileHeader'
 import { AccountSearchProvider } from '@/contexts/AccountSearchContext'
 import FeaturedProducts from '@/components/visitor/FeaturedProducts'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface WishlistItem {
   id: string
@@ -30,6 +31,9 @@ interface WishlistItem {
       thumbnail_url: string
       is_primary: boolean
     }>
+    fragile: boolean | null
+    hazardous: boolean | null
+    flammable: boolean | null
   }
 }
 
@@ -246,6 +250,7 @@ function WishlistInner() {
                   <Link href={`/products/${item.products.slug}`} className="font-semibold text-base text-foreground group-hover:text-accent-600 transition-colors line-clamp-2 min-h-[3rem] mb-2">
                     {item.products.name}
                   </Link>
+                  <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
 
                   <div className="mt-auto">
                     <div className="flex items-baseline gap-2 mb-1">

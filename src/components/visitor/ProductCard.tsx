@@ -7,6 +7,7 @@ import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { resolveEdd } from '@/lib/edd-cache'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductCardProps {
   id: string
@@ -23,12 +24,16 @@ interface ProductCardProps {
   discountPct?: number
   extraDeliveryDays?: number
   handlingDays?: number
+  fragile?: boolean | null
+  hazardous?: boolean | null
+  flammable?: boolean | null
 }
 
 export default function ProductCard({
   id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
   effectiveStock, primaryImage, brandName, categoryName, discountPct = 0,
   extraDeliveryDays = 0, handlingDays = 2,
+  fragile, hazardous, flammable,
 }: ProductCardProps) {
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
@@ -167,6 +172,10 @@ export default function ProductCard({
                 {mrpDiscount}% off
               </div>
             )}
+
+            <div className="absolute bottom-2 left-2 flex flex-col gap-0.5">
+              <ProductWarningBadges fragile={fragile} hazardous={hazardous} flammable={flammable} size="xs" />
+            </div>
           </div>
 
           {/* Info */}
