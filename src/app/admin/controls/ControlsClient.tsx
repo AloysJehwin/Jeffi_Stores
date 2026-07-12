@@ -1,9 +1,20 @@
 'use client'
 
-import { useState, useMemo, useCallback } from 'react'
+import { useState, useMemo, useCallback, useEffect } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ALL_DIMENSIONS, DIMENSION_LABEL, UNITS, type Dimension, computeAreaFactor, computeVolumeFactor } from '@/lib/units'
+
+interface ControlsLog {
+  id: string
+  operation: string
+  product_count: number
+  applied_by: string | null
+  applied_at: string
+  rolled_back_at: string | null
+  is_rollback: boolean
+  value: any
+}
 
 interface Category { id: string; name: string; parent_category_id: string | null }
 interface Brand { id: string; name: string }
@@ -100,6 +111,25 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   const [lastLogLabel, setLastLogLabel] = useState<string | null>(null)
   const [rollingBack, setRollingBack] = useState(false)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
+
+  // ── operation history ─────────────────────────────────────────────────────
+  const [logs, setLogs] = useState<ControlsLog[]>([])
+  const [logsLoading, setLogsLoading] = useState(false)
+
+  const loadLogs = useCallback(async () => {
+    setLogsLoading(true)
+    try {
+      const res = await fetch('/api/admin/controls/rollback')
+      if (res.ok) {
+        const data = await res.json()
+        setLogs(data.logs ?? [])
+      }
+    } finally {
+      setLogsLoading(false)
+    }
+  }, [])
+
+  useEffect(() => { loadLogs() }, [])
 
   // ── selling unit sub-fields ───────────────────────────────────────────────
   const [suDimension, setSuDimension] = useState<Dimension>('count')
@@ -285,11 +315,11 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
-      setApplySuccess(`✅ ${label} applied to ${data.updated} product${data.updated !== 1 ? 's' : ''}.`)
+      setApplySuccess(`${label} applied to ${data.updated} product${data.updated !== 1 ? 's' : ''}.`)
       if (data.log_id) { setLastLogId(data.log_id); setLastLogLabel(label) }
       setRollbackError(null)
       setOpValue('')
-      loadProducts(activeFilters, true)
+      loadLogs()
     } catch (e: any) {
       setApplyError(e.message)
     } finally {
@@ -299,11 +329,10 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
 
   const suUnitKey = suIsCustom ? suUnit.trim() : suUnit
 
-  async function handleRollback() {
-    if (!lastLogId) return
+  async function handleRollback(logId: string, label: string) {
     const ok = await confirm({
-      title: 'Undo last operation?',
-      message: `This will restore the before-values for "${lastLogLabel}" across all affected products.`,
+      title: 'Undo operation?',
+      message: `This will restore the before-values for "${label}" across all affected products.`,
       confirmLabel: 'Yes, undo',
       cancelLabel: 'Cancel',
       variant: 'danger',
@@ -315,13 +344,14 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
       const res = await fetch('/api/admin/controls/rollback', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ log_id: lastLogId }),
+        body: JSON.stringify({ log_id: logId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Rollback failed')
-      setApplySuccess(`↩ Rolled back "${lastLogLabel}" — ${data.restored} product${data.restored !== 1 ? 's' : ''} restored.`)
+      setApplySuccess(`Rolled back "${label}" — ${data.restored} product${data.restored !== 1 ? 's' : ''} restored.`)
       setLastLogId(null)
       setLastLogLabel(null)
+      loadLogs()
       loadProducts(activeFilters, true)
     } catch (e: any) {
       setRollbackError(e.message)
@@ -739,10 +769,10 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
           {applySuccess && (
             <div className="flex items-center gap-3 flex-wrap">
               <p className="text-sm text-green-600 dark:text-green-400 font-medium flex-1">{applySuccess}</p>
-              {lastLogId && (
+              {lastLogId && lastLogLabel && (
                 <button
                   type="button"
-                  onClick={handleRollback}
+                  onClick={() => handleRollback(lastLogId, lastLogLabel)}
                   disabled={rollingBack}
                   className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 text-xs font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50 transition-colors"
                 >
@@ -770,6 +800,58 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
           <p className="text-xs text-foreground-muted mt-1">Example: filter by <strong>Grade = 12.9</strong>, select all, then apply <strong>Inflate Price +5%</strong>.</p>
         </div>
       )}
+
+      {/* ── Operation History ─────────────────────────────────────────────── */}
+      <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-default bg-surface">
+          <h2 className="text-sm font-semibold text-foreground">Operation History</h2>
+          <button type="button" onClick={loadLogs} disabled={logsLoading}
+            className="text-xs text-foreground-muted hover:text-foreground disabled:opacity-50 transition-colors">
+            {logsLoading ? 'Loading…' : 'Refresh'}
+          </button>
+        </div>
+        {logsLoading && logs.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-foreground-muted">Loading…</p>
+        ) : logs.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-foreground-muted">No operations recorded yet.</p>
+        ) : (
+          <div className="divide-y divide-border-default max-h-80 overflow-y-auto">
+            {logs.map(log => {
+              const opLabel = OPERATIONS.find(o => o.key === log.operation)?.label ?? log.operation
+              const valueStr = (() => {
+                if (!log.value || log.value === null) return null
+                if (typeof log.value === 'object') return null
+                return String(log.value)
+              })()
+              return (
+                <div key={log.id} className={`flex items-center gap-3 px-4 py-2.5 ${log.rolled_back_at ? 'opacity-50' : ''}`}>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-foreground">
+                      {opLabel}{valueStr ? <span className="text-foreground-muted ml-1">→ {valueStr}</span> : null}
+                    </p>
+                    <p className="text-xs text-foreground-muted mt-0.5">
+                      {log.product_count} product{log.product_count !== 1 ? 's' : ''}
+                      {log.applied_by ? ` · ${log.applied_by}` : ''}
+                      {' · '}{new Date(log.applied_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                      {log.rolled_back_at ? ' · Rolled back' : ''}
+                    </p>
+                  </div>
+                  {!log.rolled_back_at && (
+                    <button
+                      type="button"
+                      onClick={() => handleRollback(log.id, opLabel)}
+                      disabled={rollingBack}
+                      className="shrink-0 px-2.5 py-1 rounded border border-border-secondary text-xs text-foreground-secondary hover:border-red-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 transition-colors"
+                    >
+                      Rollback
+                    </button>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
     </div>
   )
 }
