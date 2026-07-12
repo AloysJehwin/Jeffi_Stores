@@ -287,20 +287,22 @@ export async function POST(request: NextRequest) {
         const maxQ = max_qty != null && max_qty !== '' ? parseFloat(max_qty) : null
         const stepQ = parseFloat(qty_step) || 1
 
-        // Upsert product-level base unit row for each product
+        // Upsert product-level base unit row for each product.
+        // Target the one-base partial index so renaming the unit doesn't create a duplicate.
         for (const id of ids) {
           await client.query(
             `INSERT INTO product_units (product_id, unit, factor, dimension, display_label, min_qty, max_qty, qty_step, is_base, is_purchase_default)
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, true, false)
-             ON CONFLICT (product_id, unit) WHERE variant_id IS NULL
-             DO UPDATE SET factor=$3, dimension=$4, display_label=$5, min_qty=$6, max_qty=$7, qty_step=$8, updated_at=NOW()`,
+             ON CONFLICT (product_id) WHERE is_base = true AND variant_id IS NULL
+             DO UPDATE SET unit=$2, factor=$3, dimension=$4, display_label=$5, min_qty=$6, max_qty=$7, qty_step=$8, updated_at=NOW()`,
             [id, unit, f, dimension, display_label ?? null, minQ, maxQ, stepQ]
           )
           updated++
         }
 
         if (inherit_to_variants) {
-          // Upsert same unit row on every active variant of the selected products
+          // Upsert same unit row on every active variant of the selected products.
+          // Target the one-base-variant partial index so renaming the unit doesn't duplicate.
           const variants = await client.query(
             `SELECT pv.id, pv.product_id FROM product_variants pv WHERE pv.product_id=ANY($1::uuid[]) AND pv.is_active=true`,
             [ids]
@@ -309,8 +311,8 @@ export async function POST(request: NextRequest) {
             await client.query(
               `INSERT INTO product_units (product_id, variant_id, unit, factor, dimension, display_label, min_qty, max_qty, qty_step, is_base, is_purchase_default)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, false)
-               ON CONFLICT (variant_id, unit) WHERE variant_id IS NOT NULL
-               DO UPDATE SET factor=$4, dimension=$5, display_label=$6, min_qty=$7, max_qty=$8, qty_step=$9, updated_at=NOW()`,
+               ON CONFLICT (variant_id) WHERE is_base = true AND variant_id IS NOT NULL
+               DO UPDATE SET unit=$3, factor=$4, dimension=$5, display_label=$6, min_qty=$7, max_qty=$8, qty_step=$9, updated_at=NOW()`,
               [v.product_id, v.id, unit, f, dimension, display_label ?? null, minQ, maxQ, stepQ]
             )
           }
