@@ -35,6 +35,9 @@ interface OrderItem {
   products: {
     slug: string
     extra_delivery_days?: number | null
+    fragile?: boolean | null
+    hazardous?: boolean | null
+    flammable?: boolean | null
     product_images: Array<{
       thumbnail_url: string
       image_url: string

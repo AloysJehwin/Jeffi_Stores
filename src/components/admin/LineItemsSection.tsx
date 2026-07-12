@@ -42,6 +42,7 @@ export interface LineItem {
   mrp: number
   inventory_quantity: number | null
   serialized?: boolean
+  perishable?: boolean
 }
 
 interface Suggestion {
