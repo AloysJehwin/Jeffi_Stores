@@ -11,8 +11,11 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import HoverCard from '@/components/ui/HoverCard'
 import LineItemsSection, { newLineItem, type LineItem as LILineItem } from '@/components/admin/LineItemsSection'
+import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
+import SerialEntryModal, { type SerialItem, type SerialAssignment } from '@/components/admin/SerialEntryModal'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
 import DatePicker from '@/components/ui/DatePicker'
+import Toggle from '@/components/ui/Toggle'
 
 interface Invoice {
   id: string
@@ -97,22 +100,27 @@ export default function InvoicesClient() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  // open editor directly when ?edit=<id> is in the URL (e.g. from detail page Edit button)
+  // open editor directly when ?edit=<id>&view=edit is in the URL (reload or direct link)
+  const editIdRef = useRef<string | null>(null)
   useEffect(() => {
     const editParam = searchParams.get('edit')
-    if (editParam && searchParams.get('view') === 'edit') {
+    if (editParam && searchParams.get('view') === 'edit' && editIdRef.current !== editParam) {
+      editIdRef.current = editParam
       openEdit({ id: editParam, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [searchParams.toString()])
 
-  function navigateView(next: View) {
+  function navigateView(next: View, id?: string) {
     setViewState(next)
     if (next === 'list') {
+      editIdRef.current = null
       router.back()
     } else {
       const params = new URLSearchParams(window.location.search)
       params.set('view', next)
+      if (id) params.set('edit', id)
+      else params.delete('edit')
       router.push(ap(`/admin/invoices?${params.toString()}`), { scroll: false })
     }
   }
@@ -157,6 +165,22 @@ export default function InvoicesClient() {
   const [buyerGstin, setBuyerGstin] = useState('')
   const [paymentMode, setPaymentMode] = useState('cash')
 
+  // Buyer (Bill to) — separate from consignee
+  const [buyerSame, setBuyerSame] = useState(true)
+  const [buyerSearch, setBuyerSearch] = useState('')
+  const [buyerResults, setBuyerResults] = useState<any[]>([])
+  const [showBuyerDrop, setShowBuyerDrop] = useState(false)
+  const buyerTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [buyerName, setBuyerName] = useState('')
+  const [buyerPhone, setBuyerPhone] = useState('')
+  const [buyerEmail, setBuyerEmail] = useState('')
+  const [buyerAddr1, setBuyerAddr1] = useState('')
+  const [buyerAddr2, setBuyerAddr2] = useState('')
+  const [buyerCity, setBuyerCity] = useState('')
+  const [buyerStateVal, setBuyerStateVal] = useState('')
+  const [buyerPostalCode, setBuyerPostalCode] = useState('')
+  const [buyerGstinBill, setBuyerGstinBill] = useState('')
+
   const [custSearch, setCustSearch] = useState('')
   const [custResults, setCustResults] = useState<any[]>([])
   const [showCustDrop, setShowCustDrop] = useState(false)
@@ -172,6 +196,18 @@ export default function InvoicesClient() {
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [finalizingId, setFinalizingId] = useState<string | null>(null)
   const [editIsDraft, setEditIsDraft] = useState(false)
+
+  // Batch picker for perishable line items
+  const [batchPickerItem, setBatchPickerItem] = useState<BatchPickerItem | null>(null)
+  const [batchAssignments, setBatchAssignments] = useState<Record<string, { batch_id: string; qty: number }[]>>({}) // lineItemId → [{batch_id, qty}]
+  const [assignedBatchLabels, setAssignedBatchLabels] = useState<Record<string, string>>({}) // lineItemId → lot label(s)
+  const [serialAssignments, setSerialAssignments] = useState<SerialAssignment[]>([])
+  const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
+
+  // Draft-list finalize batch/serial picker
+  const [draftFinalizeId, setDraftFinalizeId] = useState<string | null>(null)
+  const [draftBatchItems, setDraftBatchItems] = useState<BatchPickerItem[]>([])
+  const [draftSerialItems, setDraftSerialItems] = useState<SerialItem[]>([])
 
   const totalPages = Math.ceil(total / 25)
 
@@ -234,7 +270,33 @@ export default function InvoicesClient() {
   async function finalizeDraft(id: string) {
     setFinalizingId(id)
     try {
-      const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, { method: 'POST', credentials: 'include' })
+      // Check if any items are perishable/serialized and need assignment
+      const batchRes = await fetch(`/api/admin/inventory/batches/available?order_id=${id}`, { credentials: 'include' })
+      const batchData = await batchRes.json()
+      const hasBatch = batchData.items?.length > 0
+      const hasSerial = batchData.serialized_items?.length > 0
+      if (hasBatch || hasSerial) {
+        setDraftFinalizeId(id)
+        if (hasBatch) setDraftBatchItems(batchData.items)
+        if (hasSerial) setDraftSerialItems(batchData.serialized_items)
+        setFinalizingId(null)
+        return
+      }
+      await doFinalizeDraft(id, [], [])
+    } catch {
+      showToast('Failed to finalize draft', 'error')
+      setFinalizingId(null)
+    }
+  }
+
+  async function doFinalizeDraft(id: string, batchAssignments: { order_item_id: string; batch_id: string; qty: number }[], serialAssignmentsArg: { order_item_id: string; serial_number: string }[]) {
+    setFinalizingId(id)
+    try {
+      const res = await fetch(`/api/admin/invoices/drafts/${id}/finalize`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ batch_assignments: batchAssignments, serial_assignments: serialAssignmentsArg }),
+      })
       const data = await res.json()
       if (!res.ok) { showToast(data.error || 'Failed to finalize', 'error'); return }
       showToast(`Invoice ${data.invoiceNumber || ''} finalized`, 'success')
@@ -273,6 +335,31 @@ export default function InvoicesClient() {
     setCustSearch(''); setCustResults([]); setShowCustDrop(false)
   }
 
+  function searchBuyers(q: string) {
+    setBuyerSearch(q)
+    if (buyerTimer.current) clearTimeout(buyerTimer.current)
+    if (q.length < 2) { setBuyerResults([]); setShowBuyerDrop(false); return }
+    buyerTimer.current = setTimeout(async () => {
+      const res = await fetch(`/api/admin/customers/search?q=${encodeURIComponent(q)}`)
+      const data = await res.json()
+      setBuyerResults(data.results || [])
+      setShowBuyerDrop(true)
+    }, 300)
+  }
+
+  function selectBuyer(c: any) {
+    setBuyerName(c.addr_name || c.full_name || '')
+    setBuyerPhone((c.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10))
+    setBuyerEmail(c.email || '')
+    setBuyerAddr1(c.address_line1 || '')
+    setBuyerAddr2(c.address_line2 || '')
+    setBuyerCity(c.city || '')
+    setBuyerStateVal(c.state || '')
+    setBuyerPostalCode(c.postal_code || '')
+    setBuyerGstinBill(c.gst_number || '')
+    setBuyerSearch(''); setBuyerResults([]); setShowBuyerDrop(false)
+  }
+
   function resetForm() {
     setCustomerName(''); setCustomerPhone(''); setCustomerEmail('')
     setAddressLine1(''); setAddressLine2(''); setCity(''); setState(''); setPostalCode('')
@@ -281,9 +368,16 @@ export default function InvoicesClient() {
     setEditId(null)
     setEditIsDraft(false)
     setCustSearch(''); setCustResults([]); setShowCustDrop(false)
+    setBuyerSame(true); setBuyerSearch(''); setBuyerResults([]); setShowBuyerDrop(false)
+    setBuyerName(''); setBuyerPhone(''); setBuyerEmail('')
+    setBuyerAddr1(''); setBuyerAddr2(''); setBuyerCity(''); setBuyerStateVal(''); setBuyerPostalCode(''); setBuyerGstinBill('')
+    setBatchAssignments({})
+    setSerialAssignments([])
+    setSerialPickerItems(null)
   }
 
   async function openEdit(inv: Invoice) {
+    editIdRef.current = inv.id
     setEditLoading(true)
     try {
       const res = await fetch(`/api/admin/orders/${inv.id}`, { credentials: 'include' })
@@ -307,6 +401,24 @@ export default function InvoicesClient() {
       setState(addr.state || '')
       setPostalCode(addr.postal_code || '')
 
+      const billAddr = order.billing_address || {}
+      const hasSeparateBilling = !!(billAddr.address_line1 && (
+        billAddr.address_line1 !== addr.address_line1 ||
+        billAddr.city !== addr.city
+      ))
+      setBuyerSame(!hasSeparateBilling)
+      if (hasSeparateBilling) {
+        setBuyerName(billAddr.full_name || order.customer_name || '')
+        setBuyerPhone('')
+        setBuyerEmail('')
+        setBuyerAddr1(billAddr.address_line1 || '')
+        setBuyerAddr2(billAddr.address_line2 || '')
+        setBuyerCity(billAddr.city || '')
+        setBuyerStateVal(billAddr.state || '')
+        setBuyerPostalCode(billAddr.postal_code || '')
+        setBuyerGstinBill(order.buyer_gstin || '')
+      }
+
       setItems(orderItems.length > 0 ? orderItems.map((it: any) => ({
         id: it.id || Math.random().toString(36).slice(2),
         product_id: it.product_id || null,
@@ -321,19 +433,19 @@ export default function InvoicesClient() {
         unit: it.unit || 'pcs',
         buy_unit: it.buy_unit || null,
         buy_mode: null,
-        sell_unit_factor: 1,
+        sell_unit_factor: it.sold_unit_factor && it.sold_unit_factor > 1 ? it.sold_unit_factor : 1,
         sell_unit_dimension: null,
         available_units: [],
         selected_unit_key: '',
-        unit_price: String(it.unit_price ?? ''),
+        unit_price: String(it.mrp && it.mrp > 0 ? it.mrp : (it.unit_price ?? '')),
         discount_pct: it.discount_pct ?? 0,
-        mrp: it.mrp ?? 0,
+        mrp: it.mrp ?? it.unit_price ?? 0,
         inventory_quantity: it.sub_variant?.inventory_quantity ?? it.variant?.inventory_quantity ?? it.inventory_quantity ?? null,
       })) : [newLineItem()])
 
       setFormError('')
       setEditIsDraft(inv.status === 'draft')
-      navigateView('edit')
+      navigateView('edit', inv.id)
     } catch {
       showToast('Failed to load invoice for editing', 'error')
     } finally {
@@ -403,9 +515,15 @@ export default function InvoicesClient() {
             variant_name: it.variant_name, hsn_code: it.hsn_code,
             gst_rate: it.gst_rate, quantity: it.quantity,
             buy_unit: it.buy_unit || null,
+            sell_unit_factor: it.sell_unit_factor ?? 1,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
+            temp_id: it.id,
           })),
+          batch_assignments: Object.entries(batchAssignments).flatMap(([order_item_id, batches]) =>
+            batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
+          ),
+          serial_assignments: serialAssignments,
         }),
       })
       const data = await res.json()
@@ -453,6 +571,7 @@ export default function InvoicesClient() {
             variant_name: it.variant_name, hsn_code: it.hsn_code,
             gst_rate: it.gst_rate, quantity: it.quantity,
             buy_unit: it.buy_unit || null,
+            sell_unit_factor: it.sell_unit_factor ?? 1,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
           })),
@@ -473,6 +592,24 @@ export default function InvoicesClient() {
       setFormError(err.message || 'Failed')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  async function handleStockBadgeClick(item: LILineItem) {
+    if (!item.product_id) return
+    const params = new URLSearchParams({
+      product_id: item.product_id,
+      line_item_id: item.id,
+      qty: String((Number(item.quantity) || 1) * (item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1)),
+    })
+    if (item.variant_id) params.set('variant_id', item.variant_id)
+    if (item.sub_variant_id) params.set('sub_variant_id', item.sub_variant_id)
+    const res = await fetch(`/api/admin/inventory/batches/available?${params}`, { credentials: 'include' })
+    const data = await res.json()
+    if (data.serialized_items?.length > 0) {
+      setSerialPickerItems(data.serialized_items)
+    } else if (data.items?.length > 0) {
+      setBatchPickerItem(data.items[0])
     }
   }
 
@@ -502,6 +639,7 @@ export default function InvoicesClient() {
             variant_name: it.variant_name, hsn_code: it.hsn_code,
             gst_rate: it.gst_rate, quantity: it.quantity,
             buy_unit: it.buy_unit || null,
+            sell_unit_factor: it.sell_unit_factor ?? 1,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
           })),
@@ -515,7 +653,39 @@ export default function InvoicesClient() {
         return
       }
 
-      const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, { method: 'POST', credentials: 'include' })
+      const finalRes = await fetch(`/api/admin/invoices/drafts/${editId}/finalize`, {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          batch_assignments: Object.keys(batchAssignments).length > 0
+            ? items
+                .filter(li => batchAssignments[li.id]?.length > 0)
+                .flatMap(li => {
+                  const saved = (saveData.savedItemIds || []).find((s: any) =>
+                    s.product_id === li.product_id &&
+                    (s.variant_id || null) === (li.variant_id || null)
+                  )
+                  if (!saved) return []
+                  return (batchAssignments[li.id] || []).map(b => ({
+                    order_item_id: saved.order_item_id,
+                    batch_id: b.batch_id,
+                    qty: b.qty,
+                  }))
+                })
+            : [],
+          serial_assignments: serialAssignments.length > 0
+            ? serialAssignments.map(sa => {
+                const li = items.find(it => it.id === sa.order_item_id)
+                if (!li) return sa
+                const saved = (saveData.savedItemIds || []).find((s: any) =>
+                  s.product_id === li.product_id &&
+                  (s.variant_id || null) === (li.variant_id || null)
+                )
+                return saved ? { ...sa, order_item_id: saved.order_item_id } : sa
+              })
+            : [],
+        }),
+      })
       const finalData = await finalRes.json()
       if (!finalRes.ok) { setFormError(finalData.error || 'Failed to finalize'); return }
       showToast(`Invoice ${finalData.invoiceNumber || ''} finalized`, 'success')
@@ -535,6 +705,63 @@ export default function InvoicesClient() {
 
   function renderForm(isEdit: boolean) {
     return (
+      <>
+      {batchPickerItem && (
+        <BatchPickerModal
+          items={[batchPickerItem]}
+          onConfirm={async assignments => {
+            const map: Record<string, { batch_id: string; qty: number }[]> = { ...batchAssignments }
+            const labelMap: Record<string, string> = { ...assignedBatchLabels }
+            // Group assignments by order_item_id
+            const byItem: Record<string, typeof assignments> = {}
+            for (const a of assignments) {
+              if (!byItem[a.order_item_id]) byItem[a.order_item_id] = []
+              byItem[a.order_item_id].push(a)
+            }
+            for (const [order_item_id, itemAssignments] of Object.entries(byItem)) {
+              map[order_item_id] = itemAssignments.map(a => ({ batch_id: a.batch_id, qty: a.qty }))
+              const lots = itemAssignments.map(a => {
+                const batch = batchPickerItem?.batches.find(b => b.id === a.batch_id)
+                return batch?.lot_number || a.batch_id.slice(0, 8)
+              })
+              labelMap[order_item_id] = lots.join(', ')
+            }
+            setBatchAssignments(map)
+            setAssignedBatchLabels(labelMap)
+            setBatchPickerItem(null)
+
+            // Check if this item is serialized — if so, prompt for serial numbers
+            const lineItem = items.find(it => it.id === Object.keys(byItem)[0])
+            if (lineItem?.serialized) {
+              const totalQty = assignments.reduce((s, a) => s + a.qty, 0)
+              setSerialPickerItems([{
+                order_item_id: lineItem.id,
+                product_name: lineItem.product_name,
+                variant_name: lineItem.variant_name || null,
+                required_qty: totalQty,
+                already_assigned: false,
+                product_id: lineItem.product_id || undefined,
+                variant_id: lineItem.variant_id || null,
+                sub_variant_id: lineItem.sub_variant_id || null,
+              }])
+            }
+          }}
+          onCancel={() => setBatchPickerItem(null)}
+        />
+      )}
+      {serialPickerItems && (
+        <SerialEntryModal
+          items={serialPickerItems}
+          onConfirm={assignments => {
+            setSerialAssignments(prev => {
+              const itemIds = new Set(assignments.map(a => a.order_item_id))
+              return [...prev.filter(a => !itemIds.has(a.order_item_id)), ...assignments]
+            })
+            setSerialPickerItems(null)
+          }}
+          onCancel={() => setSerialPickerItems(null)}
+        />
+      )}
       <div className="space-y-4">
         <div className="flex items-center gap-3">
           <button
@@ -563,99 +790,15 @@ export default function InvoicesClient() {
 
         <form onSubmit={isEdit ? handleEdit : handleCreate} className="space-y-4">
 
-          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <h2 className="text-sm font-semibold text-foreground mb-3">Customer Details</h2>
-            <div className="relative mb-3">
-              <input
-                type="text" value={custSearch} onChange={e => searchCustomers(e.target.value)}
-                placeholder="Search existing customer…" className={inputCls}
-              />
-              {showCustDrop && custResults.length > 0 && (
-                <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
-                  {custResults.map(c => (
-                    <button key={c.id} onClick={() => selectCustomer(c)}
-                      className="w-full text-left px-3 py-2 hover:bg-surface-secondary transition-colors">
-                      <p className="text-sm font-medium text-foreground">{c.company_name || c.full_name}</p>
-                      <p className="text-xs text-foreground-secondary">{c.city}, {c.state}</p>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className={labelCls}>Customer Name <span className="text-red-500">*</span></label>
-                <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} required
-                  className={inputCls} placeholder="Full name" />
-              </div>
-              <div>
-                <label className={labelCls}>Buyer GSTIN</label>
-                <input type="text" value={buyerGstin} onChange={e => setBuyerGstin(e.target.value.toUpperCase())} maxLength={15}
-                  className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Phone &amp; Email</label>
-                <div className="flex gap-2">
-                  <div className="flex flex-1 min-w-0">
-                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
-                    <input type="tel" inputMode="numeric" maxLength={10} value={customerPhone}
-                      onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                      onBlur={async () => {
-                        if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
-                        const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
-                        const json = await res.json()
-                        if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
-                          setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
-                        } else {
-                          setCreditWarning(null)
-                        }
-                      }}
-                      className={inputCls + ' rounded-l-none min-w-0'} placeholder="XXXXXXXXXX" />
-                  </div>
-                  <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
-                    className={inputCls + ' flex-1 min-w-0'} placeholder="customer@example.com" />
-                </div>
-              </div>
-              {isEdit && (
-                <div>
-                  <label className={labelCls}>Invoice Date</label>
-                  <DatePicker value={invoiceDate} onChange={setInvoiceDate} />
-                </div>
-              )}
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Address Line 1</label>
-                <input type="text" value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
-                  className={inputCls} placeholder="Street address" />
-              </div>
-              <div className="sm:col-span-2">
-                <label className={labelCls}>Address Line 2</label>
-                <input type="text" value={addressLine2} onChange={e => setAddressLine2(e.target.value)}
-                  className={inputCls} placeholder="Apt, area, landmark" />
-              </div>
-              <div>
-                <label className={labelCls}>City</label>
-                <input type="text" value={city} onChange={e => setCity(e.target.value)} className={inputCls} />
-              </div>
-              <div>
-                <label className={labelCls}>State</label>
-                <input type="text" value={state} onChange={e => setState(e.target.value)}
-                  className={inputCls} placeholder="Tamil Nadu" />
-              </div>
-              <div>
-                <label className={labelCls}>Postal Code</label>
-                <input type="text" value={postalCode} onChange={e => setPostalCode(e.target.value)} className={inputCls} />
-              </div>
-            </div>
-          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
 
-          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <LineItemsSection items={items} onChange={setItems} />
-          </div>
-
-
-          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <h2 className="text-sm font-semibold text-foreground mb-3">Payment &amp; Notes</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* Col 1 — Invoice Details */}
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-col gap-3">
+              <h2 className="text-sm font-semibold text-foreground">Invoice Details</h2>
+              <div>
+                <label className={labelCls}>Invoice Date</label>
+                <DatePicker value={invoiceDate} onChange={setInvoiceDate} />
+              </div>
               <div>
                 <label className={labelCls}>Payment Mode</label>
                 <div className="grid grid-cols-2 gap-2 mt-1">
@@ -686,7 +829,180 @@ export default function InvoicesClient() {
                   className={inputCls + ' resize-none'} placeholder="Any additional notes..." />
               </div>
             </div>
+
+            {/* Col 2 — Consignee (Ship to) */}
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-col gap-3">
+              <h2 className="text-sm font-semibold text-foreground">Consignee <span className="text-foreground-muted font-normal">(Ship to)</span></h2>
+              <div className="relative">
+                <input
+                  type="text" value={custSearch} onChange={e => searchCustomers(e.target.value)}
+                  placeholder="Search existing customer…" className={inputCls}
+                />
+                {showCustDrop && custResults.length > 0 && (
+                  <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {custResults.map(c => (
+                      <button key={c.id} type="button" onClick={() => selectCustomer(c)}
+                        className="w-full text-left px-3 py-2 hover:bg-surface-secondary transition-colors">
+                        <p className="text-sm font-medium text-foreground">{c.company_name || c.full_name}</p>
+                        <p className="text-xs text-foreground-secondary">{c.city}, {c.state}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <div>
+                <label className={labelCls}>Name <span className="text-red-500">*</span></label>
+                <input type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} required
+                  className={inputCls} placeholder="Full name or company" />
+              </div>
+              <div>
+                <label className={labelCls}>Phone &amp; Email</label>
+                <div className="flex gap-2">
+                  <div className="flex flex-1 min-w-0">
+                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
+                    <input type="tel" inputMode="numeric" maxLength={10} value={customerPhone}
+                      onChange={e => setCustomerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                      onBlur={async () => {
+                        if (paymentMode !== 'credit' || !customerPhone.trim()) { setCreditWarning(null); return }
+                        const res = await fetch(`/api/admin/financial/receivables?customerPhone=${encodeURIComponent(customerPhone.trim())}`)
+                        const json = await res.json()
+                        if (json.summary?.total > 0 || json.rows?.[0]?.credit_limit > 0) {
+                          setCreditWarning({ outstanding: json.summary.total, creditLimit: json.rows?.[0]?.credit_limit || 0 })
+                        } else {
+                          setCreditWarning(null)
+                        }
+                      }}
+                      className={inputCls + ' rounded-l-none min-w-0'} placeholder="XXXXXXXXXX" />
+                  </div>
+                  <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)}
+                    className={inputCls + ' flex-1 min-w-0'} placeholder="email" />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Address Line 1</label>
+                <input type="text" value={addressLine1} onChange={e => setAddressLine1(e.target.value)}
+                  className={inputCls} placeholder="Street address" />
+              </div>
+              <div>
+                <label className={labelCls}>Address Line 2</label>
+                <input type="text" value={addressLine2} onChange={e => setAddressLine2(e.target.value)}
+                  className={inputCls} placeholder="Apt, area, landmark" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={labelCls}>City <span className="text-red-500">*</span></label>
+                  <input type="text" value={city} onChange={e => setCity(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>State</label>
+                  <input type="text" value={state} onChange={e => setState(e.target.value)}
+                    className={inputCls} placeholder="Tamil Nadu" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className={labelCls}>Postal Code</label>
+                  <input type="text" value={postalCode} onChange={e => setPostalCode(e.target.value)} className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>GSTIN</label>
+                  <input type="text" value={buyerGstin} onChange={e => setBuyerGstin(e.target.value.toUpperCase())} maxLength={15}
+                    className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
+                </div>
+              </div>
+            </div>
+
+            {/* Col 3 — Buyer (Bill to) */}
+            <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-col gap-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-semibold text-foreground">Buyer <span className="text-foreground-muted font-normal">(Bill to)</span></h2>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-foreground-secondary">Same as consignee</span>
+                  <Toggle checked={buyerSame} onChange={setBuyerSame} />
+                </div>
+              </div>
+              {!buyerSame && (
+                <>
+                  <div className="relative">
+                    <input
+                      type="text" value={buyerSearch} onChange={e => searchBuyers(e.target.value)}
+                      placeholder="Search buyer…" className={inputCls}
+                    />
+                    {showBuyerDrop && buyerResults.length > 0 && (
+                      <div className="absolute z-20 left-0 right-0 top-full mt-1 bg-surface-elevated border border-border-default rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                        {buyerResults.map(c => (
+                          <button key={c.id} type="button" onClick={() => selectBuyer(c)}
+                            className="w-full text-left px-3 py-2 hover:bg-surface-secondary transition-colors">
+                            <p className="text-sm font-medium text-foreground">{c.company_name || c.full_name}</p>
+                            <p className="text-xs text-foreground-secondary">{c.city}, {c.state}</p>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <label className={labelCls}>Name</label>
+                    <input type="text" value={buyerName} onChange={e => setBuyerName(e.target.value)}
+                      className={inputCls} placeholder="Buyer name or company" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Phone &amp; Email</label>
+                    <div className="flex gap-2">
+                      <div className="flex flex-1 min-w-0">
+                        <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-border-default bg-surface-secondary text-foreground-secondary text-sm select-none shrink-0">+91</span>
+                        <input type="tel" inputMode="numeric" maxLength={10} value={buyerPhone}
+                          onChange={e => setBuyerPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                          className={inputCls + ' rounded-l-none min-w-0'} placeholder="XXXXXXXXXX" />
+                      </div>
+                      <input type="email" value={buyerEmail} onChange={e => setBuyerEmail(e.target.value)}
+                        className={inputCls + ' flex-1 min-w-0'} placeholder="email" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={labelCls}>Address Line 1</label>
+                    <input type="text" value={buyerAddr1} onChange={e => setBuyerAddr1(e.target.value)}
+                      className={inputCls} placeholder="Street address" />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Address Line 2</label>
+                    <input type="text" value={buyerAddr2} onChange={e => setBuyerAddr2(e.target.value)}
+                      className={inputCls} placeholder="Apt, area, landmark" />
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelCls}>City</label>
+                      <input type="text" value={buyerCity} onChange={e => setBuyerCity(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>State</label>
+                      <input type="text" value={buyerStateVal} onChange={e => setBuyerStateVal(e.target.value)}
+                        className={inputCls} placeholder="Tamil Nadu" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className={labelCls}>Postal Code</label>
+                      <input type="text" value={buyerPostalCode} onChange={e => setBuyerPostalCode(e.target.value)} className={inputCls} />
+                    </div>
+                    <div>
+                      <label className={labelCls}>GSTIN</label>
+                      <input type="text" value={buyerGstinBill} onChange={e => setBuyerGstinBill(e.target.value.toUpperCase())} maxLength={15}
+                        className={inputCls + ' font-mono'} placeholder="29XXXXX..." />
+                    </div>
+                  </div>
+                </>
+              )}
+              {buyerSame && (
+                <p className="text-xs text-foreground-muted">Billing address same as shipping address.</p>
+              )}
+            </div>
+
           </div>
+
+          <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
+            <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} />
+          </div>
+
 
           <div className="flex gap-3 pb-6">
             <button type="submit" disabled={submitting}
@@ -710,6 +1026,7 @@ export default function InvoicesClient() {
           </div>
         </form>
       </div>
+      </>
     )
   }
 
@@ -725,6 +1042,31 @@ export default function InvoicesClient() {
     : renderForm(true)
 
   return (
+    <>
+    {draftFinalizeId && draftBatchItems.length > 0 && (
+      <BatchPickerModal
+        items={draftBatchItems}
+        onConfirm={assignments => {
+          const id = draftFinalizeId
+          setDraftFinalizeId(null)
+          setDraftBatchItems([])
+          doFinalizeDraft(id, assignments, [])
+        }}
+        onCancel={() => { setDraftFinalizeId(null); setDraftBatchItems([]) }}
+      />
+    )}
+    {draftFinalizeId && draftSerialItems.length > 0 && draftBatchItems.length === 0 && (
+      <SerialEntryModal
+        items={draftSerialItems}
+        onConfirm={assignments => {
+          const id = draftFinalizeId
+          setDraftFinalizeId(null)
+          setDraftSerialItems([])
+          doFinalizeDraft(id, [], assignments)
+        }}
+        onCancel={() => { setDraftFinalizeId(null); setDraftSerialItems([]) }}
+      />
+    )}
     <div className="space-y-4">
       <div className="flex items-center justify-between mb-2">
         <div>
@@ -1276,6 +1618,7 @@ export default function InvoicesClient() {
       )}
       {selectedInvoice && <InvoiceDetailModal inv={selectedInvoice} onClose={() => setSelectedInvoice(null)} />}
     </div>
+    </>
   )
 }
 

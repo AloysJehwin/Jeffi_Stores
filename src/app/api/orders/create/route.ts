@@ -13,7 +13,7 @@ import { createDraftInvoice } from '@/lib/invoice'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 
 const CreateOrderSchema = z.object({
-  paymentMethod: z.enum(['razorpay', 'manual']),
+  paymentMethod: z.enum(['razorpay', 'manual', 'cod']),
   shippingAddress: z.any().optional(),
   notes: z.string().nullish(),
   couponId: z.string().nullish(),
@@ -41,7 +41,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response
     const { shippingAddress, notes, paymentMethod, couponId } = parsed.data
     const isRazorpayPayment = paymentMethod === 'razorpay'
-    const isCod = false
+    const isCod = paymentMethod === 'cod'
 
     const cartUserId = userId
 
@@ -53,8 +53,11 @@ export async function POST(request: NextRequest) {
           'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
           'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
           'stock_status', p.stock_status, 'inventory_quantity', p.inventory_quantity,
+          'is_active', p.is_active,
+          'is_cod_allowed', p.is_cod_allowed,
           'category_id', p.category_id, 'discount_pct', p.discount_pct,
-          'extra_delivery_days', p.extra_delivery_days
+          'extra_delivery_days', p.extra_delivery_days,
+          'handling_days', p.handling_days
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
@@ -81,6 +84,26 @@ export async function POST(request: NextRequest) {
 
     if (!cartItems || cartItems.length === 0) {
       return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
+    }
+
+    const inactiveItems = cartItems.filter((item: any) => item.products?.is_active === false)
+    if (inactiveItems.length > 0) {
+      const names = inactiveItems.map((item: any) => item.products?.name || 'Unknown').join(', ')
+      return NextResponse.json({
+        error: `Some items in your cart are no longer available: ${names}. Please remove them before placing your order.`,
+        inactiveProductIds: inactiveItems.map((item: any) => item.product_id),
+      }, { status: 422 })
+    }
+
+    if (isCod) {
+      const codBlockedItems = cartItems.filter((item: any) => item.products?.is_cod_allowed === false)
+      if (codBlockedItems.length > 0) {
+        const names = codBlockedItems.map((item: any) => item.products?.name || 'Unknown').join(', ')
+        return NextResponse.json({
+          error: `COD is not available for: ${names}. Please choose online payment.`,
+          codBlockedProductIds: codBlockedItems.map((item: any) => item.product_id),
+        }, { status: 422 })
+      }
     }
 
     const subtotal: number = cartItems.reduce((sum: number, item: any) => {
@@ -137,8 +160,9 @@ export async function POST(request: NextRequest) {
       return 14
     }
     const _eddPin = String(destinationPin || '')
+    const _eddHandling = Math.max(2, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 2)))
     const _eddExtra = Math.max(0, ...cartItems.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
-    const _eddTat = (/^\d{6}$/.test(_eddPin) ? _getTat(_eddPin) : 7) + _eddExtra
+    const _eddTat = _eddHandling + (/^\d{6}$/.test(_eddPin) ? _getTat(_eddPin) : 7) + _eddExtra
     const _edd = new Date(Date.now() + _eddTat * 86400000).toISOString().slice(0, 10)
 
     const order = await withTransaction(async (client) => {
@@ -282,12 +306,12 @@ export async function POST(request: NextRequest) {
       const txTotal = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, payment_mode, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, txTotal, shippingAddressId, billingAddressId,
+         'pending', isCod ? 'cod_pending' : 'unpaid', isCod ? 'cod' : (isRazorpayPayment ? 'razorpay' : 'manual'), subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, txTotal, shippingAddressId, billingAddressId,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,

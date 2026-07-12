@@ -7,10 +7,10 @@ vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
 vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
-  withTransaction: vi.fn(),
+  query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }),
 }))
-vi.mock('@/lib/inventory', () => ({
-  logStockMovement: vi.fn(),
+vi.mock('@/lib/order-stock', () => ({
+  restoreOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -18,8 +18,8 @@ vi.mock('@/lib/inventory', () => ({
 import { POST } from '@/app/api/admin/orders/[id]/cancel/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction } from '@/lib/db'
-import { logStockMovement } from '@/lib/inventory'
+import { queryOne } from '@/lib/db'
+import { restoreOrderStock } from '@/lib/order-stock'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -90,58 +90,16 @@ describe('POST /api/admin/orders/[id]/cancel', () => {
     vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryOne).mockResolvedValue(OFFLINE_ORDER as any)
 
-    // Simulate withTransaction executing the callback with a mock client
-    vi.mocked(withTransaction).mockImplementation(async (cb) => {
-      const mockClient = {
-        query: vi.fn().mockImplementation(async (sql: string) => {
-          if (sql.includes('SELECT') && sql.includes('order_items')) {
-            return {
-              rows: [
-                {
-                  product_id: 'p1',
-                  variant_id: 'v1',
-                  sub_variant_id: null,
-                  quantity: '2',
-                },
-              ],
-            }
-          }
-          if (sql.includes('product_variants')) {
-            return { rows: [{ inventory_quantity: '10' }] }
-          }
-          return { rows: [] }
-        }),
-      }
-      return cb(mockClient as any)
-    })
-
     const res = await POST(makePost(), PARAMS)
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ success: true })
-    expect(vi.mocked(withTransaction)).toHaveBeenCalled()
+    expect(vi.mocked(restoreOrderStock)).toHaveBeenCalledWith('order-1')
   })
 
   it('restores stock for sub_variant_id items in transaction', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryOne).mockResolvedValue(OFFLINE_ORDER as any)
-
-    vi.mocked(withTransaction).mockImplementation(async (cb) => {
-      const mockClient = {
-        query: vi.fn().mockImplementation(async (sql: string) => {
-          if (sql.includes('order_items')) {
-            return {
-              rows: [{ product_id: 'p1', variant_id: 'v1', sub_variant_id: 'sv1', quantity: '3' }],
-            }
-          }
-          if (sql.includes('product_sub_variants')) {
-            return { rows: [{ inventory_quantity: '5' }] }
-          }
-          return { rows: [] }
-        }),
-      }
-      return cb(mockClient as any)
-    })
 
     const res = await POST(makePost(), PARAMS)
     expect(res.status).toBe(200)
@@ -151,23 +109,6 @@ describe('POST /api/admin/orders/[id]/cancel', () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryOne).mockResolvedValue(OFFLINE_ORDER as any)
-
-    vi.mocked(withTransaction).mockImplementation(async (cb) => {
-      const mockClient = {
-        query: vi.fn().mockImplementation(async (sql: string) => {
-          if (sql.includes('order_items')) {
-            return {
-              rows: [{ product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '1' }],
-            }
-          }
-          if (sql.includes('FROM products')) {
-            return { rows: [{ inventory_quantity: '20' }] }
-          }
-          return { rows: [] }
-        }),
-      }
-      return cb(mockClient as any)
-    })
 
     const res = await POST(makePost(), PARAMS)
     expect(res.status).toBe(200)

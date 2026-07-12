@@ -74,6 +74,7 @@ export default function BusinessRecommendedProducts({ title = 'You Might Also Li
               categoryName={product.categories?.name || null}
               categoryId={product.categories?.id || null}
               extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+              handlingDays={Number((product as any).handling_days ?? 2)}
             />
           )
         })}

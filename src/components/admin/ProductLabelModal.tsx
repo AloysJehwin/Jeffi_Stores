@@ -15,6 +15,9 @@ interface LabelEntry {
   base_price: number
   gst_percentage: number
   brand_name: string | null
+  fragile?: boolean | null
+  hazardous?: boolean | null
+  flammable?: boolean | null
 }
 
 interface Props {
@@ -76,7 +79,48 @@ function QR({ size }: { size: number }) {
   )
 }
 
-function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEntry | null; scale: number }) {
+const WarnFlame = () => (
+  <svg viewBox="0 0 10 14" fill="currentColor" style={{ width: '0.7em', height: '0.95em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}>
+    <path d="M5 0C5 0 2 4 2 7a3 3 0 006 0c0-.5-.1-1-.25-1.4.5.8.75 1.7.75 2.9a4 4 0 01-8 0C.5 5 5 0 5 0zm0 3C4.3 4.5 3.5 6 3.5 7.5a1.5 1.5 0 003 0C6.5 6.3 5.8 4.8 5 3z" />
+  </svg>
+)
+const WarnTriangle = () => (
+  <svg viewBox="0 0 12 12" fill="currentColor" style={{ width: '0.7em', height: '0.7em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}>
+    <path d="M6 1L11.5 11H.5L6 1zm0 2.5L2.2 10h7.6L6 3.5zM5.4 6h1.2v2.5H5.4V6zm0 3h1.2v1.2H5.4V9z" />
+  </svg>
+)
+const WarnDiamond = () => (
+  <svg viewBox="0 0 12 12" fill="currentColor" style={{ width: '0.7em', height: '0.7em', display: 'inline', verticalAlign: 'middle', marginRight: '0.2em' }}>
+    <path d="M6 .5L11.5 6 6 11.5.5 6 6 .5zm0 2L2.5 6l1.8 1.8L5.5 6l1.5 2 1-2 .8 1.8L10.5 6 6 2.5z" />
+  </svg>
+)
+
+function WarningIcons({ entry, size, barH, pad }: { entry: LabelEntry | null; size: number; barH: number; pad: number }) {
+  if (!entry) return null
+  const badges: { key: string; label: string; color: string; bg: string; Icon: () => JSX.Element }[] = []
+  if (entry.flammable) badges.push({ key: 'flammable', label: 'FLAMMABLE', color: '#fff', bg: '#c0392b', Icon: WarnFlame })
+  if (entry.hazardous) badges.push({ key: 'hazardous', label: 'HAZARDOUS', color: '#fff', bg: '#e67e22', Icon: WarnTriangle })
+  if (entry.fragile)   badges.push({ key: 'fragile',   label: 'FRAGILE',   color: '#fff', bg: '#2980b9', Icon: WarnDiamond })
+  if (badges.length === 0) return null
+  const fs = Math.max(5, Math.round(size * 0.55))
+  return (
+    <div style={{ position: 'absolute', bottom: barH + pad + 2, right: pad, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+      {badges.map(({ key, label, color, bg, Icon }) => (
+        <div key={key} style={{
+          background: bg, color,
+          fontSize: fs, fontWeight: 700, fontFamily: 'Helvetica, Arial, sans-serif',
+          padding: `1px ${Math.round(fs * 0.6)}px`,
+          borderRadius: 2, lineHeight: 1.4, whiteSpace: 'nowrap',
+          letterSpacing: '0.02em', display: 'flex', alignItems: 'center',
+        }}>
+          <Icon />{label}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function LabelPreview({ spec, entry, scale, showPrice }: { spec: LabelSpec; entry: LabelEntry | null; scale: number; showPrice: boolean }) {
   const w = Math.round(spec.widthPt * scale)
   const h = Math.round(spec.heightPt * scale)
   const pad = Math.max(3, Math.round(2.5 * scale))
@@ -112,11 +156,12 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
         <div style={{ position:'absolute', top:pad, left:pad, right:pad, bottom:barH+pad, overflow:'hidden' }}>
           <div style={{ fontSize:fs, fontWeight:700, lineHeight:1.2, color:'#111', overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{name}</div>
           {variantName && <div style={{ fontSize:vfs, color:'#555', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{variantName}</div>}
-          {incGst && <div style={{ marginTop:1, fontSize:fs, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>}
+          {showPrice && incGst && <div style={{ marginTop:1, fontSize:fs, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>}
         </div>
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
+        <WarningIcons entry={entry} size={Math.round(16 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -131,7 +176,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
         <div style={{ position:'absolute', top:pad, left:pad, right:pad, bottom:barH+pad, overflow:'hidden', display:'flex', flexDirection:'column', justifyContent:'center' }}>
           <div style={{ fontSize:fs, fontWeight:700, color:'#111', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.2 }}>{name}</div>
           {variantName && <div style={{ fontSize:vfs, color:'#555', whiteSpace:'nowrap', overflow:'hidden', textOverflow:'ellipsis', lineHeight:1.2 }}>{variantName}</div>}
-          {incGst && (
+          {showPrice && incGst && (
             <div style={{ display:'flex', alignItems:'baseline', gap:Math.round(3*scale), flexWrap:'wrap' }}>
               {showMrp && <span style={{ fontSize:efs, color:'#aaa', textDecoration:'line-through' }}>Rs. {mrpInc!.toFixed(2)}</span>}
               <span style={{ fontSize:pfs, fontWeight:700, color:'#c0392b' }}>Rs. {incGst.toFixed(2)}</span>
@@ -142,6 +187,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
+        <WarningIcons entry={entry} size={Math.round(16 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -152,7 +198,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
         <div style={{ position:'absolute', top:pad, left:pad, right:pad, bottom:barH+pad+12, overflow:'hidden' }}>
           <div style={{ fontSize:nameFs, fontWeight:700, lineHeight:1.3, color:'#111', overflow:'hidden', display:'-webkit-box', WebkitLineClamp:variantName?2:3, WebkitBoxOrient:'vertical' as any }}>{name}</div>
           {variantName && <div style={{ fontSize:smallFs, color:'#333', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{variantName}</div>}
-          {incGst && (
+          {showPrice && incGst && (
             <div style={{ marginTop:2 }}>
               {showMrp && <div style={{ fontSize:smallFs*0.85, color:'#aaa', textDecoration:'line-through', lineHeight:1 }}>Rs. {mrpInc!.toFixed(2)}</div>}
               <div style={{ fontSize:priceFs*0.9, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>
@@ -164,6 +210,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
+        <WarningIcons entry={entry} size={Math.round(18 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -177,7 +224,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
           <div style={{ fontSize:nameFs, fontWeight:700, lineHeight:1.25, color:'#111', overflow:'hidden', display:'-webkit-box', WebkitLineClamp:variantName?1:2, WebkitBoxOrient:'vertical' as any }}>{name}</div>
           {variantName && <div style={{ fontSize:smallFs, color:'#333', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{variantName}</div>}
           <div style={{ fontSize:smallFs*0.9, color:'#666', marginTop:2 }}>SKU: {sku}</div>
-          {incGst && (
+          {showPrice && incGst && (
             <div style={{ marginTop:3 }}>
               {showMrp && <div style={{ fontSize:smallFs*0.85, color:'#aaa', textDecoration:'line-through', lineHeight:1 }}>Rs. {mrpInc!.toFixed(2)}</div>}
               <div style={{ fontSize:priceFs*0.9, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>
@@ -188,6 +235,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
+        <WarningIcons entry={entry} size={Math.round(18 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -207,7 +255,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
           <div style={{ fontSize:nameFs, fontWeight:700, lineHeight:1.25, color:'#111', overflow:'hidden', display:'-webkit-box', WebkitLineClamp:variantName?1:2, WebkitBoxOrient:'vertical' as any }}>{name}</div>
           {variantName && <div style={{ fontSize:smallFs, color:'#333', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{variantName}</div>}
           {brand && <div style={{ fontSize:Math.round(smallFs*0.85), color:'#888', marginTop:1, overflow:'hidden', whiteSpace:'nowrap', textOverflow:'ellipsis' }}>{brand}</div>}
-          {incGst && (
+          {showPrice && incGst && (
             <div style={{ marginTop:3 }}>
               {showMrp && <div style={{ fontSize:smallFs*0.9, color:'#aaa', textDecoration:'line-through', lineHeight:1 }}>Rs. {mrpInc!.toFixed(2)}</div>}
               <div style={{ fontSize:priceFs, fontWeight:700, color:'#c0392b', lineHeight:1 }}>Rs. {incGst.toFixed(2)}</div>
@@ -219,6 +267,7 @@ function LabelPreview({ spec, entry, scale }: { spec: LabelSpec; entry: LabelEnt
         <div style={{ position:'absolute', bottom:pad, left:pad, right:pad }}>
           <Barcode w={w-pad*2} h={barH} text={sku} />
         </div>
+        <WarningIcons entry={entry} size={Math.round(18 * scale)} barH={barH} pad={pad} />
       </div>
     )
   }
@@ -237,6 +286,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
   const [modalSize, setModalSize] = useState<'sm' | 'md' | 'lg'>('md')
+  const [showPrice, setShowPrice] = useState(false)
 
   const spec = LABEL_SIZES.find(s => s.size === size)!
 
@@ -293,7 +343,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
       const res = await fetch('/api/admin/labels', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product_ids: ids, size, copies, sheet: outputMode === 'sheet' }),
+        body: JSON.stringify({ product_ids: ids, size, copies, sheet: outputMode === 'sheet', showPrice }),
       })
       if (!res.ok) {
         const d = await res.json()
@@ -410,13 +460,25 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                 ))}
               </div>
             </div>
-            <div className="w-28">
+            <div className="flex-1">
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Copies each</p>
               <input
                 type="number" min={1} max={100} value={copies}
                 onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
                 className="w-full px-2 py-1.5 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
               />
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Print Price</p>
+              <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
+                <div
+                  onClick={() => setShowPrice(v => !v)}
+                  className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${showPrice ? 'bg-orange-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${showPrice ? 'translate-x-4 border-orange-300' : 'translate-x-0.5'}`} />
+                </div>
+                <span className="text-xs text-foreground-secondary">{showPrice ? 'On' : 'Off'}</span>
+              </label>
             </div>
           </div>
 
@@ -478,7 +540,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide self-start">Preview</p>
               <div className="bg-[#f0f0f0] dark:bg-zinc-800 rounded-xl p-2 flex items-center justify-center min-w-[140px] min-h-[100px]">
                 {spec && (
-                  <LabelPreview spec={spec} entry={previewEntry} scale={previewScale} />
+                  <LabelPreview spec={spec} entry={previewEntry} scale={previewScale} showPrice={showPrice} />
                 )}
               </div>
               <p className="text-[10px] text-foreground-muted text-center">

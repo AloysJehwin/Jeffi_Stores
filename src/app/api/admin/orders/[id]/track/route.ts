@@ -19,6 +19,7 @@ const STATUS_SYNC: Record<string, {
   RAD:       { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
   OT:        { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   OD:        { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  DISPATCHED:{ orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   DL:        { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
   RTO:       { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
   RTRN:      { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
@@ -114,11 +115,11 @@ export async function GET(
     const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
     let statusType = rawStatusType
     if (EXCEPTION_TYPES.has(rawStatusType)) {
-      for (let i = rawScans.length - 1; i >= 0; i--) {
+      for (let i = 0; i < rawScans.length; i++) {
         const t = (rawScans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
         if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
         const activity = (rawScans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
-        if (activity.includes('out for delivery')) { statusType = 'OD'; break }
+        if (activity.includes('out for delivery') || activity === 'dispatched') { statusType = 'OD'; break }
         if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
         if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
         if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
@@ -174,11 +175,15 @@ export async function GET(
     }
 
     // Always advance shipment_status if the new value is further along
+    let effectiveShipmentStatus = newShipmentStatus
     if (isAdvancement(order.shipment_status as any, newShipmentStatus)) {
       await query(
         `UPDATE orders SET shipment_status = $2, updated_at = NOW() WHERE id = $1`,
         [id, newShipmentStatus]
       ).catch(() => {})
+    } else if (order.shipment_status) {
+      // Delhivery returned a stale/lower status — keep the DB value so the UI doesn't regress
+      effectiveShipmentStatus = order.shipment_status as any
     }
 
     return NextResponse.json({
@@ -186,7 +191,7 @@ export async function GET(
         awb: shipment.AWB,
         status: shipment.Status?.Status ?? null,
         statusType: shipment.Status?.StatusType ?? null,
-        shipmentStatus: newShipmentStatus,
+        shipmentStatus: effectiveShipmentStatus,
         statusDateTime,
         instructions: shipment.Status?.Instructions ?? null,
         pickUpDate: shipment.PickUpDate ?? null,

@@ -106,6 +106,7 @@ describe('POST /api/cart — insert (new item)', () => {
       name: 'Test Product',
       base_price: 100,
       price_ex_gst: 90,
+      is_active: true,
     } as any)
     // upsert INSERT: inserted=true, quantity=1
     vi.mocked(query).mockResolvedValue({
@@ -135,6 +136,7 @@ describe('POST /api/cart — upsert (same item again)', () => {
       name: 'Test Product',
       base_price: 100,
       price_ex_gst: 90,
+      is_active: true,
     } as any)
     // ON CONFLICT path: inserted=false, quantity incremented to 3
     vi.mocked(query).mockResolvedValue({
@@ -164,6 +166,7 @@ describe('POST /api/cart — null variantId upsert', () => {
       name: 'Test Product',
       base_price: 100,
       price_ex_gst: 90,
+      is_active: true,
     } as any)
     vi.mocked(query).mockResolvedValue({
       rows: [{ quantity: 2, inserted: false }],
@@ -340,7 +343,7 @@ describe('POST /api/cart — subVariantId only (no variantId)', () => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
     // product lookup
     vi.mocked(queryOne)
-      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90 } as any) // product
+      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90, is_active: true } as any) // product
       .mockResolvedValueOnce({ id: '550e8400-e29b-41d4-a716-446655440005', price: 120 } as any) // subVariant
     vi.mocked(query).mockResolvedValue({ rows: [{ quantity: 1, inserted: true }], rowCount: 1 } as any)
   })
@@ -362,7 +365,7 @@ describe('POST /api/cart — subVariantId + variantId', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
     vi.mocked(queryOne)
-      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90 } as any) // product
+      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90, is_active: true } as any) // product
       .mockResolvedValueOnce({ id: '550e8400-e29b-41d4-a716-446655440005', price: 130 } as any) // subVariant
       .mockResolvedValueOnce({ id: VARIANT_ID, price: 110 } as any) // variant
     vi.mocked(query).mockResolvedValue({ rows: [{ quantity: 1, inserted: true }], rowCount: 1 } as any)
@@ -384,7 +387,7 @@ describe('POST /api/cart — subVariant not found', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
     vi.mocked(queryOne)
-      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90 } as any)
+      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90, is_active: true } as any)
       .mockResolvedValueOnce(null) // subVariant not found
   })
 
@@ -405,7 +408,7 @@ describe('POST /api/cart — variant not found', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
     vi.mocked(queryOne)
-      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90 } as any)
+      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90, is_active: true } as any)
       .mockResolvedValueOnce(null) // variant not found
   })
 
@@ -426,7 +429,7 @@ describe('POST /api/cart — buyMode factor multiplication', () => {
   beforeEach(() => {
     vi.mocked(authenticateAnyUser).mockResolvedValue({ userId: USER_ID } as any)
     vi.mocked(queryOne)
-      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90 } as any) // product
+      .mockResolvedValueOnce({ id: PRODUCT_ID, base_price: 100, price_ex_gst: 90, is_active: true } as any) // product
       .mockResolvedValueOnce({ factor: '12', is_base: false }) // unit row
     vi.mocked(query).mockResolvedValue({ rows: [{ quantity: 1, inserted: true }], rowCount: 1 } as any)
   })

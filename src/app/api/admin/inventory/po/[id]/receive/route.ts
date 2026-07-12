@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
+import { adjustStock, syncPerishableStock, getOrCreateOpenShelf } from '@/lib/shelf'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/validate'
@@ -11,6 +12,7 @@ import { parseBody, zUuid } from '@/lib/validate'
 export const dynamic = 'force-dynamic'
 
 const postSchema = z.object({
+  warehouse_id: zUuid.nullish(),
   items: z
     .array(
       z.object({
@@ -21,6 +23,11 @@ const postSchema = z.object({
         quantity_received: z.coerce.number().positive(),
         unit_cost: z.coerce.number().min(0),
         purchase_unit_factor: z.coerce.number().positive().default(1),
+        lot_number: z.string().nullish(),
+        manufacture_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+        expiry_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullish(),
+        location_id: zUuid.nullish(),
+        serial_numbers: z.array(z.string().min(1)).nullish(),
       })
     )
     .min(1, 'At least one item is required'),
@@ -38,7 +45,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const parsed = parseBody(postSchema, body, 'POST /api/admin/inventory/po/[id]/receive')
     if (!parsed.ok) return parsed.response
-    const { items } = parsed.data
+    const { items, warehouse_id: warehouseId } = parsed.data
+
+    // Default missing location_id to the warehouse's open shelf
+    if (warehouseId) {
+      const wRow = await queryOne<{ code: string }>(`SELECT code FROM warehouses WHERE id = $1`, [warehouseId])
+      if (wRow) {
+        const openShelfId = await getOrCreateOpenShelf(warehouseId, wRow.code)
+        for (const item of items) {
+          if (!item.location_id) item.location_id = openShelfId
+        }
+      }
+    }
 
     const po = await queryOne<any>(
       `SELECT po.*, s.id AS supplier_id, s.name AS supplier_name, s.contact_name, s.email AS supplier_email
@@ -80,6 +98,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
          notes || null]
       )
       const grnId = grnRow.rows[0].id
+      const perishableProductIds = new Set<string>()
 
       for (const item of items) {
         const factor = item.purchase_unit_factor ?? 1
@@ -101,49 +120,131 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         await updateWeightedAvgCost(client, { productId, variantId, qtyReceived, unitCost })
 
-        let stockBefore = 0
-        if (subVariantId) {
-          const row = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
-            [subVariantId]
+        // Fetch perishable + serialized flags
+        const productRow = await client.query<{ perishable: boolean; serialized: boolean }>(
+          'SELECT perishable, serialized FROM products WHERE id = $1',
+          [productId]
+        )
+        const isPerishable = productRow.rows[0]?.perishable ?? false
+        const isSerialised = productRow.rows[0]?.serialized ?? false
+        if (isPerishable) perishableProductIds.add(productId)
+
+        // Validate serial numbers upfront (before any inserts)
+        const serials = item.serial_numbers ?? []
+        if (isSerialised && serials.length > 0) {
+          const dupeCheck = await client.query<{ serial_number: string }>(
+            `SELECT serial_number FROM product_serials WHERE product_id = $1 AND serial_number = ANY($2) AND status != 'sold'`,
+            [productId, serials]
           )
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-          await client.query(
-            `UPDATE product_sub_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
-            [qtyReceived, subVariantId]
-          )
-        } else if (variantId) {
-          const row = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
-            [variantId]
-          )
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-          await client.query(
-            `UPDATE product_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
-            [qtyReceived, variantId]
-          )
-        } else {
-          const row = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
-            [productId]
-          )
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-          await client.query(
-            `UPDATE products SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
-            [qtyReceived, productId]
-          )
+          if (dupeCheck.rows.length > 0) {
+            throw new Error(`Duplicate serial numbers already in stock: ${dupeCheck.rows.map(r => r.serial_number).join(', ')}`)
+          }
         }
 
-        await logStockMovement(client, {
-          productId,
-          variantId,
-          subVariantId,
-          transactionType: 'purchase',
-          quantityChange: qtyReceived,
-          referenceType: 'grn',
-          referenceId: grnId,
-          currentStock: stockBefore,
-        })
+        let stockBefore = 0
+        let newBatchId: string | null = null
+
+        if (isPerishable) {
+          if (!item.expiry_date) {
+            throw new Error(`Product ${productId} is perishable — expiry_date is required for GRN receive`)
+          }
+          // Stock lives only in product_batches; read current batch total for ledger
+          const batchStockRow = await client.query<{ total: string }>(
+            `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches
+             WHERE product_id = $1
+               AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+               AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))`,
+            [productId, variantId, subVariantId]
+          )
+          stockBefore = parseFloat(batchStockRow.rows[0]?.total ?? '0') || 0
+          const batchInsert = await client.query<{ id: string }>(
+            `INSERT INTO product_batches
+               (product_id, variant_id, sub_variant_id, grn_id, lot_number, manufacture_date, expiry_date, quantity, quantity_remaining, location_id)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$8,$9) RETURNING id`,
+            [
+              productId, variantId, subVariantId, grnId,
+              item.lot_number || null,
+              item.manufacture_date || null,
+              item.expiry_date,
+              qtyReceived,
+              item.location_id || null,
+            ]
+          )
+          newBatchId = batchInsert.rows[0].id
+        } else {
+          if (subVariantId) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+              [subVariantId]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              `UPDATE product_sub_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
+              [qtyReceived, subVariantId]
+            )
+          } else if (variantId) {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+              [variantId]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              `UPDATE product_variants SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
+              [qtyReceived, variantId]
+            )
+          } else {
+            const row = await client.query<{ inventory_quantity: string }>(
+              `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
+              [productId]
+            )
+            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
+            await client.query(
+              `UPDATE products SET inventory_quantity = COALESCE(inventory_quantity,0) + $1 WHERE id = $2`,
+              [qtyReceived, productId]
+            )
+          }
+        }
+
+        // Insert product_serials rows + one ledger entry per serial unit
+        if (isSerialised && serials.length > 0) {
+          for (let si = 0; si < serials.length; si++) {
+            const sn = serials[si]
+            await client.query(
+              `INSERT INTO product_serials
+                 (product_id, variant_id, sub_variant_id, batch_id, grn_id, serial_number, status)
+               VALUES ($1,$2,$3,$4,$5,$6,'in_stock')`,
+              [productId, variantId, subVariantId, newBatchId, grnId, sn]
+            )
+            await logStockMovement(client, {
+              productId,
+              variantId,
+              subVariantId,
+              transactionType: 'purchase',
+              quantityChange: 1,
+              referenceType: 'grn',
+              referenceId: grnId,
+              currentStock: stockBefore + si,
+              ...(newBatchId ? { batchId: newBatchId } : {}),
+              lotNumber: item.lot_number || null,
+              expiryDate: item.expiry_date || null,
+              serialNumber: sn,
+            })
+          }
+        } else {
+          await logStockMovement(client, {
+            productId,
+            variantId,
+            subVariantId,
+            transactionType: 'purchase',
+            quantityChange: qtyReceived,
+            referenceType: 'grn',
+            referenceId: grnId,
+            currentStock: stockBefore,
+            ...(newBatchId ? { batchId: newBatchId } : {}),
+            lotNumber: item.lot_number || null,
+            expiryDate: item.expiry_date || null,
+          })
+        }
 
         await client.query(
           `UPDATE purchase_order_items
@@ -169,6 +270,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
 
       await client.query('COMMIT')
+
+      // Update shelf_stock for any item that had a location assigned.
+      // Perishable: recompute shelf_stock from product_batches then sync inventory_quantity.
+      // Non-perishable: increment shelf_stock directly via adjustStock.
+      const syncedPerishable = new Set<string>()
+      for (const item of items) {
+        const factor = item.purchase_unit_factor ?? 1
+        const qtyReceived = item.quantity_received * factor
+        if (qtyReceived <= 0) continue
+        try {
+          if (perishableProductIds.has(item.product_id)) {
+            const key = `${item.product_id}:${item.variant_id || ''}:${item.sub_variant_id || ''}`
+            if (!syncedPerishable.has(key)) {
+              syncedPerishable.add(key)
+              await syncPerishableStock(null, item.product_id, item.variant_id || null, item.sub_variant_id || null)
+            }
+          } else if (item.location_id) {
+            await adjustStock(
+              item.location_id,
+              item.product_id,
+              item.variant_id || null,
+              item.sub_variant_id || null,
+              qtyReceived,
+              `GRN receive — PO ${po.po_number}`,
+              admin.id,
+            )
+          }
+        } catch (_) {}
+      }
 
       if (receivedAmount > 0) {
         const expClient = await getClient()

@@ -5,6 +5,7 @@ import { queryOne, queryMany } from '@/lib/db'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 import { sendAuditedMail } from '@/lib/mail-audit'
+import { restoreOrderStock } from '@/lib/order-stock'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,9 +42,10 @@ export async function GET(
 
     const items = await queryMany<any>(`
       SELECT oi.id, oi.product_id, oi.product_name, oi.product_sku, oi.variant_id, oi.variant_name,
-             oi.sub_variant_id, oi.hsn_code, oi.gst_rate, oi.quantity, oi.unit_price, oi.total_price,
+             oi.sub_variant_id, oi.hsn_code, oi.gst_rate, oi.quantity, oi.unit_price, oi.mrp,
+             oi.discount_pct, oi.discount_amount, oi.total_price,
              oi.taxable_amount, oi.cgst_amount, oi.sgst_amount, oi.igst_amount, oi.tax_amount,
-             oi.buy_mode, oi.buy_unit,
+             oi.buy_mode, oi.buy_unit, oi.sold_unit_factor, oi.base_quantity,
              CASE WHEN psv.id IS NOT NULL THEN json_build_object(
                'id', psv.id,
                'sub_variant_name', psv.sub_variant_name,
@@ -56,7 +58,8 @@ export async function GET(
                'sku', pv.sku,
                'inventory_quantity', pv.inventory_quantity
              ) ELSE NULL END AS variant,
-             CASE WHEN psv.id IS NULL AND pv.id IS NULL AND p.id IS NOT NULL THEN p.inventory_quantity ELSE NULL END AS inventory_quantity
+             CASE WHEN psv.id IS NULL AND pv.id IS NULL AND p.id IS NOT NULL THEN p.inventory_quantity ELSE NULL END AS inventory_quantity,
+             p.fragile, p.hazardous, p.flammable
       FROM order_items oi
       LEFT JOIN product_sub_variants psv ON psv.id = oi.sub_variant_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
@@ -102,6 +105,10 @@ export async function PATCH(
 
     values.push(id)
     await queryOne(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${values.length}`, values)
+
+    if (d.status === 'returned' || d.status === 'return_received') {
+      restoreOrderStock(id).catch(() => {})
+    }
 
     if (d.estimated_delivery_date !== undefined) {
       const order = await queryOne<any>(

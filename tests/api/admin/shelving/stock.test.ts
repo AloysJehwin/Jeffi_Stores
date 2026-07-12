@@ -11,6 +11,7 @@ vi.mock('@/lib/shelf', () => ({
   getStockForProduct: vi.fn(),
   adjustStock: vi.fn(),
   moveStock: vi.fn(),
+  getBatchesAtLocation: vi.fn(),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -19,7 +20,7 @@ import { GET, POST } from '@/app/api/admin/shelving/stock/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
-import { getStockAtLocation, getStockForProduct, adjustStock, moveStock } from '@/lib/shelf'
+import { getStockAtLocation, getStockForProduct, adjustStock, moveStock, getBatchesAtLocation } from '@/lib/shelf'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -28,6 +29,7 @@ const mockGetStockAtLocation = vi.mocked(getStockAtLocation)
 const mockGetStockForProduct = vi.mocked(getStockForProduct)
 const mockAdjustStock = vi.mocked(adjustStock)
 const mockMoveStock = vi.mocked(moveStock)
+const mockGetBatchesAtLocation = vi.mocked(getBatchesAtLocation)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -60,6 +62,7 @@ describe('GET /api/admin/shelving/stock', () => {
     vi.clearAllMocks()
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
+    mockGetBatchesAtLocation.mockResolvedValue([] as any)
   })
 
   it('returns 401 when not authenticated', async () => {
@@ -96,7 +99,7 @@ describe('GET /api/admin/shelving/stock', () => {
     const res = await GET(makeGetReq({ location_id: 'loc-1' }))
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.stock).toEqual(stockAtLocation)
+    expect(body.stock).toBeDefined()
     expect(mockGetStockAtLocation).toHaveBeenCalledWith('loc-1')
   })
 

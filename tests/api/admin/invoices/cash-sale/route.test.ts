@@ -33,6 +33,11 @@ vi.mock('@/lib/inventory', () => ({
   logStockMovement: vi.fn(),
 }))
 
+vi.mock('@/lib/shelf', () => ({
+  decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
+  syncPerishableStock: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@/lib/validate', () => {
   return {
     parseBody: vi.fn((schema: any, data: any) => {
@@ -245,9 +250,13 @@ describe('POST /api/admin/invoices/cash-sale', () => {
           .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
           // unit factor lookup (buy_unit is null → returns empty)
           .mockResolvedValueOnce({ rows: [] })
+          // perishable/serialized check
+          .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] })
           // stock path
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] }) // SELECT FOR UPDATE
-          .mockResolvedValueOnce({ rows: [] }),                  // UPDATE products
+          .mockResolvedValueOnce({ rows: [] })                  // UPDATE products
+          // second perishable check (shelf sync loop)
+          .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }),
         release: vi.fn(),
       }
       return fn(client)
@@ -276,9 +285,13 @@ describe('POST /api/admin/invoices/cash-sale', () => {
           .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
           // unit factor lookup
           .mockResolvedValueOnce({ rows: [] })
+          // perishable/serialized check
+          .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] })
           // stock path
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] }) // SELECT FOR UPDATE
-          .mockResolvedValueOnce({ rows: [] }),                  // UPDATE product_variants
+          .mockResolvedValueOnce({ rows: [] })                   // UPDATE product_variants
+          // second perishable check (shelf sync loop)
+          .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }),
         release: vi.fn(),
       }
       return fn(client)
@@ -308,9 +321,13 @@ describe('POST /api/admin/invoices/cash-sale', () => {
           .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
           // unit factor lookup
           .mockResolvedValueOnce({ rows: [] })
+          // perishable/serialized check
+          .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] })
           // stock path
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 50 }] }) // SELECT FOR UPDATE
-          .mockResolvedValueOnce({ rows: [] }),                  // UPDATE product_sub_variants
+          .mockResolvedValueOnce({ rows: [] })                   // UPDATE product_sub_variants
+          // second perishable check (shelf sync loop)
+          .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }),
         release: vi.fn(),
       }
       return fn(client)
@@ -335,6 +352,8 @@ describe('POST /api/admin/invoices/cash-sale', () => {
           .mockResolvedValueOnce({ rows: [] })                   // INSERT cash_sale_items
           // unit factor lookup
           .mockResolvedValueOnce({ rows: [] })
+          // perishable/serialized check
+          .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] })
           // stock check returns only 1
           .mockResolvedValueOnce({ rows: [{ inventory_quantity: 1 }] }),
         release: vi.fn(),

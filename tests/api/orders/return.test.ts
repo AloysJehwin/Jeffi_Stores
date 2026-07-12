@@ -7,6 +7,10 @@ vi.mock('@/lib/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
+  withTransaction: vi.fn().mockImplementation(async (fn: (client: any) => Promise<any>) => {
+    const mockClient = { query: vi.fn().mockResolvedValue({ rows: [{ id: 'rr-new', type: 'refund' }], rowCount: 1 }) }
+    return fn(mockClient)
+  }),
 }))
 vi.mock('@/lib/email', () => ({
   sendReturnStatusEmail: vi.fn().mockResolvedValue(undefined),
@@ -57,6 +61,7 @@ const VALID_BODY = {
   type: 'refund',
   reason: 'defective',
   description: 'Item arrived broken',
+  items: [{ order_item_id: 'oi-1' }],
 }
 
 function makeGetRequest() {
@@ -230,7 +235,9 @@ describe('POST /api/orders/[id]/return', () => {
       .mockResolvedValueOnce(null)               // no existing return request
       .mockResolvedValueOnce({ cnt: '0' })       // monthly count = 0
       .mockResolvedValueOnce(RETURN_REQUEST)     // inserted return request
-    vi.mocked(db.queryMany).mockResolvedValue([]) // admins
+    vi.mocked(db.queryMany).mockResolvedValue([
+      { id: 'oi-1', product_id: 'p-1', variant_id: null, product_name: 'Item', variant_name: null, quantity: '1', unit_price: '100' },
+    ]) // order_items validation
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
     vi.mocked(returnPolicy.checkReturnEligibility).mockResolvedValue({ ok: true } as any)
 

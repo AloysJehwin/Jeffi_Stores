@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { query, queryOne, queryMany } from '@/lib/db'
+import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { sendReturnStatusEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
@@ -22,6 +22,14 @@ export async function GET(
       [id, authUser.userId]
     )
 
+    let returnItems = null
+    if (returnRequest) {
+      returnItems = await queryMany(
+        `SELECT * FROM return_request_items WHERE return_request_id = $1 ORDER BY created_at`,
+        [returnRequest.id]
+      )
+    }
+
     const monthlyCount = await queryOne(
       `SELECT COUNT(*) AS cnt
        FROM return_requests rr
@@ -31,11 +39,10 @@ export async function GET(
          AND DATE_TRUNC('month', rr.created_at) = DATE_TRUNC('month', NOW())`,
       [authUser.userId]
     )
-    const monthlyLimitReached = parseInt(monthlyCount?.cnt || '0', 10) >= 1
+    const monthlyLimitReached = parseInt(monthlyCount?.cnt || '0', 10) >= parseInt(process.env.MONTHLY_RETURN_LIMIT || '1', 10)
 
-    return NextResponse.json({ returnRequest: returnRequest || null, monthlyLimitReached })
+    return NextResponse.json({ returnRequest: returnRequest || null, returnItems: returnItems || [], monthlyLimitReached })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
@@ -49,7 +56,7 @@ export async function POST(
     const authUser = await authenticateUser(request)
     if (!authUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const { type, reason, description } = await request.json()
+    const { type, reason, description, image_urls, items } = await request.json()
 
     if (!['refund', 'replacement'].includes(type)) {
       return NextResponse.json({ error: 'Invalid type. Must be refund or replacement.' }, { status: 400 })
@@ -57,9 +64,12 @@ export async function POST(
     if (!REASONS.includes(reason)) {
       return NextResponse.json({ error: 'Invalid reason.' }, { status: 400 })
     }
+    if (!Array.isArray(items) || items.length === 0) {
+      return NextResponse.json({ error: 'Please select at least one item to return.' }, { status: 400 })
+    }
 
     const order = await queryOne(
-`SELECT o.id, o.status, o.order_number, o.delivered_at, o.updated_at, o.user_id,
+      `SELECT o.id, o.status, o.order_number, o.delivered_at, o.updated_at, o.user_id,
               o.customer_name, o.customer_email,
               u.first_name, u.last_name, u.email AS user_email
        FROM orders o
@@ -100,31 +110,77 @@ export async function POST(
          AND DATE_TRUNC('month', rr.created_at) = DATE_TRUNC('month', NOW())`,
       [authUser.userId]
     )
-    if (parseInt(monthlyCount?.cnt || '0', 10) >= 1) {
+    if (parseInt(monthlyCount?.cnt || '0', 10) >= parseInt(process.env.MONTHLY_RETURN_LIMIT || '1', 10)) {
       return NextResponse.json({
         error: 'You have already used your return or replacement for this month. Only 1 is allowed per month.',
       }, { status: 400 })
     }
 
-    const returnRequest = await queryOne(
-      `INSERT INTO return_requests (order_id, user_id, type, reason, description)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING *`,
-      [id, authUser.userId, type, reason, description || null]
+    // Validate submitted items against actual order_items
+    const orderItemIds = items.map((i: any) => i.order_item_id)
+    const orderItems = await queryMany(
+      `SELECT id, product_id, variant_id, product_name, variant_name, quantity, unit_price
+       FROM order_items WHERE order_id = $1 AND id = ANY($2::uuid[])`,
+      [id, orderItemIds]
     )
 
-    await query(
-      `UPDATE orders SET status = 'return_requested', updated_at = NOW() WHERE id = $1`,
-      [id]
-    )
+    if (orderItems.length !== orderItemIds.length) {
+      return NextResponse.json({ error: 'One or more selected items do not belong to this order.' }, { status: 400 })
+    }
+
+    // Build validated item rows, cap quantity at ordered quantity
+    const itemMap = new Map(orderItems.map((oi: any) => [oi.id, oi]))
+    const validatedItems = items.map((i: any) => {
+      const oi = itemMap.get(i.order_item_id)
+      const qty = Math.min(parseFloat(i.quantity) || parseFloat(oi.quantity), parseFloat(oi.quantity))
+      const refundAmount = parseFloat((qty * parseFloat(oi.unit_price)).toFixed(2))
+      return { ...oi, returnQty: qty, refundAmount }
+    })
+
+    let returnRequest: any
+    await withTransaction(async (client) => {
+      const result = await client.query(
+        `INSERT INTO return_requests (order_id, user_id, type, reason, description, image_urls)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         RETURNING *`,
+        [id, authUser.userId, type, reason, description || null, image_urls?.length > 0 ? image_urls : null]
+      )
+      returnRequest = result.rows[0]
+
+      for (const item of validatedItems) {
+        await client.query(
+          `INSERT INTO return_request_items
+             (return_request_id, order_item_id, product_id, variant_id, quantity, unit_price, refund_amount, product_name, variant_name)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+          [
+            returnRequest.id,
+            item.id,
+            item.product_id,
+            item.variant_id || null,
+            item.returnQty,
+            item.unit_price,
+            item.refundAmount,
+            item.product_name,
+            item.variant_name || null,
+          ]
+        )
+      }
+
+      await client.query(
+        `UPDATE orders SET status = 'return_requested', updated_at = NOW() WHERE id = $1`,
+        [id]
+      )
+    })
+
+    const itemsSummary = validatedItems.map((i: any) => i.product_name).join(', ')
 
     logActivity({
       userId: authUser.userId,
       kind: 'return_requested',
       referenceId: id,
       referenceType: 'orders',
-      summary: `${type === 'return' ? 'Return' : 'Replacement'} requested for order #${order.order_number}: ${reason}`,
-      metadata: { type, reason, orderNumber: order.order_number },
+      summary: `${type === 'refund' ? 'Refund' : 'Replacement'} requested for order #${order.order_number}: ${reason} (${itemsSummary})`,
+      metadata: { type, reason, orderNumber: order.order_number, itemCount: validatedItems.length },
     }).catch(() => {})
 
     createAutoTask({
@@ -132,7 +188,7 @@ export async function POST(
       sourceKind: 'review_return',
       sourceRefId: id,
       title: `Review ${type} request for #${order.order_number}`,
-      description: `Reason: ${reason}${description ? `\n\n${description}` : ''}`,
+      description: `Reason: ${reason}${description ? `\n\n${description}` : ''}\n\nItems: ${itemsSummary}`,
       priority: 'high',
       dueInDays: 1,
     }).catch(() => {})

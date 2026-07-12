@@ -32,7 +32,10 @@ export async function GET(request: NextRequest) {
           ) AS product_images
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
-        WHERE p.is_active = true AND ${sc.clause}
+        WHERE p.is_active = true
+          AND (p.launch_date IS NULL OR p.launch_date <= CURRENT_DATE)
+          AND (p.discontinue_date IS NULL OR p.discontinue_date > CURRENT_DATE)
+          AND ${sc.clause}
         ORDER BY ${rk.rank}, p.name ASC
         LIMIT 6
       `, [...sc.params, ...rk.params]),
@@ -62,7 +65,6 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ products: productsArr, categories: categoriesArr })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ products: [], categories: [] }, { status: 500 })
   }
 }

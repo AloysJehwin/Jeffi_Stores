@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, withTransaction } from '@/lib/db'
-import { logStockMovement } from '@/lib/inventory'
+import { queryOne, query } from '@/lib/db'
+import { restoreOrderStock } from '@/lib/order-stock'
 
 export async function POST(
   request: NextRequest,
@@ -26,80 +26,12 @@ export async function POST(
       return NextResponse.json({ error: 'Invoice is already cancelled' }, { status: 400 })
     }
 
-    await withTransaction(async (client) => {
-      const itemsResult = await client.query(
-        `SELECT product_id, variant_id, sub_variant_id, quantity, buy_unit FROM order_items WHERE order_id = $1`,
-        [id]
-      )
+    await restoreOrderStock(id)
 
-      for (const item of itemsResult.rows) {
-        const rawQty = parseFloat(item.quantity)
-
-        // Resolve unit factor so restore matches what was originally deducted
-        const unitRow = await client.query<{ factor: string; dimension: string }>(
-          `SELECT COALESCE(puv.factor, pup.factor) AS factor,
-                  COALESCE(puv.dimension, pup.dimension) AS dimension
-           FROM (SELECT 1) x
-           LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
-           LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
-          [item.buy_unit, item.product_id, item.variant_id || null]
-        )
-        const u = unitRow.rows[0]
-        const qty = (u?.dimension === 'count' && u?.factor)
-          ? rawQty * parseFloat(u.factor)
-          : rawQty
-
-        let stockBefore = 0
-
-        if (item.sub_variant_id) {
-          const row = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
-            [item.sub_variant_id]
-          )
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-          await client.query(
-            `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`,
-            [qty, item.sub_variant_id]
-          )
-        } else if (item.variant_id) {
-          const row = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
-            [item.variant_id]
-          )
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-          await client.query(
-            `UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`,
-            [qty, item.variant_id]
-          )
-        } else if (item.product_id) {
-          const row = await client.query<{ inventory_quantity: string }>(
-            `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
-            [item.product_id]
-          )
-          stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-          await client.query(
-            `UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`,
-            [qty, item.product_id]
-          )
-        }
-
-        await logStockMovement(client, {
-          productId: item.product_id,
-          variantId: item.variant_id || null,
-          subVariantId: item.sub_variant_id || null,
-          transactionType: 'return',
-          quantityChange: qty,
-          referenceType: 'order',
-          referenceId: id,
-          currentStock: stockBefore,
-        })
-      }
-
-      await client.query(
-        `UPDATE orders SET status = 'cancelled', payment_status = 'cancelled', updated_at = NOW() WHERE id = $1`,
-        [id]
-      )
-    })
+    await query(
+      `UPDATE orders SET status = 'cancelled', payment_status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+      [id]
+    )
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

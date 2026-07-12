@@ -10,6 +10,7 @@ import RazorpayOffers from './RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductImage {
   id: string
@@ -64,6 +65,7 @@ interface ProductDetailClientProps {
     variant_type?: string | null
     discount_pct?: number | null
     extra_delivery_days?: number | null
+    handling_days?: number | null
     weight?: number | null
     dimensions?: string | null
     material?: string | null
@@ -112,6 +114,36 @@ interface ProductDetailClientProps {
       qty_step?: number | null
     }>
     sell_unit_id?: string | null
+    // Identification & Compliance
+    barcode?: string | null
+    isbn?: string | null
+    asin?: string | null
+    brand_part_number?: string | null
+    country_of_origin?: string | null
+    // Physical Attributes
+    color?: string | null
+    color_hex?: string | null
+    volume_ml?: number | null
+    net_weight_grams?: number | null
+    fragile?: boolean | null
+    hazardous?: boolean | null
+    flammable?: boolean | null
+    // Certifications & Standards
+    certifications?: string[] | null
+    compliance_standard?: string | null
+    safety_rating?: string | null
+    warranty_months?: number | null
+    warranty_type?: string | null
+    // Condition & Lifecycle
+    condition?: string | null
+    launch_date?: string | null
+    discontinue_date?: string | null
+    // Age & Audience
+    age_min?: number | null
+    age_max?: number | null
+    target_gender?: string | null
+    target_audience?: string[] | null
+    is_cod_allowed?: boolean | null
   }
   initialSkuParam?: string
 }
@@ -121,9 +153,10 @@ interface PolicyProps {
   returnDays: number
   replacementAllowed: boolean
   replacementDays: number
+  isCodAllowed?: boolean
 }
 
-const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays }: PolicyProps) => {
+const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed }: PolicyProps) => {
   const items = [
     {
       icon: (
@@ -205,6 +238,11 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
               {m}
             </span>
           ))}
+          {isCodAllowed && (
+            <span className="text-[9px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1 py-0.5 rounded whitespace-nowrap">
+              Cash on Delivery
+            </span>
+          )}
         </div>
       </Link>
     </div>
@@ -338,7 +376,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const replacementDays = replacementAllowed
     ? (brand?.replacement_allowed === false ? (brand.replacement_window_days ?? 7) : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7))
     : 0
-  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays }
+  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed: product.is_cod_allowed ?? false }
 
   const handleWishlist = useCallback(async () => {
     if (!user) {
@@ -417,8 +455,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           <h1 className="text-2xl sm:text-3xl font-bold text-foreground flex-1">
             {product.name}
           </h1>
-          <div className="flex items-center gap-2 shrink-0 mt-1">
-            <button
+          <div className="flex items-center gap-2 shrink-0 mt-1">            <button
               onClick={handleWishlist}
               disabled={wishlistLoading}
               aria-label={isInWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
@@ -440,6 +477,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           </div>
         </div>
 
+        <ProductWarningBadges fragile={product.fragile} hazardous={product.hazardous} flammable={product.flammable} />
 
         {/* Low stock urgency + notify me for out-of-stock */}
         <div className="mb-4">
@@ -492,15 +530,19 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
           initialSkuParam={initialSkuParam}
           discountPct={product.discount_pct != null ? Number(product.discount_pct) : null}
           extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
+          handlingDays={Number(product.handling_days ?? 2)}
+          isCodAllowed={product.is_cod_allowed ?? false}
           onVariantChange={handleVariantChange}
           onUnitChange={(key, label, meta) => setSelectedUnit({ key, label, ...meta })}
           productUnits={product.product_units ?? []}
           sellUnitId={product.sell_unit_id ?? null}
+          launchDate={product.launch_date ?? null}
+          discontinueDate={product.discontinue_date ?? null}
         />
 
         <RazorpayOffers />
 
-        {/* Product Specifications */}
+        {/* Product Specifications — rendered in page.tsx Specifications card */}
       </div>
 
       <div className="order-3 lg:hidden">

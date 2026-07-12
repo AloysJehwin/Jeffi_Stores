@@ -196,17 +196,57 @@ export function packIntoCartons(
 ): Carton[] {
   const cartons: Carton[] = []
 
+  // Consolidate all flat-poly items into a single weight pool before packing.
+  // Long/tube shapes must stay in their own cartons due to dimensional constraints.
+  const flatItems: ShipmentItem[] = []
+  const longItems: ShipmentItem[] = []
+
   for (const item of items) {
+    const pt = inferEffectivePackageType(item)
+    if (pt === 'long_tube' || pt === 'drill_bit_tube') {
+      longItems.push(item)
+    } else {
+      flatItems.push(item)
+    }
+  }
+
+  if (flatItems.length > 0) {
+    const totalWeight = flatItems.reduce((s, i) => s + i.weightGrams * i.quantity, 0)
+    // Use the largest flat-poly dims among all items as the representative carton dims.
+    let repDims: PackedDims = { length_cm: 15, breadth_cm: 10, height_cm: 3 }
+    for (const item of flatItems) {
+      const d = resolvePackedDims(item)
+      if (d.length_cm * d.breadth_cm * d.height_cm > repDims.length_cm * repDims.breadth_cm * repDims.height_cm) {
+        repDims = d
+      }
+    }
+
+    let remaining = totalWeight
+    while (remaining > 0) {
+      const take = Math.min(remaining, maxCartonWeightGrams)
+      const volumetricGrams = (repDims.length_cm * repDims.breadth_cm * repDims.height_cm) / VOLUMETRIC_DIVISOR_CM3_PER_GRAM
+      const charged = Math.max(take, volumetricGrams)
+      cartons.push({
+        length_cm:             Math.ceil(repDims.length_cm),
+        breadth_cm:            Math.ceil(repDims.breadth_cm),
+        height_cm:             Math.ceil(repDims.height_cm),
+        actualWeightGrams:     Math.round(take),
+        volumetricWeightGrams: Math.round(volumetricGrams),
+        chargedWeightGrams:    Math.round(charged),
+      })
+      remaining -= take
+    }
+  }
+
+  for (const item of longItems) {
     const unitDims = resolvePackedDims(item)
-    const effectivePt = inferEffectivePackageType(item)
-    const isLongShape = effectivePt === 'long_tube' || effectivePt === 'drill_bit_tube'
     const perUnitWeight = item.weightGrams
     let remaining = item.quantity
 
     while (remaining > 0) {
       const unitsThatFit = Math.max(1, Math.floor(maxCartonWeightGrams / Math.max(1, perUnitWeight)))
       const take = Math.min(remaining, unitsThatFit)
-      const cartonDims = deriveBulkCartonDims(unitDims, take, isLongShape)
+      const cartonDims = deriveBulkCartonDims(unitDims, take, true)
       const acc: CartonAccumulator = {
         maxL: cartonDims.length_cm,
         maxB: cartonDims.breadth_cm,

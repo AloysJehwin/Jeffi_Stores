@@ -41,6 +41,8 @@ export interface LineItem {
   discount_pct: number
   mrp: number
   inventory_quantity: number | null
+  serialized?: boolean
+  perishable?: boolean
 }
 
 interface Suggestion {
@@ -58,6 +60,7 @@ interface Suggestion {
   hsn_code: string | null
   inventory_quantity: number | null
   discount_pct?: number | null
+  serialized?: boolean | null
 }
 
 interface Category {
@@ -175,9 +178,11 @@ const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 interface LineItemsSectionProps {
   items: LineItem[]
   onChange: (items: LineItem[]) => void
+  onStockBadgeClick?: (item: LineItem) => void
+  assignedBatchLabels?: Record<string, string>
 }
 
-export default function LineItemsSection({ items, onChange }: LineItemsSectionProps) {
+export default function LineItemsSection({ items, onChange, onStockBadgeClick, assignedBatchLabels }: LineItemsSectionProps) {
   const [searchModes, setSearchModes] = useState<Record<string, SearchMode>>({})
   const [nameInputs, setNameInputs] = useState<Record<string, string>>({})
   const [skuInputs, setSkuInputs] = useState<Record<string, string>>({})
@@ -286,6 +291,7 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
       discount_pct,
       mrp,
       inventory_quantity: s.inventory_quantity ?? null,
+      serialized: s.serialized ?? false,
       buy_unit: it.buy_unit,
       buy_mode: it.buy_mode,
       sell_unit_factor: it.sell_unit_factor,
@@ -425,14 +431,26 @@ export default function LineItemsSection({ items, onChange }: LineItemsSectionPr
                       <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
                         {item.product_sku && <p className="text-xs text-foreground-muted font-mono">{item.product_sku}</p>}
-                        {item.inventory_quantity !== null && (() => {
+                        {assignedBatchLabels?.[item.id] ? (
+                          <button type="button" onClick={() => onStockBadgeClick?.(item)} className="text-xs font-medium px-1.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
+                            Batch: {assignedBatchLabels[item.id]}
+                          </button>
+                        ) : item.inventory_quantity !== null && (() => {
                           const su = getSelectedUnit(item)
                           const factor = (su && su.dimension === 'count' && su.factor > 1) ? su.factor : 1
                           const stockInUnits = factor > 1 ? Math.floor(item.inventory_quantity / factor) : item.inventory_quantity
                           const unitLabel = factor > 1 ? (su?.display_label ?? item.buy_unit ?? 'units') : 'pcs'
                           const isOut = stockInUnits === 0
                           const isLow = !isOut && stockInUnits <= 5
-                          return (
+                          return onStockBadgeClick && !isOut ? (
+                            <button type="button" onClick={() => onStockBadgeClick(item)} className={`text-xs font-medium px-1.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity ${
+                              isLow
+                                ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                                : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            }`}>
+                              {`Stock: ${stockInUnits} ${unitLabel}`}
+                            </button>
+                          ) : (
                             <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
                               isOut
                                 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'

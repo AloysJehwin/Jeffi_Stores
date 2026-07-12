@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach } from 'vitest'
 
 vi.mock('@/lib/db', () => ({
-  query: vi.fn(),
+  query: vi.fn().mockResolvedValue({ rowCount: 0 }),
   queryOne: vi.fn(),
   queryMany: vi.fn(),
   withTransaction: vi.fn(),

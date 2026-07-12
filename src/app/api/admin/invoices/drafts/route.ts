@@ -39,10 +39,14 @@ export async function GET(request: NextRequest) {
            ))                                                      AS req_qty,
            -- Target the most-specific stock level; do NOT fall through to a broader
            -- level — a sub-variant with 0 stock must not inherit variant/product stock.
+           -- For perishable products, add batch quantity_remaining to inventory_quantity.
            CASE
              WHEN oi.sub_variant_id IS NOT NULL THEN COALESCE(psv.inventory_quantity, 0)
-             WHEN oi.variant_id     IS NOT NULL THEN COALESCE(pv.inventory_quantity,  0)
-             ELSE                                    COALESCE(p.inventory_quantity,   0)
+               + CASE WHEN p.perishable AND NOT p.serialized THEN COALESCE((SELECT SUM(pb.quantity_remaining) FROM product_batches pb WHERE pb.product_id = oi.product_id AND pb.variant_id = oi.variant_id AND pb.sub_variant_id = oi.sub_variant_id AND pb.quantity_remaining > 0), 0) ELSE 0 END
+             WHEN oi.variant_id IS NOT NULL THEN COALESCE(pv.inventory_quantity, 0)
+               + CASE WHEN p.perishable AND NOT p.serialized THEN COALESCE((SELECT SUM(pb.quantity_remaining) FROM product_batches pb WHERE pb.product_id = oi.product_id AND pb.variant_id = oi.variant_id AND pb.sub_variant_id IS NULL AND pb.quantity_remaining > 0), 0) ELSE 0 END
+             ELSE COALESCE(p.inventory_quantity, 0)
+               + CASE WHEN p.perishable AND NOT p.serialized THEN COALESCE((SELECT SUM(pb.quantity_remaining) FROM product_batches pb WHERE pb.product_id = oi.product_id AND pb.variant_id IS NULL AND pb.sub_variant_id IS NULL AND pb.quantity_remaining > 0), 0) ELSE 0 END
            END::numeric                                            AS avail_qty,
            oi.product_id IS NOT NULL                               AS tracked
          FROM order_items oi
@@ -96,7 +100,7 @@ export async function GET(request: NextRequest) {
           OR (o.status = 'confirmed' AND EXISTS (
                SELECT 1 FROM invoices i WHERE i.order_id = o.id AND i.status = 'draft'
              ))
-          OR (o.status = 'processing' AND o.source = 'business' AND o.invoice_number IS NULL)
+          OR (o.status = 'processing' AND o.source IN ('business', 'offline') AND o.invoice_number IS NULL)
        ORDER BY o.updated_at DESC
        LIMIT 100`
     )
@@ -136,9 +140,11 @@ export async function POST(request: NextRequest) {
     const processedItems = (items || []).map((item: any) => {
       const unitPrice = parseFloat(item.unit_price) || 0
       const qty = parseFloat(item.quantity) || 0
+      const factor = item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1
+      const baseQty = qty * factor
       const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
-      const lineTotal = round2(lineItemFromMrpIncl(qty, unitPrice, discPct, gstRate))
+      const lineTotal = round2(lineItemFromMrpIncl(baseQty, unitPrice, discPct, gstRate))
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
       subtotal += lineTotal
@@ -158,8 +164,12 @@ export async function POST(request: NextRequest) {
         gst_rate: gstRate,
         quantity: qty,
         buy_unit: item.buy_unit || null,
+        sold_unit_factor: factor > 1 ? factor : null,
+        base_quantity: factor > 1 ? baseQty : null,
         unit_price: unitPrice,
         mrp: unitPrice,
+        discount_pct: discPct,
+        discount_amount: discPct > 0 ? round2(baseQty * unitPrice / (1 + gstRate / 100) * (discPct / 100)) : 0,
         total_price: lineTotal,
         taxable_amount: round2(gst.taxableAmount),
         cgst_amount: round2(gst.cgst),
@@ -219,13 +229,16 @@ export async function POST(request: NextRequest) {
         await client.query(
           `INSERT INTO order_items (
             order_id, product_id, product_name, product_sku, variant_id, sub_variant_id, variant_name,
-            hsn_code, gst_rate, quantity, buy_unit, unit_price, mrp, discount_amount, tax_amount,
+            hsn_code, gst_rate, quantity, buy_unit, sold_unit_factor, base_quantity,
+            unit_price, mrp, discount_pct, discount_amount, tax_amount,
             total_price, taxable_amount, cgst_amount, sgst_amount, igst_amount
-          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,0,$14,$15,$16,$17,$18,$19)`,
+          ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23)`,
           [
             orderId, item.product_id, item.product_name, item.product_sku,
             item.variant_id, item.sub_variant_id, item.variant_name,
-            item.hsn_code, item.gst_rate, item.quantity, item.buy_unit, item.unit_price, item.mrp,
+            item.hsn_code, item.gst_rate, item.quantity, item.buy_unit,
+            item.sold_unit_factor ?? null, item.base_quantity ?? null,
+            item.unit_price, item.mrp, item.discount_pct, item.discount_amount,
             item.tax_amount, item.total_price, item.taxable_amount,
             item.cgst_amount, item.sgst_amount, item.igst_amount,
           ]

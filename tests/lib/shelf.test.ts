@@ -587,8 +587,9 @@ describe('moveStock', () => {
   it('throws when no stock at source', async () => {
     const client = {
       query: vi.fn()
-        .mockResolvedValueOnce({ rows: [] })   // BEGIN
-        .mockResolvedValueOnce({ rows: [] }),   // from stock — empty
+        .mockResolvedValueOnce({ rows: [] })                    // BEGIN
+        .mockResolvedValueOnce({ rows: [{ perishable: false }] }) // perishable check
+        .mockResolvedValueOnce({ rows: [] }),                    // from stock — empty
       release: vi.fn(),
     }
     mockGetClient.mockResolvedValue(client as any)
@@ -600,6 +601,7 @@ describe('moveStock', () => {
     const client = {
       query: vi.fn()
         .mockResolvedValueOnce({ rows: [] })                              // BEGIN
+        .mockResolvedValueOnce({ rows: [{ perishable: false }] })        // perishable check
         .mockResolvedValueOnce({ rows: [{ id: 'ss-from', quantity: 5 }] }) // from stock
         .mockResolvedValueOnce({ rows: [] })                              // DELETE from
         .mockResolvedValueOnce({ rows: [] })                              // INSERT move_out log
@@ -619,6 +621,7 @@ describe('moveStock', () => {
     const client = {
       query: vi.fn()
         .mockResolvedValueOnce({ rows: [] })                               // BEGIN
+        .mockResolvedValueOnce({ rows: [{ perishable: false }] })         // perishable check
         .mockResolvedValueOnce({ rows: [{ id: 'ss-from', quantity: 10 }] }) // from stock
         .mockResolvedValueOnce({ rows: [] })                               // UPDATE from
         .mockResolvedValueOnce({ rows: [] })                               // INSERT move_out log

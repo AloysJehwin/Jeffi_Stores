@@ -358,6 +358,24 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
     return `${f} ${l}`.trim() || e.admin_username || (e.admin_id ? 'Admin' : 'System')
   }
 
+  function ActorChip({ e }: { e: AuditEvent }) {
+    const name = actorLabel(e)
+    const isSystem = !e.admin_id
+    return (
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium border ${
+        isSystem
+          ? 'bg-surface-secondary text-foreground-muted border-border-default'
+          : 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border-accent-200 dark:border-accent-700'
+      }`}>
+        {isSystem
+          ? <Settings className="w-2.5 h-2.5 shrink-0" />
+          : <User className="w-2.5 h-2.5 shrink-0" />
+        }
+        {name}
+      </span>
+    )
+  }
+
   interface ImageGroup {
     kind: 'image_group'
     id: string
@@ -1092,8 +1110,10 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                           )}
                         </div>
                         <p className="text-sm text-foreground mt-1 break-words">{summary}</p>
-                        <p className="text-[11px] text-foreground-muted mt-0.5">
-                          {actorLabel(repr)}{repr.ip_address ? ` · ${repr.ip_address}` : ''}
+                        <p className="text-[11px] text-foreground-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span className="text-foreground-muted">Changed by</span>
+                          <ActorChip e={repr} />
+                          {repr.ip_address ? <span className="text-foreground-muted">· {repr.ip_address}</span> : null}
                         </p>
                       </div>
 
@@ -1224,8 +1244,10 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                             also touched: {tally.join(' · ')}
                           </p>
                         )}
-                        <p className="text-[11px] text-foreground-muted mt-0.5">
-                          {actorLabel(repr)}{repr.ip_address ? ` · ${repr.ip_address}` : ''}
+                        <p className="text-[11px] text-foreground-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span className="text-foreground-muted">Changed by</span>
+                          <ActorChip e={repr} />
+                          {repr.ip_address ? <span className="text-foreground-muted">· {repr.ip_address}</span> : null}
                         </p>
                       </div>
 
@@ -1310,8 +1332,10 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                         <span className="text-[10px] text-foreground-muted">{relTime(e.created_at)}</span>
                       </div>
                       <p className="text-sm text-foreground mt-1 break-words">{e.summary}</p>
-                      <p className="text-[11px] text-foreground-muted mt-0.5">
-                        {actorLabel(e)}{e.ip_address ? ` · ${e.ip_address}` : ''}
+                      <p className="text-[11px] text-foreground-muted mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        <span className="text-foreground-muted">Changed by</span>
+                        <ActorChip e={e} />
+                        {e.ip_address ? <span className="text-foreground-muted">· {e.ip_address}</span> : null}
                       </p>
                     </div>
 

@@ -1068,7 +1068,22 @@ export async function getOrder(id: string) {
 
 export async function getReturnRequest(orderId: string) {
   const returnRequest = await queryOne(`
-    SELECT rr.*, o2.order_number AS replacement_order_number
+    SELECT rr.*, o2.order_number AS replacement_order_number,
+      COALESCE(
+        (SELECT json_agg(json_build_object(
+          'id', rri.id,
+          'order_item_id', rri.order_item_id,
+          'product_id', rri.product_id,
+          'variant_id', rri.variant_id,
+          'quantity', rri.quantity,
+          'unit_price', rri.unit_price,
+          'refund_amount', rri.refund_amount,
+          'product_name', rri.product_name,
+          'variant_name', rri.variant_name
+        ) ORDER BY rri.created_at)
+        FROM return_request_items rri WHERE rri.return_request_id = rr.id),
+        '[]'::json
+      ) AS items
     FROM return_requests rr
     LEFT JOIN orders o2 ON o2.id = rr.replacement_order_id
     WHERE rr.order_id = $1

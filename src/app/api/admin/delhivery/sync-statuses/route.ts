@@ -3,6 +3,7 @@ import { query, queryMany } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { resolveShipmentStatus, isAdvancement } from '@/lib/shipment-status'
+import { restoreOrderStock } from '@/lib/order-stock'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,6 +22,7 @@ const STATUS_SYNC: Record<string, {
   RAD:      { orderStatus: 'shipped',          setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending'] },
   OT:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   OD:       { orderStatus: 'out_for_delivery', setShippedAt: true,   onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
+  DISPATCHED:{ orderStatus: 'out_for_delivery', setShippedAt: true,  onlyIfCurrent: ['processing', 'confirmed', 'pending', 'shipped'] },
   DL:       { orderStatus: 'delivered',        setDeliveredAt: true, onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
   RTO:      { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
   RTRN:     { orderStatus: 'shipped',                                onlyIfCurrent: ['out_for_delivery', 'shipped', 'processing', 'confirmed'] },
@@ -43,9 +45,10 @@ export async function POST(request: NextRequest) {
   const orders = await queryMany<{
     id: string; awb_number: string; status: string; shipment_status: string | null
     order_number: string; customer_name: string; customer_email: string
-    user_id: string | null
+    user_id: string | null; payment_mode: string | null
   }>(
     `SELECT o.id, o.awb_number, o.status, o.shipment_status, o.order_number, o.user_id,
+            o.payment_mode,
             COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
             COALESCE(u.email, o.customer_email) AS customer_email
      FROM orders o
@@ -110,12 +113,12 @@ export async function POST(request: NextRequest) {
         const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS', 'OC', 'PKD'])
         let statusType = rawType
         if (EXCEPTION_TYPES.has(rawType) || rawType === 'PP' || rawType === 'MF') {
-          // First try scan history newest-first (most recent state wins)
-          for (const scan of [...rawScans].reverse()) {
+          // First try scan history newest-first (Delhivery returns newest first)
+          for (const scan of rawScans) {
             const t = (scan.ScanDetail?.ScanType ?? '').toUpperCase()
             if (t && !EXCEPTION_TYPES.has(t) && t !== 'PP' && t !== 'MF') { statusType = t; break }
             const activity = (scan.ScanDetail?.Scan ?? '').toLowerCase()
-            if (activity.includes('out for delivery')) { statusType = 'OD'; break }
+            if (activity.includes('out for delivery') || activity === 'dispatched') { statusType = 'OD'; break }
             if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
             if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
             if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
@@ -142,7 +145,7 @@ export async function POST(request: NextRequest) {
 
         // Track AWBs that have been physically picked up (PU or any forward/RTO stage)
         // so we can auto-advance the pickup request status regardless of order state.
-        const PICKED_UP_TYPES = new Set(['PU', 'IT', 'RAD', 'OT', 'OD', 'DL', 'RTO', 'RTRN', 'RTO-IT', 'RTO-OT', 'RTO-OFD', 'RTO-DL'])
+        const PICKED_UP_TYPES = new Set(['PU', 'IT', 'RAD', 'OT', 'OD', 'DISPATCHED', 'DL', 'RTO', 'RTRN', 'RTO-IT', 'RTO-OT', 'RTO-OFD', 'RTO-DL'])
         if (PICKED_UP_TYPES.has(statusType)) {
           pickedUpAwbs.add(awb)
         }
@@ -190,12 +193,24 @@ export async function POST(request: NextRequest) {
           queryParams
         ).catch(() => {})
 
+        // COD orders: flip payment_status to cod_collected on delivery
+        if (syncRule.orderStatus === 'delivered' && order.payment_mode === 'cod') {
+          await query(
+            `UPDATE orders SET payment_status = 'cod_collected', updated_at = NOW() WHERE id = $1 AND payment_status = 'cod_pending'`,
+            [order.id]
+          ).catch(() => {})
+        }
+
         if (order.customer_email && order.customer_name) {
           sendOrderStatusUpdate(
             order.customer_email, order.customer_name,
             order.order_number, order.id,
             syncRule.orderStatus, order.status
           ).catch(() => {})
+        }
+
+        if (syncRule.orderStatus === 'returned') {
+          restoreOrderStock(order.id).catch(() => {})
         }
 
         if (rawType.startsWith('RTO') && order.user_id) {

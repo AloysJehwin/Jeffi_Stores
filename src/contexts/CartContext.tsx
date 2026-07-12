@@ -34,6 +34,10 @@ interface CartItem {
     stock_status: string
     brand_name: string | null
     category_id: string | null
+    is_active?: boolean | null
+    fragile?: boolean | null
+    hazardous?: boolean | null
+    flammable?: boolean | null
     product_images: Array<{
       thumbnail_url: string
       image_url: string

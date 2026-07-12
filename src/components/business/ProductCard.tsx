@@ -8,6 +8,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
 import { resolveEdd } from '@/lib/edd-cache'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductCardProps {
   id: string
@@ -23,12 +24,17 @@ interface ProductCardProps {
   categoryName?: string | null
   categoryId?: string | null
   extraDeliveryDays?: number
+  handlingDays?: number
+  fragile?: boolean | null
+  hazardous?: boolean | null
+  flammable?: boolean | null
 }
 
 export default function ProductCard({
   id, name, slug, hasVariants, displayPrice, mrp, mrpDiscount,
   effectiveStock, primaryImage, brandName, categoryName, categoryId,
-  extraDeliveryDays = 0,
+  extraDeliveryDays = 0, handlingDays = 2,
+  fragile, hazardous, flammable,
 }: ProductCardProps) {
   const { user } = useAuth()
 
@@ -44,8 +50,8 @@ export default function ProductCard({
   const [edd, setEdd] = useState<string | null>(null)
 
   useEffect(() => {
-    resolveEdd(!!user, extraDeliveryDays, 'business').then(v => { if (v) setEdd(v) })
-  }, [user, extraDeliveryDays])
+    resolveEdd(!!user, handlingDays, extraDeliveryDays, 'business').then(v => { if (v) setEdd(v) })
+  }, [user, handlingDays, extraDeliveryDays])
 
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const longPressFired = useRef(false)
@@ -136,6 +142,10 @@ export default function ProductCard({
                 {shownDiscount}% off
               </div>
             )}
+
+            <div className="absolute bottom-2 left-2 flex flex-col gap-0.5">
+              <ProductWarningBadges fragile={fragile} hazardous={hazardous} flammable={flammable} size="xs" />
+            </div>
 
           </div>
           </div>

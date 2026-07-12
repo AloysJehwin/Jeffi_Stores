@@ -346,8 +346,8 @@ describe('packIntoCartons', () => {
       [item({ packageType: 'flat_poly_auto', weightGrams: 400, quantity: 10 })],
       1000,
     )
-    // Each carton holds max floor(1000/400)=2 units
-    expect(cartons.length).toBeGreaterThanOrEqual(5)
+    // Total=4000g, maxCarton=1000g → 4 cartons
+    expect(cartons.length).toBe(4)
   })
 
   it('multiple items each produce their own carton set', () => {
@@ -355,7 +355,9 @@ describe('packIntoCartons', () => {
       item({ packageType: 'flat_poly_s', weightGrams: 50, quantity: 1 }),
       item({ packageType: 'flat_poly_m', weightGrams: 300, quantity: 1 }),
     ])
-    expect(cartons).toHaveLength(2)
+    // Both flat-poly items consolidated into one weight pool → 1 carton
+    expect(cartons).toHaveLength(1)
+    expect(cartons[0].actualWeightGrams).toBe(350)
   })
 
   it('long_tube item produces carton with breadth=8 and height=8', () => {
@@ -371,11 +373,12 @@ describe('packIntoCartons', () => {
     expect(cartons[0].height_cm).toBe(8)
   })
 
-  it('zero-weight item: carton has 0 actual weight', () => {
+  it('zero-weight item: total weight is 0 so no carton is packed', () => {
     const cartons = packIntoCartons([
       item({ packageType: 'flat_poly_s', weightGrams: 0, quantity: 1 }),
     ])
-    expect(cartons[0].actualWeightGrams).toBe(0)
+    // total weight=0, while(remaining>0) never fires → empty array
+    expect(cartons).toHaveLength(0)
   })
 })
 
@@ -405,25 +408,28 @@ describe('computeShipmentDims', () => {
     expect(result.actualWeightGrams).toBe(80)
   })
 
-  it('two items: height is summed, length/breadth is max across cartons', () => {
-    // flat_poly_s: 15×10×3, flat_poly_xl: 30×25×5
+  it('two items: consolidated into one carton, dims from largest item', () => {
+    // flat_poly_s: 15×10×3, flat_poly_xl: 30×25×5 — xl is largest by volume
     const result = computeShipmentDims([
       item({ packageType: 'flat_poly_s',  weightGrams: 50,   quantity: 1 }),
       item({ packageType: 'flat_poly_xl', weightGrams: 2000, quantity: 1 }),
     ])
     expect(result.length_cm).toBe(30)
     expect(result.breadth_cm).toBe(25)
-    expect(result.height_cm).toBe(3 + 5)
+    // consolidated: single carton uses rep dims height (5, not sum 3+5)
+    expect(result.height_cm).toBe(5)
     expect(result.actualWeightGrams).toBe(50 + 2000)
   })
 
-  it('total chargedWeightGrams sums across cartons', () => {
+  it('total chargedWeightGrams: consolidated carton uses max(actual, volumetric)', () => {
+    // two flat_poly_s items: total actual=160g
+    // flat_poly_s dims: 15×10×3=450cm³, volumetric=450/5000=0.09kg=90g
+    // consolidated → 1 carton: actual=160g > volumetric=90g → charged=160
     const result = computeShipmentDims([
       item({ packageType: 'flat_poly_s', weightGrams: 80, quantity: 1 }),
       item({ packageType: 'flat_poly_s', weightGrams: 80, quantity: 1 }),
     ])
-    // Each carton: volumetric=90 > actual=80, charged=90
-    expect(result.chargedWeightGrams).toBe(180)
+    expect(result.chargedWeightGrams).toBe(160)
   })
 })
 

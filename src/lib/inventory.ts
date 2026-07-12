@@ -22,6 +22,10 @@ export async function logStockMovement(
     unitLabel?: string | null
     unitFactor?: number | null
     quantityInUnit?: number | null
+    batchId?: string | null
+    lotNumber?: string | null
+    expiryDate?: string | null
+    serialNumber?: string | null
   }
 ) {
   const { productId, variantId, subVariantId, transactionType, quantityChange, referenceType, referenceId, notes } = params
@@ -48,14 +52,17 @@ export async function logStockMovement(
 
   const sql = `INSERT INTO inventory_transactions
     (product_id, variant_id, sub_variant_id, transaction_type, quantity_change, quantity_after,
-     reference_type, reference_id, notes, unit_id, unit_label, unit_factor, quantity_in_unit)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`
+     reference_type, reference_id, notes, unit_id, unit_label, unit_factor, quantity_in_unit, batch_id,
+     lot_number, expiry_date, serial_number)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)`
   const values = [
     productId, variantId, subVariantId || null,
     transactionType, qtyChange, quantityAfter,
     referenceType, referenceId, notes || null,
     params.unitId || null, params.unitLabel || null,
     params.unitFactor || null, params.quantityInUnit || null,
+    params.batchId || null,
+    params.lotNumber || null, params.expiryDate || null, params.serialNumber || null,
   ]
 
   if (client) {
@@ -156,9 +163,13 @@ export async function getStockLedger(filters: {
       it.unit_label,
       it.unit_factor,
       it.quantity_in_unit,
+      it.batch_id,
+      COALESCE(it.lot_number, pb.lot_number) AS lot_number,
+      COALESCE(it.expiry_date, pb.expiry_date) AS expiry_date,
+      it.serial_number,
       p.id AS product_id,
       p.name AS product_name,
-      p.sku AS product_sku,
+      COALESCE(sv.sku, pv.sku, p.sku) AS product_sku,
       p.cost_price AS product_cost_price,
       pv.id AS variant_id,
       pv.variant_name,
@@ -175,6 +186,7 @@ export async function getStockLedger(filters: {
     JOIN products p ON p.id = it.product_id
     LEFT JOIN product_variants pv ON pv.id = it.variant_id
     LEFT JOIN product_sub_variants sv ON sv.id = it.sub_variant_id
+    LEFT JOIN product_batches pb ON pb.id = it.batch_id
     LEFT JOIN orders o  ON it.reference_type = 'order'     AND o.id  = it.reference_id
     LEFT JOIN cash_sales cs ON it.reference_type = 'cash_sale' AND cs.id = it.reference_id
     LEFT JOIN grns g    ON it.reference_type = 'grn'       AND g.id  = it.reference_id
@@ -239,7 +251,12 @@ export async function getStockValuation(filters: {
         su.display_label AS sell_unit_label,
         su.dimension AS sell_unit_dimension,
         su.factor AS sell_unit_factor,
-        bu.display_label AS base_unit_label
+        bu.display_label AS base_unit_label,
+        p.perishable,
+        p.serialized,
+        (SELECT COALESCE(SUM(pb2.quantity_remaining), 0) FROM product_batches pb2
+         WHERE pb2.product_id = p.id AND pb2.variant_id IS NULL AND pb2.sub_variant_id IS NULL
+           AND pb2.quantity_remaining > 0) AS batch_qty_total
       FROM products p
       LEFT JOIN categories c ON c.id = p.category_id
       LEFT JOIN brands b ON b.id = p.brand_id
@@ -274,7 +291,12 @@ export async function getStockValuation(filters: {
         su.display_label AS sell_unit_label,
         su.dimension AS sell_unit_dimension,
         su.factor AS sell_unit_factor,
-        bu.display_label AS base_unit_label
+        bu.display_label AS base_unit_label,
+        p.perishable,
+        p.serialized,
+        (SELECT COALESCE(SUM(pb2.quantity_remaining), 0) FROM product_batches pb2
+         WHERE pb2.product_id = p.id AND pb2.variant_id = pv.id AND pb2.sub_variant_id IS NULL
+           AND pb2.quantity_remaining > 0) AS batch_qty_total
       FROM product_variants pv
       JOIN products p ON p.id = pv.product_id
       LEFT JOIN categories c ON c.id = p.category_id
@@ -311,7 +333,12 @@ export async function getStockValuation(filters: {
         su.display_label AS sell_unit_label,
         su.dimension AS sell_unit_dimension,
         su.factor AS sell_unit_factor,
-        bu.display_label AS base_unit_label
+        bu.display_label AS base_unit_label,
+        p.perishable,
+        p.serialized,
+        (SELECT COALESCE(SUM(pb2.quantity_remaining), 0) FROM product_batches pb2
+         WHERE pb2.product_id = p.id AND pb2.variant_id = pv.id AND pb2.sub_variant_id = sv.id
+           AND pb2.quantity_remaining > 0) AS batch_qty_total
       FROM product_sub_variants sv
       JOIN product_variants pv ON pv.id = sv.variant_id
       JOIN products p ON p.id = pv.product_id
