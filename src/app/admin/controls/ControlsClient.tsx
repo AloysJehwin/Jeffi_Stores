@@ -96,6 +96,10 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
   const [applySuccess, setApplySuccess] = useState<string | null>(null)
+  const [lastLogId, setLastLogId] = useState<string | null>(null)
+  const [lastLogLabel, setLastLogLabel] = useState<string | null>(null)
+  const [rollingBack, setRollingBack] = useState(false)
+  const [rollbackError, setRollbackError] = useState<string | null>(null)
 
   // ── selling unit sub-fields ───────────────────────────────────────────────
   const [suDimension, setSuDimension] = useState<Dimension>('count')
@@ -282,6 +286,8 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
       setApplySuccess(`✅ ${label} applied to ${data.updated} product${data.updated !== 1 ? 's' : ''}.`)
+      if (data.log_id) { setLastLogId(data.log_id); setLastLogLabel(label) }
+      setRollbackError(null)
       setOpValue('')
       loadProducts(activeFilters)
     } catch (e: any) {
@@ -292,7 +298,58 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   }
 
   const suUnitKey = suIsCustom ? suUnit.trim() : suUnit
-  const suEffectiveFactor = suIsCustom && suDimension !== 'count' && suCustomPreview
+
+  async function handleRollback() {
+    if (!lastLogId) return
+    const ok = await confirm({
+      title: 'Undo last operation?',
+      message: `This will restore the before-values for "${lastLogLabel}" across all affected products.`,
+      confirmLabel: 'Yes, undo',
+      cancelLabel: 'Cancel',
+      variant: 'danger',
+    })
+    if (!ok) return
+    setRollingBack(true)
+    setRollbackError(null)
+    try {
+      const res = await fetch('/api/admin/controls/rollback', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ log_id: lastLogId }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Rollback failed')
+      setApplySuccess(`↩ Rolled back "${lastLogLabel}" — ${data.restored} product${data.restored !== 1 ? 's' : ''} restored.`)
+      setLastLogId(null)
+      setLastLogLabel(null)
+      loadProducts(activeFilters)
+    } catch (e: any) {
+      setRollbackError(e.message)
+    } finally {
+      setRollingBack(false)
+    }
+  }
+
+  function handleReset() {
+    setActiveFilters({})
+    setProducts([])
+    setSelectedIds(new Set())
+    setOpKey('')
+    setOpValue('')
+    setApplyError(null)
+    setApplySuccess(null)
+    setLastLogId(null)
+    setLastLogLabel(null)
+    setRollbackError(null)
+    setSuDimension('count')
+    setSuUnit('pc')
+    setSuIsCustom(false)
+    setSuFactor('1')
+    setSuLabel('')
+    setSuMinQty('1')
+    setSuMaxQty('')
+    setSuQtyStep('1')
+  }  const suEffectiveFactor = suIsCustom && suDimension !== 'count' && suCustomPreview
     ? String(suCustomPreview.factor)
     : suFactor
   const canApply = !!opDef && selectedIds.size > 0 && !applying && (
@@ -679,7 +736,25 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
           )}
 
           {applyError && <p className="text-sm text-red-600 dark:text-red-400">{applyError}</p>}
-          {applySuccess && <p className="text-sm text-green-600 dark:text-green-400 font-medium">{applySuccess}</p>}
+          {applySuccess && (
+            <div className="flex items-center gap-3 flex-wrap">
+              <p className="text-sm text-green-600 dark:text-green-400 font-medium flex-1">{applySuccess}</p>
+              {lastLogId && (
+                <button
+                  type="button"
+                  onClick={handleRollback}
+                  disabled={rollingBack}
+                  className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 text-xs font-medium hover:bg-orange-100 dark:hover:bg-orange-900/30 disabled:opacity-50 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+                  {rollingBack ? 'Undoing…' : 'Undo'}
+                </button>
+              )}
+            </div>
+          )}
+          {rollbackError && <p className="text-sm text-red-600 dark:text-red-400">{rollbackError}</p>}
         </div>
       )}
 

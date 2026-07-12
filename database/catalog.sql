@@ -305,7 +305,6 @@ CREATE TABLE public.products (
     handling_days integer DEFAULT 2 NOT NULL,
     shipping_class character varying(30) DEFAULT 'standard' NOT NULL,
     is_oversized boolean DEFAULT false NOT NULL,
-    volumetric_weight_grams integer,
     -- Digital / Content
     is_digital boolean DEFAULT false NOT NULL,
     download_url text,
@@ -322,7 +321,6 @@ CREATE TABLE public.products (
     -- SEO & Merchandising
     meta_title character varying(160),
     meta_description character varying(320),
-    meta_keywords text[],
     is_searchable boolean DEFAULT true NOT NULL,
     -- Tax & Finance
     tax_class character varying(30) DEFAULT 'standard' NOT NULL,
@@ -396,7 +394,7 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS sort_order integer DEFAULT 0 NOT N
 ALTER TABLE products ADD COLUMN IF NOT EXISTS handling_days integer DEFAULT 2 NOT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS shipping_class character varying(30) DEFAULT 'standard' NOT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_oversized boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS volumetric_weight_grams integer;
+ALTER TABLE products DROP COLUMN IF EXISTS volumetric_weight_grams;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_digital boolean DEFAULT false NOT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS download_url text;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS license_type character varying(30);
@@ -409,7 +407,7 @@ ALTER TABLE products ADD COLUMN IF NOT EXISTS is_bundle boolean DEFAULT false NO
 ALTER TABLE products ADD COLUMN IF NOT EXISTS bundle_items jsonb;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS meta_title character varying(160);
 ALTER TABLE products ADD COLUMN IF NOT EXISTS meta_description character varying(320);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS meta_keywords text[];
+ALTER TABLE products DROP COLUMN IF EXISTS meta_keywords;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS is_searchable boolean DEFAULT true NOT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS tax_class character varying(30) DEFAULT 'standard' NOT NULL;
 ALTER TABLE products ADD COLUMN IF NOT EXISTS customs_tariff_code character varying(20);
@@ -476,4 +474,30 @@ CREATE TABLE IF NOT EXISTS public.product_serials (
     created_at       timestamp with time zone DEFAULT now() NOT NULL,
     updated_at       timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT product_serials_status_check CHECK (status = ANY (ARRAY['in_stock', 'sold', 'returned', 'damaged', 'lost']))
+);
+
+-- Remove unused fields
+ALTER TABLE products DROP COLUMN IF EXISTS meta_keywords;
+ALTER TABLE products DROP COLUMN IF EXISTS volumetric_weight_grams;
+ALTER TABLE products DROP COLUMN IF EXISTS customs_tariff_code;
+
+-- Technical specification fields
+ALTER TABLE products ADD COLUMN IF NOT EXISTS grade character varying(50);
+ALTER TABLE products ADD COLUMN IF NOT EXISTS specifications jsonb;
+
+-- Controls operation log (rollback snapshots)
+CREATE TABLE IF NOT EXISTS public.controls_operation_log (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    operation text NOT NULL,
+    product_ids uuid[] NOT NULL,
+    value jsonb,
+    snapshot jsonb,
+    applied_by text,
+    admin_id uuid,
+    product_count integer NOT NULL DEFAULT 0,
+    is_rollback boolean NOT NULL DEFAULT false,
+    rolled_back_at timestamp with time zone,
+    rolled_back_by text,
+    applied_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT controls_operation_log_pkey PRIMARY KEY (id)
 );
