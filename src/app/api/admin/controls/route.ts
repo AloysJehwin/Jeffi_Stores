@@ -359,17 +359,21 @@ export async function POST(request: NextRequest) {
 
         if (inherit_to_variants) {
           // Upsert same unit row on every active variant of the selected products.
-          // Target the one-base-variant partial index so renaming the unit doesn't duplicate.
           const variants = await client.query(
             `SELECT pv.id, pv.product_id FROM product_variants pv WHERE pv.product_id=ANY($1::uuid[]) AND pv.is_active=true`,
             [ids]
           )
           for (const v of variants.rows) {
+            // Demote any existing base row for this variant first, then upsert on (variant_id, unit)
+            await client.query(
+              `UPDATE product_units SET is_base = false WHERE variant_id = $1 AND is_base = true AND unit != $2`,
+              [v.id, unit]
+            )
             await client.query(
               `INSERT INTO product_units (product_id, variant_id, unit, factor, dimension, display_label, min_qty, max_qty, qty_step, is_base, is_purchase_default)
                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, false)
-               ON CONFLICT (variant_id) WHERE is_base = true AND variant_id IS NOT NULL
-               DO UPDATE SET unit=$3, factor=$4, dimension=$5, display_label=$6, min_qty=$7, max_qty=$8, qty_step=$9, updated_at=NOW()`,
+               ON CONFLICT (variant_id, unit) WHERE variant_id IS NOT NULL
+               DO UPDATE SET factor=$4, dimension=$5, display_label=$6, min_qty=$7, max_qty=$8, qty_step=$9, is_base=true, updated_at=NOW()`,
               [v.product_id, v.id, unit, f, dimension, display_label ?? null, minQ, maxQ, stepQ]
             )
           }
