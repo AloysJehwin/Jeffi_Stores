@@ -80,6 +80,7 @@ interface ProductActionsProps {
   sellUnitId?: string | null
   extraDeliveryDays?: number
   handlingDays?: number
+  is_active?: boolean
   launchDate?: string | null
   discontinueDate?: string | null
   isCodAllowed?: boolean | null

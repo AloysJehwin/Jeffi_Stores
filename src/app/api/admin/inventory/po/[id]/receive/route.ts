@@ -4,7 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
-import { adjustStock, syncPerishableStock } from '@/lib/shelf'
+import { adjustStock, syncPerishableStock, getOrCreateOpenShelf } from '@/lib/shelf'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/validate'
@@ -12,6 +12,7 @@ import { parseBody, zUuid } from '@/lib/validate'
 export const dynamic = 'force-dynamic'
 
 const postSchema = z.object({
+  warehouse_id: zUuid.nullish(),
   items: z
     .array(
       z.object({
@@ -44,7 +45,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     const parsed = parseBody(postSchema, body, 'POST /api/admin/inventory/po/[id]/receive')
     if (!parsed.ok) return parsed.response
-    const { items } = parsed.data
+    const { items, warehouse_id: warehouseId } = parsed.data
+
+    // Default missing location_id to the warehouse's open shelf
+    if (warehouseId) {
+      const wRow = await queryOne<{ code: string }>(`SELECT code FROM warehouses WHERE id = $1`, [warehouseId])
+      if (wRow) {
+        const openShelfId = await getOrCreateOpenShelf(warehouseId, wRow.code)
+        for (const item of items) {
+          if (!item.location_id) item.location_id = openShelfId
+        }
+      }
+    }
 
     const po = await queryOne<any>(
       `SELECT po.*, s.id AS supplier_id, s.name AS supplier_name, s.contact_name, s.email AS supplier_email

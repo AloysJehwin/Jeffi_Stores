@@ -89,10 +89,12 @@ export default function DatePicker({ value, onChange, disabled, min, max, classN
       }
       setPopupPos({ top, left })
     }
-    reposition()
+    // rAF ensures layout is settled (e.g. inside collapsible sections)
+    const raf = requestAnimationFrame(reposition)
     window.addEventListener('resize', reposition)
     window.addEventListener('scroll', reposition, true)
     return () => {
+      cancelAnimationFrame(raf)
       window.removeEventListener('resize', reposition)
       window.removeEventListener('scroll', reposition, true)
     }

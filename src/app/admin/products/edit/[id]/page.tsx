@@ -183,6 +183,13 @@ async function updateProduct(productId: string, formData: FormData) {
     setClauses.push(`barcode = $${params.length + 1}`, `isbn = $${params.length + 2}`, `asin = $${params.length + 3}`, `brand_part_number = $${params.length + 4}`, `country_of_origin = $${params.length + 5}`, `shelf_life_days = $${params.length + 6}`)
     params.push(barcode, isbn, asin, brandPartNumber, countryOfOrigin, shelfLifeDays)
 
+    // Technical Specs
+    const grade = (formData.get('grade') as string) || null
+    const specificationsRaw = (formData.get('specifications') as string) || null
+    const specifications = specificationsRaw ? JSON.parse(specificationsRaw) : null
+    setClauses.push(`grade = $${params.length + 1}`, `specifications = $${params.length + 2}`)
+    params.push(grade, specifications)
+
     // Physical Attributes
     const color = (formData.get('color') as string) || null
     const colorHex = (formData.get('color_hex') as string) || null
@@ -218,9 +225,8 @@ async function updateProduct(productId: string, formData: FormData) {
     const handlingDays = formData.get('handling_days') ? parseInt(formData.get('handling_days') as string) : 1
     const shippingClass = (formData.get('shipping_class') as string) || 'standard'
     const isOversized = formData.get('is_oversized') === 'true'
-    const volumetricWeightGrams = formData.get('volumetric_weight_grams') ? parseInt(formData.get('volumetric_weight_grams') as string) : null
-    setClauses.push(`handling_days = $${params.length + 1}`, `shipping_class = $${params.length + 2}`, `is_oversized = $${params.length + 3}`, `volumetric_weight_grams = $${params.length + 4}`)
-    params.push(handlingDays, shippingClass, isOversized, volumetricWeightGrams)
+    setClauses.push(`handling_days = $${params.length + 1}`, `shipping_class = $${params.length + 2}`, `is_oversized = $${params.length + 3}`)
+    params.push(handlingDays, shippingClass, isOversized)
 
     // Digital / Content
     const isDigital = formData.get('is_digital') === 'true'
@@ -246,17 +252,15 @@ async function updateProduct(productId: string, formData: FormData) {
     // SEO & Merchandising
     const metaTitle = (formData.get('meta_title') as string) || null
     const metaDescription = (formData.get('meta_description') as string) || null
-    const metaKeywords = (formData.get('meta_keywords') as string) ? (formData.get('meta_keywords') as string).split(',').map(s => s.trim()).filter(Boolean) : null
     const isSearchable = formData.get('is_searchable') !== 'false'
-    setClauses.push(`meta_title = $${params.length + 1}`, `meta_description = $${params.length + 2}`, `meta_keywords = $${params.length + 3}`, `is_searchable = $${params.length + 4}`)
-    params.push(metaTitle, metaDescription, metaKeywords, isSearchable)
+    setClauses.push(`meta_title = $${params.length + 1}`, `meta_description = $${params.length + 2}`, `is_searchable = $${params.length + 3}`)
+    params.push(metaTitle, metaDescription, isSearchable)
 
     // Tax & Finance
     const taxClass = (formData.get('tax_class') as string) || 'standard'
-    const customsTariffCode = (formData.get('customs_tariff_code') as string) || null
     const inclusiveTax = formData.get('inclusive_tax') === 'true'
-    setClauses.push(`tax_class = $${params.length + 1}`, `customs_tariff_code = $${params.length + 2}`, `inclusive_tax = $${params.length + 3}`)
-    params.push(taxClass, customsTariffCode, inclusiveTax)
+    setClauses.push(`tax_class = $${params.length + 1}`, `inclusive_tax = $${params.length + 2}`)
+    params.push(taxClass, inclusiveTax)
 
     // Age / Audience
     const ageMin = formData.get('age_min') ? parseInt(formData.get('age_min') as string) : null

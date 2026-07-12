@@ -5,6 +5,7 @@ import { syncPerishableStock } from '@/lib/shelf'
 import { logStockMovement } from '@/lib/inventory'
 
 const bodySchema = z.object({
+  variant_id: z.string().uuid().nullable().optional(),
   lot_number: z.string().nullable().optional(),
   manufacture_date: z.string().nullable().optional(),
   expiry_date: z.string().nullable().optional(),
@@ -21,18 +22,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: parsed.error.issues[0]?.message || 'Invalid request' }, { status: 400 })
   }
   const body = parsed.data
+  const variantId = body.variant_id ?? null
 
   const product = await queryOne<{
     id: string
     perishable: boolean
     serialized: boolean
     inventory_quantity: string
-    variant_id: string | null
-    sub_variant_id: string | null
   }>(
-    `SELECT id, perishable, serialized, inventory_quantity,
-            NULL::uuid AS variant_id, NULL::uuid AS sub_variant_id
-     FROM products WHERE id = $1`,
+    `SELECT id, perishable, serialized, inventory_quantity FROM products WHERE id = $1`,
     [productId]
   )
   if (!product) {
@@ -42,7 +40,23 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'Product is neither perishable nor serialized' }, { status: 400 })
   }
 
-  const inventoryQty = parseFloat(product.inventory_quantity) || 0
+  // For variant products, read stock from the variant row
+  let inventoryQty: number
+  let subVariantId: string | null = null
+  if (variantId) {
+    const variant = await queryOne<{ inventory_quantity: string; sub_variant_id: string | null }>(
+      `SELECT inventory_quantity, NULL::uuid AS sub_variant_id FROM product_variants WHERE id = $1 AND product_id = $2`,
+      [variantId, productId]
+    )
+    if (!variant) {
+      return NextResponse.json({ error: 'Variant not found' }, { status: 404 })
+    }
+    inventoryQty = parseFloat(variant.inventory_quantity) || 0
+    subVariantId = variant.sub_variant_id
+  } else {
+    inventoryQty = parseFloat(product.inventory_quantity) || 0
+  }
+
   if (inventoryQty <= 0) {
     return NextResponse.json({ error: 'No existing stock to bootstrap' }, { status: 400 })
   }
@@ -61,12 +75,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   // Guard: check if already bootstrapped
   const existingBatch = await queryOne<{ total: number }>(
-    `SELECT COUNT(*)::int AS total FROM product_batches WHERE product_id = $1`,
-    [productId]
+    `SELECT COUNT(*)::int AS total FROM product_batches WHERE product_id = $1 AND ($2::uuid IS NULL OR variant_id = $2)`,
+    [productId, variantId]
   )
   const existingSerial = await queryOne<{ total: number }>(
-    `SELECT COUNT(*)::int AS total FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`,
-    [productId]
+    `SELECT COUNT(*)::int AS total FROM product_serials WHERE product_id = $1 AND ($2::uuid IS NULL OR variant_id = $2) AND status = 'in_stock'`,
+    [productId, variantId]
   )
   if ((existingBatch?.total ?? 0) > 0 || (existingSerial?.total ?? 0) > 0) {
     return NextResponse.json({ error: 'Stock already bootstrapped' }, { status: 409 })
@@ -78,7 +92,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     let newBatchId: string | null = null
 
-    if (product.perishable) {
+    if (product.perishable || product.serialized) {
       const batchRes = await client.query<{ id: string }>(
         `INSERT INTO product_batches
            (product_id, variant_id, sub_variant_id, grn_id, lot_number,
@@ -86,11 +100,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
          VALUES ($1,$2,$3,NULL,$4,$5,$6,$7,$7,$8) RETURNING id`,
         [
           productId,
-          product.variant_id,
-          product.sub_variant_id,
+          variantId,
+          subVariantId,
           body.lot_number || null,
           body.manufacture_date || null,
-          body.expiry_date,
+          body.expiry_date || null,
           inventoryQty,
           body.location_id || null,
         ]
@@ -105,15 +119,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           `INSERT INTO product_serials
              (product_id, variant_id, sub_variant_id, batch_id, grn_id, serial_number, status)
            VALUES ($1,$2,$3,$4,NULL,$5,'in_stock')`,
-          [productId, product.variant_id, product.sub_variant_id, newBatchId, sn]
+          [productId, variantId, subVariantId, newBatchId, sn]
         )
       }
     }
 
     await logStockMovement(client, {
       productId,
-      variantId: product.variant_id,
-      subVariantId: product.sub_variant_id,
+      variantId,
+      subVariantId,
       transactionType: 'adjustment',
       quantityChange: 0,
       referenceType: 'manual',
@@ -123,7 +137,15 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     })
 
     if (product.perishable) {
-      await syncPerishableStock(client, productId, product.variant_id, product.sub_variant_id)
+      await syncPerishableStock(client, productId, variantId, subVariantId)
+    } else if (product.serialized && body.location_id) {
+      await client.query(
+        `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
+         VALUES ($1, $2, $3, $4, $5)
+         ON CONFLICT ON CONSTRAINT shelf_stock_unique
+         DO UPDATE SET quantity = shelf_stock.quantity + EXCLUDED.quantity, updated_at = now()`,
+        [body.location_id, productId, variantId, subVariantId, Math.round(inventoryQty)]
+      )
     }
 
     await client.query('COMMIT')

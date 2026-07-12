@@ -64,6 +64,7 @@ interface ProductDetailClientProps {
     variant_type?: string | null
     discount_pct?: number | null
     extra_delivery_days?: number | null
+    handling_days?: number | null
     weight?: number | null
     dimensions?: string | null
     brands?: {
