@@ -131,10 +131,11 @@ function QRPlaceholder({ size }: { size: number }) {
   )
 }
 
-function LabelPreview({ size, product, scale }: {
+function LabelPreview({ size, product, scale, showPrice }: {
   size: LabelSpec
   product: ProductResult | null
   scale: number
+  showPrice: boolean
 }) {
   const w = Math.round(size.widthPt * scale)
   const h = Math.round(size.heightPt * scale)
@@ -179,7 +180,7 @@ function LabelPreview({ size, product, scale }: {
             <div style={{ fontSize: varFs, color: '#555', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
           )}
           <div style={{ marginTop: 1 }}>
-            <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={nameFs} subSize={varFs * 0.85} gap={0} />
+            {showPrice && <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={nameFs} subSize={varFs * 0.85} gap={0} />}
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
@@ -203,7 +204,7 @@ function LabelPreview({ size, product, scale }: {
           {variantName && (
             <div style={{ fontSize: varFs, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>{variantName}</div>
           )}
-          {exGst && exGst > 0 && (
+          {exGst && exGst > 0 && showPrice && (
             <div style={{ display: 'flex', alignItems: 'baseline', gap: Math.round(3 * scale), flexWrap: 'wrap' }}>
               {mrp && mrp > 0 && (mrp * (1 + gstPct / 100)).toFixed(2) !== (exGst * (1 + gstPct / 100)).toFixed(2) && (
                 <span style={{ fontSize: exGstFs, color: '#aaa', textDecoration: 'line-through' }}>Rs. {(mrp * (1 + gstPct / 100)).toFixed(2)}</span>
@@ -231,7 +232,7 @@ function LabelPreview({ size, product, scale }: {
             <div style={{ fontSize: smallFontSize, color: '#333', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
           )}
           <div style={{ marginTop: 2 }}>
-            <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
+            {showPrice && <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />}
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: barH + pad + 1, left: pad, right: pad, fontSize: smallFontSize * 0.85, color: '#777', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
@@ -258,7 +259,7 @@ function LabelPreview({ size, product, scale }: {
           )}
           <div style={{ fontSize: smallFontSize * 0.9, color: '#666', marginTop: 2 }}>SKU: {sku}</div>
           <div style={{ marginTop: 3 }}>
-            <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />
+            {showPrice && <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />}
           </div>
         </div>
         <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
@@ -292,7 +293,7 @@ function LabelPreview({ size, product, scale }: {
             <div style={{ fontSize: Math.round(smallFontSize * 0.85), color: '#888', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{brand}</div>
           )}
           <div style={{ marginTop: 3 }}>
-            <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize} subSize={smallFontSize * 0.9} gap={1} />
+            {showPrice && <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize} subSize={smallFontSize * 0.9} gap={1} />}
           </div>
         </div>
         {/* SKU row above barcode */}
@@ -323,6 +324,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
   const [previewIndex, setPreviewIndex] = useState(0)
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
+  const [showPrice, setShowPrice] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const [taItems, setTaItems] = useState<{ id: string; label: string; sublabel?: string }[]>([])
@@ -439,6 +441,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           size: selectedSize,
           copies: 1,
           sheet: outputMode === 'sheet',
+          showPrice,
         }),
       })
       if (!res.ok) {
@@ -535,13 +538,26 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 {outputMode === 'thermal' ? 'One label per page — for thermal/label printers' : 'Multiple labels per A4 page with cut lines — for desktop printers'}
               </p>
             </div>
-            <div className="sm:w-32">
+            <div className="flex-1">
               <h2 className="text-sm font-semibold text-foreground mb-2">Copies per item</h2>
               <input
                 type="number" min={1} max={100} value={copies}
                 onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
                 className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
               />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-sm font-semibold text-foreground mb-2">Print Price</h2>
+              <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
+                <div
+                  onClick={() => setShowPrice(v => !v)}
+                  className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${showPrice ? 'bg-orange-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${showPrice ? 'translate-x-5 border-orange-300' : 'translate-x-0.5'}`} />
+                </div>
+                <span className="text-sm text-foreground-secondary">{showPrice ? 'On' : 'Off'}</span>
+              </label>
+              <p className="text-xs text-foreground-muted mt-1">Print price on label</p>
             </div>
           </div>
         </div>
@@ -798,7 +814,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
 
               {/* Label + X-axis ruler stacked */}
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                <LabelPreview size={activeSize} product={previewProduct} scale={previewScale} />
+                <LabelPreview size={activeSize} product={previewProduct} scale={previewScale} showPrice={showPrice} />
                 <div style={{
                   width: previewW,
                   textAlign: 'center',

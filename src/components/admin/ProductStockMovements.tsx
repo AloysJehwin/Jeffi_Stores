@@ -12,8 +12,12 @@ interface Transaction {
   quantity_after: number | null
   reference_type: string | null
   reference_id: string | null
+  reference_label: string | null
   notes: string | null
   variant_name: string | null
+  serial_number: string | null
+  lot_number: string | null
+  expiry_date: string | null
 }
 
 const TYPE_LABELS: Record<string, string> = {
@@ -86,6 +90,7 @@ export default function ProductStockMovements({ productId }: { productId: string
                     <th className="px-4 py-2 text-right text-xs font-medium text-foreground-secondary">Qty Change</th>
                     <th className="px-4 py-2 text-right text-xs font-medium text-foreground-secondary">Stock After</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-foreground-secondary">Reference</th>
+                    <th className="px-4 py-2 text-left text-xs font-medium text-foreground-secondary">Batch / Serial</th>
                     <th className="px-4 py-2 text-left text-xs font-medium text-foreground-secondary">Notes</th>
                   </tr>
                 </thead>
@@ -93,7 +98,8 @@ export default function ProductStockMovements({ productId }: { productId: string
                   {rows.map(tx => (
                     <tr key={tx.id} className="hover:bg-surface-secondary/50 transition-colors">
                       <td className="px-4 py-2 whitespace-nowrap text-foreground-secondary">
-                        {new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                        <div>{new Date(tx.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                        <div className="text-[11px] text-foreground-muted">{new Date(tx.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}</div>
                       </td>
                       <td className="px-4 py-2 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${TYPE_COLORS[tx.transaction_type] || 'bg-surface-secondary text-foreground-secondary'}`}>
@@ -110,10 +116,26 @@ export default function ProductStockMovements({ productId }: { productId: string
                       <td className="px-4 py-2 whitespace-nowrap">
                         {tx.reference_type === 'order' && tx.reference_id ? (
                           <Link href={ap(`/admin/orders/${tx.reference_id}`)} className="text-accent-500 hover:text-accent-600 hover:underline underline-offset-2 font-medium">
-                            Order
+                            {tx.reference_label || 'Order'}
                           </Link>
+                        ) : tx.reference_type === 'cash_sale' && tx.reference_id ? (
+                          <span className="text-foreground-secondary font-medium">{tx.reference_label || 'Cash Sale'}</span>
+                        ) : tx.reference_type === 'grn' ? (
+                          <span className="text-foreground-secondary font-medium">{tx.reference_label || 'GRN'}</span>
                         ) : tx.reference_type ? (
                           <span className="text-foreground-secondary capitalize">{tx.reference_type.replace(/_/g, ' ')}</span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-2 text-foreground-secondary">
+                        {tx.serial_number ? (
+                          <span className="font-mono text-xs">{tx.serial_number}</span>
+                        ) : tx.lot_number ? (
+                          <div>
+                            <span className="font-mono text-xs">{tx.lot_number}</span>
+                            {tx.expiry_date && (
+                              <div className="text-[11px] text-foreground-muted">Exp: {new Date(tx.expiry_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+                            )}
+                          </div>
                         ) : '—'}
                       </td>
                       <td className="px-4 py-2 text-foreground-secondary max-w-[200px] truncate">{tx.notes || '—'}</td>

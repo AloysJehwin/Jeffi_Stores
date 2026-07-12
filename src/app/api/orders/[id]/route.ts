@@ -15,6 +15,14 @@ import { parseBody } from '@/lib/validate'
 const OrderPatchSchema = z.object({
   status: z.string().nullish(),
   payment_status: z.string().nullish(),
+  batch_assignments: z.array(z.object({
+    order_item_id: z.string().uuid(),
+    batch_id: z.string().uuid(),
+  })).nullish(),
+  serial_assignments: z.array(z.object({
+    order_item_id: z.string().uuid(),
+    serial_number: z.string().min(1),
+  })).nullish(),
 })
 
 export async function GET(
@@ -80,7 +88,9 @@ export async function GET(
     const orderItems = await queryMany(`
       SELECT oi.id, oi.product_id, oi.product_name, oi.product_sku, oi.variant_name, oi.quantity, oi.unit_price, oi.total_price, oi.buy_mode, oi.buy_unit,
         psv.sub_variant_name, psv.sku AS sub_variant_sku,
-        json_build_object('slug', p.slug, 'extra_delivery_days', p.extra_delivery_days, 'product_images',
+        json_build_object('slug', p.slug, 'extra_delivery_days', p.extra_delivery_days,
+          'fragile', p.fragile, 'hazardous', p.hazardous, 'flammable', p.flammable,
+          'product_images',
           COALESCE(
             (SELECT json_agg(pi ORDER BY pi.display_order)
              FROM product_images pi WHERE pi.product_id = p.id),
@@ -192,7 +202,7 @@ export async function PATCH(
     const body = await request.json()
     const parsed = parseBody(OrderPatchSchema, body)
     if (!parsed.ok) return parsed.response
-    const { status, payment_status } = parsed.data
+    const { status, payment_status, batch_assignments, serial_assignments } = parsed.data
 
     const currentOrder = await queryOne(`
       SELECT
@@ -231,7 +241,7 @@ export async function PATCH(
       return NextResponse.json({ error: `Orders with status '${currentOrder.status}' cannot be modified` }, { status: 400 })
     }
 
-    const validPaymentStatuses = ['pending', 'paid', 'failed', 'refunded']
+    const validPaymentStatuses = ['pending', 'unpaid', 'paid', 'failed', 'refunded', 'cod_pending', 'cod_collected']
 
     if (status && status !== currentOrder.status) {
       const allowed = VALID_TRANSITIONS[currentOrder.status] ?? []
@@ -451,7 +461,7 @@ export async function PATCH(
 
     if (statusChanged && status === 'processing') {
       const items = await queryMany<any>(
-        `SELECT oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.buy_unit
+        `SELECT oi.id AS order_item_id, oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.buy_unit
          FROM order_items oi WHERE oi.order_id = $1`,
         [orderId]
       )
@@ -470,6 +480,11 @@ export async function PATCH(
           const qty = (u?.dimension === 'count' && u?.factor)
             ? rawQty * parseFloat(u.factor)
             : rawQty
+
+          // Resolve assigned batch for this item (if any)
+          let assignedBatchId = batch_assignments?.find(
+            a => a.order_item_id === item.order_item_id
+          )?.batch_id ?? null
 
           let stockBefore = 0
           if (item.sub_variant_id) {
@@ -503,6 +518,57 @@ export async function PATCH(
               [qty, item.product_id]
             )
           }
+
+          // Apply batch assignment: deduct quantity_remaining and link order_item → batch
+          let batchLotNumber: string | null = null
+          let batchExpiryDate: string | null = null
+          if (assignedBatchId) {
+            const batchRow = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
+              `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2 RETURNING lot_number, expiry_date`,
+              [qty, assignedBatchId]
+            )
+            batchLotNumber = batchRow.rows[0]?.lot_number ?? null
+            batchExpiryDate = batchRow.rows[0]?.expiry_date ?? null
+            await client.query(
+              `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
+              [assignedBatchId, item.order_item_id]
+            )
+          }
+
+          // Apply serial assignments: resolve batch from serial, mark serial sold
+          const itemSerials = (serial_assignments ?? []).filter(s => s.order_item_id === item.order_item_id)
+          let resolvedSerialNumber: string | null = null
+          let resolvedLotNumber: string | null = null
+          let resolvedExpiryDate: string | null = null
+          for (const sa of itemSerials) {
+            const serialRow = await client.query<{ id: string; batch_id: string | null; status: string }>(
+              `SELECT id, batch_id, status FROM product_serials WHERE product_id = $1 AND serial_number = $2 FOR UPDATE`,
+              [item.product_id, sa.serial_number]
+            )
+            if (!serialRow.rows.length) throw new Error(`Serial number not found: ${sa.serial_number}`)
+            if (serialRow.rows[0].status !== 'in_stock') throw new Error(`Serial ${sa.serial_number} is not in stock (status: ${serialRow.rows[0].status})`)
+            const serialBatchId = serialRow.rows[0].batch_id
+            if (!resolvedSerialNumber) resolvedSerialNumber = sa.serial_number
+            await client.query(
+              `UPDATE product_serials SET status = 'sold', order_id = $1, order_item_id = $2, sold_at = NOW(), updated_at = NOW() WHERE id = $3`,
+              [orderId, item.order_item_id, serialRow.rows[0].id]
+            )
+            // If no explicit batch_assignment, deduct from the serial's batch
+            if (!assignedBatchId && serialBatchId) {
+              const batchRow = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
+                `UPDATE product_batches SET quantity_remaining = quantity_remaining - 1, updated_at = NOW() WHERE id = $1 RETURNING lot_number, expiry_date`,
+                [serialBatchId]
+              )
+              resolvedLotNumber = batchRow.rows[0]?.lot_number ?? null
+              resolvedExpiryDate = batchRow.rows[0]?.expiry_date ?? null
+              await client.query(
+                `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
+                [serialBatchId, item.order_item_id]
+              )
+              assignedBatchId = serialBatchId
+            }
+          }
+
           await logStockMovement(client, {
             productId: item.product_id,
             variantId: item.variant_id || null,
@@ -512,6 +578,10 @@ export async function PATCH(
             referenceType: 'order',
             referenceId: orderId,
             currentStock: stockBefore,
+            batchId: assignedBatchId,
+            lotNumber: resolvedLotNumber ?? batchLotNumber,
+            expiryDate: resolvedExpiryDate ?? batchExpiryDate,
+            serialNumber: resolvedSerialNumber,
           })
         }
       })

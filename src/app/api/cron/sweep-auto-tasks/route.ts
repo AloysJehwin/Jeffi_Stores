@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany } from '@/lib/db'
+import { query, queryMany } from '@/lib/db'
 import { createAutoTask, type AutoTaskKind } from '@/lib/auto-tasks'
 
 export const dynamic = 'force-dynamic'
@@ -236,6 +236,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Auto-deactivate products whose discontinue_date has passed
+  const deactivated = await query(
+    `UPDATE products SET is_active = false
+     WHERE discontinue_date IS NOT NULL
+       AND discontinue_date <= CURRENT_DATE
+       AND is_active = true`
+  )
+  const deactivatedCount = deactivated.rowCount ?? 0
+
   const created: Record<string, number> = {}
   const errors: string[] = []
 
@@ -263,6 +272,7 @@ export async function GET(req: NextRequest) {
 
   return NextResponse.json({
     success: true,
+    deactivatedProducts: deactivatedCount,
     created,
     totalCreated: Object.values(created).reduce((a, b) => a + b, 0),
     errors: errors.length > 0 ? errors : undefined,

@@ -14,6 +14,7 @@ import DelhiveryTracking from '@/components/DelhiveryTracking'
 import CustomerMailPanel from '@/components/admin/CustomerMailPanel'
 import MailLogsPanel from '@/components/admin/MailLogsPanel'
 import ExtendEddButton from '@/components/admin/ExtendEddButton'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -282,12 +283,15 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                             {item.sub_variant.sub_variant_name}
                           </span>
                         )}
+                        <div className="mt-1">
+                          <ProductWarningBadges fragile={item.fragile} hazardous={item.hazardous} flammable={item.flammable} size="xs" />
+                        </div>
                         <p className="text-sm text-foreground-secondary mt-1">
                           {(() => {
                             const isFractional = (item.buy_mode && item.buy_mode !== 'unit') || (item.buy_unit && item.buy_unit !== 'unit')
                             const displayUnit = (item.buy_unit && item.buy_unit !== 'unit') ? item.buy_unit : (item.buy_mode !== 'unit' ? item.buy_mode : null)
                             const qty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
-                            const qtyStr = isFractional ? qty.toFixed(qty % 1 === 0 ? 0 : 3).replace(/\.?0+$/, '') : String(qty)
+                            const qtyStr = isFractional ? (qty % 1 === 0 ? String(Math.round(qty)) : qty.toFixed(3).replace(/0+$/, '').replace(/\.$/, '')) : String(qty)
                             const priceStr = Number(item.unit_price).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
                             return displayUnit
                               ? <>{qtyStr} <UnitLabel label={displayUnit} /> × Rs. {priceStr}/<UnitLabel label={displayUnit} /></>
@@ -378,6 +382,9 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                             {item.sub_variant.sub_variant_name}
                           </span>
                         )}
+                        <div className="mt-1">
+                          <ProductWarningBadges fragile={item.fragile} hazardous={item.hazardous} flammable={item.flammable} size="xs" />
+                        </div>
                       </div>
                       <div className="text-right shrink-0">
                         <p className={`text-sm font-semibold ${isOut ? 'text-red-500' : isLow ? 'text-yellow-500' : 'text-green-600 dark:text-green-400'}`}>

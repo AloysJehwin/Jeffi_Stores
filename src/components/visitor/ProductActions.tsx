@@ -79,6 +79,11 @@ interface ProductActionsProps {
   productUnits?: ProductUnit[]
   sellUnitId?: string | null
   extraDeliveryDays?: number
+  handlingDays?: number
+  is_active?: boolean
+  launchDate?: string | null
+  discontinueDate?: string | null
+  isCodAllowed?: boolean | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -108,8 +113,12 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onUnitChange, productUnits: productUnitsProp, sellUnitId,
-  extraDeliveryDays = 0,
+  extraDeliveryDays = 0, handlingDays = 2, is_active = true,
+  launchDate, discontinueDate, isCodAllowed,
 }: ProductActionsProps) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const isPreLaunch = !!launchDate && new Date(launchDate) > today
+  const isDiscontinued = !!discontinueDate && new Date(discontinueDate) <= today
   const { addToCart } = useCart()
   const { showToast } = useToast()
   const router = useRouter()
@@ -131,7 +140,7 @@ export default function ProductActions({
   }, [showAddressPicker])
   useEffect(() => {
     if (!user) {
-      resolveEdd(false, extraDeliveryDays).then(v => { if (v) setEdd(v) })
+      resolveEdd(false, handlingDays, extraDeliveryDays).then(v => { if (v) setEdd(v) })
       return
     }
     fetch('/api/user/addresses')
@@ -141,7 +150,7 @@ export default function ProductActions({
         setAddresses(list)
         const pin = list.find((a: any) => a.is_default)?.postal_code ?? list[0]?.postal_code ?? null
         setSelectedPin(pin)
-        return resolveEdd(true, extraDeliveryDays)
+        return resolveEdd(true, handlingDays, extraDeliveryDays)
       })
       .then(v => { if (v) setEdd(v) })
       .catch(() => {})
@@ -149,7 +158,7 @@ export default function ProductActions({
   function pickAddress(pin: string) {
     setSelectedPin(pin)
     setShowAddressPicker(false)
-    fetch(`/api/products/edd?pin=${pin}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`)
+    fetch(`/api/products/edd?pin=${pin}&handlingDays=${handlingDays}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.edd) setEdd(d.edd) })
       .catch(() => {})
@@ -554,7 +563,7 @@ export default function ProductActions({
                   Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
                 </span>
                 <span className="text-xs text-foreground-muted ml-2">
-                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                 </span>
               </div>
             )}
@@ -562,7 +571,7 @@ export default function ProductActions({
             {/* Total = selling unit price × qty */}
             <div className="flex items-center gap-2 mb-2">
               <span className="text-sm text-foreground-secondary">
-                Total ({quantity} <UnitLabel label={effectiveUnitLabel ?? 'pc'} />):
+                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />):
               </span>
               <span className="text-base font-semibold text-foreground">
                 Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -591,11 +600,18 @@ export default function ProductActions({
               </label>
               <div className="text-right">
                 {effectiveStock > 0 ? (
-                  <div className="flex items-center justify-end gap-2">
-                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                    </div>
+                    {isCodAllowed && (
+                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                        COD
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center justify-end gap-2">
@@ -661,24 +677,37 @@ export default function ProductActions({
           <div className="bg-surface rounded-lg p-6">
             <div className="flex items-baseline gap-2 flex-wrap mb-1">
               <span className="text-4xl font-bold text-primary-600 dark:text-primary-400">
-                Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
-              {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
+              <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
+              {effectiveMrp && effectiveMrp > effectivePrice && (
                 <span className="text-xl text-foreground-muted line-through">
-                  Rs. {(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  Rs. {effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                 </span>
               )}
-              {effectiveUnitLabel && (
-                <span className="text-lg text-foreground-muted">/ <UnitLabel label={effectiveUnitLabel} /></span>
-              )}
             </div>
+            {/* Selling unit price (e.g. per pair/box) on its own line */}
             {showPerBasePrice && (
               <div className="mb-1">
-                <span className="text-xs text-foreground-muted">
-                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                <span className="text-base font-semibold text-foreground">
+                  Rs. {(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                </span>
+                <span className="text-xs text-foreground-muted ml-2">
+                  (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs. {effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                 </span>
               </div>
             )}
+
+            {/* Total = selling unit price × qty */}
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-sm text-foreground-secondary">
+                Total ({quantity} <UnitLabel label={effectiveUnitLabel} />):
+              </span>
+              <span className="text-base font-semibold text-foreground">
+                Rs. {(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+
             {mrpDiscount > 0 && (
               <div className="flex items-center gap-2 mb-2">
                 <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
@@ -696,14 +725,21 @@ export default function ProductActions({
 
           <div>
             <div className="flex items-center justify-between gap-4 mb-2">
-              <label className="text-sm font-medium text-foreground-secondary">Quantity</label>
+              <label className="text-sm font-medium text-foreground-secondary">Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}</label>
               <div className="text-right">
                 {effectiveStock > 0 ? (
-                  <div className="flex items-center justify-end gap-2">
-                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                    </div>
+                    {isCodAllowed && (
+                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                        COD
+                      </span>
+                    )}
                   </div>
                 ) : (
                   <div className="flex items-center justify-end gap-2">
@@ -764,11 +800,22 @@ export default function ProductActions({
         </>
       )}
 
+      {isPreLaunch && launchDate && (
+        <div className="text-sm text-amber-600 dark:text-amber-400 font-medium py-2 px-3 bg-amber-50 dark:bg-amber-900/20 rounded-lg">
+          Coming Soon — Available from {new Date(launchDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
+        </div>
+      )}
+      {isDiscontinued && (
+        <div className="text-sm text-gray-500 dark:text-gray-400 font-medium py-2 px-3 bg-gray-100 dark:bg-gray-800 rounded-lg">
+          This product has been discontinued
+        </div>
+      )}
+
       <div className="space-y-3">
         <button
           onClick={handleBuyNow}
-          disabled={effectiveStock === 0 || isBuyingNow}
-          className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
+          disabled={!is_active || effectiveStock === 0 || isBuyingNow || isPreLaunch || isDiscontinued}
+          className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isBuyingNow ? (
             <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />Processing...</>
@@ -779,8 +826,8 @@ export default function ProductActions({
 
         <button
           onClick={handleAddToCart}
-          disabled={effectiveStock === 0 || isAddingToCart}
-          className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
+          disabled={!is_active || effectiveStock === 0 || isAddingToCart || isPreLaunch || isDiscontinued}
+          className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isAddingToCart ? (
             <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full" />Adding...</>

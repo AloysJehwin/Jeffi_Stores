@@ -35,6 +35,16 @@ vi.mock('@/lib/inventory', () => ({
   logStockMovement: vi.fn(),
 }))
 
+vi.mock('@/lib/shelf', () => ({
+  syncPerishableStock: vi.fn().mockResolvedValue(undefined),
+  decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('@/lib/shelf', () => ({
+  syncPerishableStock: vi.fn().mockResolvedValue(undefined),
+  decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
+}))
+
 vi.mock('@/lib/email', () => ({
   sendInvoiceFinalizedEmail: vi.fn(),
 }))
@@ -195,30 +205,11 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('returns 200 success when stock is sufficient', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          // existing order_items
-          .mockResolvedValueOnce({ rows: [] })
-          // unit row (buy_unit factor lookup)
-          .mockResolvedValueOnce({ rows: [{}] })
-          // stock check for product
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-          // UPDATE orders
-          .mockResolvedValueOnce({ rows: [] })
-          // UPDATE addresses
-          .mockResolvedValueOnce({ rows: [] })
-          // DELETE order_items
-          .mockResolvedValueOnce({ rows: [] })
-          // INSERT order_item
-          .mockResolvedValueOnce({ rows: [] })
-          // unit row2 (deduction factor lookup)
-          .mockResolvedValueOnce({ rows: [{}] })
-          // stock deduction SELECT
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-          // stock deduction UPDATE
-          .mockResolvedValueOnce({ rows: [] }),
-      }
-      return fn(client)
+      return fn(makeMockClient({
+        0: { rows: [] },                                           // existing order_items
+        6: { rows: [{ id: 'item-1' }] },                          // INSERT order_item
+        8: { rows: [{ perishable: false, serialized: false }] },   // perishable check
+      }))
     })
 
     const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
@@ -231,26 +222,11 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('returns movedToDraft=true when stock is insufficient', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          // existing order_items (none)
-          .mockResolvedValueOnce({ rows: [] })
-          // unit row (buy_unit factor lookup)
-          .mockResolvedValueOnce({ rows: [{}] })
-          // stock check — only 1 available, 2 needed
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '1' }] })
-          // UPDATE orders (draft)
-          .mockResolvedValueOnce({ rows: [] })
-          // DELETE FROM invoices (had invoice_number)
-          .mockResolvedValueOnce({ rows: [] })
-          // UPDATE addresses
-          .mockResolvedValueOnce({ rows: [] })
-          // DELETE order_items
-          .mockResolvedValueOnce({ rows: [] })
-          // INSERT order_item
-          .mockResolvedValueOnce({ rows: [] }),
-      }
-      return fn(client)
+      return fn(makeMockClient({
+        0: { rows: [] },                                    // existing order_items
+        2: { rows: [{ inventory_quantity: '1' }] },         // stock check — insufficient (1 < 2)
+        7: { rows: [{ id: 'item-1' }] },                    // INSERT order_item (slot 7: after UPDATE orders=3, DELETE invoices=4, UPDATE addresses=5, DELETE order_items=6)
+      }))
     })
 
     const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
@@ -265,30 +241,11 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('sends invoice email when order has invoice_number and customerEmail', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          // existing order_items
-          .mockResolvedValueOnce({ rows: [] })
-          // unit row (buy_unit factor lookup)
-          .mockResolvedValueOnce({ rows: [{}] })
-          // stock check for product
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-          // UPDATE orders
-          .mockResolvedValueOnce({ rows: [] })
-          // UPDATE addresses
-          .mockResolvedValueOnce({ rows: [] })
-          // DELETE order_items
-          .mockResolvedValueOnce({ rows: [] })
-          // INSERT order_item
-          .mockResolvedValueOnce({ rows: [] })
-          // unit row2 (deduction factor lookup)
-          .mockResolvedValueOnce({ rows: [{}] })
-          // stock deduction SELECT
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-          // stock deduction UPDATE
-          .mockResolvedValueOnce({ rows: [] }),
-      }
-      return fn(client)
+      return fn(makeMockClient({
+        0: { rows: [] },                                           // existing order_items
+        6: { rows: [{ id: 'item-1' }] },                          // INSERT order_item
+        8: { rows: [{ perishable: false, serialized: false }] },   // perishable check
+      }))
     })
 
     await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
@@ -302,18 +259,11 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
   it('does not send email when customerEmail is absent', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-      }
-      return fn(client)
+      return fn(makeMockClient({
+        0: { rows: [] },
+        6: { rows: [{ id: 'item-1' }] },
+        8: { rows: [{ perishable: false, serialized: false }] },
+      }))
     })
 
     await PATCH(
@@ -339,18 +289,11 @@ describe('PATCH /api/admin/invoices/[id]', () => {
     }
 
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '50' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '50' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-      }
-      return fn(client)
+      return fn(makeMockClient({
+        0: { rows: [] },
+        6: { rows: [{ id: 'item-1' }] },
+        8: { rows: [{ perishable: false, serialized: false }] },
+      }))
     })
 
     const res = await PATCH(patchReq(bodyWithVariant), { params: Promise.resolve({ id: ORDER_ID }) })
@@ -371,18 +314,11 @@ describe('PATCH /api/admin/invoices/[id]', () => {
     }
 
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '50' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '50' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-      }
-      return fn(client)
+      return fn(makeMockClient({
+        0: { rows: [] },
+        6: { rows: [{ id: 'item-1' }] },
+        8: { rows: [{ perishable: false, serialized: false }] },
+      }))
     })
 
     const res = await PATCH(patchReq(bodyWithSV), { params: Promise.resolve({ id: ORDER_ID }) })
@@ -398,18 +334,11 @@ describe('PATCH /api/admin/invoices/[id]', () => {
     const bodyIgst = { ...VALID_BODY, buyerGstin: '27AABCU9603R1ZM', state: 'Maharashtra' }
 
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [{ inventory_quantity: '100' }] })
-          .mockResolvedValueOnce({ rows: [] }),
-      }
-      return fn(client)
+      return fn(makeMockClient({
+        0: { rows: [] },
+        6: { rows: [{ id: 'item-1' }] },
+        8: { rows: [{ perishable: false, serialized: false }] },
+      }))
     })
 
     const res = await PATCH(patchReq(bodyIgst), { params: Promise.resolve({ id: ORDER_ID }) })
@@ -433,16 +362,11 @@ describe('PATCH /api/admin/invoices/[id]', () => {
     }
 
     vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          .mockResolvedValueOnce({ rows: [] })
-          // No stock check call needed
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] })
-          .mockResolvedValueOnce({ rows: [] }),
-      }
-      return fn(client)
+      // No stock check loop, no deduction loop — product_id is null
+      // Sequence: 0=SELECT order_items, 1=UPDATE orders, 2=UPDATE addresses, 3=DELETE order_items, 4=INSERT order_item
+      return fn(makeMockClient({
+        4: { rows: [{ id: 'item-1' }] },                          // INSERT order_item
+      }))
     })
 
     const res = await PATCH(patchReq(bodyNoProductId), { params: Promise.resolve({ id: ORDER_ID }) })

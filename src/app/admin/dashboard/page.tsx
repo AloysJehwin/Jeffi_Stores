@@ -125,12 +125,6 @@ export default async function AdminDashboard() {
           <h1 className="text-2xl font-bold text-foreground">Welcome back, {username}</h1>
           <p className="text-sm text-foreground-muted mt-0.5">Here is what is happening this month.</p>
         </div>
-        <Link href={ap('/admin/orders/new', host)} className="hidden sm:inline-flex items-center gap-2 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white text-sm font-medium rounded-lg transition-colors">
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          New Invoice
-        </Link>
       </div>
 
       <SupportRequestsAlert />
@@ -364,7 +358,6 @@ export default async function AdminDashboard() {
           { href: ap('/admin/products/add', host), label: 'Add Product', color: 'text-indigo-600 dark:text-indigo-400', bg: 'hover:bg-indigo-50 dark:hover:bg-indigo-900/20 hover:border-indigo-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /> },
           { href: ap('/admin/categories', host), label: 'Categories', color: 'text-green-600 dark:text-green-400', bg: 'hover:bg-green-50 dark:hover:bg-green-900/20 hover:border-green-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /> },
           { href: ap('/admin/orders', host), label: 'All Orders', color: 'text-yellow-600 dark:text-yellow-400', bg: 'hover:bg-yellow-50 dark:hover:bg-yellow-900/20 hover:border-yellow-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /> },
-          { href: ap('/admin/orders/new', host), label: 'Offline Invoice', color: 'text-purple-600 dark:text-purple-400', bg: 'hover:bg-purple-50 dark:hover:bg-purple-900/20 hover:border-purple-400', icon: <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /> },
         ].map(action => (
           <Link
             key={action.href}

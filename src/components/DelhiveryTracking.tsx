@@ -75,7 +75,8 @@ function statusBadge(type: string | null) {
   switch (type?.toUpperCase()) {
     case 'DL':     return 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
     case 'OT':
-    case 'OD':     return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
+    case 'OD':
+    case 'DISPATCHED': return 'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-300'
     case 'IT':
     case 'PU':     return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300'
     case 'NDR':    return 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300'
@@ -97,7 +98,8 @@ function statusLabel(type: string | null) {
     case 'PU':     return 'Picked Up'
     case 'IT':     return 'In Transit'
     case 'OT':
-    case 'OD':     return 'Out for Delivery'
+    case 'OD':
+    case 'DISPATCHED': return 'Out for Delivery'
     case 'DL':     return 'Delivered'
     case 'NDR':    return 'Delivery Attempted'
     case 'RTO':    return 'Return Initiated'
@@ -282,9 +284,19 @@ export default function DelhiveryTracking({
     )
   }
 
-  const displayType = tracking.statusType
+  const resolvedFromApi = tracking.statusType
     ? resolveDisplayType(tracking.statusType, tracking.scans)
-    : shipmentStatusToDisplayType(tracking.shipmentStatus)
+    : null
+  const resolvedFromDb = shipmentStatusToDisplayType(tracking.shipmentStatus)
+  // If the DB shipment_status is more advanced than what the live API returned
+  // (e.g. Delhivery returns PP/MF but we already know it's in_transit), prefer the DB value
+  const DISPLAY_RANK: Record<string, number> = {
+    PP: 1, MF: 1, PU: 2, IT: 3, OT: 4, OD: 4, NDR: 5, DL: 6,
+    RTO: 7, 'RTO-IT': 8, 'RTO-OT': 9, 'RTO-DL': 10,
+  }
+  const apiRank = DISPLAY_RANK[resolvedFromApi?.toUpperCase() ?? ''] ?? 0
+  const dbRank  = DISPLAY_RANK[resolvedFromDb?.toUpperCase()  ?? ''] ?? 0
+  const displayType = dbRank > apiRank ? resolvedFromDb : (resolvedFromApi ?? resolvedFromDb)
   const latestScan = tracking.scans?.[0]
   const isException = ['RTO', 'RTO-IT', 'RTO-OT', 'RTO-DL', 'NDR', 'HOLD', 'LOST', 'MIS'].includes(displayType?.toUpperCase() ?? '')
 

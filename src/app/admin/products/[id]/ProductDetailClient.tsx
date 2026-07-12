@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { Star, Sparkles, CheckCircle, XCircle, Loader2, X } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
+import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
 import { ap } from '@/lib/admin-path'
 
@@ -360,6 +361,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
           {p.is_featured && (
             <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400 inline-flex items-center gap-1"><Star className="w-3 h-3 fill-current" /> Featured</span>
           )}
+          <ProductWarningBadges fragile={p.fragile} hazardous={p.hazardous} flammable={p.flammable} />
           <button
             onClick={() => setAiOpen(true)}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"

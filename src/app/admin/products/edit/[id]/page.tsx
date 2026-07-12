@@ -4,6 +4,7 @@ import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
+import { syncPerishableStock } from '@/lib/shelf'
 import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
@@ -171,11 +172,181 @@ async function updateProduct(productId: string, formData: FormData) {
     const extraDeliveryDays = parseInt(formData.get('extra_delivery_days') as string || '0') || 0
     setClauses.push(`extra_delivery_days = $${params.length + 1}`)
     params.push(extraDeliveryDays)
+
+    // Identification & Compliance
+    const barcode = (formData.get('barcode') as string) || null
+    const isbn = (formData.get('isbn') as string) || null
+    const asin = (formData.get('asin') as string) || null
+    const brandPartNumber = (formData.get('brand_part_number') as string) || null
+    const countryOfOrigin = ((formData.get('country_of_origin') as string) || '').slice(0, 2).toUpperCase() || null
+    const shelfLifeDays = formData.get('shelf_life_days') ? parseInt(formData.get('shelf_life_days') as string) : null
+    setClauses.push(`barcode = $${params.length + 1}`, `isbn = $${params.length + 2}`, `asin = $${params.length + 3}`, `brand_part_number = $${params.length + 4}`, `country_of_origin = $${params.length + 5}`, `shelf_life_days = $${params.length + 6}`)
+    params.push(barcode, isbn, asin, brandPartNumber, countryOfOrigin, shelfLifeDays)
+
+    // Technical Specs
+    const grade = (formData.get('grade') as string) || null
+    const specificationsRaw = (formData.get('specifications') as string) || null
+    const specifications = specificationsRaw ? JSON.parse(specificationsRaw) : null
+    setClauses.push(`grade = $${params.length + 1}`, `specifications = $${params.length + 2}`)
+    params.push(grade, specifications)
+
+    // Physical Attributes
+    const color = (formData.get('color') as string) || null
+    const colorHex = (formData.get('color_hex') as string) || null
+    const volumeMl = formData.get('volume_ml') ? parseFloat(formData.get('volume_ml') as string) : null
+    const netWeightGrams = formData.get('net_weight_grams') ? parseInt(formData.get('net_weight_grams') as string) : null
+    const fragile = formData.get('fragile') === 'true'
+    const hazardous = formData.get('hazardous') === 'true'
+    const flammable = formData.get('flammable') === 'true'
+    const perishable = formData.get('perishable') === 'true'
+    const serialized = formData.get('serialized') === 'true'
+    setClauses.push(`color = $${params.length + 1}`, `color_hex = $${params.length + 2}`, `volume_ml = $${params.length + 3}`, `net_weight_grams = $${params.length + 4}`, `fragile = $${params.length + 5}`, `hazardous = $${params.length + 6}`, `flammable = $${params.length + 7}`, `perishable = $${params.length + 8}`, `serialized = $${params.length + 9}`)
+    params.push(color, colorHex, volumeMl, netWeightGrams, fragile, hazardous, flammable, perishable, serialized)
+
+    // Certifications & Standards
+    const certifications = (formData.get('certifications') as string) ? (formData.get('certifications') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+    const complianceStandard = (formData.get('compliance_standard') as string) || null
+    const safetyRating = (formData.get('safety_rating') as string) || null
+    const warrantyMonths = formData.get('warranty_months') ? parseInt(formData.get('warranty_months') as string) : null
+    const warrantyType = (formData.get('warranty_type') as string) || null
+    setClauses.push(`certifications = $${params.length + 1}`, `compliance_standard = $${params.length + 2}`, `safety_rating = $${params.length + 3}`, `warranty_months = $${params.length + 4}`, `warranty_type = $${params.length + 5}`)
+    params.push(certifications, complianceStandard, safetyRating, warrantyMonths, warrantyType)
+
+    // Condition & Lifecycle
+    const condition = (formData.get('condition') as string) || 'new'
+    const isCodAllowed = formData.get('is_cod_allowed') !== 'false'
+    const launchDate = (formData.get('launch_date') as string) || null
+    const discontinueDate = (formData.get('discontinue_date') as string) || null
+    const sortOrderVal = formData.get('sort_order') ? parseInt(formData.get('sort_order') as string) : 0
+    setClauses.push(`condition = $${params.length + 1}`, `is_cod_allowed = $${params.length + 2}`, `launch_date = $${params.length + 3}`, `discontinue_date = $${params.length + 4}`, `sort_order = $${params.length + 5}`)
+    params.push(condition, isCodAllowed, launchDate, discontinueDate, sortOrderVal)
+
+    // Shipping & Logistics
+    const handlingDays = formData.get('handling_days') ? parseInt(formData.get('handling_days') as string) : 1
+    const shippingClass = (formData.get('shipping_class') as string) || 'standard'
+    const isOversized = formData.get('is_oversized') === 'true'
+    setClauses.push(`handling_days = $${params.length + 1}`, `shipping_class = $${params.length + 2}`, `is_oversized = $${params.length + 3}`)
+    params.push(handlingDays, shippingClass, isOversized)
+
+    // Digital / Content
+    const isDigital = formData.get('is_digital') === 'true'
+    const downloadUrl = (formData.get('download_url') as string) || null
+    const licenseType = (formData.get('license_type') as string) || null
+    const fileFormat = (formData.get('file_format') as string) || null
+    const platformCompatibility = (formData.get('platform_compatibility') as string) ? (formData.get('platform_compatibility') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+    setClauses.push(`is_digital = $${params.length + 1}`, `download_url = $${params.length + 2}`, `license_type = $${params.length + 3}`, `file_format = $${params.length + 4}`, `platform_compatibility = $${params.length + 5}`)
+    params.push(isDigital, downloadUrl, licenseType, fileFormat, platformCompatibility)
+
+    // Subscriptions
+    const isSubscription = formData.get('is_subscription') === 'true'
+    const subscriptionInterval = (formData.get('subscription_interval') as string) || null
+    const subscriptionPrice = formData.get('subscription_price') ? round2(parseFloat(formData.get('subscription_price') as string)) : null
+    setClauses.push(`is_subscription = $${params.length + 1}`, `subscription_interval = $${params.length + 2}`, `subscription_price = $${params.length + 3}`)
+    params.push(isSubscription, subscriptionInterval, subscriptionPrice)
+
+    // Bundling
+    const isBundle = formData.get('is_bundle') === 'true'
+    setClauses.push(`is_bundle = $${params.length + 1}`)
+    params.push(isBundle)
+
+    // SEO & Merchandising
+    const metaTitle = (formData.get('meta_title') as string) || null
+    const metaDescription = (formData.get('meta_description') as string) || null
+    const isSearchable = formData.get('is_searchable') !== 'false'
+    setClauses.push(`meta_title = $${params.length + 1}`, `meta_description = $${params.length + 2}`, `is_searchable = $${params.length + 3}`)
+    params.push(metaTitle, metaDescription, isSearchable)
+
+    // Tax & Finance
+    const taxClass = (formData.get('tax_class') as string) || 'standard'
+    const inclusiveTax = formData.get('inclusive_tax') === 'true'
+    setClauses.push(`tax_class = $${params.length + 1}`, `inclusive_tax = $${params.length + 2}`)
+    params.push(taxClass, inclusiveTax)
+
+    // Age / Audience
+    const ageMin = formData.get('age_min') ? parseInt(formData.get('age_min') as string) : null
+    const ageMax = formData.get('age_max') ? parseInt(formData.get('age_max') as string) : null
+    const targetGender = (formData.get('target_gender') as string) || null
+    const targetAudience = (formData.get('target_audience') as string) ? (formData.get('target_audience') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+    setClauses.push(`age_min = $${params.length + 1}`, `age_max = $${params.length + 2}`, `target_gender = $${params.length + 3}`, `target_audience = $${params.length + 4}`)
+    params.push(ageMin, ageMax, targetGender, targetAudience)
+
     params.push(productId)
+    const prevRow = await queryOne<{ perishable: boolean; serialized: boolean }>('SELECT perishable, serialized FROM products WHERE id = $1', [productId])
     await query(
       `UPDATE products SET ${setClauses.join(', ')} WHERE id = $${params.length}`,
       params
     )
+    // If perishable was toggled OFF, roll up remaining batch qty into inventory_quantity then clean up batches
+    if (prevRow?.perishable && !perishable) {
+      const batchSum = await queryOne<{ total: string }>(
+        `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches WHERE product_id = $1`,
+        [productId]
+      )
+      const converted = parseFloat(batchSum?.total ?? '0') || 0
+      await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
+      await query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [converted, productId])
+      // Keep shelf_stock rows — update total quantity across locations to match converted qty
+      const shelfRows = await queryOne<{ cnt: string }>(
+        `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`, [productId]
+      )
+      const shelfCount = parseInt(shelfRows?.cnt ?? '0') || 0
+      if (shelfCount === 1) {
+        await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [converted, productId])
+      } else if (shelfCount > 1) {
+        // Distribute proportionally; zero out if converted is 0
+        await query(
+          `UPDATE shelf_stock SET quantity = CASE WHEN $1::numeric = 0 THEN 0
+             ELSE ROUND(quantity / NULLIF((SELECT SUM(quantity) FROM shelf_stock WHERE product_id = $2), 0) * $1::numeric, 4)
+           END, updated_at = now() WHERE product_id = $2`,
+          [converted, productId]
+        )
+      }
+    }
+    // If serialized was toggled OFF, count in-stock serials → set as inventory_quantity, clean up serials + batches + shelf_stock
+    if (prevRow?.serialized && !serialized) {
+      const serialCount = await queryOne<{ total: string }>(
+        `SELECT COUNT(*)::text AS total FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`,
+        [productId]
+      )
+      const converted = parseInt(serialCount?.total ?? '0') || 0
+      await query(`DELETE FROM product_serials WHERE product_id = $1`, [productId])
+      // Only delete batches if NOT still perishable (perishable cleanup above handles that case)
+      if (!perishable) {
+        await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
+        // Keep shelf_stock — update qty to match converted count
+        const shelfRows = await queryOne<{ cnt: string }>(
+          `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`, [productId]
+        )
+        const shelfCount = parseInt(shelfRows?.cnt ?? '0') || 0
+        if (shelfCount === 1) {
+          await query(`UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE product_id = $2`, [converted, productId])
+        } else if (shelfCount > 1) {
+          await query(
+            `UPDATE shelf_stock SET quantity = CASE WHEN $1::numeric = 0 THEN 0
+               ELSE ROUND(quantity / NULLIF((SELECT SUM(quantity) FROM shelf_stock WHERE product_id = $2), 0) * $1::numeric, 4)
+             END, updated_at = now() WHERE product_id = $2`,
+            [converted, productId]
+          )
+        }
+      }
+      await query(
+        `UPDATE products SET inventory_quantity = $1 WHERE id = $2`,
+        [converted, productId]
+      )
+      // Also update variant inventory_quantity if product has variants
+      await query(
+        `UPDATE product_variants pv
+         SET inventory_quantity = sub.cnt
+         FROM (
+           SELECT variant_id, COUNT(*)::numeric AS cnt
+           FROM product_serials
+           WHERE product_id = $1 AND status = 'in_stock'
+           GROUP BY variant_id
+         ) sub
+         WHERE pv.id = sub.variant_id`,
+        [productId]
+      )
+    }
 
     if (imageCount > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
       const allExistingImages = await queryMany(
@@ -432,6 +603,22 @@ export default async function EditProductPage({ params, searchParams }: { params
   const brands = await getAllBrands()
   const backUrl = back && back.startsWith('/admin/products') ? back : '/admin/products'
 
+  const batchSumRow = product.perishable
+    ? await queryOne<{ total: string }>(
+        `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches WHERE product_id = $1`,
+        [id]
+      )
+    : null
+  const perishableBatchTotal = parseFloat(batchSumRow?.total ?? '0') || 0
+
+  const serialCountRow = product.serialized
+    ? await queryOne<{ total: number }>(
+        `SELECT COUNT(*)::int AS total FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`,
+        [id]
+      )
+    : null
+  const serializedStockTotal = serialCountRow?.total ?? 0
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
@@ -455,6 +642,8 @@ export default async function EditProductPage({ params, searchParams }: { params
         productId={id}
         action={updateProduct.bind(null, id)}
         backUrl={backUrl}
+        perishableBatchTotal={perishableBatchTotal}
+        serializedStockTotal={serializedStockTotal}
       />
     </div>
   )

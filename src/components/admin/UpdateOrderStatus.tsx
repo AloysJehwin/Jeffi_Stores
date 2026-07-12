@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSelect from './AdminSelect'
+import BatchPickerModal, { BatchPickerItem, BatchAssignment } from './BatchPickerModal'
+import SerialEntryModal, { SerialItem, SerialAssignment } from './SerialEntryModal'
 
 interface UpdateOrderStatusProps {
   orderId: string
@@ -23,22 +25,25 @@ const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
 }
 
 const VALID_PAYMENT_TRANSITIONS: Record<string, string[]> = {
-  pending:  ['paid', 'failed'],
-  paid:     ['refunded'],
-  failed:   ['paid', 'pending'],
-  refunded: [],
+  pending:       ['paid', 'failed'],
+  unpaid:        ['paid', 'failed'],
+  paid:          ['refunded'],
+  failed:        ['paid', 'pending'],
+  refunded:      [],
+  cod_pending:   ['cod_collected', 'failed'],
+  cod_collected: ['paid', 'refunded'],
 }
 
 const PAYMENT_ALLOWED_FOR_STATUS: Record<string, string[]> = {
-  pending:          ['pending', 'failed'],
-  confirmed:        ['pending', 'paid', 'failed'],
-  processing:       ['paid'],
-  shipped:          ['paid'],
-  out_for_delivery: ['paid'],
-  delivered:        ['paid'],
-  cancel_requested: ['pending', 'paid', 'failed'],
-  cancel_rejected:  ['pending', 'paid', 'failed'],
-  cancelled:        ['pending', 'failed', 'refunded'],
+  pending:          ['pending', 'unpaid', 'cod_pending', 'failed'],
+  confirmed:        ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
+  processing:       ['paid', 'unpaid', 'cod_pending'],
+  shipped:          ['paid', 'cod_pending', 'cod_collected'],
+  out_for_delivery: ['paid', 'cod_pending', 'cod_collected'],
+  delivered:        ['paid', 'cod_collected'],
+  cancel_requested: ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
+  cancel_rejected:  ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
+  cancelled:        ['pending', 'unpaid', 'failed', 'refunded'],
 }
 
 const ALL_STATUS_OPTIONS = [
@@ -54,10 +59,13 @@ const ALL_STATUS_OPTIONS = [
 ]
 
 const ALL_PAYMENT_OPTIONS = [
-  { value: 'pending',  label: 'Pending' },
-  { value: 'paid',     label: 'Paid' },
-  { value: 'failed',   label: 'Failed' },
-  { value: 'refunded', label: 'Refunded' },
+  { value: 'pending',       label: 'Pending' },
+  { value: 'unpaid',        label: 'Unpaid' },
+  { value: 'paid',          label: 'Paid' },
+  { value: 'failed',        label: 'Failed' },
+  { value: 'refunded',      label: 'Refunded' },
+  { value: 'cod_pending',   label: 'COD Pending' },
+  { value: 'cod_collected', label: 'COD Collected' },
 ]
 
 export default function UpdateOrderStatus({ orderId, currentStatus, currentPaymentStatus }: UpdateOrderStatusProps) {
@@ -67,6 +75,10 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [paymentAutoResetNote, setPaymentAutoResetNote] = useState<string | null>(null)
+  const [batchPickerItems, setBatchPickerItems] = useState<BatchPickerItem[] | null>(null)
+  const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
+  const [pendingBatchAssignments, setPendingBatchAssignments] = useState<BatchAssignment[] | null>(null)
+  const [pendingPaymentStatus, setPendingPaymentStatus] = useState<string | null>(null)
   const router = useRouter()
 
   const allowedStatuses = [currentStatus, ...(VALID_STATUS_TRANSITIONS[currentStatus] ?? [])]
@@ -101,12 +113,51 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
       return
     }
 
+    // When moving to processing, check for perishable items needing batch assignment
+    if (status === 'processing' && currentStatus !== 'processing') {
+      setIsUpdating(true)
+      setError(null)
+      try {
+        const res = await fetch(`/api/admin/inventory/batches/available?order_id=${orderId}`)
+        if (!res.ok) throw new Error('Failed to load batch information')
+        const data = await res.json()
+        const hasBatchItems = data.items && data.items.length > 0
+        const hasSerialItems = data.serialized_items && data.serialized_items.length > 0
+        if (hasBatchItems || hasSerialItems) {
+          setPendingPaymentStatus(paymentStatus)
+          if (hasSerialItems) setSerialPickerItems(data.serialized_items)
+          if (hasBatchItems) {
+            setBatchPickerItems(data.items)
+          } else {
+            // Only serialized — go straight to serial entry (batch picker skipped)
+          }
+          setIsUpdating(false)
+          return
+        }
+      } catch (err: any) {
+        setError(err.message || 'Failed to check batch availability')
+        setIsUpdating(false)
+        return
+      }
+      setIsUpdating(false)
+    }
+
+    await submitUpdate(null)
+  }
+
+  async function submitUpdate(batchAssignments: BatchAssignment[] | null, serialAssignments?: SerialAssignment[] | null) {
     setIsUpdating(true)
     setError(null)
     setSuccess(null)
 
     try {
-      const body: Record<string, string> = { status, payment_status: paymentStatus }
+      const body: Record<string, any> = { status, payment_status: pendingPaymentStatus ?? paymentStatus }
+      if (batchAssignments && batchAssignments.length > 0) {
+        body.batch_assignments = batchAssignments
+      }
+      if (serialAssignments && serialAssignments.length > 0) {
+        body.serial_assignments = serialAssignments
+      }
 
       const response = await fetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
@@ -133,6 +184,7 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
 
       setSuccess(successMessage)
       setPaymentAutoResetNote(null)
+      setPendingPaymentStatus(null)
       router.refresh()
     } catch (err: any) {
       setError(err.message || 'Failed to update order. Please try again.')
@@ -153,7 +205,45 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
   }
 
   return (
-    <div className="space-y-4">
+    <>
+      {batchPickerItems && (
+        <BatchPickerModal
+          items={batchPickerItems}
+          onConfirm={(assignments) => {
+            setBatchPickerItems(null)
+            if (serialPickerItems) {
+              // Chain: batch done → now collect serials
+              setPendingBatchAssignments(assignments)
+            } else {
+              submitUpdate(assignments)
+            }
+          }}
+          onCancel={() => {
+            setBatchPickerItems(null)
+            setPendingPaymentStatus(null)
+            setPendingBatchAssignments(null)
+            setIsUpdating(false)
+          }}
+        />
+      )}
+
+      {serialPickerItems && !batchPickerItems && (
+        <SerialEntryModal
+          items={serialPickerItems}
+          onConfirm={(assignments) => {
+            setSerialPickerItems(null)
+            submitUpdate(pendingBatchAssignments, assignments)
+          }}
+          onCancel={() => {
+            setSerialPickerItems(null)
+            setPendingPaymentStatus(null)
+            setPendingBatchAssignments(null)
+            setIsUpdating(false)
+          }}
+        />
+      )}
+
+      <div className="space-y-4">
       {error && (
         <div className="p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300 text-sm">
           {error}
@@ -205,5 +295,6 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
         {isUpdating ? 'Updating...' : 'Update Order'}
       </button>
     </div>
+    </>
   )
 }

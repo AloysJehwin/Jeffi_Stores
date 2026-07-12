@@ -258,10 +258,11 @@ type PO = {
 
 type POItem = {
   id: string; product_id: string; variant_id: string | null
-  product_name: string; variant_name: string | null; sku: string | null
+  product_name: string; variant_name: string | null; sku: string | null; product_sku?: string | null
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
   purchase_unit: string | null; purchase_unit_factor: string | null
   sell_unit_label: string | null; sell_unit_dimension: string | null
+  perishable: boolean; serialized: boolean
 }
 
 /** For count-dimension products stock is always in pc; for others use sell_unit_label */
@@ -287,6 +288,9 @@ function POTab({ initialPO }: { initialPO?: string }) {
   const [receiveItems, setReceiveItems] = useState<any[]>([])
   const [receiveNotes, setReceiveNotes] = useState('')
   const [receiveSaving, setReceiveSaving] = useState(false)
+  const [receiveWarehouseId, setReceiveWarehouseId] = useState('')
+  const [editWarehouses, setEditWarehouses] = useState<{ id: string; name: string; code: string }[]>([])
+  const [shelfLocations, setShelfLocations] = useState<{ id: string; display_code: string }[]>([])
   const [poSortCol, setPoSortCol] = useState<string | undefined>(undefined)
   const [poSortDir, setPoSortDir] = useState<SortDir | undefined>(undefined)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
@@ -363,33 +367,86 @@ function POTab({ initialPO }: { initialPO?: string }) {
     const items = (json.items || []).map((it: POItem) => {
       const factor = parseFloat(it.purchase_unit_factor || '1')
       const remaining = Math.max(0, parseFloat(it.quantity) - parseFloat(it.quantity_received || '0'))
+      const today = new Date()
+      const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+      const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
+      const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+      const autoLot = `LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`
       return {
         ...it,
         receive_qty: String(factor > 1 ? Math.round((remaining / factor) * 1000) / 1000 : remaining),
         receive_cost: it.unit_cost,
         purchase_unit_factor: factor,
+        lot_number: autoLot,
+        expiry_date: '',
+        manufacture_date: '',
+        location_id: '',
+        serial_numbers: [] as string[],
       }
     })
     setReceiveMode({ po: json.purchase_order })
     setReceiveItems(items)
     setReceiveNotes('')
+    setReceiveWarehouseId('')
+    // Fetch shelf locations and warehouses for pickers
+    const [slRes, whRes] = await Promise.all([
+      fetch('/api/admin/shelving/locations').catch(() => null),
+      fetch('/api/admin/shelving/warehouses').catch(() => null),
+    ])
+    if (slRes?.ok) {
+      const slJson = await slRes.json()
+      setShelfLocations(slJson?.locations || [])
+    }
+    if (whRes?.ok) {
+      const whJson = await whRes.json()
+      const whs: { id: string; name: string; code: string }[] = whJson?.warehouses || []
+      // Auto-select if only one warehouse
+      if (whs.length === 1) setReceiveWarehouseId(whs[0].id)
+      setEditWarehouses(whs)
+    }
   }
 
   async function submitReceive() {
     if (!receiveMode) return
+    // Validate perishable items have expiry_date
+    const missing = receiveItems.filter(it => parseFloat(it.receive_qty) > 0 && it.perishable && !it.expiry_date)
+    if (missing.length > 0) {
+      showToast(`Expiry date required for: ${missing.map((it: any) => it.product_name + (it.variant_name ? ' / ' + it.variant_name : '')).join(', ')}`, 'error')
+      return
+    }
+    // Validate serialized items have the right number of serial numbers
+    const missingSerials = receiveItems.filter(it => {
+      if (!it.serialized || parseFloat(it.receive_qty) <= 0) return false
+      const serials = Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []
+      return serials.filter(Boolean).length !== Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
+    })
+    if (missingSerials.length > 0) {
+      showToast(`Serial numbers count must match received qty for: ${missingSerials.map((it: any) => it.product_name + (it.variant_name ? ' / ' + it.variant_name : '')).join(', ')}`, 'error')
+      return
+    }
     setReceiveSaving(true)
     const items = receiveItems.filter(it => parseFloat(it.receive_qty) > 0).map(it => ({
       po_item_id: it.id, product_id: it.product_id, variant_id: it.variant_id || null,
       quantity_received: parseFloat(it.receive_qty), unit_cost: parseFloat(it.receive_cost),
       purchase_unit_factor: parseFloat(it.purchase_unit_factor || '1'),
+      ...(it.perishable ? {
+        lot_number: it.lot_number || null,
+        expiry_date: it.expiry_date || null,
+        manufacture_date: it.manufacture_date || null,
+        location_id: it.location_id || null,
+      } : {}),
+      ...(it.serialized ? {
+        serial_numbers: (Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []).filter(Boolean),
+      } : {}),
     }))
     const res = await fetch(`/api/admin/inventory/po/${receiveMode.po.id}/receive`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ items, notes: receiveNotes }),
+      body: JSON.stringify({ items, notes: receiveNotes, ...(receiveWarehouseId ? { warehouse_id: receiveWarehouseId } : {}) }),
     })
     const json = await res.json()
     setReceiveSaving(false)
     if (json.success) { setReceiveMode(null); load(page) }
+    else showToast(json.error || 'Failed to receive goods', 'error')
   }
 
   async function sendPO(id: string) {
@@ -448,6 +505,8 @@ function POTab({ initialPO }: { initialPO?: string }) {
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Prev. Received</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Receive Now</th>
                   <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Unit Cost (₹)</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Tax %</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Line Total (₹)</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border-default">
@@ -458,12 +517,19 @@ function POTab({ initialPO }: { initialPO?: string }) {
                   const orderedInPu = factor > 1 ? Math.round((parseFloat(it.quantity) / factor) * 1000) / 1000 : parseFloat(it.quantity)
                   const prevInPu = factor > 1 ? Math.round((parseFloat(it.quantity_received || '0') / factor) * 1000) / 1000 : parseFloat(it.quantity_received || '0')
                   return (
-                  <tr key={it.id} className="hover:bg-surface-secondary/50 transition-colors">
+                  <React.Fragment key={it.id}>
+                  <tr className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 text-foreground">
                       <p className="font-medium">{it.product_name}{it.variant_name && <span className="text-foreground-secondary font-normal"> / {it.variant_name}</span>}</p>
                       {it.sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{it.sku}</p>}
                       {it.purchase_unit && factor > 1 && (
                         <p className="text-xs text-foreground-muted mt-0.5">1 {it.purchase_unit} = {factor} {baseLabel}</p>
+                      )}
+                      {it.perishable && (
+                        <span className="mt-1 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400">Perishable</span>
+                      )}
+                      {it.serialized && (
+                        <span className="mt-1 inline-block text-[10px] font-medium px-1.5 py-0.5 rounded bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">Serialized</span>
                       )}
                     </td>
                     <td className="px-4 py-3 text-right text-foreground-secondary">
@@ -472,31 +538,183 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     <td className="px-4 py-3 text-right text-foreground-secondary">
                       {prevInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
                     </td>
-                    <td className="px-4 py-3 text-right align-top">
-                      <div className="inline-flex flex-col items-end gap-1">
-                        <div className="flex items-center gap-1.5">
-                          <input type="number" min="0" step="0.001" className="w-24 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
-                            onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_qty: e.target.value } : r))} />
-                          {puLabel && <span className="text-xs text-foreground-muted">{puLabel}</span>}
-                        </div>
+                    <td className="px-4 py-3 text-right align-middle">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <input type="number" min="0" step="0.001" className="w-24 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_qty}
+                          onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_qty: e.target.value } : r))} />
+                        {puLabel && <span className="text-xs text-foreground-muted">{puLabel}</span>}
                         {factor > 1 && parseFloat(it.receive_qty) > 0 && (
-                          <span className="text-xs text-foreground-muted">
-                            = {Math.round(parseFloat(it.receive_qty) * factor * 1000) / 1000} {baseLabel}
-                          </span>
+                          <span className="text-xs text-foreground-muted">= {Math.round(parseFloat(it.receive_qty) * factor * 1000) / 1000} {baseLabel}</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-right align-top">
+                    <td className="px-4 py-3 text-right align-middle">
                       <input type="number" min="0" step="0.01" className="w-28 field-compact border border-border-default bg-surface text-foreground text-right focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent" value={it.receive_cost}
                         onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, receive_cost: e.target.value } : r))} />
                     </td>
+                    <td className="px-4 py-3 text-right text-foreground-secondary align-middle">
+                      {parseFloat(it.tax_rate || '0') > 0 ? `${it.tax_rate}%` : '—'}
+                    </td>
+                    <td className="px-4 py-3 text-right text-foreground align-middle">
+                      {(() => {
+                        const qty = parseFloat(it.receive_qty) || 0
+                        const cost = parseFloat(it.receive_cost) || 0
+                        const tax = parseFloat(it.tax_rate || '0')
+                        if (!qty || !cost) return '—'
+                        const baseQty = qty * factor
+                        const lineTotal = baseQty * cost * (1 + tax / 100)
+                        return formatINR(lineTotal)
+                      })()}
+                    </td>
                   </tr>
+                  {it.perishable && (
+                    <tr className="bg-orange-50/60 dark:bg-orange-900/10 border-t border-orange-100 dark:border-orange-900/30">
+                      <td colSpan={7} className="px-4 py-3">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 items-start">
+                          <div>
+                            <label className={labelCls}>Expiry Date <span className="text-red-500">*</span></label>
+                            <DatePicker
+                              value={it.expiry_date}
+                              onChange={v => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, expiry_date: v } : r))}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Manufacture Date</label>
+                            <DatePicker
+                              value={it.manufacture_date}
+                              onChange={v => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, manufacture_date: v } : r))}
+                            />
+                          </div>
+                          <div>
+                            <label className={labelCls}>Lot Number</label>
+                            <div className="flex gap-1">
+                              <input
+                                type="text"
+                                placeholder="optional"
+                                className={inputCls + ' flex-1'}
+                                value={it.lot_number}
+                                onChange={e => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: e.target.value } : r))}
+                              />
+                              <button
+                                type="button"
+                                title="Regenerate lot number"
+                                onClick={() => {
+                                  const today = new Date()
+                                  const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+                                  const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
+                                  const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+                                  const autoLot = `LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`
+                                  setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, lot_number: autoLot } : r))
+                                }}
+                                className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                              >↺</button>
+                            </div>
+                          </div>
+                          <div className="self-start">
+                            <label className={labelCls}>Shelf Location</label>
+                            <AdminSelect
+                              id={`location-${idx}`}
+                              value={it.location_id}
+                              onChange={v => setReceiveItems(items => items.map((r, i) => i === idx ? { ...r, location_id: v } : r))}
+                              sm
+                              options={[
+                                { value: '', label: '— none —' },
+                                ...shelfLocations.map(sl => ({ value: sl.id, label: sl.display_code })),
+                              ]}
+                            />
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                  {it.serialized && parseFloat(it.receive_qty) > 0 && (() => {
+                    const needed = Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
+                    const serials: string[] = Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []
+                    const entered = serials.filter(Boolean).length
+                    const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+                    const dtStamp = () => new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
+                    const randSuffix = () => Math.random().toString(36).slice(2, 8).toUpperCase()
+                    const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${dtStamp()}-${randSuffix()}`
+                    const updateSerial = (slotIdx: number, val: string) =>
+                      setReceiveItems(items => items.map((r, i) => {
+                        if (i !== idx) return r
+                        const arr = [...(r.serial_numbers as string[])]
+                        arr[slotIdx] = val
+                        return { ...r, serial_numbers: arr }
+                      }))
+                    return (
+                      <tr className="bg-blue-50/60 dark:bg-blue-900/10 border-t border-blue-100 dark:border-blue-900/30">
+                        <td colSpan={7} className="px-4 py-3">
+                          <div>
+                            <div className="flex items-center justify-between mb-2">
+                              <label className={labelCls + ' mb-0'}>
+                                Serial Numbers
+                                <span className="ml-1 text-foreground-muted font-normal">({needed} required)</span>
+                              </label>
+                              <div className="flex items-center gap-2">
+                                {entered === needed
+                                  ? <span className="text-xs text-green-600 dark:text-green-400">{entered}/{needed} entered ✓</span>
+                                  : <span className="text-xs text-amber-600 dark:text-amber-400">{entered}/{needed} entered</span>
+                                }
+                                <button
+                                  type="button"
+                                  className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                  onClick={() => setReceiveItems(items => items.map((r, i) => {
+                                    if (i !== idx) return r
+                                    return { ...r, serial_numbers: Array.from({ length: needed }, () => autoSerial()) }
+                                  }))}
+                                >
+                                  Generate All
+                                </button>
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                              {Array.from({ length: needed }, (_, n) => (
+                                <div key={n} className="flex gap-1">
+                                  <input
+                                    type="text"
+                                    placeholder={autoSerial()}
+                                    className={inputCls + ' font-mono text-xs flex-1 min-w-0'}
+                                    value={serials[n] ?? ''}
+                                    onChange={e => updateSerial(n, e.target.value)}
+                                  />
+                                  <button
+                                    type="button"
+                                    title="Auto-generate"
+                                    className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                    onClick={() => updateSerial(n, autoSerial())}
+                                  >
+                                    Auto
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })()}
+                  </React.Fragment>
                   )
                 })}
               </tbody>
             </table>
           </div>
         </div>
+        {editWarehouses.length > 0 && (
+          <div>
+            <label className={labelCls}>Warehouse <span className="text-foreground-muted font-normal">(stock destination)</span></label>
+            <AdminSelect
+              value={receiveWarehouseId}
+              onChange={setReceiveWarehouseId}
+              options={[
+                { value: '', label: '— none —' },
+                ...editWarehouses.map(w => ({ value: w.id, label: w.name })),
+              ]}
+            />
+            {receiveWarehouseId && <p className="mt-1 text-xs text-foreground-muted">Stock with no specific bin will land on the open shelf. Override per-item below.</p>}
+          </div>
+        )}
         <div>
           <label className={labelCls}>Notes</label>
           <textarea className={inputCls} rows={2} value={receiveNotes} onChange={e => setReceiveNotes(e.target.value)} />
@@ -799,12 +1017,14 @@ type StockTransaction = {
   variant_id: string | null; variant_name: string | null
   sub_variant_id: string | null; sub_variant_name: string | null
   reference_label: string | null
+  batch_id: string | null; lot_number: string | null; expiry_date: string | null; serial_number: string | null
 }
 
 function StockTab() {
   const searchParams = useSearchParams()
   const router = useRouter()
-
+  const { showToast } = useToast()
+  const confirm = useConfirm()
   const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
@@ -819,13 +1039,28 @@ function StockTab() {
   const [from, setFrom] = useState(searchParams.get('ledger_from') || '')
   const [to, setTo] = useState(searchParams.get('ledger_to') || '')
   const [view, setView] = useState<'ledger' | 'valuation'>((searchParams.get('stock_view') as 'ledger' | 'valuation') || 'ledger')
+  const [expandedValRows, setExpandedValRows] = useState<Record<string, any[] | null>>({})
+  const [loadingBatchRow, setLoadingBatchRow] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editQty, setEditQty] = useState('')
   const [editNotes, setEditNotes] = useState('')
   const [editSaving, setEditSaving] = useState(false)
   const [editUnits, setEditUnits] = useState<{ id: string; unit: string; display_label: string | null; factor: number; dimension: string }[]>([])
   const [editUnitId, setEditUnitId] = useState<string>('')
+  const [editWarehouses, setEditWarehouses] = useState<{ id: string; name: string; code: string }[]>([])
+  const [editWarehouseId, setEditWarehouseId] = useState('')
+  const [editLocationId, setEditLocationId] = useState('')
+  const [editLocations, setEditLocations] = useState<{ id: string; display_code: string; is_open_shelf: boolean }[]>([])
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [expandedSerialProducts, setExpandedSerialProducts] = useState<Set<string>>(new Set())
+
+  function toggleSerialProduct(key: string) {
+    setExpandedSerialProducts(prev => {
+      const n = new Set(prev)
+      n.has(key) ? n.delete(key) : n.add(key)
+      return n
+    })
+  }
 
   function toggleGroup(refId: string) {
     setExpandedGroups(prev => {
@@ -833,6 +1068,21 @@ function StockTab() {
       if (next.has(refId)) next.delete(refId); else next.add(refId)
       return next
     })
+  }
+
+  async function toggleValBatch(rowId: string, productId: string, variantId: string | null, subVariantId: string | null) {
+    if (expandedValRows[rowId] !== undefined) {
+      setExpandedValRows(prev => { const n = { ...prev }; delete n[rowId]; return n })
+      return
+    }
+    setLoadingBatchRow(rowId)
+    const params = new URLSearchParams({ view: 'batch_valuation', product_id: productId })
+    if (variantId) params.set('variant_id', variantId)
+    if (subVariantId) params.set('sub_variant_id', subVariantId)
+    const res = await fetch(`/api/admin/inventory/stock?${params}`)
+    const json = await res.json()
+    setExpandedValRows(prev => ({ ...prev, [rowId]: json?.batches || [] }))
+    setLoadingBatchRow(null)
   }
 
   function syncUrl(patch: Record<string, string>) {
@@ -863,9 +1113,13 @@ function StockTab() {
   // Group by reference_id, preserving order of first appearance
   const ledgerGroups: { refId: string; refType: string; refLabel: string | null; date: string; txs: StockTransaction[] }[] = []
   for (const tx of sortedTransactions) {
-    const existing = ledgerGroups.find(g => g.refId === tx.reference_id)
+    // Group by reference_id + transaction_type so sale and return events for the
+    // same order appear as separate groups instead of netting to 0.
+    // Fall back to tx.id for rows with no reference_id (legacy rows).
+    const groupKey = tx.reference_id ? `${tx.reference_id}::${tx.transaction_type}` : tx.id
+    const existing = ledgerGroups.find(g => g.refId === groupKey)
     if (existing) { existing.txs.push(tx) }
-    else { ledgerGroups.push({ refId: tx.reference_id, refType: tx.reference_type, refLabel: tx.reference_label, date: tx.created_at, txs: [tx] }) }
+    else { ledgerGroups.push({ refId: groupKey, refType: tx.reference_type, refLabel: tx.reference_label, date: tx.created_at, txs: [tx] }) }
   }
 
   function handleLedgerSort(col: string, dir: SortDir) { setLedgerSortCol(col); setLedgerSortDir(dir) }
@@ -928,6 +1182,26 @@ function StockTab() {
     const rowId = p.sub_variant_id || p.variant_id || p.id
     setEditingId(rowId)
     setEditNotes('')
+    setEditWarehouseId('')
+    setEditLocationId('')
+    setEditLocations([])
+
+    // Fetch warehouses for shelf assignment, then pre-select existing shelf
+    const variantParam = p.sub_variant_id ? `&sub_variant_id=${p.sub_variant_id}` : p.variant_id ? `&variant_id=${p.variant_id}` : ''
+    Promise.all([
+      fetch('/api/admin/shelving/warehouses', { credentials: 'include' }).then(r => r.json()),
+      fetch(`/api/admin/shelving/stock?product_id=${p.id}${variantParam}`, { credentials: 'include' }).then(r => r.json()),
+    ]).then(([wj, sj]) => {
+      const warehouses = wj.warehouses || []
+      setEditWarehouses(warehouses)
+      const existing = (sj.locations || [])[0]
+      if (existing?.warehouse_id) {
+        setEditWarehouseId(existing.warehouse_id)
+        // editLocations will be populated by the useEffect on editWarehouseId;
+        // store the location_id so it can be selected after locations load
+        setEditLocationId(existing.location_id)
+      }
+    }).catch(() => {})
 
     // Build unit options from the valuation row data
     const sellFactor = parseFloat(p.sell_unit_factor || '1') || 1
@@ -982,6 +1256,8 @@ function StockTab() {
       variant_id: p.variant_id || null,
       sub_variant_id: p.sub_variant_id || null,
       notes: editNotes || undefined,
+      ...(editWarehouseId ? { warehouse_id: editWarehouseId } : {}),
+      ...(editWarehouseId && editLocationId ? { location_id: editLocationId } : {}),
     }
     // Count-dimension units are always stored as raw pcs — never multiply via unit_id path
     const isCountUnit = !selectedUnit || selectedUnit.dimension === 'count' || selectedUnit.factor === 1
@@ -1007,7 +1283,25 @@ function StockTab() {
     setEditNotes('')
     setEditUnits([])
     setEditUnitId('')
+    setEditWarehouseId('')
+    setEditLocationId('')
+    setEditLocations([])
   }
+
+  useEffect(() => {
+    if (!editWarehouseId) { setEditLocations([]); setEditLocationId(''); return }
+    fetch(`/api/admin/shelving/locations?warehouse_id=${editWarehouseId}`, { credentials: 'include' })
+      .then(r => r.json())
+      .then(j => {
+        setEditLocations(j.locations || [])
+        // Only reset location if not already pre-seeded by startEdit
+        setEditLocationId(prev => {
+          const locs: { id: string }[] = j.locations || []
+          return locs.some(l => l.id === prev) ? prev : ''
+        })
+      })
+      .catch(() => {})
+  }, [editWarehouseId])
 
   return (
     <div className="space-y-5">
@@ -1059,11 +1353,12 @@ function StockTab() {
                       <SortableHeader label="Change" column="change" options={sortOptions('number')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} align="right" />
                       <SortableHeader label="Balance" column="balance" options={sortOptions('number')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} align="right" />
                       <SortableHeader label="Reference" column="reference" options={sortOptions('text')} currentSort={ledgerSortCol} currentDir={ledgerSortDir} onSort={handleLedgerSort} className="hidden md:table-cell" />
+                      <th className="px-4 py-3 text-xs font-semibold text-foreground-secondary uppercase tracking-wide hidden md:table-cell">Batch</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border-default">
                     {transactions.length === 0 && (
-                      <tr><td colSpan={6} className="py-12 text-center text-foreground-secondary text-sm">
+                      <tr><td colSpan={7} className="py-12 text-center text-foreground-secondary text-sm">
                         {search || from || to ? 'No transactions match your filters' : 'No stock transactions yet'}
                       </td></tr>
                     )}
@@ -1072,6 +1367,17 @@ function StockTab() {
                       const expanded = expandedGroups.has(group.refId)
                       const totalChange = Math.round(group.txs.reduce((s, t) => s + Number(t.quantity_change), 0) * 1000) / 1000
                       const txType = group.txs[0].transaction_type
+
+                      // Build per-product sub-groups within this reference group
+                      type ProductSubGroup = { key: string; productId: string; variantId: string | null; txs: StockTransaction[] }
+                      const productSubGroups: ProductSubGroup[] = []
+                      for (const tx of group.txs) {
+                        const pKey = `${tx.product_id}::${tx.variant_id || ''}`
+                        const existing = productSubGroups.find(g => g.key === pKey)
+                        if (existing) existing.txs.push(tx)
+                        else productSubGroups.push({ key: pKey, productId: tx.product_id, variantId: tx.variant_id, txs: [tx] })
+                      }
+                      const productCount = productSubGroups.length
 
                       const refLink = group.refType === 'order' ? (
                         <Link href={ap(`/admin/invoices/${group.refId}`)} className="font-mono text-accent-500 hover:underline underline-offset-2">
@@ -1094,6 +1400,34 @@ function StockTab() {
                         return `${sign}${Math.abs(n)}`
                       }
 
+                      function BatchCell({ tx }: { tx: StockTransaction }) {
+                        if (tx.serial_number) return (
+                          <div className="space-y-0.5">
+                            <span className="font-mono text-foreground-secondary">{tx.serial_number}</span>
+                            {tx.lot_number && <span className="block font-mono text-xs text-foreground-muted">{tx.lot_number}</span>}
+                            {tx.expiry_date && (() => {
+                              const d = new Date(tx.expiry_date); const now = new Date()
+                              const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                              const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                            })()}
+                          </div>
+                        )
+                        if (tx.lot_number) return (
+                          <div className="space-y-0.5">
+                            <span className="font-mono text-foreground-secondary">{tx.lot_number}</span>
+                            {tx.expiry_date && (() => {
+                              const d = new Date(tx.expiry_date); const now = new Date()
+                              const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                              const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                            })()}
+                          </div>
+                        )
+                        return <span className="text-foreground-muted">—</span>
+                      }
+
+                      // Single-product, single-tx: flat row (no grouping chrome)
                       if (!multi) {
                         const tx = group.txs[0]
                         const chg = Number(tx.quantity_change)
@@ -1116,46 +1450,30 @@ function StockTab() {
                                   {tx.variant_name && <p className="text-xs text-foreground-secondary">{tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</p>}
                                   {tx.product_sku && <p className="text-xs font-mono text-foreground-muted">{tx.product_sku}</p>}
                                   <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
-                                    <div className="flex justify-between">
-                                      <span className="text-foreground-secondary">Type</span>
-                                      <span className={`px-1.5 py-0.5 rounded-full font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-foreground-secondary">Change</span>
-                                      <span className={`font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
-                                        {fmtChange(chg)}
-                                      </span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-foreground-secondary">Balance after</span>
-                                      <span className="font-mono font-medium text-foreground">{Number(tx.quantity_after)}</span>
-                                    </div>
+                                    <div className="flex justify-between"><span className="text-foreground-secondary">Type</span><span className={`px-1.5 py-0.5 rounded-full font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span></div>
+                                    <div className="flex justify-between"><span className="text-foreground-secondary">Change</span><span className={`font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>{fmtChange(chg)}</span></div>
+                                    <div className="flex justify-between"><span className="text-foreground-secondary">Balance after</span><span className="font-mono font-medium text-foreground">{Number(tx.quantity_after)}</span></div>
                                     {tx.notes && <div className="pt-1 border-t border-border-default"><p className="text-foreground-secondary leading-snug">{tx.notes}</p></div>}
                                   </div>
                                 </div>
                               </HoverCard>
                               {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
                             </td>
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span>
-                            </td>
+                            <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span></td>
                             <td className={`px-4 py-3 text-right font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
                               {fmtChange(chg)}
-                              {tx.quantity_in_unit != null && tx.unit_label && (
-                                <span className="block text-xs font-normal text-foreground-muted">
-                                  ({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})
-                                </span>
-                              )}
+                              {tx.quantity_in_unit != null && tx.unit_label && <span className="block text-xs font-normal text-foreground-muted">({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})</span>}
                             </td>
                             <td className="px-4 py-3 text-right font-mono text-foreground font-medium">{Number(tx.quantity_after)}</td>
                             <td className="px-4 py-3 text-xs hidden md:table-cell">{refLink}</td>
+                            <td className="px-4 py-3 text-xs hidden md:table-cell"><BatchCell tx={tx} /></td>
                           </tr>
                         )
                       }
 
                       return (
                         <React.Fragment key={`group-${group.refId}`}>
-                          {/* Group header row */}
+                          {/* Level-1: GRN / order header — collapses all products */}
                           <tr
                             className="bg-surface-secondary/60 hover:bg-surface-secondary cursor-pointer transition-colors select-none"
                             onClick={() => toggleGroup(group.refId)}
@@ -1165,55 +1483,133 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-2.5">
                               <div className="flex items-center gap-2">
-                                <svg
-                                  className={`w-3.5 h-3.5 text-foreground-secondary shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
-                                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                                >
+                                <svg className={`w-3.5 h-3.5 text-foreground-secondary shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                                 </svg>
                                 <span className="text-sm font-medium text-foreground">
-                                  {group.txs.length} items
-                                </span>
-                                <span className="text-xs text-foreground-muted">
-                                  {expanded ? '(collapse)' : '(expand)'}
+                                  {productCount === 1
+                                    ? <>{group.txs[0].product_name}{group.txs[0].variant_name && <span className="text-foreground-secondary font-normal"> / {group.txs[0].variant_name}</span>}</>
+                                    : `${productCount} products`
+                                  }
+                                  <span className="ml-2 text-xs text-foreground-muted font-normal">{group.txs.length} entries</span>
                                 </span>
                               </div>
                             </td>
-                            <td className="px-4 py-2.5">
-                              <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[txType] || ''}`}>{txType}</span>
-                            </td>
+                            <td className="px-4 py-2.5"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[txType] || ''}`}>{txType}</span></td>
                             <td className={`px-4 py-2.5 text-right font-mono font-semibold ${totalChange > 0 ? 'text-green-600 dark:text-green-400' : totalChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
                               {fmtChange(totalChange)}
                               <span className="block text-xs font-normal text-foreground-muted">net total</span>
                             </td>
                             <td className="px-4 py-2.5 text-right text-foreground-muted text-xs font-mono">—</td>
                             <td className="px-4 py-2.5 text-xs hidden md:table-cell">{refLink}</td>
+                            <td className="px-4 py-2.5 hidden md:table-cell" />
                           </tr>
 
-                          {/* Expanded product rows */}
-                          {expanded && group.txs.map(tx => {
-                            const chg = Number(tx.quantity_change)
+                          {/* Level-2: per-product rows (shown when level-1 expanded) */}
+                          {expanded && productSubGroups.map(pg => {
+                            const pgTotalChange = Math.round(pg.txs.reduce((s, t) => s + Number(t.quantity_change), 0) * 1000) / 1000
+                            const isSerialPg = pg.txs.length > 1 && pg.txs.every(t => t.serial_number)
+                            const isBatchPg = !isSerialPg && pg.txs.length > 1 && pg.txs.some(t => t.lot_number || t.batch_id)
+                            const isExpandable = isSerialPg || isBatchPg
+                            const serialKey = `${group.refId}::${pg.key}`
+                            const serialExpanded = expandedSerialProducts.has(serialKey)
+                            const repTx = pg.txs[pg.txs.length - 1] // last tx has final balance
+
                             return (
-                              <tr key={tx.id} className="bg-surface/40 hover:bg-surface-secondary/30 transition-colors border-l-2 border-accent-500/30">
-                                <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8" />
-                                <td className="px-4 py-2.5 pl-8 text-foreground">
-                                  <Link href={ap(`/admin/products/${tx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2">
-                                    {tx.product_name}{tx.variant_name && <span className="text-foreground-secondary font-normal"> / {tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</span>}
-                                  </Link>
-                                  {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
-                                </td>
-                                <td className="px-4 py-2.5" />
-                                <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
-                                  {fmtChange(chg)}
-                                  {tx.quantity_in_unit != null && tx.unit_label && (
-                                    <span className="block text-xs font-normal text-foreground-muted">
-                                      ({Number(tx.quantity_in_unit) > 0 ? '+' : ''}{Number(tx.quantity_in_unit)} {tx.unit_label})
-                                    </span>
-                                  )}
-                                </td>
-                                <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">{Number(tx.quantity_after)}</td>
-                                <td className="px-4 py-2.5 text-xs hidden md:table-cell" />
-                              </tr>
+                              <React.Fragment key={`pg-${pg.key}`}>
+                                {/* Product row — clickable if it has serial or batch sub-rows */}
+                                <tr
+                                  className={`bg-surface/40 transition-colors border-l-2 border-accent-500/30 ${isExpandable ? 'cursor-pointer hover:bg-surface-secondary/30 select-none' : 'hover:bg-surface-secondary/20'}`}
+                                  onClick={isExpandable ? () => toggleSerialProduct(serialKey) : undefined}
+                                >
+                                  <td className="px-4 py-2.5 text-foreground-secondary whitespace-nowrap text-xs pl-8" />
+                                  <td className="px-4 py-2.5 pl-8 text-foreground">
+                                    <div className="flex items-center gap-2">
+                                      {isExpandable && (
+                                        <svg className={`w-3 h-3 text-foreground-secondary shrink-0 transition-transform ${serialExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                        </svg>
+                                      )}
+                                      <div>
+                                        <Link href={ap(`/admin/products/${repTx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2" onClick={e => e.stopPropagation()}>
+                                          {repTx.product_name}{repTx.variant_name && <span className="text-foreground-secondary font-normal"> / {repTx.variant_name}{repTx.sub_variant_name ? ` / ${repTx.sub_variant_name}` : ''}</span>}
+                                        </Link>
+                                        {repTx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{repTx.product_sku}</p>}
+                                        {isSerialPg && <p className="text-xs text-foreground-muted mt-0.5">{pg.txs.length} serials · {serialExpanded ? 'collapse' : 'expand'}</p>}
+                                        {isBatchPg && <p className="text-xs text-foreground-muted mt-0.5">{pg.txs.length} batches · {serialExpanded ? 'collapse' : 'expand'}</p>}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-4 py-2.5" />
+                                  <td className={`px-4 py-2.5 text-right font-mono font-semibold text-sm ${pgTotalChange > 0 ? 'text-green-600 dark:text-green-400' : pgTotalChange < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
+                                    {fmtChange(pgTotalChange)}
+                                    {isExpandable && <span className="block text-xs font-normal text-foreground-muted">net total</span>}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-right font-mono text-foreground font-medium text-sm">
+                                    {isExpandable ? '—' : Number(repTx.quantity_after)}
+                                  </td>
+                                  <td className="px-4 py-2.5 text-xs hidden md:table-cell" />
+                                  <td className="px-4 py-2.5 text-xs hidden md:table-cell">
+                                    {isSerialPg
+                                      ? <span className="font-mono text-xs text-foreground-secondary">{pg.txs.slice(0, 2).map(t => t.serial_number).join(', ')}{pg.txs.length > 2 ? ` (+${pg.txs.length - 2} more)` : ''}</span>
+                                      : isBatchPg
+                                        ? <span className="font-mono text-xs text-foreground-secondary">{pg.txs.slice(0, 2).map(t => t.lot_number).filter(Boolean).join(', ')}{pg.txs.length > 2 ? ` (+${pg.txs.length - 2} more)` : ''}</span>
+                                        : <BatchCell tx={repTx} />
+                                    }
+                                  </td>
+                                </tr>
+
+                                {/* Level-3: individual serial rows */}
+                                {isSerialPg && serialExpanded && pg.txs.map(tx => {
+                                  const chg = Number(tx.quantity_change)
+                                  return (
+                                    <tr key={tx.id} className="bg-surface/20 hover:bg-surface-secondary/20 transition-colors border-l-4 border-accent-500/20">
+                                      <td className="px-4 py-2 text-foreground-secondary whitespace-nowrap text-xs pl-14" />
+                                      <td className="px-4 py-2 pl-14 text-foreground">
+                                        <span className="font-mono text-xs text-foreground-secondary">{tx.serial_number}</span>
+                                        {tx.lot_number && <span className="block font-mono text-xs text-foreground-muted">{tx.lot_number}</span>}
+                                      </td>
+                                      <td className="px-4 py-2" />
+                                      <td className={`px-4 py-2 text-right font-mono text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>{fmtChange(chg)}</td>
+                                      <td className="px-4 py-2 text-right font-mono text-foreground text-sm">{Number(tx.quantity_after)}</td>
+                                      <td className="px-4 py-2 hidden md:table-cell" />
+                                      <td className="px-4 py-2 text-xs hidden md:table-cell">
+                                        {tx.expiry_date && (() => {
+                                          const d = new Date(tx.expiry_date); const now = new Date()
+                                          const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                                          const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                          return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                                        })()}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+
+                                {/* Level-3: individual batch/lot rows */}
+                                {isBatchPg && serialExpanded && pg.txs.map(tx => {
+                                  const chg = Number(tx.quantity_change)
+                                  return (
+                                    <tr key={tx.id} className="bg-surface/20 hover:bg-surface-secondary/20 transition-colors border-l-4 border-accent-500/20">
+                                      <td className="px-4 py-2 text-foreground-secondary whitespace-nowrap text-xs pl-14" />
+                                      <td className="px-4 py-2 pl-14 text-foreground">
+                                        <span className="font-mono text-xs text-foreground-secondary">{tx.lot_number || '—'}</span>
+                                      </td>
+                                      <td className="px-4 py-2" />
+                                      <td className={`px-4 py-2 text-right font-mono text-sm ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>{fmtChange(chg)}</td>
+                                      <td className="px-4 py-2 text-right font-mono text-foreground text-sm">{Number(tx.quantity_after)}</td>
+                                      <td className="px-4 py-2 hidden md:table-cell" />
+                                      <td className="px-4 py-2 text-xs hidden md:table-cell">
+                                        {tx.expiry_date && (() => {
+                                          const d = new Date(tx.expiry_date); const now = new Date()
+                                          const diffDays = Math.floor((d.getTime() - now.getTime()) / 86400000)
+                                          const cls = diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                          return <span className={`inline-flex px-1.5 py-0.5 rounded text-xs font-medium ${cls}`}>{formatDate(tx.expiry_date)}</span>
+                                        })()}
+                                      </td>
+                                    </tr>
+                                  )
+                                })}
+                              </React.Fragment>
                             )
                           })}
                         </React.Fragment>
@@ -1305,8 +1701,8 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(valuation?.totalValue || 0)} accent sub={`${valTotal} SKUs`} />
-                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => s + parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'), 0))} accent sub="this page" />
+                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(allValRows.reduce((s, p) => { const qty = parseFloat(p.inventory_quantity || '0'); return s + qty * parseFloat(p.cost_price || '0') }, 0))} accent sub={`${valTotal} SKUs`} />
+                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => { const qty = parseFloat(p.inventory_quantity || '0'); return s + qty * parseFloat(p.selling_price || '0') }, 0))} accent sub="this page" />
                 <SummaryCard label="Total SKUs" value={String(valTotal)} sub="across all products" />
                 <SummaryCard label="In Stock" value={String(allValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="on this page" />
               </div>
@@ -1337,7 +1733,8 @@ function StockTab() {
                         const rowId = p.sub_variant_id || p.variant_id || p.id
                         const isEditing = editingId === rowId
                         return (
-                          <tr key={rowId} className={`hover:bg-surface-secondary/50 transition-colors ${isEditing ? 'bg-secondary-50/50 dark:bg-secondary-900/10' : ''}`}>
+                          <React.Fragment key={rowId}>
+                          <tr className={`hover:bg-surface-secondary/50 transition-colors ${isEditing ? 'bg-secondary-50/50 dark:bg-secondary-900/10' : ''}`}>
                             <td className="px-4 py-3 font-medium text-foreground">
                               <HoverCard
                                 trigger={
@@ -1364,7 +1761,7 @@ function StockTab() {
                                     </div>
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Stock Value</span>
-                                      <span className="font-semibold text-foreground">{formatINR(parseFloat(p.stock_value || '0'))}</span>
+                                      <span className="font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</span>
                                     </div>
                                   </div>
                                 </div>
@@ -1409,9 +1806,14 @@ function StockTab() {
                                   })()}
                                 </div>
                               ) : (
-                                <span className={`font-medium ${parseFloat(p.inventory_quantity || '0') === 0 ? 'text-red-600 dark:text-red-400' : parseFloat(p.inventory_quantity || '0') <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
-                                  {parseFloat(p.inventory_quantity || '0')}
-                                </span>
+                                (() => {
+                                  const displayQty = parseFloat(p.inventory_quantity || '0')
+                                  return (
+                                    <span className={`font-medium ${displayQty === 0 ? 'text-red-600 dark:text-red-400' : displayQty <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
+                                      {displayQty}
+                                    </span>
+                                  )
+                                })()
                               )}
                             </td>
                             <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
@@ -1426,7 +1828,7 @@ function StockTab() {
                             </td>
                             <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
                             <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
-                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.stock_value || '0'))}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</td>
                             <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'))}</td>
                             <td className="px-4 py-3 text-right">
                               <div className="flex items-center justify-end gap-1">
@@ -1440,6 +1842,30 @@ function StockTab() {
                                       onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
                                       className="hidden lg:block field-xs w-32 border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500"
                                     />
+                                    {editWarehouses.length > 0 && (
+                                      <AdminSelect
+                                        value={editWarehouseId}
+                                        onChange={setEditWarehouseId}
+                                        xs
+                                        className="hidden lg:block w-36"
+                                        options={[
+                                          { value: '', label: '— warehouse —' },
+                                          ...editWarehouses.map(w => ({ value: w.id, label: w.name })),
+                                        ]}
+                                      />
+                                    )}
+                                    {editWarehouseId && (
+                                      <AdminSelect
+                                        value={editLocationId}
+                                        onChange={setEditLocationId}
+                                        xs
+                                        className="hidden lg:block w-40"
+                                        options={[
+                                          { value: '', label: '— open shelf —' },
+                                          ...editLocations.filter(l => !l.is_open_shelf).map(l => ({ value: l.id, label: l.display_code })),
+                                        ]}
+                                      />
+                                    )}
                                     <button
                                       onClick={() => saveEdit(p)}
                                       disabled={editSaving || editQty === ''}
@@ -1466,21 +1892,113 @@ function StockTab() {
                                       </svg>
                                     </Link>
                                     <button
-                                      onClick={() => startEdit(p)}
-                                      title="Adjust stock"
-                                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
+                                      onClick={() => !p.perishable && startEdit(p)}
+                                      title={p.perishable ? 'Stock managed via batches — use GRN to receive or Remove to deduct' : 'Adjust stock'}
+                                      disabled={!!p.perishable}
+                                      className={`p-1.5 rounded-lg transition-colors ${p.perishable ? 'opacity-30 cursor-not-allowed text-foreground-muted' : 'hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500'}`}
                                     >
                                       <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                                       </svg>
+                                    </button>
+                                    <button
+                                      onClick={() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)}
+                                      title="Batch details"
+                                      className={`p-1.5 rounded-lg hover:bg-surface-secondary transition-colors ${expandedValRows[rowId] !== undefined ? 'text-secondary-500' : 'text-foreground-secondary hover:text-secondary-500'}`}
+                                    >
+                                      {loadingBatchRow === rowId
+                                        ? <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                                        : <svg className={`w-4 h-4 transition-transform ${expandedValRows[rowId] !== undefined ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                                      }
                                     </button>
                                   </>
                                 )}
                               </div>
                             </td>
                           </tr>
-                        )
-                      })}
+                          {expandedValRows[rowId] !== undefined && (
+                            <tr className="bg-surface-secondary/30">
+                              <td colSpan={10} className="px-4 py-3">
+                                {expandedValRows[rowId]!.length === 0 ? (
+                                  <p className="text-xs text-foreground-muted italic">No batches with remaining stock for this product.</p>
+                                ) : (
+                                  <table className="w-full text-xs">
+                                    <thead>
+                                      <tr className="text-foreground-secondary">
+                                        <th className="pb-1.5 text-left font-medium pr-4">Lot / Batch</th>
+                                        <th className="pb-1.5 text-left font-medium pr-4">Expiry</th>
+                                        <th className="pb-1.5 text-left font-medium pr-4 hidden sm:table-cell">Mfg Date</th>
+                                        <th className="pb-1.5 text-left font-medium pr-4 hidden md:table-cell">Location</th>
+                                        <th className="pb-1.5 text-right font-medium pr-4">Qty Remaining</th>
+                                        <th className="pb-1.5 text-right font-medium pr-4">Batch Value</th>
+                                        <th className="pb-1.5 w-8"></th>
+                                      </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-border-default/50">
+                                      {expandedValRows[rowId]!.map((b: any) => {
+                                        const d = b.expiry_date ? new Date(b.expiry_date) : null
+                                        const diffDays = d ? Math.floor((d.getTime() - Date.now()) / 86400000) : null
+                                        const expiryCls = diffDays === null ? 'text-foreground-muted' : diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                        const qty = parseFloat(b.quantity_remaining || '0')
+                                        const batchValue = qty * parseFloat(b.unit_cost || '0')
+                                        const serials: string[] = Array.isArray(b.serials) ? b.serials : []
+                                        return (
+                                          <tr key={b.batch_id}>
+                                            <td className="py-1.5 pr-4 font-mono text-foreground-secondary">{b.lot_number || '—'}</td>
+                                            <td className="py-1.5 pr-4">
+                                              {b.expiry_date
+                                                ? <span className={`inline-flex px-1.5 py-0.5 rounded font-medium ${expiryCls}`}>{formatDate(b.expiry_date)}</span>
+                                                : <span className="text-foreground-muted">—</span>}
+                                            </td>
+                                            <td className="py-1.5 pr-4 text-foreground-secondary hidden sm:table-cell">{b.manufacture_date ? formatDate(b.manufacture_date) : '—'}</td>
+                                            <td className="py-1.5 pr-4 text-foreground-secondary hidden md:table-cell">{b.location || '—'}</td>
+                                            <td className="py-1.5 pr-4 text-right font-medium text-foreground">{qty}</td>
+                                            <td className="py-1.5 pr-4 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
+                                            <td className="py-1.5 text-right">
+                                              <button
+                                                onClick={async () => {
+                                                  const ok = await confirm({
+                                                    title: 'Remove Batch',
+                                                    message: qty > 0
+                                                      ? `This batch still has ${qty} units remaining. Are you sure you want to remove it?`
+                                                      : 'Remove this batch?',
+                                                    confirmLabel: 'Remove',
+                                                    variant: 'danger',
+                                                  })
+                                                  if (!ok) return
+                                                  const res = await fetch(`/api/admin/inventory/batches/${b.batch_id}`, { method: 'DELETE' })
+                                                  const json = await res.json()
+                                                  if (!res.ok) { showToast(json.error || 'Failed to remove batch', 'error'); return }
+                                                  showToast('Batch removed', 'success')
+                                                  toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)
+                                                  setTimeout(() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null), 100)
+                                                }}
+                                                className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                                                title="Remove batch"
+                                              >Remove</button>
+                                            </td>
+                                          </tr>
+                                        )
+                                      })}
+                                      {!p.perishable && parseFloat(p.inventory_quantity || '0') > 0 && (
+                                        <tr key="default-stock" className="border-t border-border-default/50">
+                                          <td className="py-1.5 pr-4 text-foreground-muted italic">Default stock</td>
+                                          <td className="py-1.5 pr-4 text-foreground-muted">—</td>
+                                          <td className="py-1.5 pr-4 text-foreground-muted hidden sm:table-cell">—</td>
+                                          <td className="py-1.5 pr-4 text-foreground-muted hidden md:table-cell">—</td>
+                                          <td className="py-1.5 pr-4 text-right font-medium text-foreground">{parseFloat(p.inventory_quantity || '0')}</td>
+                                          <td className="py-1.5 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</td>
+                                        </tr>
+                                      )}
+                                    </tbody>
+                                  </table>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </React.Fragment>
+                      )
+                    })}
                     </tbody>
                   </table>
                 </div>
@@ -1492,6 +2010,7 @@ function StockTab() {
           ) : null}
         </div>
       )}
+
     </div>
   )
 }

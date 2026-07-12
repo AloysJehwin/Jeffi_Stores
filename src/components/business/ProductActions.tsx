@@ -82,6 +82,9 @@ interface ProductActionsProps {
   productUnits?: ProductUnit[]
   sellUnitId?: string | null
   extraDeliveryDays?: number
+  handlingDays?: number
+  is_active?: boolean
+  isCodAllowed?: boolean | null
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -111,7 +114,8 @@ export default function ProductActions({
   basePrice, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onSelectionChange, onUnitChange, categoryId,
-  productUnits: productUnitsProp, sellUnitId, extraDeliveryDays = 0,
+  productUnits: productUnitsProp, sellUnitId, extraDeliveryDays = 0, handlingDays = 2, is_active = true,
+  isCodAllowed,
 }: ProductActionsProps) {
   const { addToCart } = useCart()
   const { showToast } = useToast()
@@ -123,7 +127,7 @@ export default function ProductActions({
   const [showAddressPicker, setShowAddressPicker] = useState(false)
   useEffect(() => {
     if (!user) {
-      resolveEdd(false, extraDeliveryDays, 'business').then(v => { if (v) setEdd(v) })
+      resolveEdd(false, handlingDays, extraDeliveryDays, 'business').then(v => { if (v) setEdd(v) })
       return
     }
     fetch('/api/user/addresses', { headers: { 'X-Auth-Portal': 'business' } })
@@ -133,7 +137,7 @@ export default function ProductActions({
         setAddresses(list)
         const pin = list.find((a: any) => a.is_default)?.postal_code ?? list[0]?.postal_code ?? null
         setSelectedPin(pin)
-        return resolveEdd(true, extraDeliveryDays, 'business')
+        return resolveEdd(true, handlingDays, extraDeliveryDays, 'business')
       })
       .then(v => { if (v) setEdd(v) })
       .catch(() => {})
@@ -141,7 +145,7 @@ export default function ProductActions({
   function pickAddress(pin: string) {
     setSelectedPin(pin)
     setShowAddressPicker(false)
-    fetch(`/api/products/edd?pin=${pin}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`)
+    fetch(`/api/products/edd?pin=${pin}&handlingDays=${handlingDays}${extraDeliveryDays > 0 ? '&extraDays=' + extraDeliveryDays : ''}`)
       .then(r => r.ok ? r.json() : null)
       .then(d => { if (d?.edd) setEdd(d.edd) })
       .catch(() => {})
@@ -646,11 +650,18 @@ export default function ProductActions({
               </label>
               <div className="text-right">
                 {effectiveStock > 0 ? (
-                  <div className="flex items-center justify-end gap-2">
-                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                    </div>
+                    {isCodAllowed && (
+                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                        COD
+                      </span>
+                    )}
                   </div>
                 ) : null}
                 {edd && effectiveStock > 0 && (
@@ -719,31 +730,40 @@ export default function ProductActions({
               <>
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                    Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
+                  <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
+                  {effectiveMrp && effectiveMrp > effectivePrice && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                  )}
-                  {effectiveUnitLabel && (
-                    <span className="text-lg text-foreground-muted">/ <UnitLabel label={effectiveUnitLabel} /></span>
                   )}
                 </div>
                 {showPerBasePrice && (
                   <div className="mb-1">
-                    <span className="text-xs text-foreground-muted">
-                      (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                    <span className="text-base font-semibold text-foreground">
+                      Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                    </span>
+                    <span className="text-xs text-foreground-muted ml-2">
+                      (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                     </span>
                   </div>
                 )}
-                {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm text-foreground-secondary">
+                    Total ({quantity} <UnitLabel label={effectiveUnitLabel} />):
+                  </span>
+                  <span className="text-base font-semibold text-foreground">
+                    Rs.&nbsp;{(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {effectiveMrp && effectiveMrp > effectivePrice && (
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
                       {mrpDiscount}% off
                     </span>
                     <span className="text-sm text-foreground-secondary">
-                      You save Rs.&nbsp;{((effectiveMrp - effectivePrice) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      You save Rs.&nbsp;{((effectiveMrp - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                     <span className="text-xs text-foreground-muted">
                       ({Math.round(((effectiveMrp - rawEffectivePrice) / effectiveMrp) * 100)}% MRP discount + {businessDiscountPct}% business discount)
@@ -755,31 +775,40 @@ export default function ProductActions({
               <>
                 <div className="flex items-baseline gap-3 mb-1 flex-wrap">
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
-                    Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
+                  <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
+                  {effectiveMrp && effectiveMrp > effectivePrice && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
-                      Rs.&nbsp;{(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                  )}
-                  {effectiveUnitLabel && (
-                    <span className="text-lg text-foreground-muted">/ <UnitLabel label={effectiveUnitLabel} /></span>
                   )}
                 </div>
                 {showPerBasePrice && (
                   <div className="mb-1">
-                    <span className="text-xs text-foreground-muted">
-                      (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? 'pc'} /> × Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
+                    <span className="text-base font-semibold text-foreground">
+                      Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })} / <UnitLabel label={effectiveUnitLabel} />
+                    </span>
+                    <span className="text-xs text-foreground-muted ml-2">
+                      (1 <UnitLabel label={effectiveUnitLabel} /> = {unitFactor} <UnitLabel label={baseUnitLabel ?? effectiveUnitLabel} /> × Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })})
                     </span>
                   </div>
                 )}
-                {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-sm text-foreground-secondary">
+                    Total ({quantity} <UnitLabel label={effectiveUnitLabel} />):
+                  </span>
+                  <span className="text-base font-semibold text-foreground">
+                    Rs.&nbsp;{(effectivePrice * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+                {effectiveMrp && effectiveMrp > effectivePrice && (
                   <div className="flex items-center gap-2 mb-2 flex-wrap">
                     <span className="bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 px-3 py-1 rounded-full text-sm font-semibold">
                       {mrpDiscount}% off
                     </span>
                     <span className="text-sm text-foreground-secondary">
-                      You save Rs.&nbsp;{((effectiveMrp - effectivePrice) * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      You save Rs.&nbsp;{((effectiveMrp - effectivePrice) * unitFactor * quantity).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
                   </div>
                 )}
@@ -792,14 +821,21 @@ export default function ProductActions({
 
           <div>
             <div className="flex items-center justify-between gap-4 mb-2">
-              <label className="text-sm font-medium text-foreground-secondary">Quantity</label>
+              <label className="text-sm font-medium text-foreground-secondary">Quantity{effectiveUnitLabel && effectiveUnitKey !== 'unit' ? <> (<UnitLabel label={effectiveUnitLabel} />)</> : ''}</label>
               <div className="text-right">
                 {effectiveStock > 0 ? (
-                  <div className="flex items-center justify-end gap-2">
-                    <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                    </svg>
-                    <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                      <svg className="w-5 h-5 text-green-600 dark:text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                      <span className="text-green-700 dark:text-green-400 font-semibold">In Stock</span>
+                    </div>
+                    {isCodAllowed && (
+                      <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 px-1.5 py-0.5 rounded-full whitespace-nowrap">
+                        COD
+                      </span>
+                    )}
                   </div>
                 ) : null}
                 {edd && effectiveStock > 0 && (
@@ -864,7 +900,7 @@ export default function ProductActions({
       <div className="space-y-3">
         <button
           onClick={handleBuyNow}
-          disabled={effectiveStock === 0 || isBuyingNow}
+          disabled={!is_active || effectiveStock === 0 || isBuyingNow}
           className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isBuyingNow ? (
@@ -876,7 +912,7 @@ export default function ProductActions({
 
         <button
           onClick={handleAddToCart}
-          disabled={effectiveStock === 0 || isAddingToCart}
+          disabled={!is_active || effectiveStock === 0 || isAddingToCart}
           className="w-full bg-primary-600 hover:bg-primary-700 text-white px-6 py-4 rounded-lg font-semibold transition-all flex items-center justify-center gap-2 disabled:bg-gray-300 dark:disabled:bg-gray-600 disabled:cursor-not-allowed active:scale-[0.98] hover:shadow-lg"
         >
           {isAddingToCart ? (

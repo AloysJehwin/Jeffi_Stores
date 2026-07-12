@@ -389,17 +389,33 @@ export default async function ProductDetailPage({
             p.sku               && { label: 'SKU',                value: p.sku },
             p.material          && { label: 'Material',           value: p.material },
             p.finish            && { label: 'Finish',             value: p.finish },
+            p.color             && { label: 'Color',              value: p.color },
             p.size              && { label: 'Size',               value: p.size },
             p.variant_type      && { label: 'Variant Type',       value: p.variant_type },
             p.sub_variant_type  && { label: 'Sub-Variant Type',   value: p.sub_variant_type },
             p.dimensions        && { label: 'Dimensions',         value: `${p.dimensions} cm` },
             p.weight != null    && { label: 'Weight',             value: p.weight_unit ? `${p.weight} ${p.weight_unit}` : `${p.weight} kg` },
             p.weight_grams      && { label: 'Net Weight',         value: `${p.weight_grams} g` },
+            p.net_weight_grams  && { label: 'Net Weight',         value: `${p.net_weight_grams} g` },
+            p.volume_ml         && { label: 'Volume',             value: `${p.volume_ml} ml` },
             (p.length_cm || p.breadth_cm || p.height_cm) && {
               label: 'Package Dimensions',
               value: [p.length_cm, p.breadth_cm, p.height_cm].filter((v: any) => v != null).join(' × ') + (p.length_unit ? ` ${p.length_unit}` : ' cm'),
             },
             p.package_type      && { label: 'Package Type',      value: p.package_type },
+            p.country_of_origin && { label: 'Origin',            value: p.country_of_origin },
+            p.brand_part_number && { label: 'Part Number',       value: p.brand_part_number },
+            p.warranty_months   && { label: 'Warranty',          value: `${p.warranty_months} month${p.warranty_months > 1 ? 's' : ''}${p.warranty_type ? ` (${p.warranty_type})` : ''}` },
+            p.compliance_standard && { label: 'Compliance',      value: p.compliance_standard },
+            p.safety_rating     && { label: 'Safety Rating',     value: p.safety_rating },
+            p.barcode           && { label: 'Barcode',           value: p.barcode },
+            p.isbn              && { label: 'ISBN',              value: p.isbn },
+            p.asin              && { label: 'ASIN',              value: p.asin },
+            (p.age_min || p.age_max) && {
+              label: 'Age Range',
+              value: p.age_min && p.age_max ? `${p.age_min}–${p.age_max} years` : p.age_min ? `${p.age_min}+ years` : `Up to ${p.age_max} years`,
+            },
+            p.target_gender && p.target_gender !== 'unisex' && { label: 'For', value: p.target_gender.charAt(0).toUpperCase() + p.target_gender.slice(1) },
           ].filter(Boolean) as { label: string; value: string }[]
 
           const generalSpecs = [
@@ -411,11 +427,24 @@ export default async function ProductDetailPage({
             p.currency          && { label: 'Currency',          value: p.currency },
           ].filter(Boolean) as { label: string; value: string }[]
 
-          if (primarySpecs.length === 0 && generalSpecs.length === 0) return null
+          const hazards = [p.fragile && 'Fragile', p.hazardous && 'Hazardous', p.flammable && 'Flammable'].filter(Boolean) as string[]
+          const certList = (p.certifications as string[] | null) ?? []
+          const audienceList = (p.target_audience as string[] | null) ?? []
+
+          if (primarySpecs.length === 0 && generalSpecs.length === 0 && hazards.length === 0 && certList.length === 0 && audienceList.length === 0) return null
 
           return (
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-8 mb-8">
               <h2 className="text-xl font-bold text-foreground mb-6">Specifications</h2>
+
+              {hazards.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {p.fragile && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300">⚠ Fragile</span>}
+                  {p.hazardous && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300">☢ Hazardous</span>}
+                  {p.flammable && <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-300">🔥 Flammable</span>}
+                </div>
+              )}
+
               {primarySpecs.length > 0 && (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5 mb-6">
                   {primarySpecs.map(({ label, value }) => (
@@ -426,9 +455,32 @@ export default async function ProductDetailPage({
                   ))}
                 </div>
               )}
+
+              {certList.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-xs text-foreground-muted mb-2">Certifications</p>
+                  <div className="flex flex-wrap gap-2">
+                    {certList.map((c: string, i: number) => (
+                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground">{c}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {audienceList.length > 0 && (
+                <div className="mb-6">
+                  <p className="text-xs text-foreground-muted mb-2">Target Audience</p>
+                  <div className="flex flex-wrap gap-2">
+                    {audienceList.map((a: string, i: number) => (
+                      <span key={i} className="px-2 py-1 rounded-md text-xs font-medium bg-surface-secondary border border-border-default text-foreground">{a}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {generalSpecs.length > 0 && (
                 <>
-                  {primarySpecs.length > 0 && <div className="border-t border-border-default mb-6" />}
+                  {(primarySpecs.length > 0 || certList.length > 0 || audienceList.length > 0) && <div className="border-t border-border-default mb-6" />}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-12 gap-y-5">
                     {generalSpecs.map(({ label, value }) => (
                       <div key={label}>
@@ -531,8 +583,21 @@ export default async function ProductDetailPage({
                 material: product.material ?? null,
                 finish: product.finish ?? null,
                 variant_type: product.variant_type ?? null,
+                condition: product.condition ?? null,
+                color: product.color ?? null,
                 weight: product.weight ?? null,
                 weight_unit: product.weight_unit ?? null,
+                net_weight_grams: product.net_weight_grams ?? null,
+                volume_ml: product.volume_ml ?? null,
+                country_of_origin: product.country_of_origin ?? null,
+                warranty_months: product.warranty_months ?? null,
+                warranty_type: product.warranty_type ?? null,
+                compliance_standard: product.compliance_standard ?? null,
+                safety_rating: product.safety_rating ?? null,
+                certifications: (product.certifications as string[] | null) ?? null,
+                fragile: product.fragile ?? null,
+                hazardous: product.hazardous ?? null,
+                flammable: product.flammable ?? null,
                 hsn_code: product.hsn_code ?? null,
                 gst_percentage: product.gst_percentage ?? null,
               }}
@@ -552,8 +617,21 @@ export default async function ProductDetailPage({
                   material: rp.material ?? null,
                   finish: rp.finish ?? null,
                   variant_type: rp.variant_type ?? null,
+                  condition: rp.condition ?? null,
+                  color: rp.color ?? null,
                   weight: rp.weight ?? null,
                   weight_unit: rp.weight_unit ?? null,
+                  net_weight_grams: rp.net_weight_grams ?? null,
+                  volume_ml: rp.volume_ml ?? null,
+                  country_of_origin: rp.country_of_origin ?? null,
+                  warranty_months: rp.warranty_months ?? null,
+                  warranty_type: rp.warranty_type ?? null,
+                  compliance_standard: rp.compliance_standard ?? null,
+                  safety_rating: rp.safety_rating ?? null,
+                  certifications: (rp.certifications as string[] | null) ?? null,
+                  fragile: rp.fragile ?? null,
+                  hazardous: rp.hazardous ?? null,
+                  flammable: rp.flammable ?? null,
                   hsn_code: rp.hsn_code ?? null,
                   gst_percentage: rp.gst_percentage ?? null,
                 }
@@ -618,6 +696,7 @@ export default async function ProductDetailPage({
                     categoryName={relatedProduct.categories?.name || null}
                     categoryId={relatedProduct.categories?.id || null}
                     extraDeliveryDays={Number(relatedProduct.extra_delivery_days ?? 0)}
+                    handlingDays={Number(relatedProduct.handling_days ?? 2)}
                   />
                 )
               })}

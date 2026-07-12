@@ -49,8 +49,7 @@ export async function getDeliverySettings(): Promise<DeliverySettings> {
     }
     cache = { value: result, expiresAt: Date.now() + TTL_MS }
     return result
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return DEFAULTS
   }
 }

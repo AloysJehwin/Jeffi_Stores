@@ -4,6 +4,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { getStockLedger, getStockValuation, logStockMovement } from '@/lib/inventory'
 import { getClient, queryOne } from '@/lib/db'
+import { getOrCreateOpenShelf } from '@/lib/shelf'
 import { logAdminAudit } from '@/lib/admin-audit'
 import { parseBody, zUuid } from '@/lib/validate'
 
@@ -16,6 +17,8 @@ const PatchSchema = z.object({
   unit_id: zUuid.nullish(),
   quantity_in_unit: z.coerce.number().positive().optional(),
   notes: z.string().nullish(),
+  warehouse_id: zUuid.nullish(),
+  location_id: zUuid.nullish(),
 }).refine(d => d.new_quantity !== undefined || (d.unit_id && d.quantity_in_unit !== undefined), {
   message: 'Provide either new_quantity or both unit_id and quantity_in_unit',
 })
@@ -30,6 +33,56 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url)
     const view = searchParams.get('view') || 'ledger'
+
+    if (view === 'batch_valuation') {
+      const search = searchParams.get('search') || ''
+      const stockStatus = searchParams.get('stock_status') || ''
+      const productId = searchParams.get('product_id') || ''
+      const variantId = searchParams.get('variant_id') || ''
+      const subVariantId = searchParams.get('sub_variant_id') || ''
+      const conditions: string[] = ['pb.quantity_remaining > 0']
+      const params: any[] = []
+      let i = 1
+      if (productId) { conditions.push(`pb.product_id = $${i++}`); params.push(productId) }
+      if (variantId) { conditions.push(`pb.variant_id = $${i++}`); params.push(variantId) }
+      if (subVariantId) { conditions.push(`pb.sub_variant_id = $${i++}`); params.push(subVariantId) }
+      if (search) {
+        conditions.push(`(p.name ILIKE $${i} OR p.sku ILIKE $${i} OR pv.variant_name ILIKE $${i} OR pb.lot_number ILIKE $${i})`)
+        params.push(`%${search}%`); i++
+      }
+      if (stockStatus === 'expired') conditions.push(`pb.expiry_date < CURRENT_DATE`)
+      if (stockStatus === 'expiring_soon') conditions.push(`pb.expiry_date BETWEEN CURRENT_DATE AND CURRENT_DATE + INTERVAL '30 days'`)
+      const where = conditions.join(' AND ')
+      const rows = await import('@/lib/db').then(m => m.queryMany<any>(`
+        SELECT
+          pb.id AS batch_id,
+          pb.lot_number,
+          pb.expiry_date,
+          pb.manufacture_date,
+          pb.quantity_remaining,
+          pb.created_at,
+          p.id AS product_id,
+          p.name AS product_name,
+          p.sku AS product_sku,
+          p.serialized,
+          ROUND(COALESCE(pv.price, p.base_price, 0) / (1 + COALESCE(p.gst_percentage, 0) / 100), 2) AS unit_cost,
+          pv.id AS variant_id,
+          pv.variant_name,
+          sl.display_code AS location,
+          CASE WHEN p.serialized THEN (
+            SELECT COALESCE(json_agg(ps.serial_number ORDER BY ps.serial_number), '[]'::json)
+            FROM product_serials ps
+            WHERE ps.batch_id = pb.id AND ps.status = 'in_stock'
+          ) ELSE '[]'::json END AS serials
+        FROM product_batches pb
+        JOIN products p ON p.id = pb.product_id
+        LEFT JOIN product_variants pv ON pv.id = pb.variant_id
+        LEFT JOIN shelf_locations sl ON sl.id = pb.location_id
+        WHERE ${where}
+        ORDER BY pb.expiry_date ASC NULLS LAST, p.name, pv.variant_name
+      `, params))
+      return NextResponse.json({ batches: rows || [] })
+    }
 
     if (view === 'valuation') {
       const valPage = Math.max(1, parseInt(searchParams.get('page') || '1'))
@@ -147,6 +200,35 @@ export async function PATCH(request: NextRequest) {
       })
 
       await client.query('COMMIT')
+
+      // Assign to shelf when warehouse provided (non-perishable/serialized — those use syncPerishableStock)
+      if (parsed.data.warehouse_id) {
+        const wRow = await queryOne<{ code: string; perishable: boolean; serialized: boolean }>(
+          `SELECT w.code, p.perishable, p.serialized
+           FROM warehouses w, products p WHERE w.id = $1 AND p.id = $2`,
+          [parsed.data.warehouse_id, product_id]
+        )
+        if (wRow && !wRow.perishable && !wRow.serialized) {
+          const locationId = parsed.data.location_id ||
+            await getOrCreateOpenShelf(parsed.data.warehouse_id, wRow.code)
+          // Remove stock from any other locations for this product/variant (reassignment)
+          await queryOne(
+            `DELETE FROM shelf_stock
+             WHERE product_id = $1
+               AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
+               AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))
+               AND location_id != $4`,
+            [product_id, variant_id ?? null, sub_variant_id ?? null, locationId]
+          )
+          await queryOne(
+            `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
+             VALUES ($1,$2,$3,$4,$5)
+             ON CONFLICT ON CONSTRAINT shelf_stock_unique
+             DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = now()`,
+            [locationId, product_id, variant_id ?? null, sub_variant_id ?? null, newQuantityBase]
+          )
+        }
+      }
 
       const product = await queryOne<{ name: string }>('SELECT name FROM products WHERE id = $1', [product_id])
       logAdminAudit({

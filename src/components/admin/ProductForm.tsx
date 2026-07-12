@@ -9,6 +9,7 @@ import { Star, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
 import Toggle from '@/components/ui/Toggle'
+import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
 import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
 import { applyDiscount } from '@/lib/pricing'
@@ -65,6 +66,8 @@ interface ProductFormProps {
   product?: any
   productId?: string
   backUrl?: string
+  perishableBatchTotal?: number
+  serializedStockTotal?: number
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
@@ -196,7 +199,7 @@ function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: (
   )
 }
 
-export default function ProductForm({ categories, brands, action, product, productId, backUrl }: ProductFormProps) {
+export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0, serializedStockTotal = 0 }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -270,6 +273,88 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [extraDeliveryDays, setExtraDeliveryDays] = useState(
     product?.extra_delivery_days != null ? String(product.extra_delivery_days) : '0'
   )
+  // Identification & Compliance
+  const [barcode, setBarcode] = useState(product?.barcode || '')
+  const [isbn, setIsbn] = useState(product?.isbn || '')
+  const [asin, setAsin] = useState(product?.asin || '')
+  const [brandPartNumber, setBrandPartNumber] = useState(product?.brand_part_number || '')
+  const [countryOfOrigin, setCountryOfOrigin] = useState(product?.country_of_origin || '')
+  const [shelfLifeDays, setShelfLifeDays] = useState(product?.shelf_life_days != null ? String(product.shelf_life_days) : '')
+  // Technical Specs
+  const [grade, setGrade] = useState(product?.grade || '')
+  const [specifications, setSpecifications] = useState<{key: string, value: string}[]>(
+    product?.specifications ? Object.entries(product.specifications as Record<string, string>).map(([key, value]) => ({ key, value })) : []
+  )
+  // Physical Attributes
+  const [color, setColor] = useState(product?.color || '')
+  const [colorHex, setColorHex] = useState(product?.color_hex || '#000000')
+  const [volumeMl, setVolumeMl] = useState(product?.volume_ml != null ? String(product.volume_ml) : '')
+  const [netWeightGrams, setNetWeightGrams] = useState(product?.net_weight_grams != null ? String(product.net_weight_grams) : '')
+  const [fragile, setFragile] = useState(product?.fragile ?? false)
+  const [hazardous, setHazardous] = useState(product?.hazardous ?? false)
+  const [flammable, setFlammable] = useState(product?.flammable ?? false)
+  const [perishable, setPerishable] = useState(product?.perishable ?? false)
+  const [confirmUnperishable, setConfirmUnperishable] = useState(false)
+  const [serialized, setSerialized] = useState(product?.serialized ?? false)
+  const [confirmUnSerialized, setConfirmUnSerialized] = useState(false)
+  // Bootstrap inline section state
+  const [bootstrapError, setBootstrapError] = useState<string | null>(null)
+  const [bsExpiryDate, setBsExpiryDate] = useState('')
+  const [bsManufactureDate, setBsManufactureDate] = useState('')
+  const [bsLotNumber, setBsLotNumber] = useState('')
+  const [bsLocationId, setBsLocationId] = useState('')
+  const [bsSerials, setBsSerials] = useState<string[]>([])
+  const [bsShelfLocations, setBsShelfLocations] = useState<{id:string;display_code:string}[]>([])
+  // Certifications & Standards
+  const [certifications, setCertifications] = useState(Array.isArray(product?.certifications) ? product.certifications.join(', ') : '')
+  const [complianceStandard, setComplianceStandard] = useState(product?.compliance_standard || '')
+  const [safetyRating, setSafetyRating] = useState(product?.safety_rating || '')
+  const [warrantyMonths, setWarrantyMonths] = useState(product?.warranty_months != null ? String(product.warranty_months) : '')
+  const [warrantyType, setWarrantyType] = useState(product?.warranty_type || '')
+  // Condition & Lifecycle
+  const [condition, setCondition] = useState(product?.condition || 'new')
+  const [isCodAllowed, setIsCodAllowed] = useState(product?.is_cod_allowed ?? false)
+  const [launchDate, setLaunchDate] = useState(product?.launch_date ? new Date(product.launch_date).toISOString().slice(0, 10) : '')
+  const [discontinueDate, setDiscontinueDate] = useState(product?.discontinue_date ? new Date(product.discontinue_date).toISOString().slice(0, 10) : '')
+  const [sortOrderVal, setSortOrderVal] = useState(product?.sort_order != null ? String(product.sort_order) : '0')
+  // Shipping & Logistics
+  const [handlingDays, setHandlingDays] = useState(product?.handling_days != null ? String(product.handling_days) : '2')
+  const [shippingClass, setShippingClass] = useState(product?.shipping_class || 'standard')
+  const [isOversized, setIsOversized] = useState(product?.is_oversized ?? false)
+  // Digital / Content
+  const [isDigital, setIsDigital] = useState(product?.is_digital ?? false)
+  const [downloadUrl, setDownloadUrl] = useState(product?.download_url || '')
+  const [licenseType, setLicenseType] = useState(product?.license_type || '')
+  const [fileFormat, setFileFormat] = useState(product?.file_format || '')
+  const [platformCompatibility, setPlatformCompatibility] = useState(Array.isArray(product?.platform_compatibility) ? product.platform_compatibility.join(', ') : '')
+  // Subscriptions
+  const [isSubscription, setIsSubscription] = useState(product?.is_subscription ?? false)
+  const [subscriptionInterval, setSubscriptionInterval] = useState(product?.subscription_interval || '')
+  const [subscriptionPrice, setSubscriptionPrice] = useState(product?.subscription_price != null ? String(product.subscription_price) : '')
+  // Bundling
+  const [isBundle, setIsBundle] = useState(product?.is_bundle ?? false)
+  // SEO
+  const [identificationExpanded, setIdentificationExpanded] = useState(false)
+  const [physicalExpanded, setPhysicalExpanded] = useState(false)
+  const [certificationsExpanded, setCertificationsExpanded] = useState(false)
+  const [conditionExpanded, setConditionExpanded] = useState(false)
+  const [shippingExpanded, setShippingExpanded] = useState(false)
+  const [digitalExpanded, setDigitalExpanded] = useState(false)
+  const [taxExpanded, setTaxExpanded] = useState(false)
+  const [ageExpanded, setAgeExpanded] = useState(false)
+  const [seoExpanded, setSeoExpanded] = useState(false)
+  const [metaTitle, setMetaTitle] = useState(product?.meta_title || '')
+  const [metaDescription, setMetaDescription] = useState(product?.meta_description || '')
+  const [isSearchable, setIsSearchable] = useState(product?.is_searchable ?? true)
+  // Tax & Finance
+  const [taxClass, setTaxClass] = useState(product?.tax_class || 'standard')
+  const [inclusiveTax, setInclusiveTax] = useState(product?.inclusive_tax ?? false)
+  // Age / Audience
+  const [ageMin, setAgeMin] = useState(product?.age_min != null ? String(product.age_min) : '')
+  const [ageMax, setAgeMax] = useState(product?.age_max != null ? String(product.age_max) : '')
+  const [targetGender, setTargetGender] = useState(product?.target_gender || '')
+  const [targetAudience, setTargetAudience] = useState(Array.isArray(product?.target_audience) ? product.target_audience.join(', ') : '')
+
   const [mrp, setMrp] = useState(product?.mrp != null ? String(product.mrp) : '')
   const [mrpExGst, setMrpExGst] = useState(() => {
     if (product?.mrp_ex_gst != null) return String(product.mrp_ex_gst)
@@ -433,6 +518,46 @@ export default function ProductForm({ categories, brands, action, product, produ
     topPriceLockSide, topMrpLockSide,
     gstRate, isActive, draftKey,
   ])
+
+  const wasPerishableOff = !(product?.perishable)
+  const wasSerializedOff = !(product?.serialized)
+  const _bsActiveVariant = product?.has_variants && Array.isArray(product?.product_variants)
+    ? product.product_variants.find((v: any) => !v._isDeleted && parseFloat(v.inventory_quantity) > 0) ?? null
+    : null
+  const _bsVariantId: string | null = _bsActiveVariant?.id ?? null
+  const _bsStockQty = _bsActiveVariant
+    ? parseFloat(_bsActiveVariant.inventory_quantity) || 0
+    : (parseFloat(product?.inventory_quantity ?? '0') || 0)
+  const showBootstrap = _bsStockQty > 0 && (
+    (perishable && wasPerishableOff && perishableBatchTotal === 0) ||
+    (serialized && wasSerializedOff && serializedStockTotal === 0)
+  )
+
+  useEffect(() => {
+    if (!showBootstrap) return
+    // auto-expand Physical Attributes section
+    setPhysicalExpanded(true)
+    // init lot number once
+    if (!bsLotNumber) {
+      const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+      const today = new Date()
+      const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+      const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
+      setBsLotNumber(`LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`)
+    }
+    // fetch shelf locations once, auto-select open shelf
+    if (bsShelfLocations.length === 0) {
+      fetch('/api/admin/shelving/locations').then(r => r.ok ? r.json() : null).then(j => {
+        if (j) {
+          const locs: {id:string;display_code:string;is_open_shelf?:boolean}[] = j.locations || []
+          setBsShelfLocations(locs)
+          const open = locs.find(l => l.is_open_shelf)
+          if (open && !bsLocationId) setBsLocationId(open.id)
+        }
+      })
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showBootstrap])
 
   function restoreDraft() {
     const saved = localStorage.getItem(draftKey)
@@ -731,6 +856,16 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
+
+    if (showBootstrap) {
+      if (perishable && !bsExpiryDate) { setBootstrapError('Expiry date is required'); return }
+      const needed = Math.round(_bsStockQty)
+      if (serialized && bsSerials.filter(Boolean).length !== needed) {
+        setBootstrapError(`Enter all ${needed} serial number${needed !== 1 ? 's' : ''}`); return
+      }
+    }
+    setBootstrapError(null)
+
     setIsSubmitting(true)
     setError(null)
 
@@ -765,6 +900,67 @@ export default function ProductForm({ categories, brands, action, product, produ
       }
       formData.set('cost_price', costPrice || '0')
       formData.set('extra_delivery_days', extraDeliveryDays || '0')
+      // Identification & Compliance
+      formData.set('barcode', barcode)
+      formData.set('isbn', isbn)
+      formData.set('asin', asin)
+      formData.set('brand_part_number', brandPartNumber)
+      formData.set('country_of_origin', countryOfOrigin.slice(0, 2).toUpperCase())
+      formData.set('shelf_life_days', shelfLifeDays)
+      // Technical Specs
+      formData.set('grade', grade)
+      const specsObj = specifications.reduce((acc, {key, value}) => key.trim() ? {...acc, [key.trim()]: value} : acc, {})
+      formData.set('specifications', JSON.stringify(specsObj))
+      // Physical Attributes
+      formData.set('color', color)
+      formData.set('color_hex', colorHex)
+      formData.set('volume_ml', volumeMl)
+      formData.set('net_weight_grams', netWeightGrams)
+      formData.set('fragile', String(fragile))
+      formData.set('hazardous', String(hazardous))
+      formData.set('flammable', String(flammable))
+      formData.set('perishable', String(perishable))
+      formData.set('serialized', String(serialized))
+      // Certifications & Standards
+      formData.set('certifications', certifications)
+      formData.set('compliance_standard', complianceStandard)
+      formData.set('safety_rating', safetyRating)
+      formData.set('warranty_months', warrantyMonths)
+      formData.set('warranty_type', warrantyType)
+      // Condition & Lifecycle
+      formData.set('condition', condition)
+      formData.set('is_cod_allowed', String(isCodAllowed))
+      formData.set('launch_date', launchDate)
+      formData.set('discontinue_date', discontinueDate)
+      formData.set('sort_order', sortOrderVal)
+      // Shipping & Logistics
+      formData.set('handling_days', handlingDays)
+      formData.set('shipping_class', shippingClass)
+      formData.set('is_oversized', String(isOversized))
+      // Digital / Content
+      formData.set('is_digital', String(isDigital))
+      formData.set('download_url', downloadUrl)
+      formData.set('license_type', licenseType)
+      formData.set('file_format', fileFormat)
+      formData.set('platform_compatibility', platformCompatibility)
+      // Subscriptions
+      formData.set('is_subscription', String(isSubscription))
+      formData.set('subscription_interval', subscriptionInterval)
+      formData.set('subscription_price', subscriptionPrice)
+      // Bundling
+      formData.set('is_bundle', String(isBundle))
+      // SEO
+      formData.set('meta_title', metaTitle)
+      formData.set('meta_description', metaDescription)
+      formData.set('is_searchable', String(isSearchable))
+      // Tax & Finance
+      formData.set('tax_class', taxClass)
+      formData.set('inclusive_tax', String(inclusiveTax))
+      // Age / Audience
+      formData.set('age_min', ageMin)
+      formData.set('age_max', ageMax)
+      formData.set('target_gender', targetGender)
+      formData.set('target_audience', targetAudience)
 
       if (hasVariants) {
         const convertedVariants = variants.map(v => {
@@ -790,7 +986,27 @@ export default function ProductForm({ categories, brands, action, product, produ
       localStorage.removeItem(draftKey)
       pendingPopupVariantIdRef.current = null
     } catch (err: any) {
-      if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) {
+        if (showBootstrap && productId) {
+          try {
+            await fetch(`/api/admin/products/${productId}/bootstrap-stock`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                variant_id: _bsVariantId || null,
+                lot_number: bsLotNumber || null,
+                manufacture_date: bsManufactureDate || null,
+                expiry_date: bsExpiryDate || null,
+                location_id: bsLocationId || null,
+                ...(serialized ? { serial_numbers: bsSerials.filter(Boolean) } : {}),
+              }),
+            })
+          } catch {
+            // bootstrap failed silently — product was saved
+          }
+        }
+        throw err
+      }
       setError(err?.message || 'Failed to save product. Please try again.')
       setIsSubmitting(false)
     }
@@ -799,7 +1015,66 @@ export default function ProductForm({ categories, brands, action, product, produ
   const inputCls = 'field-normal w-full border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+    <>
+      {confirmUnperishable && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-md mx-4 p-6">
+            <h2 className="text-base font-bold text-foreground mb-3">Remove Perishable Flag?</h2>
+            <p className="text-sm text-foreground-secondary mb-1">
+              This product has <span className="font-semibold">{perishableBatchTotal} unit(s)</span> in batches.
+            </p>
+            <p className="text-sm text-foreground-secondary mb-5">
+              Unmarking as perishable will delete all batch records and convert them to default stock ({perishableBatchTotal} units).
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmUnperishable(false)}
+                className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setConfirmUnperishable(false); setPerishable(false) }}
+                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Yes, Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {confirmUnSerialized && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-surface-elevated rounded-xl shadow-xl border border-border-default w-full max-w-md mx-4 p-6">
+            <h2 className="text-base font-bold text-foreground mb-3">Remove Serialized Flag?</h2>
+            <p className="text-sm text-foreground-secondary mb-1">
+              This product has <span className="font-semibold">{serializedStockTotal} serial(s)</span> in stock.
+            </p>
+            <p className="text-sm text-foreground-secondary mb-5">
+              Unmarking as serialized will delete all serial records and convert them to default stock ({serializedStockTotal} units).
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setConfirmUnSerialized(false)}
+                className="px-4 py-2 text-sm font-medium text-foreground border border-border-default rounded-lg hover:bg-surface transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setConfirmUnSerialized(false); setSerialized(false) }}
+                className="px-4 py-2 text-sm font-medium bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors"
+              >
+                Yes, Remove
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
         {hasDraft && (
@@ -1302,6 +1577,463 @@ export default function ProductForm({ categories, brands, action, product, produ
             <Toggle id="has_variants_toggle" checked={hasVariants} onChange={setHasVariants} label="This product has variants" />
           </div>
 
+          {/* Identification & Compliance */}
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <button type="button" onClick={() => setIdentificationExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
+              <span>Identification &amp; Compliance</span>
+              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${identificationExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {identificationExpanded && (
+              <div className="p-4 space-y-4 border-t border-border-default">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Barcode (EAN/UPC)</label>
+                    <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} className={inputCls} placeholder="e.g. 8901234567890" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-2">ISBN</label>
+                    <input type="text" value={isbn} onChange={e => setIsbn(e.target.value)} className={inputCls} placeholder="For books" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-2">ASIN</label>
+                    <input type="text" value={asin} onChange={e => setAsin(e.target.value)} className={inputCls} placeholder="Amazon reference" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Brand Part Number</label>
+                    <input type="text" value={brandPartNumber} onChange={e => setBrandPartNumber(e.target.value)} className={inputCls} placeholder="Manufacturer's part no." />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Country of Origin</label>
+                    <input type="text" maxLength={2} value={countryOfOrigin} onChange={e => setCountryOfOrigin(e.target.value.toUpperCase())} className={inputCls} placeholder="IN" />
+                    <p className="text-xs text-foreground-muted mt-1">ISO 3166 2-letter code</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Shelf Life (days)</label>
+                    <input type="number" min="0" step="1" value={shelfLifeDays} onChange={e => setShelfLifeDays(e.target.value)} className={inputCls} placeholder="e.g. 365" />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Digital & Subscription */}
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <button type="button" onClick={() => setDigitalExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
+              <span>Digital &amp; Subscription</span>
+              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${digitalExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {digitalExpanded && (
+              <div className="p-4 space-y-4 border-t border-border-default">
+                <div className="flex flex-wrap gap-6">
+                  <Toggle id="is_digital" checked={isDigital} onChange={setIsDigital} label="Digital Product" />
+                  <Toggle id="is_bundle" checked={isBundle} onChange={setIsBundle} label="Bundle" />
+                  <Toggle id="is_subscription" checked={isSubscription} onChange={setIsSubscription} label="Subscription" />
+                </div>
+                {isDigital && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">Download URL</label>
+                      <input type="url" value={downloadUrl} onChange={e => setDownloadUrl(e.target.value)} placeholder="https://..." className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">License Type</label>
+                      <input type="text" value={licenseType} onChange={e => setLicenseType(e.target.value)} placeholder="e.g. MIT, Commercial" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">File Format</label>
+                      <input type="text" value={fileFormat} onChange={e => setFileFormat(e.target.value)} placeholder="e.g. PDF, ZIP, EXE" className={inputCls} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">Platform Compatibility <span className="text-foreground-muted/60">(comma-separated)</span></label>
+                      <input type="text" value={platformCompatibility} onChange={e => setPlatformCompatibility(e.target.value)} placeholder="e.g. Windows, macOS, Linux" className={inputCls} />
+                    </div>
+                  </div>
+                )}
+                {isSubscription && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">Subscription Interval</label>
+                      <AdminSelect value={subscriptionInterval} onChange={v => setSubscriptionInterval(v)} className="w-full" options={[{ value: '', label: '— select —' }, { value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' }, { value: 'yearly', label: 'Yearly' }]} />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-muted mb-1">Subscription Price (₹)</label>
+                      <input type="number" min="0" step="0.01" value={subscriptionPrice} onChange={e => setSubscriptionPrice(e.target.value)} className={inputCls} />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Tax & Finance */}
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <button type="button" onClick={() => setTaxExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
+              <span>Tax &amp; Finance</span>
+              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${taxExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {taxExpanded && (
+              <div className="p-4 space-y-4 border-t border-border-default">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground-muted mb-1">Tax Class</label>
+                    <AdminSelect value={taxClass} onChange={v => setTaxClass(v)} className="w-full" options={[{ value: 'standard', label: 'Standard' }, { value: 'reduced', label: 'Reduced' }, { value: 'zero', label: 'Zero' }, { value: 'exempt', label: 'Exempt' }]} />
+                  </div>
+                </div>
+                <Toggle id="inclusive_tax" checked={inclusiveTax} onChange={setInclusiveTax} label="Price includes tax (inclusive tax)" />
+              </div>
+            )}
+          </div>
+
+          {/* Age & Audience */}
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <button type="button" onClick={() => setAgeExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
+              <span>Age &amp; Audience</span>
+              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${ageExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {ageExpanded && (
+              <div className="p-4 space-y-4 border-t border-border-default">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-foreground-muted mb-1">Age Range</label>
+                    <div className="flex items-center gap-2">
+                      <input type="number" min="0" value={ageMin} onChange={e => setAgeMin(e.target.value)} placeholder="Min" className={inputCls} />
+                      <span className="text-foreground-muted text-sm">–</span>
+                      <input type="number" min="0" value={ageMax} onChange={e => setAgeMax(e.target.value)} placeholder="Max" className={inputCls} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-foreground-muted mb-1">Target Gender</label>
+                    <AdminSelect value={targetGender} onChange={v => setTargetGender(v)} className="w-full" options={[{ value: '', label: '— any —' }, { value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'unisex', label: 'Unisex' }]} />
+                  </div>
+                  <div className="sm:col-span-2">
+                    <label className="block text-xs font-medium text-foreground-muted mb-1">Target Audience <span className="text-foreground-muted/60">(comma-separated)</span></label>
+                    <input type="text" value={targetAudience} onChange={e => setTargetAudience(e.target.value)} placeholder="e.g. professionals, students, DIY" className={inputCls} />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* SEO */}
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <button type="button" onClick={() => setSeoExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
+              <span>SEO &amp; Discoverability</span>
+              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${seoExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {seoExpanded && (
+              <div className="p-4 space-y-4 border-t border-border-default">
+                <div>
+                  <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
+                    <span>Meta Title</span>
+                    <span className={metaTitle.length > 160 ? 'text-red-500' : 'text-foreground-muted/60'}>{metaTitle.length}/160</span>
+                  </label>
+                  <input type="text" maxLength={160} value={metaTitle} onChange={e => setMetaTitle(e.target.value)} placeholder="SEO page title" className={inputCls} />
+                </div>
+                <div>
+                  <label className="flex items-center justify-between text-xs font-medium text-foreground-muted mb-1">
+                    <span>Meta Description</span>
+                    <span className={metaDescription.length > 320 ? 'text-red-500' : 'text-foreground-muted/60'}>{metaDescription.length}/320</span>
+                  </label>
+                  <textarea maxLength={320} rows={3} value={metaDescription} onChange={e => setMetaDescription(e.target.value)} placeholder="SEO page description" className={`${inputCls} resize-none`} />
+                </div>
+                <Toggle id="is_searchable" checked={isSearchable} onChange={setIsSearchable} label="Searchable (show in search results)" />
+              </div>
+            )}
+          </div>
+
+          {/* Product Details (grouped accordion) */}
+          <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
+            <button type="button" onClick={() => setPhysicalExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
+              <span>Product Details</span>
+              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${physicalExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {physicalExpanded && (
+              <div className="border-t border-border-default divide-y divide-border-default">
+
+                {/* Physical Attributes */}
+                <div>
+                  <button type="button" onClick={() => setCertificationsExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors">
+                    <span>Physical Attributes</span>
+                    <svg className={`w-3.5 h-3.5 text-foreground-muted transition-transform ${certificationsExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {certificationsExpanded && (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Grade</label>
+                          <input type="text" value={grade} onChange={e => setGrade(e.target.value)} className={inputCls} placeholder="e.g. 8.8, 10.9, 304, M2 HSS" />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-foreground-secondary mb-2">Technical Specifications</label>
+                        <div className="space-y-2">
+                          {specifications.map((spec, i) => (
+                            <div key={i} className="flex gap-2">
+                              <input type="text" value={spec.key} onChange={e => setSpecifications(s => s.map((x, j) => j === i ? {...x, key: e.target.value} : x))} className={inputCls} placeholder="e.g. thread_type" />
+                              <input type="text" value={spec.value} onChange={e => setSpecifications(s => s.map((x, j) => j === i ? {...x, value: e.target.value} : x))} className={inputCls} placeholder="e.g. Metric" />
+                              <button type="button" onClick={() => setSpecifications(s => s.filter((_, j) => j !== i))} className="px-2 text-foreground-muted hover:text-red-500">✕</button>
+                            </div>
+                          ))}
+                          <button type="button" onClick={() => setSpecifications(s => [...s, {key: '', value: ''}])} className="text-xs text-accent-600 hover:text-accent-700 font-medium">+ Add specification</button>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Color</label>
+                          <input type="text" value={color} onChange={e => setColor(e.target.value)} className={inputCls} placeholder="e.g. Stainless Silver" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Color Hex</label>
+                          <div className="flex gap-2 items-center">
+                            <input type="color" value={colorHex} onChange={e => setColorHex(e.target.value)} className="h-9 w-12 rounded border border-border-secondary cursor-pointer bg-surface" />
+                            <input type="text" value={colorHex} onChange={e => setColorHex(e.target.value)} className={inputCls} placeholder="#000000" maxLength={7} />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Volume (ml)</label>
+                          <input type="number" min="0" step="0.01" value={volumeMl} onChange={e => setVolumeMl(e.target.value)} className={inputCls} placeholder="For liquids/paints" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Net Weight (g)</label>
+                          <input type="number" min="0" step="1" value={netWeightGrams} onChange={e => setNetWeightGrams(e.target.value)} className={inputCls} placeholder="Product without packaging" />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-5 gap-3 pt-1">
+                        <Toggle id="fragile" checked={fragile} onChange={setFragile} label="Fragile" />
+                        <Toggle id="hazardous" checked={hazardous} onChange={setHazardous} label="Hazardous" />
+                        <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
+                        <Toggle id="perishable" checked={perishable} onChange={next => {
+                          if (!next && perishableBatchTotal > 0) {
+                            setConfirmUnperishable(true)
+                            return
+                          }
+                          setPerishable(next)
+                        }} label="Perishable" />
+                        <Toggle id="serialized" checked={serialized} onChange={next => {
+                          if (!next && serializedStockTotal > 0) {
+                            setConfirmUnSerialized(true)
+                            return
+                          }
+                          setSerialized(next)
+                        }} label="Serialized" />
+                      </div>
+
+                      {showBootstrap && (() => {
+                        const needed = Math.round(_bsStockQty)
+                        const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+                        const dtStamp = () => new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
+                        const randSuffix = () => Math.random().toString(36).slice(2, 8).toUpperCase()
+                        const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${dtStamp()}-${randSuffix()}`
+                        const entered = bsSerials.filter(Boolean).length
+                        const updateSerial = (i: number, val: string) =>
+                          setBsSerials(arr => { const a = [...arr]; a[i] = val; return a })
+                        return (
+                          <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10 p-4 space-y-4">
+                            <div>
+                              <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Assign Existing Stock</p>
+                              <p className="text-xs text-foreground-secondary mt-0.5">
+                                <span className="font-semibold">{_bsStockQty} unit(s)</span> already in stock — fill in details below so tracking is accurate.
+                              </p>
+                            </div>
+
+                            {perishable && wasPerishableOff && (
+                              <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-900/10 p-3">
+                                <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">Batch Details</p>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Expiry Date <span className="text-red-500">*</span></label>
+                                    <DatePicker value={bsExpiryDate} onChange={setBsExpiryDate} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Manufacture Date</label>
+                                    <DatePicker value={bsManufactureDate} onChange={setBsManufactureDate} />
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Lot Number</label>
+                                    <div className="flex gap-1">
+                                      <input
+                                        type="text"
+                                        className="field-compact border border-border-default bg-surface text-foreground flex-1 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                        value={bsLotNumber}
+                                        onChange={e => setBsLotNumber(e.target.value)}
+                                      />
+                                      <button
+                                        type="button"
+                                        title="Regenerate"
+                                        onClick={() => {
+                                          const today = new Date()
+                                          const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`
+                                          const rand = Math.random().toString(36).substring(2,5).toUpperCase()
+                                          setBsLotNumber(`LOT-${sku ? sku+'-' : ''}${ymd}-${rand}`)
+                                        }}
+                                        className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                                      >↺</button>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Shelf Location</label>
+                                    <AdminSelect
+                                      id="bs-location"
+                                      value={bsLocationId}
+                                      onChange={setBsLocationId}
+                                      sm
+                                      options={[
+                                        { value: '', label: '— none —' },
+                                        ...bsShelfLocations.map(sl => ({ value: sl.id, label: sl.display_code })),
+                                      ]}
+                                    />
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+
+                            {serialized && wasSerializedOff && (
+                              <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-3">
+                                <div className="flex items-center justify-between mb-3">
+                                  <div>
+                                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Serial Numbers</p>
+                                    <span className="text-xs text-foreground-muted">({needed} required)</span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    {entered === needed
+                                      ? <span className="text-xs text-green-600 dark:text-green-400">{entered}/{needed} entered ✓</span>
+                                      : <span className="text-xs text-amber-600 dark:text-amber-400">{entered}/{needed} entered</span>
+                                    }
+                                    <button
+                                      type="button"
+                                      className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                      onClick={() => setBsSerials(Array.from({ length: needed }, () => autoSerial()))}
+                                    >Generate All</button>
+                                  </div>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                                  {Array.from({ length: needed }, (_, n) => (
+                                    <div key={n} className="flex gap-1">
+                                      <input
+                                        type="text"
+                                        placeholder={autoSerial()}
+                                        className="field-compact border border-border-default bg-surface text-foreground font-mono text-xs flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                        value={bsSerials[n] ?? ''}
+                                        onChange={e => updateSerial(n, e.target.value)}
+                                      />
+                                      <button
+                                        type="button"
+                                        title="Auto-generate"
+                                        className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                        onClick={() => updateSerial(n, autoSerial())}
+                                      >Auto</button>
+                                    </div>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {bootstrapError && (
+                              <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs">
+                                {bootstrapError}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  )}
+                </div>
+
+                {/* Certifications & Standards */}
+                <div>
+                  <button type="button" onClick={() => setConditionExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors">
+                    <span>Certifications &amp; Standards</span>
+                    <svg className={`w-3.5 h-3.5 text-foreground-muted transition-transform ${conditionExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {conditionExpanded && (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div className="sm:col-span-2">
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Certifications</label>
+                          <input type="text" value={certifications} onChange={e => setCertifications(e.target.value)} className={inputCls} placeholder="BIS, CE, RoHS, ISO9001, FSSAI (comma-separated)" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Compliance Standard</label>
+                          <input type="text" value={complianceStandard} onChange={e => setComplianceStandard(e.target.value)} className={inputCls} placeholder="e.g. DIN, ISO, IS, ASTM" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Safety Rating</label>
+                          <input type="text" value={safetyRating} onChange={e => setSafetyRating(e.target.value)} className={inputCls} placeholder="e.g. IP65, Class I" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty (months)</label>
+                          <input type="number" min="0" step="1" value={warrantyMonths} onChange={e => setWarrantyMonths(e.target.value)} className={inputCls} placeholder="e.g. 12" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Warranty Type</label>
+                          <AdminSelect value={warrantyType} onChange={setWarrantyType} options={[{ value: '', label: 'None' }, { value: 'manufacturer', label: 'Manufacturer' }, { value: 'seller', label: 'Seller' }]} placeholder="Select type" />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Condition & Lifecycle */}
+                <div>
+                  <button type="button" onClick={() => setShippingExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors">
+                    <span>Condition &amp; Lifecycle</span>
+                    <svg className={`w-3.5 h-3.5 text-foreground-muted transition-transform ${shippingExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {shippingExpanded && (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Condition</label>
+                          <AdminSelect value={condition} onChange={setCondition} options={[{ value: 'new', label: 'New' }, { value: 'refurbished', label: 'Refurbished' }, { value: 'used', label: 'Used' }, { value: 'open_box', label: 'Open Box' }]} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Sort Order</label>
+                          <input type="number" step="1" value={sortOrderVal} onChange={e => setSortOrderVal(e.target.value)} className={inputCls} placeholder="0" />
+                          <p className="text-xs text-foreground-muted mt-1">Lower = appears first</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Launch Date</label>
+                          <DatePicker value={launchDate} onChange={setLaunchDate} />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Discontinue Date</label>
+                          <DatePicker value={discontinueDate} onChange={setDiscontinueDate} />
+                        </div>
+                      </div>
+                      <Toggle id="is_cod_allowed" checked={isCodAllowed} onChange={setIsCodAllowed} label="COD Allowed" />
+                    </div>
+                  )}
+                </div>
+
+                {/* Shipping & Logistics */}
+                <div>
+                  <button type="button" onClick={() => setIdentificationExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary/50 hover:bg-surface-secondary text-sm font-medium text-foreground transition-colors">
+                    <span>Shipping &amp; Logistics</span>
+                    <svg className={`w-3.5 h-3.5 text-foreground-muted transition-transform ${identificationExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                  </button>
+                  {identificationExpanded && (
+                    <div className="p-4 space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Handling Days</label>
+                          <input type="number" min="0" step="1" value={handlingDays} onChange={e => setHandlingDays(e.target.value)} className={inputCls} placeholder="1" />
+                          <p className="text-xs text-foreground-muted mt-1">Days to dispatch after order</p>
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-foreground-secondary mb-2">Shipping Class</label>
+                          <AdminSelect value={shippingClass} onChange={setShippingClass} options={[{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }, { value: 'cold_chain', label: 'Cold Chain' }]} />
+                        </div>
+                      </div>
+                      <Toggle id="is_oversized" checked={isOversized} onChange={setIsOversized} label="Oversized / Freight" />
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            )}
+          </div>
+
           {/* Variant Management Section */}
           {hasVariants && (
             <div className="md:col-span-2 border border-blue-200 dark:border-blue-800 rounded-lg p-4 bg-blue-50/50 dark:bg-blue-900/20">
@@ -1489,7 +2221,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 </div>
                               </div>
                               )}
-                              <div className="pt-2 border-t border-border-default space-y-2">
+                              <div className="pt-2 border-t border-border-default-default space-y-2">
                                 <div className="flex items-center gap-2">
                                   <button
                                     type="button"
@@ -1535,7 +2267,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 </div>
                               )}
                               {variant.id && (
-                                <div className="pt-2 border-t border-border-default">
+                                <div className="pt-2 border-t border-border-default-default">
                                   <button
                                     type="button"
                                     onClick={() => openVariantPopup(variant.id!)}
@@ -1669,7 +2401,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
 
                       {/* Add variant to group */}
-                      <div className="px-4 py-3 border-t border-border-default bg-surface">
+                      <div className="px-4 py-3 border-t border-border-default-default bg-surface">
                         <button
                           type="button"
                           onClick={() => addVariantToGroup(group.pricing_type, group.unit)}
@@ -1693,7 +2425,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
       {/* Selling Units (product-level — applies to every variant) */}
       {productId && (
-        <div className="px-4 sm:px-6 py-4 border-t border-border-default">
+        <div className="px-4 sm:px-6 py-4 border-t border-border-default-default">
           <h3 className="text-sm font-semibold text-foreground mb-3">Selling Units &amp; Conversions</h3>
           <p className="text-xs text-foreground-muted mb-4">
             Configure alternate units (e.g. box of 100, sheet of 4&apos;×8&apos;, tin of 5 L). The pricing engine
@@ -1709,7 +2441,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       )}
 
       {/* Form Actions */}
-      <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+      <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
         <Link
           href={ap('/admin/products')}
           className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors text-center"
@@ -2109,7 +2841,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           )
                         })()}
                       </div>
-                      <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
+                      <div className="px-6 py-4 border-t border-border-default-default flex justify-end gap-3">
                         <button
                           type="button"
                           onClick={() => { setVariantGalleryOpen(false); setVariantGallerySelected([]) }}
@@ -2354,7 +3086,7 @@ export default function ProductForm({ categories, brands, action, product, produ
               </div>
 
               {variantPopupId && variantPopupId.startsWith('temp-') && (
-                <div className="px-5 pb-4 border-t border-border-default pt-4 mt-0">
+                <div className="px-5 pb-4 border-t border-border-default-default pt-4 mt-0">
                   <p className="text-xs text-foreground-muted italic">Save the product first to configure selling units for this variant.</p>
                 </div>
               )}
@@ -2369,7 +3101,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 </div>
               )}
 
-              <div className="px-5 py-4 border-t border-border-default flex justify-end">
+              <div className="px-5 py-4 border-t border-border-default-default flex justify-end">
                 <button type="button" onClick={() => setVariantPopupId(null)} className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Done</button>
               </div>
             </div>
@@ -2377,5 +3109,6 @@ export default function ProductForm({ categories, brands, action, product, produ
         )
       })()}
     </form>
+    </>
   )
 }

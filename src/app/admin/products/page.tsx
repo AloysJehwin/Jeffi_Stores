@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
@@ -12,44 +13,31 @@ import ProductsTableClient from '@/components/admin/ProductsTableClient'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import MerchantSyncStatus from '@/components/admin/MerchantSyncStatus'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
+
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-export default async function ProductsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
-  const resolvedSearchParams = await searchParams
+type SP = { [key: string]: string | undefined }
+
+async function ProductsListContent({ resolvedSearchParams, featuredCount }: { resolvedSearchParams: SP; featuredCount: number }) {
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
 
-  const [{ products, total }, categories, brands, allProductsForStats] = await Promise.all([
-    getFilteredProducts({
-      category_id: resolvedSearchParams.category_id,
-      brand_id: resolvedSearchParams.brand_id,
-      is_active: resolvedSearchParams.is_active,
-      stock: resolvedSearchParams.stock,
-      search: resolvedSearchParams.search,
-      page,
-      limit: PAGE_SIZE,
-      sort,
-      dir }),
-    getAllCategories(),
-    getAllBrands(),
-    getFilteredProducts({}),
-  ])
-
-  const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
-  const activeCount = allProductsForStats.products?.filter((p: any) => p.is_active).length || 0
-  const totalCount = allProductsForStats.total
-
-  const allCats: any[] = categories || []
-  const mainCats = allCats.filter((c: any) => !c.parent_category_id)
-  const categoryOptions = mainCats.flatMap((cat: any) => {
-    const subs = allCats.filter((c: any) => c.parent_category_id === cat.id)
-    return [
-      { value: cat.id, label: cat.name, group: cat.name },
-      ...subs.map((sub: any) => ({ value: sub.id, label: sub.name, group: cat.name, indent: true })),
-    ]
+  const { products, total } = await getFilteredProducts({
+    category_id: resolvedSearchParams.category_id,
+    brand_id: resolvedSearchParams.brand_id,
+    is_active: resolvedSearchParams.is_active,
+    stock: resolvedSearchParams.stock,
+    search: resolvedSearchParams.search,
+    page,
+    limit: PAGE_SIZE,
+    sort,
+    dir,
   })
 
   const currentListUrl = (() => {
@@ -81,56 +69,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   }
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Products</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
-        </div>
-        <Link
-          href={ap('/admin/products/add', host)}
-          className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-        >
-          Add New Product
-        </Link>
-      </div>
-
-      <MerchantSyncStatus />
-
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCount}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Featured</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
-            <span className={featuredCount >= 6 ? 'text-yellow-600 dark:text-yellow-400' : ''}>{featuredCount}</span>
-            <span className="text-base font-normal text-foreground-muted">/6</span>
-          </p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{categories?.length || 0}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Active Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{activeCount}</p>
-        </div>
-      </div>
-
-      <AdminFilters
-        filters={[
-          { name: 'category_id', label: 'Category', options: categoryOptions },
-          { name: 'brand_id', label: 'Brand', options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })) },
-          { name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
-          { name: 'stock', label: 'Stock', options: [{ value: 'low', label: 'Low Stock' }, { value: 'out', label: 'Out of Stock' }] },
-        ]}
-        searchPlaceholder="Search by name or SKU..."
-        searchParam="search"
-        suggestType="products"
-      />
-
+    <>
       <div className="md:hidden space-y-3">
         {products && products.length > 0 ? (
           products.map((product: any) => {
@@ -252,6 +191,88 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       <div className="hidden md:block px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
         <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
+    </>
+  )
+}
+
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const resolvedSearchParams = await searchParams
+  const host = await getHost()
+
+  const [categories, brands, allProductsForStats] = await Promise.all([
+    getAllCategories(),
+    getAllBrands(),
+    getFilteredProducts({}),
+  ])
+
+  const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
+  const activeCount = allProductsForStats.products?.filter((p: any) => p.is_active).length || 0
+  const totalCount = allProductsForStats.total
+
+  const allCats: any[] = categories || []
+  const mainCats = allCats.filter((c: any) => !c.parent_category_id)
+  const categoryOptions = mainCats.flatMap((cat: any) => {
+    const subs = allCats.filter((c: any) => c.parent_category_id === cat.id)
+    return [
+      { value: cat.id, label: cat.name, group: cat.name },
+      ...subs.map((sub: any) => ({ value: sub.id, label: sub.name, group: cat.name, indent: true })),
+    ]
+  })
+
+  return (
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Products</h1>
+          <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
+        </div>
+        <Link
+          href={ap('/admin/products/add', host)}
+          className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+        >
+          Add New Product
+        </Link>
+      </div>
+
+      <MerchantSyncStatus />
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Total Products</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCount}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Featured</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
+            <span className={featuredCount >= 6 ? 'text-yellow-600 dark:text-yellow-400' : ''}>{featuredCount}</span>
+            <span className="text-base font-normal text-foreground-muted">/6</span>
+          </p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Categories</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{categories?.length || 0}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Active Products</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{activeCount}</p>
+        </div>
+      </div>
+
+      <AdminFilters
+        filters={[
+          { name: 'category_id', label: 'Category', options: categoryOptions },
+          { name: 'brand_id', label: 'Brand', options: (brands || []).map((b: any) => ({ value: b.id, label: b.name })) },
+          { name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
+          { name: 'stock', label: 'Stock', options: [{ value: 'low', label: 'Low Stock' }, { value: 'out', label: 'Out of Stock' }] },
+        ]}
+        searchPlaceholder="Search by name or SKU..."
+        searchParam="search"
+        suggestType="products"
+      />
+
+      <Suspense fallback={<AdminSkeleton variant="list" showStats={false} />}>
+        <ProductsListContent resolvedSearchParams={resolvedSearchParams} featuredCount={featuredCount} />
+      </Suspense>
     </div>
   )
 }

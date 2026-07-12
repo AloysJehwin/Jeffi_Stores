@@ -13,6 +13,8 @@ import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/So
 import LineItemsSection, { newLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 import HoverCard from '@/components/ui/HoverCard'
 import { ap } from '@/lib/admin-path'
+import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
+import SerialEntryModal, { type SerialItem, type SerialAssignment } from '@/components/admin/SerialEntryModal'
 
 interface CashSale {
   id: string
@@ -125,6 +127,13 @@ export default function CashSaleClient() {
   const [formError, setFormError] = useState('')
   const [receipt, setReceipt] = useState<Receipt | null>(null)
 
+  // Batch/serial assignment for perishable and serialized products
+  const [batchPickerItem, setBatchPickerItem] = useState<BatchPickerItem | null>(null)
+  const [batchAssignments, setBatchAssignments] = useState<Record<string, { batch_id: string; qty: number }[]>>({})
+  const [assignedBatchLabels, setAssignedBatchLabels] = useState<Record<string, string>>({})
+  const [serialAssignments, setSerialAssignments] = useState<SerialAssignment[]>([])
+  const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
+
   const totalPages = Math.ceil(total / 25)
 
   const SORT_KEYS: Record<string, keyof CashSale> = {
@@ -179,6 +188,11 @@ export default function CashSaleClient() {
     setNotes('')
     setItems([newLineItem()])
     setFormError('')
+    setBatchAssignments({})
+    setAssignedBatchLabels({})
+    setSerialAssignments([])
+    setSerialPickerItems(null)
+    setBatchPickerItem(null)
   }
 
   async function cancelSale(id: string) {
@@ -209,6 +223,24 @@ export default function CashSaleClient() {
     }
   }
 
+  async function handleStockBadgeClick(item: LineItem) {
+    if (!item.product_id) return
+    const params = new URLSearchParams({
+      product_id: item.product_id,
+      line_item_id: item.id,
+      qty: String((Number(item.quantity) || 1) * (item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : 1)),
+    })
+    if (item.variant_id) params.set('variant_id', item.variant_id)
+    if (item.sub_variant_id) params.set('sub_variant_id', item.sub_variant_id)
+    const res = await fetch(`/api/admin/inventory/batches/available?${params}`, { credentials: 'include' })
+    const data = await res.json()
+    if (data.serialized_items?.length > 0) {
+      setSerialPickerItems(data.serialized_items)
+    } else if (data.items?.length > 0) {
+      setBatchPickerItem(data.items[0])
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (items.some(it => !it.product_name.trim() || !it.unit_price)) {
@@ -217,6 +249,24 @@ export default function CashSaleClient() {
     }
     if (items.some(it => !it.product_id)) {
       setFormError('All items must be selected from inventory — free-typed names are not allowed')
+      return
+    }
+    // Validate serialized items have serial assignments
+    const missingSerial = items.find(it =>
+      it.product_id && it.serialized &&
+      serialAssignments.filter(sa => sa.order_item_id === it.id).length < Number(it.quantity)
+    )
+    if (missingSerial) {
+      setFormError(`Serial numbers required for "${missingSerial.product_name}${missingSerial.variant_name ? ' / ' + missingSerial.variant_name : ''}" — click the stock badge to assign`)
+      return
+    }
+    // Validate perishable items have batch assignments
+    const missingBatch = items.find(it =>
+      it.product_id && it.perishable && !it.serialized &&
+      !batchAssignments[it.id]?.length
+    )
+    if (missingBatch) {
+      setFormError(`Batch assignment required for "${missingBatch.product_name}${missingBatch.variant_name ? ' / ' + missingBatch.variant_name : ''}" — click the stock badge to assign`)
       return
     }
     const overstock = items.find(it => it.inventory_quantity !== null && Number(it.quantity) * (it.sell_unit_factor || 1) > it.inventory_quantity)
@@ -247,7 +297,12 @@ export default function CashSaleClient() {
             buy_unit: it.buy_unit || null,
             unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
             discount_pct: Number(it.discount_pct) || 0,
+            temp_id: it.id,
           })),
+          batch_assignments: Object.entries(batchAssignments).flatMap(([order_item_id, batches]) =>
+            batches.map(b => ({ order_item_id, batch_id: b.batch_id, qty: b.qty }))
+          ),
+          serial_assignments: serialAssignments,
         }),
       })
       const data = await res.json()
@@ -408,6 +463,60 @@ export default function CashSaleClient() {
     const { subtotal: liveSubtotal, tax: liveTax } = calcTotals(items)
     return (
       <div className="space-y-4">
+        {batchPickerItem && (
+          <BatchPickerModal
+            items={[batchPickerItem]}
+            onConfirm={assignments => {
+              const map: Record<string, { batch_id: string; qty: number }[]> = { ...batchAssignments }
+              const labelMap: Record<string, string> = { ...assignedBatchLabels }
+              const byItem: Record<string, typeof assignments> = {}
+              for (const a of assignments) {
+                if (!byItem[a.order_item_id]) byItem[a.order_item_id] = []
+                byItem[a.order_item_id].push(a)
+              }
+              for (const [order_item_id, itemAssignments] of Object.entries(byItem)) {
+                map[order_item_id] = itemAssignments.map(a => ({ batch_id: a.batch_id, qty: a.qty }))
+                const lots = itemAssignments.map(a => {
+                  const batch = batchPickerItem?.batches.find(b => b.id === a.batch_id)
+                  return batch?.lot_number || a.batch_id.slice(0, 8)
+                })
+                labelMap[order_item_id] = lots.join(', ')
+              }
+              setBatchAssignments(map)
+              setAssignedBatchLabels(labelMap)
+              setBatchPickerItem(null)
+              // If serialized, prompt for serial numbers next
+              const lineItem = items.find(it => it.id === Object.keys(byItem)[0])
+              if (lineItem?.serialized) {
+                const totalQty = assignments.reduce((s, a) => s + a.qty, 0)
+                setSerialPickerItems([{
+                  order_item_id: lineItem.id,
+                  product_name: lineItem.product_name,
+                  variant_name: lineItem.variant_name || null,
+                  required_qty: totalQty,
+                  already_assigned: false,
+                  product_id: lineItem.product_id || undefined,
+                  variant_id: lineItem.variant_id || null,
+                  sub_variant_id: lineItem.sub_variant_id || null,
+                }])
+              }
+            }}
+            onCancel={() => setBatchPickerItem(null)}
+          />
+        )}
+        {serialPickerItems && (
+          <SerialEntryModal
+            items={serialPickerItems}
+            onConfirm={assignments => {
+              setSerialAssignments(prev => {
+                const itemIds = new Set(assignments.map(a => a.order_item_id))
+                return [...prev.filter(a => !itemIds.has(a.order_item_id)), ...assignments]
+              })
+              setSerialPickerItems(null)
+            }}
+            onCancel={() => setSerialPickerItems(null)}
+          />
+        )}
         <div className="flex items-center gap-3">
           <button
             onClick={() => { resetForm(); setView('list') }}
@@ -433,7 +542,7 @@ export default function CashSaleClient() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
               <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-                <LineItemsSection items={items} onChange={setItems} />
+                <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} />
               </div>
 
               <div className="bg-surface-elevated border border-border-default rounded-xl p-4">

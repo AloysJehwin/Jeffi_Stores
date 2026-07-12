@@ -46,23 +46,23 @@ export function applyDeliveryRules(params: {
     }
   }
 
-  const discountEligible = subtotal >= (settings.discountMinSubtotal ?? 0)
-  const hasDiscount = discountEligible && (settings.discountPercent > 0 || settings.discountFlat > 0)
+  const hasDiscount = (settings.discountPercent > 0 || settings.discountFlat > 0) && original > 0
+  const meetsMinSubtotal = settings.discountMinSubtotal <= 0 || subtotal >= settings.discountMinSubtotal
 
-  if (!hasDiscount || original === 0) {
-    return { charge: original, originalCharge: original, discountApplied: 0, source: 'as_is' }
+  if (hasDiscount && meetsMinSubtotal) {
+    let after = original
+    if (settings.discountPercent > 0) after = round2(after * (1 - settings.discountPercent / 100))
+    if (settings.discountFlat > 0) after = round2(after - settings.discountFlat)
+    after = Math.max(0, after)
+    const result: ApplyDeliveryResult = {
+      charge: after,
+      originalCharge: original,
+      discountApplied: round2(original - after),
+      source: 'discounted',
+    }
+    if (settings.discountLabel) result.discountLabel = settings.discountLabel
+    return result
   }
 
-  const afterPercent = original - (original * settings.discountPercent) / 100
-  const afterFlat = afterPercent - settings.discountFlat
-  const finalCharge = Math.max(0, round2(afterFlat))
-  const discountApplied = round2(original - finalCharge)
-
-  return {
-    charge: finalCharge,
-    originalCharge: original,
-    discountApplied,
-    source: 'discounted',
-    discountLabel: settings.discountLabel || undefined,
-  }
+  return { charge: original, originalCharge: original, discountApplied: 0, source: 'as_is' }
 }

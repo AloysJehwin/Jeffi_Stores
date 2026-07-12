@@ -15,7 +15,18 @@ interface ReturnRequest {
   return_tracking_number?: string | null
   replacement_order_id?: string | null
   rvp_awb_number?: string | null
+  valuation_status?: string | null
+  valuation_condition?: string | null
+  valuation_notes?: string | null
   created_at: string
+  items?: Array<{
+    id: string
+    product_name?: string | null
+    variant_name?: string | null
+    quantity: number
+    unit_price: number
+    refund_amount: number
+  }> | null
 }
 
 interface ReturnReviewProps {
@@ -35,7 +46,6 @@ const REASON_LABELS: Record<string, string> = {
 export default function ReturnReview({ orderId, returnRequest, replacementOrderNumber }: ReturnReviewProps) {
   const [adminNotes, setAdminNotes] = useState('')
   const [returnTrackingNumber, setReturnTrackingNumber] = useState('')
-  const [restock, setRestock] = useState<boolean>(true)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -78,7 +88,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
           action,
           adminNotes: adminNotes.trim() || undefined,
           returnTrackingNumber: returnTrackingNumber.trim() || undefined,
-          ...(action === 'process' ? { restock } : {}),
+          ...(action === 'process' ? { restock: returnRequest.valuation_condition === 'good' } : {}),
         }),
       })
 
@@ -142,8 +152,32 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         </div>
       </div>
 
-      {description && (
+      {returnRequest.items && returnRequest.items.length > 0 && (
         <div>
+          <p className="text-sm text-foreground-secondary mb-2">
+            Items being returned ·{' '}
+            <span className="font-medium text-foreground">
+              ₹{returnRequest.items.reduce((s, i) => s + parseFloat(String(i.refund_amount)), 0).toFixed(0)} refund
+            </span>
+          </p>
+          <div className="divide-y divide-border-default border border-border-default rounded-lg overflow-hidden">
+            {returnRequest.items.map(item => (
+              <div key={item.id} className="flex items-center justify-between px-3 py-2 bg-surface text-sm">
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">{item.product_name}</p>
+                  {item.variant_name && <p className="text-xs text-foreground-secondary">{item.variant_name}</p>}
+                </div>
+                <div className="text-right flex-shrink-0 ml-4">
+                  <p className="text-xs text-foreground-secondary">Qty {item.quantity} × ₹{parseFloat(String(item.unit_price)).toFixed(0)}</p>
+                  <p className="font-medium text-foreground">₹{parseFloat(String(item.refund_amount)).toFixed(0)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {description && (        <div>
           <p className="text-sm text-foreground-secondary mb-1">Customer description</p>
           <p className="text-sm text-foreground bg-surface rounded-lg border border-border-default px-3 py-2">{description}</p>
         </div>
@@ -254,58 +288,46 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
 
       {status === 'received' && (
         <div className="pt-2 border-t border-border-default space-y-4">
-          <div>
-            <p className="text-sm font-medium text-foreground-secondary mb-2">
-              Add returned item(s) back to inventory?
-            </p>
-            <p className="text-xs text-foreground-muted mb-3">
-              If the item is defective or damaged, do not restock — it will not be added to available inventory.
-            </p>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setRestock(true)}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                  restock
-                    ? 'bg-green-600 text-white border-green-600'
-                    : 'bg-surface text-foreground-secondary border-border-secondary hover:border-green-500 hover:text-green-600'
-                }`}
-              >
-                Yes — item is in good condition
-              </button>
-              <button
-                type="button"
-                onClick={() => setRestock(false)}
-                className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium border transition-colors ${
-                  !restock
-                    ? 'bg-red-600 text-white border-red-600'
-                    : 'bg-surface text-foreground-secondary border-border-secondary hover:border-red-500 hover:text-red-600'
-                }`}
-              >
-                No — item is defective / damaged
-              </button>
+          {returnRequest.valuation_status !== 'approved' ? (
+            <div className="flex items-start gap-3 px-3 py-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
+              <svg className="w-5 h-5 text-yellow-600 dark:text-yellow-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+              </svg>
+              <div>
+                <p className="text-sm font-medium text-yellow-800 dark:text-yellow-300">Valuation pending</p>
+                <p className="text-xs text-yellow-700 dark:text-yellow-400 mt-0.5">
+                  Complete the item valuation in the <strong>Returns page</strong> before processing the {type === 'refund' ? 'refund' : 'replacement'}.
+                </p>
+              </div>
             </div>
-            {!restock && (
-              <p className="mt-2 text-xs text-red-600 dark:text-red-400">
-                Stock will NOT be restored. Write off the item manually if needed.
-              </p>
-            )}
-          </div>
-          <div>
-            <p className="text-sm text-foreground-secondary mb-3">
-              {type === 'refund'
-                ? 'Issue a full refund via Razorpay.'
-                : 'Create a replacement order (confirmed, paid).'}
-            </p>
-            <button
-              type="button"
-              onClick={() => submit('process')}
-              disabled={isSubmitting}
-              className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
-            >
-              {isSubmitting ? 'Processing...' : type === 'refund' ? 'Process Refund' : 'Create Replacement Order'}
-            </button>
-          </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg text-sm">
+                <svg className="w-4 h-4 text-green-600 dark:text-green-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-green-800 dark:text-green-300">
+                  Valuation complete — condition: <strong className="capitalize">{returnRequest.valuation_condition}</strong>
+                  {returnRequest.valuation_condition !== 'good' && <span className="text-red-600 dark:text-red-400 ml-1">(no restock)</span>}
+                </span>
+              </div>
+              <div>
+                <p className="text-sm text-foreground-secondary mb-3">
+                  {type === 'refund'
+                    ? 'Issue a full refund via Razorpay.'
+                    : 'Create a replacement order (confirmed, paid).'}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => submit('process')}
+                  disabled={isSubmitting}
+                  className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                >
+                  {isSubmitting ? 'Processing...' : type === 'refund' ? 'Process Refund' : 'Create Replacement Order'}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
