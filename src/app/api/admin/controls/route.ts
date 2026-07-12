@@ -4,6 +4,13 @@ import { round2 } from '@/lib/gst'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 
+type SnapshotRow = {
+  id: string
+  name: string
+  before: Record<string, unknown>
+  after?: Record<string, unknown>
+}
+
 // ── helpers ──────────────────────────────────────────────────────────────────
 
 function deriveFromMrpEx(mrpEx: number, discPct: number, gstPct: number) {
@@ -106,8 +113,58 @@ export async function POST(request: NextRequest) {
 
   try {
     let updated = 0
+    let logId: string | null = null
 
     await withTransaction(async (client) => {
+      // ── capture snapshot (before values) ────────────────────────────────
+      const snapshot: SnapshotRow[] = []
+
+      const PRICE_FIELDS = ['mrp_ex_gst', 'mrp', 'price_ex_gst', 'base_price', 'discount_pct']
+      const SIMPLE_FIELD_MAP: Record<string, string[]> = {
+        set_tax_class:        ['tax_class'],
+        set_condition:        ['condition'],
+        set_shipping_class:   ['shipping_class'],
+        set_handling_days:    ['handling_days'],
+        set_warranty_months:  ['warranty_months'],
+        set_target_gender:    ['target_gender'],
+        set_grade:            ['grade'],
+        set_hsn_code:         ['hsn_code'],
+        set_country_of_origin:['country_of_origin'],
+        set_featured:         ['is_featured'],
+        set_searchable:       ['is_searchable'],
+        set_active:           ['is_active'],
+      }
+
+      if (['inflate_price', 'set_discount', 'set_mrp_ex_gst'].includes(operation)) {
+        const rows = await client.query(
+          `SELECT id, name, ${PRICE_FIELDS.join(', ')} FROM products WHERE id = ANY($1::uuid[])`,
+          [ids]
+        )
+        for (const r of rows.rows) {
+          snapshot.push({ id: r.id, name: r.name, before: Object.fromEntries(PRICE_FIELDS.map(f => [f, r[f]])) })
+        }
+      } else if (SIMPLE_FIELD_MAP[operation]) {
+        const fields = SIMPLE_FIELD_MAP[operation]
+        const rows = await client.query(
+          `SELECT id, name, ${fields.join(', ')} FROM products WHERE id = ANY($1::uuid[])`,
+          [ids]
+        )
+        for (const r of rows.rows) {
+          snapshot.push({ id: r.id, name: r.name, before: Object.fromEntries(fields.map(f => [f, r[f]])) })
+        }
+      } else if (operation === 'set_selling_unit') {
+        const rows = await client.query(
+          `SELECT p.id, p.name,
+                  pu.unit, pu.factor, pu.dimension, pu.display_label, pu.min_qty, pu.max_qty, pu.qty_step
+           FROM products p
+           LEFT JOIN product_units pu ON pu.product_id = p.id AND pu.is_base = true AND pu.variant_id IS NULL
+           WHERE p.id = ANY($1::uuid[])`,
+          [ids]
+        )
+        for (const r of rows.rows) {
+          snapshot.push({ id: r.id, name: r.name, before: { unit: r.unit, factor: r.factor, dimension: r.dimension, display_label: r.display_label, min_qty: r.min_qty, max_qty: r.max_qty, qty_step: r.qty_step } })
+        }
+      }
 
       // ── price inflation ───────────────────────────────────────────────────
       if (operation === 'inflate_price') {
@@ -326,9 +383,18 @@ export async function POST(request: NextRequest) {
       else {
         throw new Error(`Unknown operation: ${operation}`)
       }
+
+      // ── insert operation log ─────────────────────────────────────────────
+      const logRes = await client.query(
+        `INSERT INTO controls_operation_log (operation, product_ids, value, snapshot, applied_by, admin_id, product_count)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id`,
+        [operation, ids, JSON.stringify(value ?? null), JSON.stringify(snapshot), admin.username ?? null, admin.adminId ?? null, ids.length]
+      )
+      logId = logRes.rows[0]?.id ?? null
     })
 
-    return NextResponse.json({ success: true, updated })
+    return NextResponse.json({ success: true, updated, log_id: logId })
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'Operation failed' }, { status: 500 })
   }
