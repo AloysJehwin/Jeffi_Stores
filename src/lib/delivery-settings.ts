@@ -7,11 +7,19 @@ export { applyDeliveryRules } from './delivery-rules'
 const DEFAULTS: DeliverySettings = {
   enabled: true,
   freeThreshold: 0,
+  discountPercent: 0,
+  discountFlat: 0,
+  discountMinSubtotal: 0,
+  discountLabel: '',
 }
 
 const KEYS = [
   'delivery_charges_enabled',
   'delivery_free_threshold',
+  'delivery_discount_percent',
+  'delivery_discount_flat',
+  'delivery_discount_min_subtotal',
+  'delivery_discount_label',
 ]
 
 let cache: { value: DeliverySettings; expiresAt: number } | null = null
@@ -34,6 +42,10 @@ export async function getDeliverySettings(): Promise<DeliverySettings> {
     const result: DeliverySettings = {
       enabled: (map.get('delivery_charges_enabled') ?? 'true').toLowerCase() === 'true',
       freeThreshold: Math.max(0, parseNum(map.get('delivery_free_threshold'), 0)),
+      discountPercent: Math.min(100, Math.max(0, parseNum(map.get('delivery_discount_percent'), 0))),
+      discountFlat: Math.max(0, parseNum(map.get('delivery_discount_flat'), 0)),
+      discountMinSubtotal: Math.max(0, parseNum(map.get('delivery_discount_min_subtotal'), 0)),
+      discountLabel: (map.get('delivery_discount_label') ?? '').trim(),
     }
     cache = { value: result, expiresAt: Date.now() + TTL_MS }
     return result

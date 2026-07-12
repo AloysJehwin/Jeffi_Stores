@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { listWarehouses, createWarehouse } from '@/lib/shelf'
+import { listWarehouses, createWarehouse, getOrCreateOpenShelf } from '@/lib/shelf'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 
@@ -39,6 +39,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response
 
     const warehouse = await createWarehouse(name.trim(), code.trim(), address?.trim() || null)
+    await getOrCreateOpenShelf(warehouse.id, warehouse.code)
     return NextResponse.json({ warehouse }, { status: 201 })
   } catch (e: any) {
     if (e.message?.includes('unique') || e.code === '23505') {

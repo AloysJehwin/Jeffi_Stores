@@ -258,7 +258,7 @@ type PO = {
 
 type POItem = {
   id: string; product_id: string; variant_id: string | null
-  product_name: string; variant_name: string | null; sku: string | null
+  product_name: string; variant_name: string | null; sku: string | null; product_sku?: string | null
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
   purchase_unit: string | null; purchase_unit_factor: string | null
   sell_unit_label: string | null; sell_unit_dimension: string | null
@@ -682,7 +682,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                                     type="button"
                                     title="Auto-generate"
                                     className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                                    onClick={() => updateSerial(n, autoSerial(n + 1))}
+                                    onClick={() => updateSerial(n, autoSerial())}
                                   >
                                     Auto
                                   </button>

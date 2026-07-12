@@ -348,7 +348,6 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [isSearchable, setIsSearchable] = useState(product?.is_searchable ?? true)
   // Tax & Finance
   const [taxClass, setTaxClass] = useState(product?.tax_class || 'standard')
-  const [customsTariffCode, setCustomsTariffCode] = useState(product?.customs_tariff_code || '')
   const [inclusiveTax, setInclusiveTax] = useState(product?.inclusive_tax ?? false)
   // Age / Audience
   const [ageMin, setAgeMin] = useState(product?.age_min != null ? String(product.age_min) : '')
@@ -956,7 +955,6 @@ export default function ProductForm({ categories, brands, action, product, produ
       formData.set('is_searchable', String(isSearchable))
       // Tax & Finance
       formData.set('tax_class', taxClass)
-      formData.set('customs_tariff_code', customsTariffCode)
       formData.set('inclusive_tax', String(inclusiveTax))
       // Age / Audience
       formData.set('age_min', ageMin)
@@ -1655,7 +1653,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 border-t border-border-default">
                     <div>
                       <label className="block text-xs font-medium text-foreground-muted mb-1">Subscription Interval</label>
-                      <AdminSelect value={subscriptionInterval} onChange={e => setSubscriptionInterval(e.target.value)} className="w-full" options={[{ value: '', label: '— select —' }, { value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' }, { value: 'yearly', label: 'Yearly' }]} />
+                      <AdminSelect value={subscriptionInterval} onChange={v => setSubscriptionInterval(v)} className="w-full" options={[{ value: '', label: '— select —' }, { value: 'daily', label: 'Daily' }, { value: 'weekly', label: 'Weekly' }, { value: 'monthly', label: 'Monthly' }, { value: 'quarterly', label: 'Quarterly' }, { value: 'yearly', label: 'Yearly' }]} />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-muted mb-1">Subscription Price (₹)</label>
@@ -1678,11 +1676,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className="block text-xs font-medium text-foreground-muted mb-1">Tax Class</label>
-                    <AdminSelect value={taxClass} onChange={e => setTaxClass(e.target.value)} className="w-full" options={[{ value: 'standard', label: 'Standard' }, { value: 'reduced', label: 'Reduced' }, { value: 'zero', label: 'Zero' }, { value: 'exempt', label: 'Exempt' }]} />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-foreground-muted mb-1">Customs Tariff Code</label>
-                    <input type="text" value={customsTariffCode} onChange={e => setCustomsTariffCode(e.target.value)} placeholder="e.g. 8302.41" className={inputCls} />
+                    <AdminSelect value={taxClass} onChange={v => setTaxClass(v)} className="w-full" options={[{ value: 'standard', label: 'Standard' }, { value: 'reduced', label: 'Reduced' }, { value: 'zero', label: 'Zero' }, { value: 'exempt', label: 'Exempt' }]} />
                   </div>
                 </div>
                 <Toggle id="inclusive_tax" checked={inclusiveTax} onChange={setInclusiveTax} label="Price includes tax (inclusive tax)" />
@@ -1709,7 +1703,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-foreground-muted mb-1">Target Gender</label>
-                    <AdminSelect value={targetGender} onChange={e => setTargetGender(e.target.value)} className="w-full" options={[{ value: '', label: '— any —' }, { value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'unisex', label: 'Unisex' }]} />
+                    <AdminSelect value={targetGender} onChange={v => setTargetGender(v)} className="w-full" options={[{ value: '', label: '— any —' }, { value: 'male', label: 'Male' }, { value: 'female', label: 'Female' }, { value: 'unisex', label: 'Unisex' }]} />
                   </div>
                   <div className="sm:col-span-2">
                     <label className="block text-xs font-medium text-foreground-muted mb-1">Target Audience <span className="text-foreground-muted/60">(comma-separated)</span></label>

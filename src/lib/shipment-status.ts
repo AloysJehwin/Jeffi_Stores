@@ -55,7 +55,7 @@ export function resolveShipmentStatus(
   // Ambiguous codes: walk scan history newest-first to find the true state.
   // UD is used for manifests, bag-adds, and generic updates — resolve from scans.
   // PP/MF are pre-pickup codes that may have progressed. NDR/HOLD/LOST/MIS need context.
-  for (const scan of [...scans].reverse()) {
+  for (const scan of scans) {
     const scanType = scan.scanType?.toUpperCase() ?? ''
     const fromScanType = directMap(scanType)
     if (fromScanType) return fromScanType
@@ -83,8 +83,9 @@ function directMap(code: string): ShipmentStatus | null {
     case 'RAD':      return 'in_transit'    // Reached at destination facility
     // UD/HOLD/MIS/LOST are ambiguous — handled by scan-walk in resolveShipmentStatus
     // Out for delivery
-    case 'OT':       return 'out_for_delivery'  // Out for delivery (hub scan)
-    case 'OD':       return 'out_for_delivery'  // Out for delivery (DE scan)
+    case 'OT':           return 'out_for_delivery'  // Out for delivery (hub scan)
+    case 'OD':           return 'out_for_delivery'  // Out for delivery (DE scan)
+    case 'DISPATCHED':   return 'out_for_delivery'  // Delhivery "Dispatched" scanType
     // Delivery attempt failed
     case 'NDR':      return 'delivery_attempted' // Non Delivery Report
     // Delivered
@@ -105,7 +106,7 @@ function activityMap(activity: string): ShipmentStatus | null {
   if (activity.includes('out for return')) return 'rto_out_for_return'
   if (activity.includes('return in transit') || activity.includes('in return transit')) return 'rto_in_transit'
   if (activity.includes('rto initiated') || activity.includes('return initiated')) return 'rto_initiated'
-  if (activity.includes('out for delivery')) return 'out_for_delivery'
+  if (activity.includes('out for delivery') || activity === 'dispatched') return 'out_for_delivery'
   if (activity.includes('delivery attempt') || activity.includes('undelivered') || activity.includes('not delivered') || activity.includes('customer not available') || activity.includes('door locked') || activity.includes('refused delivery')) return 'delivery_attempted'
   if (activity.includes('delivered') && !activity.includes('out for') && !activity.includes('return')) return 'delivered'
   if (activity.includes('added to bag') || activity.includes('in transit') || activity === 'transit' || activity.includes('reached') || activity.includes('arrived at') || activity.includes('misrouted') || activity.includes('held at')) return 'in_transit'
