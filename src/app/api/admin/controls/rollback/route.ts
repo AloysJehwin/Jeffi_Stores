@@ -10,9 +10,9 @@ export async function GET(request: NextRequest) {
 
   const logs = await queryMany<{
     id: string; operation: string; product_count: number; applied_by: string | null
-    applied_at: string; rolled_back_at: string | null; is_rollback: boolean; value: any
+    applied_at: string; rolled_back_at: string | null; is_rollback: boolean; value: any; snapshot: any
   }>(
-    `SELECT id, operation, product_count, applied_by, applied_at, rolled_back_at, is_rollback, value
+    `SELECT id, operation, product_count, applied_by, applied_at, rolled_back_at, is_rollback, value, snapshot
      FROM controls_operation_log
      WHERE is_rollback = false
      ORDER BY applied_at DESC
