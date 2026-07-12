@@ -14,6 +14,7 @@ interface ControlsLog {
   rolled_back_at: string | null
   is_rollback: boolean
   value: any
+  snapshot: { id: string; name: string; before: Record<string, any> }[] | null
 }
 
 interface Category { id: string; name: string; parent_category_id: string | null }
@@ -115,6 +116,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   // ── operation history ─────────────────────────────────────────────────────
   const [logs, setLogs] = useState<ControlsLog[]>([])
   const [logsLoading, setLogsLoading] = useState(false)
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null)
 
   const loadLogs = useCallback(async () => {
     setLogsLoading(true)
@@ -815,36 +817,57 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
         ) : logs.length === 0 ? (
           <p className="px-4 py-3 text-sm text-foreground-muted">No operations recorded yet.</p>
         ) : (
-          <div className="divide-y divide-border-default max-h-80 overflow-y-auto">
+          <div className="divide-y divide-border-default max-h-[32rem] overflow-y-auto">
             {logs.map(log => {
               const opLabel = OPERATIONS.find(o => o.key === log.operation)?.label ?? log.operation
-              const valueStr = (() => {
-                if (!log.value || log.value === null) return null
-                if (typeof log.value === 'object') return null
-                return String(log.value)
-              })()
+              const valueStr = (!log.value || typeof log.value === 'object') ? null : String(log.value)
+              const isExpanded = expandedLogId === log.id
+              const snapshotRows = log.snapshot ?? []
               return (
-                <div key={log.id} className={`flex items-center gap-3 px-4 py-2.5 ${log.rolled_back_at ? 'opacity-50' : ''}`}>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm text-foreground">
-                      {opLabel}{valueStr ? <span className="text-foreground-muted ml-1">→ {valueStr}</span> : null}
-                    </p>
-                    <p className="text-xs text-foreground-muted mt-0.5">
-                      {log.product_count} product{log.product_count !== 1 ? 's' : ''}
-                      {log.applied_by ? ` · ${log.applied_by}` : ''}
-                      {' · '}{new Date(log.applied_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
-                      {log.rolled_back_at ? ' · Rolled back' : ''}
-                    </p>
-                  </div>
-                  {!log.rolled_back_at && (
-                    <button
-                      type="button"
-                      onClick={() => handleRollback(log.id, opLabel)}
-                      disabled={rollingBack}
-                      className="shrink-0 px-2.5 py-1 rounded border border-border-secondary text-xs text-foreground-secondary hover:border-red-400 hover:text-red-600 dark:hover:text-red-400 disabled:opacity-50 transition-colors"
-                    >
-                      Rollback
-                    </button>
+                <div key={log.id} className={log.rolled_back_at ? 'opacity-50' : ''}>
+                  <button
+                    type="button"
+                    onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 text-left hover:bg-surface transition-colors"
+                  >
+                    <svg className={`w-3.5 h-3.5 shrink-0 text-foreground-muted transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-foreground">
+                        {opLabel}{valueStr ? <span className="text-foreground-muted ml-1">— {valueStr}</span> : null}
+                      </p>
+                      <p className="text-xs text-foreground-muted mt-0.5">
+                        {log.product_count} product{log.product_count !== 1 ? 's' : ''}
+                        {log.applied_by ? ` · ${log.applied_by}` : ''}
+                        {' · '}{new Date(log.applied_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
+                        {log.rolled_back_at ? ' · Rolled back' : ''}
+                      </p>
+                    </div>
+                    {!log.rolled_back_at && (
+                      <span
+                        role="button"
+                        onClick={e => { e.stopPropagation(); handleRollback(log.id, opLabel) }}
+                        className="shrink-0 px-2.5 py-1 rounded border border-border-secondary text-xs text-foreground-secondary hover:border-red-400 hover:text-red-600 dark:hover:text-red-400 transition-colors cursor-pointer"
+                      >
+                        Rollback
+                      </span>
+                    )}
+                  </button>
+
+                  {isExpanded && snapshotRows.length > 0 && (
+                    <div className="px-4 pb-3 space-y-1 bg-surface">
+                      {snapshotRows.map(row => (
+                        <div key={row.id} className="text-xs border border-border-default rounded p-2 space-y-0.5">
+                          <p className="font-medium text-foreground">{row.name}</p>
+                          <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-foreground-muted">
+                            {Object.entries(row.before).map(([k, v]) => (
+                              <span key={k}><span className="text-foreground-secondary">{k}:</span> {v == null ? '—' : String(v)}</span>
+                            ))}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   )}
                 </div>
               )
