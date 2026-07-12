@@ -20,6 +20,11 @@ vi.mock('@/lib/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/lib/shelf', () => ({
+  syncPerishableStock: vi.fn().mockResolvedValue(undefined),
+  decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
+}))
+
 import { GET, PATCH } from '@/app/api/admin/cash-sale/[id]/detail/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
@@ -167,8 +172,12 @@ describe('PATCH /api/admin/cash-sale/[id]/detail', () => {
         .mockResolvedValueOnce({ rows: [                              // SELECT items
           { product_id: 'p1', variant_id: null, sub_variant_id: null, product_name: 'Bolt', variant_name: null, quantity: '5' }
         ]})
+        .mockResolvedValueOnce({ rows: [] })                           // batchMovements query
         .mockResolvedValueOnce({ rows: [{ inventory_quantity: 10 }] }) // SELECT products inventory
         .mockResolvedValueOnce({ rows: [] })                           // UPDATE products
+        .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }) // perishable check (sync loop)
+        .mockResolvedValueOnce({ rows: [{ perishable: false, serialized: false }] }) // perishable check (restore loop)
+        .mockResolvedValueOnce({ rows: [] })                           // UPDATE shelf_stock
     }
     mockWithTx.mockImplementation(async (fn: any) => fn(mockClient))
     const res = await PATCH(makePatchReq({ action: 'cancel' }), { params })

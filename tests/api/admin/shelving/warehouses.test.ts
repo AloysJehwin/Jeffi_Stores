@@ -20,6 +20,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/shelf', () => ({
   listWarehouses: vi.fn(),
   createWarehouse: vi.fn(),
+  getOrCreateOpenShelf: vi.fn().mockResolvedValue({}),
 }))
 
 vi.mock('@/lib/validate', () => ({

@@ -24,6 +24,7 @@ vi.mock('@/lib/auto-tasks', () => ({ createAutoTask: vi.fn().mockResolvedValue(u
 vi.mock('@/lib/ai-feedback', () => ({ recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/order-commit', () => ({ quoteShipping: vi.fn().mockResolvedValue(0) }))
 vi.mock('@/lib/invoice', () => ({ createDraftInvoice: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/business-discount', () => ({ getBusinessDiscountMap: vi.fn().mockResolvedValue({}) }))
 vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
@@ -258,7 +259,7 @@ describe('POST /api/orders/create', () => {
           .mockResolvedValueOnce({ rows: [COUPON], rowCount: 1 })    // coupon FOR UPDATE
           .mockImplementation(async (sql: string, params: any[]) => {
             if (sql.includes('INSERT INTO orders')) {
-              capturedDiscount = params[8] // discount_amount is param index 8
+              capturedDiscount = params[9] // discount_amount is $10 (index 9)
             }
             return { rows: [CREATED_ORDER], rowCount: 1 }
           }),

@@ -1,0 +1,479 @@
+import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('@/lib/db', () => ({
+  query: vi.fn(),
+  queryOne: vi.fn(),
+  queryMany: vi.fn(),
+  withTransaction: vi.fn(),
+}))
+vi.mock('@/lib/jwt', () => ({
+  authenticateAnyUser: vi.fn(),
+  authenticateAdmin: vi.fn(),
+}))
+vi.mock('@/lib/email', () => ({
+  sendOrderStatusUpdate: vi.fn().mockResolvedValue(undefined),
+  sendPaymentStatusUpdate: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/invoice', () => ({
+  generateOrderInvoice: vi.fn().mockResolvedValue(Buffer.from('inv')),
+}))
+vi.mock('@/lib/delhivery', () => ({
+  cancelDelhiveryShipment: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/razorpay', () => ({
+  getRazorpayInstance: vi.fn(),
+  isRazorpayEnabled: vi.fn().mockReturnValue(false),
+}))
+vi.mock('@/lib/inventory', () => ({
+  logStockMovement: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/activity', () => ({
+  logActivity: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/auto-tasks', () => ({
+  createAutoTask: vi.fn().mockResolvedValue(undefined),
+  completeAutoTask: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/marketing', () => ({
+  attributeConversion: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/validate', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/validate')>()
+  return { ...actual }
+})
+
+import { GET, PATCH, DELETE } from '@/app/api/orders/[id]/route'
+import * as db from '@/lib/db'
+import * as jwt from '@/lib/jwt'
+
+const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }
+const USER = { userId: 'user-1', isBusiness: false }
+const BIZ_USER = { userId: 'biz-1', isBusiness: true }
+const ADMIN = { adminId: 'admin-1', username: 'root', role: 'super_admin', scopes: [] }
+
+function makeReq(method: string, body?: any, headers: Record<string, string> = {}) {
+  const init: any = {
+    method,
+    headers: { 'Content-Type': 'application/json', ...headers },
+  }
+  if (body !== undefined) init.body = JSON.stringify(body)
+  return new Request('http://localhost/api/orders/order-1', init)
+}
+
+const BASE_ORDER: any = {
+  id: 'order-1',
+  order_number: 'ORD-1',
+  status: 'pending',
+  payment_status: 'unpaid',
+  total_amount: '500',
+  invoice_number: null,
+  created_at: '2024-01-01',
+  updated_at: '2024-01-01',
+  notes: null,
+  order_type: 'cart',
+  user_id: 'user-1',
+  subtotal: '500',
+  tax_amount: '50',
+  discount_amount: '0',
+  business_discount_amount: '0',
+  shipping_amount: '0',
+  payment_mode: 'manual',
+  shipping_address: null,
+  estimated_delivery_date: null,
+  delivered_at: null,
+  original_order_id: null,
+  original_order_number: null,
+  view_token: null,
+  razorpay_qr_image_url: null,
+  tracking_url: null,
+  awb_number: null,
+}
+
+describe('GET /api/orders/[id]', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns 401 when unauthenticated', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(null)
+    const res = await GET(makeReq('GET') as any, PARAMS)
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 404 when order not found for regular user', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null)
+    const res = await GET(makeReq('GET') as any, PARAMS)
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 200 for a regular user order with items', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(BASE_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([
+      {
+        id: 'item-1',
+        product_id: 'p1',
+        product_name: 'P',
+        product_sku: 'SKU',
+        variant_name: null,
+        quantity: '1',
+        unit_price: '500',
+        total_price: '500',
+        buy_mode: 'unit',
+        buy_unit: null,
+        products: { slug: 'p', extra_delivery_days: 0 },
+        return_allowed: true,
+        return_window_days: '7',
+        replacement_allowed: true,
+        replacement_window_days: '7',
+      },
+    ])
+
+    const res = await GET(makeReq('GET') as any, PARAMS)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.order.id).toBe('order-1')
+    expect(body.order.items).toHaveLength(1)
+    expect(body.order.items[0].returnAllowed).toBe(true)
+  })
+
+  it('takes business branch when x-auth-portal=business header set', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue({ userId: 'biz-1', isBusiness: false } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ email: 'biz@x.com', phone: '9999' }) // biz user lookup
+      .mockResolvedValueOnce({ ...BASE_ORDER, id: 'order-1' })      // biz order query
+    vi.mocked(db.queryMany).mockResolvedValueOnce([])
+    const res = await GET(makeReq('GET', undefined, { 'x-auth-portal': 'business' }) as any, PARAMS)
+    expect(res.status).toBe(200)
+  })
+
+  it('takes business branch when isBusiness flag is true', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(BIZ_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ email: 'a@b.com', phone: null }) // bizUser lookup with null phone
+      .mockResolvedValueOnce(BASE_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([])
+    const res = await GET(makeReq('GET') as any, PARAMS)
+    expect(res.status).toBe(200)
+  })
+
+  it('handles Date object estimated_delivery_date', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      estimated_delivery_date: new Date('2024-03-15T00:00:00Z'),
+    })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([])
+    const res = await GET(makeReq('GET') as any, PARAMS)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.order.estimatedDeliveryDate).toBeTruthy()
+  })
+
+  it('handles string estimated_delivery_date', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      estimated_delivery_date: '2024-03-15T00:00:00Z',
+    })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([])
+    const res = await GET(makeReq('GET') as any, PARAMS)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.order.estimatedDeliveryDate).toBe('2024-03-15')
+  })
+
+  it('returns 500 on unexpected error', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockRejectedValue(new Error('boom'))
+    const res = await GET(makeReq('GET') as any, PARAMS)
+    expect(res.status).toBe(500)
+  })
+})
+
+describe('PATCH /api/orders/[id]', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns 401 when not admin', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    const res = await PATCH(makeReq('PATCH', {}) as any, PARAMS)
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 404 when order missing', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null)
+    const res = await PATCH(makeReq('PATCH', { status: 'confirmed' }) as any, PARAMS)
+    expect(res.status).toBe(404)
+  })
+
+  it('rejects modification of terminal orders', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      status: 'cancelled',
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    const res = await PATCH(makeReq('PATCH', { status: 'confirmed' }) as any, PARAMS)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/cannot be modified/i)
+  })
+
+  it('rejects invalid status transition', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      status: 'pending',
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    const res = await PATCH(makeReq('PATCH', { status: 'delivered' }) as any, PARAMS)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/cannot transition/i)
+  })
+
+  it('rejects invalid payment_status value', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    const res = await PATCH(makeReq('PATCH', { payment_status: 'garbage' }) as any, PARAMS)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/invalid payment/i)
+  })
+
+  it('rejects revert from paid to pending', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      status: 'confirmed',
+      payment_status: 'paid',
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    const res = await PATCH(makeReq('PATCH', { payment_status: 'pending' }) as any, PARAMS)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/paid orders cannot revert/i)
+  })
+
+  it('rejects processing when stock is insufficient', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({
+        ...BASE_ORDER,
+        status: 'confirmed',
+        users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+      })
+      .mockResolvedValueOnce(null) // unitRow (no product_units row)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([
+      { product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '10',
+        buy_unit: null, product_name: 'P', variant_name: null, inventory_quantity: 3 },
+    ])
+
+    const res = await PATCH(makeReq('PATCH', { status: 'processing' }) as any, PARAMS)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/insufficient stock/i)
+  })
+
+  it('processes shipped status update (adds shipped_at)', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      status: 'processing',
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    const res = await PATCH(makeReq('PATCH', { status: 'shipped' }) as any, PARAMS)
+    expect(res.status).toBe(200)
+    const called = (vi.mocked(db.query).mock.calls[0]?.[0] || '') as string
+    expect(called).toMatch(/shipped_at/i)
+  })
+
+  it('processes delivered status (sets delivered_at)', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      status: 'out_for_delivery',
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    const res = await PATCH(makeReq('PATCH', { status: 'delivered' }) as any, PARAMS)
+    expect(res.status).toBe(200)
+    const called = (vi.mocked(db.query).mock.calls[0]?.[0] || '') as string
+    expect(called).toMatch(/delivered_at/)
+  })
+
+  it('creates refund auto-task when cancelling a paid order (razorpay disabled)', async () => {
+    const { createAutoTask } = await import('@/lib/auto-tasks')
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      status: 'confirmed',
+      payment_status: 'paid',
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await PATCH(makeReq('PATCH', { status: 'cancelled' }) as any, PARAMS)
+    expect(res.status).toBe(200)
+    // Allow the fire-and-forget IIFE to schedule
+    await new Promise(r => setTimeout(r, 10))
+    expect(vi.mocked(createAutoTask)).toHaveBeenCalled()
+  })
+
+  it('handles failed payment_status (creates contact_failed_payment task)', async () => {
+    const { createAutoTask } = await import('@/lib/auto-tasks')
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await PATCH(makeReq('PATCH', { payment_status: 'failed' }) as any, PARAMS)
+    expect(res.status).toBe(200)
+    await new Promise(r => setTimeout(r, 10))
+    expect(vi.mocked(createAutoTask).mock.calls.some(
+      c => (c[0] as any)?.sourceKind === 'contact_failed_payment'
+    )).toBe(true)
+  })
+
+  it('completes process_refund auto-task when payment_status → refunded', async () => {
+    const { completeAutoTask } = await import('@/lib/auto-tasks')
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...BASE_ORDER,
+      payment_status: 'paid',
+      users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await PATCH(makeReq('PATCH', { payment_status: 'refunded' }) as any, PARAMS)
+    expect(res.status).toBe(200)
+    await new Promise(r => setTimeout(r, 10))
+    expect(vi.mocked(completeAutoTask).mock.calls.some(
+      c => c[0] === 'process_refund'
+    )).toBe(true)
+  })
+
+  it('deducts stock and processes assignments on transition to processing', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({
+        ...BASE_ORDER,
+        status: 'confirmed',
+        users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
+      })
+      .mockResolvedValueOnce(null) // unitRow
+    vi.mocked(db.queryMany)
+      .mockResolvedValueOnce([
+        { product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '2',
+          buy_unit: null, product_name: 'P', variant_name: null, inventory_quantity: 100 },
+      ])
+      .mockResolvedValueOnce([
+        { order_item_id: 'oi-1', product_id: 'p1', variant_id: null, sub_variant_id: null,
+          quantity: '2', buy_unit: null },
+      ])
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn().mockResolvedValue({ rows: [{ inventory_quantity: '100' }], rowCount: 1 }) }
+      return fn(client as any)
+    })
+
+    const res = await PATCH(makeReq('PATCH', { status: 'processing' }) as any, PARAMS)
+    expect(res.status).toBe(200)
+    expect(vi.mocked(db.withTransaction)).toHaveBeenCalled()
+  })
+
+  it('returns 500 on unexpected error', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockRejectedValue(new Error('boom'))
+    const res = await PATCH(makeReq('PATCH', { status: 'confirmed' }) as any, PARAMS)
+    expect(res.status).toBe(500)
+  })
+})
+
+describe('DELETE /api/orders/[id]', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns 401 when unauthenticated', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(null)
+    const res = await DELETE(makeReq('DELETE') as any, PARAMS)
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 404 when order not found', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null)
+    const res = await DELETE(makeReq('DELETE') as any, PARAMS)
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 400 when order is not pending', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-1', status: 'confirmed', payment_status: 'unpaid', committed_payment_count: 0,
+    })
+    const res = await DELETE(makeReq('DELETE') as any, PARAMS)
+    expect(res.status).toBe(400)
+  })
+
+  it('returns 400 when committed payments exist', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-1', status: 'pending', payment_status: 'unpaid', committed_payment_count: 1,
+    })
+    const res = await DELETE(makeReq('DELETE') as any, PARAMS)
+    expect(res.status).toBe(400)
+  })
+
+  it('re-populates cart with UPDATE when matching cart item exists', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({
+        id: 'order-1', status: 'pending', payment_status: 'unpaid', committed_payment_count: 0,
+      })
+      .mockResolvedValueOnce({ id: 'existing-cart' }) // existing cart_item lookup
+    vi.mocked(db.queryMany).mockResolvedValueOnce([
+      { product_id: 'p1', variant_id: null, sub_variant_id: null,
+        quantity: '3', unit_price: '100', buy_mode: 'unit', buy_unit: null },
+    ])
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
+
+    const res = await DELETE(makeReq('DELETE') as any, PARAMS)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.deleted).toBe(true)
+    // Should have called UPDATE cart_items then DELETE FROM orders
+    const sqls = vi.mocked(db.query).mock.calls.map(c => c[0] as string)
+    expect(sqls.some(s => /UPDATE cart_items/i.test(s))).toBe(true)
+    expect(sqls.some(s => /DELETE FROM orders/i.test(s))).toBe(true)
+  })
+
+  it('re-populates cart with INSERT when no matching cart item', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({
+        id: 'order-1', status: 'pending', payment_status: 'unpaid', committed_payment_count: 0,
+      })
+      .mockResolvedValueOnce(null) // no matching cart_item
+    vi.mocked(db.queryMany).mockResolvedValueOnce([
+      { product_id: 'p1', variant_id: null, sub_variant_id: null,
+        quantity: '3', unit_price: '100', buy_mode: 'unit', buy_unit: null },
+    ])
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
+
+    const res = await DELETE(makeReq('DELETE') as any, PARAMS)
+    expect(res.status).toBe(200)
+    const sqls = vi.mocked(db.query).mock.calls.map(c => c[0] as string)
+    expect(sqls.some(s => /INSERT INTO cart_items/i.test(s))).toBe(true)
+  })
+
+  it('returns 500 on unexpected error', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockRejectedValue(new Error('boom'))
+    const res = await DELETE(makeReq('DELETE') as any, PARAMS)
+    expect(res.status).toBe(500)
+  })
+})
