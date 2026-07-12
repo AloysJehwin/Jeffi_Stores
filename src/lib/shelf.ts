@@ -326,7 +326,7 @@ export async function syncPerishableStock(
     if (ownClient) await client.query('BEGIN')
 
     // Sum quantity_remaining per location from all batches for this product/variant
-    const batchTotals = await client.query<{ location_id: string | null; total: string }>(
+    const batchTotalsRes = await client.query(
       `SELECT location_id, COALESCE(SUM(quantity_remaining), 0) AS total
        FROM product_batches
        WHERE product_id = $1
@@ -335,16 +335,18 @@ export async function syncPerishableStock(
        GROUP BY location_id`,
       [productId, variantId, subVariantId]
     )
+    const batchTotals = batchTotalsRes as { rows: Array<{ location_id: string | null; total: string }> }
 
     // Get all existing shelf_stock rows for this product/variant
-    const existing = await client.query<{ id: string; location_id: string }>(
+    const existingRes = await client.query(
       `SELECT id, location_id FROM shelf_stock
        WHERE product_id = $1
          AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
          AND (sub_variant_id = $3 OR ($3 IS NULL AND sub_variant_id IS NULL))`,
       [productId, variantId, subVariantId]
     )
-    const existingMap = new Map<string | null, string>(existing.rows.map(r => [r.location_id, r.id]))
+    const existing = existingRes as { rows: Array<{ id: string; location_id: string }> }
+    const existingMap = new Map<string | null, string>(existing.rows.map((r: { id: string; location_id: string }) => [r.location_id, r.id]))
 
     for (const row of batchTotals.rows) {
       const qty = parseFloat(row.total) || 0

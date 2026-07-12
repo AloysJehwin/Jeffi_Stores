@@ -29,7 +29,7 @@ const COD_SURCHARGE_PCT = parseFloat(process.env.COD_SURCHARGE_PCT || '2') || 2
 interface RateBreakdown {
   charge: number
   zone: string
-  source: 'delhivery' | 'fallback' | 'free' | 'admin_disabled' | 'free_threshold'
+  source: 'delhivery' | 'fallback' | 'free' | 'admin_disabled' | 'free_threshold' | 'discounted'
   chargedWeightGrams: number
   cartonCount: number
   cartons?: { weightGrams: number; charge: number; zone: string }[]
