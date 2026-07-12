@@ -255,7 +255,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
 
   // ── apply operation ───────────────────────────────────────────────────────
   async function handleApply() {
-    if (!opDef || !opValue || selectedIds.size === 0) return
+    if (!canApply) return
 
     const label = opDef.label
     const ok = await confirm({
