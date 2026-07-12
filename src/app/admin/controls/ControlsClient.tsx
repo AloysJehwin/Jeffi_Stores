@@ -211,11 +211,11 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   const availableFilters = FILTER_OPTIONS.filter(f => !(f.key in activeFilters))
 
   // ── load products ─────────────────────────────────────────────────────────
-  const loadProducts = useCallback(async (filters: Partial<Record<FilterKey, string>>) => {
+  const loadProducts = useCallback(async (filters: Partial<Record<FilterKey, string>>, keepSuccess = false) => {
     if (Object.keys(filters).length === 0) { setProducts([]); setSelectedIds(new Set()); return }
     setLoading(true)
     setLoadError(null)
-    setApplySuccess(null)
+    if (!keepSuccess) setApplySuccess(null)
     try {
       const params = new URLSearchParams(filters as Record<string, string>)
       const res = await fetch(`/api/admin/controls?${params}`)
@@ -289,7 +289,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
       if (data.log_id) { setLastLogId(data.log_id); setLastLogLabel(label) }
       setRollbackError(null)
       setOpValue('')
-      loadProducts(activeFilters)
+      loadProducts(activeFilters, true)
     } catch (e: any) {
       setApplyError(e.message)
     } finally {
@@ -322,7 +322,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
       setApplySuccess(`↩ Rolled back "${lastLogLabel}" — ${data.restored} product${data.restored !== 1 ? 's' : ''} restored.`)
       setLastLogId(null)
       setLastLogLabel(null)
-      loadProducts(activeFilters)
+      loadProducts(activeFilters, true)
     } catch (e: any) {
       setRollbackError(e.message)
     } finally {
