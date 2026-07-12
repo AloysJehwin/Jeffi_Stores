@@ -6,6 +6,7 @@ vi.mock('@/lib/jwt', () => ({
 vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn(),
+  queryMany: vi.fn().mockResolvedValue([]),
   withTransaction: vi.fn(),
 }))
 vi.mock('@/lib/email', () => ({
@@ -25,6 +26,9 @@ vi.mock('@/lib/auto-tasks', () => ({
 }))
 vi.mock('@/lib/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/order-stock', () => ({
+  restoreOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 
 import { POST } from '@/app/api/orders/[id]/return-review/route'
@@ -68,6 +72,7 @@ function makeRequest(body: unknown) {
 describe('POST /api/orders/[id]/return-review', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn().mockResolvedValue({ rows: [] }) }
       return fn(client)
@@ -203,7 +208,6 @@ describe('POST /api/orders/[id]/return-review', () => {
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received' })
       .mockResolvedValueOnce(replacementReturnRequest)
       .mockResolvedValueOnce({ ...MOCK_ORDER, shipping_address_snapshot: null })
-      .mockResolvedValueOnce({ items: [] })
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
         query: vi.fn().mockResolvedValue({
@@ -458,7 +462,6 @@ describe('POST /api/orders/[id]/return-review', () => {
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received' })
       .mockResolvedValueOnce(replacementReturnRequest)
       .mockResolvedValueOnce({ ...MOCK_ORDER, shipping_address_snapshot: null })
-      .mockResolvedValueOnce({ items: [{ product_id: 'p1', variant_id: 'v1', quantity: '1', product_name: 'X', variant_name: 'Y', unit_price: '100', total_price: '100', buy_mode: 'retail', buy_unit: 'piece' }] })
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
         query: vi.fn().mockResolvedValue({
@@ -483,7 +486,6 @@ describe('POST /api/orders/[id]/return-review', () => {
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', user_id: null, users: null })
       .mockResolvedValueOnce(replacementReturnRequest)
       .mockResolvedValueOnce({ ...MOCK_ORDER, shipping_address_snapshot: null })
-      .mockResolvedValueOnce({ items: [] })
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = {
         query: vi.fn().mockResolvedValue({
