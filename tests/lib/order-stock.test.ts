@@ -17,7 +17,7 @@ function makeMockClient(queryResponses: Record<number, any> = {}) {
       idx++
       return resp
     }),
-  }
+  } as any
 }
 
 beforeEach(() => {

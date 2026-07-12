@@ -17,7 +17,7 @@ const PRODUCTS = [{ id: 'p1', name: 'Bolt', mrp_ex_gst: '100', mrp: '118', price
 
 function makeMockClient(responses: Record<number, any> = {}) {
   let idx = 0
-  return { query: vi.fn().mockImplementation(async () => responses[idx++] ?? { rows: [] }) }
+  return { query: vi.fn().mockImplementation(async () => responses[idx++] ?? { rows: [] }) } as any
 }
 
 beforeEach(() => {
