@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { queryMany, queryCount } from '@/lib/db'
 import Pagination from '@/components/admin/Pagination'
@@ -6,6 +7,7 @@ import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AdminFilters from '@/components/admin/AdminFilters'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -39,7 +41,15 @@ interface Campaign {
   created_at: string
 }
 
-export default async function MailerPage({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
+export default function MailerPage({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <MailerPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function MailerPageContent({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
   const host = await getHost()
   const resolvedSearchParams = await searchParams
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))

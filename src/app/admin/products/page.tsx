@@ -195,7 +195,15 @@ async function ProductsListContent({ resolvedSearchParams, featuredCount }: { re
   )
 }
 
-export default async function ProductsPage({ searchParams }: { searchParams: Promise<SP> }) {
+export default function ProductsPage({ searchParams }: { searchParams: Promise<SP> }) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <ProductsPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function ProductsPageContent({ searchParams }: { searchParams: Promise<SP> }) {
   const resolvedSearchParams = await searchParams
   const host = await getHost()
 
@@ -270,9 +278,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         suggestType="products"
       />
 
-      <Suspense fallback={<AdminSkeleton variant="list" showStats={false} />}>
-        <ProductsListContent resolvedSearchParams={resolvedSearchParams} featuredCount={featuredCount} />
-      </Suspense>
+      <ProductsListContent resolvedSearchParams={resolvedSearchParams} featuredCount={featuredCount} />
     </div>
   )
 }

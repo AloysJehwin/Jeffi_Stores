@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { cookies} from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
@@ -8,6 +9,7 @@ import { redirect } from 'next/navigation'
 import { queryMany } from '@/lib/db'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
 const PAGE_SIZE = 25
 
@@ -41,7 +43,19 @@ const STATUS_LABELS: Record<string, string> = {
   converted: 'Converted',
   rejected: 'Rejected' }
 
-export default async function BusinessRFQsPage({
+export default function BusinessRFQsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <BusinessRFQsPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function BusinessRFQsPageContent({
   searchParams }: {
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {

@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { getCustomers } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
@@ -7,13 +8,22 @@ import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-export default async function CustomersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default function CustomersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <CustomersPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function CustomersPageContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))

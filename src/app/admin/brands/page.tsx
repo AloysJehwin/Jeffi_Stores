@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
@@ -7,6 +8,7 @@ import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import BrandTableRow from '@/components/admin/BrandTableRow'
 import BrandStatusToggle from '@/components/admin/BrandStatusToggle'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -40,7 +42,15 @@ async function getFilteredBrands(filters: { is_active?: string; search?: string;
   return { brands, total }
 }
 
-export default async function BrandsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default function BrandsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <BrandsPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function BrandsPageContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))

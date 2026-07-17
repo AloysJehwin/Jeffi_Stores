@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
@@ -8,6 +9,7 @@ import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
 import CouponTableRow from '@/components/admin/CouponTableRow'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -60,7 +62,15 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
   return { coupons, total }
 }
 
-export default async function CouponsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default function CouponsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <CouponsPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function CouponsPageContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))

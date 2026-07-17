@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
@@ -6,8 +7,17 @@ import { queryMany } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import CategoriesClient from '@/components/admin/CategoriesClient'
 import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
-export default async function CategoriesPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default function CategoriesPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <CategoriesPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function CategoriesPageContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
   const host = await getHost()
   const [categories, productCountRows, misassignedRows] = await Promise.all([

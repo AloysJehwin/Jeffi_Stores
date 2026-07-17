@@ -204,7 +204,15 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
   )
 }
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {
+export default function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <OrdersPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function OrdersPageContent({ searchParams }: { searchParams: Promise<SP> }) {
   const resolvedSearchParams = await searchParams
   const host = await getHost()
   const allStats = await getFilteredOrders({})
@@ -289,9 +297,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         suggestType="orders"
       />
 
-      <Suspense fallback={<AdminSkeleton variant="list" showStats={false} />}>
-        <OrdersListContent resolvedSearchParams={resolvedSearchParams} />
-      </Suspense>
+      <OrdersListContent resolvedSearchParams={resolvedSearchParams} />
     </div>
   )
 }
