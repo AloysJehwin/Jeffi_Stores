@@ -84,10 +84,25 @@ export async function POST(
       return NextResponse.json({ error: 'Only delivered orders can be returned.' }, { status: 400 })
     }
 
+    // Validate submitted items first so we can scope eligibility check to selected products
+    const orderItemIds = items.map((i: any) => i.order_item_id)
+    const orderItems = await queryMany(
+      `SELECT id, product_id, variant_id, product_name, variant_name, quantity, unit_price
+       FROM order_items WHERE order_id = $1 AND id = ANY($2::uuid[])`,
+      [id, orderItemIds]
+    )
+
+    if (orderItems.length !== orderItemIds.length) {
+      return NextResponse.json({ error: 'One or more selected items do not belong to this order.' }, { status: 400 })
+    }
+
+    const selectedProductIds = orderItems.map((oi: any) => String(oi.product_id))
+
     const eligibility = await checkReturnEligibility(
       id,
       type as 'refund' | 'replacement',
-      new Date(order.delivered_at || order.updated_at)
+      new Date(order.delivered_at || order.updated_at),
+      selectedProductIds
     )
     if (!eligibility.ok) {
       return NextResponse.json({ error: eligibility.reason }, { status: 400 })
@@ -114,18 +129,6 @@ export async function POST(
       return NextResponse.json({
         error: 'You have already used your return or replacement for this month. Only 1 is allowed per month.',
       }, { status: 400 })
-    }
-
-    // Validate submitted items against actual order_items
-    const orderItemIds = items.map((i: any) => i.order_item_id)
-    const orderItems = await queryMany(
-      `SELECT id, product_id, variant_id, product_name, variant_name, quantity, unit_price
-       FROM order_items WHERE order_id = $1 AND id = ANY($2::uuid[])`,
-      [id, orderItemIds]
-    )
-
-    if (orderItems.length !== orderItemIds.length) {
-      return NextResponse.json({ error: 'One or more selected items do not belong to this order.' }, { status: 400 })
     }
 
     // Build validated item rows, cap quantity at ordered quantity
