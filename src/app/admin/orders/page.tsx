@@ -129,7 +129,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
                           ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
                           : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
                     }`}>
-                      {order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : 'Offline'}
+                      {order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : order.source === 'cash_sale' ? 'Cash Sale' : 'Offline'}
                     </span>
                   </div>
                   <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
@@ -268,6 +268,9 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
             label: 'Source',
             options: [
               { value: 'online', label: 'Online' },
+              { value: 'business', label: 'Business' },
+              { value: 'offline', label: 'Offline' },
+              { value: 'cash_sale', label: 'Cash Sale' },
             ] },
           {
             name: 'status',
@@ -281,6 +284,11 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
               { value: 'delivered', label: 'Delivered' },
               { value: 'cancel_requested', label: 'Cancel Requested' },
               { value: 'cancelled', label: 'Cancelled' },
+              { value: 'return_requested', label: 'Return Requested' },
+              { value: 'return_approved', label: 'Return Approved' },
+              { value: 'return_received', label: 'Return Received' },
+              { value: 'return_rejected', label: 'Return Rejected' },
+              { value: 'returned', label: 'Returned' },
             ] },
           {
             name: 'payment_status',
@@ -291,6 +299,7 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
               { value: 'failed', label: 'Failed' },
               { value: 'refunded', label: 'Refunded' },
               { value: 'unpaid', label: 'Unpaid' },
+              { value: 'cancelled', label: 'Cancelled' },
             ] },
         ]}
         searchPlaceholder="Search by order number or customer..."
