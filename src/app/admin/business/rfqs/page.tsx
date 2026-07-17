@@ -9,7 +9,7 @@ import { redirect } from 'next/navigation'
 import { queryMany } from '@/lib/db'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
 const PAGE_SIZE = 25
 
@@ -43,22 +43,22 @@ const STATUS_LABELS: Record<string, string> = {
   converted: 'Converted',
   rejected: 'Rejected' }
 
+type SP = { [key: string]: string | undefined }
+
 export default function BusinessRFQsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ [key: string]: string | undefined }>
+  searchParams: Promise<SP>
 }) {
-  return (
-    <Suspense fallback={<AdminSkeleton variant="list" />}>
-      <BusinessRFQsPageContent searchParams={searchParams} />
-    </Suspense>
-  )
+  // Auth gating + redirect must run BEFORE any list content renders, so an
+  // unauthorized user never sees the shell. This wrapper resolves the auth
+  // check (and host) then renders the static shell + keyed list Suspense.
+  return <BusinessRFQsShell searchParams={searchParams} />
 }
 
-async function BusinessRFQsPageContent({
-  searchParams }: {
-  searchParams: Promise<{ [key: string]: string | undefined }>
-}) {
+// Runs the auth check + redirect, then renders the static shell (header,
+// search form, status tabs) instantly and streams the table below.
+async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }) {
   const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
   const token = cookieStore.get('admin_token')
@@ -67,6 +67,75 @@ async function BusinessRFQsPageContent({
   const session = await verifyToken(token.value).catch(() => null)
   if (!session || !hasScope(session.role, session.scopes || [], 'business_rfqs:read')) redirect(ap('/admin/dashboard', host))
 
+  const status = resolvedSearchParams.status
+  const search = resolvedSearchParams.search
+
+  const tabUrl = (p: number, extra: Record<string, string> = {}) => {
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    Object.entries(extra).forEach(([k, v]) => params.set(k, v))
+    if (p > 1) params.set('page', String(p))
+    const qs = params.toString()
+    return ap(`/admin/business/rfqs${qs ? `?${qs}` : ''}`, host)
+  }
+
+  const key = JSON.stringify(resolvedSearchParams)
+
+  return (
+    <div className="p-4 sm:p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Business RFQs</h1>
+        <p className="text-foreground-secondary mt-1 text-sm">Review and respond to quote requests from business partners</p>
+      </div>
+
+      {/* Filters */}
+      <form method="get" className="flex gap-3 mb-4">
+        {status && <input type="hidden" name="status" value={status} />}
+        <input
+          type="search"
+          name="search"
+          defaultValue={search}
+          placeholder="Search by RFQ number, company, email…"
+          className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
+        />
+        <button type="submit" className="px-4 py-1.5 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors">
+          Search
+        </button>
+      </form>
+
+      {/* Status tabs */}
+      <div className="flex gap-2 mb-4 flex-wrap">
+        {['all', 'pending', 'reviewed', 'negotiating', 'offer_accepted', 'converted', 'rejected'].map(s => (
+          <Link
+            key={s}
+            href={tabUrl(1, s === 'all' ? {} : { status: s })}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
+              (status ?? 'all') === s
+                ? 'bg-accent-500 text-white'
+                : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
+            }`}
+          >
+            {STATUS_LABELS[s] ?? s}
+          </Link>
+        ))}
+      </div>
+
+      {/* Table — re-shimmers on filter/pagination change while shell stays mounted */}
+      <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={7} />}>
+        <BusinessRFQsListContent resolvedSearchParams={resolvedSearchParams} host={host} />
+      </Suspense>
+    </div>
+  )
+}
+
+// Runs the FILTERED list + count query and renders the table + pagination.
+async function BusinessRFQsListContent({
+  resolvedSearchParams,
+  host,
+}: {
+  resolvedSearchParams: SP
+  host: string
+}) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const status = resolvedSearchParams.status
   const search = resolvedSearchParams.search
@@ -126,44 +195,7 @@ async function BusinessRFQsPageContent({
   }
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Business RFQs</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">Review and respond to quote requests from business partners</p>
-      </div>
-
-      {/* Filters */}
-      <form method="get" className="flex gap-3 mb-4">
-        {status && <input type="hidden" name="status" value={status} />}
-        <input
-          type="search"
-          name="search"
-          defaultValue={search}
-          placeholder="Search by RFQ number, company, email…"
-          className="flex-1 px-3 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500"
-        />
-        <button type="submit" className="px-4 py-1.5 text-sm font-medium bg-accent-500 text-white rounded-lg hover:bg-accent-600 transition-colors">
-          Search
-        </button>
-      </form>
-
-      {/* Status tabs */}
-      <div className="flex gap-2 mb-4 flex-wrap">
-        {['all', 'pending', 'reviewed', 'negotiating', 'offer_accepted', 'converted', 'rejected'].map(s => (
-          <Link
-            key={s}
-            href={buildUrl(1, s === 'all' ? {} : { status: s })}
-            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-colors ${
-              (status ?? 'all') === s
-                ? 'bg-accent-500 text-white'
-                : 'bg-surface-elevated border border-border-default text-foreground-secondary hover:bg-surface-secondary'
-            }`}
-          >
-            {STATUS_LABELS[s] ?? s}
-          </Link>
-        ))}
-      </div>
-
+    <>
       {/* Table */}
       <div className="bg-surface-elevated rounded-lg border border-border-default overflow-x-auto">
         <table className="w-full text-sm">
@@ -240,6 +272,6 @@ async function BusinessRFQsPageContent({
           </div>
         </div>
       )}
-    </div>
+    </>
   )
 }

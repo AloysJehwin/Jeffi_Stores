@@ -8,7 +8,7 @@ import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -42,17 +42,44 @@ async function getForms(filters: { search?: string; page?: number }) {
   return { forms, total }
 }
 
-export default function ReviewFormsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default async function ReviewFormsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  const host = await getHost()
+
   return (
-    <Suspense fallback={<AdminSkeleton variant="list" />}>
-      <ReviewFormsPageContent searchParams={searchParams} />
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Review Forms</h1>
+          <p className="text-foreground-secondary mt-1 text-sm">Shareable forms that reward customers for Google reviews</p>
+        </div>
+        <Link href={ap('/admin/review-forms/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+          Create Form
+        </Link>
+      </div>
+
+      <AdminFilters
+        filters={[]}
+        searchPlaceholder="Search by title or slug..."
+        suggestType="review_forms"
+      />
+
+      <ReviewFormsListSection searchParams={searchParams} host={host} />
+    </div>
+  )
+}
+
+async function ReviewFormsListSection({ searchParams, host }: { searchParams: Promise<{ [key: string]: string | undefined }>; host: string }) {
+  const resolvedSearchParams = await searchParams
+  const key = JSON.stringify(resolvedSearchParams)
+
+  return (
+    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={7} />}>
+      <ReviewFormsListContent resolvedSearchParams={resolvedSearchParams} host={host} />
     </Suspense>
   )
 }
 
-async function ReviewFormsPageContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
-  const resolvedSearchParams = await searchParams
-  const host = await getHost()
+async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolvedSearchParams: { [key: string]: string | undefined }; host: string }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const { forms, total } = await getForms({ search: resolvedSearchParams.search, page })
 
@@ -73,23 +100,7 @@ async function ReviewFormsPageContent({ searchParams }: { searchParams: Promise<
   })()
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Review Forms</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Shareable forms that reward customers for Google reviews</p>
-        </div>
-        <Link href={ap('/admin/review-forms/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
-          Create Form
-        </Link>
-      </div>
-
-      <AdminFilters
-        filters={[]}
-        searchPlaceholder="Search by title or slug..."
-        suggestType="review_forms"
-      />
-
+    <>
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mt-4">
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
@@ -193,7 +204,7 @@ async function ReviewFormsPageContent({ searchParams }: { searchParams: Promise<
       </div>
 
       <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-    </div>
+    </>
   )
 }
 
