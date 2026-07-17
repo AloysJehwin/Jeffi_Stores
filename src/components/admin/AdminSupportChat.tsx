@@ -64,6 +64,42 @@ const QUICK_REPLIES = [
   },
 ]
 
+// Bot messages are stored as JSON BotPayload strings (rendered as rich cards on
+// the customer side). For the admin panel we only need a readable text summary,
+// not the interactive UI — so flatten the payload to plain text.
+function renderBotText(raw: string): string {
+  let payload: any
+  try {
+    payload = JSON.parse(raw)
+  } catch {
+    return raw // plain-text bot message (legacy / non-payload)
+  }
+  if (!payload || typeof payload.type !== 'string') return raw
+
+  const fmtAmt = (a: string) => {
+    const n = Number(a)
+    return isFinite(n) ? `₹${n.toLocaleString('en-IN')}` : '₹—'
+  }
+  const orderLine = (o: any) => `• #${o.order_number} — ${o.status}, ${fmtAmt(o.total_amount)}`
+
+  switch (payload.type) {
+    case 'text':
+      return payload.text
+    case 'text_actions':
+    case 'nav':
+    case 'chips':
+      return payload.text || ''
+    case 'order_list':
+      return [payload.text, ...(payload.orders || []).map(orderLine)].join('\n')
+    case 'order_detail': {
+      const o = payload.order
+      return o ? `Order #${o.order_number}\nStatus: ${o.status}\nPayment: ${o.payment_status}\nTotal: ${fmtAmt(o.total_amount)}` : raw
+    }
+    default:
+      return payload.text || raw
+  }
+}
+
 export default function AdminSupportChat({ customerId, autoOpen = false }: Props) {
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -329,7 +365,10 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                     {msg.sender === 'user' && (
                       <p className="text-xs font-semibold text-accent-500 mb-0.5">Customer</p>
                     )}
-                    {msg.message}
+                    {msg.sender === 'bot' && (
+                      <p className="text-xs font-semibold text-foreground-muted mb-0.5">Jeffi (auto-reply)</p>
+                    )}
+                    {msg.sender === 'bot' ? renderBotText(msg.message) : msg.message}
                   </div>
                 </div>
               ))

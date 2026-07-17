@@ -296,7 +296,6 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
       },
     }
   ])
-  const [usedQuickReplies, setUsedQuickReplies] = useState<Set<string>>(new Set())
   const [input, setInput] = useState('')
   const [session, setSession] = useState<Session | null>(null)
   const [adminName, setAdminName] = useState<string | null>(null)
@@ -382,7 +381,6 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
       return
     }
 
-    setUsedQuickReplies(prev => new Set(prev).add(query))
     const userMsg: Message = { id: Date.now().toString(), sender: 'user', message: query }
     setMessages(prev => [...prev, userMsg])
     setIsSending(true)
@@ -476,7 +474,6 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
     setMode('bot')
     setShowConnectPrompt(false)
     setShowEndSessionPrompt(false)
-    setUsedQuickReplies(new Set())
     setMessages([{
       id: 'end',
       sender: 'bot',
@@ -547,8 +544,6 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
     )
   }
 
-  const availableQuickReplies = QUICK_REPLIES.filter(qr => !usedQuickReplies.has(qr.query))
-
   return (
     <div className="relative flex flex-col w-full h-full bg-surface-elevated overflow-hidden">
       {/* Header */}
@@ -591,20 +586,6 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
                 <span className="w-1.5 h-1.5 bg-foreground-muted rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
               </div>
             </div>
-          </div>
-        )}
-
-        {mode === 'bot' && !isSending && availableQuickReplies.length > 0 && (
-          <div className="flex flex-wrap gap-2 pt-1">
-            {availableQuickReplies.map(qr => (
-              <button
-                key={qr.label}
-                onClick={() => handleBotQuery(qr.query)}
-                className="px-3.5 py-2 text-sm font-medium rounded-xl border border-primary-300 dark:border-primary-700 text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors"
-              >
-                {qr.label}
-              </button>
-            ))}
           </div>
         )}
 
