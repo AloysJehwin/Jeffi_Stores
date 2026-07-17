@@ -1,6 +1,7 @@
 import { queryMany } from '@/lib/db'
 
 export interface SupportOrder {
+  id: string
   order_number: string
   status: string
   payment_status: string
@@ -37,6 +38,7 @@ export interface BotNavLink {
 }
 
 export interface BotOrderCard {
+  id: string
   order_number: string
   status: string
   payment_status: string
@@ -52,7 +54,7 @@ export interface BotChip {
 
 export async function fetchUserOrders(userId: string): Promise<SupportOrder[]> {
   return queryMany<SupportOrder>(
-    `SELECT order_number, status, payment_status, total_amount::text, tracking_number, created_at
+    `SELECT id::text, order_number, status, payment_status, total_amount::text, tracking_number, created_at
        FROM orders WHERE user_id = $1 ORDER BY created_at DESC LIMIT 10`,
     [userId]
   )
@@ -60,6 +62,7 @@ export async function fetchUserOrders(userId: string): Promise<SupportOrder[]> {
 
 function toCard(o: SupportOrder): BotOrderCard {
   return {
+    id: o.id,
     order_number: o.order_number,
     status: o.status,
     payment_status: o.payment_status,
@@ -146,7 +149,7 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
         ...(contextOrder.tracking_number
           ? [{ label: 'Track Shipment', url: `https://www.delhivery.com/track/package/${contextOrder.tracking_number}` }]
           : []),
-        { label: 'View Order', url: `/account/orders/${contextOrder.order_number}` },
+        { label: 'View Order', url: `/account/orders/${contextOrder.id}` },
       ],
     }
   }
@@ -168,7 +171,7 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
       type: 'order_detail',
       order: toCard(contextOrder),
       actions: [
-        { label: 'View Invoice', url: `/account/orders/${contextOrder.order_number}` },
+        { label: 'View Invoice', url: `/account/orders/${contextOrder.id}` },
         { label: 'All Transactions', url: '/account/transactions' },
       ],
     }
@@ -183,8 +186,8 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
         type: 'order_detail',
         order: toCard(selectedOrder),
         actions: eligible
-          ? [{ label: 'Request Cancellation', url: `/account/orders/${selectedOrder.order_number}` }]
-          : [{ label: 'View Order', url: `/account/orders/${selectedOrder.order_number}` }, { label: 'Contact Agent', query: 'connect to agent' }],
+          ? [{ label: 'Request Cancellation', url: `/account/orders/${selectedOrder.id}` }]
+          : [{ label: 'View Order', url: `/account/orders/${selectedOrder.id}` }, { label: 'Contact Agent', query: 'connect to agent' }],
       }
     }
     const cancellable = orders.filter(o => CANCELLABLE.includes(o.status))
@@ -212,8 +215,8 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
         type: 'order_detail',
         order: toCard(selectedOrder),
         actions: eligible
-          ? [{ label: 'Request Return', url: `/account/orders/${selectedOrder.order_number}` }]
-          : [{ label: 'View Order', url: `/account/orders/${selectedOrder.order_number}` }, { label: 'Contact Agent', query: 'connect to agent' }],
+          ? [{ label: 'Request Return', url: `/account/orders/${selectedOrder.id}` }]
+          : [{ label: 'View Order', url: `/account/orders/${selectedOrder.id}` }, { label: 'Contact Agent', query: 'connect to agent' }],
       }
     }
     const returnable = orders.filter(o => RETURNABLE.includes(o.status))
@@ -239,7 +242,7 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
       type: 'order_detail',
       order: toCard(selectedOrder),
       actions: [
-        { label: 'View Order', url: `/account/orders/${selectedOrder.order_number}` },
+        { label: 'View Order', url: `/account/orders/${selectedOrder.id}` },
         ...(selectedOrder.tracking_number
           ? [{ label: 'Track Shipment', url: `https://www.delhivery.com/track/package/${selectedOrder.tracking_number}` }]
           : []),
@@ -266,9 +269,9 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
       type: 'order_detail',
       order: toCard(latest),
       actions: [
-        { label: 'View Order', url: `/account/orders/${latest.order_number}` },
+        { label: 'View Order', url: `/account/orders/${latest.id}` },
         ...(latest.tracking_number ? [{ label: 'Track Shipment', url: `https://www.delhivery.com/track/package/${latest.tracking_number}` }] : []),
-        ...(CANCELLABLE.includes(latest.status) ? [{ label: 'Cancel Order', url: `/account/orders/${latest.order_number}` }] : []),
+        ...(CANCELLABLE.includes(latest.status) ? [{ label: 'Cancel Order', url: `/account/orders/${latest.id}` }] : []),
       ],
     }
   }
