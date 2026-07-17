@@ -71,10 +71,27 @@ function toCard(o: SupportOrder): BotOrderCard {
 
 function extractOrderFromHistory(history: HistoryMessage[], orders: SupportOrder[]): SupportOrder | null {
   const combined = history.map(h => h.message).join(' ')
+  return longestMatch(combined, orders)
+}
+
+// Find an order number mentioned directly in a single message (e.g. the user just
+// tapped an order card, which sends "track order #ORD-123"). Takes priority over
+// the history scan so a freshly-selected order is honoured immediately.
+function extractOrderFromText(text: string, orders: SupportOrder[]): SupportOrder | null {
+  return longestMatch(text, orders)
+}
+
+// Returns the order whose number appears in `text`, preferring the LONGEST match.
+// Order numbers can be substrings of one another (e.g. "ORD-123" is contained in
+// "RPL-ORD-123"), so a plain first-match would pick the wrong order.
+function longestMatch(text: string, orders: SupportOrder[]): SupportOrder | null {
+  let best: SupportOrder | null = null
   for (const order of orders) {
-    if (combined.includes(order.order_number)) return order
+    if (text.includes(order.order_number) && (!best || order.order_number.length > best.order_number.length)) {
+      best = order
+    }
   }
-  return null
+  return best
 }
 
 const CANCELLABLE = ['pending', 'confirmed', 'processing']
@@ -83,13 +100,19 @@ const RETURNABLE = ['delivered']
 export function getBotPayload(msg: string, orders: SupportOrder[], history: HistoryMessage[] = []): BotPayload {
   const m = msg.toLowerCase()
   const latest = orders[0]
-  const contextOrder = extractOrderFromHistory(history, orders) ?? latest
+  // Order the user just picked (named in this message) wins; else one referenced
+  // earlier in the chat; else the most recent order.
+  const selectedOrder = extractOrderFromText(msg, orders)
+  const contextOrder = selectedOrder ?? extractOrderFromHistory(history, orders) ?? latest
 
   // ── All orders list ──────────────────────────────────────────────────────
+  // Only when NO specific order was named — otherwise fall through to detail.
   if (
-    (m.includes('all') && (m.includes('order') || m.includes('purchase'))) ||
-    (m.includes('my orders') || m.includes('list') && m.includes('order')) ||
-    (m.includes('order history') || m.includes('purchase history'))
+    !selectedOrder && (
+      (m.includes('all') && (m.includes('order') || m.includes('purchase'))) ||
+      (m.includes('my orders') || m.includes('list') && m.includes('order')) ||
+      (m.includes('order history') || m.includes('purchase history'))
+    )
   ) {
     if (!orders.length) {
       return { type: 'text_actions', text: "you haven't placed any orders yet.", actions: [{ label: 'Browse Products', url: '/products' }] }
@@ -107,17 +130,8 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
     if (!contextOrder) {
       return { type: 'text_actions', text: "you don't have any orders yet.", actions: [{ label: 'Browse Products', url: '/products' }] }
     }
-    if (contextOrder.tracking_number) {
-      return {
-        type: 'order_detail',
-        order: toCard(contextOrder),
-        actions: [
-          { label: 'Track Shipment', url: `https://www.delhivery.com/track/package/${contextOrder.tracking_number}` },
-          { label: 'View Order', url: `/account/orders/${contextOrder.order_number}` },
-        ],
-      }
-    }
-    if (orders.length > 1) {
+    // If a specific order was picked, always show its detail (don't re-prompt).
+    if (!selectedOrder && !contextOrder.tracking_number && orders.length > 1) {
       return {
         type: 'order_list',
         text: "which order would you like to track?",
@@ -128,7 +142,12 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
     return {
       type: 'order_detail',
       order: toCard(contextOrder),
-      actions: [{ label: 'View Order', url: `/account/orders/${contextOrder.order_number}` }],
+      actions: [
+        ...(contextOrder.tracking_number
+          ? [{ label: 'Track Shipment', url: `https://www.delhivery.com/track/package/${contextOrder.tracking_number}` }]
+          : []),
+        { label: 'View Order', url: `/account/orders/${contextOrder.order_number}` },
+      ],
     }
   }
 
@@ -137,7 +156,7 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
     if (!contextOrder) {
       return { type: 'text_actions', text: "you don't have any orders yet.", actions: [{ label: 'Browse Products', url: '/products' }] }
     }
-    if (orders.length > 1 && !extractOrderFromHistory(history, orders)) {
+    if (!selectedOrder && orders.length > 1 && !extractOrderFromHistory(history, orders)) {
       return {
         type: 'order_list',
         text: "which order's payment details do you need?",
@@ -157,6 +176,17 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
 
   // ── Cancel ───────────────────────────────────────────────────────────────
   if (m.includes('cancel')) {
+    // Specific order picked → show its detail with a cancel action.
+    if (selectedOrder) {
+      const eligible = CANCELLABLE.includes(selectedOrder.status)
+      return {
+        type: 'order_detail',
+        order: toCard(selectedOrder),
+        actions: eligible
+          ? [{ label: 'Request Cancellation', url: `/account/orders/${selectedOrder.order_number}` }]
+          : [{ label: 'View Order', url: `/account/orders/${selectedOrder.order_number}` }, { label: 'Contact Agent', query: 'connect to agent' }],
+      }
+    }
     const cancellable = orders.filter(o => CANCELLABLE.includes(o.status))
     if (!cancellable.length) {
       return {
@@ -175,6 +205,17 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
 
   // ── Return / refund / exchange ───────────────────────────────────────────
   if (m.includes('return') || m.includes('refund') || m.includes('exchange') || m.includes('replace')) {
+    // Specific order picked → show its detail with a return action.
+    if (selectedOrder) {
+      const eligible = RETURNABLE.includes(selectedOrder.status)
+      return {
+        type: 'order_detail',
+        order: toCard(selectedOrder),
+        actions: eligible
+          ? [{ label: 'Request Return', url: `/account/orders/${selectedOrder.order_number}` }]
+          : [{ label: 'View Order', url: `/account/orders/${selectedOrder.order_number}` }, { label: 'Contact Agent', query: 'connect to agent' }],
+      }
+    }
     const returnable = orders.filter(o => RETURNABLE.includes(o.status))
     if (!returnable.length) {
       return {
@@ -188,6 +229,27 @@ export function getBotPayload(msg: string, orders: SupportOrder[], history: Hist
       text: "which order would you like to return? refunds go back to your original payment method in 5–7 business days.",
       orders: returnable.map(toCard),
       context: 'return',
+    }
+  }
+
+  // ── A specific order was named but no cancel/return/track/payment intent ──
+  // (e.g. "details for order #ORD-123" from tapping a card in the all-orders list)
+  if (selectedOrder) {
+    return {
+      type: 'order_detail',
+      order: toCard(selectedOrder),
+      actions: [
+        { label: 'View Order', url: `/account/orders/${selectedOrder.order_number}` },
+        ...(selectedOrder.tracking_number
+          ? [{ label: 'Track Shipment', url: `https://www.delhivery.com/track/package/${selectedOrder.tracking_number}` }]
+          : []),
+        ...(CANCELLABLE.includes(selectedOrder.status)
+          ? [{ label: 'Cancel Order', query: `i want to cancel order #${selectedOrder.order_number}` }]
+          : []),
+        ...(RETURNABLE.includes(selectedOrder.status)
+          ? [{ label: 'Return Order', query: `i want to return order #${selectedOrder.order_number}` }]
+          : []),
+      ],
     }
   }
 
