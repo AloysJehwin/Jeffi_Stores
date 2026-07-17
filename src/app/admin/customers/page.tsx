@@ -8,81 +8,25 @@ import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
+import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const PAGE_SIZE = 25
 
-export default function CustomersPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
-  return (
-    <Suspense fallback={<AdminSkeleton variant="list" />}>
-      <CustomersPageContent searchParams={searchParams} />
-    </Suspense>
-  )
-}
+type SP = { [key: string]: string | undefined }
 
-async function CustomersPageContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
-  const resolvedSearchParams = await searchParams
-  const host = await getHost()
-  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
-  const sort = resolvedSearchParams.sort
-  const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
-
-  const [{ customers, total }, allStats] = await Promise.all([
-    getCustomers({
-      search: resolvedSearchParams.search,
-      status: resolvedSearchParams.status,
-      segment: resolvedSearchParams.segment,
-      tag: resolvedSearchParams.tag,
-      health: resolvedSearchParams.health,
-      page,
-      limit: PAGE_SIZE,
-      sort,
-      dir }),
-    getCustomers({}),
-  ])
+async function CustomersStats() {
+  const allStats = await getCustomers({})
 
   const activeCount = allStats.customers?.filter((c: any) => c.is_active && !c.is_flagged).length || 0
   const inactiveCount = allStats.customers?.filter((c: any) => !c.is_active && !c.is_flagged).length || 0
   const flaggedCount = allStats.customers?.filter((c: any) => c.is_flagged).length || 0
 
-  const buildUrl = (p: number) => {
-    const params = new URLSearchParams()
-    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
-    if (resolvedSearchParams.tag) params.set('tag', resolvedSearchParams.tag)
-    if (resolvedSearchParams.health) params.set('health', resolvedSearchParams.health)
-    if (sort) params.set('sort', sort)
-    if (dir) params.set('dir', dir)
-    if (p > 1) params.set('page', String(p))
-    const qs = params.toString()
-    return ap(`/admin/customers${qs ? `?${qs}` : ''}`, host)
-  }
-
-  const currentListUrl = (() => {
-    const params = new URLSearchParams()
-    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
-    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
-    if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
-    if (resolvedSearchParams.tag) params.set('tag', resolvedSearchParams.tag)
-    if (resolvedSearchParams.health) params.set('health', resolvedSearchParams.health)
-    if (sort) params.set('sort', sort)
-    if (dir) params.set('dir', dir)
-    if (page > 1) params.set('page', String(page))
-    const qs = params.toString()
-    return `/admin/customers${qs ? `?${qs}` : ''}`
-  })()
-
   return (
-    <div className="p-4 sm:p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Customers</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">View and manage customer accounts</p>
-      </div>
-
+    <div className="animate-fade-in">
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
         <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
           <p className="text-foreground-secondary text-sm">Total Customers</p>
@@ -101,6 +45,21 @@ async function CustomersPageContent({ searchParams }: { searchParams: Promise<{ 
           <p className="text-2xl sm:text-3xl font-bold text-red-500 mt-2">{flaggedCount}</p>
         </div>
       </div>
+    </div>
+  )
+}
+
+export default function CustomersPage({ searchParams }: { searchParams: Promise<SP> }) {
+  return (
+    <div className="p-4 sm:p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Customers</h1>
+        <p className="text-foreground-secondary mt-1 text-sm">View and manage customer accounts</p>
+      </div>
+
+      <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
+        <CustomersStats />
+      </Suspense>
 
       <AdminFilters
         filters={[
@@ -141,6 +100,71 @@ async function CustomersPageContent({ searchParams }: { searchParams: Promise<{ 
         searchParam="search"
       />
 
+      <CustomersListSection searchParams={searchParams} />
+    </div>
+  )
+}
+
+// Resolves searchParams (no DB — near-instant) then keys the table Suspense
+// on the query string so filter/pagination changes re-trigger the shimmer
+// while the stats + filters above stay mounted.
+async function CustomersListSection({ searchParams }: { searchParams: Promise<SP> }) {
+  const resolvedSearchParams = await searchParams
+  const key = JSON.stringify(resolvedSearchParams)
+  return (
+    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
+      <CustomersListContent resolvedSearchParams={resolvedSearchParams} />
+    </Suspense>
+  )
+}
+
+async function CustomersListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
+  const host = await getHost()
+  const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
+  const sort = resolvedSearchParams.sort
+  const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
+
+  const { customers, total } = await getCustomers({
+    search: resolvedSearchParams.search,
+    status: resolvedSearchParams.status,
+    segment: resolvedSearchParams.segment,
+    tag: resolvedSearchParams.tag,
+    health: resolvedSearchParams.health,
+    page,
+    limit: PAGE_SIZE,
+    sort,
+    dir })
+
+  const buildUrl = (p: number) => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
+    if (resolvedSearchParams.tag) params.set('tag', resolvedSearchParams.tag)
+    if (resolvedSearchParams.health) params.set('health', resolvedSearchParams.health)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
+    if (p > 1) params.set('page', String(p))
+    const qs = params.toString()
+    return ap(`/admin/customers${qs ? `?${qs}` : ''}`, host)
+  }
+
+  const currentListUrl = (() => {
+    const params = new URLSearchParams()
+    if (resolvedSearchParams.status) params.set('status', resolvedSearchParams.status)
+    if (resolvedSearchParams.search) params.set('search', resolvedSearchParams.search)
+    if (resolvedSearchParams.segment) params.set('segment', resolvedSearchParams.segment)
+    if (resolvedSearchParams.tag) params.set('tag', resolvedSearchParams.tag)
+    if (resolvedSearchParams.health) params.set('health', resolvedSearchParams.health)
+    if (sort) params.set('sort', sort)
+    if (dir) params.set('dir', dir)
+    if (page > 1) params.set('page', String(page))
+    const qs = params.toString()
+    return `/admin/customers${qs ? `?${qs}` : ''}`
+  })()
+
+  return (
+    <>
       <div className="md:hidden space-y-3">
         {customers && customers.length > 0 ? (
           customers.map((customer: any) => {
@@ -243,6 +267,6 @@ async function CustomersPageContent({ searchParams }: { searchParams: Promise<{ 
       <div className="hidden md:block px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
         <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
       </div>
-    </div>
+    </>
   )
 }
