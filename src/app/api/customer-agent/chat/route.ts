@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
-import { aiChat, AiClientError } from '@/lib/ai-client'
+import { aiChat } from '@/lib/ai-client'
 import { CUSTOMER_TOOLS, getCustomerTool, type CustomerToolContext } from '@/lib/customer-agent/tools'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/validate'
@@ -281,13 +281,12 @@ export async function POST(req: NextRequest) {
 
       messages.push({ role: 'user', content: toolOutputs.join('\n') + '\n\nNow apply the RELEVANCE CHECK and respond to the customer in plain text. If results are unrelated you may call one more tool with a refined query, otherwise give your final answer now.' })
     }
-  } catch (err: any) {
-    const errMsg = err?.message || 'AI service unavailable'
-    if (err instanceof AiClientError || err instanceof Error) {
-      return NextResponse.json({ error: errMsg, toolCalls: toolCallRecords }, { status: 502 })
-    }
+  } catch {
+    // Never surface a raw provider error (e.g. "Ollama unreachable...") to the
+    // customer — degrade to a friendly message. Any partial tool results are
+    // still returned so the widget can show what it found.
     return NextResponse.json({
-      message: "I'm having trouble responding right now. Please try again in a moment.",
+      message: "I'm having trouble responding right now. Please try again in a moment, or reach out to our support team.",
       toolCalls: toolCallRecords,
       provider,
       model,

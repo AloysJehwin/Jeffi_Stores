@@ -213,9 +213,13 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
         body: JSON.stringify({ message: q, history }),
       })
       const data = await res.json()
+      // Prefer the assistant message. Never render a raw server `error` string to
+      // the customer — fall back to a fixed friendly line for any failure.
       const assistantMsg: ChatMessage = {
         role: 'assistant',
-        content: res.ok ? (data.message || 'No response.') : (data.error || 'Something went wrong.'),
+        content: (res.ok && data.message)
+          ? data.message
+          : "I'm having trouble responding right now. Please try again in a moment.",
         id: uid(),
       }
       setMessages(prev => [...prev, assistantMsg])

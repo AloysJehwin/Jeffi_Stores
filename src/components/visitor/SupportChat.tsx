@@ -391,7 +391,8 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
       if (res.ok && data.payload) {
         payload = data.payload
       } else {
-        payload = { type: 'text', text: data.error || 'Something went wrong.' }
+        // Never render a raw server `error` string to the customer.
+        payload = { type: 'text', text: "i'm having trouble with that right now — please try again or connect to a support agent." }
       }
       setMessages(prev => [...prev, { id: Date.now().toString() + 'b', sender: 'bot', message: '', payload }])
       setShowConnectPrompt(true)
