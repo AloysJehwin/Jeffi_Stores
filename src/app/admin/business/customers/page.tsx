@@ -1,5 +1,6 @@
 export const dynamic = 'force-dynamic'
 
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { cookies} from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
@@ -8,6 +9,7 @@ import { redirect } from 'next/navigation'
 import { queryMany } from '@/lib/db'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
 const PAGE_SIZE = 25
 
@@ -76,7 +78,19 @@ const STATUS_STYLES: Record<string, string> = {
   approved: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
   rejected: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' }
 
-export default async function BusinessCustomersPage({
+export default function BusinessCustomersPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | undefined }>
+}) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <BusinessCustomersPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function BusinessCustomersPageContent({
   searchParams }: {
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {

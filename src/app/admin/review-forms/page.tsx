@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { Star, MessageSquare, FileText } from 'lucide-react'
 import { queryMany, queryCount } from '@/lib/db'
@@ -7,6 +8,7 @@ import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import AdminSkeleton from '@/components/admin/AdminSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -40,7 +42,15 @@ async function getForms(filters: { search?: string; page?: number }) {
   return { forms, total }
 }
 
-export default async function ReviewFormsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default function ReviewFormsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  return (
+    <Suspense fallback={<AdminSkeleton variant="list" />}>
+      <ReviewFormsPageContent searchParams={searchParams} />
+    </Suspense>
+  )
+}
+
+async function ReviewFormsPageContent({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
