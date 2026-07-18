@@ -5,6 +5,7 @@ import {
   isStepMultiple,
   validatePurchaseQuantity,
   serialCountForQuantity,
+  validateSerializedUnitStep,
   type SellingUnit,
 } from '@/lib/selling-unit'
 
@@ -104,5 +105,20 @@ describe('serialCountForQuantity', () => {
   })
   it('defaults to qty when unit/step missing', () => {
     expect(serialCountForQuantity(4, null)).toBe(4)
+  })
+})
+
+describe('validateSerializedUnitStep', () => {
+  it('accepts whole-number steps', () => {
+    expect(validateSerializedUnitStep(1)).toBeNull()
+    expect(validateSerializedUnitStep(5)).toBeNull()
+  })
+  it('rejects fractional steps for serialized products', () => {
+    expect(validateSerializedUnitStep(2.5)).toMatch(/whole-number qty_step/i)
+    expect(validateSerializedUnitStep(0.5)).toMatch(/whole-number qty_step/i)
+  })
+  it('rejects zero/negative', () => {
+    expect(validateSerializedUnitStep(0)).toMatch(/positive/i)
+    expect(validateSerializedUnitStep(-3)).toMatch(/positive/i)
   })
 })
