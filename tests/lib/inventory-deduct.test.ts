@@ -4,7 +4,7 @@ vi.mock('@/lib/db', () => ({ withTransaction: vi.fn() }))
 vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/shelf', () => ({ syncPerishableStock: vi.fn().mockResolvedValue(undefined) }))
 
-import { deductOrderStock } from '@/lib/inventory-deduct'
+import { deductOrderStock, deductStockForLines } from '@/lib/inventory-deduct'
 import { logStockMovement } from '@/lib/inventory'
 import { syncPerishableStock } from '@/lib/shelf'
 
@@ -150,6 +150,50 @@ describe('deductOrderStock — serialized (1 serial per qty_step)', () => {
       4: { rows: [{ id: 's1', serial_number: 'SN-1', batch_id: 'b1' }] }, // only 1, need 2
     })
     await expect(deductOrderStock('ord-1', {}, client)).rejects.toThrow(/Not enough serial units/i)
+  })
+})
+
+describe('deductStockForLines — explicit line items (cash-sale / invoice-edit)', () => {
+  it('deducts a plain line without reading order_items, keyed on referenceId', async () => {
+    // No initial idempotency guard query and no order_items SELECT — lines are given.
+    const client = makeClient({
+      0: { rows: [] }, // unit row (none → plain)
+      1: { rows: [PLAIN] }, // products flags
+      2: { rows: [{ inventory_quantity: '10' }] }, // FOR UPDATE stock
+      3: { rows: [] }, // UPDATE inventory
+    })
+    await deductStockForLines(client, 'sale-99', [
+      { id: 'ln1', product_id: 'p1', quantity: 2, buy_unit: null },
+    ])
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({
+      transactionType: 'sale', quantityChange: -2, referenceId: 'sale-99',
+    }))
+  })
+
+  it('respects manual serial assignments matched by line.id', async () => {
+    const client = makeClient({
+      0: { rows: [{ unit: 'pc', factor: '1', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }] },
+      1: { rows: [{ perishable: false, serialized: true }] },
+      2: { rows: [{ id: 's1', batch_id: null }] }, // manual serial lookup (in_stock)
+      3: { rows: [] }, // UPDATE serial sold
+      4: { rows: [] }, // UPDATE order_items batch_id (skipped: batch null) — extra safe
+    })
+    await deductStockForLines(
+      client, 'sale-1',
+      [{ id: 'ln1', product_id: 'p1', quantity: 1, buy_unit: 'pc' }],
+      { serialAssignments: [{ order_item_id: 'ln1', serial_number: 'SN-9' }], requireSerialAssignments: true }
+    )
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ serialNumber: 'SN-9', quantityChange: -1 }))
+  })
+
+  it('throws when requireSerialAssignments and serials missing', async () => {
+    const client = makeClient({
+      0: { rows: [{ unit: 'pc', factor: '1', dimension: 'count', qty_step: '1', min_qty: '1', max_qty: null }] },
+      1: { rows: [{ perishable: false, serialized: true }] },
+    })
+    await expect(
+      deductStockForLines(client, 'sale-1', [{ id: 'ln1', product_id: 'p1', quantity: 2, buy_unit: 'pc' }], { requireSerialAssignments: true })
+    ).rejects.toThrow(/Serial numbers required/i)
   })
 })
 

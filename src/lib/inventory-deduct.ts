@@ -39,6 +39,13 @@ export interface SerialAssignment {
 export interface DeductOptions {
   batchAssignments?: BatchAssignment[]
   serialAssignments?: SerialAssignment[]
+  /**
+   * When true, serialized items MUST have explicit serialAssignments (no
+   * auto-pick) — throws otherwise. Preserves the admin picker-popup contract
+   * where the operator selects serials. Online checkout leaves this false so
+   * serials are auto-picked FEFO. Batches always fall back to auto-FEFO.
+   */
+  requireSerialAssignments?: boolean
 }
 
 const FEFO_ORDER = 'ORDER BY expiry_date ASC NULLS LAST, manufacture_date ASC NULLS LAST, created_at ASC'
@@ -64,6 +71,48 @@ export async function deductOrderStock(
   return withTransaction(run)
 }
 
+/**
+ * Same deduction logic keyed on an explicit line-item list rather than reading
+ * order_items by orderId. For sale surfaces that don't persist order_items
+ * (cash-sale keyed on sale_id, invoice edits). `referenceId` is the id recorded
+ * on the ledger / product_serials.order_id (a sale id or order id). Each line's
+ * `id` is used to match manual batch/serial assignments (pass any stable key
+ * when there are none). Runs inside the caller's transaction.
+ */
+export async function deductStockForLines(
+  client: PoolClient,
+  referenceId: string,
+  lines: LineItem[],
+  opts: DeductOptions = {}
+): Promise<void> {
+  await deductItems(
+    client,
+    referenceId,
+    lines.map(l => ({
+      id: l.id,
+      product_id: l.product_id,
+      variant_id: l.variant_id ?? null,
+      sub_variant_id: l.sub_variant_id ?? null,
+      product_name: l.product_name ?? '',
+      variant_name: l.variant_name ?? null,
+      quantity: String(l.quantity),
+      buy_unit: l.buy_unit ?? null,
+    })),
+    opts
+  )
+}
+
+export interface LineItem {
+  id: string
+  product_id: string
+  variant_id?: string | null
+  sub_variant_id?: string | null
+  product_name?: string | null
+  variant_name?: string | null
+  quantity: number | string
+  buy_unit?: string | null
+}
+
 async function deductInTx(client: PoolClient, orderId: string, opts: DeductOptions): Promise<void> {
   // Idempotency guard — mirror restoreOrderStock's 'return' guard.
   const already = await client.query(
@@ -79,10 +128,18 @@ async function deductInTx(client: PoolClient, orderId: string, opts: DeductOptio
        FROM order_items WHERE order_id = $1`,
     [orderId]
   )
+  await deductItems(client, orderId, items.rows, opts)
+}
 
+async function deductItems(
+  client: PoolClient,
+  referenceId: string,
+  itemRows: OrderItemRow[],
+  opts: DeductOptions
+): Promise<void> {
   const touchedPerishable: { productId: string; variantId: string | null; subVariantId: string | null }[] = []
 
-  for (const item of items.rows) {
+  for (const item of itemRows) {
     if (!item.product_id) continue
     const qty = parseFloat(item.quantity)
 
@@ -114,13 +171,19 @@ async function deductInTx(client: PoolClient, orderId: string, opts: DeductOptio
     const label = `${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''}`
 
     if (isSerialized) {
-      await deductSerialized(client, orderId, item, baseQty, unit ? serialCountForQuantity(qty, unit) : Math.round(baseQty), manualSerials, label)
+      const needed = unit ? serialCountForQuantity(qty, unit) : Math.round(baseQty)
+      if (opts.requireSerialAssignments && manualSerials.length < needed) {
+        throw new Error(
+          `Serial numbers required for "${label}" — need ${needed}, got ${manualSerials.length}`
+        )
+      }
+      await deductSerialized(client, referenceId, item, baseQty, needed, manualSerials, label)
       touchedPerishable.push({ productId: item.product_id, variantId: item.variant_id, subVariantId: item.sub_variant_id })
     } else if (isPerishable) {
-      await deductPerishable(client, orderId, item, baseQty, manualBatches, label)
+      await deductPerishable(client, referenceId, item, baseQty, manualBatches, label)
       touchedPerishable.push({ productId: item.product_id, variantId: item.variant_id, subVariantId: item.sub_variant_id })
     } else {
-      await deductPlain(client, orderId, item, baseQty, label)
+      await deductPlain(client, referenceId, item, baseQty, label)
     }
   }
 
