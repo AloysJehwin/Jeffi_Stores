@@ -5,7 +5,6 @@ import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
 import { createDraftInvoice } from '@/lib/invoice'
-import { deductOrderStock } from '@/lib/inventory-deduct'
 import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
 import {
   loadActiveCart,
@@ -303,11 +302,6 @@ async function markLegacyOrderPaid(args: {
       `DELETE FROM cart_items WHERE user_id = $1 AND COALESCE(saved_for_later, FALSE) = FALSE`,
       [args.userId]
     )
-
-    // Order just transitioned unpaid → confirmed; deduct inventory now (auto-FEFO,
-    // idempotent). commitOrder handles the create-already-paid case; this handles
-    // the pay-now-on-existing-order case.
-    await deductOrderStock(args.orderId, {}, client)
   })
 
   const [user, orderItems] = await Promise.all([
