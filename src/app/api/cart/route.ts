@@ -8,6 +8,7 @@ import { getUserIdForSession } from '@/lib/guest-user'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { logActivity } from '@/lib/activity'
 import { parseBody, zUuid } from '@/lib/validate'
+import { toSellingUnit, validatePurchaseQuantity } from '@/lib/selling-unit'
 
 const AddCartSchema = z
   .object({
@@ -212,6 +213,26 @@ export async function POST(request: NextRequest) {
       if (unitRow) {
         priceAtAddition = round2(priceAtAddition * Number(unitRow.factor))
       }
+    }
+
+    // Enforce the selling unit's min/max/qty_step server-side (previously UI-only).
+    // Resolve the unit constraints for the chosen buyUnit; validate the quantity.
+    const constraintRow = buyUnit
+      ? await queryOne<{ unit: string; factor: string; dimension: string; qty_step: string; min_qty: string; max_qty: string | null }>(
+          `SELECT unit, factor::text, dimension, qty_step::text, min_qty::text, max_qty::text
+             FROM product_units
+            WHERE product_id = $1 AND unit = $2
+              AND ( ($4::uuid IS NOT NULL AND sub_variant_id = $4::uuid)
+                    OR (sub_variant_id IS NULL AND variant_id = $3)
+                    OR (sub_variant_id IS NULL AND variant_id IS NULL) )
+            ORDER BY sub_variant_id NULLS LAST, variant_id NULLS LAST
+            LIMIT 1`,
+          [productId, buyUnit, variantId || null, subVariantId || null]
+        )
+      : null
+    const qtyCheck = validatePurchaseQuantity(Number(quantity), toSellingUnit(constraintRow))
+    if (!qtyCheck.ok) {
+      return NextResponse.json({ error: qtyCheck.reason }, { status: 400 })
     }
 
     const upsertResult = await query(
