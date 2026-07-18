@@ -162,22 +162,26 @@ describe('POST /api/customer-agent/chat', () => {
     expect(json.toolCalls[0].isError).toBe(true)
   })
 
-  it('returns 502 when aiChat throws AiClientError', async () => {
+  it('degrades gracefully to a friendly message when aiChat throws AiClientError', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockAiChat.mockRejectedValueOnce(new AiClientError('Model unavailable', 'anthropic'))
 
     const res = await POST(makeRequest({ message: 'Hello there' }) as any)
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.error).toBe('Model unavailable')
+    expect(json.message).toMatch(/trouble responding|try again/i)
+    expect(json.error).toBeUndefined()
   })
 
-  it('returns 502 on generic AI error', async () => {
+  it('degrades gracefully to a friendly message on generic AI error', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
     mockAiChat.mockRejectedValueOnce(new Error('Connection reset'))
 
     const res = await POST(makeRequest({ message: 'Hello' }) as any)
-    expect(res.status).toBe(502)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.message).toMatch(/trouble responding|try again/i)
+    expect(json.error).toBeUndefined()
   })
 
   it('uses fallback message when max iterations exhausted with only tool calls', async () => {
