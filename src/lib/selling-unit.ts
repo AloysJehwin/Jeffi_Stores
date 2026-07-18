@@ -115,3 +115,20 @@ export function serialCountForQuantity(qty: number, unit: SellingUnit | null): n
   const step = unit && unit.qty_step > 0 ? unit.qty_step : 1
   return Math.round(qty / step)
 }
+
+/**
+ * Product-setup guardrail: a serialized product's selling unit must have a
+ * whole-number qty_step, so that every valid purchase quantity (a multiple of
+ * qty_step) maps to a whole number of serials. A fractional step (e.g. 2.5)
+ * would let a valid quantity consume a fractional serial, which is impossible.
+ * Returns an error reason when invalid, or null when OK.
+ */
+export function validateSerializedUnitStep(qtyStep: number): string | null {
+  if (!Number.isFinite(qtyStep) || qtyStep <= 0) {
+    return 'qty_step must be a positive number.'
+  }
+  if (Math.abs(qtyStep - Math.round(qtyStep)) > EPS) {
+    return 'Serialized products need a whole-number qty_step so each step maps to one serial.'
+  }
+  return null
+}

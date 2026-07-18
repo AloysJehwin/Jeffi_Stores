@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, withTransaction } from '@/lib/db'
+import { validateSerializedUnitStep } from '@/lib/selling-unit'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,6 +86,13 @@ export async function POST(request: NextRequest, { params }: Params) {
   const minQty = body.min_qty != null && Number.isFinite(Number(body.min_qty)) && Number(body.min_qty) > 0 ? Number(body.min_qty) : 1
   const maxQty = body.max_qty != null && Number.isFinite(Number(body.max_qty)) && Number(body.max_qty) >= minQty ? Number(body.max_qty) : null
   const qtyStep = body.qty_step != null && Number.isFinite(Number(body.qty_step)) && Number(body.qty_step) > 0 ? Number(body.qty_step) : 1
+
+  // Serialized products need a whole-number qty_step so each step maps to one serial.
+  const serialRow = await queryOne<{ serialized: boolean }>(`SELECT serialized FROM products WHERE id = $1`, [id])
+  if (serialRow?.serialized) {
+    const stepErr = validateSerializedUnitStep(qtyStep)
+    if (stepErr) return NextResponse.json({ error: stepErr }, { status: 400 })
+  }
 
   try {
     const inserted = await withTransaction(async (client) => {
