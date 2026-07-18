@@ -20,6 +20,8 @@ if (!PG_PASS) {
 const pool = new pg.Pool({
   host: PG_HOST, port: PG_PORT, user: PG_USER, password: PG_PASS, database: PG_DB,
   max: 8,
+  // RDS requires SSL; set PG_SSL=1 to enable (cert not verified — fine over the SSH tunnel).
+  ssl: process.env.PG_SSL === '1' ? { rejectUnauthorized: false } : undefined,
 })
 
 function sha256(s) { return crypto.createHash('sha256').update(s).digest('hex') }

@@ -29,6 +29,9 @@ function getPool(): Pool {
       max: 4,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
+      // RDS requires SSL; set RAG_PG_SSL=1 when pointing at RDS. Cert isn't verified
+      // (connection goes over the SSH tunnel / tailnet). Razer replica needs no SSL.
+      ssl: process.env.RAG_PG_SSL === '1' ? { rejectUnauthorized: false } : undefined,
     })
     pool.on('error', () => {})
   }
