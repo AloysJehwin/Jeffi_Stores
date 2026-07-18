@@ -108,19 +108,25 @@ export function validatePurchaseQuantity(qty: number, unit: SellingUnit | null):
 
 /**
  * How many serial numbers a serialized-product sale consumes: one serial per
- * BASE unit. This mirrors intake exactly — PO receive creates one product_serials
- * row per base unit received (qty × factor), and each batch's serial count equals
- * its quantity (a batch of 100 has 100 serials). So consuming `baseQty` base units
- * consumes `baseQty` serials, keeping serial rows and batch quantities in lockstep.
+ * qty_step of BASE quantity — i.e. round(baseQty / qty_step).
  *
- * NOTE: this is intentionally base-unit-based, NOT qty_step-based. For products
- * with qty_step = 1 and factor = 1 (all count-dimension serialized products) the
- * two are identical; they only diverge for a fractional-step measured unit (e.g.
- * wire sold by the metre with qty_step 0.5), where 1-serial-per-half-metre would
- * be physically meaningless and would not match the batch's serial count.
+ * This is the single serial-count rule used on both sides of inventory:
+ *   - sale: consuming `qty` selling units → round(baseQty / qty_step) serials
+ *   - intake (PO receive): receiving `baseQty` base units → the same count
+ * so serial rows and batch quantities stay in lockstep.
+ *
+ * baseQty already folds in the selling-unit factor (a box of 12 → 12 base
+ * units); dividing by qty_step then splits each base unit into step-sized
+ * serialisable slots. Examples:
+ *   - "Small wire" 400 m base, qty_step 0.5 → 800 serials (one per half-metre)
+ *   - "Earth bit cover" 100 base, qty_step 1  → 100 serials (unchanged)
+ * With qty_step enforced as a hard purchase constraint, baseQty / qty_step is
+ * always integral, so a serial is never partially consumed.
  */
 export function serialCountForQuantity(qty: number, unit: SellingUnit | null): number {
-  return Math.round(toBaseQuantity(qty, unit))
+  const base = toBaseQuantity(qty, unit)
+  const step = unit && unit.qty_step > 0 ? unit.qty_step : 1
+  return Math.round(base / step)
 }
 
 /**

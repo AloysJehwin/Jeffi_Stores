@@ -99,17 +99,19 @@ describe('validatePurchaseQuantity', () => {
 })
 
 describe('serialCountForQuantity', () => {
-  it('one serial per base unit — measured dimension passes qty through', () => {
-    // Small wire: 2 m sold, factor 1, length → 2 serials (NOT 2/0.5 = 4)
-    expect(serialCountForQuantity(2, unit({ dimension: 'length', factor: 1, qty_step: 0.5 }))).toBe(2)
-    expect(serialCountForQuantity(2.5, unit({ dimension: 'length', factor: 1, qty_step: 0.5 }))).toBe(3) // rounds
+  it('one serial per qty_step of base quantity — measured dimension', () => {
+    // Small wire: 400 m base (factor 1, length), qty_step 0.5 → 800 serials
+    expect(serialCountForQuantity(400, unit({ dimension: 'length', factor: 1, qty_step: 0.5 }))).toBe(800)
+    // 2.5 m, qty_step 0.5 → 5 serials
+    expect(serialCountForQuantity(2.5, unit({ dimension: 'length', factor: 1, qty_step: 0.5 }))).toBe(5)
   })
-  it('one serial per base unit — count dimension multiplies by factor', () => {
-    // A box of 12 → 12 serials per box
+  it('folds in the selling-unit factor before dividing by qty_step (count dim)', () => {
+    // A box of 12, qty_step 1 → 12 serials per box
     expect(serialCountForQuantity(2, unit({ dimension: 'count', factor: 12, qty_step: 1 }))).toBe(24)
+    // Earth-bit-cover shape: factor 1, step 1 → serials == qty
     expect(serialCountForQuantity(3, unit({ dimension: 'count', factor: 1, qty_step: 1 }))).toBe(3)
   })
-  it('defaults to qty when unit missing', () => {
+  it('defaults to qty when unit missing (step 1)', () => {
     expect(serialCountForQuantity(4, null)).toBe(4)
   })
 })

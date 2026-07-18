@@ -261,7 +261,7 @@ type POItem = {
   product_name: string; variant_name: string | null; sku: string | null; product_sku?: string | null
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
   purchase_unit: string | null; purchase_unit_factor: string | null
-  sell_unit_label: string | null; sell_unit_dimension: string | null
+  sell_unit_label: string | null; sell_unit_dimension: string | null; sell_unit_qty_step: string | null
   perishable: boolean; serialized: boolean
 }
 
@@ -269,6 +269,17 @@ type POItem = {
 function poBaseUnitLabel(it: Pick<POItem, 'sell_unit_label' | 'sell_unit_dimension'>): string {
   if (!it.sell_unit_dimension || it.sell_unit_dimension === 'count') return 'pc'
   return it.sell_unit_label || 'units'
+}
+
+/**
+ * Serial numbers required for a serialized receive: one serial per qty_step of
+ * BASE quantity. base = receive_qty × purchase_unit_factor; expected = base / qty_step.
+ * Matches the sale side (serialCountForQuantity) and the receive route's guard.
+ */
+function serialsRequired(it: { receive_qty?: string; purchase_unit_factor?: string | number; sell_unit_qty_step?: string | null }): number {
+  const base = parseFloat(String(it.receive_qty || '0')) * parseFloat(String(it.purchase_unit_factor || '1'))
+  const step = parseFloat(String(it.sell_unit_qty_step ?? '1')) || 1
+  return Math.round(base / (step > 0 ? step : 1))
 }
 
 function POTab({ initialPO }: { initialPO?: string }) {
@@ -418,7 +429,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
     const missingSerials = receiveItems.filter(it => {
       if (!it.serialized || parseFloat(it.receive_qty) <= 0) return false
       const serials = Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []
-      return serials.filter(Boolean).length !== Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
+      return serials.filter(Boolean).length !== serialsRequired(it)
     })
     if (missingSerials.length > 0) {
       showToast(`Serial numbers count must match received qty for: ${missingSerials.map((it: any) => it.product_name + (it.variant_name ? ' / ' + it.variant_name : '')).join(', ')}`, 'error')
@@ -628,7 +639,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     </tr>
                   )}
                   {it.serialized && parseFloat(it.receive_qty) > 0 && (() => {
-                    const needed = Math.round(parseFloat(it.receive_qty) * parseFloat(it.purchase_unit_factor || '1'))
+                    const needed = serialsRequired(it)
                     const serials: string[] = Array.isArray(it.serial_numbers) ? it.serial_numbers as string[] : []
                     const entered = serials.filter(Boolean).length
                     const sku = (it.sku || it.product_sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()

@@ -118,30 +118,33 @@ describe('deductOrderStock — perishable auto-FEFO', () => {
   })
 })
 
-describe('deductOrderStock — serialized (1 serial per base unit)', () => {
-  it('marks N serials sold where N = base quantity (qty × factor)', async () => {
-    // 3 m with factor 1 (length) → 3 serials. Serial count follows base units,
-    // NOT qty_step — mirrors intake, where a batch of N base units has N serials.
+describe('deductOrderStock — serialized (1 serial per qty_step of base qty)', () => {
+  it('marks N serials sold where N = round(baseQty / qty_step)', async () => {
+    // 3 m with factor 1 (length), qty_step 0.5 → 3 / 0.5 = 6 serials.
     const client = makeClient({
       0: { rows: [] }, // guard
       1: { rows: [{ id: 'oi1', product_id: 'p1', variant_id: null, sub_variant_id: null, product_name: 'Small wire', variant_name: null, quantity: '3', buy_unit: 'm' }] },
       2: { rows: [{ unit: 'm', factor: '1', dimension: 'length', qty_step: '0.5', min_qty: '0.5', max_qty: null }] },
       3: { rows: [{ perishable: false, serialized: true }] },
-      4: { rows: [ { id: 's1', serial_number: 'SN-1', batch_id: 'b1' }, { id: 's2', serial_number: 'SN-2', batch_id: 'b1' }, { id: 's3', serial_number: 'SN-3', batch_id: 'b1' } ] }, // FEFO serial pick, LIMIT 3
-      5: { rows: [] }, // UPDATE serial s1 sold
-      6: { rows: [{ lot_number: 'L1', expiry_date: null }] }, // batch dec for s1
-      7: { rows: [] }, // UPDATE serial s2 sold
-      8: { rows: [{ lot_number: 'L1', expiry_date: null }] }, // batch dec for s2
-      9: { rows: [] }, // UPDATE serial s3 sold
-      10: { rows: [{ lot_number: 'L1', expiry_date: null }] }, // batch dec for s3
-      11: { rows: [] }, // UPDATE order_items batch_id
+      4: { rows: [
+        { id: 's1', serial_number: 'SN-1', batch_id: 'b1' }, { id: 's2', serial_number: 'SN-2', batch_id: 'b1' },
+        { id: 's3', serial_number: 'SN-3', batch_id: 'b1' }, { id: 's4', serial_number: 'SN-4', batch_id: 'b1' },
+        { id: 's5', serial_number: 'SN-5', batch_id: 'b1' }, { id: 's6', serial_number: 'SN-6', batch_id: 'b1' },
+      ] }, // FEFO serial pick, LIMIT 6
+      5: { rows: [] }, 6: { rows: [{ lot_number: 'L1', expiry_date: null }] },
+      7: { rows: [] }, 8: { rows: [{ lot_number: 'L1', expiry_date: null }] },
+      9: { rows: [] }, 10: { rows: [{ lot_number: 'L1', expiry_date: null }] },
+      11: { rows: [] }, 12: { rows: [{ lot_number: 'L1', expiry_date: null }] },
+      13: { rows: [] }, 14: { rows: [{ lot_number: 'L1', expiry_date: null }] },
+      15: { rows: [] }, 16: { rows: [{ lot_number: 'L1', expiry_date: null }] },
+      17: { rows: [] }, // UPDATE order_items batch_id
     })
     await deductOrderStock('ord-1', {}, client)
     expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ serialNumber: 'SN-1', quantityChange: -1 }))
-    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ serialNumber: 'SN-3', quantityChange: -1 }))
-    // exactly 3 serials sold (one per base metre), not 3/0.5 = 6
+    expect(logStockMovement).toHaveBeenCalledWith(client, expect.objectContaining({ serialNumber: 'SN-6', quantityChange: -1 }))
+    // exactly 6 serials sold (3 m / 0.5 qty_step), not 3 base units
     const sold = client.calls.filter((c: any) => /UPDATE product_serials SET status = 'sold'/.test(c.sql))
-    expect(sold).toHaveLength(3)
+    expect(sold).toHaveLength(6)
   })
 
   it('throws when not enough in-stock serials', async () => {
@@ -150,7 +153,7 @@ describe('deductOrderStock — serialized (1 serial per base unit)', () => {
       1: { rows: [{ id: 'oi1', product_id: 'p1', variant_id: null, sub_variant_id: null, product_name: 'Small wire', variant_name: null, quantity: '3', buy_unit: 'm' }] },
       2: { rows: [{ unit: 'm', factor: '1', dimension: 'length', qty_step: '0.5', min_qty: '0.5', max_qty: null }] },
       3: { rows: [{ perishable: false, serialized: true }] },
-      4: { rows: [{ id: 's1', serial_number: 'SN-1', batch_id: 'b1' }] }, // only 1, need 3
+      4: { rows: [{ id: 's1', serial_number: 'SN-1', batch_id: 'b1' }] }, // only 1, need 6
     })
     await expect(deductOrderStock('ord-1', {}, client)).rejects.toThrow(/Not enough serial units/i)
   })
