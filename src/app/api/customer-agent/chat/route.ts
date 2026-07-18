@@ -103,8 +103,19 @@ function parseToolCalls(text: string): { calls: { name: string; rawInput: string
   while ((m = re.exec(text)) !== null) {
     calls.push({ name: m[1], rawInput: m[2] })
   }
-  const remainder = text.replace(re, '').trim()
-  return { calls, remainder }
+  if (calls.length > 0) {
+    return { calls, remainder: text.replace(re, '').trim() }
+  }
+
+  // Fallback: some models (e.g. qwen2.5, gemma) intermittently emit a bare
+  // `toolname {json}` instead of the <tool_use> wrapper. Accept it only when the
+  // leading token is a REAL customer tool name, so prose is never misparsed.
+  const bare = text.trim().match(/^([a-z_]+)\s*(\{[\s\S]*\})?\s*$/i)
+  if (bare && getCustomerTool(bare[1])) {
+    return { calls: [{ name: bare[1], rawInput: bare[2] || '{}' }], remainder: '' }
+  }
+
+  return { calls: [], remainder: text.trim() }
 }
 
 type ProductRow = { name: string; slug: string; price?: string; stock_status?: string; short_description?: string | null }
