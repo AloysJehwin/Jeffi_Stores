@@ -5,6 +5,28 @@ import { syncPerishableStock } from '@/lib/shelf'
 import { toSellingUnit, toBaseQuantity, serialCountForQuantity } from '@/lib/selling-unit'
 
 /**
+ * Thrown when a sale can't be fulfilled from available stock (batches/serials/
+ * plain inventory). Carries BOTH a detailed `message` — for admins and logs, who
+ * need to know exactly what's short — and a `customerMessage` safe to surface on
+ * the storefront (no serials, counts, or internal names). Online API boundaries
+ * return `customerMessage`; admin routes keep the detailed `message`.
+ */
+export class InsufficientStockError extends Error {
+  readonly customerMessage: string
+  readonly code = 'OUT_OF_STOCK'
+  constructor(detail: string, customerMessage: string) {
+    super(detail)
+    this.name = 'InsufficientStockError'
+    this.customerMessage = customerMessage
+  }
+}
+
+/** Customer-safe "out of stock" line for a product label. */
+function outOfStockMessage(label: string): string {
+  return `Sorry, "${label}" is currently out of stock. Please reduce the quantity or remove it to continue.`
+}
+
+/**
  * Deducts inventory for an order at confirmation time — the counterpart to
  * `restoreOrderStock` in order-stock.ts.
  *
@@ -208,7 +230,10 @@ async function deductPerishable(
     plan = manual.map(a => ({ batch_id: a.batch_id, qty: a.qty }))
     const total = plan.reduce((s, p) => s + p.qty, 0)
     if (total + 1e-6 < baseQty) {
-      throw new Error(`Batch total (${total}) is less than required (${baseQty}) for "${label}"`)
+      throw new InsufficientStockError(
+        `Batch total (${total}) is less than required (${baseQty}) for "${label}"`,
+        outOfStockMessage(label)
+      )
     }
   } else {
     const avail = await client.query<{ id: string; quantity_remaining: string }>(
@@ -229,7 +254,10 @@ async function deductPerishable(
       if (take > 0) { plan.push({ batch_id: b.id, qty: take }); remaining -= take }
     }
     if (remaining > 1e-6) {
-      throw new Error(`Insufficient batch stock for "${label}" — short by ${remaining.toFixed(3)}`)
+      throw new InsufficientStockError(
+        `Insufficient batch stock for "${label}" — short by ${remaining.toFixed(3)}`,
+        outOfStockMessage(label)
+      )
     }
   }
 
@@ -239,7 +267,10 @@ async function deductPerishable(
     )
     const before = parseFloat(br.rows[0]?.quantity_remaining ?? '0') || 0
     if (before + 1e-6 < p.qty) {
-      throw new Error(`Insufficient batch stock for "${label}" — batch has ${before}, taking ${p.qty}`)
+      throw new InsufficientStockError(
+        `Insufficient batch stock for "${label}" — batch has ${before}, taking ${p.qty}`,
+        outOfStockMessage(label)
+      )
     }
     const upd = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
       `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW()
@@ -283,7 +314,10 @@ async function deductSerialized(
           WHERE product_id = $1 AND serial_number = $2 AND status = 'in_stock' FOR UPDATE`,
         [item.product_id, a.serial_number]
       )
-      if (!r.rows.length) throw new Error(`Serial "${a.serial_number}" for "${label}" is not available`)
+      if (!r.rows.length) throw new InsufficientStockError(
+        `Serial "${a.serial_number}" for "${label}" is not available`,
+        outOfStockMessage(label)
+      )
       serials.push({ id: r.rows[0].id, serial_number: a.serial_number, batch_id: r.rows[0].batch_id })
     }
   } else {
@@ -302,7 +336,10 @@ async function deductSerialized(
     )
     serials = r.rows
     if (serials.length < count) {
-      throw new Error(`Not enough serial units for "${label}" — need ${count}, have ${serials.length}`)
+      throw new InsufficientStockError(
+        `Not enough serial units for "${label}" — need ${count}, have ${serials.length}`,
+        outOfStockMessage(label)
+      )
     }
   }
 
@@ -359,7 +396,10 @@ async function deductPlain(
   )
   const before = parseFloat(inv.rows[0]?.inventory_quantity ?? '0') || 0
   if (before + 1e-6 < baseQty) {
-    throw new Error(`Insufficient stock for "${label}" — available: ${before}, required: ${baseQty}`)
+    throw new InsufficientStockError(
+      `Insufficient stock for "${label}" — available: ${before}, required: ${baseQty}`,
+      outOfStockMessage(label)
+    )
   }
   await client.query(
     `UPDATE ${table} SET inventory_quantity = inventory_quantity - $1 WHERE id = $2`, [baseQty, targetId]
