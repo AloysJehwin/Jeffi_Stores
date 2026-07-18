@@ -14,6 +14,7 @@ interface Session {
   status: string
   created_at: string
   admin_name?: string
+  staleForClose?: boolean
 }
 
 interface Props {
@@ -63,6 +64,42 @@ const QUICK_REPLIES = [
   },
 ]
 
+// Bot messages are stored as JSON BotPayload strings (rendered as rich cards on
+// the customer side). For the admin panel we only need a readable text summary,
+// not the interactive UI — so flatten the payload to plain text.
+function renderBotText(raw: string): string {
+  let payload: any
+  try {
+    payload = JSON.parse(raw)
+  } catch {
+    return raw // plain-text bot message (legacy / non-payload)
+  }
+  if (!payload || typeof payload.type !== 'string') return raw
+
+  const fmtAmt = (a: string) => {
+    const n = Number(a)
+    return isFinite(n) ? `₹${n.toLocaleString('en-IN')}` : '₹—'
+  }
+  const orderLine = (o: any) => `• #${o.order_number} — ${o.status}, ${fmtAmt(o.total_amount)}`
+
+  switch (payload.type) {
+    case 'text':
+      return payload.text
+    case 'text_actions':
+    case 'nav':
+    case 'chips':
+      return payload.text || ''
+    case 'order_list':
+      return [payload.text, ...(payload.orders || []).map(orderLine)].join('\n')
+    case 'order_detail': {
+      const o = payload.order
+      return o ? `Order #${o.order_number}\nStatus: ${o.status}\nPayment: ${o.payment_status}\nTotal: ${fmtAmt(o.total_amount)}` : raw
+    }
+    default:
+      return payload.text || raw
+  }
+}
+
 export default function AdminSupportChat({ customerId, autoOpen = false }: Props) {
   const [session, setSession] = useState<Session | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -75,6 +112,8 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
   const [isClosingReply, setIsClosingReply] = useState(false)
   const [adminUsername, setAdminUsername] = useState<string>('')
   const [sessionClosed, setSessionClosed] = useState(false)
+  const [canAdminClose, setCanAdminClose] = useState(false)
+  const [isClosingSession, setIsClosingSession] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const lastMessageIdRef = useRef<string | null>(null)
@@ -116,11 +155,13 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
         if (existingAdmin && existingAdmin !== username) {
           setSession(data.session)
           setSessionClosed(false)
+          setCanAdminClose(!!data.session.staleForClose)
           setMessages([])
           setIsLoading(false)
           return
         }
         setSession(data.session)
+        setCanAdminClose(!!data.session.staleForClose)
         await loadMessages(data.session.id, username)
       }
     } catch {}
@@ -174,6 +215,9 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
           if (pollRef.current) clearInterval(pollRef.current)
           setSessionClosed(true)
           setShowQuickReplies(false)
+          setCanAdminClose(false)
+        } else {
+          setCanAdminClose(!!sessionData.session.staleForClose)
         }
       }
 
@@ -208,6 +252,25 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
       }
     } catch {}
     setIsSending(false)
+  }
+
+  async function closeStaleSession() {
+    if (!session || isClosingSession) return
+    setIsClosingSession(true)
+    try {
+      const res = await fetch(`/api/admin/support/sessions/${session.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'closed' }),
+      })
+      if (res.ok) {
+        if (pollRef.current) clearInterval(pollRef.current)
+        setSessionClosed(true)
+        setCanAdminClose(false)
+        setShowQuickReplies(false)
+      }
+    } catch {}
+    setIsClosingSession(false)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
@@ -302,7 +365,10 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                     {msg.sender === 'user' && (
                       <p className="text-xs font-semibold text-accent-500 mb-0.5">Customer</p>
                     )}
-                    {msg.message}
+                    {msg.sender === 'bot' && (
+                      <p className="text-xs font-semibold text-foreground-muted mb-0.5">Jeffi (auto-reply)</p>
+                    )}
+                    {msg.sender === 'bot' ? renderBotText(msg.message) : msg.message}
                   </div>
                 </div>
               ))
@@ -343,40 +409,56 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
 
           <div className="px-4 py-3 border-t border-border-default">
             {sessionClosed ? (
-              <p className="text-sm text-foreground-muted text-center py-1">This session has been closed by the customer.</p>
+              <p className="text-sm text-foreground-muted text-center py-1">This session has been closed.</p>
             ) : (
-              <div className="flex gap-2">
-                <button
-                  onClick={() => setShowQuickReplies(v => !v)}
-                  title="Quick replies"
-                  className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${
-                    showQuickReplies
-                      ? 'bg-accent-500 border-accent-500 text-white'
-                      : 'border-border-default text-foreground-secondary hover:border-accent-400 hover:text-accent-500'
-                  }`}
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </button>
-                <input
-                  type="text"
-                  value={input}
-                  onChange={e => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Reply to customer..."
-                  className="flex-1 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-                />
-                <button
-                  onClick={() => sendMessage(undefined, isClosingReply)}
-                  disabled={isSending || !input.trim()}
-                  className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                  </svg>
-                </button>
-              </div>
+              <>
+                {canAdminClose && (
+                  <div className="mb-3 flex items-center justify-between gap-3 rounded-lg border border-amber-400/40 bg-amber-50 dark:bg-amber-900/20 px-3 py-2">
+                    <p className="text-xs text-amber-700 dark:text-amber-300 leading-snug">
+                      Inactive for a while — the customer hasn&apos;t closed this chat. You can close it now.
+                    </p>
+                    <button
+                      onClick={closeStaleSession}
+                      disabled={isClosingSession}
+                      className="shrink-0 px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {isClosingSession ? 'Closing…' : 'Close Session'}
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setShowQuickReplies(v => !v)}
+                    title="Quick replies"
+                    className={`px-3 py-2 rounded-xl border text-sm font-semibold transition-colors ${
+                      showQuickReplies
+                        ? 'bg-accent-500 border-accent-500 text-white'
+                        : 'border-border-default text-foreground-secondary hover:border-accent-400 hover:text-accent-500'
+                    }`}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                  </button>
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={e => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Reply to customer..."
+                    className="flex-1 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+                  />
+                  <button
+                    onClick={() => sendMessage(undefined, isClosingReply)}
+                    disabled={isSending || !input.trim()}
+                    className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                    </svg>
+                  </button>
+                </div>
+              </>
             )}
           </div>
         </>

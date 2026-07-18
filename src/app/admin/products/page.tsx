@@ -13,7 +13,8 @@ import ProductsTableClient from '@/components/admin/ProductsTableClient'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import MerchantSyncStatus from '@/components/admin/MerchantSyncStatus'
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
+import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -22,23 +23,30 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function ProductsListContent({ resolvedSearchParams, featuredCount }: { resolvedSearchParams: SP; featuredCount: number }) {
+async function ProductsListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
 
-  const { products, total } = await getFilteredProducts({
-    category_id: resolvedSearchParams.category_id,
-    brand_id: resolvedSearchParams.brand_id,
-    is_active: resolvedSearchParams.is_active,
-    stock: resolvedSearchParams.stock,
-    search: resolvedSearchParams.search,
-    page,
-    limit: PAGE_SIZE,
-    sort,
-    dir,
-  })
+  const [{ products, total }, allProductsForStats] = await Promise.all([
+    getFilteredProducts({
+      category_id: resolvedSearchParams.category_id,
+      brand_id: resolvedSearchParams.brand_id,
+      is_active: resolvedSearchParams.is_active,
+      stock: resolvedSearchParams.stock,
+      search: resolvedSearchParams.search,
+      page,
+      limit: PAGE_SIZE,
+      sort,
+      dir,
+    }),
+    getFilteredProducts({}),
+  ])
+
+  // Featured count is the global count of featured products (used to enforce the
+  // 6-featured limit in FeaturedToggleButton / ProductsTableClient).
+  const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
 
   const currentListUrl = (() => {
     const params = new URLSearchParams()
@@ -195,19 +203,55 @@ async function ProductsListContent({ resolvedSearchParams, featuredCount }: { re
   )
 }
 
-export default async function ProductsPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const resolvedSearchParams = await searchParams
-  const host = await getHost()
-
-  const [categories, brands, allProductsForStats] = await Promise.all([
-    getAllCategories(),
-    getAllBrands(),
+// Runs ONLY the aggregate stats query (all products) and renders the stat cards.
+async function ProductsStats() {
+  const [allProductsForStats, categories] = await Promise.all([
     getFilteredProducts({}),
+    getAllCategories(),
   ])
 
   const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
   const activeCount = allProductsForStats.products?.filter((p: any) => p.is_active).length || 0
   const totalCount = allProductsForStats.total
+  const categoryCount = categories?.length || 0
+
+  return (
+    <div className="animate-fade-in">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Total Products</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCount}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Featured</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
+            <span className={featuredCount >= 6 ? 'text-yellow-600 dark:text-yellow-400' : ''}>{featuredCount}</span>
+            <span className="text-base font-normal text-foreground-muted">/6</span>
+          </p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Categories</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{categoryCount}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Active Products</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{activeCount}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default async function ProductsPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const host = await getHost()
+
+  // Only the fast filter-option lookups are awaited in the shell so the header +
+  // AdminFilters paint immediately. The heavy all-products aggregate lives behind
+  // Suspense in ProductsStats; featuredCount is computed inside the list section.
+  const [categories, brands] = await Promise.all([
+    getAllCategories(),
+    getAllBrands(),
+  ])
 
   const allCats: any[] = categories || []
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
@@ -236,27 +280,9 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
       <MerchantSyncStatus />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCount}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Featured</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
-            <span className={featuredCount >= 6 ? 'text-yellow-600 dark:text-yellow-400' : ''}>{featuredCount}</span>
-            <span className="text-base font-normal text-foreground-muted">/6</span>
-          </p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{categories?.length || 0}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Active Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{activeCount}</p>
-        </div>
-      </div>
+      <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
+        <ProductsStats />
+      </Suspense>
 
       <AdminFilters
         filters={[
@@ -270,9 +296,20 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         suggestType="products"
       />
 
-      <Suspense fallback={<AdminSkeleton variant="list" showStats={false} />}>
-        <ProductsListContent resolvedSearchParams={resolvedSearchParams} featuredCount={featuredCount} />
-      </Suspense>
+      <ProductsListSection searchParams={searchParams} />
     </div>
+  )
+}
+
+// Resolves searchParams (no DB — near-instant) then keys the table Suspense
+// on the query string so filter/pagination changes re-trigger the shimmer
+// while the stats + filters above stay mounted.
+async function ProductsListSection({ searchParams }: { searchParams: Promise<SP> }) {
+  const resolvedSearchParams = await searchParams
+  const key = JSON.stringify(resolvedSearchParams)
+  return (
+    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
+      <ProductsListContent resolvedSearchParams={resolvedSearchParams} />
+    </Suspense>
   )
 }

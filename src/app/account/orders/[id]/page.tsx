@@ -544,19 +544,19 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const canRefund = order?.status === 'delivered' && !returnRequest && order.items.length > 0 && (() => {
     const deliveryDate = order.deliveredAt || order.updatedAt
     if (!deliveryDate) return false
-    if (order.items.some((item: OrderItem) => !item.returnAllowed)) return false
     const ts = new Date(deliveryDate).getTime()
-    const minWindow = Math.min(...order.items.map((item: OrderItem) => item.returnWindowDays))
-    return Date.now() <= ts + minWindow * 24 * 60 * 60 * 1000
+    return order.items.some((item: OrderItem) =>
+      item.returnAllowed && Date.now() <= ts + item.returnWindowDays * 24 * 60 * 60 * 1000
+    )
   })()
 
   const canReplace = order?.status === 'delivered' && !returnRequest && order.items.length > 0 && (() => {
     const deliveryDate = order.deliveredAt || order.updatedAt
     if (!deliveryDate) return false
-    if (order.items.some((item: OrderItem) => !item.replacementAllowed)) return false
     const ts = new Date(deliveryDate).getTime()
-    const minWindow = Math.min(...order.items.map((item: OrderItem) => item.replacementWindowDays))
-    return Date.now() <= ts + minWindow * 24 * 60 * 60 * 1000
+    return order.items.some((item: OrderItem) =>
+      item.replacementAllowed && Date.now() <= ts + item.replacementWindowDays * 24 * 60 * 60 * 1000
+    )
   })()
 
   const canReturn = !monthlyLimitReached && (canRefund || canReplace)
@@ -564,10 +564,11 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
   const returnWindowExpired = order?.status === 'delivered' && !returnRequest && !monthlyLimitReached && !(canRefund || canReplace) && (() => {
     const deliveryDate = order.deliveredAt || order.updatedAt
     if (!deliveryDate) return false
-    const allAllowed = order.items.every((item: OrderItem) => item.returnAllowed || item.replacementAllowed)
-    if (!allAllowed) return false
     const ts = new Date(deliveryDate).getTime()
-    return order.items.every((item: OrderItem) => {
+    // True only if every item that HAD a policy now has an expired window
+    const eligibleItems = order.items.filter((item: OrderItem) => item.returnAllowed || item.replacementAllowed)
+    if (eligibleItems.length === 0) return false
+    return eligibleItems.every((item: OrderItem) => {
       const days = Math.max(item.returnWindowDays, item.replacementWindowDays)
       return Date.now() > ts + days * 24 * 60 * 60 * 1000
     })
@@ -907,6 +908,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       <p className="text-sm font-medium text-foreground-secondary mb-2">What would you like?</p>
                       <div className="flex gap-3">
                         {(['refund', 'replacement'] as const)
+                          .filter(t => t === 'refund' ? canRefund : canReplace)
                           .map((t) => (
                           <label key={t} className="flex items-center gap-2 cursor-pointer">
                             <input
@@ -914,7 +916,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                               name="returnType"
                               value={t}
                               checked={returnType === t}
-                              onChange={() => setReturnType(t)}
+                              onChange={() => { setReturnType(t); setReturnSelectedItems({}) }}
                               className="accent-accent-500"
                             />
                             <span className="text-sm text-foreground capitalize">{t}</span>
@@ -929,6 +931,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     </p>
                     <div className="space-y-2">
                       {order.items.map(item => {
+                        const deliveryDate = order.deliveredAt || order.updatedAt
+                        const ts = deliveryDate ? new Date(deliveryDate).getTime() : 0
+                        const eligible = returnType === 'refund'
+                          ? item.returnAllowed && Date.now() <= ts + item.returnWindowDays * 24 * 60 * 60 * 1000
+                          : item.replacementAllowed && Date.now() <= ts + item.replacementWindowDays * 24 * 60 * 60 * 1000
+                        if (!eligible) return null
                         const checked = !!returnSelectedItems[item.id]
                         const thumb = item.products?.product_images?.find(img => img.is_primary)?.thumbnail_url
                           || item.products?.product_images?.[0]?.thumbnail_url

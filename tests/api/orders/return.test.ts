@@ -178,6 +178,9 @@ describe('POST /api/orders/[id]/return', () => {
   it('returns 400 when outside return window', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(DELIVERED_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([
+      { id: 'oi-1', product_id: 'p-1', variant_id: null, product_name: 'Item', variant_name: null, quantity: '1', unit_price: '100' },
+    ]) // order_items validation (runs before eligibility check)
     vi.mocked(returnPolicy.checkReturnEligibility).mockResolvedValue({
       ok: false,
       reason: 'Return window has expired',
@@ -195,6 +198,9 @@ describe('POST /api/orders/[id]/return', () => {
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(DELIVERED_ORDER)   // order
       .mockResolvedValueOnce({ id: 'rr-existing' }) // existing return request
+    vi.mocked(db.queryMany).mockResolvedValue([
+      { id: 'oi-1', product_id: 'p-1', variant_id: null, product_name: 'Item', variant_name: null, quantity: '1', unit_price: '100' },
+    ]) // order_items validation (runs before eligibility check)
     vi.mocked(returnPolicy.checkReturnEligibility).mockResolvedValue({ ok: true } as any)
 
     const res = await POST(makeRequest(VALID_BODY) as any, PARAMS)
@@ -210,6 +216,9 @@ describe('POST /api/orders/[id]/return', () => {
       .mockResolvedValueOnce(DELIVERED_ORDER)    // order
       .mockResolvedValueOnce(null)               // no existing return request
       .mockResolvedValueOnce({ cnt: '1' })       // monthly count = 1 (limit reached)
+    vi.mocked(db.queryMany).mockResolvedValue([
+      { id: 'oi-1', product_id: 'p-1', variant_id: null, product_name: 'Item', variant_name: null, quantity: '1', unit_price: '100' },
+    ]) // order_items validation (runs before eligibility check)
     vi.mocked(returnPolicy.checkReturnEligibility).mockResolvedValue({ ok: true } as any)
 
     const res = await POST(makeRequest(VALID_BODY) as any, PARAMS)

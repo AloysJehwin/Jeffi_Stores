@@ -8,7 +8,8 @@ import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
-import AdminSkeleton from '@/components/admin/AdminSkeleton'
+import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
+import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -19,6 +20,48 @@ type SP = { [key: string]: string | string[] | undefined }
 function sp(resolvedSearchParams: SP, key: string) {
   const v = resolvedSearchParams[key]
   return Array.isArray(v) ? v[0] : v
+}
+
+async function OrdersStats() {
+  const allStats = await getFilteredOrders({})
+
+  const totalOrders = allStats.total
+  const pendingOrders = allStats.orders?.filter((o: any) => o.status === 'pending').length || 0
+  const processingOrders = allStats.orders?.filter((o: any) => o.status === 'processing').length || 0
+  const completedOrders = allStats.orders?.filter((o: any) => o.status === 'delivered').length || 0
+  const totalRevenue = allStats.orders?.reduce((sum: number, order: any) => {
+    return order.payment_status === 'paid' ? sum + Number(order.total_amount) : sum
+  }, 0) || 0
+
+  return (
+    <div className="animate-fade-in">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Total Orders</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalOrders}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Pending</p>
+          <p className="text-2xl sm:text-3xl font-bold text-orange-500 mt-2">{pendingOrders}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Processing</p>
+          <p className="text-2xl sm:text-3xl font-bold text-blue-500 mt-2">{processingOrders}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Completed</p>
+          <p className="text-2xl sm:text-3xl font-bold text-green-500 mt-2">{completedOrders}</p>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm mb-6">
+        <p className="text-white text-sm">Total Revenue</p>
+        <p className="text-3xl sm:text-4xl font-bold text-white mt-2">
+          Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+        </p>
+      </div>
+    </div>
+  )
 }
 
 async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
@@ -86,7 +129,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
                           ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
                           : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
                     }`}>
-                      {order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : 'Offline'}
+                      {order.source === 'online' ? 'Online' : order.source === 'business' ? 'Business' : order.source === 'cash_sale' ? 'Cash Sale' : 'Offline'}
                     </span>
                   </div>
                   <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${
@@ -204,19 +247,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
   )
 }
 
-export default async function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const resolvedSearchParams = await searchParams
-  const host = await getHost()
-  const allStats = await getFilteredOrders({})
-
-  const totalOrders = allStats.total
-  const pendingOrders = allStats.orders?.filter((o: any) => o.status === 'pending').length || 0
-  const processingOrders = allStats.orders?.filter((o: any) => o.status === 'processing').length || 0
-  const completedOrders = allStats.orders?.filter((o: any) => o.status === 'delivered').length || 0
-  const totalRevenue = allStats.orders?.reduce((sum: number, order: any) => {
-    return order.payment_status === 'paid' ? sum + Number(order.total_amount) : sum
-  }, 0) || 0
-
+export default function OrdersPage({ searchParams }: { searchParams: Promise<SP> }) {
   return (
     <div className="p-4 sm:p-6">
       <div className="mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -226,31 +257,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         </div>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total Orders</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalOrders}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Pending</p>
-          <p className="text-2xl sm:text-3xl font-bold text-orange-500 mt-2">{pendingOrders}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Processing</p>
-          <p className="text-2xl sm:text-3xl font-bold text-blue-500 mt-2">{processingOrders}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Completed</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-500 mt-2">{completedOrders}</p>
-        </div>
-      </div>
-
-      <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm mb-6">
-        <p className="text-white text-sm">Total Revenue</p>
-        <p className="text-3xl sm:text-4xl font-bold text-white mt-2">
-          Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-        </p>
-      </div>
+      <Suspense fallback={<AdminStatsSkeleton cards={4} banner />}>
+        <OrdersStats />
+      </Suspense>
 
       <AdminFilters
         filters={[
@@ -259,6 +268,9 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
             label: 'Source',
             options: [
               { value: 'online', label: 'Online' },
+              { value: 'business', label: 'Business' },
+              { value: 'offline', label: 'Offline' },
+              { value: 'cash_sale', label: 'Cash Sale' },
             ] },
           {
             name: 'status',
@@ -272,6 +284,11 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               { value: 'delivered', label: 'Delivered' },
               { value: 'cancel_requested', label: 'Cancel Requested' },
               { value: 'cancelled', label: 'Cancelled' },
+              { value: 'return_requested', label: 'Return Requested' },
+              { value: 'return_approved', label: 'Return Approved' },
+              { value: 'return_received', label: 'Return Received' },
+              { value: 'return_rejected', label: 'Return Rejected' },
+              { value: 'returned', label: 'Returned' },
             ] },
           {
             name: 'payment_status',
@@ -282,6 +299,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
               { value: 'failed', label: 'Failed' },
               { value: 'refunded', label: 'Refunded' },
               { value: 'unpaid', label: 'Unpaid' },
+              { value: 'cancelled', label: 'Cancelled' },
             ] },
         ]}
         searchPlaceholder="Search by order number or customer..."
@@ -289,9 +307,20 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         suggestType="orders"
       />
 
-      <Suspense fallback={<AdminSkeleton variant="list" showStats={false} />}>
-        <OrdersListContent resolvedSearchParams={resolvedSearchParams} />
-      </Suspense>
+      <OrdersListSection searchParams={searchParams} />
     </div>
+  )
+}
+
+// Resolves searchParams (no DB — near-instant) then keys the table Suspense
+// on the query string so filter/pagination changes re-trigger the shimmer
+// while the stats + filters above stay mounted.
+async function OrdersListSection({ searchParams }: { searchParams: Promise<SP> }) {
+  const resolvedSearchParams = await searchParams
+  const key = JSON.stringify(resolvedSearchParams)
+  return (
+    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={9} />}>
+      <OrdersListContent resolvedSearchParams={resolvedSearchParams} />
+    </Suspense>
   )
 }

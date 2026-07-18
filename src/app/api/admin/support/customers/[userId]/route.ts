@@ -13,16 +13,34 @@ export async function GET(
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'customers:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const session = await queryOne(
-      `SELECT id, status, created_at, admin_name FROM support_sessions
-       WHERE user_id = $1 AND status = 'open'
-       ORDER BY created_at DESC LIMIT 1`,
+    const session = await queryOne<{
+      id: string
+      status: string
+      created_at: string
+      admin_name: string | null
+      last_activity_at: string
+    }>(
+      `SELECT ss.id, ss.status, ss.created_at, ss.admin_name,
+              GREATEST(ss.created_at, COALESCE(MAX(sm.created_at), ss.created_at)) AS last_activity_at
+       FROM support_sessions ss
+       LEFT JOIN support_messages sm ON sm.session_id = ss.id
+       WHERE ss.user_id = $1 AND ss.status = 'open'
+       GROUP BY ss.id, ss.status, ss.created_at, ss.admin_name
+       ORDER BY ss.created_at DESC LIMIT 1`,
       [userId]
     )
 
-    return NextResponse.json({ session: session || null })
-  } catch (err) {
-    console.error('[route]', err)
+    if (!session) {
+      return NextResponse.json({ session: null })
+    }
+
+    // Server-authoritative staleness check so the admin's clock/env can't skew it.
+    const staleMs = parseInt(process.env.SUPPORT_STALE_CLOSE_MS || '3600000', 10)
+    const idleMs = Date.now() - new Date(session.last_activity_at).getTime()
+    const staleForClose = idleMs >= staleMs
+
+    return NextResponse.json({ session: { ...session, staleForClose } })
+  } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

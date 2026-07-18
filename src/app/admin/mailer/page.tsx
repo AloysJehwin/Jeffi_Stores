@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { queryMany, queryCount } from '@/lib/db'
 import Pagination from '@/components/admin/Pagination'
@@ -6,6 +7,7 @@ import DispatchCampaignButton from '@/components/admin/DispatchCampaignButton'
 import AdminFilters from '@/components/admin/AdminFilters'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -41,7 +43,40 @@ interface Campaign {
 
 export default async function MailerPage({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
   const host = await getHost()
+  return (
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Mailer</h1>
+          <p className="text-foreground-secondary mt-1 text-sm">Create and send email campaigns to your customers</p>
+        </div>
+        <Link href={ap('/admin/mailer/new', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+          New Campaign
+        </Link>
+      </div>
+
+      <AdminFilters filters={[]} searchPlaceholder="Search by title or subject..." />
+
+      <MailerListSection searchParams={searchParams} />
+    </div>
+  )
+}
+
+// Resolves searchParams (no DB — near-instant) then keys the table Suspense
+// on the query string so filter/pagination changes re-trigger the shimmer
+// while the header + filters above stay mounted.
+async function MailerListSection({ searchParams }: { searchParams: Promise<{ page?: string; search?: string }> }) {
   const resolvedSearchParams = await searchParams
+  const key = JSON.stringify(resolvedSearchParams)
+  return (
+    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={7} />}>
+      <MailerListContent resolvedSearchParams={resolvedSearchParams} />
+    </Suspense>
+  )
+}
+
+async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParams: { page?: string; search?: string } }) {
+  const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const search = resolvedSearchParams.search?.trim() || ''
   const offset = (page - 1) * PAGE_SIZE
@@ -93,40 +128,20 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
 
   if (migrationPending) {
     return (
-      <div className="p-4 sm:p-6">
-        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Mailer</h1>
-            <p className="text-foreground-secondary mt-1 text-sm">Create and send email campaigns to your customers</p>
-          </div>
-        </div>
-        <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6 max-w-xl">
-          <h2 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">Database migration required</h2>
-          <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
-            The <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">email_campaigns</code> table does not exist yet. Run the migration on your production database:
-          </p>
-          <pre className="bg-amber-100 dark:bg-amber-900/40 rounded-lg px-4 py-3 text-xs font-mono text-amber-900 dark:text-amber-200 overflow-x-auto">
-            psql $DATABASE_URL -f database/migrations/mailer.sql
-          </pre>
-        </div>
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg p-6 max-w-xl">
+        <h2 className="font-semibold text-amber-800 dark:text-amber-300 mb-2">Database migration required</h2>
+        <p className="text-sm text-amber-700 dark:text-amber-400 mb-3">
+          The <code className="font-mono bg-amber-100 dark:bg-amber-900/40 px-1 rounded">email_campaigns</code> table does not exist yet. Run the migration on your production database:
+        </p>
+        <pre className="bg-amber-100 dark:bg-amber-900/40 rounded-lg px-4 py-3 text-xs font-mono text-amber-900 dark:text-amber-200 overflow-x-auto">
+          psql $DATABASE_URL -f database/migrations/mailer.sql
+        </pre>
       </div>
     )
   }
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Mailer</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Create and send email campaigns to your customers</p>
-        </div>
-        <Link href={ap('/admin/mailer/new', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
-          New Campaign
-        </Link>
-      </div>
-
-      <AdminFilters filters={[]} searchPlaceholder="Search by title or subject..." />
-
+    <>
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
@@ -200,6 +215,6 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
       </div>
 
       <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-    </div>
+    </>
   )
 }

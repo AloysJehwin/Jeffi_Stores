@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateUser } from '@/lib/jwt'
-import { aiChat, AiClientError } from '@/lib/ai-client'
+import { aiChat } from '@/lib/ai-client'
 import { CUSTOMER_TOOLS, getCustomerTool, type CustomerToolContext } from '@/lib/customer-agent/tools'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/validate'
@@ -103,8 +103,19 @@ function parseToolCalls(text: string): { calls: { name: string; rawInput: string
   while ((m = re.exec(text)) !== null) {
     calls.push({ name: m[1], rawInput: m[2] })
   }
-  const remainder = text.replace(re, '').trim()
-  return { calls, remainder }
+  if (calls.length > 0) {
+    return { calls, remainder: text.replace(re, '').trim() }
+  }
+
+  // Fallback: some models (e.g. qwen2.5, gemma) intermittently emit a bare
+  // `toolname {json}` instead of the <tool_use> wrapper. Accept it only when the
+  // leading token is a REAL customer tool name, so prose is never misparsed.
+  const bare = text.trim().match(/^([a-z_]+)\s*(\{[\s\S]*\})?\s*$/i)
+  if (bare && getCustomerTool(bare[1])) {
+    return { calls: [{ name: bare[1], rawInput: bare[2] || '{}' }], remainder: '' }
+  }
+
+  return { calls: [], remainder: text.trim() }
 }
 
 type ProductRow = { name: string; slug: string; price?: string; stock_status?: string; short_description?: string | null }
@@ -281,13 +292,12 @@ export async function POST(req: NextRequest) {
 
       messages.push({ role: 'user', content: toolOutputs.join('\n') + '\n\nNow apply the RELEVANCE CHECK and respond to the customer in plain text. If results are unrelated you may call one more tool with a refined query, otherwise give your final answer now.' })
     }
-  } catch (err: any) {
-    const errMsg = err?.message || 'AI service unavailable'
-    if (err instanceof AiClientError || err instanceof Error) {
-      return NextResponse.json({ error: errMsg, toolCalls: toolCallRecords }, { status: 502 })
-    }
+  } catch {
+    // Never surface a raw provider error (e.g. "Ollama unreachable...") to the
+    // customer — degrade to a friendly message. Any partial tool results are
+    // still returned so the widget can show what it found.
     return NextResponse.json({
-      message: "I'm having trouble responding right now. Please try again in a moment.",
+      message: "I'm having trouble responding right now. Please try again in a moment, or reach out to our support team.",
       toolCalls: toolCallRecords,
       provider,
       model,
