@@ -213,9 +213,13 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
         body: JSON.stringify({ message: q, history }),
       })
       const data = await res.json()
+      // Prefer the assistant message. Never render a raw server `error` string to
+      // the customer — fall back to a fixed friendly line for any failure.
       const assistantMsg: ChatMessage = {
         role: 'assistant',
-        content: res.ok ? (data.message || 'No response.') : (data.error || 'Something went wrong.'),
+        content: (res.ok && data.message)
+          ? data.message
+          : "I'm having trouble responding right now. Please try again in a moment.",
         id: uid(),
       }
       setMessages(prev => [...prev, assistantMsg])
@@ -244,7 +248,7 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
           isOpen ? 'opacity-100 scale-100 pointer-events-auto' : 'opacity-0 scale-95 pointer-events-none'
         }`}
       >
-        <div className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl flex flex-col max-h-[min(700px,calc(100vh-4rem))]">
+        <div className="bg-surface-elevated rounded-2xl border border-border-default shadow-2xl flex flex-col max-h-[min(700px,calc(100dvh-4rem))]">
 
           {/* Header */}
           <div className="flex items-center gap-2.5 px-4 py-3 border-b border-border-default shrink-0">
@@ -270,7 +274,7 @@ export default function CustomerChatModal({ isOpen, onClose }: Props) {
           {/* Messages */}
           <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
             {messages.length === 0 && !loading && (
-              <div className="space-y-3">
+              <div className="hidden sm:block space-y-3">
                 <p className="text-xs text-foreground-muted uppercase tracking-widest font-semibold">Try asking</p>
                 {SAMPLE_PROMPTS.map(p => (
                   <button

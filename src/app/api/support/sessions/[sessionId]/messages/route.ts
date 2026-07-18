@@ -4,6 +4,7 @@ import { queryMany, queryOne } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
 import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/validate'
+import { fetchUserOrders, getBotReply } from '@/lib/support-bot'
 
 const postSchema = z.object({
   message: zNonEmpty.max(2000),
@@ -27,8 +28,8 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const session = await queryOne(
-      `SELECT id, admin_name FROM support_sessions WHERE id = $1 AND user_id = $2`,
+    const session = await queryOne<{ id: string; admin_name: string | null; created_at: string }>(
+      `SELECT id, admin_name, created_at FROM support_sessions WHERE id = $1 AND user_id = $2`,
       [sessionId, authUser.userId]
     )
     if (!session) {
@@ -41,7 +42,7 @@ export async function GET(
       [sessionId]
     )
 
-    const messagesWithMeta = messages.map((m: any) => ({
+    const messagesWithMeta: any[] = messages.map((m: any) => ({
       ...m,
       sender_name: m.sender === 'admin' ? session.admin_name : undefined,
       is_closing: m.sender === 'admin'
@@ -49,9 +50,41 @@ export async function GET(
         : false,
     }))
 
+    const BOT_DELAY_MS = parseInt(process.env.SUPPORT_BOT_DELAY_MS || '120000', 10)
+    const last = messagesWithMeta[messagesWithMeta.length - 1]
+
+    // Case 1: last message is from user and unanswered
+    // Case 2: no messages at all — session opened but user hasn't typed yet
+    const shouldCheckBot =
+      (last && last.sender === 'user' &&
+        Date.now() - new Date(last.created_at).getTime() >= BOT_DELAY_MS) ||
+      (!last && Date.now() - new Date(session.created_at).getTime() >= BOT_DELAY_MS)
+
+    if (shouldCheckBot) {
+      const refTime = last ? last.created_at : session.created_at
+      const hasReply = await queryOne(
+        `SELECT id FROM support_messages
+         WHERE session_id = $1 AND sender IN ('admin','bot') AND created_at > $2 LIMIT 1`,
+        [sessionId, refTime]
+      )
+      if (!hasReply) {
+        const orders = await fetchUserOrders(authUser.userId)
+        const userMsg = last?.message ?? ''
+        const replyText = userMsg
+          ? getBotReply(userMsg, orders, messagesWithMeta)
+          : "hey! i'm Jeffi. looks like you're waiting for a support agent — they'll be with you shortly. in the meantime, what can i help you with?"
+        const botMsg = await queryOne(
+          `INSERT INTO support_messages (session_id, sender, message)
+           VALUES ($1, 'bot', $2)
+           RETURNING id, sender, message, created_at`,
+          [sessionId, replyText]
+        )
+        if (botMsg) messagesWithMeta.push({ ...botMsg, is_closing: false })
+      }
+    }
+
     return NextResponse.json({ messages: messagesWithMeta, admin_name: session.admin_name })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }
@@ -102,8 +135,7 @@ export async function POST(
     }).catch(() => {})
 
     return NextResponse.json({ message: msg })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Failed' }, { status: 500 })
   }
 }

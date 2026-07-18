@@ -1,3 +1,4 @@
+import { Suspense } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
@@ -8,6 +9,8 @@ import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
 import CouponTableRow from '@/components/admin/CouponTableRow'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
+import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
+import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -60,23 +63,97 @@ async function getFilteredCoupons(filters: { is_active?: string; search?: string
   return { coupons, total }
 }
 
-export default async function CouponsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+export default function CouponsPage({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
+  return (
+    <div className="p-4 sm:p-6">
+      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Coupons</h1>
+          <p className="text-foreground-secondary mt-1 text-sm">Manage discount coupons</p>
+        </div>
+        <AddCouponButton />
+      </div>
+
+      <Suspense fallback={<AdminStatsSkeleton cards={4} gridClass="grid-cols-2 sm:grid-cols-4" />}>
+        <CouponsStats />
+      </Suspense>
+
+      <AdminFilters
+        filters={[
+          { name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
+          { name: 'campaign', label: 'Source', options: [{ value: '__manual__', label: 'Manual' }, { value: 'winback_90', label: 'Winback 90d' }, { value: 'winback_180', label: 'Winback 180d' }] },
+        ]}
+        searchPlaceholder="Search by code or description..."
+        suggestType="coupons"
+        />
+
+      <CouponsListSection searchParams={searchParams} />
+    </div>
+  )
+}
+
+async function AddCouponButton() {
+  const host = await getHost()
+  return (
+    <Link href={ap('/admin/coupons/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+      Add New Coupon
+    </Link>
+  )
+}
+
+async function CouponsStats() {
+  const allStats = await getFilteredCoupons({})
+
+  const totalCoupons = allStats.total
+  const activeCoupons = (allStats.coupons as { is_active: boolean }[]).filter(c => c.is_active).length
+  const expiredCoupons = (allStats.coupons as { valid_until: string | null; is_active: boolean }[]).filter(c => c.valid_until && new Date(c.valid_until) < new Date()).length
+  const campaignCoupons = (allStats.coupons as { auto_generated: boolean }[]).filter(c => c.auto_generated).length
+
+  return (
+    <div className="animate-fade-in">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mb-6">
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Total</p>
+          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCoupons}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Active</p>
+          <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">{activeCoupons}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">Expired</p>
+          <p className="text-2xl sm:text-3xl font-bold text-red-500 mt-2">{expiredCoupons}</p>
+        </div>
+        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
+          <p className="text-foreground-secondary text-sm">From Campaigns</p>
+          <p className="text-2xl sm:text-3xl font-bold text-purple-600 mt-2">{campaignCoupons}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Resolves searchParams (no DB — near-instant) then keys the table Suspense
+// on the query string so filter/pagination changes re-trigger the shimmer
+// while the stats + filters above stay mounted.
+async function CouponsListSection({ searchParams }: { searchParams: Promise<{ [key: string]: string | undefined }> }) {
   const resolvedSearchParams = await searchParams
+  const key = JSON.stringify(resolvedSearchParams)
+  return (
+    <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
+      <CouponsListContent resolvedSearchParams={resolvedSearchParams} />
+    </Suspense>
+  )
+}
+
+async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchParams: { [key: string]: string | undefined } }) {
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
   const campaign = resolvedSearchParams.campaign
 
-  const [{ coupons, total }, allStats] = await Promise.all([
-    getFilteredCoupons({ is_active: resolvedSearchParams.is_active, search: resolvedSearchParams.search, campaign, page, sort, dir }),
-    getFilteredCoupons({}),
-  ])
-
-  const totalCoupons = allStats.total
-  const activeCoupons = (allStats.coupons as { is_active: boolean }[]).filter(c => c.is_active).length
-  const expiredCoupons = (allStats.coupons as { valid_until: string | null; is_active: boolean }[]).filter(c => c.valid_until && new Date(c.valid_until) < new Date()).length
-  const campaignCoupons = (allStats.coupons as { auto_generated: boolean }[]).filter(c => c.auto_generated).length
+  const { coupons, total } = await getFilteredCoupons({ is_active: resolvedSearchParams.is_active, search: resolvedSearchParams.search, campaign, page, sort, dir })
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
@@ -103,45 +180,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
   })()
 
   return (
-    <div className="p-4 sm:p-6">
-      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Coupons</h1>
-          <p className="text-foreground-secondary mt-1 text-sm">Manage discount coupons</p>
-        </div>
-        <Link href={ap('/admin/coupons/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
-          Add New Coupon
-        </Link>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCoupons}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Active</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-600 mt-2">{activeCoupons}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Expired</p>
-          <p className="text-2xl sm:text-3xl font-bold text-red-500 mt-2">{expiredCoupons}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">From Campaigns</p>
-          <p className="text-2xl sm:text-3xl font-bold text-purple-600 mt-2">{campaignCoupons}</p>
-        </div>
-      </div>
-
-      <AdminFilters
-        filters={[
-          { name: 'is_active', label: 'Status', options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive' }] },
-          { name: 'campaign', label: 'Source', options: [{ value: '__manual__', label: 'Manual' }, { value: 'winback_90', label: 'Winback 90d' }, { value: 'winback_180', label: 'Winback 180d' }] },
-        ]}
-        searchPlaceholder="Search by code or description..."
-        suggestType="coupons"
-        />
-
+    <>
       <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mt-4">
         <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-sm">
@@ -201,7 +240,7 @@ export default async function CouponsPage({ searchParams }: { searchParams: Prom
       </div>
 
       <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-    </div>
+    </>
   )
 }
 

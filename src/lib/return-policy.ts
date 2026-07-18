@@ -94,11 +94,21 @@ export async function getOrderItemsPolicy(orderId: string): Promise<OrderItemPol
 export async function checkReturnEligibility(
   orderId: string,
   type: 'refund' | 'replacement',
-  deliveredAt: Date
+  deliveredAt: Date,
+  itemIds?: string[]
 ): Promise<{ ok: true; effectiveWindowDays: number } | { ok: false; reason: string }> {
-  const policies = await getOrderItemsPolicy(orderId)
-  if (policies.length === 0) {
+  const allPolicies = await getOrderItemsPolicy(orderId)
+  if (allPolicies.length === 0) {
     return { ok: false, reason: 'Order has no items' }
+  }
+
+  // Scope to submitted items when provided; validates only what the user selected
+  const policies = itemIds && itemIds.length > 0
+    ? allPolicies.filter(p => itemIds.includes(p.product_id))
+    : allPolicies
+
+  if (policies.length === 0) {
+    return { ok: false, reason: 'None of the selected items were found on this order' }
   }
 
   const blocked = policies.find(p =>
