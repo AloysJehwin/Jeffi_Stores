@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg'
 import { queryMany, queryOne, withTransaction } from './db'
 import { isInterState, calculateGST, round2 } from './gst'
 import { createDraftInvoice } from './invoice'
+import { deductOrderStock } from './inventory-deduct'
 import type { DraftBuyNowItem, DraftCartItem } from './order-draft'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
@@ -625,6 +626,15 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
           }),
         ]
       )
+    }
+
+    // Deduct inventory when the order is created in a confirmed state (paid online).
+    // Auto-picks batches (FEFO) / serials since online has no manual picker. Runs
+    // inside this transaction so a failure rolls back the whole order; idempotent.
+    // Unpaid/pending orders (COD-style) are NOT deducted here — stock moves when an
+    // admin confirms/invoices them, matching existing behaviour.
+    if (orderStatus === 'confirmed') {
+      await deductOrderStock(created.id, {}, client)
     }
 
     return created
