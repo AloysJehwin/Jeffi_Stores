@@ -108,12 +108,19 @@ export function validatePurchaseQuantity(qty: number, unit: SellingUnit | null):
 
 /**
  * How many serial numbers a serialized-product sale consumes: one serial per
- * qty_step of the selling unit. With qty_step enforced as a hard constraint,
- * qty / qty_step is always integral, so a serial is never partially consumed.
+ * BASE unit. This mirrors intake exactly — PO receive creates one product_serials
+ * row per base unit received (qty × factor), and each batch's serial count equals
+ * its quantity (a batch of 100 has 100 serials). So consuming `baseQty` base units
+ * consumes `baseQty` serials, keeping serial rows and batch quantities in lockstep.
+ *
+ * NOTE: this is intentionally base-unit-based, NOT qty_step-based. For products
+ * with qty_step = 1 and factor = 1 (all count-dimension serialized products) the
+ * two are identical; they only diverge for a fractional-step measured unit (e.g.
+ * wire sold by the metre with qty_step 0.5), where 1-serial-per-half-metre would
+ * be physically meaningless and would not match the batch's serial count.
  */
 export function serialCountForQuantity(qty: number, unit: SellingUnit | null): number {
-  const step = unit && unit.qty_step > 0 ? unit.qty_step : 1
-  return Math.round(qty / step)
+  return Math.round(toBaseQuantity(qty, unit))
 }
 
 /**

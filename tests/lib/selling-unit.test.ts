@@ -99,11 +99,17 @@ describe('validatePurchaseQuantity', () => {
 })
 
 describe('serialCountForQuantity', () => {
-  it('one serial per qty_step', () => {
-    expect(serialCountForQuantity(10, unit({ qty_step: 5 }))).toBe(2)
-    expect(serialCountForQuantity(3, unit({ qty_step: 1 }))).toBe(3)
+  it('one serial per base unit — measured dimension passes qty through', () => {
+    // Small wire: 2 m sold, factor 1, length → 2 serials (NOT 2/0.5 = 4)
+    expect(serialCountForQuantity(2, unit({ dimension: 'length', factor: 1, qty_step: 0.5 }))).toBe(2)
+    expect(serialCountForQuantity(2.5, unit({ dimension: 'length', factor: 1, qty_step: 0.5 }))).toBe(3) // rounds
   })
-  it('defaults to qty when unit/step missing', () => {
+  it('one serial per base unit — count dimension multiplies by factor', () => {
+    // A box of 12 → 12 serials per box
+    expect(serialCountForQuantity(2, unit({ dimension: 'count', factor: 12, qty_step: 1 }))).toBe(24)
+    expect(serialCountForQuantity(3, unit({ dimension: 'count', factor: 1, qty_step: 1 }))).toBe(3)
+  })
+  it('defaults to qty when unit missing', () => {
     expect(serialCountForQuantity(4, null)).toBe(4)
   })
 })
