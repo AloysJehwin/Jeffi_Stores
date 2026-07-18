@@ -58,11 +58,19 @@ The Razer is the **dev-DB box**: it holds a mirror of the live RDS schema/data p
 
 ### Models pulled into Ollama
 
-| Model                              | Purpose                                      | Size / Dim       |
-|------------------------------------|----------------------------------------------|------------------|
-| `qwen2.5-coder:14b`                | SQL generation (campaign scenarios)          | TBD (~9 GB)      |
-| `llama3.1:8b-instruct-q4_K_M`      | Email copy generation                        | TBD (~4.9 GB)    |
-| `nomic-embed-text`                 | Embeddings                                   | 137 M, 768-dim   |
+As of 2026-07-18, consolidated to a single multimodal generative model + the embedder:
+
+| Model                              | Purpose                                              | Size / Dim       |
+|------------------------------------|------------------------------------------------------|------------------|
+| `gemma4:12b`                       | Agent (customer + admin), SQL, copy, **vision/OCR**  | ~7.6 GB, GPU-resident |
+| `nomic-embed-text`                 | Embeddings (RAG) — **do not remove/replace**         | 137 M, 768-dim   |
+
+`gemma4:12b` replaced `qwen2.5:14b` (agent/SQL/copy — poor `<tool_use>` format compliance)
+and `llava:13b` (vision — Gemma 4 is multimodal). It fits the RTX 4080 fully (~3.6s warm
+turns). `gemma4:27b`/`26b-MoE` were tested but spilled ~58% to CPU on this GPU, so 12b was
+chosen for speed. Env vars: `OLLAMA_AGENT_MODEL`/`SQL`/`COPY`/`VISION_MODEL` → `gemma4:12b`;
+`RAG_EMBED_MODEL` → `nomic-embed-text` (must match the vectors already stored).
+
 
 ---
 
