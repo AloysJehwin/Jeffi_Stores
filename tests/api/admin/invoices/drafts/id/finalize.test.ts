@@ -87,6 +87,10 @@ function makeTxClient({
       if (sql.includes('FROM product_variants pv WHERE pv.id')) {
         return Promise.resolve({ rows: [{ inventory_quantity: stockQty, has_sub_variants: hasSubs }] })
       }
+      // variant stock via shared deductOrderStock helper (plain, alias-less SELECT)
+      if (sql.includes('FROM product_variants WHERE id') && sql.includes('FOR UPDATE')) {
+        return Promise.resolve({ rows: [{ inventory_quantity: stockQty }] })
+      }
       // aggregate sub-variant stock for variant
       if (sql.includes('COALESCE(SUM(inventory_quantity)')) {
         return Promise.resolve({ rows: [{ total: stockQty }] })

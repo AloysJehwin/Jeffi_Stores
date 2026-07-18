@@ -103,6 +103,12 @@ function makeMockClient(overrides: Partial<Record<string, any>> = {}) {
     if (/INSERT INTO addresses/i.test(s)) return { rows: [{ id: 'addr-1' }] }
     if (/INSERT INTO orders/i.test(s)) return { rows: [{ id: 'ord-1', order_number: 'OFF-1' }] }
     if (/INSERT INTO order_items/i.test(s)) return { rows: [{ id: 'oi-1' }] }
+    // deductOrderStock reads the persisted order_items back by order_id
+    if (/FROM order_items\s+WHERE order_id/i.test(s)) {
+      return { rows: [{ id: 'oi-1', product_id: 'p-1', variant_id: null, sub_variant_id: null, product_name: 'Test Product', variant_name: null, quantity: '2', buy_unit: 'pcs' }] }
+    }
+    if (/FROM inventory_transactions/i.test(s)) return { rows: [] } // idempotency guard: not yet deducted
+    if (/product_units/i.test(s)) return { rows: [{ unit: 'pcs', factor: '1', dimension: 'count', qty_step: '1', min_qty: null, max_qty: null }] }
     if (/UPDATE orders/i.test(s)) return { rows: [] }
     if (/UPDATE quotations/i.test(s)) return { rows: [] }
     if (/INSERT INTO invoices/i.test(s)) return { rows: [] }
@@ -410,8 +416,9 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
     const client = makeMockClient()
     const origQuery = client.query
     client.query = vi.fn().mockImplementation(async (sql: string, params?: any[]) => {
-      if (/SELECT serialized FROM products WHERE id = \$1/i.test(sql)) {
-        return { rows: [{ serialized: true }] }
+      // deductOrderStock resolves product kind via `perishable, serialized`
+      if (/SELECT perishable, serialized FROM products/i.test(sql)) {
+        return { rows: [{ perishable: false, serialized: true }] }
       }
       return origQuery(sql, params)
     })
