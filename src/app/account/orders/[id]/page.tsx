@@ -102,7 +102,10 @@ function getEddDisplay(order: OrderDetails, edd: string): { label: string; sub: 
   }
   const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
   todayIST.setHours(0, 0, 0, 0)
-  const eddDate = new Date(edd + ' 00:00:00')
+  // Compute the day diff from the normalized ISO date (YYYY-MM-DD) parsed as UTC —
+  // matching the admin page — so both surfaces agree on the calendar day regardless
+  // of the server's local timezone. (`edd` is the already-formatted display string.)
+  const eddDate = new Date(String(order.estimatedDeliveryDate).slice(0, 10) + 'T00:00:00Z')
   const diffDays = Math.round((eddDate.getTime() - todayIST.getTime()) / 86400000)
   if (diffDays === 0) return { label: 'Arriving Today', sub: edd, color: 'text-accent-500' }
   if (diffDays === 1) return { label: 'Arriving Tomorrow', sub: edd, color: 'text-accent-500' }
