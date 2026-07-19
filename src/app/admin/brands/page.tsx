@@ -208,7 +208,7 @@ export default function BrandsPage({ searchParams }: { searchParams: Promise<{ [
           <p className="text-foreground-secondary mt-1 text-sm">Manage product brands</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-2">
-          <BrochureButton />
+          <BrochureButton mode="brand" />
           <Suspense fallback={
             <span className="bg-accent-500 text-white px-5 py-2.5 rounded-lg font-semibold text-center text-sm sm:text-base opacity-80">
               Add New Brand

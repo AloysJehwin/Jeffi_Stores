@@ -565,6 +565,7 @@ export async function getFilteredProducts(filters: {
 export interface BrochureProduct {
   id: string
   name: string
+  slug: string
   sku: string
   short_description: string | null
   mrp: number | null
@@ -575,19 +576,34 @@ export interface BrochureProduct {
   thumbnail_url: string | null
 }
 
-/**
- * Products for the admin brochure builder: strict intersection of the selected
- * category subtrees AND the selected brands. Reuses the recursive cat_tree from
- * getFilteredProducts, widened to accept many category ids (a parent auto-includes
- * its sub-categories). Only active products; primary image (fallback: first by
- * display_order) is joined for the thumbnail.
- */
-export async function getBrochureProducts(
-  categoryIds: string[],
-  brandIds: string[]
-): Promise<BrochureProduct[]> {
-  if (categoryIds.length === 0 || brandIds.length === 0) return []
+// Shared lean projection for every brochure query. Primary image (fallback:
+// first by display_order) is joined for the thumbnail. Only active products.
+const BROCHURE_SELECT = `
+  SELECT
+    p.id, p.name, p.slug, p.sku, p.short_description, p.mrp, p.base_price, p.discount_pct,
+    b.name AS brand_name,
+    c.name AS category_name,
+    (
+      SELECT COALESCE(pi.thumbnail_url, pi.image_url)
+      FROM product_images pi
+      WHERE pi.product_id = p.id
+      ORDER BY pi.is_primary DESC, pi.display_order ASC
+      LIMIT 1
+    ) AS thumbnail_url
+  FROM products p
+  LEFT JOIN categories c ON c.id = p.category_id
+  LEFT JOIN brands b ON b.id = p.brand_id
+`
 
+/**
+ * Products under the selected category subtrees (a parent auto-includes its
+ * sub-categories via the recursive cat_tree) — regardless of brand. Backs the
+ * categories-page brochure. Active products only.
+ */
+export async function getBrochureProductsByCategories(
+  categoryIds: string[]
+): Promise<BrochureProduct[]> {
+  if (categoryIds.length === 0) return []
   return queryMany<BrochureProduct>(
     `
     WITH RECURSIVE cat_tree AS (
@@ -595,27 +611,52 @@ export async function getBrochureProducts(
       UNION ALL
       SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id
     )
-    SELECT
-      p.id, p.name, p.sku, p.short_description, p.mrp, p.base_price, p.discount_pct,
-      b.name AS brand_name,
-      c.name AS category_name,
-      (
-        SELECT COALESCE(pi.thumbnail_url, pi.image_url)
-        FROM product_images pi
-        WHERE pi.product_id = p.id
-        ORDER BY pi.is_primary DESC, pi.display_order ASC
-        LIMIT 1
-      ) AS thumbnail_url
-    FROM products p
-    LEFT JOIN categories c ON c.id = p.category_id
-    LEFT JOIN brands b ON b.id = p.brand_id
+    ${BROCHURE_SELECT}
     WHERE p.is_active = true
       AND p.category_id IN (SELECT id FROM cat_tree)
-      AND p.brand_id = ANY($2::uuid[])
-    ORDER BY b.name ASC, c.name ASC, p.name ASC
+    ORDER BY c.name ASC, p.name ASC
     `,
-    [categoryIds, brandIds]
+    [categoryIds]
   )
+}
+
+/**
+ * Products for the selected brands — regardless of category. Backs the
+ * brands-page brochure. Active products only.
+ */
+export async function getBrochureProductsByBrands(
+  brandIds: string[]
+): Promise<BrochureProduct[]> {
+  if (brandIds.length === 0) return []
+  return queryMany<BrochureProduct>(
+    `
+    ${BROCHURE_SELECT}
+    WHERE p.is_active = true
+      AND p.brand_id = ANY($1::uuid[])
+    ORDER BY b.name ASC, p.name ASC
+    `,
+    [brandIds]
+  )
+}
+
+/**
+ * Products by explicit id list — the final admin selection (after deselecting in
+ * the popup). Returned in the given id order so the PDF matches the preview.
+ */
+export async function getBrochureProductsByIds(
+  productIds: string[]
+): Promise<BrochureProduct[]> {
+  if (productIds.length === 0) return []
+  const rows = await queryMany<BrochureProduct>(
+    `
+    ${BROCHURE_SELECT}
+    WHERE p.is_active = true
+      AND p.id = ANY($1::uuid[])
+    `,
+    [productIds]
+  )
+  const byId = new Map(rows.map(r => [r.id, r]))
+  return productIds.map(id => byId.get(id)).filter(Boolean) as BrochureProduct[]
 }
 
 export async function getFilteredCategories(filters: {

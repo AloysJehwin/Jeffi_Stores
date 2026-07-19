@@ -5,9 +5,10 @@ import BrochureModal from './BrochureModal'
 
 /**
  * Toolbar button for the admin categories/brands pages. Opens the shared
- * BrochureModal to build a catalogue PDF from a category + brand selection.
+ * BrochureModal in the matching mode so section 1 shows categories (category
+ * page) or brands (brand page).
  */
-export default function BrochureButton() {
+export default function BrochureButton({ mode }: { mode: 'category' | 'brand' }) {
   const [open, setOpen] = useState(false)
   return (
     <>
@@ -20,7 +21,7 @@ export default function BrochureButton() {
         </svg>
         Generate Brochure
       </button>
-      <BrochureModal open={open} onClose={() => setOpen(false)} />
+      <BrochureModal open={open} mode={mode} onClose={() => setOpen(false)} />
     </>
   )
 }
