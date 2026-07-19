@@ -223,32 +223,84 @@ function drawColumnHeader(doc: any, y: number, showPrices: boolean, hasQR: boole
  */
 export function familyKey(name: string): string {
   let s = (name ?? '').trim()
-  // Remove one or more trailing size-ish tokens, repeatedly.
-  const sizePattern = /[\s,\-x×]*\b(?:M\d+(?:\.\d+)?|\d+(?:\.\d+)?\s?mm|\d+\/\d+"?|\d+(?:\.\d+)?["']|\d+(?:\.\d+)?\s?x\s?\d+(?:\.\d+)?|\d+(?:\.\d+)?)\s*$/i
-  let prev: string
-  do {
-    prev = s
-    s = s.replace(sizePattern, '').trim()
-  } while (s !== prev && s.length > 0)
-  const key = (s || name || '').toLowerCase().replace(/\s+/g, ' ').trim()
-  return key
+  // Remove size tokens from ANYWHERE (real names embed the size mid-string,
+  // e.g. `BSW 1/2" SS 202 Allen Cap Screw`). Leaves grade/material numbers
+  // like 202 / 304 / 12.9 intact — only sized tokens are stripped.
+  const sizeTokens = [
+    /\bM\d+(?:\.\d+)?\b/gi,                        // M6, M12
+    /\b\d+\/\d+\s*["'”]?/g,                   // 1/2", 3/16
+    /\b\d+(?:\.\d+)?\s*(?:mm|cm|inch|in)\b/gi,     // 25mm, 3 in
+    /\b\d+(?:\.\d+)?\s*["'”]/g,               // 2"
+    /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?\b/gi, // 5x40
+  ]
+  for (const re of sizeTokens) s = s.replace(re, ' ')
+  const key = s.toLowerCase().replace(/\s+/g, ' ').trim()
+  return key || (name || '').toLowerCase().replace(/\s+/g, ' ').trim()
 }
 
-/** Split products into one representative per family (first seen) + the rest. */
+/** Levenshtein distance (iterative, two-row). */
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length
+  if (m === 0) return n
+  if (n === 0) return m
+  let prev = Array.from({ length: n + 1 }, (_, j) => j)
+  let cur = new Array(n + 1).fill(0)
+  for (let i = 1; i <= m; i++) {
+    cur[0] = i
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+    }
+    [prev, cur] = [cur, prev]
+  }
+  return prev[n]
+}
+
+/** Name similarity in [0,1] (1 = identical) on normalized strings. */
+export function nameSimilarity(a: string, b: string): number {
+  const x = (a ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
+  const y = (b ?? '').toLowerCase().replace(/\s+/g, ' ').trim()
+  const L = Math.max(x.length, y.length)
+  return L === 0 ? 1 : 1 - levenshtein(x, y) / L
+}
+
+const FAMILY_SIMILARITY_THRESHOLD = 0.82
+
+/**
+ * Two products are the same family iff their names are highly similar
+ * (fuzzy ratio ≥ threshold) AND their ONLY difference is size — i.e. once size
+ * tokens are stripped the remainders are identical. This keeps "…Cap Screw" and
+ * "…CSK Screw" (or Steel vs Brass) as separate families even when very similar,
+ * while collapsing M5/M8/… or 1/2"/3/8" sizes of the same product.
+ */
+export function sameFamily(a: string, b: string): boolean {
+  if (familyKey(a) !== familyKey(b)) return false          // size-only-diff gate
+  return nameSimilarity(a, b) >= FAMILY_SIMILARITY_THRESHOLD // similarity confirm
+}
+
+/**
+ * Split products into one representative per family (first seen) + the rest.
+ * A product joins an existing family when sameFamily() holds against that
+ * family's representative; otherwise it starts a new family.
+ */
 export function splitFamilies(products: BrochureProductInput[]): {
   representatives: BrochureProductInput[]
   rest: BrochureProductInput[]
 } {
-  const seen = new Set<string>()
   const representatives: BrochureProductInput[] = []
   const rest: BrochureProductInput[] = []
+  // Bucket by familyKey first (fast), then confirm with the similarity gate so
+  // near-key-collisions across different products don't wrongly merge.
+  const repByKey = new Map<string, BrochureProductInput[]>()
   for (const p of products) {
     const key = familyKey(p.name)
-    if (seen.has(key)) {
+    const bucket = repByKey.get(key)
+    const match = bucket?.find(r => sameFamily(r.name, p.name))
+    if (match) {
       rest.push(p)
     } else {
-      seen.add(key)
       representatives.push(p)
+      if (bucket) bucket.push(p); else repByKey.set(key, [p])
     }
   }
   return { representatives, rest }

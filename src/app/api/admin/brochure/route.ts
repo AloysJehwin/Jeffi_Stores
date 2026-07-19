@@ -47,7 +47,12 @@ export async function POST(request: NextRequest) {
     const store = await loadBrochureStore()
     const pdfBuffer = await generateBrochurePDF(products, { store, title, showPrices })
 
-    const filename = `brochure-${new Date().toISOString().slice(0, 10)}.pdf`
+    // Unique filename per brochure: <title-slug>-<date>-<random>.pdf
+    const slug = (title || 'brochure')
+      .toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'brochure'
+    const stamp = new Date().toISOString().slice(0, 10)
+    const rand = Math.random().toString(36).slice(2, 8)
+    const filename = `${slug}-${stamp}-${rand}.pdf`
     return new NextResponse(new Uint8Array(pdfBuffer), {
       headers: {
         'Content-Type': 'application/pdf',
