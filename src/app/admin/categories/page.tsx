@@ -6,6 +6,7 @@ import { getFilteredCategories } from '@/lib/queries'
 import { queryMany } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import CategoriesClient from '@/components/admin/CategoriesClient'
+import BrochureButton from '@/components/admin/BrochureButton'
 import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
@@ -138,12 +139,15 @@ async function CategoriesHeader() {
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Categories</h1>
         <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
       </div>
-      <Link
-        href={ap('/admin/categories/add', host)}
-        className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-      >
-        Add New Category
-      </Link>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <BrochureButton />
+        <Link
+          href={ap('/admin/categories/add', host)}
+          className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+        >
+          Add New Category
+        </Link>
+      </div>
     </div>
   )
 }

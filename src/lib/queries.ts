@@ -562,6 +562,62 @@ export async function getFilteredProducts(filters: {
   return { products, total }
 }
 
+export interface BrochureProduct {
+  id: string
+  name: string
+  sku: string
+  short_description: string | null
+  mrp: number | null
+  base_price: number | null
+  discount_pct: number | null
+  brand_name: string | null
+  category_name: string | null
+  thumbnail_url: string | null
+}
+
+/**
+ * Products for the admin brochure builder: strict intersection of the selected
+ * category subtrees AND the selected brands. Reuses the recursive cat_tree from
+ * getFilteredProducts, widened to accept many category ids (a parent auto-includes
+ * its sub-categories). Only active products; primary image (fallback: first by
+ * display_order) is joined for the thumbnail.
+ */
+export async function getBrochureProducts(
+  categoryIds: string[],
+  brandIds: string[]
+): Promise<BrochureProduct[]> {
+  if (categoryIds.length === 0 || brandIds.length === 0) return []
+
+  return queryMany<BrochureProduct>(
+    `
+    WITH RECURSIVE cat_tree AS (
+      SELECT id FROM categories WHERE id = ANY($1::uuid[])
+      UNION ALL
+      SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id
+    )
+    SELECT
+      p.id, p.name, p.sku, p.short_description, p.mrp, p.base_price, p.discount_pct,
+      b.name AS brand_name,
+      c.name AS category_name,
+      (
+        SELECT COALESCE(pi.thumbnail_url, pi.image_url)
+        FROM product_images pi
+        WHERE pi.product_id = p.id
+        ORDER BY pi.is_primary DESC, pi.display_order ASC
+        LIMIT 1
+      ) AS thumbnail_url
+    FROM products p
+    LEFT JOIN categories c ON c.id = p.category_id
+    LEFT JOIN brands b ON b.id = p.brand_id
+    WHERE p.is_active = true
+      AND p.category_id IN (SELECT id FROM cat_tree)
+      AND p.brand_id = ANY($2::uuid[])
+    ORDER BY b.name ASC, c.name ASC, p.name ASC
+    `,
+    [categoryIds, brandIds]
+  )
+}
+
 export async function getFilteredCategories(filters: {
   is_active?: string
   type?: string
