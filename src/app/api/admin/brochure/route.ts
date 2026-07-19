@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getBrochureProducts } from '@/lib/queries'
+import { getBrochureProductsByIds } from '@/lib/queries'
 import { generateBrochurePDF, loadBrochureStore } from '@/lib/brochure-pdf'
 
 export const dynamic = 'force-dynamic'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+/**
+ * Generates the catalogue brochure PDF from the admin's final product selection.
+ * Body: { productIds: string[], showPrices: boolean, title?: string }. The ids
+ * are the products left checked in the popup (section 2).
+ */
 export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
@@ -21,25 +26,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
     }
 
-    const categoryIds: unknown = body.categoryIds
-    const brandIds: unknown = body.brandIds
+    const productIds: unknown = body.productIds
     const showPrices = body.showPrices === true
     const title = typeof body.title === 'string' ? body.title.slice(0, 120) : undefined
 
-    if (!Array.isArray(categoryIds) || categoryIds.length === 0) {
-      return NextResponse.json({ error: 'Select at least one category' }, { status: 400 })
-    }
-    if (!Array.isArray(brandIds) || brandIds.length === 0) {
-      return NextResponse.json({ error: 'Select at least one brand' }, { status: 400 })
+    if (!Array.isArray(productIds) || productIds.length === 0) {
+      return NextResponse.json({ error: 'Select at least one product' }, { status: 400 })
     }
 
-    const cats = categoryIds.filter((v): v is string => typeof v === 'string' && UUID_RE.test(v))
-    const brands = brandIds.filter((v): v is string => typeof v === 'string' && UUID_RE.test(v))
-    if (cats.length === 0 || brands.length === 0) {
-      return NextResponse.json({ error: 'Invalid category or brand selection' }, { status: 400 })
+    const ids = productIds.filter((v): v is string => typeof v === 'string' && UUID_RE.test(v))
+    if (ids.length === 0) {
+      return NextResponse.json({ error: 'Invalid product selection' }, { status: 400 })
     }
 
-    const products = await getBrochureProducts(cats, brands)
+    const products = await getBrochureProductsByIds(ids)
+    if (products.length === 0) {
+      return NextResponse.json({ error: 'No matching products found' }, { status: 404 })
+    }
 
     const store = await loadBrochureStore()
     const pdfBuffer = await generateBrochurePDF(products, { store, title, showPrices })

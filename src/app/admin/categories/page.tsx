@@ -140,7 +140,7 @@ async function CategoriesHeader() {
         <p className="text-foreground-secondary mt-1 text-sm">Manage product categories and subcategories</p>
       </div>
       <div className="flex flex-col sm:flex-row gap-2">
-        <BrochureButton />
+        <BrochureButton mode="category" />
         <Link
           href={ap('/admin/categories/add', host)}
           className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
