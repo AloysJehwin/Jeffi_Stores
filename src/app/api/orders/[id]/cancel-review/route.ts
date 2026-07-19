@@ -4,7 +4,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
-import { logStockMovement } from '@/lib/inventory'
+import { restoreOrderStock } from '@/lib/order-stock'
 import { logActivity } from '@/lib/activity'
 
 export async function POST(
@@ -55,43 +55,13 @@ export async function POST(
 
     if (action === 'approve') {
       // Stock is only deducted when an admin moves the order to 'processing'.
-      // A confirmed (paid) order that is cancelled before reaching processing has no stock impact.
-      // Check for an actual sale transaction rather than inferring from payment/status.
+      // A confirmed (paid) order cancelled before reaching processing has no stock
+      // impact. Detect an actual sale rather than inferring from payment/status.
       const saleRecord = await queryOne(
         `SELECT id FROM inventory_transactions WHERE reference_id = $1 AND transaction_type = 'sale' LIMIT 1`,
         [orderId]
       )
       const wasStockDeducted = !!saleRecord
-
-      async function restoreStock(client: any) {
-        if (!wasStockDeducted) return
-        const itemsResult = await client.query(
-          'SELECT product_id, variant_id, quantity FROM order_items WHERE order_id = $1',
-          [orderId]
-        )
-        for (const item of itemsResult.rows) {
-          const qty = parseFloat(item.quantity)
-          if (item.variant_id) {
-            await client.query(
-              'UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-              [qty, item.variant_id]
-            )
-          } else {
-            await client.query(
-              'UPDATE products SET inventory_quantity = inventory_quantity + $1 WHERE id = $2',
-              [qty, item.product_id]
-            )
-          }
-          await logStockMovement(client, {
-            productId: item.product_id,
-            variantId: item.variant_id || null,
-            transactionType: 'return',
-            quantityChange: qty,
-            referenceType: 'order',
-            referenceId: orderId,
-          })
-        }
-      }
 
       let refundSuccess = false
       if (order.payment_status === 'paid' && isRazorpayEnabled()) {
@@ -119,18 +89,15 @@ export async function POST(
                 `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
                 [JSON.stringify({ ...(typeof paymentRecord.gateway_response === 'string' ? JSON.parse(paymentRecord.gateway_response) : paymentRecord.gateway_response || {}), refund }), paymentRecord.id]
               )
-              await restoreStock(client)
             })
             refundSuccess = true
           } catch (err) {
-            console.error('[route]', err)
             refundFailed = true
             await withTransaction(async (client) => {
               await client.query(
                 `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
                 [orderId]
               )
-              await restoreStock(client)
             })
           }
         } else {
@@ -139,7 +106,6 @@ export async function POST(
               `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
               [orderId]
             )
-            await restoreStock(client)
           })
         }
       } else {
@@ -148,9 +114,17 @@ export async function POST(
             `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
             [orderId]
           )
-          await restoreStock(client)
         })
       }
+
+      // Restore inventory via the shared helper: resets serials to in_stock,
+      // reverses product_batches quantity_remaining, and syncs shelf_stock — the
+      // full counterpart of deductOrderStock. Idempotent (guards on an existing
+      // 'return' ledger row), and a no-op when stock was never deducted.
+      if (wasStockDeducted) {
+        await restoreOrderStock(orderId)
+      }
+
       newStatus = 'cancelled'
 
       if (order.awb_number) {
@@ -209,7 +183,6 @@ export async function POST(
 
     return NextResponse.json({ success: true, newStatus, refundFailed })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Failed to process cancellation review' }, { status: 500 })
   }
 }
