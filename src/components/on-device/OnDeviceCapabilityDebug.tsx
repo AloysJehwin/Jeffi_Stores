@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { detectOnDeviceCapability, type CapabilityVerdict } from '@/lib/on-device/capability'
+import { isOnDeviceSummaryEnabled } from '@/lib/on-device/flag'
 
 /**
  * Debug readout for the on-device model capability gate. Drop this on any page
@@ -39,6 +40,7 @@ export default function OnDeviceCapabilityDebug() {
       </div>
       <Row k="reason" v={verdict.reason} />
       <div className="border-t border-border-default my-2" />
+      <Row k="feature flag" v={isOnDeviceSummaryEnabled() ? 'enabled' : 'disabled'} />
       <Row k="WebGPU" v={d.hasWebGPU ? 'yes' : 'no'} />
       <Row k="GPU adapter" v={d.hasAdapter ? 'yes' : 'no'} />
       <Row k="GPU vendor" v={d.gpuVendor ?? '—'} />
