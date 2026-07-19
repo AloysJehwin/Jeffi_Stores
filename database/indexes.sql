@@ -1643,6 +1643,35 @@ CREATE INDEX shelf_stock_product_idx ON public.shelf_stock USING btree (product_
 
 
 --
+-- Name: shelf_stock_unique; Type: INDEX; Schema: public; Owner: -
+-- One shelf_stock row per (location, product, variant, sub_variant).
+--
+
+CREATE UNIQUE INDEX IF NOT EXISTS shelf_stock_unique ON public.shelf_stock USING btree (location_id, product_id, variant_id, sub_variant_id);
+
+
+
+--
+-- Name: shelf_stock_uniq_var_no_subvar; Type: INDEX; Schema: public; Owner: -
+-- PG14 treats NULLs as DISTINCT, so shelf_stock_unique does NOT prevent
+-- duplicates when sub_variant_id IS NULL. These partial unique indexes cover
+-- the NULL patterns (variant present / product-level) so a location can never
+-- hold two stock rows for the same product/variant.
+--
+
+CREATE UNIQUE INDEX IF NOT EXISTS shelf_stock_uniq_var_no_subvar ON public.shelf_stock USING btree (location_id, product_id, variant_id) WHERE sub_variant_id IS NULL AND variant_id IS NOT NULL;
+
+
+
+--
+-- Name: shelf_stock_uniq_product_only; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX IF NOT EXISTS shelf_stock_uniq_product_only ON public.shelf_stock USING btree (location_id, product_id) WHERE variant_id IS NULL AND sub_variant_id IS NULL;
+
+
+
+--
 -- Name: uniq_product_units_one_base_product; Type: INDEX; Schema: public; Owner: -
 --
 
