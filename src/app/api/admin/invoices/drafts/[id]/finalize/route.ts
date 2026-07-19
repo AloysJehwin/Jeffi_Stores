@@ -2,10 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
-import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
 import { deductOrderStock } from '@/lib/inventory-deduct'
 import { sendInvoiceFinalizedEmail, sendOrderStatusUpdate } from '@/lib/email'
-import { generateOrderInvoice } from '@/lib/invoice'
+import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,41 +55,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // products" contract; batches auto-pick FEFO when none are supplied.
       await deductOrderStock(id, { batchAssignments, serialAssignments, requireSerialAssignments: true }, client)
 
-      const isGSTEnabled = process.env.ENABLE_GST === 'true'
-      let invoiceNumber: string | null = null
-
-      if (isGSTEnabled) {
-        const settingsResult = await client.query(`SELECT value FROM site_settings WHERE key = 'invoice_prefix'`)
-        const prefix = settingsResult.rows[0]?.value || 'JS'
-        const fy = getFinancialYear(new Date())
-        const seq = await getNextInvoiceSequence(client, fy)
-        invoiceNumber = generateInvoiceNumber(prefix, fy, seq)
-        const invoiceDate = new Date().toISOString()
-
-        await client.query(
-          `UPDATE orders SET invoice_number = $1, invoice_date = $2, status = $3, updated_at = NOW() WHERE id = $4`,
-          [invoiceNumber, invoiceDate, targetStatus, id]
-        )
-
-        if (isOnlineOrder) {
-          // Update the existing draft invoice row rather than inserting a new one
-          await client.query(
-            `UPDATE invoices SET invoice_number = $1, financial_year = $2, sequence_number = $3, status = 'finalized', updated_at = NOW()
-             WHERE order_id = $4 AND status = 'draft'`,
-            [invoiceNumber, fy, seq, id]
-          )
-        } else {
-          await client.query(
-            `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)`,
-            [id, invoiceNumber, fy, seq]
-          )
-        }
-      } else {
-        await client.query(
-          `UPDATE orders SET status = $1, invoice_date = NOW(), updated_at = NOW() WHERE id = $2`,
-          [targetStatus, id]
-        )
-      }
+      // Assign the invoice number (GST-gated, idempotent) via the shared helper,
+      // then move the order to its target status. Same effect as the previous
+      // inline block; reused by the processing-transition path.
+      const invoiceNumber = await assignInvoiceNumber(client, id)
+      await client.query(
+        `UPDATE orders SET status = $1, invoice_date = COALESCE(invoice_date, NOW()), updated_at = NOW() WHERE id = $2`,
+        [targetStatus, id]
+      )
 
       return { invoiceNumber, orderId: id }
     })

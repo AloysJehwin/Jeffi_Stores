@@ -16,6 +16,7 @@ vi.mock('@/lib/email', () => ({
 }))
 vi.mock('@/lib/invoice', () => ({
   generateOrderInvoice: vi.fn().mockResolvedValue(Buffer.from('inv')),
+  assignInvoiceNumber: vi.fn().mockResolvedValue('JS/26-27/999'),
 }))
 vi.mock('@/lib/delhivery', () => ({
   cancelDelhiveryShipment: vi.fn().mockResolvedValue(undefined),

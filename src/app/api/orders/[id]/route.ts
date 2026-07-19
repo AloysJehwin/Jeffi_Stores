@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
-import { generateOrderInvoice } from '@/lib/invoice'
+import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { logActivity } from '@/lib/activity'
@@ -492,6 +492,10 @@ export async function PATCH(
           },
           client
         )
+        // Assign the invoice number/document at processing for ALL orders,
+        // including COD (never payment_status='paid' until remittance). The PDF is
+        // still rendered later by generateOrderInvoice once the order is paid.
+        await assignInvoiceNumber(client, orderId)
       })
     }
 

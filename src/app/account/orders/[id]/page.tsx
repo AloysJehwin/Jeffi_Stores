@@ -733,7 +733,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       Monthly return limit reached
                     </span>
                   )}
-                  {order.invoiceNumber && !order.originalOrderId && order.viewToken && (
+                  {order.invoiceNumber && !order.originalOrderId && order.viewToken && (order.paymentStatus === 'paid' || order.paymentStatus === 'cod_collected') && (
                     <a
                       href={`/invoice/${order.viewToken}`}
                       target="_blank"
