@@ -209,13 +209,45 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
     return rows
   }, [categories])
 
+  // parentId → all descendant ids (recursive), for cascade selection.
+  const descendantsOf = useMemo(() => {
+    const kids = new Map<string, string[]>()
+    for (const c of categories) {
+      if (c.parent_category_id) {
+        const arr = kids.get(c.parent_category_id) || []
+        arr.push(c.id); kids.set(c.parent_category_id, arr)
+      }
+    }
+    const memo = new Map<string, string[]>()
+    const collect = (id: string): string[] => {
+      if (memo.has(id)) return memo.get(id)!
+      const direct = kids.get(id) || []
+      const all = [...direct]
+      for (const d of direct) all.push(...collect(d))
+      memo.set(id, all)
+      return all
+    }
+    const out = new Map<string, string[]>()
+    for (const c of categories) out.set(c.id, collect(c.id))
+    return out
+  }, [categories])
+
+  // Toggling a category cascades to its descendants so the user sees exactly
+  // what a parent pulls in. (Brands have no hierarchy — plain toggle.)
   const toggleFilter = useCallback((id: string) => {
     setSelectedFilters(prev => {
       const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
+      const kids = descendantsOf.get(id) || []
+      if (next.has(id)) {
+        next.delete(id)
+        for (const k of kids) next.delete(k)
+      } else {
+        next.add(id)
+        for (const k of kids) next.add(k)
+      }
       return next
     })
-  }, [])
+  }, [descendantsOf])
   const toggleProduct = useCallback((id: string) => {
     setSelectedProducts(prev => {
       const next = new Set(prev)
@@ -314,7 +346,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                   <button onClick={() => setSelectedFilters(new Set())} className="text-[10px] text-foreground-muted hover:text-red-500">None</button>
                 </div>
               </div>
-              <div className="space-y-0.5 h-72 overflow-y-auto pr-1 border border-border-default rounded-lg p-1.5">
+              <div className="space-y-0.5 h-[28rem] overflow-y-auto pr-1 border border-border-default rounded-lg p-1.5">
                 {loadingFilters ? (
                   <div className="text-xs text-foreground-muted py-3 text-center">Loading…</div>
                 ) : filterOptions.length === 0 ? (
@@ -349,7 +381,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                   </div>
                 )}
               </div>
-              <div className="space-y-0.5 h-72 overflow-y-auto pr-1 border border-border-default rounded-lg p-1.5">
+              <div className="space-y-0.5 h-[28rem] overflow-y-auto pr-1 border border-border-default rounded-lg p-1.5">
                 {selectedFilters.size === 0 ? (
                   <div className="text-xs text-foreground-muted py-3 text-center px-2">Select {mode === 'category' ? 'a category' : 'a brand'} to list its products</div>
                 ) : loadingProducts ? (
@@ -384,7 +416,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                   <span className="text-[10px] text-foreground-muted">{previewPages.length} page{previewPages.length !== 1 ? 's' : ''}</span>
                 )}
               </div>
-              <div className="h-[26rem] overflow-y-auto border border-border-default rounded-lg bg-gray-100 dark:bg-zinc-800 p-3 space-y-3">
+              <div className="h-[28rem] overflow-y-auto border border-border-default rounded-lg bg-gray-100 dark:bg-zinc-800 p-3 space-y-3">
                 {previewProducts.length === 0 ? (
                   <div className="text-xs text-foreground-muted py-8 text-center px-3">Nothing selected yet</div>
                 ) : previewPages.map((page, pi) => (
