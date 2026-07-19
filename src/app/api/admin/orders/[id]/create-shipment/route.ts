@@ -58,8 +58,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const address = [order.address_line1, order.address_line2, order.landmark].filter(Boolean).join(', ')
 
     const productDesc = 'Hardware / Fasteners'
-    const codAmount = '0'
     const totalAmount = String(round2(Number(order.total_amount)))
+    // COD orders must be shipped as COD with the collectable amount so Delhivery
+    // collects cash on delivery; everything else ships Prepaid. Guard against a COD
+    // order that was already paid (cod_collected) — then it's effectively prepaid.
+    const isCodShipment = order.payment_mode === 'cod' && order.payment_status !== 'cod_collected'
+    const codAmount = isCodShipment ? totalAmount : '0'
+    const deliveryPaymentMode = isCodShipment ? 'COD' : 'Prepaid'
     const orderDate = new Date(order.created_at).toISOString().slice(0, 10)
     const baseRef = order.order_number || order.id.slice(0, 12)
     const invoiceRef = `${baseRef}-${Date.now()}`
@@ -111,7 +116,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         country: 'India',
         phone: consigneePhone,
         order: invoiceRef,
-        payment_mode: 'Prepaid',
+        payment_mode: deliveryPaymentMode,
         return_pin: ORIGIN_PIN,
         return_city: 'Raipur',
         return_phone: SELLER_PHONE,
