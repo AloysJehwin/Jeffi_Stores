@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 
 export const runtime = 'nodejs'
@@ -9,7 +9,9 @@ export const dynamic = 'force-dynamic'
 
 const TOKEN = process.env.DELHIVERY_API_KEY
 
-async function build4RPDF(pkg: any, awb: string, orderRow: any): Promise<Buffer> {
+interface LabelItem { name: string; qty: number; price: number; total: number }
+
+async function build4RPDF(pkg: any, awb: string, orderRow: any, items: LabelItem[]): Promise<Buffer> {
   const PDFDocument = eval('require')('pdfkit')
   const bwipjs = eval('require')('bwip-js')
   const path = eval('require')('path')
@@ -66,6 +68,17 @@ async function build4RPDF(pkg: any, awb: string, orderRow: any): Promise<Buffer>
       doc.moveTo(M, yy).lineTo(M + BW, yy).lineWidth(lw).strokeColor('#000').stroke()
     const vline = (xx: number, y1: number, y2: number) =>
       doc.moveTo(xx, y1).lineTo(xx, y2).lineWidth(0.5).strokeColor('#000').stroke()
+    // Hard-truncate to a single line at the doc's CURRENT font/size within maxW,
+    // measuring WITH the ellipsis so the result always fits (pdfkit's lineBreak:
+    // false still wraps otherwise).
+    const clipLine = (text: string, maxW: number): string => {
+      const s = (text ?? '').replace(/\s+/g, ' ').trim()
+      if (!s) return ''
+      if (doc.widthOfString(s) <= maxW) return s
+      let t = s
+      while (t.length > 1 && doc.widthOfString(t + '…') > maxW) t = t.slice(0, -1)
+      return t + '…'
+    }
 
     let y = M
 
@@ -101,14 +114,23 @@ async function build4RPDF(pkg: any, awb: string, orderRow: any): Promise<Buffer>
     vline(col2X, row3Y, row3Y + row3H)
 
     const addrW = col2X - M - p * 2
-    doc.fontSize(12).font('Helvetica-Bold').fillColor('#000').text(`Ship to - ${consigneeName}`, M + p, y + 6, { width: addrW, lineBreak: false })
-    let addrY = y + 22
+    // "SHIP TO" label, then the recipient name on its own line (clipped to the
+    // column) so a long name can never wrap over the address block below.
+    doc.fontSize(7).font('Helvetica-Bold').fillColor('#555').text('SHIP TO', M + p, y + 5, { width: addrW, lineBreak: false })
+    doc.fontSize(11).font('Helvetica-Bold').fillColor('#000')
+    doc.text(clipLine(consigneeName, addrW), M + p, y + 15, { width: addrW, lineBreak: false })
+    let addrY = y + 32
+    // Delhivery's pkg.add frequently repeats the consignee name as its first
+    // line — skip any address line that just echoes the name to avoid the
+    // "name printed twice / overlapping" look.
+    const nameNorm = consigneeName.trim().toLowerCase()
     for (const line of addrLines) {
+      if (line.trim().toLowerCase() === nameNorm) continue
       const isPinLine = /^\d{6}$/.test(line)
       doc.fontSize(isPinLine ? 9 : 8)
         .font(isPinLine ? 'Helvetica-Bold' : 'Helvetica')
         .fillColor('#000')
-        .text(line, M + p, addrY, { width: addrW, lineBreak: false })
+        .text(clipLine(line, addrW), M + p, addrY, { width: addrW, lineBreak: false })
       addrY += 12
     }
     doc.fontSize(10).font('Helvetica-Bold').fillColor('#000')
@@ -140,18 +162,68 @@ async function build4RPDF(pkg: any, awb: string, orderRow: any): Promise<Buffer>
     }
     y += row4H; hline(y)
 
-    doc.fontSize(7).font('Helvetica-Bold').fillColor('#000').text('Product Name', M + p, y + 6, { width: BW * 0.48, lineBreak: false })
-    doc.text('Qty.', M + BW * 0.5, y + 6, { width: 28, align: 'right', lineBreak: false })
-    doc.text('Price', M + BW * 0.66, y + 6, { width: 40, align: 'right', lineBreak: false })
-    doc.text('Total', M + BW * 0.83, y + 6, { width: BW * 0.17 - p, align: 'right', lineBreak: false })
+    // ── Items table ──
+    const colName = M + p
+    const nameW = BW * 0.46
+    const colQty = M + BW * 0.50
+    const qtyW = 34
+    const colPrice = M + BW * 0.64
+    const priceW = 52
+    const colTotal = M + BW * 0.80
+    const totalW = BW * 0.20 - p
+
+    doc.fontSize(7).font('Helvetica-Bold').fillColor('#000')
+    doc.text('Product Name', colName, y + 6, { width: nameW, lineBreak: false })
+    doc.text('Qty.', colQty, y + 6, { width: qtyW, align: 'right', lineBreak: false })
+    doc.text('Price', colPrice, y + 6, { width: priceW, align: 'right', lineBreak: false })
+    doc.text('Total', colTotal, y + 6, { width: totalW, align: 'right', lineBreak: false })
     y += 18; hline(y)
 
-    doc.fontSize(7).font('Helvetica').fillColor('#000').text(productDesc, M + p, y + 5, { width: BW * 0.48, lineBreak: false })
-    doc.text('1', M + BW * 0.5, y + 5, { width: 28, align: 'right', lineBreak: false })
-    doc.text(totalAmount || '', M + BW * 0.66, y + 5, { width: 40, align: 'right', lineBreak: false })
-    doc.text(totalAmount || '', M + BW * 0.83, y + 5, { width: BW * 0.17 - p, align: 'right', lineBreak: false })
-
+    // Real order line items. Leave room for a bottom total row above the footer.
     const footerY = M + BH - 20
+    const ROW = 12
+    const TOTAL_ROW_H = 16
+    const rowsTop = y + 4
+    const maxRows = Math.max(1, Math.floor((footerY - rowsTop - TOTAL_ROW_H) / ROW))
+
+    const list: LabelItem[] = items.length > 0
+      ? items
+      : [{ name: productDesc, qty: 1, price: Number(totalAmount) || 0, total: Number(totalAmount) || 0 }]
+
+    // If the list overflows, show maxRows-1 items then a "… N more items" row.
+    const overflow = list.length > maxRows
+    const shown = overflow ? list.slice(0, maxRows - 1) : list
+    let ry = rowsTop
+    doc.fontSize(7).font('Helvetica').fillColor('#000')
+    for (const it of shown) {
+      doc.font('Helvetica').fontSize(7)
+      doc.text(clipLine(it.name || '-', nameW), colName, ry, { width: nameW, lineBreak: false })
+      doc.text(String(it.qty), colQty, ry, { width: qtyW, align: 'right', lineBreak: false })
+      doc.text(round2(it.price).toFixed(2), colPrice, ry, { width: priceW, align: 'right', lineBreak: false })
+      doc.text(round2(it.total).toFixed(2), colTotal, ry, { width: totalW, align: 'right', lineBreak: false })
+      ry += ROW
+    }
+    if (overflow) {
+      const moreCount = list.length - shown.length
+      doc.font('Helvetica-Oblique').fillColor('#555')
+        .text(`… and ${moreCount} more item${moreCount !== 1 ? 's' : ''}`, colName, ry, { width: nameW + qtyW, lineBreak: false })
+      doc.fillColor('#000')
+    }
+
+    // Order total, bottom-right just above the footer.
+    const grand = items.length > 0
+      ? items.reduce((s, it) => s + (Number(it.total) || 0), 0)
+      : (Number(totalAmount) || 0)
+    const totalRowY = footerY - TOTAL_ROW_H
+    doc.moveTo(colPrice, totalRowY).lineTo(M + BW - p, totalRowY).lineWidth(0.4).strokeColor('#000').stroke()
+    doc.fontSize(8).font('Helvetica-Bold').fillColor('#000')
+    // "Total" label + value right-aligned to the box edge; value spans from the
+    // price column so a large amount can't wrap.
+    const totalStr = `INR ${round2(grand).toFixed(2)}`
+    const valW = M + BW - p - colPrice
+    doc.text('Total', colName, totalRowY + 4, { width: colPrice - colName - 6, align: 'right', lineBreak: false })
+    doc.text(totalStr, colPrice, totalRowY + 4, { width: valW, align: 'right', lineBreak: false })
+
     hline(footerY)
     doc.fontSize(6.5).font('Helvetica').fillColor('#000')
       .text(`Return Address: ${sellerAdd}`, M + p, footerY + 5, { width: BW * 0.78 - p })
@@ -183,6 +255,18 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (!order.awb_number) return NextResponse.json({ error: 'No AWB number for this order' }, { status: 404 })
 
+    const itemRows = await queryMany<any>(
+      `SELECT product_name, variant_name, quantity, unit_price, total_price
+       FROM order_items WHERE order_id = $1 ORDER BY id`,
+      [id]
+    )
+    const items: LabelItem[] = (itemRows || []).map((r) => ({
+      name: [r.product_name, r.variant_name].filter(Boolean).join(' — '),
+      qty: Number(r.quantity) || 1,
+      price: Number(r.unit_price) || 0,
+      total: Number(r.total_price) || 0,
+    }))
+
     const pdfSize = (request.nextUrl.searchParams.get('size') === '4R') ? '4R' : 'A4'
     const print = request.nextUrl.searchParams.get('print') === '1'
     const inline = request.nextUrl.searchParams.get('inline') === '1'
@@ -196,7 +280,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       const data = await res.json()
       const pkg = data?.packages?.[0] ?? {}
 
-      const buffer = await build4RPDF(pkg, order.awb_number, order)
+      const buffer = await build4RPDF(pkg, order.awb_number, order, items)
 
       if (print) {
         const pdfBase64 = buffer.toString('base64')
