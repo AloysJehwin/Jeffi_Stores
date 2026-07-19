@@ -251,6 +251,21 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
     : getCartTotal()
 
+  // Line items for the on-device recap — works for both cart and buy-now flows.
+  const recapItems = isBuyNow
+    ? (buyNowItem ? [{
+        name: buyNowItem.variantName ? `${buyNowItem.productName} ${buyNowItem.variantName}` : buyNowItem.productName,
+        category: null,
+        brand: buyNowItem.brandName ?? null,
+        qty: buyNowItem.qty,
+      }] : [])
+    : cartItems.map((it: any) => ({
+        name: it.variant?.variant_name ? `${it.products?.name} ${it.variant.variant_name}` : (it.products?.name || 'Item'),
+        category: null,
+        brand: it.products?.brand_name ?? null,
+        qty: Number(it.quantity) || 1,
+      }))
+
   const belowMinimum = minOrderAmount > 0 && cartSubtotal > 0 && cartSubtotal < minOrderAmount
 
   useEffect(() => {
@@ -680,7 +695,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           <div className="lg:col-span-2 space-y-6">
             {/* On-device AI cart recap (silent unless the device is capable) */}
-            <CheckoutRecapSummary />
+            <CheckoutRecapSummary items={recapItems} total={cartSubtotal} />
             {/* Delivery Address */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <div className="flex justify-between items-center mb-4">

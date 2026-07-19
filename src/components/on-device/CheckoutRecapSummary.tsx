@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { useCart } from '@/contexts/CartContext'
 import { canRunOnDeviceSummary, generateRecap, disposeSummarizer } from '@/lib/on-device/runtime'
 import { getViewedProducts, getSearches } from '@/lib/on-device/session-signals'
 import type { SessionSignals, CartLine } from '@/lib/on-device/prompt'
@@ -11,11 +10,14 @@ import type { SessionSignals, CartLine } from '@/lib/on-device/prompt'
  * device is capable (flag on + WebGPU + memory + GPU limits). The ~400MB model
  * downloads lazily in a Web Worker and the summary streams in — fully
  * non-blocking; checkout works identically whether or not this appears.
+ *
+ * The parent supplies the resolved line items + total, so this works for BOTH
+ * the persisted-cart and buy-now flows (buy-now items aren't in useCart()).
  */
-export default function CheckoutRecapSummary() {
-  const { cartItems, getCartTotal } = useCart()
+export default function CheckoutRecapSummary({ items, total }: { items: CartLine[]; total: number }) {
   const [capable, setCapable] = useState<boolean | null>(null)
   const [text, setText] = useState('')
+  const [errMsg, setErrMsg] = useState('')
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const started = useRef(false)
 
@@ -26,25 +28,16 @@ export default function CheckoutRecapSummary() {
     return () => { alive = false; disposeSummarizer() }
   }, [])
 
-  // Kick off generation once capable + cart is populated (only once).
+  // Kick off generation once capable + items are known (only once).
   useEffect(() => {
     if (!capable || started.current) return
-    if (!cartItems || cartItems.length === 0) return
+    if (!items || items.length === 0) return
     started.current = true
 
-    const cart: CartLine[] = cartItems.map((it: any) => ({
-      name: it.variant?.variant_name
-        ? `${it.products?.name} ${it.variant.variant_name}`
-        : (it.products?.name || 'Item'),
-      category: it.products?.category_id ? null : null, // category name not on cart item; brand suffices
-      brand: it.products?.brand_name ?? null,
-      qty: it.quantity || 1,
-    }))
-    const itemCount = cart.reduce((s, c) => s + c.qty, 0)
-
+    const itemCount = items.reduce((s, c) => s + c.qty, 0)
     const signals: SessionSignals = {
-      cart,
-      total: Math.round((getCartTotal() || 0) * 100) / 100,
+      cart: items,
+      total: Math.round((total || 0) * 100) / 100,
       itemCount,
       viewed: getViewedProducts(),
       searches: getSearches(),
@@ -53,12 +46,13 @@ export default function CheckoutRecapSummary() {
     setState('loading')
     generateRecap(signals, (partial) => setText(partial))
       .then(final => { setText(final); setState('done') })
-      .catch(() => setState('error'))
-  }, [capable, cartItems, getCartTotal])
+      .catch((e) => { setErrMsg(e?.message || String(e)); setState('error') })
+  }, [capable, items, total])
 
-  // Silent on incapable devices, errors, or empty output.
+  // Silent on incapable devices or empty output. (Error is shown on-screen in
+  // development to aid debugging; hidden in production.)
   if (capable !== true) return null
-  if (state === 'error') return null
+  if (state === 'error' && process.env.NODE_ENV === 'production') return null
   if (state === 'idle') return null
   if (state === 'done' && !text.trim()) return null
 
@@ -71,7 +65,9 @@ export default function CheckoutRecapSummary() {
         <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Your order at a glance</span>
         <span className="text-[9px] text-foreground-muted ml-auto">on-device · private</span>
       </div>
-      {state === 'loading' && !text ? (
+      {state === 'error' ? (
+        <p className="text-xs text-red-600 break-words font-mono">[dev] {errMsg || 'unknown error'}</p>
+      ) : state === 'loading' && !text ? (
         <p className="text-sm text-foreground-muted animate-pulse">Preparing your summary…</p>
       ) : (
         <p className="text-sm text-foreground leading-relaxed">{text}{state === 'loading' && <span className="animate-pulse">▍</span>}</p>
