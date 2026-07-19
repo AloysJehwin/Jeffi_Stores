@@ -8,7 +8,12 @@
  * Policy (strict): WebGPU adapter present AND navigator.deviceMemory >= 4 GB
  * AND the GPU adapter's limits are large enough for the model's tensors. Devices
  * that fail are silently excluded (the summary UI simply never renders).
+ *
+ * The whole check is additionally gated by the feature flag — when the flag is
+ * off, the gate short-circuits to reason:'disabled' before any probing.
  */
+
+import { isOnDeviceSummaryEnabled } from './flag'
 
 // ── Minimal local WebGPU typings (avoids adding @webgpu/types as a dep) ──────
 interface GPUAdapterLike {
@@ -30,6 +35,7 @@ export interface CapabilityVerdict {
   /** Machine-readable reason when not capable (for telemetry/debug). */
   reason:
     | 'ok'
+    | 'disabled'
     | 'no-window'
     | 'no-webgpu'
     | 'no-adapter'
@@ -98,6 +104,11 @@ export async function detectOnDeviceCapability(): Promise<CapabilityVerdict> {
     gpuVendor: null,
     storageQuotaMB: null,
     modelCached: false,
+  }
+
+  // Feature flag first — when off, do nothing at all.
+  if (!isOnDeviceSummaryEnabled()) {
+    return { capable: false, reason: 'disabled', details }
   }
 
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {
