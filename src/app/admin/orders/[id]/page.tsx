@@ -54,7 +54,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
         : String(order.estimated_delivery_date).slice(0, 10))
     : null
   const edd = eddDateStr
-    ? new Date(eddDateStr + 'T00:00:00Z').toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Asia/Kolkata' })
+    ? new Date(eddDateStr + 'T00:00:00Z').toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Kolkata' })
     : null
   const rawEdd: string | null = eddDateStr ?? null
 

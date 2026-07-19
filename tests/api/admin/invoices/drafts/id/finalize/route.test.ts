@@ -19,7 +19,7 @@ vi.mock('@/lib/gst', () => ({
 }))
 vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendInvoiceFinalizedEmail: vi.fn(), sendOrderStatusUpdate: vi.fn() }))
-vi.mock('@/lib/invoice', () => ({ generateOrderInvoice: vi.fn() }))
+vi.mock('@/lib/invoice', () => ({ generateOrderInvoice: vi.fn(), assignInvoiceNumber: vi.fn().mockResolvedValue('JS/2024-25/0001') }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 
@@ -86,6 +86,10 @@ function makeTxClient({
       // variant stock (with has_sub_variants computed)
       if (sql.includes('FROM product_variants pv WHERE pv.id')) {
         return Promise.resolve({ rows: [{ inventory_quantity: stockQty, has_sub_variants: hasSubs }] })
+      }
+      // variant stock via shared deductOrderStock helper (plain, alias-less SELECT)
+      if (sql.includes('FROM product_variants WHERE id') && sql.includes('FOR UPDATE')) {
+        return Promise.resolve({ rows: [{ inventory_quantity: stockQty }] })
       }
       // aggregate sub-variant stock for variant
       if (sql.includes('COALESCE(SUM(inventory_quantity)')) {

@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg'
 import { queryMany, queryOne, withTransaction } from './db'
 import { isInterState, calculateGST, round2 } from './gst'
 import { createDraftInvoice } from './invoice'
+import { computeEdd } from './edd'
 import type { DraftBuyNowItem, DraftCartItem } from './order-draft'
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
@@ -25,6 +26,7 @@ export interface CartLine {
     category_id: string | null
     mrp: number | null
     extra_delivery_days: number | null
+    handling_days?: number | null
   }
   variant: { id: string; variant_name: string; sku: string; price: number | null; price_ex_gst: number | null; mrp: number | null } | null
   sub_variant: { id: string; sub_variant_name: string; sku: string | null; price: number | null; price_ex_gst: number | null; mrp: number | null } | null
@@ -40,7 +42,8 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
         'base_price', p.base_price, 'price_ex_gst', p.price_ex_gst,
         'gst_percentage', p.gst_percentage, 'hsn_code', p.hsn_code,
         'category_id', p.category_id, 'mrp', p.mrp,
-        'extra_delivery_days', p.extra_delivery_days
+        'extra_delivery_days', p.extra_delivery_days,
+        'handling_days', p.handling_days
       ) AS products,
       CASE WHEN ci.variant_id IS NOT NULL THEN
         json_build_object(
@@ -289,22 +292,6 @@ export async function getMinOrderAmount(): Promise<number> {
   return row ? parseFloat(row.value) || 0 : 0
 }
 
-function getTat(pin: string): number {
-  if (/^49/.test(pin)) return 7
-  if (/^\d{3}/.test(pin)) {
-    const prefix3 = parseInt(pin.slice(0, 3), 10)
-    const metro = [110, 400, 500, 600, 700, 560, 380]
-    if (metro.includes(prefix3)) return 10
-  }
-  return 14
-}
-
-function addDays(date: Date, days: number): Date {
-  const d = new Date(date)
-  d.setDate(d.getDate() + days)
-  return d
-}
-
 interface ShippingQuoteItem {
   productId: string
   variantId?: string | null
@@ -375,7 +362,7 @@ export interface CartCommitInput extends CommitInput {
 export interface BuyNowCommitInput extends CommitInput {
   mode: 'buyNow'
   item: DraftBuyNowItem
-  product: { id: string; name: string; sku: string | null; gst_percentage: string | number | null; hsn_code: string | null; mrp: number | null; extra_delivery_days?: number | null }
+  product: { id: string; name: string; sku: string | null; gst_percentage: string | number | null; hsn_code: string | null; mrp: number | null; extra_delivery_days?: number | null; handling_days?: number | null }
   variant: { id: string; variant_name: string; sku: string; mrp: number | null } | null
   subVariant: { id: string; sub_variant_name: string; sku: string | null; mrp: number | null } | null
   subtotal: number
@@ -411,8 +398,10 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     const maxExtraDays = input.mode === 'cart'
       ? Math.max(0, ...input.cartItems.map(i => Number(i.products.extra_delivery_days ?? 0)))
       : Number(input.product.extra_delivery_days ?? 0)
-    const tat = (/^\d{6}$/.test(pin) ? getTat(pin) : 7) + maxExtraDays
-    const estimatedDeliveryDate = addDays(new Date(), tat).toISOString().slice(0, 10)
+    const maxHandlingDays = input.mode === 'cart'
+      ? Math.max(2, ...input.cartItems.map(i => Number(i.products.handling_days ?? 2)))
+      : Number(input.product.handling_days ?? 2)
+    const estimatedDeliveryDate = computeEdd({ pin, handlingDays: maxHandlingDays, extraDays: maxExtraDays })
 
     const customerName = `${input.user.first_name || ''} ${input.user.last_name || ''}`.trim() || 'Customer'
     const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'

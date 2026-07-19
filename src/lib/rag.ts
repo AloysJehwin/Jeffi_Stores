@@ -1,4 +1,7 @@
 import { Pool } from 'pg'
+import path from 'path'
+import fs from 'fs'
+import { Signer } from '@aws-sdk/rds-signer'
 
 export interface RagResult {
   source_table: string
@@ -19,20 +22,39 @@ let pool: Pool | null = null
 
 function getPool(): Pool {
   if (!pool) {
-    const password = process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
-    pool = new Pool({
-      host: process.env.RAG_PG_HOST || '100.82.208.8',
-      port: parseInt(process.env.RAG_PG_PORT || '5432', 10),
-      user: process.env.RAG_PG_USER || 'postgres',
-      password,
-      database: process.env.RAG_PG_DB || 'jeffi_replica',
+    const host = process.env.RAG_PG_HOST || '100.82.208.8'
+    const port = parseInt(process.env.RAG_PG_PORT || '5432', 10)
+    const user = process.env.RAG_PG_USER || 'postgres'
+    const database = process.env.RAG_PG_DB || 'jeffi_replica'
+
+    const config: any = {
+      host,
+      port,
+      user,
+      database,
       max: 4,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
-      // RDS requires SSL; set RAG_PG_SSL=1 when pointing at RDS. Cert isn't verified
-      // (connection goes over the SSH tunnel / tailnet). Razer replica needs no SSL.
-      ssl: process.env.RAG_PG_SSL === '1' ? { rejectUnauthorized: false } : undefined,
-    })
+    }
+
+    if (process.env.RAG_PG_IAM_AUTH === 'true') {
+      // Prod: authenticate to RDS via IAM (like the main pool in db.ts) — no stored
+      // password. Uses the RDS CA bundle for real cert verification when present.
+      const region = process.env.AWS_REGION || 'us-east-1'
+      const signer = new Signer({ hostname: host, port, region, username: user })
+      config.password = () => signer.getAuthToken()
+      const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
+      config.ssl = fs.existsSync(certPath)
+        ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
+        : { rejectUnauthorized: false }
+    } else {
+      config.password = process.env.RAG_PG_PASSWORD || process.env.RDS_MASTER_PASSWORD
+      // RDS requires SSL; set RAG_PG_SSL=1 when pointing at RDS with a password.
+      // Cert isn't verified (dev connects over the SSH tunnel). Razer replica needs no SSL.
+      config.ssl = process.env.RAG_PG_SSL === '1' ? { rejectUnauthorized: false } : undefined
+    }
+
+    pool = new Pool(config)
     pool.on('error', () => {})
   }
   return pool

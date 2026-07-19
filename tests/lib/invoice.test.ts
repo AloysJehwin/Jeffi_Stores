@@ -32,7 +32,7 @@ vi.mock('@/lib/s3', () => ({
   uploadInvoicePDF: vi.fn().mockResolvedValue('https://s3.example.com/invoices/JS-2024-25-0001.pdf'),
 }))
 
-import { createDraftInvoice, generateOrderInvoice } from '@/lib/invoice'
+import { createDraftInvoice, generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { generateInvoicePDF } from '@/lib/invoice-pdf'
 import { uploadInvoicePDF } from '@/lib/s3'
@@ -465,5 +465,55 @@ describe('generateOrderInvoice with separate billing address', () => {
       postal_code: '',
       phone: '',
     })
+  })
+})
+
+describe('assignInvoiceNumber', () => {
+  // resetAllMocks (top-level beforeEach) wipes the gst mock return values, so
+  // re-establish them here.
+  beforeEach(() => {
+    mockGetFinancialYear.mockReturnValue('2024-25')
+    mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0001')
+    vi.mocked(getNextInvoiceSequence).mockResolvedValue(1)
+  })
+  // A fake tx client whose query() answers by SQL substring.
+  function makeClient(over: { invoice_number?: string | null; source?: string; draftRowCount?: number } = {}) {
+    const calls: { sql: string; params?: any[] }[] = []
+    const query = vi.fn(async (sql: string, params?: any[]) => {
+      calls.push({ sql, params })
+      if (/SELECT invoice_number, source FROM orders/i.test(sql)) {
+        return { rows: [{ invoice_number: over.invoice_number ?? null, source: over.source ?? 'online' }] }
+      }
+      if (/FROM site_settings/i.test(sql)) return { rows: [{ value: 'JS' }] }
+      if (/UPDATE invoices SET/i.test(sql)) return { rowCount: over.draftRowCount ?? 1, rows: [] }
+      return { rowCount: 1, rows: [] }
+    })
+    return { query, calls }
+  }
+
+  it('assigns a number and finalizes the draft row for an online order', async () => {
+    const client = makeClient({ source: 'online' })
+    const num = await assignInvoiceNumber(client as any, 'order-1')
+    expect(num).toBe('JS/2024-25/0001')
+    // orders.invoice_number written
+    expect(client.calls.some(c => /UPDATE orders SET invoice_number/i.test(c.sql))).toBe(true)
+    // existing draft invoices row flipped to finalized
+    expect(client.calls.some(c => /UPDATE invoices SET .*status = 'finalized'/is.test(c.sql))).toBe(true)
+  })
+
+  it('is idempotent — no-op when the order already has an invoice number', async () => {
+    const client = makeClient({ invoice_number: 'JS/2024-25/0001', source: 'online' })
+    const num = await assignInvoiceNumber(client as any, 'order-1')
+    expect(num).toBe('JS/2024-25/0001')
+    // must NOT write a new number / touch invoices
+    expect(client.calls.some(c => /UPDATE orders SET invoice_number/i.test(c.sql))).toBe(false)
+    expect(client.calls.some(c => /UPDATE invoices SET/i.test(c.sql))).toBe(false)
+  })
+
+  it('inserts a finalized invoices row for offline orders', async () => {
+    const client = makeClient({ source: 'offline' })
+    await assignInvoiceNumber(client as any, 'order-2')
+    expect(client.calls.some(c => /INSERT INTO invoices/i.test(c.sql))).toBe(true)
+    expect(client.calls.some(c => /UPDATE invoices SET/i.test(c.sql))).toBe(false)
   })
 })

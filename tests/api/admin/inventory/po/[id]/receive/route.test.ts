@@ -379,4 +379,59 @@ describe('POST /api/admin/inventory/po/[id]/receive', () => {
     const data = await res.json()
     expect(data.error).toMatch(/DB failure/i)
   })
+
+  // ── Serialized: serial count = base units ÷ qty_step ─────────────────────────
+  describe('serialized serial-count guard (base units ÷ qty_step)', () => {
+    // 4 base units (qty_received 4, factor 1) at qty_step 0.5 → 8 serials required.
+    const serializedItem = {
+      po_item_id: 'poi-1', product_id: 'prod-1', variant_id: null, sub_variant_id: null,
+      quantity_received: 4, unit_cost: 50, purchase_unit_factor: 1,
+    }
+    function serializedClient() {
+      return {
+        query: vi.fn().mockImplementation((sql: string) => {
+          if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-s' }] }
+          if (sql.includes('perishable, serialized')) return { rows: [{ perishable: false, serialized: true }] }
+          if (sql.includes('COALESCE(vsu.qty_step')) return { rows: [{ qty_step: '0.5' }] }
+          if (sql.includes('FROM product_serials WHERE product_id')) return { rows: [] } // no dupes
+          if (sql.includes('FROM products WHERE id')) return { rows: [{ inventory_quantity: '100' }] }
+          if (sql.includes('FROM purchase_order_items WHERE po_id')) return { rows: [{ quantity: '4', quantity_received: '4' }] }
+          return { rows: [] }
+        }),
+        release: vi.fn(),
+      }
+    }
+
+    it('rejects when serial count does not match base units ÷ qty_step', async () => {
+      mockAuth.mockResolvedValue(admin as any)
+      mockHasScope.mockReturnValue(true)
+      // 4 base units / 0.5 = 8 expected, but only 3 provided → throw → 500
+      mockParseBody.mockReturnValue({ ok: true, data: { items: [{ ...serializedItem, serial_numbers: ['S1', 'S2', 'S3'] }] } } as any)
+      mockQueryOne.mockResolvedValueOnce(mockPO as any).mockResolvedValueOnce({ cnt: 0 } as any)
+      mockGetClient.mockResolvedValue(serializedClient() as any)
+      mockQueryMany.mockResolvedValue([])
+
+      const res = await POST(makePost(validBody), params as any)
+      expect(res.status).toBe(500)
+      const data = await res.json()
+      expect(data.error).toMatch(/expected 8 serial number/i)
+    })
+
+    it('accepts when serial count equals base units ÷ qty_step', async () => {
+      mockAuth.mockResolvedValue(admin as any)
+      mockHasScope.mockReturnValue(true)
+      const serials = Array.from({ length: 8 }, (_, i) => `S-${i + 1}`)
+      mockParseBody.mockReturnValue({ ok: true, data: { items: [{ ...serializedItem, serial_numbers: serials }] } } as any)
+      mockQueryOne.mockResolvedValueOnce(mockPO as any).mockResolvedValueOnce({ cnt: 0 } as any)
+      const client = serializedClient()
+      mockGetClient.mockResolvedValue(client as any)
+      mockQueryMany.mockResolvedValue([])
+
+      const res = await POST(makePost(validBody), params as any)
+      expect(res.status).toBe(200)
+      // exactly 8 product_serials inserts
+      const inserts = client.query.mock.calls.filter((c: any[]) => /INSERT INTO product_serials/.test(c[0]))
+      expect(inserts).toHaveLength(8)
+    })
+  })
 })

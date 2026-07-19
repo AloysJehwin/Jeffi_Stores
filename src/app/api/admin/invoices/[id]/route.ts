@@ -7,6 +7,7 @@ import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/shelf'
+import { deleteBatchIfEmpty } from '@/lib/inventory-deduct'
 
 export const dynamic = 'force-dynamic'
 
@@ -238,9 +239,10 @@ export async function PATCH(
           const rawExtra = item.quantity - previousQty
           if (rawExtra <= 0) continue
 
-          const unitRow2 = await client.query<{ factor: string; dimension: string }>(
+          const unitRow2 = await client.query<{ factor: string; dimension: string; qty_step: string | null }>(
             `SELECT COALESCE(puv.factor, pup.factor, pu_sv.factor, pu_sp.factor)::text AS factor,
-                    COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension
+                    COALESCE(puv.dimension, pup.dimension, pu_sv.dimension, pu_sp.dimension) AS dimension,
+                    COALESCE(puv.qty_step, pup.qty_step, pu_sv.qty_step, pu_sp.qty_step)::text AS qty_step
              FROM (SELECT 1) x
              LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3 AND $1 IS NOT NULL
              LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL AND $1 IS NOT NULL
@@ -300,19 +302,26 @@ export async function PATCH(
                 expiryDate: batch.expiry_date,
               })
               remaining -= take
+              // Drop the batch if this consumed it entirely.
+              await deleteBatchIfEmpty(client, batch.id)
             }
             await syncPerishableStock(client, item.product_id!, item.variant_id || null, item.sub_variant_id || null)
           } else if (serialized) {
-            // Take available serials in order
-            const serials = await client.query<{ id: string; serial_number: string }>(
-              `SELECT id, serial_number FROM product_serials
-               WHERE product_id = $1
-                 AND (variant_id = $2 OR ($2 IS NULL AND variant_id IS NULL))
-                 AND status = 'in_stock'
-               ORDER BY created_at ASC
+            // Serial count follows the qty_step rule (round(baseQty / qty_step)),
+            // matching the shared deduction helper — not Math.ceil(extraQty).
+            const stepVal = parseFloat(u2?.qty_step ?? '1') || 1
+            const serialCount = Math.round(extraQty / (stepVal > 0 ? stepVal : 1))
+            // Take available serials FEFO, carrying each serial's own batch.
+            const serials = await client.query<{ id: string; serial_number: string; batch_id: string | null }>(
+              `SELECT ps.id, ps.serial_number, ps.batch_id FROM product_serials ps
+               LEFT JOIN product_batches pb ON pb.id = ps.batch_id
+               WHERE ps.product_id = $1
+                 AND (ps.variant_id = $2 OR ($2 IS NULL AND ps.variant_id IS NULL))
+                 AND ps.status = 'in_stock'
+               ORDER BY pb.expiry_date ASC NULLS LAST, ps.created_at ASC
                LIMIT $3
-               FOR UPDATE`,
-              [item.product_id, item.variant_id || null, Math.ceil(extraQty)]
+               FOR UPDATE OF ps`,
+              [item.product_id, item.variant_id || null, serialCount]
             )
             const invRow = await client.query<{ inventory_quantity: string }>(
               item.variant_id
@@ -321,11 +330,23 @@ export async function PATCH(
               [item.variant_id || item.product_id]
             )
             stockBefore = parseFloat(invRow.rows[0]?.inventory_quantity ?? '0') || 0
+            const touchedBatches = new Set<string>()
             for (const serial of serials.rows) {
               await client.query(
-                `UPDATE product_serials SET status = 'sold', order_id = $1, sold_at = NOW(), updated_at = NOW() WHERE id = $2`,
-                [id, serial.id]
+                `UPDATE product_serials SET status = 'sold', order_id = $1, order_item_id = $2, sold_at = NOW(), updated_at = NOW() WHERE id = $3`,
+                [id, item.id ?? null, serial.id]
               )
+              let lotNumber: string | null = null
+              let expiryDate: string | null = null
+              if (serial.batch_id) {
+                const bu = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
+                  `UPDATE product_batches SET quantity_remaining = GREATEST(0, quantity_remaining - 1), updated_at = NOW() WHERE id = $1 RETURNING lot_number, expiry_date`,
+                  [serial.batch_id]
+                )
+                lotNumber = bu.rows[0]?.lot_number ?? null
+                expiryDate = bu.rows[0]?.expiry_date ?? null
+                touchedBatches.add(serial.batch_id)
+              }
               await logStockMovement(client, {
                 productId: item.product_id!,
                 variantId: item.variant_id || null,
@@ -335,10 +356,14 @@ export async function PATCH(
                 referenceType: 'order',
                 referenceId: id,
                 currentStock: stockBefore,
+                batchId: serial.batch_id,
+                lotNumber,
+                expiryDate,
                 serialNumber: serial.serial_number,
               })
               stockBefore -= 1
             }
+            for (const b of touchedBatches) await deleteBatchIfEmpty(client, b)
             await syncPerishableStock(client, item.product_id!, item.variant_id || null, item.sub_variant_id || null)
           } else {
             // Plain stock deduction

@@ -135,8 +135,16 @@ export async function getStockLedger(filters: {
   }
 
   const where = conditions.join(' AND ')
+
+  // Ledger rows are grouped in the UI by (reference_id, transaction_type) — a
+  // GRN/sale that touched 50 serials is ONE event. Paginate by that group so the
+  // footer counts events (not raw rows) and no group splits across a page.
+  // Group key must match the UI (InventoryClient ledgerGroups): reference_id +
+  // transaction_type, falling back to the row id for legacy rows with no reference.
+  const GROUP_KEY = `COALESCE(it.reference_id::text || '::' || it.transaction_type, it.id::text)`
+
   const countRow = await queryOne<{ total: number }>(
-    `SELECT COUNT(it.id)::int AS total
+    `SELECT COUNT(DISTINCT ${GROUP_KEY})::int AS total
      FROM inventory_transactions it
      JOIN products p ON p.id = it.product_id
      LEFT JOIN product_variants pv ON pv.id = it.variant_id
@@ -147,8 +155,27 @@ export async function getStockLedger(filters: {
 
   const limit = filters.limit || 50
   const offset = filters.offset || 0
-  params.push(limit, offset)
 
+  // Step 1: the page's group keys, ordered by event recency.
+  const pageParams = [...params, limit, offset]
+  const groupRows = await queryMany<{ group_key: string }>(
+    `SELECT ${GROUP_KEY} AS group_key, MAX(it.created_at) AS ts
+     FROM inventory_transactions it
+     JOIN products p ON p.id = it.product_id
+     LEFT JOIN product_variants pv ON pv.id = it.variant_id
+     WHERE ${where}
+     GROUP BY group_key
+     ORDER BY ts DESC
+     LIMIT $${i} OFFSET $${i + 1}`,
+    pageParams
+  )
+
+  if (!groupRows || groupRows.length === 0) return { rows: [], total }
+
+  // Step 2: all child rows for exactly those groups, kept contiguous and in the
+  // same group order (by the group's newest timestamp) so the UI groups cleanly.
+  const keys = groupRows.map(g => g.group_key)
+  const rowParams = [...params, keys]
   const rows = await queryMany<any>(`
     SELECT
       it.id,
@@ -190,10 +217,9 @@ export async function getStockLedger(filters: {
     LEFT JOIN orders o  ON it.reference_type = 'order'     AND o.id  = it.reference_id
     LEFT JOIN cash_sales cs ON it.reference_type = 'cash_sale' AND cs.id = it.reference_id
     LEFT JOIN grns g    ON it.reference_type = 'grn'       AND g.id  = it.reference_id
-    WHERE ${where}
-    ORDER BY it.created_at DESC
-    LIMIT $${i} OFFSET $${i + 1}
-  `, params)
+    WHERE ${where} AND ${GROUP_KEY} = ANY($${i}::text[])
+    ORDER BY MAX(it.created_at) OVER (PARTITION BY ${GROUP_KEY}) DESC, ${GROUP_KEY}, it.created_at DESC
+  `, rowParams)
 
   return { rows: rows || [], total }
 }

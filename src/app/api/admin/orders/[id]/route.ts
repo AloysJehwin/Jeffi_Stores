@@ -99,7 +99,13 @@ export async function PATCH(
     const values: any[] = []
 
     if (d.status !== undefined) { setClauses.push(`status = $${values.length + 1}`); values.push(d.status) }
-    if (d.awb_number !== undefined) { setClauses.push(`awb_number = $${values.length + 1}`); values.push(d.awb_number) }
+    if (d.awb_number !== undefined) {
+      setClauses.push(`awb_number = $${values.length + 1}`); values.push(d.awb_number)
+      // Initialize the shipment tracking stage when an AWB is first attached, so the
+      // tracking widget starts at "Shipment Created" (COALESCE never clobbers a
+      // status the Delhivery sync already advanced).
+      if (d.awb_number) setClauses.push(`shipment_status = COALESCE(shipment_status, 'created')`)
+    }
     if (d.notes !== undefined) { setClauses.push(`notes = $${values.length + 1}`); values.push(d.notes) }
     if (d.estimated_delivery_date !== undefined) { setClauses.push(`estimated_delivery_date = $${values.length + 1}`); values.push(d.estimated_delivery_date) }
 

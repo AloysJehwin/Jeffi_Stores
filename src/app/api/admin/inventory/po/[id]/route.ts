@@ -42,7 +42,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
               p.serialized,
               pv.variant_name,
               COALESCE(vsu.display_label, vsu.unit, psu.display_label, psu.unit) AS sell_unit_label,
-              COALESCE(vsu.dimension, psu.dimension) AS sell_unit_dimension
+              COALESCE(vsu.dimension, psu.dimension) AS sell_unit_dimension,
+              COALESCE(vsu.qty_step, psu.qty_step) AS sell_unit_qty_step
        FROM purchase_order_items poi
        LEFT JOIN products p ON p.id = poi.product_id
        LEFT JOIN product_variants pv ON pv.id = poi.variant_id

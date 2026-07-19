@@ -131,13 +131,35 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
         // Validate serial numbers upfront (before any inserts)
         const serials = item.serial_numbers ?? []
-        if (isSerialised && serials.length > 0) {
-          const dupeCheck = await client.query<{ serial_number: string }>(
-            `SELECT serial_number FROM product_serials WHERE product_id = $1 AND serial_number = ANY($2) AND status != 'sold'`,
-            [productId, serials]
+        if (isSerialised) {
+          // Serial count follows the same rule as the sale side: one serial per
+          // qty_step of BASE quantity. qtyReceived is already in base units
+          // (receive_qty × purchase_unit_factor), so expected = qtyReceived / qty_step.
+          const stepRow = await client.query<{ qty_step: string | null }>(
+            `SELECT COALESCE(vsu.qty_step, psu.qty_step) AS qty_step
+             FROM products p
+             LEFT JOIN product_variants pv ON pv.id = $2
+             LEFT JOIN product_units vsu ON vsu.id = pv.sell_unit_id
+             LEFT JOIN product_units psu ON psu.id = p.sell_unit_id
+             WHERE p.id = $1`,
+            [productId, variantId]
           )
-          if (dupeCheck.rows.length > 0) {
-            throw new Error(`Duplicate serial numbers already in stock: ${dupeCheck.rows.map(r => r.serial_number).join(', ')}`)
+          const qtyStep = parseFloat(stepRow.rows[0]?.qty_step ?? '1') || 1
+          const expectedSerials = Math.round(qtyReceived / (qtyStep > 0 ? qtyStep : 1))
+          if (serials.filter(Boolean).length !== expectedSerials) {
+            throw new Error(
+              `Product ${productId} is serialized — expected ${expectedSerials} serial number(s) ` +
+              `(${qtyReceived} base units ÷ ${qtyStep} qty_step), got ${serials.filter(Boolean).length}`
+            )
+          }
+          if (serials.length > 0) {
+            const dupeCheck = await client.query<{ serial_number: string }>(
+              `SELECT serial_number FROM product_serials WHERE product_id = $1 AND serial_number = ANY($2) AND status != 'sold'`,
+              [productId, serials]
+            )
+            if (dupeCheck.rows.length > 0) {
+              throw new Error(`Duplicate serial numbers already in stock: ${dupeCheck.rows.map(r => r.serial_number).join(', ')}`)
+            }
           }
         }
 
