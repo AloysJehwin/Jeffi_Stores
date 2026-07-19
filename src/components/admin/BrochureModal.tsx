@@ -134,6 +134,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
 
   const [showPrices, setShowPrices] = useState(true)
   const [title, setTitle] = useState('')
+  const [promo, setPromo] = useState('')
   const [generating, setGenerating] = useState(false)
   const [error, setError] = useState('')
 
@@ -163,6 +164,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
     setProducts([])
     setSelectedProducts(new Set())
     setTitle('')
+    setPromo('')
     setError('')
   }, [open])
 
@@ -261,6 +263,12 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
     [products, selectedProducts]
   )
   const previewPages = useMemo(() => paginate(previewProducts), [previewProducts])
+  // Index entries mirror the PDF: each family representative → its page number
+  // (cover=1, index=2, matrix pages start at 3).
+  const indexFamilies = useMemo(() => {
+    const { representatives } = splitFamilies(previewProducts)
+    return representatives.map((p, i) => ({ name: p.name, page: 3 + Math.floor(i / MATRIX_PER_PAGE) }))
+  }, [previewProducts])
 
   const canGenerate = selectedProducts.size > 0 && !generating && !loadingProducts
 
@@ -276,6 +284,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
           productIds: previewProducts.map(p => p.id),
           showPrices,
           title: title.trim() || undefined,
+          promo: promo.trim() || undefined,
         }),
       })
       if (!res.ok) {
@@ -412,23 +421,29 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
             <div className="min-w-0">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Preview</p>
-                {previewPages.length > 0 && (
-                  <span className="text-[10px] text-foreground-muted">{previewPages.length} page{previewPages.length !== 1 ? 's' : ''}</span>
+                {previewProducts.length > 0 && (
+                  <span className="text-[10px] text-foreground-muted">{previewPages.length + 2} pages</span>
                 )}
               </div>
               <div className="h-[28rem] overflow-y-auto border border-border-default rounded-lg bg-gray-100 dark:bg-zinc-800 p-3 space-y-3">
                 {previewProducts.length === 0 ? (
                   <div className="text-xs text-foreground-muted py-8 text-center px-3">Nothing selected yet</div>
-                ) : previewPages.map((page, pi) => (
-                  <PreviewPageCard
-                    key={pi}
-                    page={page}
-                    pageNum={pi + 1}
-                    totalPages={previewPages.length}
-                    title={title.trim() || 'Product Brochure'}
-                    showPrices={showPrices}
-                  />
-                ))}
+                ) : (
+                  <>
+                    <CoverPreviewCard title={title.trim() || 'Product Brochure'} promo={promo.trim()} />
+                    <IndexPreviewCard families={indexFamilies} />
+                    {previewPages.map((page, pi) => (
+                      <PreviewPageCard
+                        key={pi}
+                        page={page}
+                        pageNum={pi + 3}
+                        totalPages={previewPages.length + 2}
+                        title={title.trim() || 'Product Brochure'}
+                        showPrices={showPrices}
+                      />
+                    ))}
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -446,17 +461,35 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                 className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
               />
             </div>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Cover promo line (optional)</p>
+              <input
+                type="text"
+                value={promo}
+                onChange={e => setPromo(e.target.value)}
+                maxLength={140}
+                placeholder="e.g. Monsoon Sale — up to 20% off fasteners"
+                className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
+              />
+            </div>
             <div className="shrink-0">
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Prices</p>
-              <label className="flex items-center gap-2 cursor-pointer select-none h-[38px]">
-                <div
-                  onClick={() => setShowPrices(v => !v)}
-                  className={`relative w-9 h-5 rounded-full transition-colors cursor-pointer ${showPrices ? 'bg-orange-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={showPrices}
+                onClick={() => setShowPrices(v => !v)}
+                className="flex items-center gap-2 cursor-pointer select-none h-[38px] group"
+              >
+                <span
+                  className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 ${showPrices ? 'bg-orange-500' : 'bg-gray-300 dark:bg-zinc-600'}`}
                 >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${showPrices ? 'translate-x-4 border-orange-300' : 'translate-x-0.5'}`} />
-                </div>
-                <span className="text-xs text-foreground-secondary">{showPrices ? 'Show' : 'Hide'}</span>
-              </label>
+                  <span
+                    className={`inline-block w-5 h-5 bg-white rounded-full shadow transform transition-transform duration-200 ${showPrices ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
+                  />
+                </span>
+                <span className="text-xs font-medium text-foreground-secondary w-8 text-left">{showPrices ? 'Show' : 'Hide'}</span>
+              </button>
             </div>
           </div>
 
@@ -517,6 +550,48 @@ function Thumb({ url, size, radius = 4 }: { url: string | null; size: number; ra
   return (
     <div style={{ width: size, height: size, borderRadius: radius }} className="bg-gray-100 dark:bg-zinc-700 flex-shrink-0 grid place-items-center text-[6px] text-gray-400">
       No image
+    </div>
+  )
+}
+
+/** Cover preview card (page 1) — mirrors the PDF's advertising cover. */
+function CoverPreviewCard({ title, promo }: { title: string; promo: string }) {
+  return (
+    <div
+      className="rounded-sm overflow-hidden shadow-sm flex flex-col items-center justify-center text-center px-4"
+      style={{ aspectRatio: `1 / ${A4_RATIO}`, background: 'linear-gradient(to bottom, #2c5200, #7cb900)' }}
+    >
+      <div className="w-10 h-10 rounded-full bg-white/90 grid place-items-center mb-2">
+        <span className="text-[#3d6b00] font-black text-sm">JS</span>
+      </div>
+      <div className="text-white font-extrabold text-sm uppercase leading-tight">Jeffi Stores</div>
+      <div className="w-8 border-t border-[#d4edaa] my-1.5" />
+      <div className="text-white font-bold text-[11px] leading-tight">{title}</div>
+      {promo && <div className="text-[#eaffd0] italic text-[8px] mt-1 leading-tight">{promo}</div>}
+      <div className="text-[#dfeecb] text-[7px] mt-auto pt-4">Product Catalogue</div>
+    </div>
+  )
+}
+
+/** Index preview card (page 2) — families → page numbers. */
+function IndexPreviewCard({ families }: { families: { name: string; page: number }[] }) {
+  return (
+    <div className="bg-white dark:bg-zinc-900 shadow-sm rounded-sm overflow-hidden" style={{ aspectRatio: `1 / ${A4_RATIO}` }}>
+      <div className="bg-[#3d6b00] text-white px-3 py-2 flex items-center justify-between">
+        <div className="text-[11px] font-bold uppercase truncate">Jeffi Stores</div>
+        <div className="text-[8px] opacity-90 uppercase tracking-wide">Index</div>
+      </div>
+      <div className="p-3">
+        <div className="text-[11px] font-bold text-[#3d6b00] dark:text-green-400 mb-1">Index</div>
+        <div className="text-[7px] font-semibold text-gray-400 uppercase mb-1">Featured Products</div>
+        {families.map((f, i) => (
+          <div key={i} className="flex items-baseline gap-1 text-[8px] text-gray-800 dark:text-gray-200 py-0.5">
+            <span className="truncate">{f.name}</span>
+            <span className="flex-1 border-b border-dotted border-gray-300 dark:border-zinc-600 translate-y-[-2px]" />
+            <span className="font-bold text-[#3d6b00] dark:text-green-400">{f.page}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

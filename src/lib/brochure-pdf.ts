@@ -1,5 +1,6 @@
 import { queryMany } from '@/lib/db'
 import path from 'path'
+import fs from 'fs'
 
 const PDFDocument = eval('require')('pdfkit')
 const QRCode = eval('require')('qrcode')
@@ -31,6 +32,7 @@ export interface BrochureStore {
 export interface BrochureOptions {
   store: BrochureStore
   title?: string
+  promo?: string
   showPrices: boolean
 }
 
@@ -319,18 +321,19 @@ export async function generateBrochurePDF(
 ): Promise<Buffer> {
   const { store, showPrices } = opts
   const title = (opts.title && opts.title.trim()) || 'Product Brochure'
+  const promo = (opts.promo && opts.promo.trim()) || ''
 
   const [imageBufs, qrBufs] = await Promise.all([
     prefetchImages(products.map(p => p.thumbnail_url)),
     buildQRCodes(products, store.web),
   ])
   const hasQR = qrBufs.some(Boolean)
-  // Look up prefetched buffers by product id (matrix + list share these).
   const imgById = new Map<string, Buffer | null>()
   const qrById = new Map<string, Buffer | null>()
   products.forEach((p, i) => { imgById.set(p.id, imageBufs[i]); qrById.set(p.id, qrBufs[i]) })
 
   const { representatives, rest } = splitFamilies(products)
+  const coverImg = loadCoverImage()
 
   const doc = new PDFDocument({ size: 'A4', margin: 0, bufferPages: true })
   const chunks: Buffer[] = []
@@ -338,6 +341,16 @@ export async function generateBrochurePDF(
   const done = new Promise<Buffer>((resolve) => {
     doc.on('end', () => resolve(Buffer.concat(chunks)))
   })
+
+  const perPage = MATRIX_COLS * MATRIX_ROWS
+  const matrixPages = Math.ceil(representatives.length / perPage)
+  // Page numbering: 1 = cover, 2 = index, matrix starts at 3.
+  const FIRST_CONTENT_PAGE = 3
+  // Index entries: each family representative → the matrix page it lands on.
+  const familyPages = representatives.map((p, i) => ({
+    name: p.name,
+    page: FIRST_CONTENT_PAGE + Math.floor(i / perPage),
+  }))
 
   let pageStarted = false
   const newPage = (heading: string) => {
@@ -347,6 +360,14 @@ export async function generateBrochurePDF(
     return HEADER_H + 14
   }
 
+  // ── Page 1: advertising cover ──
+  drawCover(doc, store, title, promo, coverImg)
+  pageStarted = true
+
+  // ── Page 2: index (families → page numbers) ──
+  doc.addPage({ size: 'A4', margin: 0 })
+  drawIndex(doc, store, title, familyPages, rest.length > 0)
+
   if (products.length === 0) {
     newPage('')
     doc.font('Helvetica').fontSize(11).fillColor(TEXT_MUTED)
@@ -354,7 +375,6 @@ export async function generateBrochurePDF(
   }
 
   // ── Featured matrix (3×3) of family representatives ──
-  const perPage = MATRIX_COLS * MATRIX_ROWS
   for (let i = 0; i < representatives.length; i += perPage) {
     const top = newPage('Featured Products')
     const pageItems = representatives.slice(i, i + perPage)
@@ -382,9 +402,10 @@ export async function generateBrochurePDF(
     })
   }
 
-  // Footer + page numbers across all buffered pages
+  // Footer + page numbers across all buffered pages EXCEPT the cover (page 0).
   const range = doc.bufferedPageRange()
   for (let i = range.start; i < range.start + range.count; i++) {
+    if (i === range.start) continue // cover has its own full-bleed layout
     doc.switchToPage(i)
     hRule(doc, ML, PAGE_H - FOOTER_H, ML + CW, GREEN_MAIN, 1)
     doc.font('Helvetica').fontSize(7.5).fillColor(TEXT_MUTED)
@@ -395,6 +416,142 @@ export async function generateBrochurePDF(
 
   doc.end()
   return done
+}
+
+/** Cover background image, if a curated one has been dropped in public/images. */
+function loadCoverImage(): string | null {
+  const candidates = ['brochure-cover.png', 'brochure-cover.jpg', 'brochure-cover.jpeg']
+  for (const f of candidates) {
+    const p = path.join(process.cwd(), 'public', 'images', f)
+    try { if (fs.existsSync(p)) return p } catch { /* ignore */ }
+  }
+  return null
+}
+
+/**
+ * Page 1 — advertising cover. Uses public/images/brochure-cover.* as a full-bleed
+ * hero if present; otherwise paints a branded green gradient. Overlaid: logo,
+ * store name, brochure title, optional promo line, contact/GST, generated date.
+ */
+function drawCover(doc: any, store: BrochureStore, title: string, promo: string, coverImg: string | null) {
+  // Background
+  if (coverImg) {
+    try { doc.image(coverImg, 0, 0, { width: PAGE_W, height: PAGE_H, align: 'center', valign: 'center' }) }
+    catch { paintGradient(doc) }
+  } else {
+    paintGradient(doc)
+  }
+  // Dark scrim so overlay text is legible on any image
+  doc.save()
+  doc.rect(0, 0, PAGE_W, PAGE_H).fillColor('#000000').opacity(coverImg ? 0.38 : 0.12).fill()
+  doc.restore()
+
+  const cx = PAGE_W / 2
+  // Logo (centered, upper third)
+  const LOGO = 96
+  const logoPath = path.join(process.cwd(), 'public', 'images', 'store-logo.png')
+  try { doc.image(logoPath, cx - LOGO / 2, 150, { width: LOGO, height: LOGO }) } catch { /* skip */ }
+
+  doc.fillColor('#ffffff')
+  doc.font('Helvetica-Bold').fontSize(30)
+  doc.text(store.name.toUpperCase(), ML, 270, { width: CW, align: 'center' })
+
+  // Accent rule
+  doc.moveTo(cx - 60, 312).lineTo(cx + 60, 312).lineWidth(2).strokeColor(GREEN_MAIN).stroke()
+
+  doc.font('Helvetica-Bold').fontSize(18).fillColor('#ffffff')
+  doc.text(title, ML, 330, { width: CW, align: 'center' })
+
+  if (promo) {
+    doc.font('Helvetica-Oblique').fontSize(13).fillColor('#eaffd0')
+    doc.text(promo, ML + 40, 366, { width: CW - 80, align: 'center' })
+  }
+
+  // Contact block near bottom
+  const contact = [
+    [store.address, store.city].filter(Boolean).join(', '),
+    [store.phone && `Ph: ${store.phone}`, store.email].filter(Boolean).join('   |   '),
+    [store.web, store.gstin && `GSTIN: ${store.gstin}`].filter(Boolean).join('   |   '),
+  ].filter(Boolean)
+  doc.font('Helvetica').fontSize(10).fillColor('#ffffff')
+  let cyc = PAGE_H - 150
+  for (const line of contact) {
+    doc.text(line, ML, cyc, { width: CW, align: 'center' })
+    cyc += 15
+  }
+  doc.font('Helvetica').fontSize(8).fillColor('#dfeecb')
+  doc.text('Product Catalogue', ML, PAGE_H - 70, { width: CW, align: 'center' })
+}
+
+function paintGradient(doc: any) {
+  // Simple vertical two-tone band as a dependency-free "gradient".
+  const bands = 60
+  for (let i = 0; i < bands; i++) {
+    const t = i / (bands - 1)
+    const c = mixHex('#2c5200', '#7cb900', t)
+    doc.rect(0, (PAGE_H / bands) * i, PAGE_W, PAGE_H / bands + 1).fillColor(c).fill()
+  }
+}
+
+function mixHex(a: string, b: string, t: number): string {
+  const pa = [1, 3, 5].map(i => parseInt(a.slice(i, i + 2), 16))
+  const pb = [1, 3, 5].map(i => parseInt(b.slice(i, i + 2), 16))
+  const mix = pa.map((v, i) => Math.round(v + (pb[i] - v) * t))
+  return '#' + mix.map(v => v.toString(16).padStart(2, '0')).join('')
+}
+
+/** Page 2 — index: each family representative → its page number. */
+function drawIndex(
+  doc: any, store: BrochureStore, title: string,
+  familyPages: { name: string; page: number }[], hasList: boolean
+) {
+  drawHeader(doc, store, title, 'Index')
+  let y = HEADER_H + 24
+  doc.font('Helvetica-Bold').fontSize(14).fillColor(GREEN_DARK)
+  doc.text('Index', ML, y, { lineBreak: false })
+  y += 24
+
+  doc.font('Helvetica-Bold').fontSize(8).fillColor(TEXT_MUTED)
+  doc.text('FEATURED PRODUCTS', ML, y, { lineBreak: false })
+  y += 16
+
+  const bottomLimit = PAGE_H - FOOTER_H - 8
+  const dotStartPad = 6
+  for (const { name, page } of familyPages) {
+    if (y + 16 > bottomLimit) {
+      doc.addPage({ size: 'A4', margin: 0 })
+      drawHeader(doc, store, title, 'Index')
+      y = HEADER_H + 24
+    }
+    doc.font('Helvetica').fontSize(9.5).fillColor(TEXT_DARK)
+    const nameMax = CW - 40
+    const label = clip1(doc, name, nameMax - 30)
+    const labelW = doc.widthOfString(label)
+    doc.text(label, ML, y, { lineBreak: false })
+    // leader dots
+    const pageStr = String(page)
+    doc.font('Helvetica').fontSize(9.5).fillColor(GREEN_DARK)
+    const pageW = doc.widthOfString(pageStr)
+    doc.font('Helvetica').fontSize(8).fillColor('#bbbbbb')
+    const dotsX1 = ML + labelW + dotStartPad
+    const dotsX2 = ML + CW - pageW - dotStartPad
+    if (dotsX2 > dotsX1) {
+      let dx = dotsX1
+      const dots: string[] = []
+      const dotW = doc.widthOfString('.')
+      while (dx < dotsX2) { dots.push('.'); dx += dotW }
+      doc.text(dots.join(''), dotsX1, y + 1, { lineBreak: false })
+    }
+    doc.font('Helvetica-Bold').fontSize(9.5).fillColor(GREEN_DARK)
+    doc.text(pageStr, ML + CW - pageW, y, { lineBreak: false })
+    y += 16
+  }
+
+  if (hasList) {
+    y += 8
+    doc.font('Helvetica-Oblique').fontSize(8.5).fillColor(TEXT_MUTED)
+    doc.text('Additional sizes & variants are listed under "More Products".', ML, y, { width: CW, lineBreak: false })
+  }
 }
 
 /** One compact list row (used for the non-representative products). */

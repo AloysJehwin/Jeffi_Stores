@@ -29,6 +29,7 @@ export async function POST(request: NextRequest) {
     const productIds: unknown = body.productIds
     const showPrices = body.showPrices === true
     const title = typeof body.title === 'string' ? body.title.slice(0, 120) : undefined
+    const promo = typeof body.promo === 'string' ? body.promo.slice(0, 140) : undefined
 
     if (!Array.isArray(productIds) || productIds.length === 0) {
       return NextResponse.json({ error: 'Select at least one product' }, { status: 400 })
@@ -45,7 +46,7 @@ export async function POST(request: NextRequest) {
     }
 
     const store = await loadBrochureStore()
-    const pdfBuffer = await generateBrochurePDF(products, { store, title, showPrices })
+    const pdfBuffer = await generateBrochurePDF(products, { store, title, promo, showPrices })
 
     // Unique filename per brochure: <title-slug>-<date>-<random>.pdf
     const slug = (title || 'brochure')
