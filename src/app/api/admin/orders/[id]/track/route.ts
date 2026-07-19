@@ -3,7 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
-import { resolveShipmentStatus, isAdvancement } from '@/lib/shipment-status'
+import { resolveShipmentStatus, isAdvancement, shipmentStatusToSyncType } from '@/lib/shipment-status'
 
 const TOKEN = process.env.DELHIVERY_API_KEY
 
@@ -109,29 +109,13 @@ export async function GET(
     }))
 
     // Resolve stable internal shipment status from raw type + scan history
-    const newShipmentStatus = resolveShipmentStatus(rawStatusType, scans)
+    const newShipmentStatus = resolveShipmentStatus(rawStatusType, scans, shipment.Status?.Status ?? null)
 
-    // Derive the Delhivery statusType string we use for STATUS_SYNC (keep legacy behaviour)
-    const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
-    let statusType = rawStatusType
-    if (EXCEPTION_TYPES.has(rawStatusType)) {
-      for (let i = 0; i < rawScans.length; i++) {
-        const t = (rawScans[i]?.ScanDetail?.ScanType ?? '').toUpperCase()
-        if (t && !EXCEPTION_TYPES.has(t)) { statusType = t; break }
-        const activity = (rawScans[i]?.ScanDetail?.Scan ?? '').toLowerCase()
-        if (activity.includes('out for delivery') || activity === 'dispatched') { statusType = 'OD'; break }
-        if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
-        if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
-        if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
-        if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
-        if (activity.includes('in transit') || activity === 'transit') { statusType = 'IT'; break }
-        if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) { statusType = 'PU'; break }
-        if (activity === 'manifested' || activity.includes('manifest')) { statusType = 'MF'; break }
-        if (activity.includes('delivered')) { statusType = 'DL'; break }
-      }
-    }
+    // Derive the Delhivery statusType we use for STATUS_SYNC from the RESOLVED
+    // status via the shared mapper — same logic as the cron sync route.
+    const statusType = shipmentStatusToSyncType(newShipmentStatus)
 
-    const syncRule = STATUS_SYNC[statusType]
+    const syncRule = statusType ? STATUS_SYNC[statusType] : undefined
     let statusSynced = false
 
     if (syncRule && (!syncRule.onlyIfCurrent || syncRule.onlyIfCurrent.includes(order.status))) {
@@ -201,7 +185,7 @@ export async function GET(
         scans,
       },
       statusSynced,
-      syncedTo: statusSynced ? STATUS_SYNC[statusType]?.orderStatus : null,
+      syncedTo: statusSynced && statusType ? STATUS_SYNC[statusType]?.orderStatus : null,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })
