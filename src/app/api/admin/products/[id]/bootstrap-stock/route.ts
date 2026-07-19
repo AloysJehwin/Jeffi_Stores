@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getClient, queryOne } from '@/lib/db'
-import { syncPerishableStock } from '@/lib/shelf'
+import { syncPerishableStock, upsertShelfStock } from '@/lib/shelf'
 import { logStockMovement } from '@/lib/inventory'
 
 const bodySchema = z.object({
@@ -139,13 +139,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (product.perishable) {
       await syncPerishableStock(client, productId, variantId, subVariantId)
     } else if (product.serialized && body.location_id) {
-      await client.query(
-        `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
-         VALUES ($1, $2, $3, $4, $5)
-         ON CONFLICT ON CONSTRAINT shelf_stock_unique
-         DO UPDATE SET quantity = shelf_stock.quantity + EXCLUDED.quantity, updated_at = now()`,
-        [body.location_id, productId, variantId, subVariantId, Math.round(inventoryQty)]
-      )
+      await upsertShelfStock(client, {
+        locationId: body.location_id,
+        productId,
+        variantId,
+        subVariantId,
+        quantity: Math.round(inventoryQty),
+        mode: 'add',
+      })
     }
 
     await client.query('COMMIT')

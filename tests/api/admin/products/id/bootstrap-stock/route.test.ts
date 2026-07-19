@@ -20,6 +20,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/shelf', () => ({
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
+  upsertShelfStock: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('@/lib/inventory', () => ({
@@ -32,7 +33,7 @@ vi.mock('@/lib/inventory', () => ({
 
 import { POST } from '@/app/api/admin/products/[id]/bootstrap-stock/route'
 import { getClient, queryOne } from '@/lib/db'
-import { syncPerishableStock } from '@/lib/shelf'
+import { syncPerishableStock, upsertShelfStock } from '@/lib/shelf'
 import { logStockMovement } from '@/lib/inventory'
 
 const PRODUCT_ID = '111e4567-e89b-12d3-a456-426614174001'
@@ -275,6 +276,12 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     const json = await res.json()
     expect(json.success).toBe(true)
     expect(syncPerishableStock).not.toHaveBeenCalled()
+    // Serialized product stock is added to the bin (increment, not overwrite),
+    // via the NULL-safe helper — never a raw ON CONFLICT that duplicates.
+    expect(upsertShelfStock).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ locationId: LOCATION_ID, quantity: 3, mode: 'add' })
+    )
   })
 
   it('bootstraps a serialized product without location_id (no shelf_stock insert)', async () => {
