@@ -13,6 +13,7 @@ import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { mrpDiscountPct } from '@/lib/pricing'
 import { round2 } from '@/lib/gst'
 import { bp } from '@/lib/business-path'
+import CheckoutRecapSummary from '@/components/on-device/CheckoutRecapSummary'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -678,6 +679,8 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8">
           <div className="lg:col-span-2 space-y-6">
+            {/* On-device AI cart recap (silent unless the device is capable) */}
+            <CheckoutRecapSummary />
             {/* Delivery Address */}
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <div className="flex justify-between items-center mb-4">
