@@ -1,50 +1,70 @@
 import { describe, it, expect } from 'vitest'
-import { familyKey, splitFamilies } from '@/lib/brochure-pdf'
+import { familyKey, nameSimilarity, sameFamily, splitFamilies } from '@/lib/brochure-pdf'
 
 const p = (id: string, name: string) => ({ id, name, sku: id, slug: id } as any)
 
-describe('familyKey — strips trailing size tokens', () => {
-  it('collapses metric M-sizes of the same screw to one key', () => {
-    expect(familyKey('Unbrako Button Head Socket Screw Metric 12.9 M5'))
-      .toBe(familyKey('Unbrako Button Head Socket Screw Metric 12.9 M12'))
+describe('familyKey — strips size tokens anywhere in the name', () => {
+  it('strips embedded fraction sizes so BSW sizes share a key', () => {
+    expect(familyKey('BSW 1/2" SS 202 Allen Cap Screw'))
+      .toBe(familyKey('BSW 3/16" SS 202 Allen Cap Screw'))
   })
-
-  it('strips mm / inch / fraction sizes', () => {
-    expect(familyKey('Socket Head Cap Screw 25mm')).toBe('socket head cap screw')
-    expect(familyKey('Allen Key 1/2"')).toBe('allen key')
-    expect(familyKey('Bar 10 x 40')).toBe('bar')
+  it('strips embedded M-sizes', () => {
+    expect(familyKey('GMF SS 304 M10 Allen Cap Screw'))
+      .toBe(familyKey('GMF SS 304 M12 Allen Cap Screw'))
   })
-
-  it('keeps a name with no size token intact', () => {
+  it('keeps grade/material numbers (202/304/12.9) intact', () => {
+    expect(familyKey('BSW 1/2" SS 202 Allen Cap Screw')).toContain('202')
+    expect(familyKey('GMF SS 304 M10 Allen Cap Screw')).toContain('304')
+  })
+  it('leaves a name with no size token intact', () => {
     expect(familyKey('Plain Washer')).toBe('plain washer')
   })
+})
 
-  it('is case- and whitespace-insensitive', () => {
-    expect(familyKey('  HEX   BOLT  M6 ')).toBe(familyKey('hex bolt m8'))
+describe('nameSimilarity', () => {
+  it('identical names → 1', () => {
+    expect(nameSimilarity('Hex Bolt', 'hex   bolt')).toBe(1)
+  })
+  it('very different names → low', () => {
+    expect(nameSimilarity('Plain Washer', 'Threaded Rod')).toBeLessThan(0.5)
+  })
+})
+
+describe('sameFamily — similarity + size-only-diff gate', () => {
+  it('collapses different sizes of the same product', () => {
+    expect(sameFamily('BSW 1/2" SS 202 Allen Cap Screw', 'BSW 3/8" SS 202 Allen Cap Screw')).toBe(true)
+  })
+  it('keeps Cap vs CSK separate even when very similar', () => {
+    expect(nameSimilarity('GMF SS 304 M10 Allen Cap Screw', 'GMF SS 304 M10 Allen CSK Screw')).toBeGreaterThan(0.8)
+    expect(sameFamily('GMF SS 304 M10 Allen Cap Screw', 'GMF SS 304 M10 Allen CSK Screw')).toBe(false)
+  })
+  it('keeps different materials separate', () => {
+    expect(sameFamily('Hex Bolt M6 Steel', 'Hex Bolt M6 Brass')).toBe(false)
   })
 })
 
 describe('splitFamilies', () => {
-  it('takes the first product per family as the representative, rest to list', () => {
+  it('one representative per family; other sizes to the list', () => {
     const products = [
-      p('a', 'Hex Bolt M3'),
-      p('b', 'Hex Bolt M4'),
-      p('c', 'Hex Bolt M5'),
-      p('d', 'Plain Washer'),
+      p('a', 'BSW 1/2" SS 202 Allen Cap Screw'),
+      p('b', 'BSW 1/4" SS 202 Allen Cap Screw'),
+      p('c', 'BSW 3/8" SS 202 Allen Cap Screw'),
+      p('d', 'GMF SS 304 M10 Allen CSK Screw'),
+      p('e', 'Plain Washer'),
     ]
     const { representatives, rest } = splitFamilies(products)
-    expect(representatives.map(r => r.id)).toEqual(['a', 'd'])
+    expect(representatives.map(r => r.id)).toEqual(['a', 'd', 'e'])
     expect(rest.map(r => r.id)).toEqual(['b', 'c'])
   })
 
-  it('preserves input order and handles all-unique lists', () => {
+  it('all-unique list keeps everyone as a representative', () => {
     const products = [p('a', 'Nut'), p('b', 'Bolt'), p('c', 'Washer')]
     const { representatives, rest } = splitFamilies(products)
     expect(representatives).toHaveLength(3)
     expect(rest).toHaveLength(0)
   })
 
-  it('returns empty for empty input', () => {
+  it('empty input', () => {
     expect(splitFamilies([])).toEqual({ representatives: [], rest: [] })
   })
 })

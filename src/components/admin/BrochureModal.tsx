@@ -38,6 +38,81 @@ function rs(n: number | null): string {
   return 'Rs.' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+// Mirror of the PDF's family grouping (src/lib/brochure-pdf.ts) so the preview
+// paginates identically. Kept in sync manually.
+const SIZE_TOKENS = [
+  /\bM\d+(?:\.\d+)?\b/gi,
+  /\b\d+\/\d+\s*["'”]?/g,
+  /\b\d+(?:\.\d+)?\s*(?:mm|cm|inch|in)\b/gi,
+  /\b\d+(?:\.\d+)?\s*["'”]/g,
+  /\b\d+(?:\.\d+)?\s*[x×]\s*\d+(?:\.\d+)?\b/gi,
+]
+function normName(s: string): string { return (s ?? '').toLowerCase().replace(/\s+/g, ' ').trim() }
+function familyKey(name: string): string {
+  let s = (name ?? '').trim()
+  for (const re of SIZE_TOKENS) s = s.replace(re, ' ')
+  return normName(s) || normName(name)
+}
+function levenshtein(a: string, b: string): number {
+  const m = a.length, n = b.length
+  if (!m) return n; if (!n) return m
+  let prev = Array.from({ length: n + 1 }, (_, j) => j)
+  let cur = new Array(n + 1).fill(0)
+  for (let i = 1; i <= m; i++) {
+    cur[0] = i
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost)
+    }
+    ;[prev, cur] = [cur, prev]
+  }
+  return prev[n]
+}
+function nameSimilarity(a: string, b: string): number {
+  const x = normName(a), y = normName(b)
+  const L = Math.max(x.length, y.length)
+  return L === 0 ? 1 : 1 - levenshtein(x, y) / L
+}
+const FAMILY_THRESHOLD = 0.82
+function sameFamily(a: string, b: string): boolean {
+  if (familyKey(a) !== familyKey(b)) return false
+  return nameSimilarity(a, b) >= FAMILY_THRESHOLD
+}
+function splitFamilies(products: BrochureProduct[]): { representatives: BrochureProduct[]; rest: BrochureProduct[] } {
+  const representatives: BrochureProduct[] = []
+  const rest: BrochureProduct[] = []
+  const byKey = new Map<string, BrochureProduct[]>()
+  for (const p of products) {
+    const key = familyKey(p.name)
+    const bucket = byKey.get(key)
+    const match = bucket?.find(r => sameFamily(r.name, p.name))
+    if (match) rest.push(p)
+    else { representatives.push(p); if (bucket) bucket.push(p); else byKey.set(key, [p]) }
+  }
+  return { representatives, rest }
+}
+
+// A4 aspect ratio for the scaled preview page cards.
+const A4_RATIO = 841.89 / 595.28
+const MATRIX_PER_PAGE = 9
+const LIST_PER_PAGE = 11
+
+type PreviewPage =
+  | { kind: 'matrix'; items: BrochureProduct[] }
+  | { kind: 'list'; items: BrochureProduct[] }
+
+function paginate(products: BrochureProduct[]): PreviewPage[] {
+  const { representatives, rest } = splitFamilies(products)
+  const pages: PreviewPage[] = []
+  for (let i = 0; i < representatives.length; i += MATRIX_PER_PAGE) {
+    pages.push({ kind: 'matrix', items: representatives.slice(i, i + MATRIX_PER_PAGE) })
+  }
+  for (let i = 0; i < rest.length; i += LIST_PER_PAGE) {
+    pages.push({ kind: 'list', items: rest.slice(i, i + LIST_PER_PAGE) })
+  }
+  return pages
+}
+
 /**
  * Admin brochure builder — 3 sections:
  *  1. Filter: category tree (category mode) OR brand list (brand mode).
@@ -153,6 +228,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
     () => products.filter(p => selectedProducts.has(p.id)),
     [products, selectedProducts]
   )
+  const previewPages = useMemo(() => paginate(previewProducts), [previewProducts])
 
   const canGenerate = selectedProducts.size > 0 && !generating && !loadingProducts
 
@@ -175,10 +251,16 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
         throw new Error(d.error || 'Failed to generate brochure')
       }
       const blob = await res.blob()
+      // Prefer the server's unique filename (Content-Disposition); fall back to
+      // a locally-unique name so two brochures never collide in Downloads.
+      const cd = res.headers.get('Content-Disposition') || ''
+      const m = cd.match(/filename="?([^"]+)"?/i)
+      const slug = (title.trim() || 'brochure').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'brochure'
+      const fallback = `${slug}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.pdf`
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `brochure-${new Date().toISOString().slice(0, 10)}.pdf`
+      a.download = m ? m[1] : fallback
       a.click()
       URL.revokeObjectURL(url)
     } catch (e: any) {
@@ -200,7 +282,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
     <div className="fixed inset-0 z-[300] flex items-end sm:items-center justify-center p-0 sm:p-4" onClick={onClose}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
       <div
-        className="relative bg-surface-elevated w-full sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[92vh] flex flex-col sm:max-w-5xl"
+        className="relative bg-surface-elevated w-full sm:rounded-2xl rounded-t-2xl shadow-2xl max-h-[94vh] flex flex-col sm:max-w-7xl"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-start justify-between px-5 pt-5 pb-4 border-b border-border-default shrink-0">
@@ -225,7 +307,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
             {/* ── Section 1: filter ── */}
             <div className="min-w-0">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">1 · {filterLabel}</p>
+                <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">{filterLabel}</p>
                 <div className="flex gap-2">
                   <button onClick={() => setSelectedFilters(new Set(allFilterIds))} className="text-[10px] text-accent-500 hover:text-accent-600">All</button>
                   <span className="text-foreground-muted text-[10px]">·</span>
@@ -258,7 +340,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
             {/* ── Section 2: products ── */}
             <div className="min-w-0">
               <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">2 · Products</p>
+                <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Products</p>
                 {products.length > 0 && (
                   <div className="flex gap-2">
                     <button onClick={() => setSelectedProducts(new Set(products.map(p => p.id)))} className="text-[10px] text-accent-500 hover:text-accent-600">All</button>
@@ -294,42 +376,27 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
               </div>
             </div>
 
-            {/* ── Section 3: preview ── */}
+            {/* ── Section 3: paginated A4 preview ── */}
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">3 · Preview</p>
-              <div className="h-72 overflow-y-auto border border-border-default rounded-lg bg-white dark:bg-zinc-900">
-                <div className="bg-[#3d6b00] text-white px-3 py-2">
-                  <div className="text-[11px] font-bold uppercase truncate">{title.trim() || 'Product Brochure'}</div>
-                  <div className="text-[8px] opacity-80 truncate">Jeffi Stores catalogue</div>
-                </div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Preview</p>
+                {previewPages.length > 0 && (
+                  <span className="text-[10px] text-foreground-muted">{previewPages.length} page{previewPages.length !== 1 ? 's' : ''}</span>
+                )}
+              </div>
+              <div className="h-[26rem] overflow-y-auto border border-border-default rounded-lg bg-gray-100 dark:bg-zinc-800 p-3 space-y-3">
                 {previewProducts.length === 0 ? (
                   <div className="text-xs text-foreground-muted py-8 text-center px-3">Nothing selected yet</div>
-                ) : (
-                  <div>
-                    {previewProducts.map((p, i) => (
-                      <div key={p.id} className={`flex items-center gap-2 px-2 py-1.5 border-b border-gray-100 dark:border-zinc-800 ${i % 2 ? 'bg-[#fafcf5] dark:bg-zinc-800/40' : ''}`}>
-                        {p.thumbnail_url
-                          ? <img src={p.thumbnail_url} alt="" className="w-9 h-9 rounded object-cover bg-gray-100 flex-shrink-0" />
-                          : <div className="w-9 h-9 rounded bg-gray-100 dark:bg-zinc-700 flex-shrink-0 flex items-center justify-center text-[6px] text-gray-400">No image</div>}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[10px] font-bold text-gray-900 dark:text-gray-100 truncate">{p.name}</div>
-                          <div className="text-[8px] text-gray-500 truncate">SKU: {p.sku}{p.brand_name ? `  •  ${p.brand_name}` : ''}</div>
-                          {p.short_description && <div className="text-[8px] text-gray-600 dark:text-gray-400 truncate">{p.short_description}</div>}
-                        </div>
-                        {showPrices && (
-                          <div className="text-[10px] font-bold text-[#3d6b00] dark:text-green-400 shrink-0 text-right">{rs(p.base_price ?? p.mrp)}</div>
-                        )}
-                        {p.slug && (
-                          <div className="w-8 h-8 shrink-0 grid place-items-center border border-gray-300 dark:border-zinc-600 rounded" title="QR → product page">
-                            <svg viewBox="0 0 24 24" className="w-5 h-5 text-gray-700 dark:text-gray-300" fill="currentColor">
-                              <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm0 3h3v5h-5v-3h2v-2zm-5 0h3v3h-3v-3z" />
-                            </svg>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
+                ) : previewPages.map((page, pi) => (
+                  <PreviewPageCard
+                    key={pi}
+                    page={page}
+                    pageNum={pi + 1}
+                    totalPages={previewPages.length}
+                    title={title.trim() || 'Product Brochure'}
+                    showPrices={showPrices}
+                  />
+                ))}
               </div>
             </div>
           </div>
@@ -395,5 +462,95 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
       </div>
     </div>,
     document.body
+  )
+}
+
+/** Decorative QR glyph used in the preview (the real PDF embeds a scannable QR). */
+function QrGlyph({ size }: { size: number }) {
+  return (
+    <div
+      className="shrink-0 grid place-items-center border border-gray-300 dark:border-zinc-600 rounded-sm bg-white"
+      style={{ width: size, height: size }}
+      title="QR → product page"
+    >
+      <svg viewBox="0 0 24 24" style={{ width: size * 0.8, height: size * 0.8 }} className="text-gray-800" fill="currentColor">
+        <path d="M3 3h8v8H3V3zm2 2v4h4V5H5zm8-2h8v8h-8V3zm2 2v4h4V5h-4zM3 13h8v8H3v-8zm2 2v4h4v-4H5zm13-2h3v2h-3v-2zm0 3h3v5h-5v-3h2v-2zm-5 0h3v3h-3v-3z" />
+      </svg>
+    </div>
+  )
+}
+
+function Thumb({ url, size, radius = 4 }: { url: string | null; size: number; radius?: number }) {
+  if (url) return <img src={url} alt="" style={{ width: size, height: size, borderRadius: radius }} className="object-cover bg-gray-100 flex-shrink-0" />
+  return (
+    <div style={{ width: size, height: size, borderRadius: radius }} className="bg-gray-100 dark:bg-zinc-700 flex-shrink-0 grid place-items-center text-[6px] text-gray-400">
+      No image
+    </div>
+  )
+}
+
+/**
+ * A scaled A4 page card mirroring the real PDF page — branded header (with the
+ * FEATURED/MORE section label), then a 3×3 tile matrix or compact list rows, and
+ * a footer with the page number. Purely visual (approximation of the PDF).
+ */
+function PreviewPageCard({
+  page, pageNum, totalPages, title, showPrices,
+}: { page: PreviewPage; pageNum: number; totalPages: number; title: string; showPrices: boolean }) {
+  const heading = page.kind === 'matrix' ? 'Featured Products' : (pageNum === 1 ? 'Products' : 'More Products')
+  return (
+    <div className="bg-white dark:bg-zinc-900 shadow-sm rounded-sm overflow-hidden" style={{ aspectRatio: `1 / ${A4_RATIO}` }}>
+      {/* header */}
+      <div className="bg-[#3d6b00] text-white px-3 py-2 flex items-start justify-between">
+        <div className="min-w-0">
+          <div className="text-[11px] font-bold uppercase leading-tight truncate">Jeffi Stores</div>
+          <div className="text-[8px] opacity-80 truncate">{title}</div>
+        </div>
+        <div className="text-[8px] opacity-90 uppercase tracking-wide shrink-0 pl-2 pt-0.5">{heading}</div>
+      </div>
+
+      {/* body */}
+      {page.kind === 'matrix' ? (
+        <div className="grid grid-cols-3 gap-1.5 p-2">
+          {page.items.map(p => (
+            <div key={p.id} className="border border-gray-200 dark:border-zinc-700 rounded p-1 flex flex-col">
+              <div className="w-full aspect-square grid place-items-center overflow-hidden rounded-sm bg-gray-50 dark:bg-zinc-800">
+                <Thumb url={p.thumbnail_url} size={44} radius={2} />
+              </div>
+              <div className="mt-1 text-[7px] font-bold text-gray-900 dark:text-gray-100 leading-tight line-clamp-2">{p.name}</div>
+              <div className="text-[6px] text-gray-500 truncate">SKU: {p.sku}</div>
+              <div className="mt-auto flex items-end justify-between pt-1">
+                {showPrices
+                  ? <span className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400">{rs(p.base_price ?? p.mrp)}</span>
+                  : <span />}
+                {p.slug && <QrGlyph size={14} />}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="px-2 py-1">
+          {page.items.map((p, i) => (
+            <div key={p.id} className={`flex items-center gap-1.5 px-1 py-1 border-b border-gray-100 dark:border-zinc-800 ${i % 2 ? 'bg-[#fafcf5] dark:bg-zinc-800/40' : ''}`}>
+              <Thumb url={p.thumbnail_url} size={22} />
+              <div className="flex-1 min-w-0">
+                <div className="text-[8px] font-bold text-gray-900 dark:text-gray-100 truncate">{p.name}</div>
+                <div className="text-[6px] text-gray-500 truncate">SKU: {p.sku}{p.brand_name ? `  •  ${p.brand_name}` : ''}</div>
+                {p.short_description && <div className="text-[6px] text-gray-600 dark:text-gray-400 truncate">{p.short_description}</div>}
+              </div>
+              {showPrices && <div className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400 shrink-0">{rs(p.base_price ?? p.mrp)}</div>}
+              {p.slug && <QrGlyph size={16} />}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* footer */}
+      <div className="border-t border-[#7cb900] mx-2 mt-1" />
+      <div className="px-2 py-1 flex items-center justify-between text-[6px] text-gray-500">
+        <span className="truncate">Jeffi Stores</span>
+        <span className="shrink-0">Page {pageNum} of {totalPages}</span>
+      </div>
+    </div>
   )
 }
