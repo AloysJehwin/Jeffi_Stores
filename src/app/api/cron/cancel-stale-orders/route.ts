@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
        FROM orders
        WHERE status = 'pending'
          AND payment_status IN ('unpaid', 'failed')
+         AND payment_mode IS DISTINCT FROM 'cod'
          AND created_at < NOW() - INTERVAL '${STALE_PAYMENT_WINDOW_MINUTES} minutes'
        ORDER BY created_at
        LIMIT 100`
