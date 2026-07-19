@@ -8,6 +8,7 @@ vi.mock('@/lib/db', () => ({
 
 vi.mock('@/lib/shelf', () => ({
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
+  upsertShelfStock: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('@/lib/inventory', () => ({

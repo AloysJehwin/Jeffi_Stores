@@ -625,3 +625,54 @@ export async function decrementNonPerishableShelfStock(
     try { await run(c) } finally { c.release() }
   }
 }
+
+/**
+ * NULL-safe upsert of a single shelf_stock row (one row per location + product +
+ * variant + sub_variant). Use this instead of a raw `INSERT ... ON CONFLICT ON
+ * CONSTRAINT shelf_stock_unique`: that constraint does NOT fire on PG<15 when
+ * variant_id/sub_variant_id IS NULL, so the upsert silently inserts a duplicate
+ * (or, with the partial NULL-guard indexes in place, throws a unique violation).
+ *
+ * mode 'add' increments the existing quantity (adding stock to a bin that already
+ * holds the product bumps the count); mode 'set' replaces it. A resulting
+ * quantity of 0 deletes the row. Runs on the given client (caller's transaction).
+ */
+export async function upsertShelfStock(
+  client: any,
+  opts: {
+    locationId: string
+    productId: string
+    variantId: string | null
+    subVariantId: string | null
+    quantity: number
+    mode: 'add' | 'set'
+  }
+): Promise<void> {
+  const { locationId, productId, variantId, subVariantId, quantity, mode } = opts
+  const existing = await client.query(
+    `SELECT id, quantity FROM shelf_stock
+     WHERE location_id = $1 AND product_id = $2
+       AND (variant_id = $3 OR ($3::uuid IS NULL AND variant_id IS NULL))
+       AND (sub_variant_id = $4 OR ($4::uuid IS NULL AND sub_variant_id IS NULL))`,
+    [locationId, productId, variantId, subVariantId]
+  )
+
+  if (existing.rows.length > 0) {
+    const current = parseFloat(existing.rows[0].quantity) || 0
+    const next = mode === 'add' ? current + quantity : quantity
+    if (next <= 0) {
+      await client.query(`DELETE FROM shelf_stock WHERE id = $1`, [existing.rows[0].id])
+    } else {
+      await client.query(
+        `UPDATE shelf_stock SET quantity = $1, updated_at = now() WHERE id = $2`,
+        [next, existing.rows[0].id]
+      )
+    }
+  } else if (quantity > 0) {
+    await client.query(
+      `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [locationId, productId, variantId, subVariantId, quantity]
+    )
+  }
+}
