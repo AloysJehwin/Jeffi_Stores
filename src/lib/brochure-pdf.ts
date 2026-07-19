@@ -108,6 +108,12 @@ function rs(n: number) {
   return 'Rs.' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
+/** Display discount % off MRP (0 when no positive discount). Mirrors mrpDiscountPct. */
+function discountPct(mrp: number | null, price: number | null): number {
+  if (mrp == null || price == null || mrp <= price || mrp <= 0) return 0
+  return Math.round(((mrp - price) / mrp) * 100)
+}
+
 /**
  * Truncate a string with an ellipsis so it fits on ONE line at the doc's current
  * font/size within maxW. pdfkit's `ellipsis`/`lineBreak:false` still wraps some
@@ -597,6 +603,7 @@ function drawListRow(
     const price = p.base_price != null ? Number(p.base_price) : null
     const mrp = p.mrp != null ? Number(p.mrp) : null
     const showMrpStrike = mrp != null && price != null && mrp > price
+    const off = discountPct(mrp, price)
     const stackH = showMrpStrike ? 22 : 12
     let py = y + Math.round((ROW_H - stackH) / 2)
     if (showMrpStrike) {
@@ -605,6 +612,11 @@ function drawListRow(
     }
     doc.font('Helvetica-Bold').fontSize(10).fillColor(GREEN_DARK)
     doc.text(price != null ? rs(price) : (mrp != null ? rs(mrp) : '—'), priceColX, py, { width: PRICE_W, align: 'right', lineBreak: false })
+    if (off > 0) {
+      // small "N% OFF" badge to the left of the price column
+      doc.font('Helvetica-Bold').fontSize(7).fillColor('#c0392b')
+      doc.text(`${off}% OFF`, priceColX - 54, py + 1, { width: 50, align: 'right', lineBreak: false })
+    }
   }
 
   if (hasQR && qr) {
@@ -661,11 +673,17 @@ function drawTile(
     const price = p.base_price != null ? Number(p.base_price) : null
     const mrp = p.mrp != null ? Number(p.mrp) : null
     const showMrpStrike = mrp != null && price != null && mrp > price
+    const off = discountPct(mrp, price)
     const priceMaxW = innerW - (hasQR ? QR_SIZE + 6 : 0)
     let py = stripY + (showMrpStrike ? 4 : 12)
     if (showMrpStrike) {
       doc.font('Helvetica').fontSize(7).fillColor(TEXT_MUTED)
-      doc.text(rs(mrp!), x + pad, py, { width: priceMaxW, lineBreak: false }); py += 11
+      doc.text(rs(mrp!), x + pad, py, { width: priceMaxW, lineBreak: false })
+      if (off > 0) {
+        doc.font('Helvetica-Bold').fontSize(7).fillColor('#c0392b')
+        doc.text(`${off}% OFF`, x + pad, py, { width: priceMaxW, align: 'right', lineBreak: false })
+      }
+      py += 11
     }
     doc.font('Helvetica-Bold').fontSize(11).fillColor(GREEN_DARK)
     doc.text(price != null ? rs(price) : (mrp != null ? rs(mrp) : '—'), x + pad, py, { width: priceMaxW, lineBreak: false })

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
+import Toggle from '@/components/ui/Toggle'
 
 type Mode = 'category' | 'brand'
 
@@ -36,6 +37,10 @@ interface Props {
 function rs(n: number | null): string {
   if (n == null) return '—'
   return 'Rs.' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+}
+function discountPct(mrp: number | null, price: number | null): number {
+  if (mrp == null || price == null || mrp <= price || mrp <= 0) return 0
+  return Math.round(((mrp - price) / mrp) * 100)
 }
 
 // Mirror of the PDF's family grouping (src/lib/brochure-pdf.ts) so the preview
@@ -474,22 +479,9 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
             </div>
             <div className="shrink-0">
               <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Prices</p>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={showPrices}
-                onClick={() => setShowPrices(v => !v)}
-                className="flex items-center gap-2 cursor-pointer select-none h-[38px] group"
-              >
-                <span
-                  className={`relative inline-flex items-center w-11 h-6 rounded-full transition-colors duration-200 ${showPrices ? 'bg-orange-500' : 'bg-gray-300 dark:bg-zinc-600'}`}
-                >
-                  <span
-                    className={`inline-block w-5 h-5 bg-white rounded-full shadow transform transition-transform duration-200 ${showPrices ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
-                  />
-                </span>
-                <span className="text-xs font-medium text-foreground-secondary w-8 text-left">{showPrices ? 'Show' : 'Hide'}</span>
-              </button>
+              <div className="h-[38px] flex items-center">
+                <Toggle checked={showPrices} onChange={setShowPrices} label={showPrices ? 'Show' : 'Hide'} />
+              </div>
             </div>
           </div>
 
@@ -627,9 +619,17 @@ function PreviewPageCard({
               <div className="mt-1 text-[7px] font-bold text-gray-900 dark:text-gray-100 leading-tight line-clamp-2">{p.name}</div>
               <div className="text-[6px] text-gray-500 truncate">SKU: {p.sku}</div>
               <div className="mt-auto flex items-end justify-between pt-1">
-                {showPrices
-                  ? <span className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400">{rs(p.base_price ?? p.mrp)}</span>
-                  : <span />}
+                {showPrices ? (
+                  <div className="leading-tight">
+                    {discountPct(p.mrp, p.base_price) > 0 && (
+                      <div className="flex items-center gap-1">
+                        <span className="text-[6px] text-gray-400 line-through">{rs(p.mrp)}</span>
+                        <span className="text-[6px] font-bold text-red-600">{discountPct(p.mrp, p.base_price)}% OFF</span>
+                      </div>
+                    )}
+                    <span className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400">{rs(p.base_price ?? p.mrp)}</span>
+                  </div>
+                ) : <span />}
                 {p.slug && <QrGlyph size={14} />}
               </div>
             </div>
@@ -645,7 +645,17 @@ function PreviewPageCard({
                 <div className="text-[6px] text-gray-500 truncate">SKU: {p.sku}{p.brand_name ? `  •  ${p.brand_name}` : ''}</div>
                 {p.short_description && <div className="text-[6px] text-gray-600 dark:text-gray-400 truncate">{p.short_description}</div>}
               </div>
-              {showPrices && <div className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400 shrink-0">{rs(p.base_price ?? p.mrp)}</div>}
+              {showPrices && (
+                <div className="shrink-0 text-right leading-tight">
+                  {discountPct(p.mrp, p.base_price) > 0 && (
+                    <div className="text-[6px] text-gray-400 line-through">{rs(p.mrp)}</div>
+                  )}
+                  <div className="text-[8px] font-bold text-[#3d6b00] dark:text-green-400">{rs(p.base_price ?? p.mrp)}</div>
+                  {discountPct(p.mrp, p.base_price) > 0 && (
+                    <div className="text-[6px] font-bold text-red-600">{discountPct(p.mrp, p.base_price)}% OFF</div>
+                  )}
+                </div>
+              )}
               {p.slug && <QrGlyph size={16} />}
             </div>
           ))}

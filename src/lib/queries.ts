@@ -578,9 +578,33 @@ export interface BrochureProduct {
 
 // Shared lean projection for every brochure query. Primary image (fallback:
 // first by display_order) is joined for the thumbnail. Only active products.
+// Effective price/mrp: use the product's own base_price/mrp when > 0, else fall
+// back to the lowest active variant / sub-variant price (variant products carry
+// base_price = 0, with the real price on the variants — same rule the admin
+// product list uses for its "From Rs." display).
 const BROCHURE_SELECT = `
   SELECT
-    p.id, p.name, p.slug, p.sku, p.short_description, p.mrp, p.base_price, p.discount_pct,
+    p.id, p.name, p.slug, p.sku, p.short_description, p.discount_pct,
+    COALESCE(
+      NULLIF(p.base_price, 0),
+      (SELECT MIN(px) FROM (
+        SELECT NULLIF(pv.price, 0) AS px FROM product_variants pv
+          WHERE pv.product_id = p.id AND pv.is_active = true
+        UNION ALL
+        SELECT NULLIF(sv.price, 0) AS px FROM product_sub_variants sv
+          WHERE sv.product_id = p.id AND sv.is_active = true
+      ) q WHERE px IS NOT NULL)
+    ) AS base_price,
+    COALESCE(
+      NULLIF(p.mrp, 0),
+      (SELECT MIN(mx) FROM (
+        SELECT NULLIF(pv.mrp, 0) AS mx FROM product_variants pv
+          WHERE pv.product_id = p.id AND pv.is_active = true
+        UNION ALL
+        SELECT NULLIF(sv.mrp, 0) AS mx FROM product_sub_variants sv
+          WHERE sv.product_id = p.id AND sv.is_active = true
+      ) q WHERE mx IS NOT NULL)
+    ) AS mrp,
     b.name AS brand_name,
     c.name AS category_name,
     (
