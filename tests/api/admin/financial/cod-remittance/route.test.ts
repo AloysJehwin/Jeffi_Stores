@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), query: vi.fn() }))
+vi.mock('@/lib/invoice', () => ({ generateOrderInvoice: vi.fn().mockResolvedValue(null) }))
 
 import { GET, POST } from '@/app/api/admin/financial/cod-remittance/route'
 import { authenticateAdmin } from '@/lib/jwt'
@@ -117,6 +118,8 @@ describe('POST /api/admin/financial/cod-remittance', () => {
   })
 
   it('marks orders as paid and returns success', async () => {
+    // UPDATE ... RETURNING id → the two orders that actually flipped to paid
+    vi.mocked(query).mockResolvedValueOnce({ rows: [{ id: 'o1' }, { id: 'o2' }] } as any)
     const res = await POST(makePost({ orderIds: ['o1', 'o2'] }))
     expect(res.status).toBe(200)
     const body = await res.json()

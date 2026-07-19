@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany, query } from '@/lib/db'
+import { generateOrderInvoice } from '@/lib/invoice'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,12 +81,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'orderIds required' }, { status: 400 })
   }
 
-  await query(
+  const remitted = await query<{ id: string }>(
     `UPDATE orders
      SET payment_status = 'paid', cod_remitted_at = NOW(), updated_at = NOW()
-     WHERE id = ANY($1::uuid[]) AND payment_mode = 'cod' AND payment_status = 'cod_collected'`,
+     WHERE id = ANY($1::uuid[]) AND payment_mode = 'cod' AND payment_status = 'cod_collected'
+     RETURNING id`,
     [orderIds]
   )
 
-  return NextResponse.json({ success: true, marked: orderIds.length })
+  // Now that these COD orders are 'paid', render their invoice PDFs (the number
+  // was assigned at processing; generateOrderInvoice was paid-gated until now).
+  // Fire-and-forget so remittance never fails on PDF/S3 errors.
+  for (const row of remitted.rows) {
+    generateOrderInvoice(row.id).catch(() => {})
+  }
+
+  return NextResponse.json({ success: true, marked: remitted.rows.length })
 }

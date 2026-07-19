@@ -19,7 +19,7 @@ vi.mock('@/lib/gst', () => ({
 }))
 vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn() }))
 vi.mock('@/lib/email', () => ({ sendInvoiceFinalizedEmail: vi.fn(), sendOrderStatusUpdate: vi.fn() }))
-vi.mock('@/lib/invoice', () => ({ generateOrderInvoice: vi.fn() }))
+vi.mock('@/lib/invoice', () => ({ generateOrderInvoice: vi.fn(), assignInvoiceNumber: vi.fn().mockResolvedValue('JS/2024-25/0001') }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
 

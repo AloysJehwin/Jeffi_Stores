@@ -19,6 +19,67 @@ export async function createDraftInvoice(orderId: string): Promise<void> {
   )
 }
 
+/**
+ * Assigns the invoice NUMBER to an order (and finalizes its invoices row) WITHOUT
+ * generating the PDF and WITHOUT any payment-status check. Used when an order is
+ * moved to `processing` so every order — including COD (never `payment_status='paid'`
+ * until remittance) — gets an invoice number/document at that point. The PDF is
+ * rendered later by `generateOrderInvoice` once the order is paid.
+ *
+ * Idempotent: no-op if the order already has an invoice_number, or if GST is off.
+ * Runs on the caller's transaction client.
+ */
+export async function assignInvoiceNumber(
+  client: { query: (sql: string, params?: any[]) => Promise<any> },
+  orderId: string
+): Promise<string | null> {
+  if (!isGSTEnabled) return null
+
+  const ord = await client.query(
+    `SELECT invoice_number, source FROM orders WHERE id = $1 FOR UPDATE`,
+    [orderId]
+  )
+  const row = ord.rows[0]
+  if (!row) return null
+  if (row.invoice_number) return row.invoice_number // already numbered — idempotent
+
+  const isOnlineOrder = row.source === 'online' || row.source === 'business'
+
+  const settingsResult = await client.query(`SELECT value FROM site_settings WHERE key = 'invoice_prefix'`)
+  const prefix = settingsResult.rows[0]?.value || 'JS'
+  const fy = getFinancialYear(new Date())
+  const seq = await getNextInvoiceSequence(client, fy)
+  const invoiceNumber = generateInvoiceNumber(prefix, fy, seq)
+  const invoiceDate = new Date().toISOString()
+
+  await client.query(
+    `UPDATE orders SET invoice_number = $1, invoice_date = $2, updated_at = NOW() WHERE id = $3`,
+    [invoiceNumber, invoiceDate, orderId]
+  )
+
+  if (isOnlineOrder) {
+    // Flip the draft row (created at order placement) to finalized.
+    const upd = await client.query(
+      `UPDATE invoices SET invoice_number = $1, financial_year = $2, sequence_number = $3, status = 'finalized', updated_at = NOW()
+       WHERE order_id = $4 AND status = 'draft'`,
+      [invoiceNumber, fy, seq, orderId]
+    )
+    if ((upd.rowCount ?? 0) === 0) {
+      await client.query(
+        `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number, status) VALUES ($1, $2, $3, $4, 'finalized')`,
+        [orderId, invoiceNumber, fy, seq]
+      )
+    }
+  } else {
+    await client.query(
+      `INSERT INTO invoices (order_id, invoice_number, financial_year, sequence_number) VALUES ($1, $2, $3, $4)`,
+      [orderId, invoiceNumber, fy, seq]
+    )
+  }
+
+  return invoiceNumber
+}
+
 export async function generateOrderInvoice(orderId: string): Promise<Buffer | null> {
   if (!isGSTEnabled) return null
 
