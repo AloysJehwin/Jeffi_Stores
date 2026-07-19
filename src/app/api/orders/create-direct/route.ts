@@ -6,6 +6,7 @@ import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/emai
 import { isInterState, calculateGST, round2 } from '@/lib/gst'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { resolveBuyNowItem, quoteShipping, validateCouponForUser, loadAddress } from '@/lib/order-commit'
+import { computeEdd } from '@/lib/edd'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { parseBody, zUuid } from '@/lib/validate'
 import { verifyIntent } from '@/lib/checkout-intent'
@@ -186,15 +187,12 @@ export async function POST(request: NextRequest) {
     const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
-    function _getTat(pin: string): number {
-      if (/^49/.test(pin)) return 7
-      const p3 = parseInt(pin.slice(0, 3), 10)
-      if ([110, 400, 500, 600, 700, 560, 380].includes(p3)) return 10
-      return 14
-    }
     const _eddPin = String(destinationPin || '')
-    const _eddTat = (/^\d{6}$/.test(_eddPin) ? _getTat(_eddPin) : 7) + Number(product.extra_delivery_days ?? 0)
-    const _edd = new Date(Date.now() + _eddTat * 86400000).toISOString().slice(0, 10)
+    const _edd = computeEdd({
+      pin: _eddPin,
+      handlingDays: Number(product.handling_days ?? 2),
+      extraDays: Number(product.extra_delivery_days ?? 0),
+    })
 
     const order = await withTransaction(async (client) => {
       let shippingAddressId = null

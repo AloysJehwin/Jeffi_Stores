@@ -8,6 +8,7 @@ import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { quoteShipping } from '@/lib/order-commit'
+import { computeEdd } from '@/lib/edd'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { createDraftInvoice } from '@/lib/invoice'
 import { parseBody, zNonEmpty } from '@/lib/validate'
@@ -153,17 +154,10 @@ export async function POST(request: NextRequest) {
         })
       : 0
 
-    function _getTat(pin: string): number {
-      if (/^49/.test(pin)) return 7
-      const p3 = parseInt(pin.slice(0, 3), 10)
-      if ([110, 400, 500, 600, 700, 560, 380].includes(p3)) return 10
-      return 14
-    }
     const _eddPin = String(destinationPin || '')
     const _eddHandling = Math.max(2, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 2)))
     const _eddExtra = Math.max(0, ...cartItems.map((i: any) => Number(i.products?.extra_delivery_days ?? 0)))
-    const _eddTat = _eddHandling + (/^\d{6}$/.test(_eddPin) ? _getTat(_eddPin) : 7) + _eddExtra
-    const _edd = new Date(Date.now() + _eddTat * 86400000).toISOString().slice(0, 10)
+    const _edd = computeEdd({ pin: _eddPin, handlingDays: _eddHandling, extraDays: _eddExtra })
 
     const order = await withTransaction(async (client) => {
       let shippingAddressId = null
