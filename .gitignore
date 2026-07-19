@@ -71,3 +71,6 @@ ML_JOURNEY.md
 
 # Playwright MCP artifacts
 .playwright-mcp/
+
+# On-device model training data (regenerated via scripts/gen-onboarding-dataset.mjs)
+data/onboarding/
