@@ -35,7 +35,18 @@ export function isAdvancement(current: ShipmentStatus | null, next: ShipmentStat
   return (RANK[next] ?? 0) > (RANK[current] ?? 0)
 }
 
-type RawScan = { activity?: string | null; scanType?: string | null }
+/** Numeric rank of a status (for pickup/advancement comparisons by callers). */
+export function rankOf(s: ShipmentStatus | null): number {
+  return s ? (RANK[s] ?? 0) : 0
+}
+
+type RawScan = { activity?: string | null; scanType?: string | null; date?: string | null }
+
+const RTO_STATUSES = new Set<ShipmentStatus>(['rto_initiated', 'rto_in_transit', 'rto_out_for_return', 'rto_delivered'])
+
+/** Delhivery StatusType codes that are ambiguous — must be resolved from scan history, not taken at face value. */
+const AMBIGUOUS_TOP = new Set(['UD', 'PP', 'MF', 'NDR', 'HOLD', 'LOST', 'MIS', 'OC', 'PKD'])
+
 
 /**
  * Derive our internal ShipmentStatus from Delhivery's raw statusType + scan history.
@@ -45,30 +56,94 @@ type RawScan = { activity?: string | null; scanType?: string | null }
 export function resolveShipmentStatus(
   rawStatusType: string | null,
   scans: RawScan[],
+  statusLabel?: string | null,
 ): ShipmentStatus {
   const type = rawStatusType?.toUpperCase() ?? ''
 
-  // Direct mapping for unambiguous Delhivery status codes — StatusType is authoritative
-  const direct = directMap(type)
-  if (direct) return direct
+  // Collect EVERY status the payload evidences — never stop at the first scan.
+  // Delhivery returns scans OLDEST-first, so a positional first-match would latch
+  // "Manifested" (created) and ignore later "In Transit" scans. We instead gather
+  // all candidates and pick the furthest-along, which is order-independent.
+  type Candidate = { status: ShipmentStatus; date: string | null; idx: number }
+  const candidates: Candidate[] = []
 
-  // Ambiguous codes: walk scan history newest-first to find the true state.
-  // UD is used for manifests, bag-adds, and generic updates — resolve from scans.
-  // PP/MF are pre-pickup codes that may have progressed. NDR/HOLD/LOST/MIS need context.
-  for (const scan of scans) {
-    const scanType = scan.scanType?.toUpperCase() ?? ''
-    const fromScanType = directMap(scanType)
-    if (fromScanType) return fromScanType
-
-    const activity = (scan.activity ?? '').toLowerCase()
-    const fromActivity = activityMap(activity)
-    if (fromActivity) return fromActivity
+  // The top-level StatusType is authoritative only when unambiguous; ambiguous
+  // codes (UD/PP/MF/NDR/HOLD/LOST/MIS/OC/PKD) are resolved from scans.
+  if (!AMBIGUOUS_TOP.has(type)) {
+    const d = directMap(type)
+    if (d) candidates.push({ status: d, date: null, idx: -1 })
   }
 
-  // UD with no resolvable scans = just manifested / generic update — treat as created
-  if (type === 'UD') return 'created'
-  return 'created'
+  // Low-priority fallback: the human Status.Status label (e.g. "Out for Delivery",
+  // "Delivered"). Used when scans are absent/unhelpful. idx -1 so any dated scan wins.
+  const fromLabel = activityMap((statusLabel ?? '').toLowerCase())
+  if (fromLabel) candidates.push({ status: fromLabel, date: null, idx: -1 })
+
+  scans.forEach((scan, idx) => {
+    const scanType = (scan.scanType ?? '').toUpperCase()
+    // A per-scan ScanType is authoritative only when unambiguous; an ambiguous
+    // scan code (e.g. NDR) with a clarifying activity ("out for delivery") should
+    // resolve from the activity, not the code.
+    const s = (!AMBIGUOUS_TOP.has(scanType) ? directMap(scanType) : null)
+      ?? activityMap((scan.activity ?? '').toLowerCase())
+    if (s) candidates.push({ status: s, date: scan.date ?? null, idx })
+  })
+
+  if (candidates.length === 0) return 'created'
+
+  const maxByRank = (list: Candidate[]) =>
+    list.reduce((best, c) => ((RANK[c.status] ?? 0) > (RANK[best.status] ?? 0) ? c : best))
+
+  // RTO is a distinct lifecycle branch — presence wins over the forward chain.
+  const rto = candidates.filter(c => RTO_STATUSES.has(c.status))
+  if (rto.length) return maxByRank(rto).status
+
+  const forward = candidates.filter(c => !RTO_STATUSES.has(c.status))
+  const nonAttempt = forward.filter(c => c.status !== 'delivery_attempted')
+  const best = nonAttempt.length ? maxByRank(nonAttempt) : null
+
+  // A failed-delivery (NDR) only "wins" if it is the LATEST signal — a shipment
+  // that had an NDR then recovered (in transit / delivered again) must not be
+  // pinned at delivery_attempted. Compare by scan date when available, else index.
+  const attempts = forward.filter(c => c.status === 'delivery_attempted')
+  if (attempts.length) {
+    const latestAttempt = attempts.reduce((a, b) => (isLater(b, a) ? b : a))
+    if (!best) return 'delivery_attempted'
+    return isLater(latestAttempt, best) ? 'delivery_attempted' : best.status
+  }
+
+  return best ? best.status : 'created'
+
+  function isLater(a: Candidate, b: Candidate): boolean {
+    const da = a.date ? Date.parse(a.date) : NaN
+    const db = b.date ? Date.parse(b.date) : NaN
+    if (!Number.isNaN(da) && !Number.isNaN(db)) return da > db
+    return a.idx > b.idx // Delhivery is oldest-first → higher index = later
+  }
 }
+
+/**
+ * Map a resolved internal ShipmentStatus back to the canonical Delhivery status
+ * code used to key the routes' STATUS_SYNC tables. Single source of truth so the
+ * cron and the on-demand track route can never diverge. Returns null when there
+ * is no order-status transition for the state (created / NDR).
+ */
+export function shipmentStatusToSyncType(s: ShipmentStatus): string | null {
+  switch (s) {
+    case 'picked_up':          return 'PU'
+    case 'in_transit':         return 'IT'
+    case 'out_for_delivery':   return 'OD'
+    case 'delivered':          return 'DL'
+    case 'rto_initiated':      return 'RTO'
+    case 'rto_in_transit':     return 'RTO-IT'
+    case 'rto_out_for_return': return 'RTO-OT'
+    case 'rto_delivered':      return 'RTO-DL'
+    case 'created':
+    case 'delivery_attempted':
+    default:                   return null
+  }
+}
+
 
 function directMap(code: string): ShipmentStatus | null {
   switch (code) {
