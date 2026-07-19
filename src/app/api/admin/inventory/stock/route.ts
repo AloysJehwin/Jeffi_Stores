@@ -3,8 +3,8 @@ import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { getStockLedger, getStockValuation, logStockMovement } from '@/lib/inventory'
-import { getClient, queryOne } from '@/lib/db'
-import { getOrCreateOpenShelf } from '@/lib/shelf'
+import { getClient, queryOne, query } from '@/lib/db'
+import { getOrCreateOpenShelf, upsertShelfStock } from '@/lib/shelf'
 import { logAdminAudit } from '@/lib/admin-audit'
 import { parseBody, zUuid } from '@/lib/validate'
 
@@ -220,13 +220,14 @@ export async function PATCH(request: NextRequest) {
                AND location_id != $4`,
             [product_id, variant_id ?? null, sub_variant_id ?? null, locationId]
           )
-          await queryOne(
-            `INSERT INTO shelf_stock (location_id, product_id, variant_id, sub_variant_id, quantity)
-             VALUES ($1,$2,$3,$4,$5)
-             ON CONFLICT ON CONSTRAINT shelf_stock_unique
-             DO UPDATE SET quantity = EXCLUDED.quantity, updated_at = now()`,
-            [locationId, product_id, variant_id ?? null, sub_variant_id ?? null, newQuantityBase]
-          )
+          await upsertShelfStock({ query }, {
+            locationId,
+            productId: product_id,
+            variantId: variant_id ?? null,
+            subVariantId: sub_variant_id ?? null,
+            quantity: newQuantityBase,
+            mode: 'set',
+          })
         }
       }
 

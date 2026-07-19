@@ -5,7 +5,7 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryOne: vi.fn() }))
+vi.mock('@/lib/db', () => ({ queryOne: vi.fn(), queryMany: vi.fn() }))
 
 // pdfkit and bwip-js are eval-required inside the route — stub at module level
 // so the route's eval('require') calls resolve to our mocks
@@ -44,7 +44,7 @@ vi.mock('bwip-js', () => ({
 import { GET } from '@/app/api/admin/orders/[id]/shipping-label/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/db'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -60,6 +60,7 @@ function makeReq(params: Record<string, string> = {}) {
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
 const mockQueryOne = vi.mocked(queryOne)
+const mockQueryMany = vi.mocked(queryMany)
 
 const sampleOrder = {
   order_number: 'ORD-001',
@@ -81,6 +82,7 @@ describe('GET /api/admin/orders/[id]/shipping-label', () => {
     vi.clearAllMocks()
     mockAuth.mockResolvedValue(ADMIN as any)
     mockHasScope.mockReturnValue(true)
+    mockQueryMany.mockResolvedValue([])
   })
 
   // ── Auth / authz ────────────────────────────────────────────────────────

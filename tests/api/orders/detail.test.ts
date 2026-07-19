@@ -16,12 +16,19 @@ vi.mock('@/lib/email', () => ({
 }))
 vi.mock('@/lib/invoice', () => ({
   generateOrderInvoice: vi.fn().mockResolvedValue(Buffer.alloc(0)),
+  assignInvoiceNumber: vi.fn().mockResolvedValue('JS/26-27/999'),
 }))
 vi.mock('@/lib/delhivery', () => ({
   cancelDelhiveryShipment: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/inventory-deduct', () => ({
+  deductOrderStock: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/order-stock', () => ({
+  restoreOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
@@ -315,15 +322,10 @@ describe('PATCH /api/orders/[id] (extended)', () => {
       users: { email: 'test@example.com', first_name: 'Test', last_name: 'User' },
     })
     vi.mocked(db.queryOne).mockResolvedValueOnce(null) // unit row
-    // Stock check pass (sufficient)
-    vi.mocked(db.queryMany)
-      .mockResolvedValueOnce([
-        { product_id: 'prod-1', variant_id: 'var-1', quantity: '2', inventory_quantity: '10' },
-      ])
-      // Inventory deduction items
-      .mockResolvedValueOnce([
-        { product_id: 'prod-1', variant_id: 'var-1', quantity: '2' },
-      ])
+    // Stock check pass (sufficient); deduction is delegated to the mocked helper.
+    vi.mocked(db.queryMany).mockResolvedValueOnce([
+      { product_id: 'prod-1', variant_id: 'var-1', quantity: '2', inventory_quantity: '10' },
+    ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) }
@@ -345,13 +347,9 @@ describe('PATCH /api/orders/[id] (extended)', () => {
       users: { email: 'test@example.com', first_name: 'Test', last_name: 'User' },
     })
     vi.mocked(db.queryOne).mockResolvedValueOnce(null) // unit row
-    vi.mocked(db.queryMany)
-      .mockResolvedValueOnce([
-        { product_id: 'prod-1', variant_id: null, quantity: '2', inventory_quantity: '10' },
-      ])
-      .mockResolvedValueOnce([
-        { product_id: 'prod-1', variant_id: null, quantity: '2' },
-      ])
+    vi.mocked(db.queryMany).mockResolvedValueOnce([
+      { product_id: 'prod-1', variant_id: null, quantity: '2', inventory_quantity: '10' },
+    ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) }
@@ -397,7 +395,7 @@ describe('PATCH /api/orders/[id] (extended)', () => {
       payment_status: 'paid',
       user_id: 'user-456',
       users: { email: 'test@example.com', first_name: 'Test', last_name: 'User' },
-    })
+    }).mockResolvedValue(null) // sale-check + any later reads → null (no sale, no payment record)
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
     const res = await PATCH(makePatchRequest({ status: 'cancelled' }) as any, PARAMS)

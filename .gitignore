@@ -71,3 +71,13 @@ ML_JOURNEY.md
 
 # Playwright MCP artifacts
 .playwright-mcp/
+
+# On-device model training data (regenerated via scripts/gen-onboarding-dataset.mjs)
+data/onboarding/
+
+# On-device model weights (large; host on CDN/S3 in prod — regenerate via scripts/train+export)
+public/models/onboarding/onnx/*.onnx
+
+# On-device ORT runtime WASM (large; served from public/ or CDN in prod — copy from node_modules/onnxruntime-web/dist)
+public/ort/*.wasm
+public/ort/*.map

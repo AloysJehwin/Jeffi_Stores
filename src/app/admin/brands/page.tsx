@@ -10,6 +10,7 @@ import BrandTableRow from '@/components/admin/BrandTableRow'
 import BrandStatusToggle from '@/components/admin/BrandStatusToggle'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import BrochureButton from '@/components/admin/BrochureButton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -206,13 +207,16 @@ export default function BrandsPage({ searchParams }: { searchParams: Promise<{ [
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Brands</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage product brands</p>
         </div>
-        <Suspense fallback={
-          <span className="bg-accent-500 text-white px-5 py-2.5 rounded-lg font-semibold text-center text-sm sm:text-base opacity-80">
-            Add New Brand
-          </span>
-        }>
-          <AddBrandButton />
-        </Suspense>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <BrochureButton mode="brand" />
+          <Suspense fallback={
+            <span className="bg-accent-500 text-white px-5 py-2.5 rounded-lg font-semibold text-center text-sm sm:text-base opacity-80">
+              Add New Brand
+            </span>
+          }>
+            <AddBrandButton />
+          </Suspense>
+        </div>
       </div>
 
       <Suspense fallback={<AdminStatsSkeleton cards={3} gridClass="grid-cols-3" />}>

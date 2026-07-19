@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { query, queryMany } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
-import { resolveShipmentStatus, isAdvancement } from '@/lib/shipment-status'
+import { resolveShipmentStatus, isAdvancement, shipmentStatusToSyncType, rankOf } from '@/lib/shipment-status'
 import { restoreOrderStock } from '@/lib/order-stock'
 
 export const dynamic = 'force-dynamic'
@@ -103,50 +103,19 @@ export async function POST(request: NextRequest) {
           activity: s.ScanDetail?.Scan ?? null,
           scanType: s.ScanDetail?.ScanType ?? null,
           instructions: s.ScanDetail?.Instructions ?? null,
+          date: s.ScanDetail?.ScanDateTime ?? null,
         }))
 
         // Resolve stable internal status (shared lib — same logic as admin track route)
-        const newShipmentStatus = resolveShipmentStatus(rawType, scans)
+        const newShipmentStatus = resolveShipmentStatus(rawType, scans, shipment.Status?.Status ?? null)
 
-        // Derive the Delhivery statusType string we use for STATUS_SYNC
-        // UD/NDR/HOLD/LOST/MIS/OC are ambiguous/exception codes — walk scan history to resolve true state
-        const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS', 'OC', 'PKD'])
-        let statusType = rawType
-        if (EXCEPTION_TYPES.has(rawType) || rawType === 'PP' || rawType === 'MF') {
-          // First try scan history newest-first (Delhivery returns newest first)
-          for (const scan of rawScans) {
-            const t = (scan.ScanDetail?.ScanType ?? '').toUpperCase()
-            if (t && !EXCEPTION_TYPES.has(t) && t !== 'PP' && t !== 'MF') { statusType = t; break }
-            const activity = (scan.ScanDetail?.Scan ?? '').toLowerCase()
-            if (activity.includes('out for delivery') || activity === 'dispatched') { statusType = 'OD'; break }
-            if (activity.includes('rto delivered') || activity.includes('return delivered') || activity.includes('returned to origin')) { statusType = 'RTO-DL'; break }
-            if (activity.includes('out for return')) { statusType = 'RTO-OT'; break }
-            if (activity.includes('return in transit') || activity.includes('in return transit')) { statusType = 'RTO-IT'; break }
-            if (activity.includes('rto initiated') || activity.includes('return initiated')) { statusType = 'RTO'; break }
-            if (activity.includes('in transit') || activity === 'transit' || activity.includes('added to bag') || activity.includes('reached') || activity.includes('arrived at')) { statusType = 'IT'; break }
-            if (activity.includes('picked up') || activity.includes('shipment picked') || activity.includes('pickup')) { statusType = 'PU'; break }
-            if (activity === 'manifested' || activity.includes('manifest')) { statusType = 'MF'; break }
-            if (activity.includes('delivered')) { statusType = 'DL'; break }
-          }
-          // Fall back to Status.Status label when scans are absent or unhelpful
-          if (statusType === rawType) {
-            const label = (shipment.Status?.Status ?? '').toLowerCase()
-            if (label.includes('delivered') && !label.includes('out for')) statusType = 'DL'
-            else if (label.includes('out for delivery')) statusType = 'OD'
-            else if (label.includes('rto delivered') || label.includes('returned to origin')) statusType = 'RTO-DL'
-            else if (label.includes('out for return')) statusType = 'RTO-OT'
-            else if (label.includes('return in transit') || label.includes('in return transit')) statusType = 'RTO-IT'
-            else if (label.includes('rto') || label.includes('return initiated')) statusType = 'RTO'
-            else if (label.includes('in transit') || label === 'transit') statusType = 'IT'
-            else if (label.includes('picked up') || label.includes('pickup')) statusType = 'PU'
-          }
-        }
-        const syncRule = STATUS_SYNC[statusType]
+        // Derive the STATUS_SYNC key from the RESOLVED status via the shared mapper
+        // (single source of truth; keeps cron and the on-demand track route in lockstep).
+        const statusType = shipmentStatusToSyncType(newShipmentStatus)
+        const syncRule = statusType ? STATUS_SYNC[statusType] : undefined
 
-        // Track AWBs that have been physically picked up (PU or any forward/RTO stage)
-        // so we can auto-advance the pickup request status regardless of order state.
-        const PICKED_UP_TYPES = new Set(['PU', 'IT', 'RAD', 'OT', 'OD', 'DISPATCHED', 'DL', 'RTO', 'RTRN', 'RTO-IT', 'RTO-OT', 'RTO-OFD', 'RTO-DL'])
-        if (PICKED_UP_TYPES.has(statusType)) {
+        // A shipment is "picked up" once it reached at least the picked_up stage.
+        if (rankOf(newShipmentStatus) >= rankOf('picked_up')) {
           pickedUpAwbs.add(awb)
         }
 

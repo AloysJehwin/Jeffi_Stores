@@ -63,10 +63,14 @@ export async function PATCH(
         if (!item.product_id) continue
         const qty = parseFloat(item.quantity)
 
-        // Find all batch deductions logged for this cash sale item
+        // Find all batch deductions logged for this cash sale item. The shared
+        // deduction helper records cash-sale movements with reference_type='order'
+        // and reference_id=saleId (it does not distinguish cash sales), so match
+        // that here — matching 'cash_sale' would find nothing and skip the batch
+        // restore entirely.
         const batchMovements = await client.query<{ batch_id: string; quantity_change: string; serial_number: string | null }>(
           `SELECT batch_id, quantity_change, serial_number FROM inventory_transactions
-           WHERE reference_type = 'cash_sale' AND reference_id = $1
+           WHERE reference_type = 'order' AND reference_id = $1
              AND product_id = $2
              AND (variant_id = $3 OR ($3 IS NULL AND variant_id IS NULL))
              AND batch_id IS NOT NULL
@@ -140,6 +144,17 @@ export async function PATCH(
           })
         }
       }
+
+      // Reset serialized units back to in_stock. The deduction marked them sold
+      // with order_id = saleId (the helper uses order_id for both orders and cash
+      // sales), so unlink by that id. Without this, cancelled cash-sale serials
+      // stay 'sold' forever.
+      await client.query(
+        `UPDATE product_serials
+         SET status = 'in_stock', order_id = NULL, order_item_id = NULL, sold_at = NULL, updated_at = NOW()
+         WHERE order_id = $1`,
+        [id]
+      )
 
       // Sync shelf_stock for perishable/serialized products
       const synced = new Set<string>()

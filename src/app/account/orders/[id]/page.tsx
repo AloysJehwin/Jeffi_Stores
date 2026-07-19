@@ -58,6 +58,7 @@ interface OrderDetails {
   shippingAmount: number
   status: string
   paymentStatus: string
+  paymentMode?: string | null
   createdAt: string
   updatedAt: string
   deliveredAt: string | null
@@ -101,7 +102,10 @@ function getEddDisplay(order: OrderDetails, edd: string): { label: string; sub: 
   }
   const todayIST = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }))
   todayIST.setHours(0, 0, 0, 0)
-  const eddDate = new Date(edd + ' 00:00:00')
+  // Compute the day diff from the normalized ISO date (YYYY-MM-DD) parsed as UTC —
+  // matching the admin page — so both surfaces agree on the calendar day regardless
+  // of the server's local timezone. (`edd` is the already-formatted display string.)
+  const eddDate = new Date(String(order.estimatedDeliveryDate).slice(0, 10) + 'T00:00:00Z')
   const diffDays = Math.round((eddDate.getTime() - todayIST.getTime()) / 86400000)
   if (diffDays === 0) return { label: 'Arriving Today', sub: edd, color: 'text-accent-500' }
   if (diffDays === 1) return { label: 'Arriving Tomorrow', sub: edd, color: 'text-accent-500' }
@@ -273,6 +277,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (!order) return
     if (order.status === 'cancelled' || order.status === 'cancel_requested') return
     if (order.paymentStatus !== 'failed' && order.paymentStatus !== 'unpaid') return
+    if (order.paymentMode === 'cod') return // COD is paid on delivery — never a pay-now countdown
     if (!isRazorpayEnabled) return
 
     const orderCreatedAt = new Date(order.createdAt).getTime()
@@ -728,7 +733,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                       Monthly return limit reached
                     </span>
                   )}
-                  {order.invoiceNumber && !order.originalOrderId && order.viewToken && (
+                  {order.invoiceNumber && !order.originalOrderId && order.viewToken && (order.paymentStatus === 'paid' || order.paymentStatus === 'cod_collected') && (
                     <a
                       href={`/invoice/${order.viewToken}`}
                       target="_blank"
@@ -1277,7 +1282,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             )}
 
-            {order.paymentStatus === 'unpaid' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
+            {order.paymentStatus === 'unpaid' && order.paymentMode !== 'cod' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex gap-3 flex-1">

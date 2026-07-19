@@ -3,11 +3,12 @@ import { z } from 'zod'
 import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/lib/jwt'
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
-import { generateOrderInvoice } from '@/lib/invoice'
+import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
-import { logStockMovement } from '@/lib/inventory'
 import { logActivity } from '@/lib/activity'
+import { deductOrderStock } from '@/lib/inventory-deduct'
+import { restoreOrderStock } from '@/lib/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { attributeConversion } from '@/lib/marketing'
 import { parseBody } from '@/lib/validate'
@@ -18,6 +19,7 @@ const OrderPatchSchema = z.object({
   batch_assignments: z.array(z.object({
     order_item_id: z.string().uuid(),
     batch_id: z.string().uuid(),
+    qty: z.number().positive(),
   })).nullish(),
   serial_assignments: z.array(z.object({
     order_item_id: z.string().uuid(),
@@ -335,6 +337,19 @@ export async function PATCH(
       values
     )
 
+    // On cancellation, restore inventory if — and only if — stock was actually
+    // deducted (i.e. the order reached 'processing' and has a 'sale' ledger row).
+    // restoreOrderStock resets serials to in_stock, reverses batches, and syncs
+    // shelf/central qty; it is idempotent (guards on an existing 'return' row).
+    // Orders cancelled before processing never deducted, so this is a no-op.
+    if (statusChanged && status === 'cancelled') {
+      const sale = await queryOne(
+        `SELECT 1 FROM inventory_transactions WHERE reference_type = 'order' AND reference_id = $1 AND transaction_type = 'sale' LIMIT 1`,
+        [orderId]
+      )
+      if (sale) await restoreOrderStock(orderId)
+    }
+
     if (currentOrder.user_id) {
       if (statusChanged) {
         logActivity({
@@ -460,130 +475,27 @@ export async function PATCH(
     }
 
     if (statusChanged && status === 'processing') {
-      const items = await queryMany<any>(
-        `SELECT oi.id AS order_item_id, oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.buy_unit
-         FROM order_items oi WHERE oi.order_id = $1`,
-        [orderId]
-      )
+      // Deduct inventory via the shared helper — the single source of truth for
+      // plain / perishable (FEFO) / serialized deduction. It writes ONE ledger
+      // row per serial (quantityChange -1), decrements batches per serial, and
+      // recomputes central inventory via syncPerishableStock (so serialized/
+      // perishable items are NOT double-deducted). Admin batch/serial picker
+      // selections are respected; requireSerialAssignments preserves the picker
+      // contract for serialized items. Idempotent on re-transition.
       await withTransaction(async (client) => {
-        for (const item of items) {
-          const rawQty = parseFloat(item.quantity)
-          const unitRow = await client.query<{ factor: string; dimension: string }>(
-            `SELECT COALESCE(puv.factor, pup.factor) AS factor,
-                    COALESCE(puv.dimension, pup.dimension) AS dimension
-             FROM (SELECT 1) x
-             LEFT JOIN product_units puv ON puv.unit = $1 AND puv.product_id = $2 AND puv.variant_id = $3
-             LEFT JOIN product_units pup ON pup.unit = $1 AND pup.product_id = $2 AND pup.variant_id IS NULL`,
-            [item.buy_unit, item.product_id, item.variant_id || null]
-          )
-          const u = unitRow.rows[0]
-          const qty = (u?.dimension === 'count' && u?.factor)
-            ? rawQty * parseFloat(u.factor)
-            : rawQty
-
-          // Resolve assigned batch for this item (if any)
-          let assignedBatchId = batch_assignments?.find(
-            a => a.order_item_id === item.order_item_id
-          )?.batch_id ?? null
-
-          let stockBefore = 0
-          if (item.sub_variant_id) {
-            const row = await client.query<{ inventory_quantity: string }>(
-              `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
-              [item.sub_variant_id]
-            )
-            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-            await client.query(
-              'UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
-              [qty, item.sub_variant_id]
-            )
-          } else if (item.variant_id) {
-            const row = await client.query<{ inventory_quantity: string }>(
-              `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
-              [item.variant_id]
-            )
-            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-            await client.query(
-              'UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
-              [qty, item.variant_id]
-            )
-          } else {
-            const row = await client.query<{ inventory_quantity: string }>(
-              `SELECT inventory_quantity FROM products WHERE id = $1 FOR UPDATE`,
-              [item.product_id]
-            )
-            stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
-            await client.query(
-              'UPDATE products SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
-              [qty, item.product_id]
-            )
-          }
-
-          // Apply batch assignment: deduct quantity_remaining and link order_item → batch
-          let batchLotNumber: string | null = null
-          let batchExpiryDate: string | null = null
-          if (assignedBatchId) {
-            const batchRow = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
-              `UPDATE product_batches SET quantity_remaining = quantity_remaining - $1, updated_at = NOW() WHERE id = $2 RETURNING lot_number, expiry_date`,
-              [qty, assignedBatchId]
-            )
-            batchLotNumber = batchRow.rows[0]?.lot_number ?? null
-            batchExpiryDate = batchRow.rows[0]?.expiry_date ?? null
-            await client.query(
-              `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
-              [assignedBatchId, item.order_item_id]
-            )
-          }
-
-          // Apply serial assignments: resolve batch from serial, mark serial sold
-          const itemSerials = (serial_assignments ?? []).filter(s => s.order_item_id === item.order_item_id)
-          let resolvedSerialNumber: string | null = null
-          let resolvedLotNumber: string | null = null
-          let resolvedExpiryDate: string | null = null
-          for (const sa of itemSerials) {
-            const serialRow = await client.query<{ id: string; batch_id: string | null; status: string }>(
-              `SELECT id, batch_id, status FROM product_serials WHERE product_id = $1 AND serial_number = $2 FOR UPDATE`,
-              [item.product_id, sa.serial_number]
-            )
-            if (!serialRow.rows.length) throw new Error(`Serial number not found: ${sa.serial_number}`)
-            if (serialRow.rows[0].status !== 'in_stock') throw new Error(`Serial ${sa.serial_number} is not in stock (status: ${serialRow.rows[0].status})`)
-            const serialBatchId = serialRow.rows[0].batch_id
-            if (!resolvedSerialNumber) resolvedSerialNumber = sa.serial_number
-            await client.query(
-              `UPDATE product_serials SET status = 'sold', order_id = $1, order_item_id = $2, sold_at = NOW(), updated_at = NOW() WHERE id = $3`,
-              [orderId, item.order_item_id, serialRow.rows[0].id]
-            )
-            // If no explicit batch_assignment, deduct from the serial's batch
-            if (!assignedBatchId && serialBatchId) {
-              const batchRow = await client.query<{ lot_number: string | null; expiry_date: string | null }>(
-                `UPDATE product_batches SET quantity_remaining = quantity_remaining - 1, updated_at = NOW() WHERE id = $1 RETURNING lot_number, expiry_date`,
-                [serialBatchId]
-              )
-              resolvedLotNumber = batchRow.rows[0]?.lot_number ?? null
-              resolvedExpiryDate = batchRow.rows[0]?.expiry_date ?? null
-              await client.query(
-                `UPDATE order_items SET batch_id = $1 WHERE id = $2`,
-                [serialBatchId, item.order_item_id]
-              )
-              assignedBatchId = serialBatchId
-            }
-          }
-
-          await logStockMovement(client, {
-            productId: item.product_id,
-            variantId: item.variant_id || null,
-            subVariantId: item.sub_variant_id || null,
-            transactionType: 'sale',
-            quantityChange: -qty,
-            referenceType: 'order',
-            referenceId: orderId,
-            currentStock: stockBefore,
-            batchId: assignedBatchId,
-            lotNumber: resolvedLotNumber ?? batchLotNumber,
-            expiryDate: resolvedExpiryDate ?? batchExpiryDate,
-            serialNumber: resolvedSerialNumber,
-          })
-        }
+        await deductOrderStock(
+          orderId,
+          {
+            batchAssignments: batch_assignments ?? undefined,
+            serialAssignments: serial_assignments ?? undefined,
+            requireSerialAssignments: true,
+          },
+          client
+        )
+        // Assign the invoice number/document at processing for ALL orders,
+        // including COD (never payment_status='paid' until remittance). The PDF is
+        // still rendered later by generateOrderInvoice once the order is paid.
+        await assignInvoiceNumber(client, orderId)
       })
     }
 

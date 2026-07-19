@@ -6,6 +6,7 @@ import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/emai
 import { isInterState, calculateGST, round2 } from '@/lib/gst'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { resolveBuyNowItem, quoteShipping, validateCouponForUser, loadAddress } from '@/lib/order-commit'
+import { computeEdd } from '@/lib/edd'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { parseBody, zUuid } from '@/lib/validate'
 import { verifyIntent } from '@/lib/checkout-intent'
@@ -112,6 +113,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
+    // COD is not available for products flagged is_cod_allowed=false.
+    if (isCod && product.is_cod_allowed === false) {
+      return NextResponse.json({
+        error: `COD is not available for: ${product.name}. Please choose online payment.`,
+        codBlockedProductIds: [product.id],
+      }, { status: 422 })
+    }
+
     const variant = resolved.item.variantId
       ? await queryOne<any>('SELECT * FROM product_variants WHERE id = $1', [resolved.item.variantId])
       : null
@@ -178,15 +187,12 @@ export async function POST(request: NextRequest) {
     const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
-    function _getTat(pin: string): number {
-      if (/^49/.test(pin)) return 7
-      const p3 = parseInt(pin.slice(0, 3), 10)
-      if ([110, 400, 500, 600, 700, 560, 380].includes(p3)) return 10
-      return 14
-    }
     const _eddPin = String(destinationPin || '')
-    const _eddTat = (/^\d{6}$/.test(_eddPin) ? _getTat(_eddPin) : 7) + Number(product.extra_delivery_days ?? 0)
-    const _edd = new Date(Date.now() + _eddTat * 86400000).toISOString().slice(0, 10)
+    const _edd = computeEdd({
+      pin: _eddPin,
+      handlingDays: Number(product.handling_days ?? 2),
+      extraDays: Number(product.extra_delivery_days ?? 0),
+    })
 
     const order = await withTransaction(async (client) => {
       let shippingAddressId = null
@@ -233,12 +239,15 @@ export async function POST(request: NextRequest) {
       }
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 'direct', $22, $23, $24)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, payment_mode, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'direct', $23, $24, $25)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, total,
+         'pending',
+         isCod ? 'cod_pending' : 'unpaid',
+         isCod ? 'cod' : (isRazorpayPayment ? 'razorpay' : 'manual'),
+         subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, total,
          shippingAddressId, billingAddressId,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
@@ -311,6 +320,10 @@ export async function POST(request: NextRequest) {
     }]
 
     if (!isRazorpayPayment) {
+      // COD / manual orders confirm on placement (payment is collected later — on
+      // delivery for COD). Mirrors the cart path (orders/create).
+      await query(`UPDATE orders SET status = 'confirmed', updated_at = NOW() WHERE id = $1`, [order.id])
+      order.status = 'confirmed'
       sendOrderConfirmationEmail(user.email, order, orderItems).catch(() => {})
       sendNewOrderNotification(order, orderItems, user).catch(() => {})
     }
