@@ -18,12 +18,27 @@ import {
   env,
 } from '@huggingface/transformers'
 
-// Serve our self-hosted model from /models/onboarding (public/). Disable the
-// remote HF hub so nothing is fetched from the internet.
-env.allowRemoteModels = false
-env.allowLocalModels = true
-// Model files live under public/models/ ; transformers.js prepends this base.
-;(env as any).localModelPath = '/models/'
+// Self-host the model on OUR origin, presented to transformers.js as its "hub".
+// We deliberately use the remote code path (remoteHost + remotePathTemplate)
+// rather than localModelPath, because:
+//   1. localModelPath's existence probe treats an absolute URL as "remote" and
+//      fails to find files (returns empty tokenizer set → crash), and
+//   2. a blob-based Worker resolves root-relative URLs against its blob: URL,
+//      which also breaks fetching.
+// Pointing remoteHost at our own origin does plain GETs against
+// <origin>/models/<id>/<file>, which works in the worker.
+const ORIGIN = (self as any).location?.origin || ''
+env.allowRemoteModels = true
+env.allowLocalModels = false
+;(env as any).remoteHost = ORIGIN
+;(env as any).remotePathTemplate = '/models/{model}'
+
+// Serve the onnxruntime-web WASM/backend files from our own origin (public/ort/)
+// instead of the jsdelivr CDN — the CDN is blocked by our CSP and we don't want
+// a third-party runtime dependency. Files copied from node_modules/onnxruntime-web/dist.
+try {
+  ;(env as any).backends.onnx.wasm.wasmPaths = `${ORIGIN}/ort/`
+} catch { /* backends not ready — set below after first import */ }
 
 const MODEL_ID = 'onboarding'
 
@@ -46,7 +61,8 @@ async function load() {
 
 async function generate(id: number, prompt: string) {
   await load()
-  const inputs = await tokenizer(prompt, { return_tensor: true })
+  const inputs = await tokenizer(prompt)
+  const promptLen: number = inputs.input_ids.dims.at(-1)
 
   // Stream tokens back so the UI can show text as it arrives.
   const streamer = new TextStreamer(tokenizer, {
@@ -57,6 +73,8 @@ async function generate(id: number, prompt: string) {
     },
   })
 
+  // generate() returns a 2-D Tensor [batch, seq]. Convert to a JS array and
+  // drop the prompt tokens, then decode just the newly generated ids.
   const output = await model.generate({
     ...inputs,
     max_new_tokens: 90,
@@ -64,10 +82,9 @@ async function generate(id: number, prompt: string) {
     streamer,
   })
 
-  const decoded: string = tokenizer.decode(
-    output[0].slice(inputs.input_ids.dims.at(-1)),
-    { skip_special_tokens: true }
-  )
+  const seq: number[] = Array.from(output.tolist ? output.tolist()[0] : output[0])
+  const newIds = seq.slice(promptLen)
+  const decoded: string = tokenizer.decode(newIds, { skip_special_tokens: true })
   ;(self as any).postMessage({ type: 'result', id, text: decoded.trim() })
 }
 
