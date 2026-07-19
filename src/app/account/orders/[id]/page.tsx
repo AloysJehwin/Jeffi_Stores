@@ -58,6 +58,7 @@ interface OrderDetails {
   shippingAmount: number
   status: string
   paymentStatus: string
+  paymentMode?: string | null
   createdAt: string
   updatedAt: string
   deliveredAt: string | null
@@ -273,6 +274,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (!order) return
     if (order.status === 'cancelled' || order.status === 'cancel_requested') return
     if (order.paymentStatus !== 'failed' && order.paymentStatus !== 'unpaid') return
+    if (order.paymentMode === 'cod') return // COD is paid on delivery — never a pay-now countdown
     if (!isRazorpayEnabled) return
 
     const orderCreatedAt = new Date(order.createdAt).getTime()
@@ -1277,7 +1279,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
               </div>
             )}
 
-            {order.paymentStatus === 'unpaid' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
+            {order.paymentStatus === 'unpaid' && order.paymentMode !== 'cod' && isRazorpayEnabled && order.status !== 'cancelled' && order.status !== 'cancel_requested' && (
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div className="flex gap-3 flex-1">

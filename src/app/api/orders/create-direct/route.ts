@@ -112,6 +112,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
+    // COD is not available for products flagged is_cod_allowed=false.
+    if (isCod && product.is_cod_allowed === false) {
+      return NextResponse.json({
+        error: `COD is not available for: ${product.name}. Please choose online payment.`,
+        codBlockedProductIds: [product.id],
+      }, { status: 422 })
+    }
+
     const variant = resolved.item.variantId
       ? await queryOne<any>('SELECT * FROM product_variants WHERE id = $1', [resolved.item.variantId])
       : null
@@ -233,12 +241,15 @@ export async function POST(request: NextRequest) {
       }
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, 'direct', $22, $23, $24)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, payment_mode, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'direct', $23, $24, $25)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
-         'pending', 'unpaid', subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, total,
+         'pending',
+         isCod ? 'cod_pending' : 'unpaid',
+         isCod ? 'cod' : (isRazorpayPayment ? 'razorpay' : 'manual'),
+         subtotal, round2(appliedDiscount), round2(businessDiscountAmount), round2(taxAmount), appliedShipping, total,
          shippingAddressId, billingAddressId,
          notes || null,
          isGSTEnabled ? orderTaxableAmount : 0,
@@ -311,6 +322,10 @@ export async function POST(request: NextRequest) {
     }]
 
     if (!isRazorpayPayment) {
+      // COD / manual orders confirm on placement (payment is collected later — on
+      // delivery for COD). Mirrors the cart path (orders/create).
+      await query(`UPDATE orders SET status = 'confirmed', updated_at = NOW() WHERE id = $1`, [order.id])
+      order.status = 'confirmed'
       sendOrderConfirmationEmail(user.email, order, orderItems).catch(() => {})
       sendNewOrderNotification(order, orderItems, user).catch(() => {})
     }
