@@ -24,8 +24,8 @@ vi.mock('@/lib/razorpay', () => ({
   getRazorpayInstance: vi.fn(),
   isRazorpayEnabled: vi.fn().mockReturnValue(false),
 }))
-vi.mock('@/lib/inventory', () => ({
-  logStockMovement: vi.fn().mockResolvedValue(undefined),
+vi.mock('@/lib/inventory-deduct', () => ({
+  deductOrderStock: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
@@ -45,6 +45,7 @@ vi.mock('@/lib/validate', async (importOriginal) => {
 import { GET, PATCH, DELETE } from '@/app/api/orders/[id]/route'
 import * as db from '@/lib/db'
 import * as jwt from '@/lib/jwt'
+import * as inventoryDeduct from '@/lib/inventory-deduct'
 
 const PARAMS = { params: Promise.resolve({ id: 'order-1' }) }
 const USER = { userId: 'user-1', isBusiness: false }
@@ -358,7 +359,7 @@ describe('PATCH /api/orders/[id]', () => {
     )).toBe(true)
   })
 
-  it('deducts stock and processes assignments on transition to processing', async () => {
+  it('delegates deduction to the shared helper on transition to processing', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({
@@ -366,25 +367,32 @@ describe('PATCH /api/orders/[id]', () => {
         status: 'confirmed',
         users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
       })
-      .mockResolvedValueOnce(null) // unitRow
-    vi.mocked(db.queryMany)
-      .mockResolvedValueOnce([
-        { product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '2',
-          buy_unit: null, product_name: 'P', variant_name: null, inventory_quantity: 100 },
-      ])
-      .mockResolvedValueOnce([
-        { order_item_id: 'oi-1', product_id: 'p1', variant_id: null, sub_variant_id: null,
-          quantity: '2', buy_unit: null },
-      ])
+      .mockResolvedValueOnce(null) // pre-flight unitRow → passthrough qty
+    vi.mocked(db.queryMany).mockResolvedValueOnce([
+      { product_id: 'p1', variant_id: null, sub_variant_id: null, quantity: '2',
+        buy_unit: null, product_name: 'P', variant_name: null, inventory_quantity: 100 },
+    ])
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
-    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
-      const client = { query: vi.fn().mockResolvedValue({ rows: [{ inventory_quantity: '100' }], rowCount: 1 }) }
-      return fn(client as any)
-    })
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) =>
+      fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) } as any)
+    )
 
-    const res = await PATCH(makeReq('PATCH', { status: 'processing' }) as any, PARAMS)
+    const batch_assignments = [{ order_item_id: '22222222-2222-4222-8222-222222222222', batch_id: '11111111-1111-4111-8111-111111111111', qty: 2 }]
+    const serial_assignments = [{ order_item_id: '22222222-2222-4222-8222-222222222222', serial_number: 'SN-1' }]
+    const res = await PATCH(makeReq('PATCH', { status: 'processing', batch_assignments, serial_assignments }) as any, PARAMS)
     expect(res.status).toBe(200)
     expect(vi.mocked(db.withTransaction)).toHaveBeenCalled()
+    // Deduction is delegated to the shared helper (one -1 ledger row per serial,
+    // no double-deduct); picker assignments are forwarded verbatim.
+    expect(vi.mocked(inventoryDeduct.deductOrderStock)).toHaveBeenCalledWith(
+      'order-1',
+      expect.objectContaining({
+        batchAssignments: batch_assignments,
+        serialAssignments: serial_assignments,
+        requireSerialAssignments: true,
+      }),
+      expect.anything()
+    )
   })
 
   it('returns 500 on unexpected error', async () => {

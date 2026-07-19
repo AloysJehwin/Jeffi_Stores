@@ -27,6 +27,23 @@ function outOfStockMessage(label: string): string {
 }
 
 /**
+ * Delete a batch row once it is fully consumed (quantity_remaining <= 0), so
+ * empty batches don't linger in stock views. Safe because inventory_transactions
+ * SNAPSHOTS lot_number/expiry_date/serial_number at movement time — lot history
+ * survives the row's deletion (order_items/product_serials/inventory_transactions
+ * .batch_id are ON DELETE SET NULL). Call after any decrement. Returns true if
+ * the batch was deleted.
+ */
+export async function deleteBatchIfEmpty(client: { query: (sql: string, params?: any[]) => Promise<any> }, batchId: string | null | undefined): Promise<boolean> {
+  if (!batchId) return false
+  const res = await client.query(
+    `DELETE FROM product_batches WHERE id = $1 AND quantity_remaining <= 0`,
+    [batchId]
+  )
+  return (res?.rowCount ?? 0) > 0
+}
+
+/**
  * Deducts inventory for an order at confirmation time — the counterpart to
  * `restoreOrderStock` in order-stock.ts.
  *
@@ -293,6 +310,8 @@ async function deductPerishable(
   }
   // Tag order_item with the first (nearest-expiry) batch for display.
   await client.query(`UPDATE order_items SET batch_id = $1 WHERE id = $2`, [plan[0].batch_id, item.id])
+  // Remove any batch fully consumed by this deduction.
+  for (const p of plan) await deleteBatchIfEmpty(client, p.batch_id)
 }
 
 /** Serialized: mark `count` serials sold FEFO; each serial deducts 1 from its batch. */
@@ -379,6 +398,9 @@ async function deductSerialized(
   if (serials[0]?.batch_id) {
     await client.query(`UPDATE order_items SET batch_id = $1 WHERE id = $2`, [serials[0].batch_id, item.id])
   }
+  // Remove any batch fully consumed by these serials.
+  const touchedBatches = [...new Set(serials.map(s => s.batch_id).filter(Boolean))] as string[]
+  for (const b of touchedBatches) await deleteBatchIfEmpty(client, b)
 }
 
 /** Plain product: decrement inventory_quantity by base qty + non-perishable shelf stock. */
