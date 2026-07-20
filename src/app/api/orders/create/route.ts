@@ -18,6 +18,9 @@ const CreateOrderSchema = z.object({
   shippingAddress: z.any().optional(),
   notes: z.string().nullish(),
   couponId: z.string().nullish(),
+  // Client-quoted shipping; server re-quotes authoritatively and falls back to
+  // this only when the live quote is unavailable (see below).
+  shippingAmount: z.number().nonnegative().nullish(),
 })
 
 const isGSTEnabled = process.env.ENABLE_GST === 'true'
@@ -41,6 +44,7 @@ export async function POST(request: NextRequest) {
     const parsed = parseBody(CreateOrderSchema, body)
     if (!parsed.ok) return parsed.response
     const { shippingAddress, notes, paymentMethod, couponId } = parsed.data
+    const clientShipping = parsed.data.shippingAmount ?? null
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = paymentMethod === 'cod'
 
@@ -145,7 +149,10 @@ export async function POST(request: NextRequest) {
     }, 0)
 
     const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
-    const appliedShipping = destinationPin
+    // Server re-quotes with the correct COD flag; fall back to the client-quoted
+    // amount when the live quote is unavailable so the charged total matches what
+    // the customer saw instead of silently dropping shipping to 0.
+    const quotedShipping = destinationPin
       ? await quoteShipping({
           destinationPin,
           items: cartItems.map((c: any) => ({ productId: c.product_id, variantId: c.variant_id, quantity: Number(c.quantity) })),
@@ -153,6 +160,7 @@ export async function POST(request: NextRequest) {
           isCod,
         })
       : 0
+    const appliedShipping = quotedShipping > 0 ? quotedShipping : (clientShipping != null ? round2(clientShipping) : 0)
 
     const _eddPin = String(destinationPin || '')
     const _eddHandling = Math.max(2, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 2)))
