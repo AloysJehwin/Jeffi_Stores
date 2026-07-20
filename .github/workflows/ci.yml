@@ -193,6 +193,8 @@ jobs:
             NEXT_PUBLIC_ENABLE_GST=${{ secrets.NEXT_PUBLIC_ENABLE_GST }}
             NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
             NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL }}
+            NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY=${{ vars.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
+            NEXT_PUBLIC_ONDEVICE_MODEL_BASE=${{ vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
 
   # ────────────────────────────────────────────────────────
   # Stage 4 — Deploy to EC2  (main only, gate: docker)
