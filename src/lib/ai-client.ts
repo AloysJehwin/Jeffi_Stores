@@ -29,7 +29,10 @@ export class AiClientError extends Error {
 
 const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '')
 const OLLAMA_HEALTH_TIMEOUT_MS = 2000
-const OLLAMA_REQUEST_TIMEOUT_MS = 120_000
+// Per-request Ollama timeout. Kept modest so a hung/unreachable Ollama (e.g. the
+// Razer laptop asleep) fails fast and the OpenAI fallback can trigger within the
+// web request budget instead of hanging the whole request. Override via env.
+const OLLAMA_REQUEST_TIMEOUT_MS = Number(process.env.OLLAMA_REQUEST_TIMEOUT_MS) || 20_000
 
 async function isOllamaReachable(): Promise<boolean> {
   try {
