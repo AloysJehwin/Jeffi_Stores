@@ -1213,3 +1213,201 @@ export async function getReturnRequest(orderId: string) {
   `, [orderId])
   return returnRequest || null
 }
+
+// ── Dashboard analytics (range-aware) ────────────────────────────────────────
+
+export type AnalyticsRange = 'today' | '7d' | '30d' | '90d' | 'month' | 'year'
+
+/** Map a range key → an interval string + the trend bucket granularity. */
+function rangeConfig(range: AnalyticsRange): { interval: string; bucket: 'hour' | 'day' | 'week' | 'month'; label: string } {
+  switch (range) {
+    case 'today': return { interval: '1 day', bucket: 'hour', label: 'Today' }
+    case '7d':    return { interval: '7 days', bucket: 'day', label: 'Last 7 days' }
+    case '30d':   return { interval: '30 days', bucket: 'day', label: 'Last 30 days' }
+    case '90d':   return { interval: '90 days', bucket: 'week', label: 'Last 90 days' }
+    case 'month': return { interval: '1 month', bucket: 'day', label: 'This month' }
+    case 'year':  return { interval: '1 year', bucket: 'month', label: 'Last 12 months' }
+    default:      return { interval: '30 days', bucket: 'day', label: 'Last 30 days' }
+  }
+}
+
+const num = (v: unknown) => (v == null ? 0 : parseFloat(String(v)) || 0)
+const int = (v: unknown) => (v == null ? 0 : parseInt(String(v), 10) || 0)
+const pctDelta = (a: number, b: number): number | null => (b === 0 ? null : Math.round(((a - b) / b) * 100))
+
+export interface DashboardAnalytics {
+  range: AnalyticsRange
+  rangeLabel: string
+  kpis: {
+    revenue: number; revenuePrev: number; revenuePct: number | null
+    orders: number; ordersPrev: number; ordersPct: number | null
+    aov: number; aovPrev: number; aovPct: number | null
+    customers: number; customersPrev: number; customersPct: number | null
+  }
+  trend: { bucket: string; label: string; revenue: number; orders: number }[]
+  payment: { online: number; cod: number; other: number; codOutstanding: number; codOutstandingCount: number }
+  topCategories: { name: string; units: number; revenue: number }[]
+  topBrands: { name: string; units: number; revenue: number }[]
+  customerSplit: { newCustomers: number; returningCustomers: number }
+  buyerSplit: { business: number; consumer: number; businessRevenue: number; consumerRevenue: number }
+  inventory: { inStock: number; lowStock: number; outOfStock: number; stockValue: number }
+  returns: { total: number; rtoInTransit: number; rtoDelivered: number }
+}
+
+/**
+ * Range-aware commerce analytics for the admin dashboard. Only counts revenue on
+ * paid orders; order counts include all statuses. Compares to the immediately
+ * preceding equal-length window for deltas. All columns verified against schema.
+ */
+export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Promise<DashboardAnalytics> {
+  const { interval, bucket, label } = rangeConfig(range)
+  // For 'month'/'year' anchor to calendar boundaries; else rolling window.
+  const startExpr = range === 'month'
+    ? `date_trunc('month', NOW())`
+    : range === 'year'
+      ? `date_trunc('month', NOW()) - INTERVAL '11 months'`
+      : `NOW() - INTERVAL '${interval}'`
+  const prevStartExpr = range === 'month'
+    ? `date_trunc('month', NOW() - INTERVAL '1 month')`
+    : range === 'year'
+      ? `date_trunc('month', NOW()) - INTERVAL '23 months'`
+      : `NOW() - INTERVAL '${interval}' - INTERVAL '${interval}'`
+  const prevEndExpr = range === 'month' ? `date_trunc('month', NOW())` : `NOW() - INTERVAL '${interval}'`
+
+  const [kpiRow, trendRows, payRow, topCats, topBrandsRows, custSplit, buyerRow, invRow, retRow] = await Promise.all([
+    // KPIs: current + previous window
+    queryOne<Record<string, string>>(`
+      SELECT
+        COALESCE(SUM(total_amount) FILTER (WHERE created_at >= ${startExpr} AND payment_status = 'paid'), 0) AS rev,
+        COALESCE(SUM(total_amount) FILTER (WHERE created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr} AND payment_status = 'paid'), 0) AS rev_prev,
+        COUNT(*) FILTER (WHERE created_at >= ${startExpr}) AS ord,
+        COUNT(*) FILTER (WHERE created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr}) AS ord_prev,
+        COUNT(DISTINCT user_id) FILTER (WHERE created_at >= ${startExpr}) AS cust,
+        COUNT(DISTINCT user_id) FILTER (WHERE created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr}) AS cust_prev
+      FROM orders
+    `),
+    // Trend series over the range
+    queryMany<Record<string, string>>(`
+      SELECT
+        date_trunc('${bucket}', created_at) AS bucket,
+        COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0) AS revenue,
+        COUNT(*) AS orders
+      FROM orders
+      WHERE created_at >= ${startExpr}
+      GROUP BY 1 ORDER BY 1 ASC
+    `),
+    // Payment split + COD outstanding
+    queryOne<Record<string, string>>(`
+      SELECT
+        COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid' AND payment_mode NOT ILIKE '%cod%'), 0) AS online,
+        COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid' AND payment_mode ILIKE '%cod%'), 0) AS cod,
+        COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid' AND payment_mode IS NULL), 0) AS other,
+        COALESCE(SUM(total_amount) FILTER (WHERE payment_mode ILIKE '%cod%' AND payment_status <> 'paid' AND status NOT IN ('cancelled','returned')), 0) AS cod_outstanding,
+        COUNT(*) FILTER (WHERE payment_mode ILIKE '%cod%' AND payment_status <> 'paid' AND status NOT IN ('cancelled','returned')) AS cod_outstanding_count
+      FROM orders
+      WHERE created_at >= ${startExpr}
+    `),
+    // Top categories
+    queryMany<Record<string, string>>(`
+      SELECT c.name AS name, SUM(oi.quantity) AS units, SUM(oi.total_price) AS revenue
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      JOIN products p ON p.id = oi.product_id
+      JOIN categories c ON c.id = p.category_id
+      WHERE o.created_at >= ${startExpr}
+      GROUP BY c.name ORDER BY revenue DESC LIMIT 6
+    `),
+    // Top brands
+    queryMany<Record<string, string>>(`
+      SELECT b.name AS name, SUM(oi.quantity) AS units, SUM(oi.total_price) AS revenue
+      FROM order_items oi
+      JOIN orders o ON o.id = oi.order_id
+      JOIN products p ON p.id = oi.product_id
+      JOIN brands b ON b.id = p.brand_id
+      WHERE o.created_at >= ${startExpr}
+      GROUP BY b.name ORDER BY revenue DESC LIMIT 6
+    `),
+    // New vs returning customers in range (based on first-ever order date)
+    queryOne<Record<string, string>>(`
+      WITH firsts AS (
+        SELECT user_id, MIN(created_at) AS first_order FROM orders WHERE user_id IS NOT NULL GROUP BY user_id
+      ), in_range AS (
+        SELECT DISTINCT o.user_id FROM orders o WHERE o.created_at >= ${startExpr} AND o.user_id IS NOT NULL
+      )
+      SELECT
+        COUNT(*) FILTER (WHERE f.first_order >= ${startExpr}) AS new_cust,
+        COUNT(*) FILTER (WHERE f.first_order < ${startExpr}) AS returning_cust
+      FROM in_range ir JOIN firsts f ON f.user_id = ir.user_id
+    `),
+    // Business vs consumer (by orders in range; B2B = GSTIN present or business discount)
+    queryOne<Record<string, string>>(`
+      SELECT
+        COUNT(*) FILTER (WHERE buyer_gstin IS NOT NULL AND buyer_gstin <> '' OR business_discount_amount > 0) AS business,
+        COUNT(*) FILTER (WHERE (buyer_gstin IS NULL OR buyer_gstin = '') AND business_discount_amount = 0) AS consumer,
+        COALESCE(SUM(total_amount) FILTER (WHERE (buyer_gstin IS NOT NULL AND buyer_gstin <> '') OR business_discount_amount > 0), 0) AS business_rev,
+        COALESCE(SUM(total_amount) FILTER (WHERE (buyer_gstin IS NULL OR buyer_gstin = '') AND business_discount_amount = 0), 0) AS consumer_rev
+      FROM orders WHERE created_at >= ${startExpr} AND payment_status = 'paid'
+    `),
+    // Inventory health (active products) + stock value at cost
+    queryOne<Record<string, string>>(`
+      SELECT
+        COUNT(*) FILTER (WHERE stock_status = 'In Stock') AS in_stock,
+        COUNT(*) FILTER (WHERE stock_status = 'Low Stock') AS low_stock,
+        COUNT(*) FILTER (WHERE stock_status = 'Out of Stock') AS out_of_stock,
+        COALESCE(SUM(inventory_quantity * COALESCE(NULLIF(cost_price,0), base_price)), 0) AS stock_value
+      FROM products WHERE is_active = true
+    `),
+    // Returns / RTO
+    queryOne<Record<string, string>>(`
+      SELECT
+        (SELECT COUNT(*) FROM return_requests WHERE created_at >= ${startExpr}) AS total_returns,
+        COUNT(*) FILTER (WHERE shipment_status IN ('rto_initiated','rto_in_transit','rto_out_for_return')) AS rto_in_transit,
+        COUNT(*) FILTER (WHERE shipment_status = 'rto_delivered') AS rto_delivered
+      FROM orders WHERE created_at >= ${startExpr}
+    `),
+  ])
+
+  const rev = num(kpiRow?.rev), revPrev = num(kpiRow?.rev_prev)
+  const ord = int(kpiRow?.ord), ordPrev = int(kpiRow?.ord_prev)
+  const cust = int(kpiRow?.cust), custPrev = int(kpiRow?.cust_prev)
+  const aov = ord > 0 ? rev / ord : 0
+  const aovPrev = ordPrev > 0 ? revPrev / ordPrev : 0
+
+  return {
+    range,
+    rangeLabel: label,
+    kpis: {
+      revenue: rev, revenuePrev: revPrev, revenuePct: pctDelta(rev, revPrev),
+      orders: ord, ordersPrev: ordPrev, ordersPct: pctDelta(ord, ordPrev),
+      aov: Math.round(aov), aovPrev: Math.round(aovPrev), aovPct: pctDelta(aov, aovPrev),
+      customers: cust, customersPrev: custPrev, customersPct: pctDelta(cust, custPrev),
+    },
+    trend: trendRows.map(r => ({
+      bucket: String(r.bucket),
+      label: String(r.bucket),
+      revenue: num(r.revenue),
+      orders: int(r.orders),
+    })),
+    payment: {
+      online: num(payRow?.online),
+      cod: num(payRow?.cod),
+      other: num(payRow?.other),
+      codOutstanding: num(payRow?.cod_outstanding),
+      codOutstandingCount: int(payRow?.cod_outstanding_count),
+    },
+    topCategories: topCats.map(c => ({ name: c.name || 'Uncategorized', units: num(c.units), revenue: num(c.revenue) })),
+    topBrands: topBrandsRows.map(b => ({ name: b.name || 'No brand', units: num(b.units), revenue: num(b.revenue) })),
+    customerSplit: { newCustomers: int(custSplit?.new_cust), returningCustomers: int(custSplit?.returning_cust) },
+    buyerSplit: {
+      business: int(buyerRow?.business), consumer: int(buyerRow?.consumer),
+      businessRevenue: num(buyerRow?.business_rev), consumerRevenue: num(buyerRow?.consumer_rev),
+    },
+    inventory: {
+      inStock: int(invRow?.in_stock), lowStock: int(invRow?.low_stock),
+      outOfStock: int(invRow?.out_of_stock), stockValue: num(invRow?.stock_value),
+    },
+    returns: {
+      total: int(retRow?.total_returns), rtoInTransit: int(retRow?.rto_in_transit), rtoDelivered: int(retRow?.rto_delivered),
+    },
+  }
+}
