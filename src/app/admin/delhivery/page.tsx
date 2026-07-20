@@ -60,6 +60,7 @@ export default function DelhiveryPickupPage() {
   const [addAwbOrderId, setAddAwbOrderId] = useState<string>('')
   const [addAwbLoading, setAddAwbLoading] = useState(false)
   const [refreshingId, setRefreshingId] = useState<string | null>(null)
+  const [downloadingId, setDownloadingId] = useState<string | null>(null)
 
   const PAGE_SIZE = 25
   const [ordersPage, setOrdersPage] = useState(1)
@@ -196,6 +197,29 @@ export default function DelhiveryPickupPage() {
       setResult({ success: false, message: err.message || 'Refresh failed' })
     } finally {
       setRefreshingId(null)
+    }
+  }
+
+  const handleDownloadLabels = async (req: PickupRequest) => {
+    setDownloadingId(req.id)
+    try {
+      const res = await fetch(`/api/admin/delhivery/pickup-request/${req.id}/labels`, { credentials: 'include' })
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}))
+        setResult({ success: false, message: data.error || 'Could not generate labels' })
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `pickup-labels-${(req.pickup_id || req.id.slice(0, 8)).replace(/[^a-zA-Z0-9-]/g, '-')}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (err: any) {
+      setResult({ success: false, message: err.message || 'Could not generate labels' })
+    } finally {
+      setDownloadingId(null)
     }
   }
 
@@ -410,6 +434,26 @@ export default function DelhiveryPickupPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center justify-end gap-2">
+                          {req.awbs.length > 0 && (
+                            <button
+                              onClick={() => handleDownloadLabels(req)}
+                              disabled={downloadingId === req.id}
+                              title="Download all shipping labels in this pickup request (one PDF)"
+                              className="h-[34px] px-3 flex items-center gap-1.5 rounded-lg border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 disabled:opacity-50 transition-colors whitespace-nowrap"
+                            >
+                              {downloadingId === req.id ? (
+                                <svg className="animate-spin w-3.5 h-3.5" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                              )}
+                              <span className="text-sm font-medium">Labels</span>
+                            </button>
+                          )}
                           {req.pickup_status === 'pending' && (
                             <button
                               onClick={() => handleRefresh(req)}
