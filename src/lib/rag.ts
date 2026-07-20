@@ -198,9 +198,10 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
      ORDER BY embedding <=> $1::vector
      LIMIT $2
   `
-  const [productResult, variantResult] = await Promise.all([
+  const [productResult, variantResult, keywordRows] = await Promise.all([
     runWithHnswTuning(productSql, [vecLiteral, limit]),
     runWithHnswTuning(variantSql, [vecLiteral, limit]),
+    keywordProductIds(query, limit),
   ])
 
   const merged: SimilarProductId[] = []
@@ -227,7 +228,45 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
     out.push(r)
     if (out.length >= limit) break
   }
-  return out
+
+  // Hybrid: fold in keyword/full-text product hits the vector search missed.
+  // Semantic search drifts on project-style queries ("wooden shelf" pulls
+  // woodworking tools), so literal term matches (screw/bolt/bracket…) are added
+  // with a high synthetic similarity and kept ahead of weak vector hits.
+  for (const pid of keywordRows) {
+    if (seenProducts.has(pid)) continue
+    seenProducts.add(pid)
+    out.unshift({ productId: pid, similarity: 0.99, matchedVia: 'products', variantId: null })
+  }
+  return out.slice(0, limit)
+}
+
+/**
+ * Full-text / keyword product match — complements the vector search so literal
+ * fastener/hardware terms surface even when embeddings drift off-topic. Uses the
+ * products.search_vector when available, falling back to name/description ILIKE.
+ */
+async function keywordProductIds(query: string, limit: number): Promise<string[]> {
+  // Salient tokens: drop stopwords / connectors, keep words >= 3 chars.
+  const STOP = new Set(['for', 'the', 'and', 'need', 'want', 'what', 'which', 'with', 'from', 'that', 'this', 'building', 'build', 'make', 'making', 'some', 'any', 'are', 'you', 'your', 'have', 'get', 'looking', 'about', 'help'])
+  const tokens = query.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter(t => t.length >= 3 && !STOP.has(t))
+  if (tokens.length === 0) return []
+  const tsquery = tokens.join(' | ')
+  try {
+    const r = await runWithHnswTuning(
+      `SELECT id::text AS source_id
+         FROM products
+        WHERE is_active = true
+          AND search_vector @@ to_tsquery('english', $1)
+        ORDER BY ts_rank(search_vector, to_tsquery('english', $1)) DESC
+        LIMIT $2`,
+      [tsquery, limit]
+    )
+    return r.rows.map((row: { source_id: string }) => row.source_id)
+  } catch {
+    return []
+  }
 }
 
 export async function findSimilarCustomers(query: string, limit = 5): Promise<RagResult[]> {
