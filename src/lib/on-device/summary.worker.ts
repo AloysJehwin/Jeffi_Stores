@@ -18,29 +18,43 @@ import {
   env,
 } from '@huggingface/transformers'
 
-// Self-host the model on OUR origin, presented to transformers.js as its "hub".
-// We deliberately use the remote code path (remoteHost + remotePathTemplate)
+// The model + ORT runtime are served either from our own origin (local dev) or
+// a CDN (prod), selected by NEXT_PUBLIC_ONDEVICE_MODEL_BASE. We present the host
+// to transformers.js via the remote code path (remoteHost + remotePathTemplate)
 // rather than localModelPath, because:
 //   1. localModelPath's existence probe treats an absolute URL as "remote" and
-//      fails to find files (returns empty tokenizer set → crash), and
-//   2. a blob-based Worker resolves root-relative URLs against its blob: URL,
-//      which also breaks fetching.
-// Pointing remoteHost at our own origin does plain GETs against
-// <origin>/models/<id>/<file>, which works in the worker.
+//      fails to find files (empty tokenizer set → crash), and
+//   2. a blob-based Worker resolves root-relative URLs against its blob: URL.
+// Plain GETs against <host>/<template> work in the worker.
+//
+// Layout served (both origin/public and CDN):
+//   <base>/models/onboarding[/vN]/config.json, tokenizer.json, onnx/*, ort/*
 const ORIGIN = (self as any).location?.origin || ''
-env.allowRemoteModels = true
-env.allowLocalModels = false
-;(env as any).remoteHost = ORIGIN
-;(env as any).remotePathTemplate = '/models/{model}'
-
-// Serve the onnxruntime-web WASM/backend files from our own origin (public/ort/)
-// instead of the jsdelivr CDN — the CDN is blocked by our CSP and we don't want
-// a third-party runtime dependency. Files copied from node_modules/onnxruntime-web/dist.
-try {
-  ;(env as any).backends.onnx.wasm.wasmPaths = `${ORIGIN}/ort/`
-} catch { /* backends not ready — set below after first import */ }
+// NEXT_PUBLIC_ONDEVICE_MODEL_BASE = full URL to the model directory, e.g.
+//   https://dm9rri2wgl1e.cloudfront.net/models/onboarding/v1
+// When unset (local dev): same-origin /models/onboarding
+const RAW_BASE = process.env.NEXT_PUBLIC_ONDEVICE_MODEL_BASE || `${ORIGIN}/models/onboarding`
+const MODEL_BASE = RAW_BASE.replace(/\/+$/, '')
 
 const MODEL_ID = 'onboarding'
+
+env.allowRemoteModels = true
+env.allowLocalModels = false
+// transformers.js builds <remoteHost><remotePathTemplate-with-{model}>/<file>.
+// Put the whole base path in the template with {model} standing in for the dir
+// name, so files resolve at <base>/<file>.
+const baseUrl = new URL(MODEL_BASE)
+const basePath = baseUrl.pathname.replace(/\/+$/, '')                 // e.g. /models/onboarding/v1
+const templatePath = basePath.includes(`/${MODEL_ID}`)
+  ? basePath.replace(`/${MODEL_ID}`, `/{model}`)                      // /models/{model}/v1
+  : `${basePath}/{model}`                                            // fallback
+;(env as any).remoteHost = baseUrl.origin
+;(env as any).remotePathTemplate = templatePath
+
+// onnxruntime-web WASM/backends under <base>/ort/ (not jsdelivr, which CSP blocks).
+try {
+  ;(env as any).backends.onnx.wasm.wasmPaths = `${MODEL_BASE}/ort/`
+} catch { /* backends not ready — harmless */ }
 
 let tokenizer: any = null
 let model: any = null
