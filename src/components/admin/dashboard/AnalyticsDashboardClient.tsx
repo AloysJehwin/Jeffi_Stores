@@ -72,7 +72,7 @@ export default function AnalyticsDashboardClient({ initial }: { initial: Dashboa
               onClick={() => changeRange(r.key)}
               disabled={loading}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${
-                range === r.key ? 'bg-accent-500 text-white' : 'bg-surface-secondary text-foreground-secondary hover:bg-surface-secondary/70'
+                range === r.key ? 'bg-accent-500 text-white' : 'bg-surface-secondary text-foreground-secondary border border-border-default hover:border-accent-400 hover:bg-surface-secondary/70'
               }`}
             >
               {r.label}
