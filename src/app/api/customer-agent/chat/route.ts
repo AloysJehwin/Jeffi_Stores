@@ -122,6 +122,13 @@ function formatToolResult(toolName: string, out: Record<string, unknown>): strin
   return JSON.stringify(out)
 }
 
+// Tools whose output is formatted server-side — no second LLM turn needed.
+// Prevents the model from hallucinating product names.
+const SELF_FORMATTING_TOOLS = new Set([
+  'recommend_for_project', 'search_products', 'get_my_recommendations',
+  'get_featured_products', 'get_recent_products', 'get_my_orders',
+])
+
 export async function POST(req: NextRequest) {
   const user = await authenticateUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -212,9 +219,8 @@ export async function POST(req: NextRequest) {
       provider = r.provider
       model = r.model
 
-      // Model returned tool calls — execute them and loop back
+      // Model returned tool calls — execute them
       if (r.toolCalls && r.toolCalls.length > 0) {
-        // Push the assistant's tool-call turn (empty content, tool_calls)
         messages.push({ role: 'assistant', content: '', tool_calls: r.toolCalls.map(tc => ({ function: { name: tc.name, arguments: tc.arguments } })) })
 
         for (const tc of r.toolCalls) {
@@ -228,6 +234,14 @@ export async function POST(req: NextRequest) {
           try {
             const out = await tool.handler(tc.arguments, ctx) as Record<string, unknown>
             toolCallRecords.push({ tool: tc.name, input: tc.arguments, output: out })
+
+            // For product/order tools, format server-side and return immediately.
+            // This prevents the model from hallucinating product names.
+            if (SELF_FORMATTING_TOOLS.has(tc.name)) {
+              finalText = formatToolResult(tc.name, out)
+              return NextResponse.json({ message: finalText, toolCalls: toolCallRecords, provider: r.provider, model: r.model })
+            }
+
             messages.push({ role: 'tool', content: JSON.stringify(out).slice(0, 5000) })
           } catch (err: any) {
             const msg = String(err?.message || err)
