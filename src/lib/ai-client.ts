@@ -1,6 +1,17 @@
 export interface AiChatMessage {
-  role: 'system' | 'user' | 'assistant'
+  role: 'system' | 'user' | 'assistant' | 'tool'
   content: string
+  tool_calls?: Array<{ function: { name: string; arguments: Record<string, unknown> } }>
+  tool_call_id?: string
+}
+
+export interface AiToolDef {
+  type: 'function'
+  function: {
+    name: string
+    description: string
+    parameters: Record<string, unknown>
+  }
 }
 
 export interface AiChatRequest {
@@ -10,10 +21,17 @@ export interface AiChatRequest {
   jsonMode?: boolean
   modelHint?: 'sql' | 'copy' | 'agent' | 'fast'
   forceProvider?: 'openai' | 'ollama'
+  tools?: AiToolDef[]
+}
+
+export interface AiToolCall {
+  name: string
+  arguments: Record<string, unknown>
 }
 
 export interface AiChatResponse {
   content: string
+  toolCalls?: AiToolCall[]
   provider: 'openai' | 'ollama'
   model: string
   latencyMs: number
@@ -46,7 +64,7 @@ async function isOllamaReachable(): Promise<boolean> {
   }
 }
 
-async function callOllama(req: AiChatRequest): Promise<{ content: string; model: string }> {
+async function callOllama(req: AiChatRequest): Promise<{ content: string; toolCalls?: AiToolCall[]; model: string }> {
   const agentModel = process.env.OLLAMA_AGENT_MODEL || 'glm4'
   const model = req.modelHint === 'sql'
     ? (process.env.OLLAMA_SQL_MODEL || agentModel)
@@ -63,6 +81,7 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
       body: JSON.stringify({
         model,
         messages: req.messages,
+        tools: req.tools,
         stream: false,
         think: false,
         format: req.jsonMode ? 'json' : undefined,
@@ -78,10 +97,23 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
       throw new AiClientError(`Ollama HTTP ${res.status}: ${body}`, 'ollama')
     }
     const data = await res.json()
-    let content = data?.message?.content
+    const msg = data?.message ?? {}
+
+    // Native tool calls (Ollama tools API)
+    if (Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+      const toolCalls: AiToolCall[] = msg.tool_calls.map((tc: any) => ({
+        name: tc.function?.name ?? '',
+        arguments: typeof tc.function?.arguments === 'string'
+          ? JSON.parse(tc.function.arguments)
+          : (tc.function?.arguments ?? {}),
+      }))
+      return { content: '', toolCalls, model }
+    }
+
+    let content = msg.content
     // Qwen3 extended-thinking mode returns content in a separate 'thinking' field with empty content
-    if ((typeof content !== 'string' || content.trim() === '') && typeof data?.message?.thinking === 'string') {
-      content = data.message.thinking
+    if ((typeof content !== 'string' || content.trim() === '') && typeof msg.thinking === 'string') {
+      content = msg.thinking
     }
     if (typeof content !== 'string') throw new AiClientError('Ollama response missing message.content', 'ollama')
     // Strip <think>...</think> reasoning blocks emitted by Qwen3 and similar models
@@ -127,7 +159,7 @@ export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
     if (reachable) {
       try {
         const r = await callOllama(req)
-        return { content: r.content, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
+        return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
       } catch (err) {
         if (!fallbackEnabled) throw err
       }
