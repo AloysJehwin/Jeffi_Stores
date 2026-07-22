@@ -140,16 +140,18 @@ export async function publishProductDraft(productId: string): Promise<void> {
       [productId, JSON.stringify(draft.fields)]
     )
 
-    // UPSERT variants by SKU to preserve IDs referenced by purchase_order_items etc.
-    const draftSkus = (variants as any[]).map((v: any) => v.sku).filter(Boolean)
-    if (draftSkus.length > 0) {
+    // UPSERT variants — never hard-delete to preserve FK references from POs/orders
+    // Only process variants that have valid SKUs
+    const validVariants = (variants as any[]).filter((v: any) => v.sku)
+    const draftSkus = validVariants.map((v: any) => v.sku)
+
+    if (validVariants.length > 0) {
+      // Deactivate variants removed from draft (soft delete only)
       await client.query(
-        `DELETE FROM product_variants WHERE product_id = $1 AND sku != ALL($2::text[])`,
+        `UPDATE product_variants SET is_active = false, updated_at = NOW()
+         WHERE product_id = $1 AND sku != ALL($2::text[])`,
         [productId, draftSkus]
       )
-    } else {
-      await client.query(`DELETE FROM product_variants WHERE product_id = $1`, [productId])
-    }
     await client.query(
       `INSERT INTO product_variants (
          product_id, sku, variant_name, price, attributes, is_active, mrp,
@@ -189,8 +191,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
          stock_decimal_precision = EXCLUDED.stock_decimal_precision,
          sell_unit_id = EXCLUDED.sell_unit_id, stock_status = EXCLUDED.stock_status,
          updated_at = NOW()`,
-      [productId, JSON.stringify(variants)]
+      [productId, JSON.stringify(validVariants)]
     )
+    }
 
     await client.query(`DELETE FROM product_images WHERE product_id = $1`, [productId])
     await client.query(
