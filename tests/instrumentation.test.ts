@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
+// Mock Redis so the distributed lock always succeeds (single-process test env)
+vi.mock('@/lib/redis', () => ({
+  default: { set: vi.fn().mockResolvedValue('OK') },
+}))
+
 // ---------------------------------------------------------------------------
 // Mock global fetch before importing instrumentation
 // ---------------------------------------------------------------------------
@@ -73,6 +78,8 @@ describe('register', () => {
     // (setInterval would loop infinitely)
     vi.advanceTimersByTime(31_000)
     await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
 
     // At least one fetch should use the NEXT_PUBLIC_APP_URL base
     const calls = vi.mocked(global.fetch).mock.calls
@@ -115,6 +122,8 @@ describe('register', () => {
     // Advance past the 30s initial delay for delhivery_sync
     vi.advanceTimersByTime(31_000)
     await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
 
     const calls = vi.mocked(global.fetch).mock.calls
     const delhiveryCall = calls.find(([url]) =>
@@ -136,6 +145,8 @@ describe('register', () => {
     await register()
 
     vi.advanceTimersByTime(31_000)
+    await Promise.resolve()
+    await Promise.resolve()
     await Promise.resolve()
 
     const calls = vi.mocked(global.fetch).mock.calls
@@ -159,7 +170,9 @@ describe('register', () => {
     await register()
 
     vi.advanceTimersByTime(31_000)
-    // flush two microtask ticks: one for the rejection, one for the recordRun call
+    // flush microtask ticks: Redis lock + cron fetch rejection + recordRun call
+    await Promise.resolve()
+    await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
 
@@ -193,6 +206,8 @@ describe('register', () => {
     await register()
 
     vi.advanceTimersByTime(31_000)
+    await Promise.resolve()
+    await Promise.resolve()
     await Promise.resolve()
     await Promise.resolve()
 

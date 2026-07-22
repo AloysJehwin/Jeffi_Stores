@@ -68,6 +68,13 @@ ML_JOURNEY.md
 # Claude Code runtime files
 .claude/scheduled_tasks.json
 .claude/scheduled_tasks.lock
+.claude/worktrees/
+
+# Claude-generated planning/architecture docs (not checked in)
+docs/MULTI_TENANT_ARCHITECTURE.md
+
+# Graphify dated snapshot directories (regenerated on demand)
+graphify-out/20*/
 
 # Playwright MCP artifacts
 .playwright-mcp/
