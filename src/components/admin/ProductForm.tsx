@@ -728,6 +728,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function uploadVariantImageFile(variantId: string, file: File) {
     if (!productId) return
+    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     if (variantId.startsWith('temp-')) {
       setVariantImageError('Save the product first to upload variant images.')
       return
@@ -757,6 +758,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function deleteVariantImage(variantId: string, imageId: string) {
     if (!productId) return
+    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     setVariantImageDeleting(m => ({ ...m, [imageId]: true }))
     try {
       await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
@@ -776,6 +778,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function setVariantImagePrimary(variantId: string, imageId: string) {
     if (!productId) return
+    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -789,6 +792,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function reorderVariantImages(variantId: string, fromIndex: number, toIndex: number) {
     if (!productId || fromIndex === toIndex) return
+    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     const current = variantImagesMap[variantId] || []
     if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) return
     const next = [...current]
@@ -830,6 +834,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function addVariantImagesFromGallery() {
     if (!productId || !variantPopupId) return
+    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     const currentImages = variantImagesMap[variantPopupId] || []
     const slotsLeft = 5 - currentImages.length
     const toAdd = variantGallerySelected.slice(0, slotsLeft)
@@ -865,6 +870,8 @@ export default function ProductForm({ categories, brands, action, product, produ
       setVariantImageError('Save the product first to add sub-variants.')
       return
     }
+    if (isDraft) { setVariantImageError('In draft mode — sub-variant changes apply when you publish.'); return }
+    }
     if (variantId.startsWith('temp-')) {
       setVariantImageError('Save the product first to add sub-variants for this variant.')
       return
@@ -894,8 +901,8 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function deleteSubVariant(variantId: string, subId: string) {
     if (!productId) return
+    if (isDraft) { setVariantImageError('In draft mode — sub-variant changes apply when you publish.'); return }
     if (variantId.startsWith('temp-')) return
-    await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: subId }),
@@ -2494,6 +2501,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           <UnitsManager
             productId={productId}
             basePrice={basePrice}
+            isDraft={isDraft}
           />
         </div>
       )}
@@ -3036,6 +3044,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1 pl-1 flex items-center gap-1">
                                     <button type="button" onClick={async () => {
                                       if (!ed) return
+                                      if (isDraft) { setVariantImageError('In draft mode — sub-variant changes apply when you publish.'); return }
                                       const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`, {
                                         method: 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
@@ -3073,6 +3082,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       variantId={variantPopupId}
                                       subVariantId={sv.id}
                                       basePrice={sv.price}
+                                      isDraft={isDraft}
                                     />
                                   </td>
                                 </tr>
@@ -3166,6 +3176,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     variantId={variantPopupId}
                     basePrice={popupVariant?.price || (popupVariant?.price_ex_gst ? exToIncl(popupVariant.price_ex_gst, gstRate) : null)}
                     onUnitLoaded={(info) => { setPopupUnitKey(info.unitKey); setPopupUnitInfo(info) }}
+                    isDraft={isDraft}
                   />
                 </div>
               )}
