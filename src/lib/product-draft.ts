@@ -243,7 +243,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
     await client.query(`DELETE FROM product_units WHERE product_id = $1 AND variant_id IS NULL AND sub_variant_id IS NULL`, [productId])
 
     // Insert product-level units from draft
-    const productUnits = (units as any[]).filter((u: any) => !u.variant_id || u.variant_id === 'null')
+    const productUnits = (units as any[]).filter((u: any) => !u._cleared && (!u.variant_id || u.variant_id === 'null'))
     if (productUnits.length > 0) {
       await client.query(
         `INSERT INTO product_units (
@@ -264,7 +264,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
     }
 
     // UPSERT variant-level units from draft (preserve IDs via ON CONFLICT on product_id+variant_id+unit)
-    const variantUnits = (units as any[]).filter((u: any) => u.variant_id && u.variant_id !== 'null')
+    const variantUnits = (units as any[]).filter((u: any) => !u._cleared && u.variant_id && u.variant_id !== 'null')
     for (const u of variantUnits) {
       await client.query(
         `INSERT INTO product_units (
