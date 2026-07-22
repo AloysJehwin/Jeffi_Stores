@@ -50,8 +50,8 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       JOIN users u ON u.id = ci.user_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE ci.saved_for_later = FALSE
-        AND ci.updated_at < NOW() - ($2 || ' hours')::interval
-        AND ci.updated_at > NOW() - ($3 || ' days')::interval
+        AND ci.updated_at < NOW() - ($2::text || ' hours')::interval
+        AND ci.updated_at > NOW() - ($3::text || ' days')::interval
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
@@ -60,7 +60,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
             AND ecs.user_id = ci.user_id
-            AND ecs.sent_at > NOW() - ($4 || ' days')::interval
+            AND ecs.sent_at > NOW() - ($4::text || ' days')::interval
         )
       LIMIT $5
     `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep])
@@ -75,7 +75,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       JOIN email_campaigns_sent ecs1 ON ecs1.user_id = ci.user_id
         AND ecs1.campaign_kind = $1
         AND (ecs1.metadata->>'sequence')::int = 1
-        AND ecs1.sent_at < NOW() - ($6 || ' hours')::interval
+        AND ecs1.sent_at < NOW() - ($6::text || ' hours')::interval
         AND ecs1.sent_at > NOW() - ($4 || ' days')::interval
       WHERE ci.saved_for_later = FALSE
         AND ci.updated_at > NOW() - ($3 || ' days')::interval
