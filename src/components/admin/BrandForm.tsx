@@ -10,9 +10,10 @@ interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
   brand?: any
   backUrl?: string
+  isDraft?: boolean
 }
 
-export default function BrandForm({ action, brand, backUrl }: BrandFormProps) {
+export default function BrandForm({ action, brand, backUrl, isDraft = false }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>(brand?.name || '')
@@ -211,13 +212,23 @@ export default function BrandForm({ action, brand, backUrl }: BrandFormProps) {
         >
           Cancel
         </Link>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? 'Saving...' : brand ? 'Update Brand' : 'Create Brand'}
-        </button>
+        {isDraft ? (
+          <>
+            <button type="submit" name="intent" value="draft" disabled={isSubmitting}
+              className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50">
+              {isSubmitting ? 'Saving…' : 'Save Draft'}
+            </button>
+            <button type="submit" name="intent" value="publish" disabled={isSubmitting}
+              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50">
+              {isSubmitting ? 'Publishing…' : 'Publish'}
+            </button>
+          </>
+        ) : (
+          <button type="submit" disabled={isSubmitting}
+            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {isSubmitting ? 'Saving...' : brand ? 'Update Brand' : 'Create Brand'}
+          </button>
+        )}
       </div>
     </form>
   )
