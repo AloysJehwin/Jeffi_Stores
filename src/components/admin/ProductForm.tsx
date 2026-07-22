@@ -526,7 +526,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const serverSaveInFlight = useRef(false)
   const serverSavePending = useRef(false)
   const variantsRef = useRef(variants)
-  useEffect(() => { variantsRef.current = variants }, [variants])
+  variantsRef.current = variants  // always sync — no useEffect delay
 
   async function serverSaveNow() {
     if (!isDraft || !productId) return
