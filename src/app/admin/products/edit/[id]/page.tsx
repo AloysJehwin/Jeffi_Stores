@@ -692,8 +692,9 @@ export default async function EditProductPage({ params, searchParams }: { params
 
   // In draft mode, merge saved draft fields over the live product so the form
   // shows the admin's last saved changes (not the original live values).
-  // Also merge draft variants if they have valid SKUs (popup changes were autosaved).
-  const draftVariants = isDraft && Array.isArray(draftRow?.variants) && draftRow!.variants.some((v: any) => v.sku)
+  // Only use draft variants if they have both id and sku (autosaved from popup).
+  const draftVariants = isDraft && Array.isArray(draftRow?.variants) &&
+    draftRow!.variants.some((v: any) => v.sku && v.id)
     ? draftRow!.variants
     : null
   const productForForm = isDraft && draftRow?.fields
