@@ -1,4 +1,4 @@
-import { queryOne, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, withTransaction } from '@/lib/db'
 
 interface ProductDraft {
   product_id: string
@@ -21,6 +21,19 @@ export async function publishProductDraft(productId: string): Promise<void> {
     [productId]
   )
   if (!draft) throw new Error('Draft not found')
+
+  // If draft variants/sub_variants are empty, fall back to live data
+  const variants = Array.isArray(draft.variants) && draft.variants.length > 0
+    ? draft.variants
+    : await queryMany(`SELECT * FROM product_variants WHERE product_id = $1`, [productId])
+
+  const subVariants = Array.isArray(draft.sub_variants) && draft.sub_variants.length > 0
+    ? draft.sub_variants
+    : await queryMany(`SELECT * FROM product_sub_variants WHERE product_id = $1`, [productId])
+
+  const units = Array.isArray(draft.units) && draft.units.length > 0
+    ? draft.units
+    : await queryMany(`SELECT * FROM product_units WHERE product_id = $1`, [productId])
 
   await withTransaction(async (client) => {
     await client.query(
@@ -151,7 +164,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          NULLIF(v->>'stock_decimal_precision','')::integer, NULLIF(v->>'sell_unit_id','')::uuid,
          v->>'stock_status', NOW(), NOW()
        FROM jsonb_array_elements($2::jsonb) AS v`,
-      [productId, JSON.stringify(draft.variants)]
+      [productId, JSON.stringify(variants)]
     )
 
     await client.query(`DELETE FROM product_images WHERE product_id = $1`, [productId])
@@ -186,7 +199,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          NULLIF(sv->>'discount_pct','')::numeric, sv->>'stock_status', NOW(), NOW()
        FROM jsonb_array_elements($2::jsonb) AS sv
        JOIN product_variants pv ON pv.product_id = $1 AND pv.sku = sv->>'variant_sku'`,
-      [productId, JSON.stringify(draft.sub_variants)]
+      [productId, JSON.stringify(subVariants)]
     )
 
     await client.query(`DELETE FROM product_units WHERE product_id = $1`, [productId])
@@ -208,7 +221,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          NULLIF(u->>'min_qty','')::numeric, NULLIF(u->>'max_qty','')::numeric,
          NULLIF(u->>'qty_step','')::numeric, NOW(), NOW()
        FROM jsonb_array_elements($2::jsonb) AS u`,
-      [productId, JSON.stringify(draft.units)]
+      [productId, JSON.stringify(units)]
     )
 
     await client.query(`DELETE FROM product_drafts WHERE product_id = $1`, [productId])
