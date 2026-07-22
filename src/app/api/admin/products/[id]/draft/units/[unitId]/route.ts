@@ -39,7 +39,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   return NextResponse.json({ success: true, unit: updated.find((u: any) => u.id === unitId) })
 }
 
-// DELETE — remove a unit from draft.units by id
+// DELETE — remove a unit from draft.units by id, storing a sentinel so GET knows it was explicitly cleared
 export async function DELETE(req: NextRequest, { params }: Params) {
   const { id, unitId } = await params
   const admin = await authenticateAdmin(req)
@@ -48,7 +48,19 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const units = await getDraftUnits(id)
+  const deleted = units.find((u: any) => u.id === unitId)
   const filtered = units.filter((u: any) => u.id !== unitId)
+
+  // Add a sentinel so the GET fallback knows this scope was explicitly cleared
+  if (deleted) {
+    filtered.push({
+      _cleared: true,
+      id: `cleared-${unitId}`,
+      variant_id: deleted.variant_id ?? null,
+      sub_variant_id: deleted.sub_variant_id ?? null,
+    })
+  }
+
   await query(
     `UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
     [id, JSON.stringify(filtered)]

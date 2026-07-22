@@ -44,10 +44,11 @@ export async function GET(req: NextRequest, { params }: Params) {
     await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [id, JSON.stringify(all)])
   }
 
-  let units = all.filter((u: any) => scopeMatch(u, variantId, subVariantId))
+  let units = all.filter((u: any) => !u._cleared && scopeMatch(u, variantId, subVariantId))
+  const wasCleared = all.some((u: any) => u._cleared && scopeMatch(u, variantId, subVariantId))
 
-  // If no draft units for this scope, fall back to live product_units
-  if (units.length === 0) {
+  // Only fall back to live product_units if this scope was never touched in the draft
+  if (units.length === 0 && !wasCleared) {
     const liveUnits = await queryMany(
       `SELECT * FROM product_units WHERE product_id = $1
        AND ($2::uuid IS NULL OR variant_id = $2::uuid)
