@@ -15,7 +15,7 @@ import DownloadAdButton from '@/components/admin/DownloadAdButton'
 import ProductsTableClient from '@/components/admin/ProductsTableClient'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
-import MerchantSyncStatus from '@/components/admin/MerchantSyncStatus'
+import DraftRowActions from '@/components/admin/DraftRowActions'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
@@ -261,19 +261,14 @@ async function ProductsStats() {
             </div>
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
               {pendingDrafts.map((d) => (
-                <Link
+                <DraftRowActions
                   key={d.product_id}
-                  href={ap(`/admin/products/edit/${d.product_id}`, host)}
-                  className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
-                >
-                  <div>
-                    <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{d.name}</p>
-                    {d.sku && <p className="text-xs text-amber-600 dark:text-amber-400">{d.sku}</p>}
-                  </div>
-                  <p className="text-xs text-amber-500 dark:text-amber-500 ml-4 shrink-0">
-                    {new Date(d.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                  </p>
-                </Link>
+                  productId={d.product_id}
+                  name={d.name}
+                  sku={d.sku}
+                  updatedAt={d.updated_at}
+                  editHref={ap(`/admin/products/edit/${d.product_id}`, host)}
+                />
               ))}
             </div>
           </div>
