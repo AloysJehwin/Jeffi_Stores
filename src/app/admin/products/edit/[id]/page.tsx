@@ -241,7 +241,7 @@ async function updateProduct(productId: string, formData: FormData) {
            COALESCE($3::jsonb, (SELECT variants FROM product_drafts WHERE product_id = $1)),
            COALESCE((SELECT json_agg(to_jsonb(i) - 'id' ORDER BY i.display_order) FROM product_images i WHERE i.product_id = $1)::jsonb, '[]'::jsonb),
            COALESCE((SELECT json_agg(to_jsonb(sv) - 'id') FROM product_sub_variants sv WHERE sv.product_id = $1)::jsonb, '[]'::jsonb),
-           COALESCE((SELECT json_agg(to_jsonb(u) - 'id') FROM product_units u WHERE u.product_id = $1)::jsonb, '[]'::jsonb),
+           COALESCE((SELECT units FROM product_drafts WHERE product_id = $1), (SELECT json_agg(to_jsonb(u) - 'id') FROM product_units u WHERE u.product_id = $1)::jsonb, '[]'::jsonb),
            NOW()
          )
          ON CONFLICT (product_id) DO UPDATE SET
@@ -249,7 +249,7 @@ async function updateProduct(productId: string, formData: FormData) {
            variants = COALESCE(EXCLUDED.variants, product_drafts.variants),
            images = EXCLUDED.images,
            sub_variants = EXCLUDED.sub_variants,
-           units = EXCLUDED.units,
+           units = product_drafts.units,
            updated_at = NOW()`,
         [productId, JSON.stringify(draftFields), draftVariants ? JSON.stringify(draftVariants) : null]
       )
