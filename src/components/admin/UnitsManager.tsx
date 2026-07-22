@@ -309,13 +309,6 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
 
   if (loading) return <div className="text-xs text-foreground-muted py-3">Loading…</div>
 
-  if (isDraft) return (
-    <div className="rounded-lg border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 text-sm text-amber-800 dark:text-amber-300">
-      Selling unit changes are staged with the draft — publish to apply them to the live product.
-      <span className="block text-xs text-amber-600 dark:text-amber-400 mt-0.5">Current live units are shown below (read-only in draft mode).</span>
-    </div>
-  )
-
   const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
   const extraCountUnits = allUnits.filter(u => !u.is_base && u.dimension === 'count')
   const showExtraSection = !baseUnit || baseUnit.dimension === 'count'
