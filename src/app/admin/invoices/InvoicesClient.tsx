@@ -195,6 +195,7 @@ export default function InvoicesClient() {
   const [drafts, setDrafts] = useState<any[]>([])
   const [draftsLoading, setDraftsLoading] = useState(false)
   const [finalizingId, setFinalizingId] = useState<string | null>(null)
+  const [publishingId, setPublishingId] = useState<string | null>(null)
   const [editIsDraft, setEditIsDraft] = useState(false)
 
   // Batch picker for perishable line items
@@ -286,6 +287,24 @@ export default function InvoicesClient() {
     } catch {
       showToast('Failed to finalize draft', 'error')
       setFinalizingId(null)
+    }
+  }
+
+  async function publishAmendmentDraft(id: string) {
+    setPublishingId(id)
+    try {
+      const res = await fetch(`/api/admin/invoices/drafts/${id}/publish`, {
+        method: 'POST', credentials: 'include',
+      })
+      const data = await res.json()
+      if (!res.ok) { showToast(data.error || 'Failed to publish amendment', 'error'); return }
+      showToast(`Amendment published as ${data.invoiceNumber || ''}`, 'success')
+      fetchDrafts()
+      fetchInvoices(1)
+    } catch {
+      showToast('Failed to publish amendment', 'error')
+    } finally {
+      setPublishingId(null)
     }
   }
 
@@ -1136,7 +1155,7 @@ export default function InvoicesClient() {
                 </span>
               )}
             </div>
-            <p className="text-xs text-amber-700 dark:text-amber-400">Saved due to insufficient stock — finalize once stock is restocked</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400">Draft invoices pending finalization or amendment publishing</p>
           </div>
 
           {draftsLoading ? (
@@ -1162,6 +1181,11 @@ export default function InvoicesClient() {
                           >
                             {draft.order_number}
                           </a>
+                          {draft.order_number?.startsWith('AMD-') ? (
+                            <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Amendment Draft</span>
+                          ) : (
+                            <span className="ml-2 px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Draft</span>
+                          )}
                         </td>
                         <td className="px-4 py-3 text-sm text-foreground">{draft.customer_name}</td>
                         <td className="px-4 py-3 text-xs text-foreground-secondary">{draft.customer_phone ? `+91 ${draft.customer_phone}` : '—'}</td>
@@ -1174,7 +1198,7 @@ export default function InvoicesClient() {
                         <td className="px-4 py-3 text-xs text-foreground-secondary whitespace-nowrap">{fmtDate(draft.created_at)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            {draft.source === 'offline' && (
+                            {draft.source === 'offline' && !draft.order_number?.startsWith('AMD-') && (
                             <button
                               onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
                               className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
@@ -1190,13 +1214,31 @@ export default function InvoicesClient() {
                               View
                             </a>
                             )}
-                            <button
-                              onClick={() => finalizeDraft(draft.id)}
-                              disabled={finalizingId === draft.id}
-                              className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 disabled:opacity-50 transition-colors"
-                            >
-                              {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
-                            </button>
+                            {draft.order_number?.startsWith('AMD-') ? (
+                              <>
+                                <a
+                                  href={ap(`/admin/invoices/${draft.id}`)}
+                                  className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
+                                >
+                                  View
+                                </a>
+                                <button
+                                  onClick={() => publishAmendmentDraft(draft.id)}
+                                  disabled={publishingId === draft.id}
+                                  className="text-xs font-semibold text-blue-700 dark:text-blue-300 hover:text-blue-900 dark:hover:text-blue-100 disabled:opacity-50 transition-colors"
+                                >
+                                  {publishingId === draft.id ? 'Publishing…' : 'Publish Amendment'}
+                                </button>
+                              </>
+                            ) : (
+                              <button
+                                onClick={() => finalizeDraft(draft.id)}
+                                disabled={finalizingId === draft.id}
+                                className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-amber-100 disabled:opacity-50 transition-colors"
+                              >
+                                {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -1209,7 +1251,14 @@ export default function InvoicesClient() {
                 {drafts.map(draft => (
                   <div key={draft.id} className="p-4 space-y-2">
                     <div className="flex items-center justify-between">
-                      <a href={ap(`/admin/orders/${draft.id}`)} className="font-mono text-xs font-medium text-foreground hover:text-accent-500 hover:underline transition-colors">{draft.order_number}</a>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <a href={ap(`/admin/orders/${draft.id}`)} className="font-mono text-xs font-medium text-foreground hover:text-accent-500 hover:underline transition-colors">{draft.order_number}</a>
+                        {draft.order_number?.startsWith('AMD-') ? (
+                          <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300">Amendment Draft</span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded-full text-xs font-semibold bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">Draft</span>
+                        )}
+                      </div>
                       <span className="text-sm font-semibold text-foreground">
                         ₹{parseFloat(draft.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                       </span>
@@ -1225,7 +1274,7 @@ export default function InvoicesClient() {
                       <DraftStockPill draft={draft} />
                     </div>
                     <div className="flex gap-4 pt-1">
-                      {draft.source === 'offline' && (
+                      {draft.source === 'offline' && !draft.order_number?.startsWith('AMD-') && (
                       <button
                         onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
                         className="text-xs text-foreground-secondary hover:text-foreground font-medium"
@@ -1233,7 +1282,7 @@ export default function InvoicesClient() {
                         Edit
                       </button>
                       )}
-                      {draft.source !== 'offline' && (
+                      {(draft.source !== 'offline' || draft.order_number?.startsWith('AMD-')) && (
                       <a
                         href={ap(`/admin/invoices/${draft.id}`)}
                         className="text-xs text-foreground-secondary hover:text-foreground font-medium"
@@ -1241,13 +1290,23 @@ export default function InvoicesClient() {
                         View
                       </a>
                       )}
-                      <button
-                        onClick={() => finalizeDraft(draft.id)}
-                        disabled={finalizingId === draft.id}
-                        className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 disabled:opacity-50"
-                      >
-                        {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
-                      </button>
+                      {draft.order_number?.startsWith('AMD-') ? (
+                        <button
+                          onClick={() => publishAmendmentDraft(draft.id)}
+                          disabled={publishingId === draft.id}
+                          className="text-xs font-semibold text-blue-700 dark:text-blue-300 hover:text-blue-900 disabled:opacity-50"
+                        >
+                          {publishingId === draft.id ? 'Publishing…' : 'Publish Amendment'}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => finalizeDraft(draft.id)}
+                          disabled={finalizingId === draft.id}
+                          className="text-xs font-semibold text-amber-700 dark:text-amber-300 hover:text-amber-900 disabled:opacity-50"
+                        >
+                          {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
