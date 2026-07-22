@@ -412,6 +412,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         const mrpExStr = mrpEx != null ? String(mrpEx) : ''
         return ({
         id: v.id,
+        sku: v.sku || '',
         variant_name: v.variant_name,
         price,
         mrp: mrpInclStr,
