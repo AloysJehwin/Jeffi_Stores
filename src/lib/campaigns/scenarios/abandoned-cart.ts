@@ -76,9 +76,9 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         AND ecs1.campaign_kind = $1
         AND (ecs1.metadata->>'sequence')::int = 1
         AND ecs1.sent_at < NOW() - ($6::text || ' hours')::interval
-        AND ecs1.sent_at > NOW() - ($4 || ' days')::interval
+        AND ecs1.sent_at > NOW() - ($4::text || ' days')::interval
       WHERE ci.saved_for_later = FALSE
-        AND ci.updated_at > NOW() - ($3 || ' days')::interval
+        AND ci.updated_at > NOW() - ($3::text || ' days')::interval
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
@@ -112,8 +112,8 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         SELECT DISTINCT ci.user_id
         FROM cart_items ci
         WHERE ci.saved_for_later = FALSE
-          AND ci.updated_at < NOW() - ($2 || ' hours')::interval
-          AND ci.updated_at > NOW() - ($3 || ' days')::interval
+          AND ci.updated_at < NOW() - ($2::text || ' hours')::interval
+          AND ci.updated_at > NOW() - ($3::text || ' days')::interval
       )
       SELECT
         ec.user_id::text,
@@ -132,7 +132,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
           ELSE NULL
         END AS reason_detail,
         CASE
-          WHEN ecs.sent_at IS NOT NULL THEN (ecs.sent_at + ($4 || ' days')::interval)::text
+          WHEN ecs.sent_at IS NOT NULL THEN (ecs.sent_at + ($4::text || ' days')::interval)::text
           ELSE NULL
         END AS blocked_until
       FROM eligible_carts ec
@@ -141,7 +141,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         SELECT sent_at FROM email_campaigns_sent
          WHERE campaign_kind = $1
            AND user_id = ec.user_id
-           AND sent_at > NOW() - ($4 || ' days')::interval
+           AND sent_at > NOW() - ($4::text || ' days')::interval
          ORDER BY sent_at DESC LIMIT 1
       ) ecs ON TRUE
       WHERE u.is_active = FALSE OR u.is_guest = TRUE OR u.marketing_opt_out = TRUE OR ecs.sent_at IS NOT NULL
