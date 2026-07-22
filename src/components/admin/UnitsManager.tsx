@@ -418,7 +418,12 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
         </div>
       ) : (
         <div className="flex items-center justify-between bg-surface border border-dashed border-border-default rounded-lg px-4 py-3">
-          <span className="text-xs text-foreground-muted italic">No unit set</span>
+          <div>
+            <span className="text-xs text-foreground-muted italic">No unit set</span>
+            {(isVariantScope || isSubVariantScope) && (
+              <span className="ml-2 text-xs text-foreground-muted">— inherits from {isSubVariantScope ? 'variant' : 'product'}</span>
+            )}
+          </div>
           <button type="button" onClick={() => openBaseEdit()} className="text-xs text-accent-600 hover:underline">Set unit</button>
         </div>
       )}
