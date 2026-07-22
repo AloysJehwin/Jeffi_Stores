@@ -221,6 +221,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   }
 
   async function handleResetBase() {
+    if (isDraft) { showToast('Selling unit changes are blocked in draft mode — publish first', 'error'); return }
     const base = allUnits.find(u => u.is_base) ?? allUnits[0]
     if (!base) return
     setSaving(true)
@@ -232,6 +233,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   }
 
   async function handleDeleteExtra(u: ProductUnit) {
+    if (isDraft) { showToast('Selling unit changes are blocked in draft mode — publish first', 'error'); return }
     setDeletingId(u.id)
     try {
       const res = await fetch(`${baseUrl}/${u.id}`, { method: 'DELETE', credentials: 'include' })
@@ -241,6 +243,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   }
 
   async function handleSaveBase() {
+    if (isDraft) { showToast('Selling unit changes are blocked in draft mode — publish first', 'error'); return }
     const key = draftUnit.trim()
     if (!key) { showToast('Unit name is required', 'error'); return }
 
@@ -282,6 +285,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   }
 
   async function handleSaveExtra() {
+    if (isDraft) { showToast('Selling unit changes are blocked in draft mode — publish first', 'error'); return }
     const key = extraUnit.trim()
     if (!key) { showToast('Unit name is required', 'error'); return }
 

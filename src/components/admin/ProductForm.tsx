@@ -549,7 +549,12 @@ export default function ProductForm({ categories, brands, action, product, produ
       const r = await fetch(`/api/admin/products/${productId}/draft`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ fields }),
+        body: JSON.stringify({
+          fields,
+          imageOrder,
+          existingImagesToKeep,
+          galleryImageIds,
+        }),
       })
       setServerSaveStatus(r.ok ? 'saved' : 'error')
     } catch {
