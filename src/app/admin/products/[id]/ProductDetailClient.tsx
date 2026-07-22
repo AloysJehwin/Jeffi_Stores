@@ -249,7 +249,11 @@ function CollapsibleCard({ title, children }: { title: string; children: React.R
         <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">{title}</p>
         <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
-      {open && <div className="px-4 pb-4 space-y-2.5">{children}</div>}
+      {open && (
+        <div className="px-4 pb-4 pt-1 space-y-2.5">
+          {children}
+        </div>
+      )}
     </div>
   )
 }
@@ -541,23 +545,30 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
             {/* — Physical & Compliance — */}
             <CollapsibleCard title="Physical & Compliance">
-              <Field label="Material" value={p.material} />
-              <Field label="Finish" value={p.finish} />
-              <Field label="Size" value={p.size} />
-              <Field label="Color" value={p.color} />
-              <Field label="Color Hex" value={p.color_hex} mono />
-              <Field label="Shelf Life (days)" value={p.shelf_life_days} />
-              <Field label="Certifications" value={Array.isArray(p.certifications) && p.certifications.length ? p.certifications.join(', ') : null} />
-              <Field label="Compliance Standard" value={p.compliance_standard} />
-              <Field label="Safety Rating" value={p.safety_rating} />
-              <Field label="Warranty" value={p.warranty_months ? `${p.warranty_months} months${p.warranty_type ? ` (${p.warranty_type})` : ''}` : null} />
-              <div className="flex flex-wrap gap-2 pt-1">
-                {p.fragile && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">Fragile</span>}
-                {p.hazardous && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Hazardous</span>}
-                {p.flammable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">Flammable</span>}
-                {p.perishable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Perishable</span>}
-                {p.serialized && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Serialized</span>}
-              </div>
+              {!p.material && !p.finish && !p.size && !p.color && !p.shelf_life_days &&
+               !(Array.isArray(p.certifications) && p.certifications.length) &&
+               !p.compliance_standard && !p.safety_rating && !p.warranty_months &&
+               !p.fragile && !p.hazardous && !p.flammable && !p.perishable && !p.serialized ? (
+                <p className="text-xs text-foreground-muted italic">No physical or compliance data configured.</p>
+              ) : (<>
+                <Field label="Material" value={p.material} />
+                <Field label="Finish" value={p.finish} />
+                <Field label="Size" value={p.size} />
+                <Field label="Color" value={p.color} />
+                <Field label="Color Hex" value={p.color_hex} mono />
+                <Field label="Shelf Life (days)" value={p.shelf_life_days} />
+                <Field label="Certifications" value={Array.isArray(p.certifications) && p.certifications.length ? p.certifications.join(', ') : null} />
+                <Field label="Compliance Standard" value={p.compliance_standard} />
+                <Field label="Safety Rating" value={p.safety_rating} />
+                <Field label="Warranty" value={p.warranty_months ? `${p.warranty_months} months${p.warranty_type ? ` (${p.warranty_type})` : ''}` : null} />
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {p.fragile && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">Fragile</span>}
+                  {p.hazardous && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Hazardous</span>}
+                  {p.flammable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">Flammable</span>}
+                  {p.perishable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Perishable</span>}
+                  {p.serialized && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Serialized</span>}
+                </div>
+              </>)}
             </CollapsibleCard>
 
             {/* — Lifecycle & Merchandising — */}
