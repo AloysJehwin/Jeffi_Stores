@@ -473,7 +473,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-3">
             {/* — Details — */}
             <CollapsibleCard title="Details">
               <Field label="Category" value={p.categories?.name} />
@@ -700,7 +700,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
           )}
 
           {/* — Selling Units & Shelf Locations — */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="space-y-3">
             <CollapsibleCard title="Selling Units">
               <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
             </CollapsibleCard>
