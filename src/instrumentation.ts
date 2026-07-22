@@ -1,4 +1,7 @@
-import redis from '@/lib/redis'
+// Redis is imported dynamically below — only in the nodejs runtime — because
+// ioredis uses Node.js APIs (process.version.charCodeAt) that are unavailable
+// in the edge runtime and cause a module evaluation crash if imported at the
+// top level of instrumentation.ts (which Turbopack evaluates in both runtimes).
 
 export async function register() {
   if (process.env.NEXT_RUNTIME !== 'nodejs') return
@@ -27,8 +30,10 @@ export async function register() {
   // Acquire a distributed Redis lock for the given job.
   // Returns true if this instance won the lock and should run the job.
   // TTL slightly shorter than the cron interval so the lock expires before next run.
+  // Redis is imported dynamically so ioredis is never evaluated in the edge runtime.
   const acquireLock = async (jobId: string, ttlMs: number): Promise<boolean> => {
     try {
+      const { default: redis } = await import('@/lib/redis')
       const key = `cron:lock:${jobId}`
       const result = await redis.set(key, '1', 'PX', ttlMs, 'NX' as any)
       return result === 'OK'
