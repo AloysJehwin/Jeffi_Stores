@@ -955,7 +955,6 @@ export default function ProductForm({ categories, brands, action, product, produ
       setVariantImageError('Save the product first to add sub-variants.')
       return
     }
-    if (isDraft) { setVariantImageError('In draft mode — sub-variant changes apply when you publish.'); return }
     if (variantId.startsWith('temp-')) {
       setVariantImageError('Save the product first to add sub-variants for this variant.')
       return
@@ -985,7 +984,6 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function deleteSubVariant(variantId: string, subId: string) {
     if (!productId) return
-    if (isDraft) { setVariantImageError('In draft mode — sub-variant changes apply when you publish.'); return }
     if (variantId.startsWith('temp-')) return
     await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
       method: 'DELETE',
@@ -3129,8 +3127,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1 pl-1 flex items-center gap-1">
                                     <button type="button" onClick={async () => {
                                       if (!ed) return
-                                      if (isDraft) { setVariantImageError('In draft mode — sub-variant changes apply when you publish.'); return }
-                                      const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`, {
+                                                                        const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`, {
                                         method: 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, discount_pct: parseFloat(discountPct) || 0, stock_status: ed.stock || 'In Stock', sku: ed.sku || null }),
