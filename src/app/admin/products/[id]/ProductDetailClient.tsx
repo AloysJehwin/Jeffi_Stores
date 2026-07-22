@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import { Star, Sparkles, CheckCircle, XCircle, Loader2, X } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
@@ -258,6 +259,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
   const [selectedImage, setSelectedImage] = useState(0)
   const [shelfStock, setShelfStock] = useState<ShelfRow[]>([])
   const [aiOpen, setAiOpen] = useState(false)
+  const [showDraftModal, setShowDraftModal] = useState(false)
 
   const loadProduct = useCallback(() => {
     setLoading(true)
@@ -372,9 +374,28 @@ export default function ProductDetailClient({ id }: { id: string }) {
           <Link href={ap(`/admin/products/${p.id}/analytics`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Analytics
           </Link>
-          <Link href={ap(`/admin/products/edit/${p.id}`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
-            Edit
-          </Link>
+          {p.is_active && !p.draft_of_id ? (
+            <button
+              onClick={() => setShowDraftModal(true)}
+              className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            >
+              Edit
+            </button>
+          ) : (
+            <Link href={ap(`/admin/products/edit/${p.id}`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
+              Edit
+            </Link>
+          )}
+          {showDraftModal && (
+            <DraftConfirmModal
+              productId={p.id}
+              productName={p.name}
+              productSku={p.sku || null}
+              existingDraftId={null}
+              backUrl={`/admin/products/${p.id}`}
+              onClose={() => setShowDraftModal(false)}
+            />
+          )}
         </div>
       </div>
 
