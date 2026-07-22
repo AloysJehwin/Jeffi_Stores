@@ -68,6 +68,7 @@ interface ProductFormProps {
   backUrl?: string
   perishableBatchTotal?: number
   serializedStockTotal?: number
+  isDraft?: boolean
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
@@ -199,7 +200,7 @@ function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: (
   )
 }
 
-export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0, serializedStockTotal = 0 }: ProductFormProps) {
+export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0, serializedStockTotal = 0, isDraft = false }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -386,6 +387,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [hasDraft, setHasDraft] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const serverAutosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [serverSaveStatus, setServerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
     if (product?.product_variants && product.product_variants.length > 0) {
@@ -517,6 +520,47 @@ export default function ProductForm({ categories, brands, action, product, produ
     basePrice, mrp, mrpExGst, salePrice, costPrice, discountPct,
     topPriceLockSide, topMrpLockSide,
     gstRate, isActive, draftKey,
+  ])
+
+  // Server autosave — fires 5s after last change, only in draft mode
+  useEffect(() => {
+    if (!isDraft || !productId) return
+    if (serverAutosaveTimer.current) clearTimeout(serverAutosaveTimer.current)
+    serverAutosaveTimer.current = setTimeout(() => {
+      const form = formRef.current
+      if (!form) return
+      const formData = new FormData(form)
+      const fields: Record<string, unknown> = {}
+      for (const [k, v] of formData.entries()) {
+        if (typeof v === 'string') fields[k] = v
+      }
+      fields.has_variants = hasVariants
+      fields.base_price = basePrice
+      fields.mrp = mrp
+      fields.mrp_ex_gst = mrpExGst
+      fields.price_ex_gst = salePrice
+      fields.cost_price = costPrice
+      fields.discount_pct = discountPct
+      fields.is_active = isActive
+      setServerSaveStatus('saving')
+      fetch(`/api/admin/products/${productId}/draft`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fields }),
+      }).then(r => {
+        setServerSaveStatus(r.ok ? 'saved' : 'error')
+        setTimeout(() => setServerSaveStatus('idle'), 3000)
+      }).catch(() => {
+        setServerSaveStatus('error')
+        setTimeout(() => setServerSaveStatus('idle'), 3000)
+      })
+    }, 5000)
+    return () => { if (serverAutosaveTimer.current) clearTimeout(serverAutosaveTimer.current) }
+  }, [
+    isDraft, productId,
+    hasVariants, variants, groups,
+    basePrice, mrp, mrpExGst, salePrice, costPrice, discountPct,
+    gstRate, isActive,
   ])
 
   const wasPerishableOff = !(product?.perishable)
@@ -2449,6 +2493,17 @@ export default function ProductForm({ categories, brands, action, product, produ
 
       {/* Form Actions */}
       <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+        {isDraft && serverSaveStatus !== 'idle' && (
+          <span className={`self-center text-xs mr-auto ${
+            serverSaveStatus === 'saving' ? 'text-foreground-muted' :
+            serverSaveStatus === 'saved' ? 'text-green-600 dark:text-green-400' :
+            'text-red-500'
+          }`}>
+            {serverSaveStatus === 'saving' ? 'Auto-saving…' :
+             serverSaveStatus === 'saved' ? 'Draft saved' :
+             'Auto-save failed'}
+          </span>
+        )}
         <Link
           href={ap('/admin/products')}
           className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors text-center"

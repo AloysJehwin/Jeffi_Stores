@@ -730,6 +730,7 @@ export default async function EditProductPage({ params, searchParams }: { params
         backUrl={backUrl}
         perishableBatchTotal={perishableBatchTotal}
         serializedStockTotal={serializedStockTotal}
+        isDraft={isDraft}
       />
     </div>
   )
