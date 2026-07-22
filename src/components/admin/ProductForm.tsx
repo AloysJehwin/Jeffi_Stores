@@ -545,6 +545,61 @@ export default function ProductForm({ categories, brands, action, product, produ
     fields.cost_price = costPrice
     fields.discount_pct = discountPct
     fields.is_active = isActive
+    fields.is_featured = isFeatured
+    fields.fragile = fragile
+    fields.hazardous = hazardous
+    fields.flammable = flammable
+    fields.perishable = perishable
+    fields.serialized = serialized
+    fields.is_cod_allowed = isCodAllowed
+    fields.is_searchable = isSearchable
+    fields.is_oversized = isOversized
+    fields.is_digital = isDigital
+    fields.is_subscription = isSubscription
+    fields.is_bundle = isBundle
+    fields.inclusive_tax = inclusiveTax
+    fields.name = productName
+    fields.description = description
+    fields.brand_id = brandId || null
+    fields.category_id = categoryId || null
+    fields.sku = sku || null
+    fields.gst_percentage = gstRate
+    fields.package_type = productPackageType
+    fields.certifications = certifications
+    fields.compliance_standard = complianceStandard
+    fields.safety_rating = safetyRating
+    fields.warranty_months = warrantyMonths
+    fields.warranty_type = warrantyType
+    fields.condition = condition
+    fields.launch_date = launchDate || null
+    fields.discontinue_date = discontinueDate || null
+    fields.sort_order = sortOrderVal
+    fields.handling_days = handlingDays
+    fields.shipping_class = shippingClass
+    fields.download_url = downloadUrl || null
+    fields.license_type = licenseType || null
+    fields.file_format = fileFormat || null
+    fields.platform_compatibility = platformCompatibility
+    fields.subscription_interval = subscriptionInterval || null
+    fields.subscription_price = subscriptionPrice || null
+    fields.meta_title = metaTitle || null
+    fields.meta_description = metaDescription || null
+    fields.tax_class = taxClass
+    fields.age_min = ageMin || null
+    fields.age_max = ageMax || null
+    fields.target_gender = targetGender || null
+    fields.target_audience = targetAudience
+    fields.barcode = barcode || null
+    fields.isbn = isbn || null
+    fields.asin = asin || null
+    fields.brand_part_number = brandPartNumber || null
+    fields.country_of_origin = countryOfOrigin || null
+    fields.shelf_life_days = shelfLifeDays || null
+    fields.color = color || null
+    fields.color_hex = colorHex || null
+    fields.volume_ml = volumeMl || null
+    fields.net_weight_grams = netWeightGrams || null
+    fields.grade = grade || null
     try {
       const r = await fetch(`/api/admin/products/${productId}/draft`, {
         method: 'PATCH',
@@ -573,7 +628,35 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (!isDraft || !productId) return
     void serverSaveNow()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDraft, productId, hasVariants, isActive, isFeatured, fragile, hazardous, flammable, perishable, serialized, isCodAllowed, isSearchable, isOversized, isDigital, isSubscription, isBundle, inclusiveTax, imageOrder, existingImagesToKeep, galleryImageIds])
+  }, [
+    isDraft, productId,
+    // product identity & pricing
+    productName, description, brandId, categoryId, sku,
+    basePrice, mrp, mrpExGst, salePrice, costPrice, discountPct, gstRate,
+    hasVariants, isActive, isFeatured,
+    // physical
+    productPackageType, fragile, hazardous, flammable, perishable, serialized,
+    certifications, complianceStandard, safetyRating, warrantyMonths, warrantyType,
+    color, colorHex, volumeMl, netWeightGrams, grade,
+    // condition & lifecycle
+    condition, isCodAllowed, launchDate, discontinueDate, sortOrderVal,
+    // shipping
+    handlingDays, shippingClass, isOversized, extraDeliveryDays,
+    // digital
+    isDigital, downloadUrl, licenseType, fileFormat, platformCompatibility,
+    // subscription & bundle
+    isSubscription, subscriptionInterval, subscriptionPrice, isBundle,
+    // seo & tax
+    metaTitle, metaDescription, isSearchable, taxClass, inclusiveTax,
+    // audience
+    ageMin, ageMax, targetGender, targetAudience,
+    // identification
+    barcode, isbn, asin, brandPartNumber, countryOfOrigin, shelfLifeDays,
+    // images
+    imageOrder, existingImagesToKeep, galleryImageIds,
+    // variants
+    variants, groups,
+  ])
 
   const wasPerishableOff = !(product?.perishable)
   const wasSerializedOff = !(product?.serialized)
