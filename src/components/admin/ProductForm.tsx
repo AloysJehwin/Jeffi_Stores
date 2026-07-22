@@ -387,7 +387,6 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [hasDraft, setHasDraft] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const serverAutosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [serverSaveStatus, setServerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
@@ -523,39 +522,51 @@ export default function ProductForm({ categories, brands, action, product, produ
   ])
 
   // Server autosave — fires 5s after last change, only in draft mode
-  useEffect(() => {
+  const serverSaveInFlight = useRef(false)
+  const serverSavePending = useRef(false)
+
+  async function serverSaveNow() {
     if (!isDraft || !productId) return
-    if (serverAutosaveTimer.current) clearTimeout(serverAutosaveTimer.current)
-    serverAutosaveTimer.current = setTimeout(() => {
-      const form = formRef.current
-      if (!form) return
-      const formData = new FormData(form)
-      const fields: Record<string, unknown> = {}
-      for (const [k, v] of formData.entries()) {
-        if (typeof v === 'string') fields[k] = v
-      }
-      fields.has_variants = hasVariants
-      fields.base_price = basePrice
-      fields.mrp = mrp
-      fields.mrp_ex_gst = mrpExGst
-      fields.price_ex_gst = salePrice
-      fields.cost_price = costPrice
-      fields.discount_pct = discountPct
-      fields.is_active = isActive
-      setServerSaveStatus('saving')
-      fetch(`/api/admin/products/${productId}/draft`, {
+    const form = formRef.current
+    if (!form) return
+    if (serverSaveInFlight.current) { serverSavePending.current = true; return }
+    serverSaveInFlight.current = true
+    setServerSaveStatus('saving')
+    const formData = new FormData(form)
+    const fields: Record<string, unknown> = {}
+    for (const [k, v] of formData.entries()) {
+      if (typeof v === 'string') fields[k] = v
+    }
+    fields.has_variants = hasVariants
+    fields.base_price = basePrice
+    fields.mrp = mrp
+    fields.mrp_ex_gst = mrpExGst
+    fields.price_ex_gst = salePrice
+    fields.cost_price = costPrice
+    fields.discount_pct = discountPct
+    fields.is_active = isActive
+    try {
+      const r = await fetch(`/api/admin/products/${productId}/draft`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ fields }),
-      }).then(r => {
-        setServerSaveStatus(r.ok ? 'saved' : 'error')
-        setTimeout(() => setServerSaveStatus('idle'), 3000)
-      }).catch(() => {
-        setServerSaveStatus('error')
-        setTimeout(() => setServerSaveStatus('idle'), 3000)
       })
-    }, 1000)
-    return () => { if (serverAutosaveTimer.current) clearTimeout(serverAutosaveTimer.current) }
+      setServerSaveStatus(r.ok ? 'saved' : 'error')
+    } catch {
+      setServerSaveStatus('error')
+    }
+    serverSaveInFlight.current = false
+    if (serverSavePending.current) {
+      serverSavePending.current = false
+      serverSaveNow()
+    } else {
+      setTimeout(() => setServerSaveStatus('idle'), 2000)
+    }
+  }
+
+  useEffect(() => {
+    if (!isDraft || !productId) return
+    void serverSaveNow()
   }, [
     isDraft, productId,
     hasVariants, variants, groups,
