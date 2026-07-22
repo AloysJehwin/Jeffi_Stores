@@ -24,7 +24,16 @@ export async function GET(req: NextRequest, { params }: Params) {
   }
   const draft = await getDraft(id)
   if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
-  const units = Array.isArray(draft.units) ? draft.units : []
+  // Ensure every unit has a stable id — assign one if missing (from original snapshot)
+  const raw = Array.isArray(draft.units) ? draft.units : []
+  const units = raw.map((u: any, i: number) => u.id ? u : { ...u, id: `draft-unit-${i}` })
+  // Persist ids back if any were missing
+  if (raw.some((u: any) => !u.id)) {
+    await query(
+      `UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
+      [id, JSON.stringify(units)]
+    )
+  }
   const base = units.find((u: any) => u.is_base) ?? null
   return NextResponse.json({ units, inherited: false, rules: base ? [{ unit: (base as any).unit, dimension: (base as any).dimension }] : [] })
 }

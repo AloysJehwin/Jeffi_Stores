@@ -23,11 +23,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   const units = await getDraftUnits(id)
-  if (!units.find((u: any) => u.id === unitId)) {
-    return NextResponse.json({ error: 'Unit not found in draft' }, { status: 404 })
-  }
   const body = await req.json()
-  const updated = units.map((u: any) => u.id === unitId ? { ...u, ...body } : u)
+  let updated: any[]
+  const idx = units.findIndex((u: any) => u.id === unitId)
+  if (idx >= 0) {
+    updated = units.map((u: any) => u.id === unitId ? { ...u, ...body } : u)
+  } else {
+    // Unit not in draft yet — add it with this id
+    updated = [...units, { ...body, id: unitId }]
+  }
   await query(
     `UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
     [id, JSON.stringify(updated)]
