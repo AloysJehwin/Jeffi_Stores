@@ -524,6 +524,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   // Server autosave — fires 5s after last change, only in draft mode
   const serverSaveInFlight = useRef(false)
   const serverSavePending = useRef(false)
+  const variantsRef = useRef(variants)
+  useEffect(() => { variantsRef.current = variants }, [variants])
 
   async function serverSaveNow() {
     if (!isDraft || !productId) return
@@ -611,7 +613,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           imageOrder,
           existingImagesToKeep,
           galleryImageIds,
-          variants: variants.filter((v: any) => !v._isDeleted),
+          variants: variantsRef.current.filter((v: any) => !v._isDeleted),
         }),
       })
       setServerSaveStatus(r.ok ? 'saved' : 'error')
