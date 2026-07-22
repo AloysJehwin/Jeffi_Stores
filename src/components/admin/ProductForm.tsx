@@ -817,9 +817,10 @@ export default function ProductForm({ categories, brands, action, product, produ
           setVariantImageError(err.error || `Could not load images (${res.status})`)
         }
       }
-    const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
-      credentials: 'include',
-    })
+    const svEndpoint = isDraft && productId
+      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
+    const res = await fetch(svEndpoint, { credentials: 'include' })
     if (res.ok) {
       const data = await res.json()
       const loaded = data.sub_variants || []
@@ -975,8 +976,12 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
     const draft = subVariantDrafts[variantId]
     if (!draft?.name) return
-    const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
+    const svUrl = isDraft
+      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
+    const res = await fetch(svUrl, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sub_variant_name: draft.name,
@@ -999,7 +1004,10 @@ export default function ProductForm({ categories, brands, action, product, produ
   async function deleteSubVariant(variantId: string, subId: string) {
     if (!productId) return
     if (variantId.startsWith('temp-')) return
-    const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
+    const svUrl = isDraft
+      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
+    const res = await fetch(svUrl, {
       method: 'DELETE',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -3143,8 +3151,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1 pl-1 flex items-center gap-1">
                                     <button type="button" onClick={async () => {
                                       if (!ed) return
-                                                                        const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`, {
-                                        method: 'PUT',
+                                      const svEditUrl = isDraft
+                                        ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantPopupId}`
+                                        : `/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`
+                                      const res = await fetch(svEditUrl, {
+                                        method: isDraft ? 'PATCH' : 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, discount_pct: parseFloat(discountPct) || 0, stock_status: ed.stock || 'In Stock', sku: ed.sku || null }),
                                       })
