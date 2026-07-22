@@ -433,9 +433,13 @@ export default function ProductForm({ categories, brands, action, product, produ
         breadth_cm: v.breadth_cm != null ? String(v.breadth_cm) : '',
         height_cm: v.height_cm != null ? String(v.height_cm) : '',
         sub_variant_type: v.sub_variant_type || '',
-        sub_variant_type_on: !!v.sub_variant_type || (Array.isArray(v.sub_variants) && v.sub_variants.length > 0),
+        sub_variant_type_on: v.sub_variant_type_on != null
+          ? !!v.sub_variant_type_on
+          : (!!v.sub_variant_type || (Array.isArray(v.sub_variants) && v.sub_variants.length > 0)),
         variant_type: v.variant_type || '',
-        use_own_images: !!(v.variant_images && v.variant_images.length > 0),
+        use_own_images: v.use_own_images != null
+          ? !!v.use_own_images
+          : !!(v.variant_images && v.variant_images.length > 0),
       })
       })
     }
