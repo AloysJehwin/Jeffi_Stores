@@ -619,6 +619,20 @@ export default async function EditProductPage({ params, searchParams }: { params
     : null
   const serializedStockTotal = serialCountRow?.total ?? 0
 
+  // Draft system state
+  const isLiveProduct = product.is_active === true && !product.draft_of_id
+  const isDraft = !product.is_active && !!product.draft_of_id
+
+  // For live products: check if a draft already exists
+  const existingDraftRow = isLiveProduct
+    ? await queryOne<{ id: string }>(`SELECT id FROM products WHERE draft_of_id = $1::uuid LIMIT 1`, [id])
+    : null
+
+  // For drafts: load the original product's SKU for the banner label
+  const originalProductRow = isDraft
+    ? await queryOne<{ id: string; sku: string | null; name: string }>(`SELECT id, sku, name FROM products WHERE id = $1::uuid`, [product.draft_of_id])
+    : null
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
@@ -627,24 +641,182 @@ export default async function EditProductPage({ params, searchParams }: { params
           Products
         </a>
         <span className="text-border-default">/</span>
-        <span className="text-foreground font-medium">Edit Product</span>
+        <span className="text-foreground font-medium">{isDraft ? 'Edit Draft' : 'Edit Product'}</span>
       </div>
+
+      {/* Draft banner — shown when editing a draft */}
+      {isDraft && (
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+              Editing draft of{originalProductRow ? ` "${originalProductRow.name}"${originalProductRow.sku ? ` (${originalProductRow.sku})` : ''}` : ` product #${product.draft_of_id}`}. Changes won&apos;t go live until published.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <form action={async () => {
+              'use server'
+              const host2 = await getHost()
+              await query(`UPDATE products SET is_active = true, draft_of_id = NULL, updated_at = NOW()
+                WHERE id = $1::uuid`, [id])
+              revalidatePath('/admin/products')
+              revalidatePath(`/admin/products/edit/${id}`)
+              if (product.draft_of_id) {
+                revalidatePath(`/admin/products/edit/${product.draft_of_id}`)
+              }
+              redirect(ap(`/admin/products/edit/${product.draft_of_id}`, host2))
+            }}>
+              <button
+                type="submit"
+                className="px-3 py-1.5 text-xs font-semibold rounded-md bg-green-600 hover:bg-green-700 text-white transition-colors"
+              >
+                Publish Draft
+              </button>
+            </form>
+            <form action={async () => {
+              'use server'
+              const host2 = await getHost()
+              const origId = product.draft_of_id
+              await query(`DELETE FROM products WHERE id = $1::uuid`, [id])
+              revalidatePath('/admin/products')
+              if (origId) revalidatePath(`/admin/products/edit/${origId}`)
+              redirect(ap(origId ? `/admin/products/edit/${origId}` : '/admin/products', host2))
+            }}>
+              <button
+                type="submit"
+                className="px-3 py-1.5 text-xs font-semibold rounded-md border border-border-default bg-surface-elevated hover:bg-surface-secondary text-foreground transition-colors"
+              >
+                Discard Draft
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Live product banner — read-only gate */}
+      {isLiveProduct && existingDraftRow && (
+        <div className="mb-6 rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">A draft is pending for this product.</p>
+            <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">Edit the draft to make changes, then publish when ready.</p>
+          </div>
+          <a
+            href={ap(`/admin/products/edit/${existingDraftRow.id}`, host)}
+            className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors text-center"
+          >
+            Go to Draft
+          </a>
+        </div>
+      )}
+
+      {isLiveProduct && !existingDraftRow && (
+        <div className="mb-6 rounded-lg border border-border-default bg-surface-secondary px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">This product is live.</p>
+            <p className="text-xs text-foreground-muted mt-0.5">Create a draft to edit safely. The live product won&apos;t change until you publish.</p>
+          </div>
+          <form action={async () => {
+            'use server'
+            const host2 = await getHost()
+            const newDraft = await queryOne<{ id: string }>(
+              `INSERT INTO products
+                 SELECT gen_random_uuid() AS id, name, slug || '-draft-' || EXTRACT(EPOCH FROM NOW())::bigint, description,
+                        category_id, brand_id, base_price, mrp, mrp_ex_gst, price_ex_gst, gst_percentage, hsn_code,
+                        stock_status, weight, dimensions, false AS is_active, is_featured, has_variants, variant_type,
+                        sub_variant_type, weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price,
+                        discount_pct, NOW() AS created_at, NOW() AS updated_at, sku, inventory_quantity, mpn, gtin,
+                        extra_delivery_days, barcode, isbn, asin, brand_part_number, country_of_origin, shelf_life_days,
+                        grade, specifications, color, color_hex, volume_ml, net_weight_grams, fragile, hazardous,
+                        flammable, perishable, serialized, certifications, compliance_standard, safety_rating,
+                        warranty_months, warranty_type, condition, is_cod_allowed, launch_date, discontinue_date,
+                        sort_order, handling_days, shipping_class, is_oversized, is_digital, download_url,
+                        license_type, file_format, platform_compatibility, is_subscription, subscription_interval,
+                        subscription_price, is_bundle, meta_title, meta_description, is_searchable, tax_class,
+                        inclusive_tax, age_min, age_max, target_gender, target_audience, material, size,
+                        $1::uuid AS draft_of_id
+               FROM products WHERE id = $1::uuid
+               RETURNING id`,
+              [id]
+            )
+            if (!newDraft) redirect(ap(`/admin/products/edit/${id}`, host2))
+            revalidatePath('/admin/products')
+            revalidatePath(`/admin/products/edit/${id}`)
+            redirect(ap(`/admin/products/edit/${newDraft.id}`, host2))
+          }}>
+            <button
+              type="submit"
+              className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-md bg-accent-500 hover:bg-accent-600 text-white transition-colors"
+            >
+              Create Draft
+            </button>
+          </form>
+        </div>
+      )}
 
       <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Edit Product</h1>
-        <p className="text-foreground-secondary mt-1">Update product information</p>
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">{isDraft ? 'Edit Draft' : 'Edit Product'}</h1>
+        <p className="text-foreground-secondary mt-1">{isDraft ? 'Changes are saved to the draft only' : isLiveProduct ? 'Viewing live product' : 'Update product information'}</p>
       </div>
 
-      <ProductForm
-        categories={categories || []}
-        brands={brands || []}
-        product={product}
-        productId={id}
-        action={updateProduct.bind(null, id)}
-        backUrl={backUrl}
-        perishableBatchTotal={perishableBatchTotal}
-        serializedStockTotal={serializedStockTotal}
-      />
+      {isLiveProduct ? (
+        /* Live products are shown read-only — form is hidden, view mode displayed */
+        <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-4 text-sm">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Name</p>
+              <p className="text-foreground font-medium">{product.name}</p>
+            </div>
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">SKU</p>
+              <p className="text-foreground">{product.sku || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Category</p>
+              <p className="text-foreground">{(product.categories as any)?.name || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Brand</p>
+              <p className="text-foreground">{(product.brands as any)?.name || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Base Price</p>
+              <p className="text-foreground">Rs. {Number(product.base_price || 0).toLocaleString('en-IN')}</p>
+            </div>
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">MRP</p>
+              <p className="text-foreground">{product.mrp ? `Rs. ${Number(product.mrp).toLocaleString('en-IN')}` : '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Stock Status</p>
+              <p className="text-foreground">{product.stock_status || '—'}</p>
+            </div>
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">GST %</p>
+              <p className="text-foreground">{product.gst_percentage ?? '—'}</p>
+            </div>
+          </div>
+          {product.description && (
+            <div>
+              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Description</p>
+              <p className="text-foreground whitespace-pre-line">{product.description}</p>
+            </div>
+          )}
+          <p className="text-xs text-foreground-muted pt-2 border-t border-border-default">
+            To edit this product, create a draft using the banner above.
+          </p>
+        </div>
+      ) : (
+        <ProductForm
+          categories={categories || []}
+          brands={brands || []}
+          product={product}
+          productId={id}
+          action={updateProduct.bind(null, id)}
+          backUrl={backUrl}
+          perishableBatchTotal={perishableBatchTotal}
+          serializedStockTotal={serializedStockTotal}
+        />
+      )}
     </div>
   )
 }

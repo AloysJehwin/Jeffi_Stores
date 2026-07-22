@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
+import { queryOne } from '@/lib/db'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
@@ -205,15 +206,20 @@ async function ProductsListContent({ resolvedSearchParams }: { resolvedSearchPar
 
 // Runs ONLY the aggregate stats query (all products) and renders the stat cards.
 async function ProductsStats() {
-  const [allProductsForStats, categories] = await Promise.all([
+  const host = await getHost()
+  const [allProductsForStats, categories, pendingDraftsRow] = await Promise.all([
     getFilteredProducts({}),
     getAllCategories(),
+    queryOne<{ count: string }>(
+      `SELECT COUNT(*)::text AS count FROM products WHERE is_active = false AND draft_of_id IS NOT NULL`
+    ),
   ])
 
   const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
   const activeCount = allProductsForStats.products?.filter((p: any) => p.is_active).length || 0
   const totalCount = allProductsForStats.total
   const categoryCount = categories?.length || 0
+  const pendingDraftsCount = parseInt(pendingDraftsRow?.count ?? '0') || 0
 
   return (
     <div className="animate-fade-in">
@@ -238,6 +244,20 @@ async function ProductsStats() {
           <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{activeCount}</p>
         </div>
       </div>
+      {pendingDraftsCount > 0 && (
+        <div className="mb-6">
+          <Link
+            href={ap('/admin/products?is_active=false', host)}
+            className="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg px-4 py-3 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+          >
+            <div>
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Pending Drafts</p>
+              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Products with unpublished edits awaiting review</p>
+            </div>
+            <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 ml-4">{pendingDraftsCount}</span>
+          </Link>
+        </div>
+      )}
     </div>
   )
 }
