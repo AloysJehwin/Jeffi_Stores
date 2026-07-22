@@ -7,7 +7,7 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { syncPerishableStock } from '@/lib/shelf'
 import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
-import ProductDetailClient from '@/app/admin/products/[id]/ProductDetailClient'
+import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import { ChevronLeft } from 'lucide-react'
 import { round2 } from '@/lib/gst'
 
@@ -694,75 +694,23 @@ export default async function EditProductPage({ params, searchParams }: { params
         </div>
       )}
 
-      {/* Live product banner — read-only gate */}
-      {isLiveProduct && existingDraftRow && (
-        <div className="mb-6 rounded-lg border border-blue-300 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-blue-800 dark:text-blue-300">A draft is pending for this product.</p>
-            <p className="text-xs text-blue-700 dark:text-blue-400 mt-0.5">Edit the draft to make changes, then publish when ready.</p>
-          </div>
-          <a
-            href={ap(`/admin/products/edit/${existingDraftRow.id}`, host)}
-            className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors text-center"
-          >
-            Go to Draft
-          </a>
-        </div>
-      )}
-
-      {isLiveProduct && !existingDraftRow && (
-        <div className="mb-6 rounded-lg border border-border-default bg-surface-secondary px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-foreground">This product is live.</p>
-            <p className="text-xs text-foreground-muted mt-0.5">Create a draft to edit safely. The live product won&apos;t change until you publish.</p>
-          </div>
-          <form action={async () => {
-            'use server'
-            const host2 = await getHost()
-            const newDraft = await queryOne<{ id: string }>(
-              `INSERT INTO products
-                 SELECT gen_random_uuid() AS id, name, slug || '-draft-' || EXTRACT(EPOCH FROM NOW())::bigint, description,
-                        category_id, brand_id, base_price, mrp, mrp_ex_gst, price_ex_gst, gst_percentage, hsn_code,
-                        stock_status, weight, dimensions, false AS is_active, is_featured, has_variants, variant_type,
-                        sub_variant_type, weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price,
-                        discount_pct, NOW() AS created_at, NOW() AS updated_at, sku, inventory_quantity, mpn, gtin,
-                        extra_delivery_days, barcode, isbn, asin, brand_part_number, country_of_origin, shelf_life_days,
-                        grade, specifications, color, color_hex, volume_ml, net_weight_grams, fragile, hazardous,
-                        flammable, perishable, serialized, certifications, compliance_standard, safety_rating,
-                        warranty_months, warranty_type, condition, is_cod_allowed, launch_date, discontinue_date,
-                        sort_order, handling_days, shipping_class, is_oversized, is_digital, download_url,
-                        license_type, file_format, platform_compatibility, is_subscription, subscription_interval,
-                        subscription_price, is_bundle, meta_title, meta_description, is_searchable, tax_class,
-                        inclusive_tax, age_min, age_max, target_gender, target_audience, material, size,
-                        $1::uuid AS draft_of_id
-               FROM products WHERE id = $1::uuid
-               RETURNING id`,
-              [id]
-            )
-            if (!newDraft) redirect(ap(`/admin/products/edit/${id}`, host2))
-            revalidatePath('/admin/products')
-            revalidatePath(`/admin/products/edit/${id}`)
-            redirect(ap(`/admin/products/edit/${newDraft.id}`, host2))
-          }}>
-            <button
-              type="submit"
-              className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold rounded-md bg-accent-500 hover:bg-accent-600 text-white transition-colors"
-            >
-              Create Draft
-            </button>
-          </form>
-        </div>
+      {/* Draft confirmation modal — pops up automatically when editing a live product */}
+      {isLiveProduct && (
+        <DraftConfirmModal
+          productId={id}
+          productName={product.name}
+          productSku={product.sku || null}
+          existingDraftId={existingDraftRow?.id ?? null}
+          backUrl={backUrl}
+        />
       )}
 
       <div className="mb-6">
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">{isDraft ? 'Edit Draft' : 'Edit Product'}</h1>
-        <p className="text-foreground-secondary mt-1">{isDraft ? 'Changes are saved to the draft only' : isLiveProduct ? 'Viewing live product' : 'Update product information'}</p>
+        <p className="text-foreground-secondary mt-1">{isDraft ? 'Changes are saved to the draft only' : 'Update product information'}</p>
       </div>
 
-      {isLiveProduct ? (
-        /* Live product — show full detail view (same as /admin/products/[id]) */
-        <ProductDetailClient id={id} />
-      ) : (
+      {isLiveProduct ? null : (
         <ProductForm
           categories={categories || []}
           brands={brands || []}
