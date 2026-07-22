@@ -716,113 +716,13 @@ export default async function EditProductPage({ params, searchParams }: { params
         <span className="text-foreground font-medium">{isDraft ? 'Edit Draft' : 'Edit Product'}</span>
       </div>
 
-      {/* Draft banner — shown when editing a draft */}
+      {/* Draft notice — informational only; publish/discard actions are in the form footer */}
       {isDraft && (
-        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft</p>
-            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-              Editing draft of{originalProductRow ? ` "${originalProductRow.name}"${originalProductRow.sku ? ` (${originalProductRow.sku})` : ''}` : ` product #${product.draft_of_id}`}. Changes won&apos;t go live until published.
-            </p>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <form action={async () => {
-              'use server'
-              const host2 = await getHost()
-              const originalId = product.draft_of_id as string
-              // Atomically publish: copy all draft fields to original, delete draft
-              await withTransaction(async (client) => {
-                // Copy all data fields from draft to original (preserving original id, is_active, created_at)
-                await client.query(
-                  `UPDATE products AS live SET
-                     category_id=d.category_id, brand_id=d.brand_id,
-                     sku=REPLACE(d.sku,'-DRAFT',''), name=d.name,
-                     slug=REPLACE(d.slug,'-draft',''),
-                     description=d.description, short_description=d.short_description,
-                     base_price=d.base_price, price_ex_gst=d.price_ex_gst, currency=d.currency,
-                     weight=d.weight, dimensions=d.dimensions, material=d.material, finish=d.finish,
-                     size=d.size, is_featured=d.is_featured, mrp=d.mrp, gst_percentage=d.gst_percentage,
-                     hsn_code=d.hsn_code, has_variants=d.has_variants, variant_type=d.variant_type,
-                     mpn=d.mpn, gtin=d.gtin, weight_grams=d.weight_grams, length_cm=d.length_cm,
-                     breadth_cm=d.breadth_cm, height_cm=d.height_cm, package_type=d.package_type,
-                     cost_price=d.cost_price, extra_delivery_days=d.extra_delivery_days,
-                     inventory_quantity=d.inventory_quantity, mrp_ex_gst=d.mrp_ex_gst,
-                     sub_variant_type=d.sub_variant_type, stock_status=d.stock_status,
-                     image_url=d.image_url, barcode=d.barcode, discount_pct=d.discount_pct,
-                     sell_unit_id=d.sell_unit_id, color=d.color, color_hex=d.color_hex,
-                     fragile=d.fragile, hazardous=d.hazardous, flammable=d.flammable,
-                     perishable=d.perishable, serialized=d.serialized, specifications=d.specifications,
-                     meta_title=d.meta_title, meta_description=d.meta_description,
-                     meta_keywords=d.meta_keywords, is_searchable=d.is_searchable,
-                     updated_at=NOW()
-                   FROM products d WHERE live.id=$2 AND d.id=$1`,
-                  [id, originalId]
-                )
-                // Replace variants (strip -DRAFT suffix from SKU)
-                await client.query(`DELETE FROM product_variants WHERE product_id=$1`, [originalId])
-                await client.query(
-                  `INSERT INTO product_variants (product_id, sku, variant_name, price, attributes, is_active,
-                     mrp, price_ex_gst, mpn, gtin, pricing_type, unit, numeric_value,
-                     weight_grams, length_cm, breadth_cm, height_cm, package_type, cost_price,
-                     inventory_quantity, mrp_ex_gst, variant_type, sub_variant_type,
-                     sub_variant_type_on, use_own_images, discount_pct, stock_decimal_precision,
-                     sell_unit_id, stock_status, created_at, updated_at)
-                   SELECT $2, REPLACE(sku,'-DRAFT',''), variant_name, price, attributes, is_active,
-                     mrp, price_ex_gst, mpn, gtin, pricing_type, unit, numeric_value,
-                     weight_grams, length_cm, breadth_cm, height_cm, package_type, cost_price,
-                     inventory_quantity, mrp_ex_gst, variant_type, sub_variant_type,
-                     sub_variant_type_on, use_own_images, discount_pct, stock_decimal_precision,
-                     sell_unit_id, stock_status, NOW(), NOW()
-                   FROM product_variants WHERE product_id=$1`,
-                  [id, originalId]
-                )
-                // Replace images
-                await client.query(`DELETE FROM product_images WHERE product_id=$1`, [originalId])
-                await client.query(
-                  `INSERT INTO product_images (product_id, image_url, thumbnail_url, s3_bucket, s3_key,
-                     s3_thumbnail_key, file_name, file_size, mime_type, width, height, alt_text,
-                     display_order, is_primary, created_at, updated_at)
-                   SELECT $2, image_url, thumbnail_url, s3_bucket, s3_key,
-                     s3_thumbnail_key, file_name, file_size, mime_type, width, height, alt_text,
-                     display_order, is_primary, NOW(), NOW()
-                   FROM product_images WHERE product_id=$1`,
-                  [id, originalId]
-                )
-                // Delete the draft and its child rows
-                await client.query(`DELETE FROM product_units WHERE product_id=$1`, [id])
-                await client.query(`DELETE FROM product_sub_variants WHERE product_id=$1`, [id])
-                await client.query(`DELETE FROM product_images WHERE product_id=$1`, [id])
-                await client.query(`DELETE FROM product_variants WHERE product_id=$1`, [id])
-                await client.query(`DELETE FROM products WHERE id=$1`, [id])
-              })
-              revalidatePath('/admin/products')
-              revalidatePath(`/admin/products/edit/${originalId}`)
-              redirect(ap(`/admin/products/edit/${originalId}`, host2))
-            }}>
-              <button
-                type="submit"
-                className="px-3 py-1.5 text-xs font-semibold rounded-md bg-green-600 hover:bg-green-700 text-white transition-colors"
-              >
-                Publish Draft
-              </button>
-            </form>
-            <form action={async () => {
-              'use server'
-              const host2 = await getHost()
-              const origId = product.draft_of_id
-              await query(`DELETE FROM products WHERE id = $1::uuid`, [id])
-              revalidatePath('/admin/products')
-              if (origId) revalidatePath(`/admin/products/edit/${origId}`)
-              redirect(ap(origId ? `/admin/products/edit/${origId}` : '/admin/products', host2))
-            }}>
-              <button
-                type="submit"
-                className="px-3 py-1.5 text-xs font-semibold rounded-md border border-border-default bg-surface-elevated hover:bg-surface-secondary text-foreground transition-colors"
-              >
-                Discard Draft
-              </button>
-            </form>
-          </div>
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft</p>
+          <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
+            Editing draft of{originalProductRow ? ` "${originalProductRow.name}"${originalProductRow.sku ? ` (${originalProductRow.sku})` : ''}` : ` product #${product.draft_of_id}`}. Use Save as Draft or Update &amp; Publish below.
+          </p>
         </div>
       )}
 
