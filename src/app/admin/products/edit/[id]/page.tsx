@@ -684,16 +684,20 @@ export default async function EditProductPage({ params, searchParams }: { params
   const serializedStockTotal = serialCountRow?.total ?? 0
 
   // Check if a product_drafts row exists for this product
-  const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown> }>(
-    `SELECT product_id, fields FROM product_drafts WHERE product_id = $1`,
+  const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown>; variants: Record<string, unknown>[] }>(
+    `SELECT product_id, fields, variants FROM product_drafts WHERE product_id = $1`,
     [id]
   )
   const isDraft = !!draftRow
 
   // In draft mode, merge saved draft fields over the live product so the form
   // shows the admin's last saved changes (not the original live values).
+  // Also merge draft variants if they have valid SKUs (popup changes were autosaved).
+  const draftVariants = isDraft && Array.isArray(draftRow?.variants) && draftRow!.variants.some((v: any) => v.sku)
+    ? draftRow!.variants
+    : null
   const productForForm = isDraft && draftRow?.fields
-    ? { ...product, ...draftRow.fields }
+    ? { ...product, ...draftRow.fields, ...(draftVariants ? { product_variants: draftVariants } : {}) }
     : product
 
   return (
