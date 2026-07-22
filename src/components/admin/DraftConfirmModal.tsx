@@ -49,7 +49,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-      <div className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default w-full max-w-md p-6 animate-fade-in">
+      <div className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default w-full max-w-md p-6">
         {/* Icon */}
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-xl bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">

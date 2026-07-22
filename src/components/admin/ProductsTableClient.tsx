@@ -319,7 +319,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                   </Link>
                   {product.is_active && !product.draft_of_id ? (
                     <button
-                      onClick={() => setDraftProduct({ id: product.id, name: product.name, sku: product.sku || null, backUrl })}
+                      onClick={() => setDraftProduct({ id: product.id, name: String(product.name || ''), sku: product.sku ? String(product.sku) : null, backUrl })}
                       title="Edit Product"
                       className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
                     >
