@@ -230,30 +230,57 @@ export async function publishProductDraft(productId: string): Promise<void> {
       [productId, JSON.stringify(subVariants)]
     )
 
-    // Units: delete only product-level units (variant units are handled separately)
-    // Use UPSERT to preserve IDs referenced by other tables
+    // Units: UPSERT all scopes — product-level, variant-level, sub-variant-level
+    // Delete only product-level units first (safe — variant-level kept to avoid FK issues)
     await client.query(`DELETE FROM product_units WHERE product_id = $1 AND variant_id IS NULL AND sub_variant_id IS NULL`, [productId])
-    await client.query(
-      `INSERT INTO product_units (
-         product_id, variant_id, unit, factor, is_base, is_purchase_default,
-         price_override, display_label, notes, dimension, conversion_meta,
-         sub_variant_id, min_qty, max_qty, qty_step, created_at, updated_at
-       )
-       SELECT $1,
-         CASE WHEN u->>'variant_id' IS NOT NULL AND u->>'variant_id' != 'null'
-              THEN (u->>'variant_id')::uuid ELSE NULL END,
-         u->>'unit', (u->>'factor')::numeric,
-         COALESCE((u->>'is_base')::boolean, false), COALESCE((u->>'is_purchase_default')::boolean, false),
-         NULLIF(u->>'price_override','')::numeric, u->>'display_label',
-         u->>'notes', u->>'dimension', u->'conversion_meta',
-         CASE WHEN u->>'sub_variant_id' IS NOT NULL AND u->>'sub_variant_id' != 'null'
-              THEN (u->>'sub_variant_id')::uuid ELSE NULL END,
-         NULLIF(u->>'min_qty','')::numeric, NULLIF(u->>'max_qty','')::numeric,
-         NULLIF(u->>'qty_step','')::numeric, NOW(), NOW()
-       FROM jsonb_array_elements($2::jsonb) AS u
-       WHERE u->>'variant_id' IS NULL OR u->>'variant_id' = 'null'`,
-      [productId, JSON.stringify(units)]
-    )
+
+    // Insert product-level units from draft
+    const productUnits = (units as any[]).filter((u: any) => !u.variant_id || u.variant_id === 'null')
+    if (productUnits.length > 0) {
+      await client.query(
+        `INSERT INTO product_units (
+           product_id, variant_id, unit, factor, is_base, is_purchase_default,
+           price_override, display_label, notes, dimension, conversion_meta,
+           sub_variant_id, min_qty, max_qty, qty_step, created_at, updated_at
+         )
+         SELECT $1, NULL,
+           u->>'unit', (u->>'factor')::numeric,
+           COALESCE((u->>'is_base')::boolean, false), COALESCE((u->>'is_purchase_default')::boolean, false),
+           NULLIF(u->>'price_override','')::numeric, u->>'display_label',
+           u->>'notes', u->>'dimension', u->'conversion_meta', NULL,
+           NULLIF(u->>'min_qty','')::numeric, NULLIF(u->>'max_qty','')::numeric,
+           NULLIF(u->>'qty_step','')::numeric, NOW(), NOW()
+         FROM jsonb_array_elements($2::jsonb) AS u`,
+        [productId, JSON.stringify(productUnits)]
+      )
+    }
+
+    // UPSERT variant-level units from draft (preserve IDs via ON CONFLICT on product_id+variant_id+unit)
+    const variantUnits = (units as any[]).filter((u: any) => u.variant_id && u.variant_id !== 'null')
+    for (const u of variantUnits) {
+      await client.query(
+        `INSERT INTO product_units (
+           product_id, variant_id, unit, factor, is_base, is_purchase_default,
+           price_override, display_label, notes, dimension, conversion_meta,
+           sub_variant_id, min_qty, max_qty, qty_step, created_at, updated_at
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW(), NOW())
+         ON CONFLICT (variant_id, unit) WHERE variant_id IS NOT NULL DO UPDATE SET
+           factor = EXCLUDED.factor, is_base = EXCLUDED.is_base,
+           is_purchase_default = EXCLUDED.is_purchase_default,
+           price_override = EXCLUDED.price_override, display_label = EXCLUDED.display_label,
+           notes = EXCLUDED.notes, dimension = EXCLUDED.dimension,
+           conversion_meta = EXCLUDED.conversion_meta, min_qty = EXCLUDED.min_qty,
+           max_qty = EXCLUDED.max_qty, qty_step = EXCLUDED.qty_step, updated_at = NOW()`,
+        [
+          productId, u.variant_id, u.unit, u.factor ?? 1,
+          u.is_base ?? false, u.is_purchase_default ?? false,
+          u.price_override ?? null, u.display_label ?? null,
+          u.notes ?? null, u.dimension ?? 'count', u.conversion_meta ?? null,
+          u.sub_variant_id ?? null,
+          u.min_qty ?? 1, u.max_qty ?? null, u.qty_step ?? 1
+        ]
+      )
+    }
 
     await client.query(`DELETE FROM product_drafts WHERE product_id = $1`, [productId])
   })
