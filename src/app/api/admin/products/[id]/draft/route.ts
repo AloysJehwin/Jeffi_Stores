@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: Params) {
          to_jsonb(p) - 'id' - 'created_at' - 'updated_at' - 'search_vector' - 'views_count' - 'sales_count',
          COALESCE((SELECT json_agg(to_jsonb(v) - 'id') FROM product_variants v WHERE v.product_id = p.id), '[]'),
          COALESCE((SELECT json_agg(to_jsonb(i) - 'id' ORDER BY i.display_order) FROM product_images i WHERE i.product_id = p.id), '[]'),
-         COALESCE((SELECT json_agg(to_jsonb(sv) - 'id') FROM product_sub_variants sv WHERE sv.product_id = p.id), '[]'),
+         '[]'::jsonb,
          COALESCE((SELECT json_agg(to_jsonb(u) - 'id') FROM product_units u WHERE u.product_id = p.id), '[]')
        FROM products p WHERE p.id = $1`,
       [id]

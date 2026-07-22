@@ -212,45 +212,49 @@ export async function publishProductDraft(productId: string): Promise<void> {
       [productId, JSON.stringify(draft.images)]
     )
 
-    // Apply staged sub-variants from draft.sub_variants
-    const stagedSubVariants = (subVariants as any[]).filter((sv: any) => !sv._cleared && sv.sub_variant_name && sv.variant_id)
-    const clearedVariantIds = new Set(
-      (subVariants as any[]).filter((sv: any) => sv._cleared).map((sv: any) => sv.variant_id)
+    // Apply staged sub-variants — only if admin actually made changes in draft mode
+    // (draft.sub_variants either has _cleared sentinels or draft-sv- prefixed IDs)
+    const hasSubVariantChanges = (subVariants as any[]).some(
+      (sv: any) => sv._cleared || (sv.id && String(sv.id).startsWith('draft-sv-'))
     )
-    // For variant scopes that had any staging (adds/deletes), delete live and re-insert from draft
-    const stagedVariantIds = new Set([
-      ...stagedSubVariants.map((sv: any) => sv.variant_id),
-      ...Array.from(clearedVariantIds),
-    ])
-    for (const vid of stagedVariantIds) {
-      // Check no FK references before deleting
-      const refs = await client.query(
-        `SELECT COUNT(*) FROM order_items WHERE sub_variant_id IN (SELECT id FROM product_sub_variants WHERE variant_id = $1)`,
-        [vid]
+    if (hasSubVariantChanges) {
+      const stagedSubVariants = (subVariants as any[]).filter((sv: any) => !sv._cleared && sv.sub_variant_name && sv.variant_id)
+      const clearedVariantIds = new Set(
+        (subVariants as any[]).filter((sv: any) => sv._cleared).map((sv: any) => sv.variant_id)
       )
-      if (parseInt(refs.rows[0].count) === 0) {
-        await client.query(`DELETE FROM product_sub_variants WHERE variant_id = $1`, [vid])
-      }
-      const svsForVariant = stagedSubVariants.filter((sv: any) => sv.variant_id === vid)
-      for (const sv of svsForVariant) {
-        await client.query(
-          `INSERT INTO product_sub_variants (variant_id, product_id, sku, sub_variant_name, price, mrp,
-             price_ex_gst, mrp_ex_gst, attributes, is_active, inventory_quantity, discount_pct, stock_status,
-             created_at, updated_at)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
-          [
-            vid, productId, sv.sku || null, sv.sub_variant_name,
-            sv.price != null ? sv.price : null,
-            sv.mrp != null ? sv.mrp : null,
-            sv.price_ex_gst != null ? sv.price_ex_gst : null,
-            sv.mrp_ex_gst != null ? sv.mrp_ex_gst : null,
-            sv.attributes || null,
-            sv.is_active != null ? sv.is_active : true,
-            sv.inventory_quantity != null ? sv.inventory_quantity : 0,
-            sv.discount_pct != null ? sv.discount_pct : 0,
-            sv.stock_status || 'In Stock',
-          ]
+      const stagedVariantIds = new Set([
+        ...stagedSubVariants.map((sv: any) => sv.variant_id),
+        ...Array.from(clearedVariantIds),
+      ])
+      for (const vid of stagedVariantIds) {
+        const refs = await client.query(
+          `SELECT COUNT(*) FROM order_items WHERE sub_variant_id IN (SELECT id FROM product_sub_variants WHERE variant_id = $1)`,
+          [vid]
         )
+        if (parseInt(refs.rows[0].count) === 0) {
+          await client.query(`DELETE FROM product_sub_variants WHERE variant_id = $1`, [vid])
+        }
+        const svsForVariant = stagedSubVariants.filter((sv: any) => sv.variant_id === vid)
+        for (const sv of svsForVariant) {
+          await client.query(
+            `INSERT INTO product_sub_variants (variant_id, product_id, sku, sub_variant_name, price, mrp,
+               price_ex_gst, mrp_ex_gst, attributes, is_active, inventory_quantity, discount_pct, stock_status,
+               created_at, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
+            [
+              vid, productId, sv.sku || null, sv.sub_variant_name,
+              sv.price != null ? sv.price : null,
+              sv.mrp != null ? sv.mrp : null,
+              sv.price_ex_gst != null ? sv.price_ex_gst : null,
+              sv.mrp_ex_gst != null ? sv.mrp_ex_gst : null,
+              sv.attributes || null,
+              sv.is_active != null ? sv.is_active : true,
+              sv.inventory_quantity != null ? sv.inventory_quantity : 0,
+              sv.discount_pct != null ? sv.discount_pct : 0,
+              sv.stock_status || 'In Stock',
+            ]
+          )
+        }
       }
     }
 
