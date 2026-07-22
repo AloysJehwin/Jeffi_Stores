@@ -8,6 +8,7 @@ import { Star, Sparkles, CheckCircle, XCircle, Loader2, X } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
+import UnitsManager from '@/components/admin/UnitsManager'
 import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
@@ -573,6 +574,15 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <span>Created {formatDate(p.created_at)}</span>
             <span>Updated {formatDate(p.updated_at)}</span>
           </div>
+        </div>
+      </div>
+
+      <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+        <div className="px-4 py-3 border-b border-border-default">
+          <p className="text-sm font-semibold text-foreground">Selling Units</p>
+        </div>
+        <div className="px-4 py-4">
+          <UnitsManager productId={p.id} basePrice={p.base_price} />
         </div>
       </div>
 
