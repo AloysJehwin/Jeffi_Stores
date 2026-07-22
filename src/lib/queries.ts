@@ -442,9 +442,10 @@ export async function getFilteredProducts(filters: {
     conditions.push(`p.is_active = $${i++}`)
     params.push(filters.is_active === 'true')
   } else {
-    // By default exclude shadow draft copies (is_active=false AND draft_of_id IS NOT NULL)
-    // so they don't appear as duplicates in the products list.
-    conditions.push(`NOT (p.is_active = false AND p.draft_of_id IS NOT NULL)`)
+    // By default exclude products that have a pending draft (they show in draft context only)
+    // A product has a draft when there's a row in product_drafts for it.
+    // All products are shown; we no longer shadow-copy inactive draft rows.
+    // (product_drafts is the new draft table — no draft_of_id column on products)
   }
   if (filters.stock === 'low') {
     conditions.push(`p.stock_status = 'Low Stock'`)

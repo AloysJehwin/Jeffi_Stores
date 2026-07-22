@@ -213,7 +213,7 @@ async function ProductsStats() {
     getFilteredProducts({}),
     getAllCategories(),
     queryOne<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM products WHERE is_active = false AND draft_of_id IS NOT NULL`
+      `SELECT COUNT(*)::text AS count FROM product_drafts`
     ),
   ])
 
