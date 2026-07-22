@@ -29,7 +29,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          brand_id                 = NULLIF(($2::jsonb)->>'brand_id', '')::uuid,
          sku                      = ($2::jsonb)->>'sku',
          name                     = ($2::jsonb)->>'name',
-         slug                     = ($2::jsonb)->>'slug',
+         slug                     = COALESCE(NULLIF(($2::jsonb)->>'slug', ''), slug),
          description              = ($2::jsonb)->>'description',
          short_description        = ($2::jsonb)->>'short_description',
          base_price               = (($2::jsonb)->>'base_price')::numeric,
