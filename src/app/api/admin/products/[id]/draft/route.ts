@@ -77,9 +77,62 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     )
     if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
 
+    // Build image snapshot: take live product_images, apply order/primary from client state
+    const imageOrder: string[] = body?.imageOrder || []
+    const existingImagesToKeep: { id: string; is_primary?: boolean }[] = body?.existingImagesToKeep || []
+    const keepIds = new Set(existingImagesToKeep.map((img: any) => img.id))
+
+    // Re-snapshot images from DB filtered to kept IDs, then apply order and primary from client
+    const imagesSnapshotSql = keepIds.size > 0
+      ? `SELECT to_jsonb(i) - 'id' || jsonb_build_object(
+           'display_order', idx.ord,
+           'is_primary', idx.is_primary
+         ) AS img
+         FROM product_images i
+         JOIN (
+           SELECT id, ordinality - 1 AS ord,
+                  id = $3 AS is_primary
+           FROM unnest($2::uuid[]) WITH ORDINALITY AS t(id, ordinality)
+         ) idx ON idx.id = i.id
+         WHERE i.product_id = $1`
+      : null
+
+    // Determine ordered IDs and primary from imageOrder
+    const orderedExistingIds = imageOrder
+      .filter((k: string) => k.startsWith('existing:'))
+      .map((k: string) => k.slice(9))
+      .filter((id: string) => keepIds.has(id))
+
+    const primaryKey = imageOrder[0] || ''
+    const primaryId = primaryKey.startsWith('existing:') ? primaryKey.slice(9) : null
+
+    let imagesJson = '[]'
+    if (orderedExistingIds.length > 0) {
+      const rows = await query<{ img: Record<string, unknown> }>(
+        `SELECT to_jsonb(i) - 'id' AS img, array_position($2::uuid[], i.id) - 1 AS ord,
+                i.id = $3 AS is_primary
+         FROM product_images i
+         WHERE i.product_id = $1 AND i.id = ANY($2::uuid[])
+         ORDER BY array_position($2::uuid[], i.id)`,
+        [id, orderedExistingIds, primaryId]
+      )
+      imagesJson = JSON.stringify(rows.rows.map((r: any) => ({
+        ...r.img,
+        display_order: r.ord,
+        is_primary: r.is_primary,
+      })))
+    } else {
+      // Fall back to current live images
+      const rows = await query(
+        `SELECT json_agg(to_jsonb(i) - 'id' ORDER BY i.display_order) FROM product_images i WHERE i.product_id = $1`,
+        [id]
+      )
+      imagesJson = JSON.stringify(rows.rows[0]?.json_agg || [])
+    }
+
     await query(
-      `UPDATE product_drafts SET fields = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-      [id, JSON.stringify(fields)]
+      `UPDATE product_drafts SET fields = $2::jsonb, images = $3::jsonb, updated_at = NOW() WHERE product_id = $1`,
+      [id, JSON.stringify(fields), imagesJson]
     )
 
     return NextResponse.json({ success: true })
