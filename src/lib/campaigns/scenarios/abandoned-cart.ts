@@ -75,10 +75,10 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       JOIN email_campaigns_sent ecs1 ON ecs1.user_id = ci.user_id
         AND ecs1.campaign_kind = $1
         AND (ecs1.metadata->>'sequence')::int = 1
-        AND ecs1.sent_at < NOW() - ($6::text || ' hours')::interval
-        AND ecs1.sent_at > NOW() - ($4::text || ' days')::interval
+        AND ecs1.sent_at < NOW() - ($5::text || ' hours')::interval
+        AND ecs1.sent_at > NOW() - ($3::text || ' days')::interval
       WHERE ci.saved_for_later = FALSE
-        AND ci.updated_at > NOW() - ($3::text || ' days')::interval
+        AND ci.updated_at > NOW() - ($2::text || ' days')::interval
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
@@ -97,8 +97,8 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
             AND o.status NOT IN ('cancelled', 'refunded')
             AND o.created_at > ecs1.sent_at
         )
-      LIMIT $5
-    `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep, params.secondEmailDelayHours])
+      LIMIT $4
+    `, [campaign.kind, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep, params.secondEmailDelayHours])
 
     // Merge — seq1 users take priority, don't double-send
     const seq1Ids = new Set(seq1.map(r => r.user_id))
