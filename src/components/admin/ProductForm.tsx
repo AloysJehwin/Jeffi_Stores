@@ -871,7 +871,6 @@ export default function ProductForm({ categories, brands, action, product, produ
       return
     }
     if (isDraft) { setVariantImageError('In draft mode — sub-variant changes apply when you publish.'); return }
-    }
     if (variantId.startsWith('temp-')) {
       setVariantImageError('Save the product first to add sub-variants for this variant.')
       return
