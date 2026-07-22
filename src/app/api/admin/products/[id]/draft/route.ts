@@ -58,7 +58,7 @@ export async function POST(req: NextRequest, { params }: Params) {
            draft_of_id, created_at, updated_at
          )
          SELECT
-           category_id, brand_id, sku, name, slug, description, short_description,
+           category_id, brand_id, sku || '-DRAFT' AS sku, name, slug || '-draft' AS slug, description, short_description,
            base_price, price_ex_gst, currency, weight, dimensions, material, finish,
            size, is_featured, false, 0, 0, mrp, gst_percentage,
            hsn_code, has_variants, variant_type, mpn, gtin, weight_grams, length_cm,
