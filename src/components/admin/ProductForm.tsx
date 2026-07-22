@@ -573,7 +573,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (!isDraft || !productId) return
     void serverSaveNow()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDraft, productId, hasVariants, isActive, isFeatured, fragile, hazardous, flammable, perishable, serialized, isCodAllowed, isSearchable, isOversized, isDigital, isSubscription, isBundle, inclusiveTax])
+  }, [isDraft, productId, hasVariants, isActive, isFeatured, fragile, hazardous, flammable, perishable, serialized, isCodAllowed, isSearchable, isOversized, isDigital, isSubscription, isBundle, inclusiveTax, imageOrder, existingImagesToKeep, galleryImageIds])
 
   const wasPerishableOff = !(product?.perishable)
   const wasSerializedOff = !(product?.serialized)
