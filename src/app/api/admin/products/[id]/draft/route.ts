@@ -54,3 +54,37 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: msg || 'Failed to create draft' }, { status: 500 })
   }
 }
+
+// Autosave: update only the fields column of an existing draft
+export async function PATCH(req: NextRequest, { params }: Params) {
+  const { id } = await params
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+
+  try {
+    const body = await req.json()
+    const fields = body?.fields
+    if (!fields || typeof fields !== 'object') {
+      return NextResponse.json({ error: 'Missing fields' }, { status: 400 })
+    }
+
+    const draft = await queryOne<{ product_id: string }>(
+      `SELECT product_id FROM product_drafts WHERE product_id = $1`,
+      [id]
+    )
+    if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+
+    await query(
+      `UPDATE product_drafts SET fields = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
+      [id, JSON.stringify(fields)]
+    )
+
+    return NextResponse.json({ success: true })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: msg || 'Autosave failed' }, { status: 500 })
+  }
+}
