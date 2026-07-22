@@ -7,14 +7,20 @@ export const dynamic = 'force-dynamic'
 
 interface Params { params: Promise<{ id: string }> }
 
-async function getDraft(productId: string) {
-  return queryOne<{ product_id: string; units: Record<string, unknown>[] }>(
-    `SELECT product_id, units FROM product_drafts WHERE product_id = $1`,
-    [productId]
+async function getAllDraftUnits(productId: string): Promise<any[]> {
+  const row = await queryOne<{ units: any[] }>(
+    `SELECT units FROM product_drafts WHERE product_id = $1`, [productId]
   )
+  return Array.isArray(row?.units) ? row!.units : []
 }
 
-// GET — return units from draft.units JSONB (same shape as live units route)
+function scopeMatch(u: any, variantId: string | null, subVariantId: string | null): boolean {
+  if (subVariantId) return u.sub_variant_id === subVariantId
+  if (variantId) return u.variant_id === variantId && !u.sub_variant_id
+  return !u.variant_id && !u.sub_variant_id
+}
+
+// GET — return units for this scope from draft.units JSONB
 export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
@@ -22,23 +28,27 @@ export async function GET(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:read')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const draft = await getDraft(id)
-  if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
-  // Ensure every unit has a stable id — assign one if missing (from original snapshot)
-  const raw = Array.isArray(draft.units) ? draft.units : []
-  const units = raw.map((u: any, i: number) => u.id ? u : { ...u, id: `draft-unit-${i}` })
-  // Persist ids back if any were missing
-  if (raw.some((u: any) => !u.id)) {
-    await query(
-      `UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-      [id, JSON.stringify(units)]
-    )
+
+  const variantId = req.nextUrl.searchParams.get('variant_id')
+  const subVariantId = req.nextUrl.searchParams.get('sub_variant_id')
+
+  const raw = await getAllDraftUnits(id)
+  // Ensure stable ids
+  let changed = false
+  const all = raw.map((u: any, i: number) => {
+    if (!u.id) { changed = true; return { ...u, id: `draft-unit-${i}` } }
+    return u
+  })
+  if (changed) {
+    await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [id, JSON.stringify(all)])
   }
+
+  const units = all.filter((u: any) => scopeMatch(u, variantId, subVariantId))
   const base = units.find((u: any) => u.is_base) ?? null
-  return NextResponse.json({ units, inherited: false, rules: base ? [{ unit: (base as any).unit, dimension: (base as any).dimension }] : [] })
+  return NextResponse.json({ units, inherited: false, rules: base ? [{ unit: base.unit, dimension: base.dimension }] : [] })
 }
 
-// POST — add or update a unit in draft.units JSONB
+// POST — add a unit for this scope into draft.units JSONB
 export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
@@ -46,30 +56,34 @@ export async function POST(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const draft = await getDraft(id)
-  if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
+
+  const variantId = req.nextUrl.searchParams.get('variant_id')
+  const subVariantId = req.nextUrl.searchParams.get('sub_variant_id')
 
   const body = await req.json()
-  const units: any[] = Array.isArray(draft.units) ? [...draft.units] : []
-  const newUnit = { ...body, id: `draft-${Date.now()}-${Math.random().toString(36).slice(2)}` }
-
-  if (body.is_base) {
-    // Replace existing base unit
-    const idx = units.findIndex((u: any) => u.is_base)
-    if (idx >= 0) units[idx] = newUnit
-    else units.unshift(newUnit)
-  } else {
-    units.push(newUnit)
+  const all = await getAllDraftUnits(id)
+  const newUnit = {
+    ...body,
+    id: `draft-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    variant_id: variantId || null,
+    sub_variant_id: subVariantId || null,
   }
 
-  await query(
-    `UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-    [id, JSON.stringify(units)]
-  )
+  let updated: any[]
+  if (body.is_base) {
+    // Replace existing base unit in this scope
+    const idx = all.findIndex((u: any) => u.is_base && scopeMatch(u, variantId, subVariantId))
+    if (idx >= 0) { updated = [...all]; updated[idx] = newUnit }
+    else updated = [...all, newUnit]
+  } else {
+    updated = [...all, newUnit]
+  }
+
+  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [id, JSON.stringify(updated)])
   return NextResponse.json({ success: true, unit: newUnit })
 }
 
-// DELETE — remove a unit from draft.units by id
+// DELETE — remove a unit by id from draft.units
 export async function DELETE(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
@@ -77,15 +91,11 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  const draft = await getDraft(id)
-  if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
 
   const { unitId } = await req.json()
-  const units = (Array.isArray(draft.units) ? draft.units : []).filter((u: any) => u.id !== unitId)
+  const all = await getAllDraftUnits(id)
+  const updated = all.filter((u: any) => u.id !== unitId)
 
-  await query(
-    `UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
-    [id, JSON.stringify(units)]
-  )
+  await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [id, JSON.stringify(updated)])
   return NextResponse.json({ success: true })
 }

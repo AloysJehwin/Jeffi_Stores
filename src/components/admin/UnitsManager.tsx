@@ -45,8 +45,8 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const baseUrl = isDraft && !variantId && !subVariantId
-    ? `/api/admin/products/${productId}/draft/units`
+  const baseUrl = isDraft
+    ? `/api/admin/products/${productId}/draft/units${subVariantId ? `?sub_variant_id=${subVariantId}&variant_id=${variantId}` : variantId ? `?variant_id=${variantId}` : ''}`
     : subVariantId
       ? `/api/admin/products/${productId}/variants/${variantId}/sub-variants/${subVariantId}/units`
       : variantId
