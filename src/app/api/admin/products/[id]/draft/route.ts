@@ -130,9 +130,14 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       imagesJson = JSON.stringify(rows.rows[0]?.json_agg || [])
     }
 
+    const variantsFromBody = body?.variants
+    const variantsJson = Array.isArray(variantsFromBody) ? JSON.stringify(variantsFromBody) : null
+
     await query(
-      `UPDATE product_drafts SET fields = $2::jsonb, images = $3::jsonb, updated_at = NOW() WHERE product_id = $1`,
-      [id, JSON.stringify(fields), imagesJson]
+      `UPDATE product_drafts SET fields = $2::jsonb, images = $3::jsonb,
+       variants = COALESCE($4::jsonb, variants),
+       updated_at = NOW() WHERE product_id = $1`,
+      [id, JSON.stringify(fields), imagesJson, variantsJson]
     )
 
     return NextResponse.json({ success: true })

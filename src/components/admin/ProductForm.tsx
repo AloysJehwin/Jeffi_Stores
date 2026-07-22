@@ -611,6 +611,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           imageOrder,
           existingImagesToKeep,
           galleryImageIds,
+          variants: variants.filter((v: any) => !v._isDeleted),
         }),
       })
       setServerSaveStatus(r.ok ? 'saved' : 'error')
