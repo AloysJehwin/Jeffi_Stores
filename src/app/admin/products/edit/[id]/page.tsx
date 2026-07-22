@@ -230,11 +230,28 @@ async function updateProduct(productId: string, formData: FormData) {
         tax_class: taxClass, inclusive_tax: inclusiveTax,
         age_min: ageMin, age_max: ageMax, target_gender: targetGender, target_audience: targetAudience,
       }
+      // Snapshot variants from form and images/sub_variants/units from live DB
+      const variantsJsonRaw = formData.get('variants_json') as string | null
+      const draftVariants = variantsJsonRaw ? JSON.parse(variantsJsonRaw).filter((v: any) => !v._isDeleted) : null
+
       await query(
-        `INSERT INTO product_drafts (product_id, fields, updated_at)
-         VALUES ($1, $2::jsonb, NOW())
-         ON CONFLICT (product_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
-        [productId, JSON.stringify(draftFields)]
+        `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, updated_at)
+         VALUES (
+           $1, $2::jsonb,
+           COALESCE($3::jsonb, (SELECT variants FROM product_drafts WHERE product_id = $1)),
+           COALESCE((SELECT json_agg(to_jsonb(i) - 'id' ORDER BY i.display_order) FROM product_images i WHERE i.product_id = $1)::jsonb, '[]'::jsonb),
+           COALESCE((SELECT json_agg(to_jsonb(sv) - 'id') FROM product_sub_variants sv WHERE sv.product_id = $1)::jsonb, '[]'::jsonb),
+           COALESCE((SELECT json_agg(to_jsonb(u) - 'id') FROM product_units u WHERE u.product_id = $1)::jsonb, '[]'::jsonb),
+           NOW()
+         )
+         ON CONFLICT (product_id) DO UPDATE SET
+           fields = EXCLUDED.fields,
+           variants = COALESCE(EXCLUDED.variants, product_drafts.variants),
+           images = EXCLUDED.images,
+           sub_variants = EXCLUDED.sub_variants,
+           units = EXCLUDED.units,
+           updated_at = NOW()`,
+        [productId, JSON.stringify(draftFields), draftVariants ? JSON.stringify(draftVariants) : null]
       )
       revalidatePath(`/admin/products/edit/${productId}`)
       const host = await getHost()
