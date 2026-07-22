@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryOne, query } from '@/lib/db'
+import { queryOne, query, queryMany } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +20,8 @@ function scopeMatch(u: any, variantId: string | null, subVariantId: string | nul
   return !u.variant_id && !u.sub_variant_id
 }
 
-// GET — return units for this scope from draft.units JSONB
+// GET — return units for this scope from draft.units JSONB,
+// falling back to live product_units if the draft has none for this scope
 export async function GET(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
@@ -43,9 +44,23 @@ export async function GET(req: NextRequest, { params }: Params) {
     await query(`UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`, [id, JSON.stringify(all)])
   }
 
-  const units = all.filter((u: any) => scopeMatch(u, variantId, subVariantId))
+  let units = all.filter((u: any) => scopeMatch(u, variantId, subVariantId))
+
+  // If no draft units for this scope, fall back to live product_units
+  if (units.length === 0) {
+    const liveUnits = await queryMany(
+      `SELECT * FROM product_units WHERE product_id = $1
+       AND ($2::uuid IS NULL OR variant_id = $2::uuid)
+       AND ($3::uuid IS NULL OR sub_variant_id = $3::uuid)
+       AND ($2::uuid IS NOT NULL OR variant_id IS NULL)
+       AND ($3::uuid IS NOT NULL OR sub_variant_id IS NULL)`,
+      [id, variantId || null, subVariantId || null]
+    )
+    units = liveUnits
+  }
+
   const base = units.find((u: any) => u.is_base) ?? null
-  return NextResponse.json({ units, inherited: false, rules: base ? [{ unit: base.unit, dimension: base.dimension }] : [] })
+  return NextResponse.json({ units, inherited: false, rules: base ? [{ unit: (base as any).unit, dimension: (base as any).dimension }] : [] })
 }
 
 // POST — add a unit for this scope into draft.units JSONB
