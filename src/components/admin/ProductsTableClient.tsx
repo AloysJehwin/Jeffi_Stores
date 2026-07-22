@@ -12,6 +12,7 @@ import ProductDetailModal from '@/components/admin/ProductDetailModal'
 import ProductLabelModal from '@/components/admin/ProductLabelModal'
 import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import HoverCard from '@/components/ui/HoverCard'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Props {
   products: any[]
@@ -21,6 +22,7 @@ interface Props {
 }
 
 export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products', isSuperAdmin = false }: Props) {
+  const confirm = useConfirm()
   const [selected, setSelected] = useState<any>(null)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({})
@@ -43,7 +45,8 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
   }
 
   async function handleDelete(productId: string, productName: string) {
-    if (!window.confirm(`Permanently delete "${productName}"? This cannot be undone.`)) return
+    const ok = await confirm({ message: `Permanently delete "${productName}"? This cannot be undone.`, variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     setDeletingId(productId)
     try {
       const res = await fetch(`/api/admin/products/${productId}`, { method: 'DELETE' })
