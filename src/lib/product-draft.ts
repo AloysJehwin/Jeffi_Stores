@@ -196,15 +196,18 @@ export async function publishProductDraft(productId: string): Promise<void> {
          price_override, display_label, notes, dimension, conversion_meta,
          sub_variant_id, min_qty, max_qty, qty_step, created_at, updated_at
        )
-       SELECT $1, pv.id, u->>'unit', (u->>'factor')::numeric,
+       SELECT $1,
+         CASE WHEN u->>'variant_id' IS NOT NULL AND u->>'variant_id' != 'null'
+              THEN (u->>'variant_id')::uuid ELSE NULL END,
+         u->>'unit', (u->>'factor')::numeric,
          (u->>'is_base')::boolean, (u->>'is_purchase_default')::boolean,
          NULLIF(u->>'price_override','')::numeric, u->>'display_label',
-         u->>'notes', u->>'dimension', u->'conversion_meta', psv.id,
+         u->>'notes', u->>'dimension', u->'conversion_meta',
+         CASE WHEN u->>'sub_variant_id' IS NOT NULL AND u->>'sub_variant_id' != 'null'
+              THEN (u->>'sub_variant_id')::uuid ELSE NULL END,
          NULLIF(u->>'min_qty','')::numeric, NULLIF(u->>'max_qty','')::numeric,
          NULLIF(u->>'qty_step','')::numeric, NOW(), NOW()
-       FROM jsonb_array_elements($2::jsonb) AS u
-       LEFT JOIN product_variants pv ON pv.product_id = $1 AND pv.sku = u->>'variant_sku'
-       LEFT JOIN product_sub_variants psv ON psv.product_id = $1 AND psv.sku = u->>'sub_variant_sku'`,
+       FROM jsonb_array_elements($2::jsonb) AS u`,
       [productId, JSON.stringify(draft.units)]
     )
 

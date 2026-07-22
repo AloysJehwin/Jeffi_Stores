@@ -26,6 +26,7 @@ interface Props {
   basePrice?: number | string | null
   onUnitLoaded?: (info: UnitLoadedInfo) => void
   isDraft?: boolean
+  readOnly?: boolean
 }
 
 const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]"
@@ -33,7 +34,7 @@ const lockedCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface
 
 type FormMode = 'base' | 'extra' | null
 
-export default function UnitsManager({ productId, variantId, subVariantId, basePrice, onUnitLoaded, isDraft = false }: Props) {
+export default function UnitsManager({ productId, variantId, subVariantId, basePrice, onUnitLoaded, isDraft = false, readOnly = false }: Props) {
   const { showToast } = useToast()
   const [allUnits, setAllUnits] = useState<ProductUnit[]>([])
   const [inherited, setInherited] = useState(false)
@@ -310,6 +311,30 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   }
 
   if (loading) return <div className="text-xs text-foreground-muted py-3">Loading…</div>
+
+  if (readOnly) {
+    const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
+    const extras = allUnits.filter(u => !u.is_base)
+    if (!baseUnit) return <p className="text-xs text-foreground-muted py-2">No selling unit configured.</p>
+    return (
+      <div className="space-y-1 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-foreground">{baseUnit.display_label || baseUnit.unit}</span>
+          <span className="text-xs text-foreground-muted">({baseUnit.dimension})</span>
+          {baseUnit.factor && Number(baseUnit.factor) !== 1 && (
+            <span className="text-xs text-foreground-muted">× {baseUnit.factor}</span>
+          )}
+          <span className="text-[10px] px-1.5 py-0.5 bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 rounded">Base</span>
+        </div>
+        {extras.map((u, i) => (
+          <div key={i} className="flex items-center gap-2 text-foreground-secondary">
+            <span>{u.display_label || u.unit}</span>
+            <span className="text-xs text-foreground-muted">× {u.factor}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
   const extraCountUnits = allUnits.filter(u => !u.is_base && u.dimension === 'count')

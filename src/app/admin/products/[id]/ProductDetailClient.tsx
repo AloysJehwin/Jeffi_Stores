@@ -582,7 +582,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
           <p className="text-sm font-semibold text-foreground">Selling Units</p>
         </div>
         <div className="px-4 py-4">
-          <UnitsManager productId={p.id} basePrice={p.base_price} />
+          <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
         </div>
       </div>
 
