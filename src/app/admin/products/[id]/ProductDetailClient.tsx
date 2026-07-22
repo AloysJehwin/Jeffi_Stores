@@ -699,18 +699,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           )}
 
-          {/* — Selling Units & Shelf Locations — */}
+          {/* — Selling Units — */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
             <CollapsibleCard title="Selling Units">
               <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
             </CollapsibleCard>
-            {shelfStock.length > 0 && (
-              <CollapsibleCard title="Shelf Locations">
-                <div className="flex flex-wrap gap-2">
-                  <ShelfBadges rows={shelfStock} />
-                </div>
-              </CollapsibleCard>
-            )}
           </div>
 
           <div className="flex gap-4 text-xs text-foreground-muted">
