@@ -683,12 +683,18 @@ export default async function EditProductPage({ params, searchParams }: { params
     : null
   const serializedStockTotal = serialCountRow?.total ?? 0
 
-  // Check if a product_drafts row exists for this product
   const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown>; variants: Record<string, unknown>[] }>(
     `SELECT product_id, fields, variants FROM product_drafts WHERE product_id = $1`,
     [id]
   )
   const isDraft = !!draftRow
+
+  // For active products without a draft, redirect to detail page.
+  // Editing active products requires going through a draft (via the Edit button).
+  if (product.is_active && !isDraft) {
+    const host = await getHost()
+    redirect(ap(`/admin/products/${id}`, host))
+  }
 
   // In draft mode, merge saved draft fields over the live product so the form
   // shows the admin's last saved changes (not the original live values).
