@@ -5,7 +5,7 @@ import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { verifyToken } from '@/lib/jwt'
 import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
-import { queryOne } from '@/lib/db'
+import { queryOne, queryMany } from '@/lib/db'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
@@ -209,11 +209,15 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { res
 // Runs ONLY the aggregate stats query (all products) and renders the stat cards.
 async function ProductsStats() {
   const host = await getHost()
-  const [allProductsForStats, categories, pendingDraftsRow] = await Promise.all([
+  const [allProductsForStats, categories, pendingDrafts] = await Promise.all([
     getFilteredProducts({}),
     getAllCategories(),
-    queryOne<{ count: string }>(
-      `SELECT COUNT(*)::text AS count FROM product_drafts`
+    queryMany<{ product_id: string; name: string; sku: string; updated_at: string }>(
+      `SELECT pd.product_id, p.name, p.sku, pd.updated_at
+       FROM product_drafts pd
+       JOIN products p ON p.id = pd.product_id
+       ORDER BY pd.updated_at DESC
+       LIMIT 10`
     ),
   ])
 
@@ -221,7 +225,7 @@ async function ProductsStats() {
   const activeCount = allProductsForStats.products?.filter((p: any) => p.is_active).length || 0
   const totalCount = allProductsForStats.total
   const categoryCount = categories?.length || 0
-  const pendingDraftsCount = parseInt(pendingDraftsRow?.count ?? '0') || 0
+  const pendingDraftsCount = pendingDrafts.length
 
   return (
     <div className="animate-fade-in">
@@ -248,16 +252,31 @@ async function ProductsStats() {
       </div>
       {pendingDraftsCount > 0 && (
         <div className="mb-6">
-          <Link
-            href={ap('/admin/products?is_active=false', host)}
-            className="flex items-center justify-between bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg px-4 py-3 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
-          >
-            <div>
-              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Pending Drafts</p>
-              <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Products with unpublished edits awaiting review</p>
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Pending Drafts ({pendingDraftsCount})
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
             </div>
-            <span className="text-2xl font-bold text-amber-700 dark:text-amber-300 ml-4">{pendingDraftsCount}</span>
-          </Link>
+            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+              {pendingDrafts.map((d) => (
+                <Link
+                  key={d.product_id}
+                  href={ap(`/admin/products/edit/${d.product_id}`, host)}
+                  className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors"
+                >
+                  <div>
+                    <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{d.name}</p>
+                    {d.sku && <p className="text-xs text-amber-600 dark:text-amber-400">{d.sku}</p>}
+                  </div>
+                  <p className="text-xs text-amber-500 dark:text-amber-500 ml-4 shrink-0">
+                    {new Date(d.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                  </p>
+                </Link>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
