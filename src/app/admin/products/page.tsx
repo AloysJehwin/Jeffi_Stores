@@ -1,7 +1,9 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { verifyToken } from '@/lib/jwt'
 import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
 import { queryOne } from '@/lib/db'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
@@ -24,7 +26,7 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function ProductsListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
+async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { resolvedSearchParams: SP; isSuperAdmin: boolean }) {
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
@@ -193,7 +195,7 @@ async function ProductsListContent({ resolvedSearchParams }: { resolvedSearchPar
                 <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Actions</th>
               </tr>
             </thead>
-            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} />
+            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} isSuperAdmin={isSuperAdmin} />
           </table>
         </div>
       </div>
@@ -265,9 +267,17 @@ async function ProductsStats() {
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const host = await getHost()
 
-  // Only the fast filter-option lookups are awaited in the shell so the header +
-  // AdminFilters paint immediately. The heavy all-products aggregate lives behind
-  // Suspense in ProductsStats; featuredCount is computed inside the list section.
+  // Read admin role for super_admin-only features (e.g. delete product)
+  const cookieStore = await cookies()
+  const token = cookieStore.get('admin_token')
+  let isSuperAdmin = false
+  if (token) {
+    try {
+      const payload = await verifyToken(token.value) as any
+      isSuperAdmin = payload?.role === 'super_admin'
+    } catch {}
+  }
+
   const [categories, brands] = await Promise.all([
     getAllCategories(),
     getAllBrands(),
@@ -316,7 +326,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         suggestType="products"
       />
 
-      <ProductsListSection searchParams={searchParams} />
+      <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} />
     </div>
   )
 }
@@ -324,12 +334,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 // Resolves searchParams (no DB — near-instant) then keys the table Suspense
 // on the query string so filter/pagination changes re-trigger the shimmer
 // while the stats + filters above stay mounted.
-async function ProductsListSection({ searchParams }: { searchParams: Promise<SP> }) {
+async function ProductsListSection({ searchParams, isSuperAdmin }: { searchParams: Promise<SP>; isSuperAdmin: boolean }) {
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
-      <ProductsListContent resolvedSearchParams={resolvedSearchParams} />
+      <ProductsListContent resolvedSearchParams={resolvedSearchParams} isSuperAdmin={isSuperAdmin} />
     </Suspense>
   )
 }
