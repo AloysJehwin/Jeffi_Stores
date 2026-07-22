@@ -45,13 +45,18 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  const draftBasePath = isDraft ? `/api/admin/products/${productId}/draft/units` : null
   const baseUrl = isDraft
-    ? `/api/admin/products/${productId}/draft/units${subVariantId ? `?sub_variant_id=${subVariantId}&variant_id=${variantId}` : variantId ? `?variant_id=${variantId}` : ''}`
+    ? `${draftBasePath}${subVariantId ? `?sub_variant_id=${subVariantId}&variant_id=${variantId}` : variantId ? `?variant_id=${variantId}` : ''}`
     : subVariantId
       ? `/api/admin/products/${productId}/variants/${variantId}/sub-variants/${subVariantId}/units`
       : variantId
         ? `/api/admin/products/${productId}/variants/${variantId}/units`
         : `/api/admin/products/${productId}/units`
+  // For [unitId] routes (PATCH/DELETE), use the path without query params
+  const unitUrl = (unitId: string) => isDraft
+    ? `${draftBasePath}/${unitId}`
+    : `${baseUrl}/${unitId}`
   const isVariantScope = !!variantId && !subVariantId
   const isSubVariantScope = !!subVariantId
 
@@ -228,7 +233,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
     if (!base) return
     setSaving(true)
     try {
-      const res = await fetch(`${baseUrl}/${base.id}`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(unitUrl(base.id), { method: 'DELETE', credentials: 'include' })
       if (!res.ok) { showToast((await res.json().catch(() => ({}))).error || 'Failed to reset', 'error'); return }
       await load()
     } finally { setSaving(false) }
@@ -237,7 +242,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   async function handleDeleteExtra(u: ProductUnit) {
     setDeletingId(u.id)
     try {
-      const res = await fetch(`${baseUrl}/${u.id}`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(unitUrl(u.id), { method: 'DELETE', credentials: 'include' })
       if (!res.ok) { showToast((await res.json().catch(() => ({}))).error || 'Failed to delete', 'error'); return }
       await load()
     } finally { setDeletingId(null) }
@@ -275,7 +280,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
     setSaving(true)
     try {
       const res = baseUnit && !inherited
-        ? await fetch(`${baseUrl}/${baseUnit.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        ? await fetch(unitUrl(baseUnit.id), { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         : await fetch(baseUrl, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, is_base: true }) })
       const data = await res.json()
       if (!res.ok) { showToast(data.error || 'Failed to save', 'error'); return }
@@ -300,7 +305,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
     setSaving(true)
     try {
       const res = editingExtraId
-        ? await fetch(`${baseUrl}/${editingExtraId}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        ? await fetch(unitUrl(editingExtraId), { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         : await fetch(baseUrl, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, is_base: false }) })
       const data = await res.json()
       if (!res.ok) { showToast(data.error || 'Failed to save', 'error'); return }
