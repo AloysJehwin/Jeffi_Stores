@@ -330,7 +330,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </Link>
-                  {product.is_active && !product.draft_of_id ? (
+                  {product.is_active ? (
                     <button
                       onClick={() => setDraftProduct({ id: product.id, name: String(product.name || ''), sku: product.sku ? String(product.sku) : null, backUrl })}
                       title="Edit Product"
