@@ -614,7 +614,13 @@ export default function ProductForm({ categories, brands, action, product, produ
           imageOrder,
           existingImagesToKeep,
           galleryImageIds,
-          variants: variantsRef.current.filter((v: any) => !v._isDeleted),
+          variants: variantsRef.current.filter((v: any) => !v._isDeleted).map((v: any) => {
+            const clean: any = {}
+            for (const [k, val] of Object.entries(v)) {
+              clean[k] = (typeof val === 'string' && val === 'NaN') ? '' : val
+            }
+            return clean
+          }),
         }),
       })
       setServerSaveStatus(r.ok ? 'saved' : 'error')
