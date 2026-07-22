@@ -202,6 +202,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
         [productId, v.sku]
       )
     }
+    // Delete variant images for variants where use_own_images was turned off
+    const variantsWithOwnImagesOff = validVariants.filter((v: any) => !v.use_own_images && v.sku)
+    for (const v of variantsWithOwnImagesOff) {
+      await client.query(
+        `DELETE FROM variant_images
+         WHERE variant_id = (SELECT id FROM product_variants WHERE product_id = $1 AND sku = $2)`,
+        [productId, v.sku]
+      )
+    }
     }
 
     await client.query(`DELETE FROM product_images WHERE product_id = $1`, [productId])
