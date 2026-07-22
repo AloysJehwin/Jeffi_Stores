@@ -302,6 +302,21 @@ export async function publishProductDraft(productId: string): Promise<void> {
     }
 
     // UPSERT variant-level units from draft (preserve IDs via ON CONFLICT on product_id+variant_id+unit)
+    // First delete variant units that were explicitly cleared (Reset to product default)
+    const clearedVariantUnitIds = (units as any[])
+      .filter((u: any) => u._cleared && u.variant_id && u.variant_id !== 'null')
+      .map((u: any) => u.variant_id)
+    for (const vid of clearedVariantUnitIds) {
+      await client.query(
+        `DELETE FROM product_units WHERE product_id = $1 AND variant_id = $2`,
+        [productId, vid]
+      )
+      // Clear sell_unit_id on the variant so it inherits from product
+      await client.query(
+        `UPDATE product_variants SET sell_unit_id = NULL, updated_at = NOW() WHERE id = $1`,
+        [vid]
+      )
+    }
     const variantUnits = (units as any[]).filter((u: any) => !u._cleared && u.variant_id && u.variant_id !== 'null')
     for (const u of variantUnits) {
       await client.query(
