@@ -4,6 +4,7 @@ import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
+import { publishProductDraft } from '@/lib/product-draft'
 import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
@@ -238,20 +239,9 @@ async function updateProduct(productId: string, formData: FormData) {
       revalidatePath(`/admin/products/edit/${productId}`)
       const host = await getHost()
 
-      // Publish: draft fields just saved — now call publish API to merge into live product
+      // Publish: draft fields just saved — call publishProductDraft directly (no HTTP roundtrip)
       if (intent === 'publish') {
-        const { headers } = await import('next/headers')
-        const hdrs = await headers()
-        const cookie = hdrs.get('cookie') || ''
-        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || 3000}`
-        const publishRes = await fetch(`${baseUrl}/api/admin/products/${productId}/publish`, {
-          method: 'POST',
-          headers: { cookie },
-        })
-        if (!publishRes.ok) {
-          const body = await publishRes.json().catch(() => ({}))
-          throw new Error((body as { error?: string }).error || 'Publish failed')
-        }
+        await publishProductDraft(productId)
         revalidatePath('/admin/products')
         revalidatePath(`/admin/products/${productId}`)
         redirect(ap(`/admin/products/${productId}`, host))
