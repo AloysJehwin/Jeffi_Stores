@@ -453,24 +453,32 @@ export default function ProductDetailClient({ id }: { id: string }) {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {/* — Details — */}
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Details</p>
               <Field label="Category" value={p.categories?.name} />
               <Field label="Brand" value={p.brands?.name} />
-              <Field label="GST" value={p.gst_percentage != null ? `${p.gst_percentage}%` : null} />
+              <Field label="GST" value={p.gst_percentage != null ? `${Number(p.gst_percentage).toFixed(2)}%` : null} />
               <Field label="HSN Code" value={p.hsn_code} mono />
               <Field label="MPN" value={p.mpn} mono />
               <Field label="GTIN" value={p.gtin} mono />
+              <Field label="Barcode" value={p.barcode} mono />
+              <Field label="ISBN" value={p.isbn} mono />
+              <Field label="ASIN" value={p.asin} mono />
+              <Field label="Brand Part No." value={p.brand_part_number} mono />
+              <Field label="Variant Type" value={p.variant_type} />
+              <Field label="Sub-Variant Type" value={p.sub_variant_type} />
+              <Field label="Condition" value={p.condition} />
+              <Field label="Grade" value={p.grade} />
               <Field label="Slug" value={p.slug} mono />
             </div>
 
+            {/* — Stock & Shipping — */}
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
               <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Stock & Shipping</p>
               <div className="flex justify-between text-sm">
                 <span className="text-foreground-secondary">Inventory Stock</span>
-                <span className={`font-semibold ${stockColor}`}>
-                  {inventoryQty}{p.has_variants ? ' (variants)' : ''}
-                </span>
+                <span className={`font-semibold ${stockColor}`}>{inventoryQty}{p.has_variants ? ' (variants)' : ''}</span>
               </div>
               {!p.has_variants && (
                 <div className="flex justify-between text-sm">
@@ -478,8 +486,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   <span className="font-semibold text-foreground">{listedQty}</span>
                 </div>
               )}
+              <Field label="Stock Status" value={p.stock_status} />
               <Field label="Weight" value={p.weight ? `${p.weight} kg` : null} />
               <Field label="Weight (g)" value={p.weight_grams} />
+              <Field label="Net Weight (g)" value={p.net_weight_grams} />
+              <Field label="Volume (ml)" value={p.volume_ml} />
               <Field label="Dimensions" value={p.dimensions} />
               {(p.length_cm || p.breadth_cm || p.height_cm) && (
                 <div className="flex justify-between text-sm">
@@ -488,8 +499,106 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 </div>
               )}
               <Field label="Package Type" value={p.package_type} />
+              <Field label="Handling Days" value={p.handling_days} />
+              <Field label="Extra Delivery Days" value={p.extra_delivery_days} />
+              <Field label="Shipping Class" value={p.shipping_class} />
+              {p.is_oversized && <Field label="Oversized" value="Yes" />}
+              <Field label="Country of Origin" value={p.country_of_origin} />
+            </div>
+
+            {/* — Pricing & Finance — */}
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Pricing & Finance</p>
+              <Field label="MRP (incl. GST)" value={p.mrp != null ? formatINR(Number(p.mrp)) : null} />
+              <Field label="MRP (ex-GST)" value={p.mrp_ex_gst != null ? formatINR(Number(p.mrp_ex_gst)) : null} />
+              <Field label="Selling Price" value={p.base_price != null ? formatINR(Number(p.base_price)) : null} />
+              <Field label="Price (ex-GST)" value={p.price_ex_gst != null ? formatINR(Number(p.price_ex_gst)) : null} />
+              <Field label="Cost Price" value={p.cost_price != null ? formatINR(Number(p.cost_price)) : null} />
+              <Field label="Discount %" value={p.discount_pct != null ? `${p.discount_pct}%` : null} />
+              <Field label="Tax Class" value={p.tax_class} />
+              <Field label="Inclusive Tax" value={p.inclusive_tax ? 'Yes' : 'No'} />
+              <Field label="COD Allowed" value={p.is_cod_allowed ? 'Yes' : 'No'} />
+              {p.is_subscription && <>
+                <Field label="Subscription" value="Yes" />
+                <Field label="Interval" value={p.subscription_interval} />
+                <Field label="Sub. Price" value={p.subscription_price != null ? formatINR(Number(p.subscription_price)) : null} />
+              </>}
+            </div>
+
+            {/* — Physical & Compliance — */}
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Physical & Compliance</p>
+              <Field label="Material" value={p.material} />
+              <Field label="Finish" value={p.finish} />
+              <Field label="Size" value={p.size} />
+              <Field label="Color" value={p.color} />
+              <Field label="Color Hex" value={p.color_hex} mono />
+              <Field label="Shelf Life (days)" value={p.shelf_life_days} />
+              <Field label="Certifications" value={Array.isArray(p.certifications) && p.certifications.length ? p.certifications.join(', ') : null} />
+              <Field label="Compliance Standard" value={p.compliance_standard} />
+              <Field label="Safety Rating" value={p.safety_rating} />
+              <Field label="Warranty" value={p.warranty_months ? `${p.warranty_months} months${p.warranty_type ? ` (${p.warranty_type})` : ''}` : null} />
+              <div className="flex flex-wrap gap-2 pt-1">
+                {p.fragile && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">Fragile</span>}
+                {p.hazardous && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Hazardous</span>}
+                {p.flammable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">Flammable</span>}
+                {p.perishable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Perishable</span>}
+                {p.serialized && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Serialized</span>}
+              </div>
+            </div>
+
+            {/* — Lifecycle & Merchandising — */}
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Lifecycle & Merchandising</p>
+              <Field label="Launch Date" value={p.launch_date ? new Date(p.launch_date).toLocaleDateString('en-IN') : null} />
+              <Field label="Discontinue Date" value={p.discontinue_date ? new Date(p.discontinue_date).toLocaleDateString('en-IN') : null} />
+              <Field label="Sort Order" value={p.sort_order} />
+              <Field label="Views" value={p.views_count} />
+              <Field label="Sales" value={p.sales_count} />
+              {p.is_bundle && <Field label="Bundle" value="Yes" />}
+              {p.is_digital && <>
+                <Field label="Digital Product" value="Yes" />
+                <Field label="Download URL" value={p.download_url} mono />
+                <Field label="License Type" value={p.license_type} />
+                <Field label="File Format" value={p.file_format} />
+                <Field label="Platform Compat." value={Array.isArray(p.platform_compatibility) && p.platform_compatibility.length ? p.platform_compatibility.join(', ') : null} />
+              </>}
+            </div>
+
+            {/* — SEO & Audience — */}
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">SEO & Audience</p>
+              <Field label="Meta Title" value={p.meta_title} />
+              <Field label="Meta Description" value={p.meta_description} />
+              <Field label="Searchable" value={p.is_searchable ? 'Yes' : 'No'} />
+              <Field label="Target Gender" value={p.target_gender} />
+              <Field label="Target Audience" value={Array.isArray(p.target_audience) && p.target_audience.length ? p.target_audience.join(', ') : null} />
+              <Field label="Age Range" value={(p.age_min != null || p.age_max != null) ? `${p.age_min ?? '—'} – ${p.age_max ?? '—'}` : null} />
             </div>
           </div>
+
+          {/* — Specifications — */}
+          {p.specifications && Object.keys(p.specifications).length > 0 && (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Specifications</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5">
+                {Object.entries(p.specifications).map(([k, v]) => (
+                  <div key={k} className="flex justify-between text-sm border-b border-border-default/40 pb-1">
+                    <span className="text-foreground-secondary">{k}</span>
+                    <span className="text-foreground font-mono text-xs">{String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* — Short Description — */}
+          {p.short_description && (
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">Short Description</p>
+              <p className="text-sm text-foreground leading-relaxed">{p.short_description}</p>
+            </div>
+          )}
 
           {p.description && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
@@ -570,19 +679,26 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           )}
 
+          {/* — Selling Units & Shelf Locations — */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Selling Units</p>
+              <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
+            </div>
+            {shelfStock.length > 0 && (
+              <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
+                <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Shelf Locations</p>
+                <div className="flex flex-wrap gap-2">
+                  <ShelfBadges rows={shelfStock} />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-4 text-xs text-foreground-muted">
             <span>Created {formatDate(p.created_at)}</span>
             <span>Updated {formatDate(p.updated_at)}</span>
           </div>
-        </div>
-      </div>
-
-      <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
-        <div className="px-4 py-3 border-b border-border-default">
-          <p className="text-sm font-semibold text-foreground">Selling Units</p>
-        </div>
-        <div className="px-4 py-4">
-          <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
         </div>
       </div>
 
