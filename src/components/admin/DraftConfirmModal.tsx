@@ -30,15 +30,16 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
       const res = await fetch(`/api/admin/products/${productId}/draft`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
-        // 409 = draft already exists — go to it
-        if (res.status === 409 && data.draftId) {
-          router.push(`${apPrefix}/admin/products/edit/${data.draftId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`)
+        // 409 = draft already exists — reload this same edit page to show the draft form
+        if (res.status === 409) {
+          router.push(`${apPrefix}/admin/products/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`)
           return
         }
         setError(data.error || 'Failed to create draft')
         return
       }
-      router.push(`${apPrefix}/admin/products/edit/${data.draftId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`)
+      // Draft created — reload the same edit page (original product id); it will detect the draft
+      router.push(`${apPrefix}/admin/products/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`)
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
@@ -109,7 +110,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
             Cancel
           </button>
           <button
-            onClick={existingDraftId ? () => router.push(`${apPrefix}/admin/products/edit/${existingDraftId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`) : createDraft}
+            onClick={existingDraftId ? () => router.push(`${apPrefix}/admin/products/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`) : createDraft}
             disabled={loading}
             className="flex-1 px-4 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >

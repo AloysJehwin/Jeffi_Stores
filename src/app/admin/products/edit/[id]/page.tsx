@@ -3,8 +3,7 @@ import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
-import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
-import { syncPerishableStock } from '@/lib/shelf'
+import { query, queryOne, queryMany } from '@/lib/db'
 import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
@@ -123,7 +122,7 @@ async function updateProduct(productId: string, formData: FormData) {
   const breadthCm = formData.get('breadth_cm') ? parseFloat(formData.get('breadth_cm') as string) : null
   const heightCm = formData.get('height_cm') ? parseFloat(formData.get('height_cm') as string) : null
   const intent = formData.get('intent') as string | null
-  const isActive = (intent === 'draft' || intent === 'draft-stay' || intent === 'publish') ? false : (formData.get('is_active') === 'true')
+  const isActive = (intent === 'draft' || intent === 'draft-stay') ? false : (formData.get('is_active') === 'true')
   const isFeatured = formData.get('is_featured') === 'true'
   const imageCount = parseInt(formData.get('image_count') as string || '0')
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
@@ -133,16 +132,144 @@ async function updateProduct(productId: string, formData: FormData) {
   const imageOrderJson = formData.get('image_order') as string
   const imageOrder: string[] = imageOrderJson ? JSON.parse(imageOrderJson) : []
 
-  const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').replace(/-draft$/g, '')
-  // The draft always keeps the -draft slug suffix — the publish transaction
-  // strips it via REPLACE when copying to the original product.
-  const slug = `${baseSlug}-draft`
+  const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const slug = baseSlug
 
   const rawSku = (formData.get('sku') as string || '').trim().toUpperCase()
-  const skuFromForm = (intent === 'publish' ? rawSku.replace(/-DRAFT$/i, '') : rawSku) || null
+  const skuFromForm = rawSku || null
+
+  // Extra fields collected for draft fields JSONB (mirrors all SET clauses below)
+  const extraDeliveryDays = parseInt(formData.get('extra_delivery_days') as string || '0') || 0
+  const barcode = (formData.get('barcode') as string) || null
+  const isbn = (formData.get('isbn') as string) || null
+  const asin = (formData.get('asin') as string) || null
+  const brandPartNumber = (formData.get('brand_part_number') as string) || null
+  const countryOfOrigin = ((formData.get('country_of_origin') as string) || '').slice(0, 2).toUpperCase() || null
+  const shelfLifeDays = formData.get('shelf_life_days') ? parseInt(formData.get('shelf_life_days') as string) : null
+  const grade = (formData.get('grade') as string) || null
+  const specificationsRaw = (formData.get('specifications') as string) || null
+  const specifications = specificationsRaw ? JSON.parse(specificationsRaw) : null
+  const color = (formData.get('color') as string) || null
+  const colorHex = (formData.get('color_hex') as string) || null
+  const volumeMl = formData.get('volume_ml') ? parseFloat(formData.get('volume_ml') as string) : null
+  const netWeightGrams = formData.get('net_weight_grams') ? parseInt(formData.get('net_weight_grams') as string) : null
+  const fragile = formData.get('fragile') === 'true'
+  const hazardous = formData.get('hazardous') === 'true'
+  const flammable = formData.get('flammable') === 'true'
+  const perishable = formData.get('perishable') === 'true'
+  const serialized = formData.get('serialized') === 'true'
+  const certifications = (formData.get('certifications') as string) ? (formData.get('certifications') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+  const complianceStandard = (formData.get('compliance_standard') as string) || null
+  const safetyRating = (formData.get('safety_rating') as string) || null
+  const warrantyMonths = formData.get('warranty_months') ? parseInt(formData.get('warranty_months') as string) : null
+  const warrantyType = (formData.get('warranty_type') as string) || null
+  const condition = (formData.get('condition') as string) || 'new'
+  const isCodAllowed = formData.get('is_cod_allowed') !== 'false'
+  const launchDate = (formData.get('launch_date') as string) || null
+  const discontinueDate = (formData.get('discontinue_date') as string) || null
+  const sortOrderVal = formData.get('sort_order') ? parseInt(formData.get('sort_order') as string) : 0
+  const handlingDays = formData.get('handling_days') ? parseInt(formData.get('handling_days') as string) : 1
+  const shippingClass = (formData.get('shipping_class') as string) || 'standard'
+  const isOversized = formData.get('is_oversized') === 'true'
+  const isDigital = formData.get('is_digital') === 'true'
+  const downloadUrl = (formData.get('download_url') as string) || null
+  const licenseType = (formData.get('license_type') as string) || null
+  const fileFormat = (formData.get('file_format') as string) || null
+  const platformCompatibility = (formData.get('platform_compatibility') as string) ? (formData.get('platform_compatibility') as string).split(',').map(s => s.trim()).filter(Boolean) : null
+  const isSubscription = formData.get('is_subscription') === 'true'
+  const subscriptionInterval = (formData.get('subscription_interval') as string) || null
+  const subscriptionPrice = formData.get('subscription_price') ? round2(parseFloat(formData.get('subscription_price') as string)) : null
+  const isBundle = formData.get('is_bundle') === 'true'
+  const metaTitle = (formData.get('meta_title') as string) || null
+  const metaDescription = (formData.get('meta_description') as string) || null
+  const isSearchable = formData.get('is_searchable') !== 'false'
+  const taxClass = (formData.get('tax_class') as string) || 'standard'
+  const inclusiveTax = formData.get('inclusive_tax') === 'true'
+  const ageMin = formData.get('age_min') ? parseInt(formData.get('age_min') as string) : null
+  const ageMax = formData.get('age_max') ? parseInt(formData.get('age_max') as string) : null
+  const targetGender = (formData.get('target_gender') as string) || null
+  const targetAudience = (formData.get('target_audience') as string) ? (formData.get('target_audience') as string).split(',').map(s => s.trim()).filter(Boolean) : null
 
   try {
+    // Check if a product_drafts row exists for this product
+    const draftRow = await queryOne<{ product_id: string }>(
+      `SELECT product_id FROM product_drafts WHERE product_id = $1`,
+      [productId]
+    )
+    const hasDraft = !!draftRow
 
+    // If publish intent and a draft exists, POST to publish API then redirect
+    if (intent === 'publish' && hasDraft) {
+      const host = await getHost()
+      const { headers } = await import('next/headers')
+      const hdrs = await headers()
+      const cookie = hdrs.get('cookie') || ''
+      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || `http://localhost:${process.env.PORT || 3000}`
+      const publishRes = await fetch(`${baseUrl}/api/admin/products/${productId}/publish`, {
+        method: 'POST',
+        headers: { cookie },
+      })
+      if (!publishRes.ok) {
+        const body = await publishRes.json().catch(() => ({}))
+        throw new Error((body as { error?: string }).error || 'Publish failed')
+      }
+      revalidatePath('/admin/products')
+      revalidatePath(`/admin/products/${productId}`)
+      revalidatePath(`/admin/products/edit/${productId}`)
+      redirect(ap(`/admin/products/${productId}`, host))
+    }
+
+    // If draft exists: save form fields to product_drafts.fields only — don't touch products table
+    if (hasDraft) {
+      const draftFields = {
+        name, slug, description, category_id: categoryId,
+        brand_id: brandId || null, base_price: basePrice, mrp, mrp_ex_gst: mrpExGst,
+        price_ex_gst: salePrice, gst_percentage: gstPercentage, hsn_code: hsnCode,
+        stock_status: stockStatus, weight, dimensions, is_active: isActive,
+        is_featured: isFeatured, has_variants: hasVariants, variant_type: variantType,
+        sub_variant_type: subVariantType, weight_grams: weightGrams, package_type: packageType,
+        length_cm: lengthCm, breadth_cm: breadthCm, height_cm: heightCm,
+        cost_price: costPrice, discount_pct: discountPct,
+        sku: skuFromForm,
+        mpn: hasVariants ? null : mpn, gtin: hasVariants ? null : gtin,
+        extra_delivery_days: extraDeliveryDays,
+        barcode, isbn, asin, brand_part_number: brandPartNumber,
+        country_of_origin: countryOfOrigin, shelf_life_days: shelfLifeDays,
+        grade, specifications, color, color_hex: colorHex, volume_ml: volumeMl,
+        net_weight_grams: netWeightGrams, fragile, hazardous, flammable, perishable, serialized,
+        certifications, compliance_standard: complianceStandard, safety_rating: safetyRating,
+        warranty_months: warrantyMonths, warranty_type: warrantyType,
+        condition, is_cod_allowed: isCodAllowed, launch_date: launchDate,
+        discontinue_date: discontinueDate, sort_order: sortOrderVal,
+        handling_days: handlingDays, shipping_class: shippingClass, is_oversized: isOversized,
+        is_digital: isDigital, download_url: downloadUrl, license_type: licenseType,
+        file_format: fileFormat, platform_compatibility: platformCompatibility,
+        is_subscription: isSubscription, subscription_interval: subscriptionInterval,
+        subscription_price: subscriptionPrice, is_bundle: isBundle,
+        meta_title: metaTitle, meta_description: metaDescription, is_searchable: isSearchable,
+        tax_class: taxClass, inclusive_tax: inclusiveTax,
+        age_min: ageMin, age_max: ageMax, target_gender: targetGender, target_audience: targetAudience,
+      }
+      await query(
+        `INSERT INTO product_drafts (product_id, fields, updated_at)
+         VALUES ($1, $2::jsonb, NOW())
+         ON CONFLICT (product_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
+        [productId, JSON.stringify(draftFields)]
+      )
+      revalidatePath(`/admin/products/edit/${productId}`)
+      const host = await getHost()
+      if (intent === 'draft-stay') {
+        const popupVariantId = formData.get('popup_variant_id') as string | null
+        const dest = popupVariantId
+          ? `/admin/products/edit/${productId}?popup=${encodeURIComponent(popupVariantId)}`
+          : `/admin/products/edit/${productId}`
+        redirect(ap(dest, host))
+      }
+      const back = formData.get('_back') as string | null
+      redirect(ap(back && back.startsWith('/admin/products') ? back : '/admin/products', host))
+    }
+
+    // No draft — live product direct edit path
     const setClauses: string[] = [
       'name = $1', 'slug = $2', 'description = $3', 'category_id = $4',
       'brand_id = $5', 'base_price = $6', 'mrp = $7', 'mrp_ex_gst = $8',
@@ -173,104 +300,30 @@ async function updateProduct(productId: string, formData: FormData) {
       setClauses.push(`mpn = $${params.length + 1}`, `gtin = $${params.length + 2}`)
       params.push(mpn, gtin)
     }
-    const extraDeliveryDays = parseInt(formData.get('extra_delivery_days') as string || '0') || 0
     setClauses.push(`extra_delivery_days = $${params.length + 1}`)
     params.push(extraDeliveryDays)
-
-    // Identification & Compliance
-    const barcode = (formData.get('barcode') as string) || null
-    const isbn = (formData.get('isbn') as string) || null
-    const asin = (formData.get('asin') as string) || null
-    const brandPartNumber = (formData.get('brand_part_number') as string) || null
-    const countryOfOrigin = ((formData.get('country_of_origin') as string) || '').slice(0, 2).toUpperCase() || null
-    const shelfLifeDays = formData.get('shelf_life_days') ? parseInt(formData.get('shelf_life_days') as string) : null
     setClauses.push(`barcode = $${params.length + 1}`, `isbn = $${params.length + 2}`, `asin = $${params.length + 3}`, `brand_part_number = $${params.length + 4}`, `country_of_origin = $${params.length + 5}`, `shelf_life_days = $${params.length + 6}`)
     params.push(barcode, isbn, asin, brandPartNumber, countryOfOrigin, shelfLifeDays)
-
-    // Technical Specs
-    const grade = (formData.get('grade') as string) || null
-    const specificationsRaw = (formData.get('specifications') as string) || null
-    const specifications = specificationsRaw ? JSON.parse(specificationsRaw) : null
     setClauses.push(`grade = $${params.length + 1}`, `specifications = $${params.length + 2}`)
     params.push(grade, specifications)
-
-    // Physical Attributes
-    const color = (formData.get('color') as string) || null
-    const colorHex = (formData.get('color_hex') as string) || null
-    const volumeMl = formData.get('volume_ml') ? parseFloat(formData.get('volume_ml') as string) : null
-    const netWeightGrams = formData.get('net_weight_grams') ? parseInt(formData.get('net_weight_grams') as string) : null
-    const fragile = formData.get('fragile') === 'true'
-    const hazardous = formData.get('hazardous') === 'true'
-    const flammable = formData.get('flammable') === 'true'
-    const perishable = formData.get('perishable') === 'true'
-    const serialized = formData.get('serialized') === 'true'
     setClauses.push(`color = $${params.length + 1}`, `color_hex = $${params.length + 2}`, `volume_ml = $${params.length + 3}`, `net_weight_grams = $${params.length + 4}`, `fragile = $${params.length + 5}`, `hazardous = $${params.length + 6}`, `flammable = $${params.length + 7}`, `perishable = $${params.length + 8}`, `serialized = $${params.length + 9}`)
     params.push(color, colorHex, volumeMl, netWeightGrams, fragile, hazardous, flammable, perishable, serialized)
-
-    // Certifications & Standards
-    const certifications = (formData.get('certifications') as string) ? (formData.get('certifications') as string).split(',').map(s => s.trim()).filter(Boolean) : null
-    const complianceStandard = (formData.get('compliance_standard') as string) || null
-    const safetyRating = (formData.get('safety_rating') as string) || null
-    const warrantyMonths = formData.get('warranty_months') ? parseInt(formData.get('warranty_months') as string) : null
-    const warrantyType = (formData.get('warranty_type') as string) || null
     setClauses.push(`certifications = $${params.length + 1}`, `compliance_standard = $${params.length + 2}`, `safety_rating = $${params.length + 3}`, `warranty_months = $${params.length + 4}`, `warranty_type = $${params.length + 5}`)
     params.push(certifications, complianceStandard, safetyRating, warrantyMonths, warrantyType)
-
-    // Condition & Lifecycle
-    const condition = (formData.get('condition') as string) || 'new'
-    const isCodAllowed = formData.get('is_cod_allowed') !== 'false'
-    const launchDate = (formData.get('launch_date') as string) || null
-    const discontinueDate = (formData.get('discontinue_date') as string) || null
-    const sortOrderVal = formData.get('sort_order') ? parseInt(formData.get('sort_order') as string) : 0
     setClauses.push(`condition = $${params.length + 1}`, `is_cod_allowed = $${params.length + 2}`, `launch_date = $${params.length + 3}`, `discontinue_date = $${params.length + 4}`, `sort_order = $${params.length + 5}`)
     params.push(condition, isCodAllowed, launchDate, discontinueDate, sortOrderVal)
-
-    // Shipping & Logistics
-    const handlingDays = formData.get('handling_days') ? parseInt(formData.get('handling_days') as string) : 1
-    const shippingClass = (formData.get('shipping_class') as string) || 'standard'
-    const isOversized = formData.get('is_oversized') === 'true'
     setClauses.push(`handling_days = $${params.length + 1}`, `shipping_class = $${params.length + 2}`, `is_oversized = $${params.length + 3}`)
     params.push(handlingDays, shippingClass, isOversized)
-
-    // Digital / Content
-    const isDigital = formData.get('is_digital') === 'true'
-    const downloadUrl = (formData.get('download_url') as string) || null
-    const licenseType = (formData.get('license_type') as string) || null
-    const fileFormat = (formData.get('file_format') as string) || null
-    const platformCompatibility = (formData.get('platform_compatibility') as string) ? (formData.get('platform_compatibility') as string).split(',').map(s => s.trim()).filter(Boolean) : null
     setClauses.push(`is_digital = $${params.length + 1}`, `download_url = $${params.length + 2}`, `license_type = $${params.length + 3}`, `file_format = $${params.length + 4}`, `platform_compatibility = $${params.length + 5}`)
     params.push(isDigital, downloadUrl, licenseType, fileFormat, platformCompatibility)
-
-    // Subscriptions
-    const isSubscription = formData.get('is_subscription') === 'true'
-    const subscriptionInterval = (formData.get('subscription_interval') as string) || null
-    const subscriptionPrice = formData.get('subscription_price') ? round2(parseFloat(formData.get('subscription_price') as string)) : null
     setClauses.push(`is_subscription = $${params.length + 1}`, `subscription_interval = $${params.length + 2}`, `subscription_price = $${params.length + 3}`)
     params.push(isSubscription, subscriptionInterval, subscriptionPrice)
-
-    // Bundling
-    const isBundle = formData.get('is_bundle') === 'true'
     setClauses.push(`is_bundle = $${params.length + 1}`)
     params.push(isBundle)
-
-    // SEO & Merchandising
-    const metaTitle = (formData.get('meta_title') as string) || null
-    const metaDescription = (formData.get('meta_description') as string) || null
-    const isSearchable = formData.get('is_searchable') !== 'false'
     setClauses.push(`meta_title = $${params.length + 1}`, `meta_description = $${params.length + 2}`, `is_searchable = $${params.length + 3}`)
     params.push(metaTitle, metaDescription, isSearchable)
-
-    // Tax & Finance
-    const taxClass = (formData.get('tax_class') as string) || 'standard'
-    const inclusiveTax = formData.get('inclusive_tax') === 'true'
     setClauses.push(`tax_class = $${params.length + 1}`, `inclusive_tax = $${params.length + 2}`)
     params.push(taxClass, inclusiveTax)
-
-    // Age / Audience
-    const ageMin = formData.get('age_min') ? parseInt(formData.get('age_min') as string) : null
-    const ageMax = formData.get('age_max') ? parseInt(formData.get('age_max') as string) : null
-    const targetGender = (formData.get('target_gender') as string) || null
-    const targetAudience = (formData.get('target_audience') as string) ? (formData.get('target_audience') as string).split(',').map(s => s.trim()).filter(Boolean) : null
     setClauses.push(`age_min = $${params.length + 1}`, `age_max = $${params.length + 2}`, `target_gender = $${params.length + 3}`, `target_audience = $${params.length + 4}`)
     params.push(ageMin, ageMax, targetGender, targetAudience)
 
@@ -579,78 +632,6 @@ async function updateProduct(productId: string, formData: FormData) {
     revalidatePath(`/admin/products/edit/${productId}`)
     const host = await getHost()
 
-    // If publishing a draft, atomically merge draft→original then redirect to original
-    if (intent === 'publish') {
-      const draftRow = await queryOne<{ draft_of_id: string | null }>(`SELECT draft_of_id FROM products WHERE id = $1`, [productId])
-      if (draftRow?.draft_of_id) {
-        const originalId = draftRow.draft_of_id
-        await withTransaction(async (client) => {
-          await client.query(
-            `UPDATE products AS live SET
-               category_id=d.category_id, brand_id=d.brand_id,
-               sku=REPLACE(d.sku,'-DRAFT',''), name=d.name,
-               slug=REPLACE(d.slug,'-draft',''),
-               description=d.description, short_description=d.short_description,
-               base_price=d.base_price, price_ex_gst=d.price_ex_gst, currency=d.currency,
-               weight=d.weight, dimensions=d.dimensions, material=d.material, finish=d.finish,
-               size=d.size, is_featured=d.is_featured, mrp=d.mrp, gst_percentage=d.gst_percentage,
-               hsn_code=d.hsn_code, has_variants=d.has_variants, variant_type=d.variant_type,
-               mpn=d.mpn, gtin=d.gtin, weight_grams=d.weight_grams, length_cm=d.length_cm,
-               breadth_cm=d.breadth_cm, height_cm=d.height_cm, package_type=d.package_type,
-               cost_price=d.cost_price, extra_delivery_days=d.extra_delivery_days,
-               inventory_quantity=d.inventory_quantity, mrp_ex_gst=d.mrp_ex_gst,
-               sub_variant_type=d.sub_variant_type, stock_status=d.stock_status,
-               image_url=d.image_url, barcode=d.barcode, discount_pct=d.discount_pct,
-               sell_unit_id=d.sell_unit_id, color=d.color, color_hex=d.color_hex,
-               fragile=d.fragile, hazardous=d.hazardous, flammable=d.flammable,
-               perishable=d.perishable, serialized=d.serialized, specifications=d.specifications,
-               meta_title=d.meta_title, meta_description=d.meta_description,
-               meta_keywords=d.meta_keywords, is_searchable=d.is_searchable,
-               updated_at=NOW()
-             FROM products d WHERE live.id=$2 AND d.id=$1`,
-            [productId, originalId]
-          )
-          await client.query(`DELETE FROM product_variants WHERE product_id=$1`, [originalId])
-          await client.query(
-            `INSERT INTO product_variants (product_id, sku, variant_name, price, attributes, is_active,
-               mrp, price_ex_gst, mpn, gtin, pricing_type, unit, numeric_value,
-               weight_grams, length_cm, breadth_cm, height_cm, package_type, cost_price,
-               inventory_quantity, mrp_ex_gst, variant_type, sub_variant_type,
-               sub_variant_type_on, use_own_images, discount_pct, stock_decimal_precision,
-               sell_unit_id, stock_status, created_at, updated_at)
-             SELECT $2, REPLACE(sku,'-DRAFT',''), variant_name, price, attributes, is_active,
-               mrp, price_ex_gst, mpn, gtin, pricing_type, unit, numeric_value,
-               weight_grams, length_cm, breadth_cm, height_cm, package_type, cost_price,
-               inventory_quantity, mrp_ex_gst, variant_type, sub_variant_type,
-               sub_variant_type_on, use_own_images, discount_pct, stock_decimal_precision,
-               sell_unit_id, stock_status, NOW(), NOW()
-             FROM product_variants WHERE product_id=$1`,
-            [productId, originalId]
-          )
-          await client.query(`DELETE FROM product_images WHERE product_id=$1`, [originalId])
-          await client.query(
-            `INSERT INTO product_images (product_id, image_url, thumbnail_url, s3_bucket, s3_key,
-               s3_thumbnail_key, file_name, file_size, mime_type, width, height, alt_text,
-               display_order, is_primary, created_at, updated_at)
-             SELECT $2, image_url, thumbnail_url, s3_bucket, s3_key,
-               s3_thumbnail_key, file_name, file_size, mime_type, width, height, alt_text,
-               display_order, is_primary, NOW(), NOW()
-             FROM product_images WHERE product_id=$1`,
-            [productId, originalId]
-          )
-          await client.query(`DELETE FROM product_units WHERE product_id=$1`, [productId])
-          await client.query(`DELETE FROM product_sub_variants WHERE product_id=$1`, [productId])
-          await client.query(`DELETE FROM product_images WHERE product_id=$1`, [productId])
-          await client.query(`DELETE FROM product_variants WHERE product_id=$1`, [productId])
-          await client.query(`DELETE FROM products WHERE id=$1`, [productId])
-        })
-        revalidatePath('/admin/products')
-        revalidatePath(`/admin/products/${originalId}`)
-        // Redirect to detail page (not edit) so the draft modal doesn't re-trigger
-        redirect(ap(`/admin/products/${originalId}`, host))
-      }
-    }
-
     if (intent === 'draft-stay') {
       const popupVariantId = formData.get('popup_variant_id') as string | null
       const dest = popupVariantId
@@ -696,19 +677,17 @@ export default async function EditProductPage({ params, searchParams }: { params
     : null
   const serializedStockTotal = serialCountRow?.total ?? 0
 
-  // Draft system state
-  const isLiveProduct = product.is_active === true && !product.draft_of_id
-  const isDraft = !product.is_active && !!product.draft_of_id
+  // Check if a product_drafts row exists for this product
+  const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown> }>(
+    `SELECT product_id, fields FROM product_drafts WHERE product_id = $1`,
+    [id]
+  )
+  const isDraft = !!draftRow
 
-  // For live products: check if a draft already exists
-  const existingDraftRow = isLiveProduct
-    ? await queryOne<{ id: string }>(`SELECT id FROM products WHERE draft_of_id = $1::uuid LIMIT 1`, [id])
-    : null
-
-  // For drafts: load the original product's SKU for the banner label
-  const originalProductRow = isDraft
-    ? await queryOne<{ id: string; sku: string | null; name: string }>(`SELECT id, sku, name FROM products WHERE id = $1::uuid`, [product.draft_of_id])
-    : null
+  // If a draft exists, merge draft fields over the live product to pre-populate the form
+  const productForForm = isDraft && draftRow.fields
+    ? { ...product, ...draftRow.fields, id: product.id }
+    : product
 
   return (
     <div className="p-4 sm:p-6">
@@ -721,12 +700,11 @@ export default async function EditProductPage({ params, searchParams }: { params
         <span className="text-foreground font-medium">{isDraft ? 'Edit Draft' : 'Edit Product'}</span>
       </div>
 
-      {/* Draft notice — informational only; publish/discard actions are in the form footer */}
       {isDraft && (
         <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3">
-          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft</p>
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
           <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">
-            Editing draft of{originalProductRow ? ` "${originalProductRow.name}"${originalProductRow.sku ? ` (${originalProductRow.sku})` : ''}` : ` product #${product.draft_of_id}`}. Use Save as Draft or Update &amp; Publish below.
+            Edits are saved to draft. The live product stays unchanged until you publish.
           </p>
         </div>
       )}
@@ -736,18 +714,16 @@ export default async function EditProductPage({ params, searchParams }: { params
         <p className="text-foreground-secondary mt-1">{isDraft ? 'Changes are saved to the draft only' : 'Update product information'}</p>
       </div>
 
-      {isLiveProduct ? null : (
-        <ProductForm
-          categories={categories || []}
-          brands={brands || []}
-          product={product}
-          productId={id}
-          action={updateProduct.bind(null, id)}
-          backUrl={backUrl}
-          perishableBatchTotal={perishableBatchTotal}
-          serializedStockTotal={serializedStockTotal}
-        />
-      )}
+      <ProductForm
+        categories={categories || []}
+        brands={brands || []}
+        product={productForForm}
+        productId={id}
+        action={updateProduct.bind(null, id)}
+        backUrl={backUrl}
+        perishableBatchTotal={perishableBatchTotal}
+        serializedStockTotal={serializedStockTotal}
+      />
     </div>
   )
 }
