@@ -212,31 +212,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
       [productId, JSON.stringify(draft.images)]
     )
 
-    const validSubVariants = (subVariants as any[]).filter((sv: any) => sv.sku)
-    if (validSubVariants.length > 0) {
-      await client.query(`DELETE FROM product_sub_variants WHERE product_id = $1`, [productId])
-      await client.query(
-        `INSERT INTO product_sub_variants (
-           variant_id, product_id, sku, sub_variant_name, price, mrp,
-           price_ex_gst, mrp_ex_gst, attributes, is_active,
-           inventory_quantity, discount_pct, stock_status, created_at, updated_at
-         )
-         SELECT
-           CASE WHEN sv->>'variant_id' IS NOT NULL AND sv->>'variant_id' != 'null'
-                THEN (sv->>'variant_id')::uuid
-                ELSE pv.id END,
-           $1, sv->>'sku', sv->>'sub_variant_name',
-           (sv->>'price')::numeric, NULLIF(sv->>'mrp','')::numeric,
-           NULLIF(sv->>'price_ex_gst','')::numeric, NULLIF(sv->>'mrp_ex_gst','')::numeric,
-           sv->'attributes', COALESCE((sv->>'is_active')::boolean, true),
-           NULLIF(sv->>'inventory_quantity','')::integer,
-           NULLIF(sv->>'discount_pct','')::numeric,
-           COALESCE(NULLIF(sv->>'stock_status',''), 'In Stock'), NOW(), NOW()
-         FROM jsonb_array_elements($2::jsonb) AS sv
-         LEFT JOIN product_variants pv ON pv.product_id = $1 AND pv.sku = sv->>'variant_sku'`,
-        [productId, JSON.stringify(validSubVariants)]
-      )
-    }
+    // Sub-variants write directly to live product_sub_variants in draft mode
+    // (addSubVariant/deleteSubVariant bypass staging) — skip on publish to avoid
+    // re-applying stale draft snapshot over already-correct live data.
 
     // Units: UPSERT all scopes — product-level, variant-level, sub-variant-level
     // Delete only product-level units first (safe — variant-level kept to avoid FK issues)
