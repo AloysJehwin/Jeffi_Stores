@@ -82,7 +82,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          ai_search_tags           = CASE WHEN jsonb_typeof(($2::jsonb)->'ai_search_tags') = 'array' THEN ARRAY(SELECT jsonb_array_elements_text(($2::jsonb)->'ai_search_tags')) ELSE NULL END,
          discount_pct             = NULLIF(($2::jsonb)->>'discount_pct', '')::numeric,
          sell_unit_id             = NULLIF(($2::jsonb)->>'sell_unit_id', '')::uuid,
-         stock_status             = ($2::jsonb)->>'stock_status',
+         stock_status             = COALESCE(NULLIF(($2::jsonb)->>'stock_status', ''), stock_status),
          image_url                = ($2::jsonb)->>'image_url',
          barcode                  = ($2::jsonb)->>'barcode',
          isbn                     = ($2::jsonb)->>'isbn',
