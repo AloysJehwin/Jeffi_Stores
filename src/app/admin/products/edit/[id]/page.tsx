@@ -7,6 +7,7 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { syncPerishableStock } from '@/lib/shelf'
 import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
+import ProductDetailClient from '@/app/admin/products/[id]/ProductDetailClient'
 import { ChevronLeft } from 'lucide-react'
 import { round2 } from '@/lib/gst'
 
@@ -759,52 +760,8 @@ export default async function EditProductPage({ params, searchParams }: { params
       </div>
 
       {isLiveProduct ? (
-        /* Live products are shown read-only — form is hidden, view mode displayed */
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-4 text-sm">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Name</p>
-              <p className="text-foreground font-medium">{product.name}</p>
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">SKU</p>
-              <p className="text-foreground">{product.sku || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Category</p>
-              <p className="text-foreground">{(product.categories as any)?.name || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Brand</p>
-              <p className="text-foreground">{(product.brands as any)?.name || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Base Price</p>
-              <p className="text-foreground">Rs. {Number(product.base_price || 0).toLocaleString('en-IN')}</p>
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">MRP</p>
-              <p className="text-foreground">{product.mrp ? `Rs. ${Number(product.mrp).toLocaleString('en-IN')}` : '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Stock Status</p>
-              <p className="text-foreground">{product.stock_status || '—'}</p>
-            </div>
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">GST %</p>
-              <p className="text-foreground">{product.gst_percentage ?? '—'}</p>
-            </div>
-          </div>
-          {product.description && (
-            <div>
-              <p className="text-xs text-foreground-muted uppercase tracking-wide mb-1">Description</p>
-              <p className="text-foreground whitespace-pre-line">{product.description}</p>
-            </div>
-          )}
-          <p className="text-xs text-foreground-muted pt-2 border-t border-border-default">
-            To edit this product, create a draft using the banner above.
-          </p>
-        </div>
+        /* Live product — show full detail view (same as /admin/products/[id]) */
+        <ProductDetailClient id={id} />
       ) : (
         <ProductForm
           categories={categories || []}
