@@ -134,10 +134,9 @@ async function updateProduct(productId: string, formData: FormData) {
   const imageOrder: string[] = imageOrderJson ? JSON.parse(imageOrderJson) : []
 
   const baseSlug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').replace(/-draft$/g, '')
-  // Drafts keep a -draft suffix to avoid colliding with the live product's slug.
-  // On publish the suffix is stripped so the original gets the clean slug.
-  const isDraftIntent = intent === 'draft' || intent === 'draft-stay' || (!intent && !formData.get('is_active'))
-  const slug = isDraftIntent ? `${baseSlug}-draft` : baseSlug
+  // The draft always keeps the -draft slug suffix — the publish transaction
+  // strips it via REPLACE when copying to the original product.
+  const slug = `${baseSlug}-draft`
 
   const rawSku = (formData.get('sku') as string || '').trim().toUpperCase()
   const skuFromForm = (intent === 'publish' ? rawSku.replace(/-DRAFT$/i, '') : rawSku) || null
