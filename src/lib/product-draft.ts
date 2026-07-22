@@ -164,15 +164,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
        )
        SELECT $1, v->>'sku', v->>'variant_name', (v->>'price')::numeric, v->'attributes',
          COALESCE((v->>'is_active')::boolean, true), NULLIF(v->>'mrp','')::numeric,
-         NULLIF(v->>'price_ex_gst','')::numeric, v->>'mpn', v->>'gtin', v->>'pricing_type',
+         NULLIF(v->>'price_ex_gst','')::numeric, v->>'mpn', v->>'gtin', COALESCE(NULLIF(v->>'pricing_type',''), 'unit'),
          v->>'unit', NULLIF(v->>'numeric_value','')::numeric,
          NULLIF(v->>'weight_grams','')::integer, NULLIF(v->>'length_cm','')::numeric,
          NULLIF(v->>'breadth_cm','')::numeric, NULLIF(v->>'height_cm','')::numeric,
          v->>'package_type', NULLIF(v->>'cost_price','')::numeric,
          COALESCE(NULLIF(v->>'inventory_quantity','')::numeric, 0), NULLIF(v->>'mrp_ex_gst','')::numeric,
          v->>'variant_type', v->>'sub_variant_type', COALESCE((v->>'sub_variant_type_on')::boolean, false),
-         COALESCE((v->>'use_own_images')::boolean, false), NULLIF(v->>'discount_pct','')::numeric,
-         NULLIF(v->>'stock_decimal_precision','')::integer, NULLIF(v->>'sell_unit_id','')::uuid,
+         COALESCE((v->>'use_own_images')::boolean, false), COALESCE(NULLIF(v->>'discount_pct','')::numeric, 0),
+         COALESCE(NULLIF(v->>'stock_decimal_precision','')::integer, 0), NULLIF(v->>'sell_unit_id','')::uuid,
          COALESCE(NULLIF(v->>'stock_status',''), 'In Stock'), NOW(), NOW()
        FROM jsonb_array_elements($2::jsonb) AS v
        ON CONFLICT (sku) DO UPDATE SET
