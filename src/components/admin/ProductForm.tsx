@@ -989,11 +989,13 @@ export default function ProductForm({ categories, brands, action, product, produ
   async function deleteSubVariant(variantId: string, subId: string) {
     if (!productId) return
     if (variantId.startsWith('temp-')) return
-    await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
+    const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
       method: 'DELETE',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: subId }),
     })
+    if (!res.ok) { setVariantImageError(`Failed to delete sub-variant: ${(await res.json().catch(() => ({}))).error || res.status}`); return }
     setSubVariantsMap(m => ({ ...m, [variantId]: (m[variantId] || []).filter((sv: any) => sv.id !== subId) }))
   }
 
