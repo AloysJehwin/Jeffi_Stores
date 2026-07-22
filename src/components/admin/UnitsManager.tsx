@@ -54,8 +54,9 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
         ? `/api/admin/products/${productId}/variants/${variantId}/units`
         : `/api/admin/products/${productId}/units`
   // For [unitId] routes (PATCH/DELETE), use the path without query params
+  // But include scope params so DELETE knows which scope to clear
   const unitUrl = (unitId: string) => isDraft
-    ? `${draftBasePath}/${unitId}`
+    ? `${draftBasePath}/${unitId}${subVariantId ? `?sub_variant_id=${subVariantId}&variant_id=${variantId}` : variantId ? `?variant_id=${variantId}` : ''}`
     : `${baseUrl}/${unitId}`
   const isVariantScope = !!variantId && !subVariantId
   const isSubVariantScope = !!subVariantId

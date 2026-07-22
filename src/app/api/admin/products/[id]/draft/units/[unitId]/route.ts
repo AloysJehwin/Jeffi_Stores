@@ -47,19 +47,26 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   if (!hasScope(admin.role, admin.scopes, 'products:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
+
+  // Get scope from query params (needed when unit came from live fallback and has no draft entry)
+  const variantId = req.nextUrl.searchParams.get('variant_id')
+  const subVariantId = req.nextUrl.searchParams.get('sub_variant_id')
+
   const units = await getDraftUnits(id)
   const deleted = units.find((u: any) => u.id === unitId)
   const filtered = units.filter((u: any) => u.id !== unitId)
 
-  // Add a sentinel so the GET fallback knows this scope was explicitly cleared
-  if (deleted) {
-    filtered.push({
-      _cleared: true,
-      id: `cleared-${unitId}`,
-      variant_id: deleted.variant_id ?? null,
-      sub_variant_id: deleted.sub_variant_id ?? null,
-    })
-  }
+  // Store a sentinel so the GET fallback knows this scope was explicitly cleared
+  // Use scope from the found unit, or from query params if unit came from live fallback
+  const clearedVariantId = deleted?.variant_id ?? variantId ?? null
+  const clearedSubVariantId = deleted?.sub_variant_id ?? subVariantId ?? null
+
+  filtered.push({
+    _cleared: true,
+    id: `cleared-${Date.now()}`,
+    variant_id: clearedVariantId,
+    sub_variant_id: clearedSubVariantId,
+  })
 
   await query(
     `UPDATE product_drafts SET units = $2::jsonb, updated_at = NOW() WHERE product_id = $1`,
