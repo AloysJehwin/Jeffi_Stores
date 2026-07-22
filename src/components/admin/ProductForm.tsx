@@ -872,6 +872,13 @@ export default function ProductForm({ categories, brands, action, product, produ
     try {
       const formData = new FormData(e.currentTarget)
 
+      // Capture the submitter button's intent — new FormData(form) does not
+      // include the clicked submit button's name/value automatically.
+      const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+      if (submitter?.name === 'intent' && submitter.value) {
+        formData.set('intent', submitter.value)
+      }
+
       if (pendingPopupVariantIdRef.current) {
         formData.set('popup_variant_id', pendingPopupVariantIdRef.current)
       }
