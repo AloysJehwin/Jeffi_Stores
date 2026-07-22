@@ -35,9 +35,9 @@ export async function POST(req: NextRequest, { params }: Params) {
         `UPDATE products AS live SET
            category_id = d.category_id,
            brand_id = d.brand_id,
-           sku = d.sku,
+           sku = REPLACE(d.sku, '-DRAFT', ''),
            name = d.name,
-           slug = d.slug,
+           slug = REPLACE(d.slug, '-draft', ''),
            description = d.description,
            short_description = d.short_description,
            base_price = d.base_price,
@@ -163,7 +163,7 @@ export async function POST(req: NextRequest, { params }: Params) {
             NOW()
           ) RETURNING id`,
           [
-            originalId, v.sku, v.variant_name, v.price, v.attributes, v.is_active,
+            originalId, REPLACE(v.sku, '-DRAFT', ''), v.variant_name, v.price, v.attributes, v.is_active,
             v.mrp, v.price_ex_gst, v.mpn, v.gtin, v.pricing_type, v.unit, v.numeric_value,
             v.weight_grams, v.length_cm, v.breadth_cm, v.height_cm,
             v.package_type, v.cost_price, v.inventory_quantity, v.mrp_ex_gst,

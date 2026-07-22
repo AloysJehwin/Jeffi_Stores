@@ -663,7 +663,9 @@ export default async function EditProductPage({ params, searchParams }: { params
                 // Copy all data fields from draft to original (preserving original id, is_active, created_at)
                 await client.query(
                   `UPDATE products AS live SET
-                     category_id=d.category_id, brand_id=d.brand_id, sku=d.sku, name=d.name, slug=d.slug,
+                     category_id=d.category_id, brand_id=d.brand_id,
+                     sku=REPLACE(d.sku,'-DRAFT',''), name=d.name,
+                     slug=REPLACE(d.slug,'-draft',''),
                      description=d.description, short_description=d.short_description,
                      base_price=d.base_price, price_ex_gst=d.price_ex_gst, currency=d.currency,
                      weight=d.weight, dimensions=d.dimensions, material=d.material, finish=d.finish,
