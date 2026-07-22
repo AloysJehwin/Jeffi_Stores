@@ -807,16 +807,16 @@ export default function ProductForm({ categories, brands, action, product, produ
           setVariantImageError(err.error || `Could not load images (${res.status})`)
         }
       }
-      if (!subVariantsMap[variantId]) {
-        const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`)
-        if (res.ok) {
-          const data = await res.json()
-          const loaded = data.sub_variants || []
-          setSubVariantsMap(m => ({ ...m, [variantId]: loaded }))
-        } else {
-          setSubVariantsMap(m => ({ ...m, [variantId]: [] }))
-        }
-      }
+    const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
+      credentials: 'include',
+    })
+    if (res.ok) {
+      const data = await res.json()
+      const loaded = data.sub_variants || []
+      setSubVariantsMap(m => ({ ...m, [variantId]: loaded }))
+    } else {
+      setSubVariantsMap(m => ({ ...m, [variantId]: [] }))
+    }
     }
   }
 
