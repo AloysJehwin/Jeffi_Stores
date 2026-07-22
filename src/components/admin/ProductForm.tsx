@@ -567,12 +567,8 @@ export default function ProductForm({ categories, brands, action, product, produ
   useEffect(() => {
     if (!isDraft || !productId) return
     void serverSaveNow()
-  }, [
-    isDraft, productId,
-    hasVariants, variants, groups,
-    basePrice, mrp, mrpExGst, salePrice, costPrice, discountPct,
-    gstRate, isActive,
-  ])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isDraft, productId, hasVariants, isActive])
 
   const wasPerishableOff = !(product?.perishable)
   const wasSerializedOff = !(product?.serialized)
@@ -1136,7 +1132,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
         </div>
       )}
-      <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+      <form ref={formRef} onSubmit={handleSubmit} onChange={isDraft ? () => { void serverSaveNow() } : undefined} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
         {hasDraft && (
