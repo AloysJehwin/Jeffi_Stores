@@ -568,7 +568,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (!isDraft || !productId) return
     void serverSaveNow()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isDraft, productId, hasVariants, isActive])
+  }, [isDraft, productId, hasVariants, isActive, isFeatured, fragile, hazardous, flammable, perishable, serialized, isCodAllowed, isSearchable, isOversized, isDigital, isSubscription, isBundle, inclusiveTax])
 
   const wasPerishableOff = !(product?.perishable)
   const wasSerializedOff = !(product?.serialized)
@@ -903,6 +903,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (!productId) return
     if (isDraft) { setVariantImageError('In draft mode — sub-variant changes apply when you publish.'); return }
     if (variantId.startsWith('temp-')) return
+    await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: subId }),
