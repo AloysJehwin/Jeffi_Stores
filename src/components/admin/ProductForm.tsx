@@ -542,6 +542,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     fields.mrp = mrp
     fields.mrp_ex_gst = mrpExGst
     fields.price_ex_gst = salePrice
+    fields.slug = productName ? productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : null
     fields.cost_price = costPrice
     fields.discount_pct = discountPct
     fields.is_active = isActive
