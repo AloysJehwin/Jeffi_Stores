@@ -441,6 +441,10 @@ export async function getFilteredProducts(filters: {
   if (filters.is_active === 'true' || filters.is_active === 'false') {
     conditions.push(`p.is_active = $${i++}`)
     params.push(filters.is_active === 'true')
+  } else {
+    // By default exclude shadow draft copies (is_active=false AND draft_of_id IS NOT NULL)
+    // so they don't appear as duplicates in the products list.
+    conditions.push(`NOT (p.is_active = false AND p.draft_of_id IS NOT NULL)`)
   }
   if (filters.stock === 'low') {
     conditions.push(`p.stock_status = 'Low Stock'`)
