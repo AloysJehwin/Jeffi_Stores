@@ -27,7 +27,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({})
   const [draftProduct, setDraftProduct] = useState<{ id: string; name: string; sku: string | null; backUrl: string } | null>(null)
-  const [deletingId, setDeletingId] = useState<string | null>(null))
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleToggleActive(productId: string, currentActive: boolean) {
     const next = !currentActive
