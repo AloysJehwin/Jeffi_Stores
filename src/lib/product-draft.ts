@@ -163,17 +163,17 @@ export async function publishProductDraft(productId: string): Promise<void> {
          created_at, updated_at
        )
        SELECT $1, v->>'sku', v->>'variant_name', (v->>'price')::numeric, v->'attributes',
-         (v->>'is_active')::boolean, NULLIF(v->>'mrp','')::numeric,
+         COALESCE((v->>'is_active')::boolean, true), NULLIF(v->>'mrp','')::numeric,
          NULLIF(v->>'price_ex_gst','')::numeric, v->>'mpn', v->>'gtin', v->>'pricing_type',
          v->>'unit', NULLIF(v->>'numeric_value','')::numeric,
          NULLIF(v->>'weight_grams','')::integer, NULLIF(v->>'length_cm','')::numeric,
          NULLIF(v->>'breadth_cm','')::numeric, NULLIF(v->>'height_cm','')::numeric,
          v->>'package_type', NULLIF(v->>'cost_price','')::numeric,
-         NULLIF(v->>'inventory_quantity','')::numeric, NULLIF(v->>'mrp_ex_gst','')::numeric,
-         v->>'variant_type', v->>'sub_variant_type', (v->>'sub_variant_type_on')::boolean,
-         (v->>'use_own_images')::boolean, NULLIF(v->>'discount_pct','')::numeric,
+         COALESCE(NULLIF(v->>'inventory_quantity','')::numeric, 0), NULLIF(v->>'mrp_ex_gst','')::numeric,
+         v->>'variant_type', v->>'sub_variant_type', COALESCE((v->>'sub_variant_type_on')::boolean, false),
+         COALESCE((v->>'use_own_images')::boolean, false), NULLIF(v->>'discount_pct','')::numeric,
          NULLIF(v->>'stock_decimal_precision','')::integer, NULLIF(v->>'sell_unit_id','')::uuid,
-         v->>'stock_status', NOW(), NOW()
+         COALESCE(NULLIF(v->>'stock_status',''), 'In Stock'), NOW(), NOW()
        FROM jsonb_array_elements($2::jsonb) AS v
        ON CONFLICT (sku) DO UPDATE SET
          variant_name = EXCLUDED.variant_name, price = EXCLUDED.price,
