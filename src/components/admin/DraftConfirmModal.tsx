@@ -64,9 +64,9 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
         </div>
 
         {/* Product info */}
-        <div className="bg-surface rounded-xl border border-border-default px-4 py-3 mb-5">
-          <p className="text-sm font-semibold text-foreground truncate">{productName}</p>
-          {productSku && <p className="text-xs text-foreground-muted mt-0.5">SKU: {productSku}</p>}
+        <div className="bg-surface-secondary rounded-xl border border-border-default px-4 py-3 mb-5">
+          <p className="text-sm font-semibold text-foreground leading-tight">{productName || 'Product'}</p>
+          {productSku && <p className="text-xs text-foreground-muted mt-1">SKU: {productSku}</p>}
           <div className="flex items-center gap-1.5 mt-2">
             <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
