@@ -140,7 +140,16 @@ export async function publishProductDraft(productId: string): Promise<void> {
       [productId, JSON.stringify(draft.fields)]
     )
 
-    await client.query(`DELETE FROM product_variants WHERE product_id = $1`, [productId])
+    // UPSERT variants by SKU to preserve IDs referenced by purchase_order_items etc.
+    const draftSkus = (variants as any[]).map((v: any) => v.sku).filter(Boolean)
+    if (draftSkus.length > 0) {
+      await client.query(
+        `DELETE FROM product_variants WHERE product_id = $1 AND sku != ALL($2::text[])`,
+        [productId, draftSkus]
+      )
+    } else {
+      await client.query(`DELETE FROM product_variants WHERE product_id = $1`, [productId])
+    }
     await client.query(
       `INSERT INTO product_variants (
          product_id, sku, variant_name, price, attributes, is_active, mrp,
@@ -163,7 +172,23 @@ export async function publishProductDraft(productId: string): Promise<void> {
          (v->>'use_own_images')::boolean, NULLIF(v->>'discount_pct','')::numeric,
          NULLIF(v->>'stock_decimal_precision','')::integer, NULLIF(v->>'sell_unit_id','')::uuid,
          v->>'stock_status', NOW(), NOW()
-       FROM jsonb_array_elements($2::jsonb) AS v`,
+       FROM jsonb_array_elements($2::jsonb) AS v
+       ON CONFLICT (sku) DO UPDATE SET
+         variant_name = EXCLUDED.variant_name, price = EXCLUDED.price,
+         attributes = EXCLUDED.attributes, is_active = EXCLUDED.is_active,
+         mrp = EXCLUDED.mrp, price_ex_gst = EXCLUDED.price_ex_gst,
+         mpn = EXCLUDED.mpn, gtin = EXCLUDED.gtin, pricing_type = EXCLUDED.pricing_type,
+         unit = EXCLUDED.unit, numeric_value = EXCLUDED.numeric_value,
+         weight_grams = EXCLUDED.weight_grams, length_cm = EXCLUDED.length_cm,
+         breadth_cm = EXCLUDED.breadth_cm, height_cm = EXCLUDED.height_cm,
+         package_type = EXCLUDED.package_type, cost_price = EXCLUDED.cost_price,
+         inventory_quantity = EXCLUDED.inventory_quantity, mrp_ex_gst = EXCLUDED.mrp_ex_gst,
+         variant_type = EXCLUDED.variant_type, sub_variant_type = EXCLUDED.sub_variant_type,
+         sub_variant_type_on = EXCLUDED.sub_variant_type_on,
+         use_own_images = EXCLUDED.use_own_images, discount_pct = EXCLUDED.discount_pct,
+         stock_decimal_precision = EXCLUDED.stock_decimal_precision,
+         sell_unit_id = EXCLUDED.sell_unit_id, stock_status = EXCLUDED.stock_status,
+         updated_at = NOW()`,
       [productId, JSON.stringify(variants)]
     )
 
