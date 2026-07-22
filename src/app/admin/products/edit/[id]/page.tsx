@@ -673,10 +673,10 @@ export default async function EditProductPage({ params, searchParams }: { params
   )
   const isDraft = !!draftRow
 
-  // If a draft exists, merge draft fields over the live product to pre-populate the form
-  const productForForm = isDraft && draftRow.fields
-    ? { ...product, ...draftRow.fields, id: product.id }
-    : product
+  // Always use the live product data for the form — the admin edits from the
+  // current live state. The draft records THAT pending changes exist, not what
+  // those changes are. The UPSERT on save will capture whatever the admin types.
+  const productForForm = product
 
   return (
     <div className="p-4 sm:p-6">
