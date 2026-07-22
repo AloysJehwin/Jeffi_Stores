@@ -123,7 +123,7 @@ async function updateProduct(productId: string, formData: FormData) {
   const breadthCm = formData.get('breadth_cm') ? parseFloat(formData.get('breadth_cm') as string) : null
   const heightCm = formData.get('height_cm') ? parseFloat(formData.get('height_cm') as string) : null
   const intent = formData.get('intent') as string | null
-  const isActive = (intent === 'draft' || intent === 'draft-stay') ? false : (intent === 'publish' ? true : formData.get('is_active') === 'true')
+  const isActive = (intent === 'draft' || intent === 'draft-stay' || intent === 'publish') ? false : (formData.get('is_active') === 'true')
   const isFeatured = formData.get('is_featured') === 'true'
   const imageCount = parseInt(formData.get('image_count') as string || '0')
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
@@ -133,9 +133,10 @@ async function updateProduct(productId: string, formData: FormData) {
   const imageOrderJson = formData.get('image_order') as string
   const imageOrder: string[] = imageOrderJson ? JSON.parse(imageOrderJson) : []
 
-  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').replace(/-draft$/g, '')
 
-  const skuFromForm = (formData.get('sku') as string || '').trim().toUpperCase() || null
+  const rawSku = (formData.get('sku') as string || '').trim().toUpperCase()
+  const skuFromForm = (intent === 'publish' ? rawSku.replace(/-DRAFT$/i, '') : rawSku) || null
 
   try {
 
@@ -574,6 +575,77 @@ async function updateProduct(productId: string, formData: FormData) {
     revalidatePath('/admin/products')
     revalidatePath(`/admin/products/edit/${productId}`)
     const host = await getHost()
+
+    // If publishing a draft, atomically merge draft→original then redirect to original
+    if (intent === 'publish') {
+      const draftRow = await queryOne<{ draft_of_id: string | null }>(`SELECT draft_of_id FROM products WHERE id = $1`, [productId])
+      if (draftRow?.draft_of_id) {
+        const originalId = draftRow.draft_of_id
+        await withTransaction(async (client) => {
+          await client.query(
+            `UPDATE products AS live SET
+               category_id=d.category_id, brand_id=d.brand_id,
+               sku=REPLACE(d.sku,'-DRAFT',''), name=d.name,
+               slug=REPLACE(d.slug,'-draft',''),
+               description=d.description, short_description=d.short_description,
+               base_price=d.base_price, price_ex_gst=d.price_ex_gst, currency=d.currency,
+               weight=d.weight, dimensions=d.dimensions, material=d.material, finish=d.finish,
+               size=d.size, is_featured=d.is_featured, mrp=d.mrp, gst_percentage=d.gst_percentage,
+               hsn_code=d.hsn_code, has_variants=d.has_variants, variant_type=d.variant_type,
+               mpn=d.mpn, gtin=d.gtin, weight_grams=d.weight_grams, length_cm=d.length_cm,
+               breadth_cm=d.breadth_cm, height_cm=d.height_cm, package_type=d.package_type,
+               cost_price=d.cost_price, extra_delivery_days=d.extra_delivery_days,
+               inventory_quantity=d.inventory_quantity, mrp_ex_gst=d.mrp_ex_gst,
+               sub_variant_type=d.sub_variant_type, stock_status=d.stock_status,
+               image_url=d.image_url, barcode=d.barcode, discount_pct=d.discount_pct,
+               sell_unit_id=d.sell_unit_id, color=d.color, color_hex=d.color_hex,
+               fragile=d.fragile, hazardous=d.hazardous, flammable=d.flammable,
+               perishable=d.perishable, serialized=d.serialized, specifications=d.specifications,
+               meta_title=d.meta_title, meta_description=d.meta_description,
+               meta_keywords=d.meta_keywords, is_searchable=d.is_searchable,
+               updated_at=NOW()
+             FROM products d WHERE live.id=$2 AND d.id=$1`,
+            [productId, originalId]
+          )
+          await client.query(`DELETE FROM product_variants WHERE product_id=$1`, [originalId])
+          await client.query(
+            `INSERT INTO product_variants (product_id, sku, variant_name, price, attributes, is_active,
+               mrp, price_ex_gst, mpn, gtin, pricing_type, unit, numeric_value,
+               weight_grams, length_cm, breadth_cm, height_cm, package_type, cost_price,
+               inventory_quantity, mrp_ex_gst, variant_type, sub_variant_type,
+               sub_variant_type_on, use_own_images, discount_pct, stock_decimal_precision,
+               sell_unit_id, stock_status, created_at, updated_at)
+             SELECT $2, REPLACE(sku,'-DRAFT',''), variant_name, price, attributes, is_active,
+               mrp, price_ex_gst, mpn, gtin, pricing_type, unit, numeric_value,
+               weight_grams, length_cm, breadth_cm, height_cm, package_type, cost_price,
+               inventory_quantity, mrp_ex_gst, variant_type, sub_variant_type,
+               sub_variant_type_on, use_own_images, discount_pct, stock_decimal_precision,
+               sell_unit_id, stock_status, NOW(), NOW()
+             FROM product_variants WHERE product_id=$1`,
+            [productId, originalId]
+          )
+          await client.query(`DELETE FROM product_images WHERE product_id=$1`, [originalId])
+          await client.query(
+            `INSERT INTO product_images (product_id, image_url, thumbnail_url, s3_bucket, s3_key,
+               s3_thumbnail_key, file_name, file_size, mime_type, width, height, alt_text,
+               display_order, is_primary, created_at, updated_at)
+             SELECT $2, image_url, thumbnail_url, s3_bucket, s3_key,
+               s3_thumbnail_key, file_name, file_size, mime_type, width, height, alt_text,
+               display_order, is_primary, NOW(), NOW()
+             FROM product_images WHERE product_id=$1`,
+            [productId, originalId]
+          )
+          await client.query(`DELETE FROM product_units WHERE product_id=$1`, [productId])
+          await client.query(`DELETE FROM product_sub_variants WHERE product_id=$1`, [productId])
+          await client.query(`DELETE FROM product_images WHERE product_id=$1`, [productId])
+          await client.query(`DELETE FROM product_variants WHERE product_id=$1`, [productId])
+          await client.query(`DELETE FROM products WHERE id=$1`, [productId])
+        })
+        revalidatePath(`/admin/products/edit/${originalId}`)
+        redirect(ap(`/admin/products/edit/${originalId}`, host))
+      }
+    }
+
     if (intent === 'draft-stay') {
       const popupVariantId = formData.get('popup_variant_id') as string | null
       const dest = popupVariantId
