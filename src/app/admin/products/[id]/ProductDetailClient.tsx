@@ -4,7 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
-import { Star, Sparkles, CheckCircle, XCircle, Loader2, X } from 'lucide-react'
+import { Star, Sparkles, CheckCircle, XCircle, Loader2, X, ChevronDown } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
@@ -237,6 +237,23 @@ function Field({ label, value, mono }: { label: string; value?: any; mono?: bool
   )
 }
 
+function CollapsibleCard({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors"
+      >
+        <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">{title}</p>
+        <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="px-4 pb-4 space-y-2.5">{children}</div>}
+    </div>
+  )
+}
+
 type ShelfRow = { location_display_code: string; quantity: number; variant_id: string | null; sub_variant_id: string | null }
 
 function ShelfBadges({ rows }: { rows: ShelfRow[] }) {
@@ -454,8 +471,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {/* — Details — */}
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Details</p>
+            <CollapsibleCard title="Details">
               <Field label="Category" value={p.categories?.name} />
               <Field label="Brand" value={p.brands?.name} />
               <Field label="GST" value={p.gst_percentage != null ? `${Number(p.gst_percentage).toFixed(2)}%` : null} />
@@ -471,11 +487,10 @@ export default function ProductDetailClient({ id }: { id: string }) {
               <Field label="Condition" value={p.condition} />
               <Field label="Grade" value={p.grade} />
               <Field label="Slug" value={p.slug} mono />
-            </div>
+            </CollapsibleCard>
 
             {/* — Stock & Shipping — */}
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Stock & Shipping</p>
+            <CollapsibleCard title="Stock & Shipping">
               <div className="flex justify-between text-sm">
                 <span className="text-foreground-secondary">Inventory Stock</span>
                 <span className={`font-semibold ${stockColor}`}>{inventoryQty}{p.has_variants ? ' (variants)' : ''}</span>
@@ -504,11 +519,10 @@ export default function ProductDetailClient({ id }: { id: string }) {
               <Field label="Shipping Class" value={p.shipping_class} />
               {p.is_oversized && <Field label="Oversized" value="Yes" />}
               <Field label="Country of Origin" value={p.country_of_origin} />
-            </div>
+            </CollapsibleCard>
 
             {/* — Pricing & Finance — */}
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Pricing & Finance</p>
+            <CollapsibleCard title="Pricing & Finance">
               <Field label="MRP (incl. GST)" value={p.mrp != null ? formatINR(Number(p.mrp)) : null} />
               <Field label="MRP (ex-GST)" value={p.mrp_ex_gst != null ? formatINR(Number(p.mrp_ex_gst)) : null} />
               <Field label="Selling Price" value={p.base_price != null ? formatINR(Number(p.base_price)) : null} />
@@ -523,11 +537,10 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 <Field label="Interval" value={p.subscription_interval} />
                 <Field label="Sub. Price" value={p.subscription_price != null ? formatINR(Number(p.subscription_price)) : null} />
               </>}
-            </div>
+            </CollapsibleCard>
 
             {/* — Physical & Compliance — */}
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Physical & Compliance</p>
+            <CollapsibleCard title="Physical & Compliance">
               <Field label="Material" value={p.material} />
               <Field label="Finish" value={p.finish} />
               <Field label="Size" value={p.size} />
@@ -545,11 +558,10 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 {p.perishable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Perishable</span>}
                 {p.serialized && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Serialized</span>}
               </div>
-            </div>
+            </CollapsibleCard>
 
             {/* — Lifecycle & Merchandising — */}
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Lifecycle & Merchandising</p>
+            <CollapsibleCard title="Lifecycle & Merchandising">
               <Field label="Launch Date" value={p.launch_date ? new Date(p.launch_date).toLocaleDateString('en-IN') : null} />
               <Field label="Discontinue Date" value={p.discontinue_date ? new Date(p.discontinue_date).toLocaleDateString('en-IN') : null} />
               <Field label="Sort Order" value={p.sort_order} />
@@ -563,24 +575,22 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 <Field label="File Format" value={p.file_format} />
                 <Field label="Platform Compat." value={Array.isArray(p.platform_compatibility) && p.platform_compatibility.length ? p.platform_compatibility.join(', ') : null} />
               </>}
-            </div>
+            </CollapsibleCard>
 
             {/* — SEO & Audience — */}
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">SEO & Audience</p>
+            <CollapsibleCard title="SEO & Audience">
               <Field label="Meta Title" value={p.meta_title} />
               <Field label="Meta Description" value={p.meta_description} />
               <Field label="Searchable" value={p.is_searchable ? 'Yes' : 'No'} />
               <Field label="Target Gender" value={p.target_gender} />
               <Field label="Target Audience" value={Array.isArray(p.target_audience) && p.target_audience.length ? p.target_audience.join(', ') : null} />
               <Field label="Age Range" value={(p.age_min != null || p.age_max != null) ? `${p.age_min ?? '—'} – ${p.age_max ?? '—'}` : null} />
-            </div>
+            </CollapsibleCard>
           </div>
 
           {/* — Specifications — */}
           {p.specifications && Object.keys(p.specifications).length > 0 && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Specifications</p>
+            <CollapsibleCard title="Specifications">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5">
                 {Object.entries(p.specifications).map(([k, v]) => (
                   <div key={k} className="flex justify-between text-sm border-b border-border-default/40 pb-1">
@@ -589,15 +599,14 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   </div>
                 ))}
               </div>
-            </div>
+            </CollapsibleCard>
           )}
 
           {/* — Short Description — */}
           {p.short_description && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">Short Description</p>
+            <CollapsibleCard title="Short Description">
               <p className="text-sm text-foreground leading-relaxed">{p.short_description}</p>
-            </div>
+            </CollapsibleCard>
           )}
 
           {p.description && (
@@ -681,17 +690,15 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
           {/* — Selling Units & Shelf Locations — */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Selling Units</p>
+            <CollapsibleCard title="Selling Units">
               <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
-            </div>
+            </CollapsibleCard>
             {shelfStock.length > 0 && (
-              <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
-                <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Shelf Locations</p>
+              <CollapsibleCard title="Shelf Locations">
                 <div className="flex flex-wrap gap-2">
                   <ShelfBadges rows={shelfStock} />
                 </div>
-              </div>
+              </CollapsibleCard>
             )}
           </div>
 
