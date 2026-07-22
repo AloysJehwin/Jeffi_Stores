@@ -554,7 +554,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         setServerSaveStatus('error')
         setTimeout(() => setServerSaveStatus('idle'), 3000)
       })
-    }, 5000)
+    }, 1000)
     return () => { if (serverAutosaveTimer.current) clearTimeout(serverAutosaveTimer.current) }
   }, [
     isDraft, productId,
@@ -2499,9 +2499,9 @@ export default function ProductForm({ categories, brands, action, product, produ
             serverSaveStatus === 'saved' ? 'text-green-600 dark:text-green-400' :
             'text-red-500'
           }`}>
-            {serverSaveStatus === 'saving' ? 'Auto-saving…' :
-             serverSaveStatus === 'saved' ? 'Draft saved' :
-             'Auto-save failed'}
+            {serverSaveStatus === 'saving' ? 'Saving…' :
+             serverSaveStatus === 'saved' ? 'Saved' :
+             'Save failed'}
           </span>
         )}
         <Link
