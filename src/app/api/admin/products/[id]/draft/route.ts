@@ -83,7 +83,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       )
       const newDraftId = draftRes.rows[0].id as string
 
-      // Copy product_variants using INSERT...SELECT
+      // Copy product_variants using INSERT...SELECT with -DRAFT suffix on sku
       await client.query(
         `INSERT INTO product_variants (
            product_id, sku, variant_name, price, attributes, is_active, mrp,
@@ -95,7 +95,7 @@ export async function POST(req: NextRequest, { params }: Params) {
            created_at, updated_at
          )
          SELECT
-           $2, sku, variant_name, price, attributes, is_active, mrp,
+           $2, sku || '-DRAFT', variant_name, price, attributes, is_active, mrp,
            price_ex_gst, mpn, gtin, pricing_type, unit, numeric_value,
            weight_grams, length_cm, breadth_cm, height_cm, package_type,
            cost_price, inventory_quantity, mrp_ex_gst, variant_type,
@@ -106,12 +106,12 @@ export async function POST(req: NextRequest, { params }: Params) {
         [id, newDraftId]
       )
 
-      // Build variant id map: old → new (needed for sub_variants and units)
+      // Build variant id map: old → new (match on draft sku = original sku + '-DRAFT')
       const variantMap = await client.query<{ old_id: string; new_id: string }>(
         `SELECT ov.id AS old_id, nv.id AS new_id
          FROM product_variants ov
          JOIN product_variants nv
-           ON nv.product_id = $2 AND nv.sku = ov.sku AND nv.variant_name = ov.variant_name
+           ON nv.product_id = $2 AND nv.sku = ov.sku || '-DRAFT' AND nv.variant_name = ov.variant_name
          WHERE ov.product_id = $1`,
         [id, newDraftId]
       )

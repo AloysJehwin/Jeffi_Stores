@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 
 interface Props {
@@ -17,6 +18,10 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [mounted, setMounted] = useState(false)
+
+  // Mount portal after hydration to avoid SSR/hydration mismatch
+  useEffect(() => { setMounted(true) }, [])
 
   async function createDraft() {
     setLoading(true)
@@ -47,7 +52,9 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
     else router.push(`${apPrefix}/admin/products`)
   }
 
-  return (
+  if (!mounted) return null
+
+  return createPortal(
     <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-surface-elevated rounded-2xl shadow-2xl border border-border-default w-full max-w-md p-6">
         {/* Icon */}
@@ -115,6 +122,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
