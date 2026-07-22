@@ -7,7 +7,6 @@ import { query, queryOne, queryMany } from '@/lib/db'
 import { syncPerishableStock } from '@/lib/shelf'
 import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
-import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import { ChevronLeft } from 'lucide-react'
 import { round2 } from '@/lib/gst'
 
@@ -692,17 +691,6 @@ export default async function EditProductPage({ params, searchParams }: { params
             </form>
           </div>
         </div>
-      )}
-
-      {/* Draft confirmation modal — pops up automatically when editing a live product */}
-      {isLiveProduct && (
-        <DraftConfirmModal
-          productId={id}
-          productName={product.name}
-          productSku={product.sku || null}
-          existingDraftId={existingDraftRow?.id ?? null}
-          backUrl={backUrl}
-        />
       )}
 
       <div className="mb-6">

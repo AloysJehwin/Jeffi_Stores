@@ -10,6 +10,7 @@ import ProductImage from '@/components/admin/ProductImage'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
 import ProductDetailModal from '@/components/admin/ProductDetailModal'
 import ProductLabelModal from '@/components/admin/ProductLabelModal'
+import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import HoverCard from '@/components/ui/HoverCard'
 
 interface Props {
@@ -22,6 +23,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
   const [selected, setSelected] = useState<any>(null)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({})
+  const [draftProduct, setDraftProduct] = useState<{ id: string; name: string; sku: string | null; backUrl: string } | null>(null))
 
   async function handleToggleActive(productId: string, currentActive: boolean) {
     const next = !currentActive
@@ -315,15 +317,27 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </Link>
-                  <Link
-                    href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`)}
-                    title="Edit Product"
-                    className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </Link>
+                  {product.is_active && !product.draft_of_id ? (
+                    <button
+                      onClick={() => setDraftProduct({ id: product.id, name: product.name, sku: product.sku || null, backUrl })}
+                      title="Edit Product"
+                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <Link
+                      href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`)}
+                      title="Edit Product"
+                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </Link>
+                  )}
                   <button
                     onClick={() => setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })}
                     title="Print Label"
@@ -349,6 +363,16 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
 
       <ProductDetailModal product={selected} onClose={() => setSelected(null)} />
       <ProductLabelModal product={labelProduct} onClose={() => setLabelProduct(null)} />
+      {draftProduct && (
+        <DraftConfirmModal
+          productId={draftProduct.id}
+          productName={draftProduct.name}
+          productSku={draftProduct.sku}
+          existingDraftId={null}
+          backUrl={draftProduct.backUrl}
+          onClose={() => setDraftProduct(null)}
+        />
+      )}
     </>
   )
 }

@@ -10,9 +10,10 @@ interface Props {
   existingDraftId: string | null
   backUrl?: string
   apPrefix?: string
+  onClose?: () => void  // when provided, Cancel calls this instead of router.back()
 }
 
-export default function DraftConfirmModal({ productId, productName, productSku, existingDraftId, backUrl, apPrefix = '' }: Props) {
+export default function DraftConfirmModal({ productId, productName, productSku, existingDraftId, backUrl, apPrefix = '', onClose }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -41,6 +42,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
   }
 
   function goBack() {
+    if (onClose) { onClose(); return }
     if (backUrl) router.push(backUrl)
     else router.push(`${apPrefix}/admin/products`)
   }
