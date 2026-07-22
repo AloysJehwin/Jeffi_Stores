@@ -644,8 +644,10 @@ async function updateProduct(productId: string, formData: FormData) {
           await client.query(`DELETE FROM product_variants WHERE product_id=$1`, [productId])
           await client.query(`DELETE FROM products WHERE id=$1`, [productId])
         })
-        revalidatePath(`/admin/products/edit/${originalId}`)
-        redirect(ap(`/admin/products/edit/${originalId}`, host))
+        revalidatePath('/admin/products')
+        revalidatePath(`/admin/products/${originalId}`)
+        // Redirect to detail page (not edit) so the draft modal doesn't re-trigger
+        redirect(ap(`/admin/products/${originalId}`, host))
       }
     }
 
