@@ -33,6 +33,9 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   const [qrModalOpen, setQrModalOpen] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState<string | null>(null)
+  const [amendDraft, setAmendDraft] = useState<{ id: string; order_number: string } | null | undefined>(undefined)
+  const [amending, setAmending] = useState(false)
+  const [amendError, setAmendError] = useState<string | null>(null)
   const qrModalRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
 
@@ -44,6 +47,17 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         setData(j)
         setQrImageUrl(j.order?.razorpay_qr_image_url || null)
         setLoading(false)
+        // Check for amendment draft only for finalized invoices
+        if (j.order?.invoice_number && j.order?.status !== 'draft') {
+          fetch(`/api/admin/invoices/${id}/amendment-draft`, { credentials: 'include' })
+            .then(r => r.ok ? r.json() : null)
+            .then(d => {
+              setAmendDraft(d?.draft ?? null)
+            })
+            .catch(() => { setAmendDraft(null) })
+        } else {
+          setAmendDraft(null)
+        }
         return j
       })
       .catch(() => { setLoading(false) })
@@ -118,6 +132,24 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
       setFinalizeError('Failed to finalize invoice')
     } finally {
       setFinalizing(false)
+    }
+  }
+
+  async function createAmendmentDraft() {
+    setAmending(true)
+    setAmendError(null)
+    try {
+      const res = await fetch(`/api/admin/invoices/${id}/amendment-draft`, {
+        method: 'POST',
+        credentials: 'include',
+      })
+      const json = await res.json()
+      if (!res.ok) { setAmendError(json.error || 'Failed to create amendment draft'); return }
+      router.push(ap(`/admin/invoices/${json.draftId}`))
+    } catch {
+      setAmendError('Failed to create amendment draft')
+    } finally {
+      setAmending(false)
     }
   }
 
@@ -285,6 +317,15 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               {qrLoading ? 'Generating…' : 'QR'}
             </button>
           )}
+          {o.invoice_number && o.status !== 'draft' && amendDraft === null && (
+            <button
+              onClick={createAmendmentDraft}
+              disabled={amending}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
+            >
+              {amending ? 'Creating…' : 'Amend Invoice'}
+            </button>
+          )}
           <a
             href={`/api/orders/${o.id}/invoice`}
             target="_blank"
@@ -309,6 +350,22 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
       {finalizeError && (
         <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
           {finalizeError}
+        </div>
+      )}
+      {amendError && (
+        <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-700 dark:text-red-300">
+          {amendError}
+        </div>
+      )}
+      {amendDraft && (
+        <div className="flex items-center justify-between gap-4 p-3 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700 text-sm text-blue-800 dark:text-blue-300">
+          <span>An amendment draft is pending for this invoice.</span>
+          <a
+            href={ap(`/admin/invoices/${amendDraft.id}`)}
+            className="shrink-0 font-semibold underline underline-offset-2 hover:text-blue-900 dark:hover:text-blue-100 transition-colors"
+          >
+            View draft ({amendDraft.order_number})
+          </a>
         </div>
       )}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

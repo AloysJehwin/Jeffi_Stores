@@ -72,6 +72,7 @@ ML_JOURNEY.md
 
 # Claude-generated planning/architecture docs (not checked in)
 docs/MULTI_TENANT_ARCHITECTURE.md
+docs/MULTI_TENANT_PHASES.md
 
 # Graphify dated snapshot directories (regenerated on demand)
 graphify-out/20*/
