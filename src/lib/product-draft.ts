@@ -230,7 +230,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
       [productId, JSON.stringify(subVariants)]
     )
 
-    await client.query(`DELETE FROM product_units WHERE product_id = $1`, [productId])
+    // Units: delete only product-level units (variant units are handled separately)
+    // Use UPSERT to preserve IDs referenced by other tables
+    await client.query(`DELETE FROM product_units WHERE product_id = $1 AND variant_id IS NULL AND sub_variant_id IS NULL`, [productId])
     await client.query(
       `INSERT INTO product_units (
          product_id, variant_id, unit, factor, is_base, is_purchase_default,
@@ -241,14 +243,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
          CASE WHEN u->>'variant_id' IS NOT NULL AND u->>'variant_id' != 'null'
               THEN (u->>'variant_id')::uuid ELSE NULL END,
          u->>'unit', (u->>'factor')::numeric,
-         (u->>'is_base')::boolean, (u->>'is_purchase_default')::boolean,
+         COALESCE((u->>'is_base')::boolean, false), COALESCE((u->>'is_purchase_default')::boolean, false),
          NULLIF(u->>'price_override','')::numeric, u->>'display_label',
          u->>'notes', u->>'dimension', u->'conversion_meta',
          CASE WHEN u->>'sub_variant_id' IS NOT NULL AND u->>'sub_variant_id' != 'null'
               THEN (u->>'sub_variant_id')::uuid ELSE NULL END,
          NULLIF(u->>'min_qty','')::numeric, NULLIF(u->>'max_qty','')::numeric,
          NULLIF(u->>'qty_step','')::numeric, NOW(), NOW()
-       FROM jsonb_array_elements($2::jsonb) AS u`,
+       FROM jsonb_array_elements($2::jsonb) AS u
+       WHERE u->>'variant_id' IS NULL OR u->>'variant_id' = 'null'`,
       [productId, JSON.stringify(units)]
     )
 
