@@ -818,7 +818,6 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function uploadVariantImageFile(variantId: string, file: File) {
     if (!productId) return
-    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     if (variantId.startsWith('temp-')) {
       setVariantImageError('Save the product first to upload variant images.')
       return
@@ -848,7 +847,6 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function deleteVariantImage(variantId: string, imageId: string) {
     if (!productId) return
-    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     setVariantImageDeleting(m => ({ ...m, [imageId]: true }))
     try {
       await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
@@ -868,7 +866,6 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function setVariantImagePrimary(variantId: string, imageId: string) {
     if (!productId) return
-    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -882,7 +879,6 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function reorderVariantImages(variantId: string, fromIndex: number, toIndex: number) {
     if (!productId || fromIndex === toIndex) return
-    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     const current = variantImagesMap[variantId] || []
     if (fromIndex < 0 || fromIndex >= current.length || toIndex < 0 || toIndex >= current.length) return
     const next = [...current]
@@ -924,7 +920,6 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function addVariantImagesFromGallery() {
     if (!productId || !variantPopupId) return
-    if (isDraft) { setVariantImageError('In draft mode — changes apply when you publish.'); return }
     const currentImages = variantImagesMap[variantPopupId] || []
     const slotsLeft = 5 - currentImages.length
     const toAdd = variantGallerySelected.slice(0, slotsLeft)
