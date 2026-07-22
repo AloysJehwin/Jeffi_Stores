@@ -448,12 +448,6 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           )}
 
-          {!p.has_variants && shelfStock.length > 0 && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Shelf Locations</p>
-              <ShelfBadges rows={shelfStock} />
-            </div>
-          )}
         </div>
 
         <div className="lg:col-span-2 space-y-4">
@@ -699,11 +693,16 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           )}
 
-          {/* — Selling Units — */}
+          {/* — Selling Units & Shelf Locations — */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
             <CollapsibleCard title="Selling Units">
               <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
             </CollapsibleCard>
+            {shelfStock.length > 0 && (
+              <CollapsibleCard title="Shelf Locations">
+                <ShelfBadges rows={shelfStock} />
+              </CollapsibleCard>
+            )}
           </div>
 
           <div className="flex gap-4 text-xs text-foreground-muted">
