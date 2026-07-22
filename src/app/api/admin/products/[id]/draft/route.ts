@@ -141,3 +141,20 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: msg || 'Autosave failed' }, { status: 500 })
   }
 }
+
+// DELETE — discard the draft entirely
+export async function DELETE(req: NextRequest, { params }: Params) {
+  const { id } = await params
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
+  try {
+    await query(`DELETE FROM product_drafts WHERE product_id = $1`, [id])
+    return NextResponse.json({ success: true })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'Unknown error'
+    return NextResponse.json({ error: msg || 'Failed to discard draft' }, { status: 500 })
+  }
+}
