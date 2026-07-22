@@ -193,6 +193,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
          updated_at = NOW()`,
       [productId, JSON.stringify(validVariants)]
     )
+    // Deactivate sub-variants for variants where sub_variant_type_on was turned off
+    const variantsWithSubsOff = validVariants.filter((v: any) => !v.sub_variant_type_on && v.sku)
+    for (const v of variantsWithSubsOff) {
+      await client.query(
+        `UPDATE product_sub_variants SET is_active = false, updated_at = NOW()
+         WHERE variant_id = (SELECT id FROM product_variants WHERE product_id = $1 AND sku = $2)`,
+        [productId, v.sku]
+      )
+    }
     }
 
     await client.query(`DELETE FROM product_images WHERE product_id = $1`, [productId])
