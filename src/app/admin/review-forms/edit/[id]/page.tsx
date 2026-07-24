@@ -1,5 +1,5 @@
 import { notFound } from 'next/navigation'
-import { queryOne, queryMany } from '@/lib/db'
+import { queryOne, queryMany, query } from '@/lib/db'
 import Link from 'next/link'
 import ReviewFormForm from '../../ReviewFormForm'
 import { ap } from '@/lib/admin-path'
@@ -21,11 +21,32 @@ export default async function EditReviewFormPage({ params, searchParams }: { par
   const host = await getHost()
   const back = resolvedSearchParams?.back
   const backUrl = back && back.startsWith('/admin/review-forms') ? back : '/admin/review-forms'
+
   const [form, coupons] = await Promise.all([
     queryOne<ReviewForm>('SELECT * FROM review_forms WHERE id = $1', [id]),
     queryMany<Coupon>('SELECT id, code, description FROM coupons WHERE is_active = true ORDER BY code'),
   ])
   if (!form) notFound()
+
+  // Auto-create draft on first edit visit
+  let draftRow = await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
+    `SELECT form_id, fields FROM review_form_drafts WHERE form_id = $1`, [id]
+  )
+  if (!draftRow) {
+    await query(
+      `INSERT INTO review_form_drafts (form_id, fields)
+       SELECT id, to_jsonb(rf) - 'id' - 'created_at' - 'updated_at' - 'submissions_count'
+       FROM review_forms rf WHERE rf.id = $1
+       ON CONFLICT (form_id) DO NOTHING`,
+      [id]
+    )
+    draftRow = await queryOne<{ form_id: string; fields: Record<string, unknown> }>(
+      `SELECT form_id, fields FROM review_form_drafts WHERE form_id = $1`, [id]
+    )
+  }
+
+  const isDraft = !!draftRow
+  const df = (draftRow?.fields || {}) as any
 
   return (
     <div className="p-4 sm:p-6">
@@ -33,23 +54,39 @@ export default async function EditReviewFormPage({ params, searchParams }: { par
         <Link href={ap(backUrl, host)} className="text-foreground-muted hover:text-foreground transition-colors">
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
-        <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">Edit Review Form</h1>
+        <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">{isDraft ? 'Edit Draft' : 'Edit Review Form'}</h1>
       </div>
 
+      {isDraft && (
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Changes are saved to draft. The live form stays unchanged until you publish.</p>
+          </div>
+          <form action={async () => {
+            'use server'
+            await query(`DELETE FROM review_form_drafts WHERE form_id = $1`, [id])
+          }}>
+            <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">Discard draft</button>
+          </form>
+        </div>
+      )}
+
       <ReviewFormForm
-        submitLabel="Save Changes"
+        isDraft={isDraft}
         coupons={coupons}
         formId={form.id}
         backUrl={backUrl}
         defaultValues={{
-          title: form.title,
-          slug: form.slug,
-          template_type: form.template_type || 'google_review',
-          google_review_url: form.google_review_url,
-          coupon_id: form.coupon_id,
-          description: form.description,
-          is_active: form.is_active,
-          custom_fields: form.custom_fields || [] }}
+          title: df.title ?? form.title,
+          slug: df.slug ?? form.slug,
+          template_type: df.template_type ?? form.template_type ?? 'google_review',
+          google_review_url: df.google_review_url ?? form.google_review_url,
+          coupon_id: df.coupon_id ?? form.coupon_id,
+          description: df.description ?? form.description,
+          is_active: df.is_active ?? form.is_active,
+          custom_fields: df.custom_fields ?? form.custom_fields ?? [],
+        }}
       />
     </div>
   )
