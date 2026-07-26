@@ -3,7 +3,6 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SlidersHorizontal, X } from 'lucide-react'
-import AdminSelect from './AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
 
 export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'text'
@@ -117,17 +116,20 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
 
   // Group fields by section
   const sections = Array.from(new Set(fields.map(f => f.section || 'General')))
-
-  const inputCls = 'w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
+  const inputCls = 'w-full px-3 py-1.5 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 transition-colors hover:border-border-default placeholder:text-foreground-muted'
+  const selectCls = `${inputCls} cursor-pointer pr-8 appearance-none`
 
   function renderField(f: AdvancedFilterField) {
     if (f.type === 'select') {
       const name = Array.isArray(f.name) ? f.name[0] : f.name
       return (
-        <select className={inputCls} value={local[name] || ''} onChange={e => setLocalVal(name, e.target.value)}>
-          <option value="">Any</option>
-          {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <div className="relative">
+          <select className={selectCls} value={local[name] || ''} onChange={e => setLocalVal(name, e.target.value)}>
+            <option value="">Any</option>
+            {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+        </div>
       )
     }
     if (f.type === 'toggle') {
