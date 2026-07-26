@@ -2,6 +2,7 @@ import { Suspense } from 'react'
 import Link from 'next/link'
 import { getFilteredOrders } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
+import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
 import Pagination from '@/components/admin/Pagination'
 import OrdersTableRows from '@/components/admin/OrdersTableRows'
 import SortableHeader from '@/components/admin/SortableHeader'
@@ -75,6 +76,14 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
     payment_status: sp(resolvedSearchParams, 'payment_status'),
     source: sp(resolvedSearchParams, 'source'),
     search: sp(resolvedSearchParams, 'search'),
+    date_from: sp(resolvedSearchParams, 'date_from'),
+    date_to: sp(resolvedSearchParams, 'date_to'),
+    amount_min: sp(resolvedSearchParams, 'amount_min'),
+    amount_max: sp(resolvedSearchParams, 'amount_max'),
+    awb: sp(resolvedSearchParams, 'awb'),
+    shipment_status: sp(resolvedSearchParams, 'shipment_status'),
+    payment_mode: sp(resolvedSearchParams, 'payment_mode'),
+    coupon_code: sp(resolvedSearchParams, 'coupon_code'),
     page,
     limit: PAGE_SIZE,
     sort,
@@ -306,6 +315,25 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
         searchParam="search"
         suggestType="orders"
       />
+
+      <AdvancedFilterPanel fields={[
+        { name: ['date_from', 'date_to'], label: 'Order Date', type: 'date-range', section: 'Date & Amount' },
+        { name: ['amount_min', 'amount_max'], label: 'Order Amount', type: 'range', section: 'Date & Amount', unit: '₹' },
+        { name: 'shipment_status', label: 'Shipment Status', type: 'select', section: 'Shipment', options: [
+          { value: 'created', label: 'Created' },
+          { value: 'in_transit', label: 'In Transit' },
+          { value: 'out_for_delivery', label: 'Out for Delivery' },
+          { value: 'delivered', label: 'Delivered' },
+          { value: 'rto_initiated', label: 'RTO Initiated' },
+          { value: 'rto_delivered', label: 'RTO Delivered' },
+        ]},
+        { name: 'awb', label: 'AWB / Tracking No.', type: 'text', section: 'Shipment', placeholder: 'Search by AWB number' },
+        { name: 'payment_mode', label: 'Payment Mode', type: 'select', section: 'Payment', options: [
+          { value: 'cod', label: 'Cash on Delivery' },
+          { value: 'prepaid', label: 'Prepaid' },
+        ]},
+        { name: 'coupon_code', label: 'Coupon Code', type: 'text', section: 'Payment', placeholder: 'Search by coupon code' },
+      ]} />
 
       <OrdersListSection searchParams={searchParams} />
     </div>

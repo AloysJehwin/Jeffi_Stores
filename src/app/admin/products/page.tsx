@@ -10,6 +10,7 @@ import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
 import AdminFilters from '@/components/admin/AdminFilters'
+import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
 import Pagination from '@/components/admin/Pagination'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
 import ProductsTableClient from '@/components/admin/ProductsTableClient'
@@ -40,6 +41,23 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { res
       is_active: resolvedSearchParams.is_active,
       stock: resolvedSearchParams.stock,
       search: resolvedSearchParams.search,
+      is_featured: resolvedSearchParams.is_featured,
+      has_variants: resolvedSearchParams.has_variants,
+      price_min: resolvedSearchParams.price_min,
+      price_max: resolvedSearchParams.price_max,
+      gst_percentage: resolvedSearchParams.gst_percentage,
+      condition: resolvedSearchParams.condition,
+      grade: resolvedSearchParams.grade,
+      is_digital: resolvedSearchParams.is_digital,
+      is_bundle: resolvedSearchParams.is_bundle,
+      is_cod_allowed: resolvedSearchParams.is_cod_allowed,
+      shipping_class: resolvedSearchParams.shipping_class,
+      is_oversized: resolvedSearchParams.is_oversized,
+      country_of_origin: resolvedSearchParams.country_of_origin,
+      fragile: resolvedSearchParams.fragile,
+      hazardous: resolvedSearchParams.hazardous,
+      perishable: resolvedSearchParams.perishable,
+      serialized: resolvedSearchParams.serialized,
       page,
       limit: PAGE_SIZE,
       sort,
@@ -340,6 +358,25 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         searchParam="search"
         suggestType="products"
       />
+
+      <AdvancedFilterPanel fields={[
+        { name: 'is_featured', label: 'Featured', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Featured' }, { value: 'false', label: 'Not Featured' }] },
+        { name: 'has_variants', label: 'Has Variants', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+        { name: 'is_digital', label: 'Digital Product', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+        { name: 'is_bundle', label: 'Bundle', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+        { name: 'condition', label: 'Condition', type: 'select', section: 'Product Type', options: [{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }, { value: 'refurbished', label: 'Refurbished' }] },
+        { name: ['price_min', 'price_max'], label: 'Price Range', type: 'range', section: 'Pricing & Tax', unit: '₹' },
+        { name: 'gst_percentage', label: 'GST %', type: 'select', section: 'Pricing & Tax', options: [{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }] },
+        { name: 'is_cod_allowed', label: 'COD Allowed', type: 'toggle', section: 'Pricing & Tax', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+        { name: 'shipping_class', label: 'Shipping Class', type: 'select', section: 'Logistics', options: [{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }] },
+        { name: 'is_oversized', label: 'Oversized', type: 'toggle', section: 'Logistics', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+        { name: 'country_of_origin', label: 'Country of Origin', type: 'text', section: 'Logistics', placeholder: 'e.g. IN' },
+        { name: 'fragile', label: 'Fragile', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+        { name: 'hazardous', label: 'Hazardous', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+        { name: 'perishable', label: 'Perishable', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+        { name: 'serialized', label: 'Serialized', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+        { name: 'grade', label: 'Grade', type: 'select', section: 'Other', options: [{ value: 'A', label: 'Grade A' }, { value: 'B', label: 'Grade B' }, { value: 'C', label: 'Grade C' }] },
+      ]} />
 
       <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} />
     </div>
