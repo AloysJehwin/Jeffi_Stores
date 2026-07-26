@@ -342,6 +342,14 @@ export async function getFilteredOrders(filters: {
   payment_status?: string
   source?: string
   search?: string
+  date_from?: string
+  date_to?: string
+  amount_min?: string
+  amount_max?: string
+  awb?: string
+  shipment_status?: string
+  payment_mode?: string
+  coupon_code?: string
   page?: number
   limit?: number
   sort?: string
@@ -362,6 +370,38 @@ export async function getFilteredOrders(filters: {
   if (filters.source) {
     conditions.push(`o.source = $${i++}`)
     params.push(filters.source)
+  }
+  if (filters.date_from) {
+    conditions.push(`o.created_at >= $${i++}::timestamptz`)
+    params.push(filters.date_from)
+  }
+  if (filters.date_to) {
+    conditions.push(`o.created_at <= ($${i++}::date + INTERVAL '1 day')::timestamptz`)
+    params.push(filters.date_to)
+  }
+  if (filters.amount_min) {
+    conditions.push(`o.total_amount >= $${i++}::numeric`)
+    params.push(filters.amount_min)
+  }
+  if (filters.amount_max) {
+    conditions.push(`o.total_amount <= $${i++}::numeric`)
+    params.push(filters.amount_max)
+  }
+  if (filters.awb) {
+    conditions.push(`o.awb_number ILIKE '%' || $${i++} || '%'`)
+    params.push(filters.awb)
+  }
+  if (filters.shipment_status) {
+    conditions.push(`o.shipment_status = $${i++}`)
+    params.push(filters.shipment_status)
+  }
+  if (filters.payment_mode) {
+    conditions.push(`o.payment_mode = $${i++}`)
+    params.push(filters.payment_mode)
+  }
+  if (filters.coupon_code) {
+    conditions.push(`o.coupon_code ILIKE '%' || $${i++} || '%'`)
+    params.push(filters.coupon_code)
   }
   if (filters.search) {
     const sc = buildVectorSearchClause(filters.search, 'o.search_vector', ['o.customer_name'], ['o.order_number'], i, 'simple')
@@ -413,6 +453,23 @@ export async function getFilteredProducts(filters: {
   is_active?: string
   stock?: string
   search?: string
+  is_featured?: string
+  has_variants?: string
+  price_min?: string
+  price_max?: string
+  gst_percentage?: string
+  condition?: string
+  grade?: string
+  is_digital?: string
+  is_bundle?: string
+  is_cod_allowed?: string
+  shipping_class?: string
+  is_oversized?: string
+  country_of_origin?: string
+  fragile?: string
+  hazardous?: string
+  perishable?: string
+  serialized?: string
   page?: number
   limit?: number
   sort?: string
@@ -452,6 +509,62 @@ export async function getFilteredProducts(filters: {
   } else if (filters.stock === 'out') {
     conditions.push(`p.stock_status = 'Out of Stock'`)
   }
+  if (filters.is_featured === 'true' || filters.is_featured === 'false') {
+    conditions.push(`p.is_featured = $${i++}`)
+    params.push(filters.is_featured === 'true')
+  }
+  if (filters.has_variants === 'true' || filters.has_variants === 'false') {
+    conditions.push(`p.has_variants = $${i++}`)
+    params.push(filters.has_variants === 'true')
+  }
+  if (filters.price_min) {
+    conditions.push(`COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price) >= $${i++}::numeric`)
+    params.push(filters.price_min)
+  }
+  if (filters.price_max) {
+    conditions.push(`COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price) <= $${i++}::numeric`)
+    params.push(filters.price_max)
+  }
+  if (filters.gst_percentage) {
+    conditions.push(`p.gst_percentage = $${i++}::numeric`)
+    params.push(filters.gst_percentage)
+  }
+  if (filters.condition) {
+    conditions.push(`p.condition = $${i++}`)
+    params.push(filters.condition)
+  }
+  if (filters.grade) {
+    conditions.push(`p.grade = $${i++}`)
+    params.push(filters.grade)
+  }
+  if (filters.is_digital === 'true' || filters.is_digital === 'false') {
+    conditions.push(`p.is_digital = $${i++}`)
+    params.push(filters.is_digital === 'true')
+  }
+  if (filters.is_bundle === 'true' || filters.is_bundle === 'false') {
+    conditions.push(`p.is_bundle = $${i++}`)
+    params.push(filters.is_bundle === 'true')
+  }
+  if (filters.is_cod_allowed === 'true' || filters.is_cod_allowed === 'false') {
+    conditions.push(`p.is_cod_allowed = $${i++}`)
+    params.push(filters.is_cod_allowed === 'true')
+  }
+  if (filters.shipping_class) {
+    conditions.push(`p.shipping_class = $${i++}`)
+    params.push(filters.shipping_class)
+  }
+  if (filters.is_oversized === 'true' || filters.is_oversized === 'false') {
+    conditions.push(`p.is_oversized = $${i++}`)
+    params.push(filters.is_oversized === 'true')
+  }
+  if (filters.country_of_origin) {
+    conditions.push(`p.country_of_origin = $${i++}`)
+    params.push(filters.country_of_origin.toUpperCase())
+  }
+  if (filters.fragile === 'true') { conditions.push(`p.fragile = true`) }
+  if (filters.hazardous === 'true') { conditions.push(`p.hazardous = true`) }
+  if (filters.perishable === 'true') { conditions.push(`p.perishable = true`) }
+  if (filters.serialized === 'true') { conditions.push(`p.serialized = true`) }
   let rankExpr = '0::int'
   if (filters.search) {
     const sc = buildProductSearchClause(filters.search, 'p.name', 'p.sku', 'p.search_vector', i)
