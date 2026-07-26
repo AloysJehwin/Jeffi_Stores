@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SlidersHorizontal, X } from 'lucide-react'
 import AdminSelect from './AdminSelect'
+import DatePicker from '@/components/ui/DatePicker'
 
 export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'text'
 
@@ -172,11 +173,13 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
       const [fromName, toName] = Array.isArray(f.name) ? f.name : [`${f.name}_from`, `${f.name}_to`]
       return (
         <div className="flex items-center gap-2">
-          <input type="date" className={`${inputCls} flex-1`}
-            value={local[fromName] || ''} onChange={e => setLocalVal(fromName, e.target.value)} />
+          <div className="flex-1">
+            <DatePicker value={local[fromName] || ''} onChange={v => setLocalVal(fromName, v)} placeholder="From date" />
+          </div>
           <span className="text-foreground-muted text-sm">–</span>
-          <input type="date" className={`${inputCls} flex-1`}
-            value={local[toName] || ''} onChange={e => setLocalVal(toName, e.target.value)} />
+          <div className="flex-1">
+            <DatePicker value={local[toName] || ''} onChange={v => setLocalVal(toName, v)} placeholder="To date" />
+          </div>
         </div>
       )
     }
