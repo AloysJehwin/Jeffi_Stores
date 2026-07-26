@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
+  <!-- Green circle background -->
+  <circle cx="100" cy="100" r="98" fill="#5cb85c"/>
+
+  <!-- Dark green hexagon -->
+  <polygon points="100,18 170,57 170,143 100,182 30,143 30,57"
+    fill="none" stroke="#3d7a3d" stroke-width="14" stroke-linejoin="round"/>
+
+  <!-- White JS text -->
+  <text x="100" y="125"
+    font-family="'Arial Black', 'Helvetica Neue', Arial, sans-serif"
+    font-size="72" font-weight="900"
+    fill="white" text-anchor="middle"
+    letter-spacing="-2">JS</text>
+</svg>
