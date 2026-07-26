@@ -191,6 +191,9 @@ export default function InvoicesClient() {
   const [items, setItems] = useState<LineItem[]>([newLineItem()])
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle'|'saving'|'saved'|'error'>('idle')
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSaveInFlight = useRef(false)
   const [editLoading, setEditLoading] = useState(false)
   const [drafts, setDrafts] = useState<any[]>([])
   const [draftsLoading, setDraftsLoading] = useState(false)
@@ -267,6 +270,14 @@ export default function InvoicesClient() {
   }, [])
 
   useEffect(() => { fetchDrafts() }, [fetchDrafts])
+
+  // Autosave draft every 30s when editing an existing draft
+  useEffect(() => {
+    if (!editId || !editIsDraft) return
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => { void autoSaveDraft() }, 30000)
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
+  }, [editId, editIsDraft, customerName, customerPhone, customerEmail, addressLine1, addressLine2, city, state, postalCode, buyerGstin, paymentMode, notes, items])
 
   async function finalizeDraft(id: string) {
     setFinalizingId(id)
@@ -507,6 +518,74 @@ export default function InvoicesClient() {
     } finally {
       setSendingEmailId(null)
     }
+  }
+
+  // Save new invoice as draft without finalizing
+  async function handleSaveDraft() {
+    if (!customerName.trim()) { setFormError('Customer name is required'); return }
+    setFormError(''); setSubmitting(true)
+    try {
+      const res = await fetch('/api/admin/invoices/drafts', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName, customerPhone, customerEmail,
+          addressLine1, addressLine2, city, state, postalCode,
+          buyerGstin, paymentMode, notes,
+          saveAsDraft: true,
+          items: items.map(it => ({
+            product_id: it.product_id, product_name: it.product_name,
+            product_sku: it.product_sku, variant_id: it.variant_id,
+            sub_variant_id: it.sub_variant_id || null,
+            variant_name: it.variant_name, hsn_code: it.hsn_code,
+            gst_rate: it.gst_rate, quantity: it.quantity,
+            buy_unit: it.buy_unit || null,
+            sell_unit_factor: it.sell_unit_factor ?? 1,
+            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
+            discount_pct: Number(it.discount_pct) || 0,
+            temp_id: it.id,
+          })),
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setFormError(data.error || 'Failed to save draft'); return }
+      showToast('Invoice saved as draft', 'success')
+      resetForm(); navigateView('list'); fetchDrafts()
+    } catch (err: any) {
+      setFormError(err.message || 'Failed')
+    } finally { setSubmitting(false) }
+  }
+
+  // Autosave existing draft — debounced
+  async function autoSaveDraft() {
+    if (!editId || !editIsDraft || autoSaveInFlight.current) return
+    autoSaveInFlight.current = true
+    setAutoSaveStatus('saving')
+    try {
+      const res = await fetch(`/api/admin/invoices/drafts/${editId}`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerName, customerPhone, customerEmail,
+          addressLine1, addressLine2, city, state, postalCode,
+          buyerGstin, paymentMode, invoiceDate, notes,
+          items: items.map(it => ({
+            product_id: it.product_id, product_name: it.product_name,
+            product_sku: it.product_sku, variant_id: it.variant_id,
+            sub_variant_id: it.sub_variant_id || null,
+            variant_name: it.variant_name, hsn_code: it.hsn_code,
+            gst_rate: it.gst_rate, quantity: it.quantity,
+            buy_unit: it.buy_unit || null,
+            sell_unit_factor: it.sell_unit_factor ?? 1,
+            unit_price: Number(it.mrp) > 0 ? Number(it.mrp) : Number(it.unit_price),
+            discount_pct: Number(it.discount_pct) || 0,
+          })),
+        }),
+      })
+      setAutoSaveStatus(res.ok ? 'saved' : 'error')
+      setTimeout(() => setAutoSaveStatus('idle'), 2000)
+    } catch { setAutoSaveStatus('error'); setTimeout(() => setAutoSaveStatus('idle'), 2000) }
+    finally { autoSaveInFlight.current = false }
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -1023,11 +1102,17 @@ export default function InvoicesClient() {
           </div>
 
 
-          <div className="flex gap-3 pb-6">
+          <div className="flex flex-wrap items-center gap-3 pb-6">
             <button type="submit" disabled={submitting}
               className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
               {submitting ? (isEdit ? 'Saving…' : 'Creating…') : (isEdit ? 'Save Changes' : 'Create Invoice')}
             </button>
+            {!isEdit && (
+              <button type="button" disabled={submitting} onClick={handleSaveDraft}
+                className="px-6 py-2 border border-border-default hover:bg-surface-secondary text-foreground rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
+                {submitting ? 'Saving…' : 'Save as Draft'}
+              </button>
+            )}
             {isEdit && editIsDraft && (
               <button
                 type="button"
@@ -1037,6 +1122,11 @@ export default function InvoicesClient() {
               >
                 {submitting ? 'Finalizing…' : 'Save & Finalize'}
               </button>
+            )}
+            {isEdit && editIsDraft && autoSaveStatus !== 'idle' && (
+              <span className={`text-xs ml-auto ${autoSaveStatus === 'saving' ? 'text-foreground-muted' : autoSaveStatus === 'saved' ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                {autoSaveStatus === 'saving' ? 'Auto-saving…' : autoSaveStatus === 'saved' ? 'Auto-saved' : 'Auto-save failed'}
+              </span>
             )}
             <button type="button" onClick={() => { resetForm(); navigateView('list') }}
               className="px-6 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
