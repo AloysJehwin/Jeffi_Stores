@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SlidersHorizontal, X } from 'lucide-react'
+import AdminSelect from './AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
 
 export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'text'
@@ -123,13 +124,13 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
     if (f.type === 'select') {
       const name = Array.isArray(f.name) ? f.name[0] : f.name
       return (
-        <div className="relative">
-          <select className={selectCls} value={local[name] || ''} onChange={e => setLocalVal(name, e.target.value)}>
-            <option value="">Any</option>
-            {f.options?.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </select>
-          <svg className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground-muted pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-        </div>
+        <AdminSelect
+          sm
+          value={local[name] || ''}
+          placeholder="Any"
+          options={[{ value: '', label: 'Any' }, ...(f.options || [])]}
+          onChange={v => setLocalVal(name, v)}
+        />
       )
     }
     if (f.type === 'toggle') {
@@ -230,7 +231,7 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
 
       {/* Modal */}
       {open && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50" onClick={() => setOpen(false)}>
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/50" onClick={() => setOpen(false)}>
           <div className="bg-surface-elevated rounded-xl border border-border-default shadow-2xl w-full max-w-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
             {/* Header */}
             <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
@@ -244,7 +245,7 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
             </div>
 
             {/* Body */}
-            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-6 py-4 space-y-6">
               {sections.map(section => {
                 const sectionFields = fields.filter(f => (f.section || 'General') === section)
                 return (
