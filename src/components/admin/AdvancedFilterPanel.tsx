@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { SlidersHorizontal, X } from 'lucide-react'
+import AdminSelect from './AdminSelect'
 
 export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'text'
 
@@ -18,44 +19,34 @@ export interface AdvancedFilterField {
 
 interface AdvancedFilterPanelProps {
   fields: AdvancedFilterField[]
-  paramNames?: string[] // all URL params managed by this panel (for reset)
+  paramNames?: string[]
 }
 
-// All param names used by a field definition
 function fieldParamNames(f: AdvancedFilterField): string[] {
   if (Array.isArray(f.name)) return f.name
   return [f.name]
 }
 
-// Human-readable chip label for an active filter
 function chipLabel(f: AdvancedFilterField, params: URLSearchParams): string {
   if (f.type === 'range') {
     const [min, max] = Array.isArray(f.name) ? f.name : [f.name + '_min', f.name + '_max']
-    const mn = params.get(min)
-    const mx = params.get(max)
-    const u = f.unit || ''
+    const mn = params.get(min); const mx = params.get(max); const u = f.unit || ''
     if (mn && mx) return `${f.label}: ${u}${mn}–${u}${mx}`
     if (mn) return `${f.label}: ≥${u}${mn}`
     if (mx) return `${f.label}: ≤${u}${mx}`
-    return f.label
   }
   if (f.type === 'date-range') {
     const [from, to] = Array.isArray(f.name) ? f.name : [`${f.name}_from`, `${f.name}_to`]
-    const df = params.get(from)
-    const dt = params.get(to)
+    const df = params.get(from); const dt = params.get(to)
     if (df && dt) return `${f.label}: ${df} – ${dt}`
     if (df) return `${f.label}: from ${df}`
     if (dt) return `${f.label}: to ${dt}`
-    return f.label
   }
   if (f.type === 'toggle' || f.type === 'select') {
     const name = Array.isArray(f.name) ? f.name[0] : f.name
     const val = params.get(name) || ''
-    if (f.options) {
-      const opt = f.options.find(o => o.value === val)
-      if (opt) return `${f.label}: ${opt.label}`
-    }
-    return `${f.label}: ${val}`
+    const opt = f.options?.find(o => o.value === val)
+    return `${f.label}: ${opt?.label || val}`
   }
   if (f.type === 'text') {
     const name = Array.isArray(f.name) ? f.name[0] : f.name
@@ -64,7 +55,6 @@ function chipLabel(f: AdvancedFilterField, params: URLSearchParams): string {
   return f.label
 }
 
-// Check if a field has any active value
 function fieldIsActive(f: AdvancedFilterField, params: URLSearchParams): boolean {
   return fieldParamNames(f).some(n => !!params.get(n))
 }

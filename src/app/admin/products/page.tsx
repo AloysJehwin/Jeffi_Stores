@@ -357,26 +357,25 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         searchPlaceholder="Search by name or SKU..."
         searchParam="search"
         suggestType="products"
+        advancedPanel={<AdvancedFilterPanel fields={[
+          { name: 'is_featured', label: 'Featured', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Featured' }, { value: 'false', label: 'Not Featured' }] },
+          { name: 'has_variants', label: 'Has Variants', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'is_digital', label: 'Digital Product', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'is_bundle', label: 'Bundle', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'condition', label: 'Condition', type: 'select', section: 'Product Type', options: [{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }, { value: 'refurbished', label: 'Refurbished' }] },
+          { name: ['price_min', 'price_max'], label: 'Price Range', type: 'range', section: 'Pricing & Tax', unit: '₹' },
+          { name: 'gst_percentage', label: 'GST %', type: 'select', section: 'Pricing & Tax', options: [{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }] },
+          { name: 'is_cod_allowed', label: 'COD Allowed', type: 'toggle', section: 'Pricing & Tax', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'shipping_class', label: 'Shipping Class', type: 'select', section: 'Logistics', options: [{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }] },
+          { name: 'is_oversized', label: 'Oversized', type: 'toggle', section: 'Logistics', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'country_of_origin', label: 'Country of Origin', type: 'text', section: 'Logistics', placeholder: 'e.g. IN' },
+          { name: 'fragile', label: 'Fragile', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+          { name: 'hazardous', label: 'Hazardous', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+          { name: 'perishable', label: 'Perishable', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+          { name: 'serialized', label: 'Serialized', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+          { name: 'grade', label: 'Grade', type: 'select', section: 'Other', options: [{ value: 'A', label: 'Grade A' }, { value: 'B', label: 'Grade B' }, { value: 'C', label: 'Grade C' }] },
+        ]} />}
       />
-
-      <AdvancedFilterPanel fields={[
-        { name: 'is_featured', label: 'Featured', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Featured' }, { value: 'false', label: 'Not Featured' }] },
-        { name: 'has_variants', label: 'Has Variants', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-        { name: 'is_digital', label: 'Digital Product', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-        { name: 'is_bundle', label: 'Bundle', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-        { name: 'condition', label: 'Condition', type: 'select', section: 'Product Type', options: [{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }, { value: 'refurbished', label: 'Refurbished' }] },
-        { name: ['price_min', 'price_max'], label: 'Price Range', type: 'range', section: 'Pricing & Tax', unit: '₹' },
-        { name: 'gst_percentage', label: 'GST %', type: 'select', section: 'Pricing & Tax', options: [{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }] },
-        { name: 'is_cod_allowed', label: 'COD Allowed', type: 'toggle', section: 'Pricing & Tax', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-        { name: 'shipping_class', label: 'Shipping Class', type: 'select', section: 'Logistics', options: [{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }] },
-        { name: 'is_oversized', label: 'Oversized', type: 'toggle', section: 'Logistics', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-        { name: 'country_of_origin', label: 'Country of Origin', type: 'text', section: 'Logistics', placeholder: 'e.g. IN' },
-        { name: 'fragile', label: 'Fragile', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
-        { name: 'hazardous', label: 'Hazardous', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
-        { name: 'perishable', label: 'Perishable', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
-        { name: 'serialized', label: 'Serialized', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
-        { name: 'grade', label: 'Grade', type: 'select', section: 'Other', options: [{ value: 'A', label: 'Grade A' }, { value: 'B', label: 'Grade B' }, { value: 'C', label: 'Grade C' }] },
-      ]} />
 
       <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} />
     </div>
