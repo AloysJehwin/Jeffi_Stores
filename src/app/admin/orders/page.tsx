@@ -314,26 +314,25 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
         searchPlaceholder="Search by order number or customer..."
         searchParam="search"
         suggestType="orders"
+        advancedPanel={<AdvancedFilterPanel fields={[
+          { name: ['date_from', 'date_to'], label: 'Order Date', type: 'date-range', section: 'Date & Amount' },
+          { name: ['amount_min', 'amount_max'], label: 'Order Amount', type: 'range', section: 'Date & Amount', unit: '₹' },
+          { name: 'shipment_status', label: 'Shipment Status', type: 'select', section: 'Shipment', options: [
+            { value: 'created', label: 'Created' },
+            { value: 'in_transit', label: 'In Transit' },
+            { value: 'out_for_delivery', label: 'Out for Delivery' },
+            { value: 'delivered', label: 'Delivered' },
+            { value: 'rto_initiated', label: 'RTO Initiated' },
+            { value: 'rto_delivered', label: 'RTO Delivered' },
+          ]},
+          { name: 'awb', label: 'AWB / Tracking No.', type: 'text', section: 'Shipment', placeholder: 'Search by AWB number' },
+          { name: 'payment_mode', label: 'Payment Mode', type: 'select', section: 'Payment', options: [
+            { value: 'cod', label: 'Cash on Delivery' },
+            { value: 'prepaid', label: 'Prepaid' },
+          ]},
+          { name: 'coupon_code', label: 'Coupon Code', type: 'text', section: 'Payment', placeholder: 'Search by coupon code' },
+        ]} />}
       />
-
-      <AdvancedFilterPanel fields={[
-        { name: ['date_from', 'date_to'], label: 'Order Date', type: 'date-range', section: 'Date & Amount' },
-        { name: ['amount_min', 'amount_max'], label: 'Order Amount', type: 'range', section: 'Date & Amount', unit: '₹' },
-        { name: 'shipment_status', label: 'Shipment Status', type: 'select', section: 'Shipment', options: [
-          { value: 'created', label: 'Created' },
-          { value: 'in_transit', label: 'In Transit' },
-          { value: 'out_for_delivery', label: 'Out for Delivery' },
-          { value: 'delivered', label: 'Delivered' },
-          { value: 'rto_initiated', label: 'RTO Initiated' },
-          { value: 'rto_delivered', label: 'RTO Delivered' },
-        ]},
-        { name: 'awb', label: 'AWB / Tracking No.', type: 'text', section: 'Shipment', placeholder: 'Search by AWB number' },
-        { name: 'payment_mode', label: 'Payment Mode', type: 'select', section: 'Payment', options: [
-          { value: 'cod', label: 'Cash on Delivery' },
-          { value: 'prepaid', label: 'Prepaid' },
-        ]},
-        { name: 'coupon_code', label: 'Coupon Code', type: 'text', section: 'Payment', placeholder: 'Search by coupon code' },
-      ]} />
 
       <OrdersListSection searchParams={searchParams} />
     </div>
