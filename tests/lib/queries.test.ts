@@ -31,6 +31,7 @@ import {
   getCustomerById,
   getRecentOrders,
   getDashboardMetrics,
+  getDashboardAnalytics,
   getOrder,
   getReturnRequest,
   VARIANT_STOCK_TOTAL_SQL,
@@ -341,6 +342,41 @@ describe('getFilteredOrders', () => {
     expect(args).toContain('unpaid')
     expect(args).toContain('online')
   })
+
+  it('applies date_from filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredOrders({ date_from: '2026-01-01' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('2026-01-01')
+  })
+
+  it('applies amount_min and amount_max filters', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredOrders({ amount_min: '100', amount_max: '500' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('100')
+    expect(args).toContain('500')
+  })
+
+  it('applies awb filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredOrders({ awb: 'AWB123' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('AWB123')
+  })
+
+  it('applies shipment_status, payment_mode, coupon_code filters', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredOrders({ shipment_status: 'delivered', payment_mode: 'cod', coupon_code: 'SAVE10' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('delivered')
+    expect(args).toContain('cod')
+    expect(args).toContain('SAVE10')
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -454,6 +490,49 @@ describe('getFilteredProducts', () => {
     await getFilteredProducts({ is_active: 'maybe' })
     // should not crash and should not add is_active filter
     expect(mockQueryMany).toHaveBeenCalled()
+  })
+
+  it('applies is_featured filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ is_featured: 'true' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain(true)
+  })
+
+  it('applies price_min and price_max filters', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ price_min: '100', price_max: '500' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('100')
+    expect(args).toContain('500')
+  })
+
+  it('applies gst_percentage filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ gst_percentage: '18' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('18')
+  })
+
+  it('applies fragile and hazardous flags', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ fragile: 'true', hazardous: 'true' })
+    const sql = mockQueryMany.mock.calls[0][0] as string
+    expect(sql).toContain('p.fragile = true')
+    expect(sql).toContain('p.hazardous = true')
+  })
+
+  it('applies condition and grade filters', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ condition: 'new', grade: 'A' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('new')
+    expect(args).toContain('A')
   })
 })
 
@@ -934,6 +1013,36 @@ describe('getDashboardMetrics', () => {
     const result = await getDashboardMetrics()
     expect(result.revenue.thisMonth).toBe(0)
     expect(result.revenue.lastMonth).toBe(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getDashboardAnalytics
+// ---------------------------------------------------------------------------
+
+describe('getDashboardAnalytics', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns analytics with default 30d range', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany.mockResolvedValue([])
+    const result = await getDashboardAnalytics()
+    expect(result).toBeDefined()
+    expect(typeof result).toBe('object')
+  })
+
+  it('accepts month range', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany.mockResolvedValue([])
+    const result = await getDashboardAnalytics('month')
+    expect(result).toBeDefined()
+  })
+
+  it('accepts year range', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany.mockResolvedValue([])
+    const result = await getDashboardAnalytics('year')
+    expect(result).toBeDefined()
   })
 })
 
