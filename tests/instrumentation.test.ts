@@ -76,11 +76,7 @@ describe('register', () => {
 
     // Advance past the 30s delay for delhivery_sync — do NOT use runAllTimers
     // (setInterval would loop infinitely)
-    vi.advanceTimersByTime(31_000)
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-
+    await vi.advanceTimersByTimeAsync(31_000)
     // At least one fetch should use the NEXT_PUBLIC_APP_URL base
     const calls = vi.mocked(global.fetch).mock.calls
     const hasPubUrl = calls.some(([url]) =>
@@ -120,11 +116,7 @@ describe('register', () => {
     await register()
 
     // Advance past the 30s initial delay for delhivery_sync
-    vi.advanceTimersByTime(31_000)
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-
+    await vi.advanceTimersByTimeAsync(31_000)
     const calls = vi.mocked(global.fetch).mock.calls
     const delhiveryCall = calls.find(([url]) =>
       typeof url === 'string' && url.includes('delhivery/sync-statuses')
@@ -144,11 +136,7 @@ describe('register', () => {
 
     await register()
 
-    vi.advanceTimersByTime(31_000)
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-
+    await vi.advanceTimersByTimeAsync(31_000)
     const calls = vi.mocked(global.fetch).mock.calls
     const cronCall = calls.find(([url]) =>
       typeof url === 'string' && url.includes('localhost:3000/api')
@@ -169,12 +157,7 @@ describe('register', () => {
 
     await register()
 
-    vi.advanceTimersByTime(31_000)
-    // flush microtask ticks: Redis lock + cron fetch rejection + recordRun call
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(31_000)
 
     const calls = vi.mocked(global.fetch).mock.calls
     // Second call should be the recordRun call
@@ -205,12 +188,7 @@ describe('register', () => {
 
     await register()
 
-    vi.advanceTimersByTime(31_000)
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-    await Promise.resolve()
-
+    await vi.advanceTimersByTimeAsync(31_000)
     const calls = vi.mocked(global.fetch).mock.calls
     const recordCall = calls.find(([url]) =>
       typeof url === 'string' && url.includes('cron-record')
