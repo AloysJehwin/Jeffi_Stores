@@ -203,20 +203,22 @@ describe('abandonedCart scenario', () => {
 
   // --- findEligible ---
   it('findEligible calls queryMany and returns its result', async () => {
-    const rows = [{ user_id: 'usr-1' }, { user_id: 'usr-2' }]
-    mockQueryMany.mockResolvedValueOnce(rows as any)
+    const rows = [{ user_id: 'usr-1', sequence: 1 }, { user_id: 'usr-2', sequence: 1 }]
+    mockQueryMany.mockResolvedValueOnce(rows as any)  // seq1
+    mockQueryMany.mockResolvedValueOnce([])           // seq2
 
     const result = await abandonedCart.findEligible({
       campaign: makeCampaign() as any,
       params: abandonedCart.defaultParams,
     })
 
-    expect(mockQueryMany).toHaveBeenCalledTimes(1)
+    expect(mockQueryMany).toHaveBeenCalledTimes(2)
     expect(result).toEqual(rows)
   })
 
   it('findEligible passes campaign.kind and params to queryMany', async () => {
-    mockQueryMany.mockResolvedValueOnce([])
+    mockQueryMany.mockResolvedValueOnce([])  // seq1
+    mockQueryMany.mockResolvedValueOnce([])  // seq2
     const campaign = makeCampaign({ kind: 'abandoned_cart', delay_hours: 2 })
 
     await abandonedCart.findEligible({
@@ -239,7 +241,7 @@ describe('abandonedCart scenario', () => {
     mockQueryMany.mockResolvedValueOnce([])
 
     const result = await abandonedCart.send(
-      { user_id: 'usr-1' },
+      { user_id: 'usr-1', sequence: 1 },
       { campaign: makeCampaign() as any, params: abandonedCart.defaultParams }
     )
 
@@ -254,7 +256,7 @@ describe('abandonedCart scenario', () => {
     mockFetchUser.mockResolvedValueOnce(null)
 
     const result = await abandonedCart.send(
-      { user_id: 'usr-1' },
+      { user_id: 'usr-1', sequence: 1 },
       { campaign: makeCampaign() as any, params: abandonedCart.defaultParams }
     )
 
@@ -269,7 +271,7 @@ describe('abandonedCart scenario', () => {
     mockQueryMany.mockResolvedValueOnce([cartItem] as any)
 
     const result = await abandonedCart.send(
-      { user_id: 'usr-123' },
+      { user_id: 'usr-123', sequence: 1 },
       { campaign: makeCampaign() as any, params: abandonedCart.defaultParams }
     )
 
@@ -287,7 +289,7 @@ describe('abandonedCart scenario', () => {
     mockFetchUser.mockResolvedValueOnce({ ...makeUser(), first_name: null } as any)
 
     await abandonedCart.send(
-      { user_id: 'usr-123' },
+      { user_id: 'usr-123', sequence: 1 },
       { campaign: makeCampaign() as any, params: abandonedCart.defaultParams }
     )
 
@@ -301,7 +303,7 @@ describe('abandonedCart scenario', () => {
     mockResolveCoupon.mockResolvedValueOnce({ couponCode: 'DISCOUNT20', discountPercent: 20 } as any)
 
     await abandonedCart.send(
-      { user_id: 'usr-123' },
+      { user_id: 'usr-123', sequence: 1 },
       { campaign: makeCampaign() as any, params: abandonedCart.defaultParams }
     )
 

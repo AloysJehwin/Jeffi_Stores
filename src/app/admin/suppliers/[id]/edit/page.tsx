@@ -20,32 +20,57 @@ export default function EditSupplierPage() {
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [publishing, setPublishing] = useState(false)
+  const [hasDraft, setHasDraft] = useState(false)
   const [error, setError] = useState('')
   const [ifscLookup, setIfscLookup] = useState<'idle' | 'loading' | 'ok' | 'error'>('idle')
 
   useEffect(() => {
-    fetch(`/api/admin/suppliers/${id}`)
-      .then(r => r.json())
-      .then(json => {
-        const s = json.supplier
-        if (!s) { setError('Supplier not found'); return }
+    Promise.all([
+      fetch(`/api/admin/suppliers/${id}`).then(r => r.json()),
+      fetch(`/api/admin/suppliers/${id}/draft`, { credentials: 'include' }).then(r => r.json()),
+    ]).then(([supplierJson, draftJson]) => {
+      const s = supplierJson.supplier
+      if (!s) { setError('Supplier not found'); return }
+      const live = {
+        name: s.name || '',
+        gstin: s.gstin || '',
+        contact_name: s.contact_name || '',
+        phone: (s.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10),
+        email: s.email || '',
+        address: s.address || '',
+        payment_terms: String(s.payment_terms ?? '30'),
+        notes: s.notes || '',
+        bank_name: s.bank_name || '',
+        account_number: s.account_number || '',
+        ifsc: s.ifsc || '',
+        upi_id: s.upi_id || '',
+      }
+      const df = draftJson.draft_fields
+      if (df) {
+        setHasDraft(true)
         setForm({
-          name: s.name || '',
-          gstin: s.gstin || '',
-          contact_name: s.contact_name || '',
-          phone: (s.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10),
-          email: s.email || '',
-          address: s.address || '',
-          payment_terms: String(s.payment_terms ?? '30'),
-          notes: s.notes || '',
-          bank_name: s.bank_name || '',
-          account_number: s.account_number || '',
-          ifsc: s.ifsc || '',
-          upi_id: s.upi_id || '',
+          name: df.name ?? live.name,
+          gstin: df.gstin ?? live.gstin,
+          contact_name: df.contact_name ?? live.contact_name,
+          phone: df.phone ?? live.phone,
+          email: df.email ?? live.email,
+          address: df.address ?? live.address,
+          payment_terms: df.payment_terms ?? live.payment_terms,
+          notes: df.notes ?? live.notes,
+          bank_name: df.bank_name ?? live.bank_name,
+          account_number: df.account_number ?? live.account_number,
+          ifsc: df.ifsc ?? live.ifsc,
+          upi_id: df.upi_id ?? live.upi_id,
         })
-      })
-      .catch(() => setError('Failed to load supplier'))
-      .finally(() => setLoading(false))
+      } else {
+        setForm(live)
+      }
+    }).catch(() => setError('Failed to load supplier')).finally(() => setLoading(false))
+
+    // Auto-create draft on first visit
+    fetch(`/api/admin/suppliers/${id}/draft`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      .then(() => setHasDraft(true))
   }, [id])
 
   async function lookupIfsc(code: string) {
@@ -58,34 +83,58 @@ export default function EditSupplierPage() {
       const data = await res.json()
       setForm(f => ({ ...f, bank_name: data.BANK || f.bank_name }))
       setIfscLookup('ok')
-    } catch {
-      setIfscLookup('error')
-    }
+    } catch { setIfscLookup('error') }
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
+  async function saveDraft() {
     if (!form.name.trim()) { setError('Supplier name is required'); return }
     setError('')
     setSaving(true)
     try {
-      const res = await fetch(`/api/admin/inventory/suppliers/${id}`, {
-        method: 'PATCH',
+      const res = await fetch(`/api/admin/suppliers/${id}/draft`, {
+        method: 'PATCH', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
       })
-      const json = await res.json()
-      if (!res.ok) { setError(json.error || 'Failed to update supplier'); setSaving(false); return }
-      router.push(ap('/admin/inventory?tab=suppliers'))
-    } catch {
-      setError('Failed to update supplier')
-      setSaving(false)
-    }
+      if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to save draft'); return }
+      setHasDraft(true)
+    } finally { setSaving(false) }
   }
 
-  if (loading) {
-    return null
+  async function publish() {
+    if (!form.name.trim()) { setError('Supplier name is required'); return }
+    setError('')
+    setPublishing(true)
+    try {
+      // Save latest form to draft first, then publish
+      await fetch(`/api/admin/suppliers/${id}/draft`, {
+        method: 'PATCH', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const res = await fetch(`/api/admin/suppliers/${id}/draft`, { method: 'POST', credentials: 'include' })
+      if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to publish'); return }
+      router.push(ap('/admin/inventory?tab=suppliers'))
+    } finally { setPublishing(false) }
   }
+
+  async function discardDraft() {
+    await fetch(`/api/admin/suppliers/${id}/draft`, { method: 'DELETE', credentials: 'include' })
+    setHasDraft(false)
+    // Reload from live
+    const res = await fetch(`/api/admin/suppliers/${id}`)
+    const json = await res.json()
+    const s = json.supplier
+    if (s) setForm({
+      name: s.name || '', gstin: s.gstin || '', contact_name: s.contact_name || '',
+      phone: (s.phone || '').replace(/^\+?91/, '').replace(/\D/g, '').slice(-10),
+      email: s.email || '', address: s.address || '', payment_terms: String(s.payment_terms ?? '30'),
+      notes: s.notes || '', bank_name: s.bank_name || '', account_number: s.account_number || '',
+      ifsc: s.ifsc || '', upi_id: s.upi_id || '',
+    })
+  }
+
+  if (loading) return null
 
   return (
     <div className="p-4 sm:p-6">
@@ -96,12 +145,22 @@ export default function EditSupplierPage() {
           </svg>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Edit Supplier</h1>
+          <h1 className="text-2xl font-bold text-foreground">{hasDraft ? 'Edit Draft' : 'Edit Supplier'}</h1>
           <p className="text-foreground-secondary text-sm mt-0.5">{form.name}</p>
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      {hasDraft && (
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Changes are saved to draft. The live supplier stays unchanged until you publish.</p>
+          </div>
+          <button type="button" onClick={discardDraft} className="text-xs text-amber-600 hover:underline ml-4">Discard draft</button>
+        </div>
+      )}
+
+      <form onSubmit={e => { e.preventDefault(); saveDraft() }} className="space-y-6">
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
           <h2 className="text-sm font-semibold text-foreground">Basic Information</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -149,14 +208,9 @@ export default function EditSupplierPage() {
             <div>
               <label className={labelCls}>IFSC Code</label>
               <div className="relative">
-                <input
-                  className={inputCls}
-                  value={form.ifsc}
+                <input className={inputCls} value={form.ifsc}
                   onChange={e => { setForm(f => ({ ...f, ifsc: e.target.value.toUpperCase() })); setIfscLookup('idle') }}
-                  onBlur={e => lookupIfsc(e.target.value)}
-                  placeholder="e.g. HDFC0001234"
-                  maxLength={11}
-                />
+                  onBlur={e => lookupIfsc(e.target.value)} placeholder="e.g. HDFC0001234" maxLength={11} />
                 {ifscLookup === 'loading' && <span className="absolute right-2 top-2.5 text-xs text-foreground-secondary">…</span>}
                 {ifscLookup === 'ok' && <Check className="absolute right-2 top-2.5 w-4 h-4 text-green-600 dark:text-green-400" />}
                 {ifscLookup === 'error' && <span className="absolute right-2 top-2.5 text-xs text-red-500">?</span>}
@@ -185,7 +239,10 @@ export default function EditSupplierPage() {
 
         <div className="flex gap-3">
           <button type="submit" disabled={saving || !form.name.trim()} className={btnPrimary}>
-            {saving ? 'Saving...' : 'Save Changes'}
+            {saving ? 'Saving…' : 'Save Draft'}
+          </button>
+          <button type="button" onClick={publish} disabled={publishing || !form.name.trim()} className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
+            {publishing ? 'Publishing…' : 'Publish'}
           </button>
           <Link href={ap('/admin/inventory?tab=suppliers')} className={btnSecondary}>
             Cancel

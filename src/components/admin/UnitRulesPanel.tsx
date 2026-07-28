@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 export interface ProductUnitRule {
   id: string
@@ -39,6 +40,7 @@ export default function UnitRulesPanel({
   productId, unitId, unitVariantId, rules, unitLabel, onChanged,
 }: Props) {
   const { showToast } = useToast()
+  const confirm = useConfirm()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [minQty, setMinQty] = useState('')
@@ -92,7 +94,8 @@ export default function UnitRulesPanel({
   }
 
   async function deleteRule(rule: ProductUnitRule) {
-    if (!confirm('Delete this pricing rule?')) return
+    const ok = await confirm({ message: 'Delete this pricing rule?', variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
     setBusy(true)
     try {
       const res = await fetch(`${rulesUrl(productId, unitId, unitVariantId)}/${rule.id}`, {

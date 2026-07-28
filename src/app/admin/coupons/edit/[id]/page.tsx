@@ -114,6 +114,25 @@ export default async function EditCouponPage({ params, searchParams }: { params:
         ),
       ])
 
+  // Draft system — auto-create on first edit
+  let draftRow = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
+    `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`, [coupon.id]
+  )
+  if (!draftRow) {
+    await query(
+      `INSERT INTO coupon_drafts (coupon_id, fields)
+       SELECT id, to_jsonb(c) - 'id' - 'created_at' - 'updated_at'
+       FROM coupons c WHERE c.id = $1
+       ON CONFLICT (coupon_id) DO NOTHING`,
+      [coupon.id]
+    )
+    draftRow = await queryOne<{ coupon_id: string; fields: Record<string, unknown> }>(
+      `SELECT coupon_id, fields FROM coupon_drafts WHERE coupon_id = $1`, [coupon.id]
+    )
+  }
+  const isDraft = !!draftRow
+  const df = (draftRow?.fields || {}) as any
+
   async function updateCoupon(formData: FormData) {
     'use server'
     const code = (formData.get('code') as string).toUpperCase().trim()
@@ -127,22 +146,45 @@ export default async function EditCouponPage({ params, searchParams }: { params:
     const valid_from = formData.get('valid_from') || null
     const valid_until = formData.get('valid_until') || null
     const is_active = formData.get('is_active') === 'true'
-
-    try {
-      await query(
-        `UPDATE coupons SET code=$1, description=$2, discount_type=$3, discount_value=$4, min_purchase_amount=$5, max_discount_amount=$6, usage_limit=$7, usage_limit_per_user=$8, valid_from=$9, valid_until=$10, is_active=$11 WHERE id=$12`,
-        [code, description || null, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active, id]
-      )
-    } catch (err) {
-      if ((err as { digest?: string }).digest?.startsWith('NEXT_REDIRECT')) throw err
-      throw new Error('Failed to update coupon')
-    }
-    revalidatePath('/admin/coupons')
-
+    const intent = formData.get('intent') as string | null
     const host = await getHost()
     const rawBack = formData.get('_back') as string | null
-    const destination = rawBack && rawBack.startsWith('/admin/coupons') ? rawBack : '/admin/coupons'
-    redirect(ap(destination, host))
+    const destination = rawBack && rawBack.startsWith('/admin/coupons') ? rawBack : `/admin/coupons/edit/${id}`
+
+    const draftFields = { code, description: description || null, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active }
+
+    try {
+      if (intent === 'discard') {
+        await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
+        revalidatePath(`/admin/coupons/edit/${id}`)
+        redirect(ap(`/admin/coupons/edit/${id}`, host))
+      }
+
+      // Save to draft
+      await query(
+        `INSERT INTO coupon_drafts (coupon_id, fields, updated_at) VALUES ($1, $2::jsonb, NOW())
+         ON CONFLICT (coupon_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
+        [id, JSON.stringify(draftFields)]
+      )
+
+      if (intent === 'publish') {
+        await query(
+          `UPDATE coupons SET code=$1, description=$2, discount_type=$3, discount_value=$4,
+           min_purchase_amount=$5, max_discount_amount=$6, usage_limit=$7, usage_limit_per_user=$8,
+           valid_from=$9, valid_until=$10, is_active=$11, updated_at=NOW() WHERE id=$12`,
+          [code, description || null, discount_type, isNaN(discount_value) ? 0 : discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active, id]
+        )
+        await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
+        revalidatePath('/admin/coupons')
+        redirect(ap('/admin/coupons', host))
+      }
+
+      revalidatePath(`/admin/coupons/edit/${id}`)
+      redirect(ap(destination, host))
+    } catch (err: any) {
+      if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
+      throw new Error('Failed to update coupon')
+    }
   }
 
   return (
@@ -152,27 +194,42 @@ export default async function EditCouponPage({ params, searchParams }: { params:
           <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
         </Link>
         <div>
-          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">Edit Coupon</h1>
+          <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">{isDraft ? 'Edit Draft' : 'Edit Coupon'}</h1>
           <p className="text-sm text-foreground-secondary mt-0.5 font-mono">{coupon.code}</p>
         </div>
       </div>
 
+      {isDraft && (
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Changes are saved to draft. The live coupon stays unchanged until you publish.</p>
+          </div>
+          <form action={updateCoupon}>
+            <input type="hidden" name="intent" value="discard" />
+            <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">Discard draft</button>
+          </form>
+        </div>
+      )}
+
       <CouponForm
         action={updateCoupon}
-        submitLabel="Save Changes"
+        submitLabel={isDraft ? undefined : 'Save Changes'}
+        isDraft={isDraft}
         backUrl={backUrl}
         defaultValues={{
-          code: coupon.code,
-          discount_type: coupon.discount_type,
-          discount_value: coupon.discount_value,
-          min_purchase_amount: coupon.min_purchase_amount,
-          max_discount_amount: coupon.max_discount_amount,
-          usage_limit: coupon.usage_limit,
-          usage_limit_per_user: coupon.usage_limit_per_user,
-          valid_from: toDatetimeLocal(coupon.valid_from),
-          valid_until: toDatetimeLocal(coupon.valid_until),
-          description: coupon.description,
-          is_active: coupon.is_active }}
+          code: df.code ?? coupon.code,
+          discount_type: df.discount_type ?? coupon.discount_type,
+          discount_value: df.discount_value ?? coupon.discount_value,
+          min_purchase_amount: df.min_purchase_amount ?? coupon.min_purchase_amount,
+          max_discount_amount: df.max_discount_amount ?? coupon.max_discount_amount,
+          usage_limit: df.usage_limit ?? coupon.usage_limit,
+          usage_limit_per_user: df.usage_limit_per_user ?? coupon.usage_limit_per_user,
+          valid_from: toDatetimeLocal(df.valid_from ?? coupon.valid_from),
+          valid_until: toDatetimeLocal(df.valid_until ?? coupon.valid_until),
+          description: df.description ?? coupon.description,
+          is_active: df.is_active ?? coupon.is_active,
+        }}
       />
 
       {/* Eligible Users */}

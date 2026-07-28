@@ -25,6 +25,8 @@ interface Props {
   subVariantId?: string | null
   basePrice?: number | string | null
   onUnitLoaded?: (info: UnitLoadedInfo) => void
+  isDraft?: boolean
+  readOnly?: boolean
 }
 
 const inputCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface text-foreground text-sm focus:ring-1 focus:ring-accent-500 w-full h-[34px]"
@@ -32,7 +34,7 @@ const lockedCls = "px-2 py-1.5 border border-border-secondary rounded bg-surface
 
 type FormMode = 'base' | 'extra' | null
 
-export default function UnitsManager({ productId, variantId, subVariantId, basePrice, onUnitLoaded }: Props) {
+export default function UnitsManager({ productId, variantId, subVariantId, basePrice, onUnitLoaded, isDraft = false, readOnly = false }: Props) {
   const { showToast } = useToast()
   const [allUnits, setAllUnits] = useState<ProductUnit[]>([])
   const [inherited, setInherited] = useState(false)
@@ -43,11 +45,19 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
-  const baseUrl = subVariantId
-    ? `/api/admin/products/${productId}/variants/${variantId}/sub-variants/${subVariantId}/units`
-    : variantId
-      ? `/api/admin/products/${productId}/variants/${variantId}/units`
-      : `/api/admin/products/${productId}/units`
+  const draftBasePath = isDraft ? `/api/admin/products/${productId}/draft/units` : null
+  const baseUrl = isDraft
+    ? `${draftBasePath}${subVariantId ? `?sub_variant_id=${subVariantId}&variant_id=${variantId}` : variantId ? `?variant_id=${variantId}` : ''}`
+    : subVariantId
+      ? `/api/admin/products/${productId}/variants/${variantId}/sub-variants/${subVariantId}/units`
+      : variantId
+        ? `/api/admin/products/${productId}/variants/${variantId}/units`
+        : `/api/admin/products/${productId}/units`
+  // For [unitId] routes (PATCH/DELETE), use the path without query params
+  // But include scope params so DELETE knows which scope to clear
+  const unitUrl = (unitId: string) => isDraft
+    ? `${draftBasePath}/${unitId}${subVariantId ? `?sub_variant_id=${subVariantId}&variant_id=${variantId}` : variantId ? `?variant_id=${variantId}` : ''}`
+    : `${baseUrl}/${unitId}`
   const isVariantScope = !!variantId && !subVariantId
   const isSubVariantScope = !!subVariantId
 
@@ -224,7 +234,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
     if (!base) return
     setSaving(true)
     try {
-      const res = await fetch(`${baseUrl}/${base.id}`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(unitUrl(base.id), { method: 'DELETE', credentials: 'include' })
       if (!res.ok) { showToast((await res.json().catch(() => ({}))).error || 'Failed to reset', 'error'); return }
       await load()
     } finally { setSaving(false) }
@@ -233,7 +243,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   async function handleDeleteExtra(u: ProductUnit) {
     setDeletingId(u.id)
     try {
-      const res = await fetch(`${baseUrl}/${u.id}`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(unitUrl(u.id), { method: 'DELETE', credentials: 'include' })
       if (!res.ok) { showToast((await res.json().catch(() => ({}))).error || 'Failed to delete', 'error'); return }
       await load()
     } finally { setDeletingId(null) }
@@ -271,7 +281,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
     setSaving(true)
     try {
       const res = baseUnit && !inherited
-        ? await fetch(`${baseUrl}/${baseUnit.id}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        ? await fetch(unitUrl(baseUnit.id), { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         : await fetch(baseUrl, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, is_base: true }) })
       const data = await res.json()
       if (!res.ok) { showToast(data.error || 'Failed to save', 'error'); return }
@@ -296,7 +306,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
     setSaving(true)
     try {
       const res = editingExtraId
-        ? await fetch(`${baseUrl}/${editingExtraId}`, { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        ? await fetch(unitUrl(editingExtraId), { method: 'PATCH', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         : await fetch(baseUrl, { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...payload, is_base: false }) })
       const data = await res.json()
       if (!res.ok) { showToast(data.error || 'Failed to save', 'error'); return }
@@ -307,6 +317,30 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
   }
 
   if (loading) return <div className="text-xs text-foreground-muted py-3">Loading…</div>
+
+  if (readOnly) {
+    const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
+    const extras = allUnits.filter(u => !u.is_base)
+    if (!baseUnit) return <p className="text-xs text-foreground-muted py-2">No selling unit configured.</p>
+    return (
+      <div className="space-y-1 text-sm">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-foreground">{baseUnit.display_label || baseUnit.unit}</span>
+          <span className="text-xs text-foreground-muted">({baseUnit.dimension})</span>
+          {baseUnit.factor && Number(baseUnit.factor) !== 1 && (
+            <span className="text-xs text-foreground-muted">× {baseUnit.factor}</span>
+          )}
+          <span className="text-[10px] px-1.5 py-0.5 bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 rounded">Base</span>
+        </div>
+        {extras.map((u, i) => (
+          <div key={i} className="flex items-center gap-2 text-foreground-secondary">
+            <span>{u.display_label || u.unit}</span>
+            <span className="text-xs text-foreground-muted">× {u.factor}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
 
   const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
   const extraCountUnits = allUnits.filter(u => !u.is_base && u.dimension === 'count')
@@ -390,7 +424,12 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
         </div>
       ) : (
         <div className="flex items-center justify-between bg-surface border border-dashed border-border-default rounded-lg px-4 py-3">
-          <span className="text-xs text-foreground-muted italic">No unit set</span>
+          <div>
+            <span className="text-xs text-foreground-muted italic">No unit set</span>
+            {(isVariantScope || isSubVariantScope) && (
+              <span className="ml-2 text-xs text-foreground-muted">— inherits from {isSubVariantScope ? 'variant' : 'product'}</span>
+            )}
+          </div>
           <button type="button" onClick={() => openBaseEdit()} className="text-xs text-accent-600 hover:underline">Set unit</button>
         </div>
       )}

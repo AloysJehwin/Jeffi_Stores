@@ -30,7 +30,7 @@ const nextConfig = {
       '/api/admin/orders/[id]/shipping-label': ['./node_modules/pdfkit/js/data/**/*'],
     },
   },
-  serverExternalPackages: ['pdfkit'],
+  serverExternalPackages: ['pdfkit', 'ioredis'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'jeffi-stores-bucket.s3.us-east-1.amazonaws.com' },
@@ -65,6 +65,26 @@ const nextConfig = {
         ],
       },
     ]
+  },
+  webpack(config, { isServer }) {
+    if (!isServer) {
+      const ioredisStub = require.resolve('./src/lib/ioredis-stub.js')
+      if (!config.resolve) config.resolve = {}
+      if (!config.resolve.alias) config.resolve.alias = {}
+      config.resolve.alias['ioredis'] = ioredisStub
+    } else {
+      const existingExternals = config.externals || []
+      config.externals = [
+        ...(Array.isArray(existingExternals) ? existingExternals : [existingExternals]),
+        function(context, request, callback) {
+          if (request === 'ioredis' || request.startsWith('ioredis/')) {
+            return callback(null, 'commonjs ' + request)
+          }
+          callback()
+        },
+      ]
+    }
+    return config
   },
 }
 

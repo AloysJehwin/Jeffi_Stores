@@ -12,10 +12,12 @@ interface Params extends Record<string, unknown> {
   sendCooldownDays: number
   maxRecipientsPerSweep: number
   maxItemsPerEmail: number
+  secondEmailDelayHours: number
 }
 
 interface Row {
   user_id: string
+  sequence: number
 }
 
 export const abandonedCart: ScenarioModule<Params, Row> = {
@@ -28,23 +30,28 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     sendCooldownDays: 7,
     maxRecipientsPerSweep: 50,
     maxItemsPerEmail: 5,
+    secondEmailDelayHours: 48,
   },
   paramSchema: {
-    lookbackDays:          { type: 'integer', min: 1, max: 90,  label: 'Lookback (days)',          description: 'Only consider carts updated in the last N days' },
-    sendCooldownDays:      { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)', description: 'Skip users sent this campaign within N days' },
-    maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',   description: 'Hard limit per sweep' },
-    maxItemsPerEmail:      { type: 'integer', min: 1, max: 10,  label: 'Items shown in email',     description: 'Cap on cart items rendered in the email body' },
+    lookbackDays:            { type: 'integer', min: 1, max: 90,  label: 'Lookback (days)',              description: 'Only consider carts updated in the last N days' },
+    sendCooldownDays:        { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)',     description: 'Skip users sent this campaign within N days' },
+    maxRecipientsPerSweep:   { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',       description: 'Hard limit per sweep' },
+    maxItemsPerEmail:        { type: 'integer', min: 1, max: 10,  label: 'Items shown in email',         description: 'Cap on cart items rendered in the email body' },
+    secondEmailDelayHours:   { type: 'integer', min: 24, max: 168, label: 'Second email delay (hours)', description: 'Send follow-up email N hours after first email if cart still not checked out' },
   },
 
   async findEligible({ campaign, params }) {
-    return queryMany<Row>(`
-      SELECT DISTINCT ci.user_id
+    // Sequence 1: users who haven't received ANY email in cooldown window
+    // Sequence 2: users who received seq=1 but NOT seq=2, cart still active,
+    //             and secondEmailDelayHours have passed since seq=1
+    const seq1 = await queryMany<Row>(`
+      SELECT DISTINCT ci.user_id, 1 AS sequence
       FROM cart_items ci
       JOIN users u ON u.id = ci.user_id
       LEFT JOIN business_profiles bp ON bp.user_id = u.id
       WHERE ci.saved_for_later = FALSE
-        AND ci.updated_at < NOW() - ($2 || ' hours')::interval
-        AND ci.updated_at > NOW() - ($3 || ' days')::interval
+        AND ci.updated_at < NOW() - ($2::text || ' hours')::interval
+        AND ci.updated_at > NOW() - ($3::text || ' days')::interval
         AND u.is_active = TRUE
         AND u.is_guest = FALSE
         AND u.marketing_opt_out = FALSE
@@ -53,10 +60,50 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
           SELECT 1 FROM email_campaigns_sent ecs
           WHERE ecs.campaign_kind = $1
             AND ecs.user_id = ci.user_id
-            AND ecs.sent_at > NOW() - ($4 || ' days')::interval
+            AND ecs.sent_at > NOW() - ($4::text || ' days')::interval
         )
       LIMIT $5
     `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep])
+
+    // Sequence 2: got seq=1, no seq=2 yet, secondEmailDelayHours passed, cart still active
+    const seq2 = await queryMany<Row>(`
+      SELECT DISTINCT ci.user_id, 2 AS sequence
+      FROM cart_items ci
+      JOIN users u ON u.id = ci.user_id
+      LEFT JOIN business_profiles bp ON bp.user_id = u.id
+      -- Must have received sequence 1
+      JOIN email_campaigns_sent ecs1 ON ecs1.user_id = ci.user_id
+        AND ecs1.campaign_kind = $1
+        AND (ecs1.metadata->>'sequence')::int = 1
+        AND ecs1.sent_at < NOW() - ($5::text || ' hours')::interval
+        AND ecs1.sent_at > NOW() - ($3::text || ' days')::interval
+      WHERE ci.saved_for_later = FALSE
+        AND ci.updated_at > NOW() - ($2::text || ' days')::interval
+        AND u.is_active = TRUE
+        AND u.is_guest = FALSE
+        AND u.marketing_opt_out = FALSE
+        AND (bp.user_id IS NULL OR bp.approval_status != 'approved')
+        -- No sequence 2 sent yet
+        AND NOT EXISTS (
+          SELECT 1 FROM email_campaigns_sent ecs2
+          WHERE ecs2.campaign_kind = $1
+            AND ecs2.user_id = ci.user_id
+            AND (ecs2.metadata->>'sequence')::int = 2
+        )
+        -- No order placed after seq1 sent
+        AND NOT EXISTS (
+          SELECT 1 FROM orders o
+          WHERE o.user_id = ci.user_id
+            AND o.status NOT IN ('cancelled', 'refunded')
+            AND o.created_at > ecs1.sent_at
+        )
+      LIMIT $4
+    `, [campaign.kind, params.lookbackDays, params.sendCooldownDays, params.maxRecipientsPerSweep, params.secondEmailDelayHours])
+
+    // Merge — seq1 users take priority, don't double-send
+    const seq1Ids = new Set(seq1.map(r => r.user_id))
+    const uniqueSeq2 = seq2.filter(r => !seq1Ids.has(r.user_id))
+    return [...seq1, ...uniqueSeq2]
   },
 
   async findSuppressed({ campaign, params }) {
@@ -65,8 +112,8 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         SELECT DISTINCT ci.user_id
         FROM cart_items ci
         WHERE ci.saved_for_later = FALSE
-          AND ci.updated_at < NOW() - ($2 || ' hours')::interval
-          AND ci.updated_at > NOW() - ($3 || ' days')::interval
+          AND ci.updated_at < NOW() - ($2::text || ' hours')::interval
+          AND ci.updated_at > NOW() - ($3::text || ' days')::interval
       )
       SELECT
         ec.user_id::text,
@@ -85,7 +132,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
           ELSE NULL
         END AS reason_detail,
         CASE
-          WHEN ecs.sent_at IS NOT NULL THEN (ecs.sent_at + ($4 || ' days')::interval)::text
+          WHEN ecs.sent_at IS NOT NULL THEN (ecs.sent_at + ($4::text || ' days')::interval)::text
           ELSE NULL
         END AS blocked_until
       FROM eligible_carts ec
@@ -94,7 +141,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         SELECT sent_at FROM email_campaigns_sent
          WHERE campaign_kind = $1
            AND user_id = ec.user_id
-           AND sent_at > NOW() - ($4 || ' days')::interval
+           AND sent_at > NOW() - ($4::text || ' days')::interval
          ORDER BY sent_at DESC LIMIT 1
       ) ecs ON TRUE
       WHERE u.is_active = FALSE OR u.is_guest = TRUE OR u.marketing_opt_out = TRUE OR ecs.sent_at IS NOT NULL
@@ -109,6 +156,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
   },
 
   async send(row, { campaign, params }) {
+    const sequence = row.sequence || 1
     const items = await queryMany<{ product_id: string; product_slug: string | null; name: string; quantity: number; price: number; image_url: string | null }>(`
       SELECT p.id::text AS product_id,
              p.slug AS product_slug,
@@ -137,12 +185,16 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       }))
     )
 
-    const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
+    // Sequence 2 always gets a coupon if available
+    const { couponCode, discountPercent } = sequence === 2
+      ? await resolveCoupon(campaign, row.user_id)
+      : await resolveCoupon(campaign, row.user_id)
 
     return sendCampaignEmail({
       campaign,
       user,
-      referenceId: null,
+      referenceId: `seq${sequence}`,
+      metadata: { sequence },
       vars: {
         firstName: user.first_name || 'there',
         itemCount: items.length,
@@ -151,7 +203,9 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         couponCode,
         discountPercent,
         ctaUrl: `${user.baseUrl}/cart`,
+        isFollowUp: sequence === 2 ? 'true' : '',
       },
     })
   },
 }
+

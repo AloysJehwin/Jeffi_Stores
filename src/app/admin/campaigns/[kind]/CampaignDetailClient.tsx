@@ -128,6 +128,8 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [hasDraft, setHasDraft] = useState(false)
+  const [publishing, setPublishing] = useState(false)
   const [testEmail, setTestEmail] = useState('')
   const [testBusy, setTestBusy] = useState(false)
   const [coupons, setCoupons] = useState<CouponOption[]>([])
@@ -167,15 +169,18 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         setCampaign(data.campaign)
         setRecentSends(data.recentSends || [])
         setSendsTotal(data.total || 0)
+        const draft = data.campaign.draft_fields
+        setHasDraft(!!draft)
+        const src = draft || data.campaign
         setForm({
-          enabled: data.campaign.enabled,
-          delay_hours: data.campaign.delay_hours,
-          discount_percent: data.campaign.discount_percent,
-          coupon_id: data.campaign.coupon_id || null,
-          scenario_kind: data.campaign.scenario_kind || null,
-          subject_template: data.campaign.subject_template,
-          body_template: data.campaign.body_template,
-          parameters: (data.campaign.parameters || {}) as Record<string, number | boolean | string>,
+          enabled: src.enabled ?? data.campaign.enabled,
+          delay_hours: src.delay_hours ?? data.campaign.delay_hours,
+          discount_percent: src.discount_percent ?? data.campaign.discount_percent,
+          coupon_id: src.coupon_id || null,
+          scenario_kind: src.scenario_kind || null,
+          subject_template: src.subject_template ?? data.campaign.subject_template,
+          body_template: src.body_template ?? data.campaign.body_template,
+          parameters: (src.parameters || {}) as Record<string, number | boolean | string>,
         })
       }
       if (couponsRes.ok) {
@@ -212,7 +217,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     const t = setTimeout(async () => {
       setAutoSaveStatus('saving')
       try {
-        const res = await fetch(`/api/admin/campaigns/${kind}`, {
+        const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -270,22 +275,50 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     if (!form) return
     setSaving(true)
     try {
-      const res = await fetch(`/api/admin/campaigns/${kind}`, {
+      const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify(form),
       })
       if (res.ok) {
-        await load(sendsOffset)
-        router.refresh()
-        showToast('Campaign settings saved', 'success')
+        setHasDraft(true)
+        showToast('Draft saved', 'success')
       } else {
         const data = await res.json().catch(() => ({}))
-        showToast(data.error || 'Failed to save', 'error')
+        showToast(data.error || 'Failed to save draft', 'error')
       }
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function publish() {
+    setPublishing(true)
+    try {
+      const res = await fetch(`/api/admin/campaigns/${kind}/publish`, {
+        method: 'POST', credentials: 'include',
+      })
+      if (res.ok) {
+        setHasDraft(false)
+        await load(sendsOffset)
+        router.refresh()
+        showToast('Campaign published', 'success')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        showToast(data.error || 'Failed to publish', 'error')
+      }
+    } finally { setPublishing(false) }
+  }
+
+  async function discardDraft() {
+    const res = await fetch(`/api/admin/campaigns/${kind}/draft`, {
+      method: 'DELETE', credentials: 'include',
+    })
+    if (res.ok) {
+      setHasDraft(false)
+      await load(sendsOffset)
+      showToast('Draft discarded', 'success')
     }
   }
 
@@ -513,6 +546,17 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           </p>
         </div>
 
+        {hasDraft && (
+          <div className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
+            <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">Draft pending — changes not live yet.</p>
+            <button type="button" onClick={discardDraft} className="text-xs text-amber-600 dark:text-amber-400 hover:underline">Discard</button>
+            <button type="button" onClick={publish} disabled={publishing}
+              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-md transition-colors disabled:opacity-50">
+              {publishing ? 'Publishing…' : 'Publish'}
+            </button>
+          </div>
+        )}
+
         <div className="flex items-center gap-2 mt-5 flex-wrap">
           <button
             type="button"
@@ -520,7 +564,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             disabled={saving}
             className="px-4 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
           >
-            {saving ? 'Saving…' : 'Save changes'}
+            {saving ? 'Saving…' : 'Save Draft'}
           </button>
           <input
             type="email"

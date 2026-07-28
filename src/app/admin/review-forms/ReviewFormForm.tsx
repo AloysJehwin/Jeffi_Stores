@@ -32,7 +32,8 @@ const TEMPLATES: { value: TemplateType; label: string; Icon: LucideIcon; descrip
 ]
 
 interface ReviewFormFormProps {
-  submitLabel: string
+  submitLabel?: string
+  isDraft?: boolean
   coupons: Coupon[]
   formId?: string
   backUrl?: string
@@ -62,7 +63,7 @@ function randomId() {
   return Math.random().toString(36).slice(2, 10)
 }
 
-export default function ReviewFormForm({ submitLabel, coupons, formId, backUrl, defaultValues: d = {} }: ReviewFormFormProps) {
+export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, formId, backUrl, defaultValues: d = {} }: ReviewFormFormProps) {
   const router = useRouter()
   const [templateType, setTemplateType] = useState<TemplateType>(d.template_type || 'google_review')
   const [title, setTitle] = useState(d.title || '')
@@ -109,6 +110,25 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, backUrl, 
         description: description.trim() || null,
         is_active: isActive,
         custom_fields: customFields,
+      }
+
+      if (isDraft && formId) {
+        // Determine intent from the clicked button
+        const intent = (document.activeElement as HTMLButtonElement)?.value || 'draft'
+        if (intent === 'publish') {
+          // Save to draft then publish
+          await fetch(`/api/admin/review-forms/${formId}/draft`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+          const res = await fetch(`/api/admin/review-forms/${formId}/draft`, { method: 'POST' })
+          if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed to publish'); return }
+          router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
+          router.refresh()
+          return
+        }
+        // Save draft
+        const res = await fetch(`/api/admin/review-forms/${formId}/draft`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
+        if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed to save draft'); return }
+        router.refresh()
+        return
       }
 
       const url = formId ? `/api/admin/review-forms/${formId}` : '/api/admin/review-forms'
@@ -249,9 +269,20 @@ export default function ReviewFormForm({ submitLabel, coupons, formId, backUrl, 
           <Link href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
             Cancel
           </Link>
-          <button type="submit" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
-            {submitting ? 'Saving…' : submitLabel}
-          </button>
+          {isDraft ? (
+            <>
+              <button type="submit" value="draft" disabled={submitting} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
+                {submitting ? 'Saving…' : 'Save Draft'}
+              </button>
+              <button type="submit" value="publish" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
+                {submitting ? 'Publishing…' : 'Publish'}
+              </button>
+            </>
+          ) : (
+            <button type="submit" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
+              {submitting ? 'Saving…' : (submitLabel || 'Save Changes')}
+            </button>
+          )}
         </div>
       </div>
 

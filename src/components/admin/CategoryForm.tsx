@@ -36,6 +36,7 @@ interface CategoryFormProps {
   action: (formData: FormData) => Promise<void>
   category?: any
   backUrl?: string
+  isDraft?: boolean
 }
 
 function IconPreview({ name, className }: { name: string; className?: string }) {
@@ -92,7 +93,7 @@ function resolveIconByName(name: string): string {
   return 'Package'
 }
 
-export default function CategoryForm({ categories, action, category, backUrl }: CategoryFormProps) {
+export default function CategoryForm({ categories, action, category, backUrl, isDraft = false }: CategoryFormProps) {
   const isSubcat = !!category?.parent_category_id
   const isCurrentlyInherited = isSubcat && category?.return_allowed == null
 
@@ -466,13 +467,23 @@ export default function CategoryForm({ categories, action, category, backUrl }: 
         >
           Cancel
         </Link>
-        <button
-          type="submit"
-          disabled={isSubmitting}
-          className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? 'Saving…' : category ? 'Update Category' : 'Create Category'}
-        </button>
+        {isDraft ? (
+          <>
+            <button type="submit" name="intent" value="draft" disabled={isSubmitting}
+              className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50">
+              {isSubmitting ? 'Saving…' : 'Save Draft'}
+            </button>
+            <button type="submit" name="intent" value="publish" disabled={isSubmitting}
+              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50">
+              {isSubmitting ? 'Publishing…' : 'Publish'}
+            </button>
+          </>
+        ) : (
+          <button type="submit" disabled={isSubmitting}
+            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {isSubmitting ? 'Saving…' : category ? 'Update Category' : 'Create Category'}
+          </button>
+        )}
       </div>
     </form>
   )

@@ -285,7 +285,10 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ destinationPin: pin, cartItems: items, subtotal: cartSubtotal }),
+      // Pass isCod so the quoted rate matches what the order route will charge —
+      // Delhivery bills COD shipments differently from prepaid. Without this the
+      // page shows the prepaid rate while a COD order is charged the COD rate.
+      body: JSON.stringify({ destinationPin: pin, cartItems: items, subtotal: cartSubtotal, isCod: paymentMethod === 'cod' }),
     })
       .then(r => r.json())
       .then(data => {
@@ -296,7 +299,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       })
       .catch(() => setShippingError('Could not fetch rate'))
       .finally(() => setIsLoadingShipping(false))
-  }, [selectedAddress?.postal_code, cartSubtotal])
+  }, [selectedAddress?.postal_code, cartSubtotal, paymentMethod])
 
   const [edd, setEdd] = useState<string | null>(null)
   const [isLoadingEdd, setIsLoadingEdd] = useState(false)

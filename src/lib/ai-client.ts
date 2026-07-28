@@ -1,6 +1,17 @@
 export interface AiChatMessage {
-  role: 'system' | 'user' | 'assistant'
+  role: 'system' | 'user' | 'assistant' | 'tool'
   content: string
+  tool_calls?: Array<{ function: { name: string; arguments: Record<string, unknown> } }>
+  tool_call_id?: string
+}
+
+export interface AiToolDef {
+  type: 'function'
+  function: {
+    name: string
+    description: string
+    parameters: Record<string, unknown>
+  }
 }
 
 export interface AiChatRequest {
@@ -10,10 +21,17 @@ export interface AiChatRequest {
   jsonMode?: boolean
   modelHint?: 'sql' | 'copy' | 'agent' | 'fast'
   forceProvider?: 'openai' | 'ollama'
+  tools?: AiToolDef[]
+}
+
+export interface AiToolCall {
+  name: string
+  arguments: Record<string, unknown>
 }
 
 export interface AiChatResponse {
   content: string
+  toolCalls?: AiToolCall[]
   provider: 'openai' | 'ollama'
   model: string
   latencyMs: number
@@ -32,7 +50,7 @@ const OLLAMA_HEALTH_TIMEOUT_MS = 2000
 // Per-request Ollama timeout. Kept modest so a hung/unreachable Ollama (e.g. the
 // Razer laptop asleep) fails fast and the OpenAI fallback can trigger within the
 // web request budget instead of hanging the whole request. Override via env.
-const OLLAMA_REQUEST_TIMEOUT_MS = Number(process.env.OLLAMA_REQUEST_TIMEOUT_MS) || 20_000
+const OLLAMA_REQUEST_TIMEOUT_MS = Number(process.env.OLLAMA_REQUEST_TIMEOUT_MS) || 60_000
 
 async function isOllamaReachable(): Promise<boolean> {
   try {
@@ -46,7 +64,7 @@ async function isOllamaReachable(): Promise<boolean> {
   }
 }
 
-async function callOllama(req: AiChatRequest): Promise<{ content: string; model: string }> {
+async function callOllama(req: AiChatRequest): Promise<{ content: string; toolCalls?: AiToolCall[]; model: string }> {
   const agentModel = process.env.OLLAMA_AGENT_MODEL || 'glm4'
   const model = req.modelHint === 'sql'
     ? (process.env.OLLAMA_SQL_MODEL || agentModel)
@@ -63,6 +81,7 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
       body: JSON.stringify({
         model,
         messages: req.messages,
+        tools: req.tools,
         stream: false,
         think: false,
         format: req.jsonMode ? 'json' : undefined,
@@ -78,10 +97,23 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
       throw new AiClientError(`Ollama HTTP ${res.status}: ${body}`, 'ollama')
     }
     const data = await res.json()
-    let content = data?.message?.content
+    const msg = data?.message ?? {}
+
+    // Native tool calls (Ollama tools API)
+    if (Array.isArray(msg.tool_calls) && msg.tool_calls.length > 0) {
+      const toolCalls: AiToolCall[] = msg.tool_calls.map((tc: any) => ({
+        name: tc.function?.name ?? '',
+        arguments: typeof tc.function?.arguments === 'string'
+          ? JSON.parse(tc.function.arguments)
+          : (tc.function?.arguments ?? {}),
+      }))
+      return { content: '', toolCalls, model }
+    }
+
+    let content = msg.content
     // Qwen3 extended-thinking mode returns content in a separate 'thinking' field with empty content
-    if ((typeof content !== 'string' || content.trim() === '') && typeof data?.message?.thinking === 'string') {
-      content = data.message.thinking
+    if ((typeof content !== 'string' || content.trim() === '') && typeof msg.thinking === 'string') {
+      content = msg.thinking
     }
     if (typeof content !== 'string') throw new AiClientError('Ollama response missing message.content', 'ollama')
     // Strip <think>...</think> reasoning blocks emitted by Qwen3 and similar models
@@ -92,7 +124,7 @@ async function callOllama(req: AiChatRequest): Promise<{ content: string; model:
   }
 }
 
-async function callOpenAi(req: AiChatRequest): Promise<{ content: string; model: string }> {
+async function callOpenAi(req: AiChatRequest): Promise<{ content: string; toolCalls?: AiToolCall[]; model: string }> {
   const apiKey = process.env.OPENAI_API_KEY
   if (!apiKey) throw new AiClientError('OPENAI_API_KEY not configured', 'openai')
   const openaiModel = process.env.OPENAI_MODEL || 'gpt-4o-mini'
@@ -105,6 +137,8 @@ async function callOpenAi(req: AiChatRequest): Promise<{ content: string; model:
       temperature: req.temperature ?? 0.2,
       max_tokens: req.maxTokens ?? 2000,
       response_format: req.jsonMode ? { type: 'json_object' } : undefined,
+      tools: req.tools,
+      tool_choice: req.tools?.length ? 'auto' : undefined,
     }),
   })
   if (!res.ok) {
@@ -112,7 +146,21 @@ async function callOpenAi(req: AiChatRequest): Promise<{ content: string; model:
     throw new AiClientError(body?.error?.message || `OpenAI HTTP ${res.status}`, 'openai')
   }
   const data = await res.json()
-  const content = data?.choices?.[0]?.message?.content
+  const choice = data?.choices?.[0]
+  const msg = choice?.message
+
+  // Handle tool calls from OpenAI
+  if (Array.isArray(msg?.tool_calls) && msg.tool_calls.length > 0) {
+    const toolCalls: AiToolCall[] = msg.tool_calls.map((tc: any) => ({
+      name: tc.function?.name ?? '',
+      arguments: typeof tc.function?.arguments === 'string'
+        ? JSON.parse(tc.function.arguments)
+        : (tc.function?.arguments ?? {}),
+    }))
+    return { content: '', toolCalls, model: openaiModel }
+  }
+
+  const content = msg?.content
   if (typeof content !== 'string') throw new AiClientError('OpenAI response missing choices[0].message.content', 'openai')
   return { content, model: openaiModel }
 }
@@ -127,20 +175,20 @@ export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
     if (reachable) {
       try {
         const r = await callOllama(req)
-        return { content: r.content, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
+        return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
       } catch (err) {
         if (!fallbackEnabled) throw err
       }
     }
     if (fallbackEnabled) {
       const r = await callOpenAi(req)
-      return { content: r.content, provider: 'openai', model: r.model, latencyMs: Date.now() - start, fallbackUsed: true }
+      return { content: r.content, toolCalls: r.toolCalls, provider: 'openai', model: r.model, latencyMs: Date.now() - start, fallbackUsed: true }
     }
     throw new AiClientError('Ollama unreachable and fallback disabled', 'ollama')
   }
 
   const r = await callOpenAi(req)
-  return { content: r.content, provider: 'openai', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
+  return { content: r.content, toolCalls: r.toolCalls, provider: 'openai', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
 }
 
 export function getAiProvider(): 'openai' | 'ollama' {
