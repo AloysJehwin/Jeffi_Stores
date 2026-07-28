@@ -59,6 +59,13 @@ describe('buildUnsubscribeUrl', () => {
     expect(url).toContain('campaign=winback_90')
     expect(url).toContain('/api/unsubscribe')
   })
+
+  it('works with different campaign kinds', () => {
+    const url1 = buildUnsubscribeUrl('t1', 'abandoned_cart')
+    const url2 = buildUnsubscribeUrl('t2', 'post_purchase')
+    expect(url1).toContain('campaign=abandoned_cart')
+    expect(url2).toContain('campaign=post_purchase')
+  })
 })
 
 describe('buildTrackingPixelUrl', () => {
