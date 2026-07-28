@@ -30,7 +30,7 @@ const nextConfig = {
       '/api/admin/orders/[id]/shipping-label': ['./node_modules/pdfkit/js/data/**/*'],
     },
   },
-  serverExternalPackages: ['pdfkit'],
+  serverExternalPackages: ['pdfkit', 'ioredis'],
   images: {
     remotePatterns: [
       { protocol: 'https', hostname: 'jeffi-stores-bucket.s3.us-east-1.amazonaws.com' },
