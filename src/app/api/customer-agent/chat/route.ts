@@ -53,7 +53,7 @@ function buildToolsDef(): AiToolDef[] {
     function: {
       name: t.name,
       description: t.description,
-      parameters: t.inputSchema,
+      parameters: t.inputSchema as unknown as Record<string, unknown>,
     },
   }))
 }
