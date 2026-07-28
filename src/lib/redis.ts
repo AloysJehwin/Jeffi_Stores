@@ -1,8 +1,6 @@
-import Redis from 'ioredis'
+let redisClient: any | null = null
 
-let redisClient: Redis | null = null
-
-export function getRedisClient(): Redis {
+export function getRedisClient(): any {
   if (redisClient) {
     return redisClient
   }
@@ -14,12 +12,12 @@ export function getRedisClient(): Redis {
   }
 
   try {
+    // ioredis is server-only — require with webpackIgnore prevents client bundling
+    const Redis = require(/* webpackIgnore: true */ 'ioredis') // noqa
     redisClient = new Redis(redisUrl, {
       maxRetriesPerRequest: 3,
-      retryStrategy: (times) => {
-        if (times > 3) {
-          return null
-        }
+      retryStrategy: (times: number) => {
+        if (times > 3) return null
         return Math.min(times * 200, 1000)
       },
     })
@@ -28,13 +26,12 @@ export function getRedisClient(): Redis {
     redisClient.on('connect', () => {})
 
     return redisClient
-  } catch (err) {
-    console.error('[route]', err)
-    return createInMemoryRedis()
+  } catch {
+    return (redisClient = createInMemoryRedis())
   }
 }
 
-function createInMemoryRedis(): Redis {
+function createInMemoryRedis(): any {
   const store = new Map<string, { value: string; expiry?: number }>()
 
   const mockRedis = {
@@ -42,6 +39,9 @@ function createInMemoryRedis(): Redis {
       const entry: { value: string; expiry?: number } = { value }
       if (args[0] === 'EX' && args[1]) {
         entry.expiry = Date.now() + args[1] * 1000
+      }
+      if (args[0] === 'PX' && args[1]) {
+        entry.expiry = Date.now() + args[1]
       }
       store.set(key, entry)
       return 'OK'
@@ -81,12 +81,12 @@ function createInMemoryRedis(): Redis {
     on: () => {},
   } as any
 
-  return mockRedis as Redis
+  return mockRedis
 }
 
-const lazyRedis = new Proxy({} as Redis, {
+const lazyRedis = new Proxy({} as any, {
   get(_target, prop) {
-    return getRedisClient()[prop as keyof Redis]
+    return getRedisClient()[prop]
   },
 })
 
