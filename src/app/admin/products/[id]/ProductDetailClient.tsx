@@ -3,10 +3,12 @@
 import React, { useEffect, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
-import { Star, Sparkles, CheckCircle, XCircle, Loader2, X } from 'lucide-react'
+import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
+import { Star, Sparkles, CheckCircle, XCircle, Loader2, X, ChevronDown } from 'lucide-react'
 import HoverCard from '@/components/ui/HoverCard'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
+import UnitsManager from '@/components/admin/UnitsManager'
 import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
@@ -235,6 +237,27 @@ function Field({ label, value, mono }: { label: string; value?: any; mono?: bool
   )
 }
 
+function CollapsibleCard({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors"
+      >
+        <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">{title}</p>
+        <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-1 space-y-2.5">
+          {children}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type ShelfRow = { location_display_code: string; quantity: number; variant_id: string | null; sub_variant_id: string | null }
 
 function ShelfBadges({ rows }: { rows: ShelfRow[] }) {
@@ -258,6 +281,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
   const [selectedImage, setSelectedImage] = useState(0)
   const [shelfStock, setShelfStock] = useState<ShelfRow[]>([])
   const [aiOpen, setAiOpen] = useState(false)
+  const [showDraftModal, setShowDraftModal] = useState(false)
 
   const loadProduct = useCallback(() => {
     setLoading(true)
@@ -372,9 +396,28 @@ export default function ProductDetailClient({ id }: { id: string }) {
           <Link href={ap(`/admin/products/${p.id}/analytics`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Analytics
           </Link>
-          <Link href={ap(`/admin/products/edit/${p.id}`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
-            Edit
-          </Link>
+          {p.is_active ? (
+            <button
+              onClick={() => setShowDraftModal(true)}
+              className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            >
+              Edit
+            </button>
+          ) : (
+            <Link href={ap(`/admin/products/edit/${p.id}`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
+              Edit
+            </Link>
+          )}
+          {showDraftModal && (
+            <DraftConfirmModal
+              productId={p.id}
+              productName={p.name}
+              productSku={p.sku || null}
+              existingDraftId={null}
+              backUrl={`/admin/products/${p.id}`}
+              onClose={() => setShowDraftModal(false)}
+            />
+          )}
         </div>
       </div>
 
@@ -405,12 +448,6 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           )}
 
-          {!p.has_variants && shelfStock.length > 0 && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Shelf Locations</p>
-              <ShelfBadges rows={shelfStock} />
-            </div>
-          )}
         </div>
 
         <div className="lg:col-span-2 space-y-4">
@@ -430,25 +467,31 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Details</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+            {/* — Details — */}
+            <CollapsibleCard title="Details">
               <Field label="Category" value={p.categories?.name} />
               <Field label="Brand" value={p.brands?.name} />
-              <Field label="GST" value={p.gst_percentage != null ? `${p.gst_percentage}%` : null} />
+              <Field label="GST" value={p.gst_percentage != null ? `${Number(p.gst_percentage).toFixed(2)}%` : null} />
               <Field label="HSN Code" value={p.hsn_code} mono />
               <Field label="MPN" value={p.mpn} mono />
               <Field label="GTIN" value={p.gtin} mono />
+              <Field label="Barcode" value={p.barcode} mono />
+              <Field label="ISBN" value={p.isbn} mono />
+              <Field label="ASIN" value={p.asin} mono />
+              <Field label="Brand Part No." value={p.brand_part_number} mono />
+              <Field label="Variant Type" value={p.variant_type} />
+              <Field label="Sub-Variant Type" value={p.sub_variant_type} />
+              <Field label="Condition" value={p.condition} />
+              <Field label="Grade" value={p.grade} />
               <Field label="Slug" value={p.slug} mono />
-            </div>
+            </CollapsibleCard>
 
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4 space-y-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Stock & Shipping</p>
+            {/* — Stock & Shipping — */}
+            <CollapsibleCard title="Stock & Shipping">
               <div className="flex justify-between text-sm">
                 <span className="text-foreground-secondary">Inventory Stock</span>
-                <span className={`font-semibold ${stockColor}`}>
-                  {inventoryQty}{p.has_variants ? ' (variants)' : ''}
-                </span>
+                <span className={`font-semibold ${stockColor}`}>{inventoryQty}{p.has_variants ? ' (variants)' : ''}</span>
               </div>
               {!p.has_variants && (
                 <div className="flex justify-between text-sm">
@@ -456,8 +499,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   <span className="font-semibold text-foreground">{listedQty}</span>
                 </div>
               )}
+              <Field label="Stock Status" value={p.stock_status} />
               <Field label="Weight" value={p.weight ? `${p.weight} kg` : null} />
               <Field label="Weight (g)" value={p.weight_grams} />
+              <Field label="Net Weight (g)" value={p.net_weight_grams} />
+              <Field label="Volume (ml)" value={p.volume_ml} />
               <Field label="Dimensions" value={p.dimensions} />
               {(p.length_cm || p.breadth_cm || p.height_cm) && (
                 <div className="flex justify-between text-sm">
@@ -466,8 +512,107 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 </div>
               )}
               <Field label="Package Type" value={p.package_type} />
-            </div>
+              <Field label="Handling Days" value={p.handling_days} />
+              <Field label="Extra Delivery Days" value={p.extra_delivery_days} />
+              <Field label="Shipping Class" value={p.shipping_class} />
+              {p.is_oversized && <Field label="Oversized" value="Yes" />}
+              <Field label="Country of Origin" value={p.country_of_origin} />
+            </CollapsibleCard>
+
+            {/* — Pricing & Finance — */}
+            <CollapsibleCard title="Pricing & Finance">
+              <Field label="MRP (incl. GST)" value={p.mrp != null ? formatINR(Number(p.mrp)) : null} />
+              <Field label="MRP (ex-GST)" value={p.mrp_ex_gst != null ? formatINR(Number(p.mrp_ex_gst)) : null} />
+              <Field label="Selling Price" value={p.base_price != null ? formatINR(Number(p.base_price)) : null} />
+              <Field label="Price (ex-GST)" value={p.price_ex_gst != null ? formatINR(Number(p.price_ex_gst)) : null} />
+              <Field label="Cost Price" value={p.cost_price != null ? formatINR(Number(p.cost_price)) : null} />
+              <Field label="Discount %" value={p.discount_pct != null ? `${p.discount_pct}%` : null} />
+              <Field label="Tax Class" value={p.tax_class} />
+              <Field label="Inclusive Tax" value={p.inclusive_tax ? 'Yes' : 'No'} />
+              <Field label="COD Allowed" value={p.is_cod_allowed ? 'Yes' : 'No'} />
+              {p.is_subscription && <>
+                <Field label="Subscription" value="Yes" />
+                <Field label="Interval" value={p.subscription_interval} />
+                <Field label="Sub. Price" value={p.subscription_price != null ? formatINR(Number(p.subscription_price)) : null} />
+              </>}
+            </CollapsibleCard>
+
+            {/* — Physical & Compliance — */}
+            <CollapsibleCard title="Physical & Compliance">
+              {!p.material && !p.finish && !p.size && !p.color && !p.shelf_life_days &&
+               !(Array.isArray(p.certifications) && p.certifications.length) &&
+               !p.compliance_standard && !p.safety_rating && !p.warranty_months &&
+               !p.fragile && !p.hazardous && !p.flammable && !p.perishable && !p.serialized ? (
+                <p className="text-xs text-foreground-muted italic">No physical or compliance data configured.</p>
+              ) : (<>
+                <Field label="Material" value={p.material} />
+                <Field label="Finish" value={p.finish} />
+                <Field label="Size" value={p.size} />
+                <Field label="Color" value={p.color} />
+                <Field label="Color Hex" value={p.color_hex} mono />
+                <Field label="Shelf Life (days)" value={p.shelf_life_days} />
+                <Field label="Certifications" value={Array.isArray(p.certifications) && p.certifications.length ? p.certifications.join(', ') : null} />
+                <Field label="Compliance Standard" value={p.compliance_standard} />
+                <Field label="Safety Rating" value={p.safety_rating} />
+                <Field label="Warranty" value={p.warranty_months ? `${p.warranty_months} months${p.warranty_type ? ` (${p.warranty_type})` : ''}` : null} />
+                <div className="flex flex-wrap gap-2 pt-1">
+                  {p.fragile && <span className="text-[10px] px-2 py-0.5 rounded-full bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300">Fragile</span>}
+                  {p.hazardous && <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">Hazardous</span>}
+                  {p.flammable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300">Flammable</span>}
+                  {p.perishable && <span className="text-[10px] px-2 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Perishable</span>}
+                  {p.serialized && <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300">Serialized</span>}
+                </div>
+              </>)}
+            </CollapsibleCard>
+
+            {/* — Lifecycle & Merchandising — */}
+            <CollapsibleCard title="Lifecycle & Merchandising">
+              <Field label="Launch Date" value={p.launch_date ? new Date(p.launch_date).toLocaleDateString('en-IN') : null} />
+              <Field label="Discontinue Date" value={p.discontinue_date ? new Date(p.discontinue_date).toLocaleDateString('en-IN') : null} />
+              <Field label="Sort Order" value={p.sort_order} />
+              <Field label="Views" value={p.views_count} />
+              <Field label="Sales" value={p.sales_count} />
+              {p.is_bundle && <Field label="Bundle" value="Yes" />}
+              {p.is_digital && <>
+                <Field label="Digital Product" value="Yes" />
+                <Field label="Download URL" value={p.download_url} mono />
+                <Field label="License Type" value={p.license_type} />
+                <Field label="File Format" value={p.file_format} />
+                <Field label="Platform Compat." value={Array.isArray(p.platform_compatibility) && p.platform_compatibility.length ? p.platform_compatibility.join(', ') : null} />
+              </>}
+            </CollapsibleCard>
+
+            {/* — SEO & Audience — */}
+            <CollapsibleCard title="SEO & Audience">
+              <Field label="Meta Title" value={p.meta_title} />
+              <Field label="Meta Description" value={p.meta_description} />
+              <Field label="Searchable" value={p.is_searchable ? 'Yes' : 'No'} />
+              <Field label="Target Gender" value={p.target_gender} />
+              <Field label="Target Audience" value={Array.isArray(p.target_audience) && p.target_audience.length ? p.target_audience.join(', ') : null} />
+              <Field label="Age Range" value={(p.age_min != null || p.age_max != null) ? `${p.age_min ?? '—'} – ${p.age_max ?? '—'}` : null} />
+            </CollapsibleCard>
           </div>
+
+          {/* — Specifications — */}
+          {p.specifications && Object.keys(p.specifications).length > 0 && (
+            <CollapsibleCard title="Specifications">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1.5">
+                {Object.entries(p.specifications).map(([k, v]) => (
+                  <div key={k} className="flex justify-between text-sm border-b border-border-default/40 pb-1">
+                    <span className="text-foreground-secondary">{k}</span>
+                    <span className="text-foreground font-mono text-xs">{String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            </CollapsibleCard>
+          )}
+
+          {/* — Short Description — */}
+          {p.short_description && (
+            <CollapsibleCard title="Short Description">
+              <p className="text-sm text-foreground leading-relaxed">{p.short_description}</p>
+            </CollapsibleCard>
+          )}
 
           {p.description && (
             <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
@@ -547,6 +692,18 @@ export default function ProductDetailClient({ id }: { id: string }) {
               </div>
             </div>
           )}
+
+          {/* — Selling Units & Shelf Locations — */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+            <CollapsibleCard title="Selling Units">
+              <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
+            </CollapsibleCard>
+            {shelfStock.length > 0 && (
+              <CollapsibleCard title="Shelf Locations">
+                <ShelfBadges rows={shelfStock} />
+              </CollapsibleCard>
+            )}
+          </div>
 
           <div className="flex gap-4 text-xs text-foreground-muted">
             <span>Created {formatDate(p.created_at)}</span>

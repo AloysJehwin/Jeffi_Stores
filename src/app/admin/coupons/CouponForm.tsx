@@ -11,7 +11,8 @@ import CouponUserSelector from '@/components/admin/CouponUserSelector'
 
 interface CouponFormProps {
   action: (formData: FormData) => Promise<void>
-  submitLabel: string
+  submitLabel?: string
+  isDraft?: boolean
   showUserSelector?: boolean
   backUrl?: string
   defaultValues?: {
@@ -37,7 +38,7 @@ const DISCOUNT_TYPE_OPTIONS = [
 const inputClass = 'w-full px-4 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent'
 const labelClass = 'block text-sm font-medium text-foreground-secondary mb-1.5'
 
-export default function CouponForm({ action, submitLabel, showUserSelector = false, backUrl, defaultValues: d = {} }: CouponFormProps) {
+export default function CouponForm({ action, submitLabel, isDraft = false, showUserSelector = false, backUrl, defaultValues: d = {} }: CouponFormProps) {
   const [isActive, setIsActive] = useState<boolean>(d.is_active !== false)
   const [validFrom, setValidFrom] = useState(d.valid_from ?? '')
   const [validUntil, setValidUntil] = useState(d.valid_until ?? '')
@@ -200,9 +201,20 @@ export default function CouponForm({ action, submitLabel, showUserSelector = fal
         <Link href={ap(backUrl ?? '/admin/coupons')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
           Cancel
         </Link>
-        <button type="submit" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">
-          {submitLabel}
-        </button>
+        {isDraft ? (
+          <>
+            <button type="submit" name="intent" value="draft" className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm">
+              Save Draft
+            </button>
+            <button type="submit" name="intent" value="publish" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">
+              Publish
+            </button>
+          </>
+        ) : (
+          <button type="submit" className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm">
+            {submitLabel || 'Save Changes'}
+          </button>
+        )}
       </div>
     </form>
   )

@@ -1,17 +1,22 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { cookies } from 'next/headers'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { verifyToken } from '@/lib/jwt'
 import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
+import { queryOne, queryMany } from '@/lib/db'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
 import ProductImage from '@/components/admin/ProductImage'
 import AdminFilters from '@/components/admin/AdminFilters'
+import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
 import Pagination from '@/components/admin/Pagination'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
 import ProductsTableClient from '@/components/admin/ProductsTableClient'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
+import DraftRowActions from '@/components/admin/DraftRowActions'
 import MerchantSyncStatus from '@/components/admin/MerchantSyncStatus'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
@@ -23,7 +28,7 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function ProductsListContent({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
+async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { resolvedSearchParams: SP; isSuperAdmin: boolean }) {
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
@@ -36,6 +41,23 @@ async function ProductsListContent({ resolvedSearchParams }: { resolvedSearchPar
       is_active: resolvedSearchParams.is_active,
       stock: resolvedSearchParams.stock,
       search: resolvedSearchParams.search,
+      is_featured: resolvedSearchParams.is_featured,
+      has_variants: resolvedSearchParams.has_variants,
+      price_min: resolvedSearchParams.price_min,
+      price_max: resolvedSearchParams.price_max,
+      gst_percentage: resolvedSearchParams.gst_percentage,
+      condition: resolvedSearchParams.condition,
+      grade: resolvedSearchParams.grade,
+      is_digital: resolvedSearchParams.is_digital,
+      is_bundle: resolvedSearchParams.is_bundle,
+      is_cod_allowed: resolvedSearchParams.is_cod_allowed,
+      shipping_class: resolvedSearchParams.shipping_class,
+      is_oversized: resolvedSearchParams.is_oversized,
+      country_of_origin: resolvedSearchParams.country_of_origin,
+      fragile: resolvedSearchParams.fragile,
+      hazardous: resolvedSearchParams.hazardous,
+      perishable: resolvedSearchParams.perishable,
+      serialized: resolvedSearchParams.serialized,
       page,
       limit: PAGE_SIZE,
       sort,
@@ -192,7 +214,7 @@ async function ProductsListContent({ resolvedSearchParams }: { resolvedSearchPar
                 <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Actions</th>
               </tr>
             </thead>
-            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} />
+            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} isSuperAdmin={isSuperAdmin} />
           </table>
         </div>
       </div>
@@ -205,15 +227,24 @@ async function ProductsListContent({ resolvedSearchParams }: { resolvedSearchPar
 
 // Runs ONLY the aggregate stats query (all products) and renders the stat cards.
 async function ProductsStats() {
-  const [allProductsForStats, categories] = await Promise.all([
+  const host = await getHost()
+  const [allProductsForStats, categories, pendingDrafts] = await Promise.all([
     getFilteredProducts({}),
     getAllCategories(),
+    queryMany<{ product_id: string; name: string; sku: string; updated_at: string }>(
+      `SELECT pd.product_id, p.name, p.sku, pd.updated_at
+       FROM product_drafts pd
+       JOIN products p ON p.id = pd.product_id
+       ORDER BY pd.updated_at DESC
+       LIMIT 10`
+    ),
   ])
 
   const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
   const activeCount = allProductsForStats.products?.filter((p: any) => p.is_active).length || 0
   const totalCount = allProductsForStats.total
   const categoryCount = categories?.length || 0
+  const pendingDraftsCount = pendingDrafts.length
 
   return (
     <div className="animate-fade-in">
@@ -238,6 +269,30 @@ async function ProductsStats() {
           <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{activeCount}</p>
         </div>
       </div>
+      {pendingDraftsCount > 0 && (
+        <div className="mb-6">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Pending Drafts ({pendingDraftsCount})
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
+            </div>
+            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+              {pendingDrafts.map((d) => (
+                <DraftRowActions
+                  key={d.product_id}
+                  productId={d.product_id}
+                  name={d.name}
+                  sku={d.sku}
+                  updatedAt={d.updated_at}
+                  editHref={ap(`/admin/products/edit/${d.product_id}`, host)}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -245,9 +300,17 @@ async function ProductsStats() {
 export default async function ProductsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const host = await getHost()
 
-  // Only the fast filter-option lookups are awaited in the shell so the header +
-  // AdminFilters paint immediately. The heavy all-products aggregate lives behind
-  // Suspense in ProductsStats; featuredCount is computed inside the list section.
+  // Read admin role for super_admin-only features (e.g. delete product)
+  const cookieStore = await cookies()
+  const token = cookieStore.get('admin_token')
+  let isSuperAdmin = false
+  if (token) {
+    try {
+      const payload = await verifyToken(token.value) as any
+      isSuperAdmin = payload?.role === 'super_admin'
+    } catch {}
+  }
+
   const [categories, brands] = await Promise.all([
     getAllCategories(),
     getAllBrands(),
@@ -294,9 +357,27 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         searchPlaceholder="Search by name or SKU..."
         searchParam="search"
         suggestType="products"
+        advancedPanel={<AdvancedFilterPanel fields={[
+          { name: 'is_featured', label: 'Featured', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Featured' }, { value: 'false', label: 'Not Featured' }] },
+          { name: 'has_variants', label: 'Has Variants', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'is_digital', label: 'Digital Product', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'is_bundle', label: 'Bundle', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'condition', label: 'Condition', type: 'select', section: 'Product Type', options: [{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }, { value: 'refurbished', label: 'Refurbished' }] },
+          { name: ['price_min', 'price_max'], label: 'Price Range', type: 'range', section: 'Pricing & Tax', unit: '₹' },
+          { name: 'gst_percentage', label: 'GST %', type: 'select', section: 'Pricing & Tax', options: [{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }] },
+          { name: 'is_cod_allowed', label: 'COD Allowed', type: 'toggle', section: 'Pricing & Tax', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'shipping_class', label: 'Shipping Class', type: 'select', section: 'Logistics', options: [{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }] },
+          { name: 'is_oversized', label: 'Oversized', type: 'toggle', section: 'Logistics', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
+          { name: 'country_of_origin', label: 'Country of Origin', type: 'text', section: 'Logistics', placeholder: 'e.g. IN' },
+          { name: 'fragile', label: 'Fragile', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+          { name: 'hazardous', label: 'Hazardous', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+          { name: 'perishable', label: 'Perishable', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+          { name: 'serialized', label: 'Serialized', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
+          { name: 'grade', label: 'Grade', type: 'select', section: 'Other', options: [{ value: 'A', label: 'Grade A' }, { value: 'B', label: 'Grade B' }, { value: 'C', label: 'Grade C' }] },
+        ]} />}
       />
 
-      <ProductsListSection searchParams={searchParams} />
+      <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} />
     </div>
   )
 }
@@ -304,12 +385,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 // Resolves searchParams (no DB — near-instant) then keys the table Suspense
 // on the query string so filter/pagination changes re-trigger the shimmer
 // while the stats + filters above stay mounted.
-async function ProductsListSection({ searchParams }: { searchParams: Promise<SP> }) {
+async function ProductsListSection({ searchParams, isSuperAdmin }: { searchParams: Promise<SP>; isSuperAdmin: boolean }) {
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
-      <ProductsListContent resolvedSearchParams={resolvedSearchParams} />
+      <ProductsListContent resolvedSearchParams={resolvedSearchParams} isSuperAdmin={isSuperAdmin} />
     </Suspense>
   )
 }

@@ -50,8 +50,9 @@ export async function sendCampaignEmail(params: {
   user: UserContext
   referenceId: string | null
   vars: Record<string, string | number>
+  metadata?: Record<string, unknown>
 }): Promise<{ ok: boolean; sentId?: string; reason?: string }> {
-  const { campaign, user, referenceId, vars } = params
+  const { campaign, user, referenceId, vars, metadata } = params
 
   const eligibility = await canSendMarketing(user.id, campaign.kind as CampaignKind)
   if (!eligibility.ok) return { ok: false, reason: eligibility.reason }
@@ -64,6 +65,7 @@ export async function sendCampaignEmail(params: {
     campaignKind: campaign.kind as CampaignKind,
     userId: user.id,
     referenceId,
+    metadata,
   })
   if (!sentId) return { ok: false, reason: 'record_failed' }
 

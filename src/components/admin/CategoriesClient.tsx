@@ -335,6 +335,7 @@ function SortableRow({
           <button
             {...attributes}
             {...listeners}
+            suppressHydrationWarning
             className="cursor-grab active:cursor-grabbing text-foreground-muted hover:text-foreground p-1 rounded touch-none"
             title="Drag to reorder"
             onClick={e => e.stopPropagation()}

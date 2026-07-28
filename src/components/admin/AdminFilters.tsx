@@ -23,9 +23,10 @@ interface AdminFiltersProps {
   searchPlaceholder?: string
   searchParam?: string
   suggestType?: string
+  advancedPanel?: React.ReactNode
 }
 
-export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search', suggestType }: AdminFiltersProps) {
+export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search', suggestType, advancedPanel }: AdminFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -178,6 +179,11 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
             >
               Clear Filters
             </button>
+          )}
+          {advancedPanel && (
+            <div className="sm:self-end pb-0">
+              {advancedPanel}
+            </div>
           )}
         </div>
       </div>

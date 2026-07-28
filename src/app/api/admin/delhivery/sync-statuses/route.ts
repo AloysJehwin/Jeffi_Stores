@@ -127,6 +127,16 @@ export async function POST(request: NextRequest) {
           ).catch(() => {})
         }
 
+        // Always update EDD when Delhivery provides one — independent of status
+        // transitions. COALESCE is intentionally NOT used here; Delhivery revises
+        // EDD as the shipment moves, and we want the latest estimate reflected.
+        if (delhiveryEdd) {
+          await query(
+            `UPDATE orders SET estimated_delivery_date = $2::date, updated_at = NOW() WHERE id = $1`,
+            [order.id, delhiveryEdd]
+          ).catch(() => {})
+        }
+
         if (!syncRule) continue
         if (syncRule.onlyIfCurrent && !syncRule.onlyIfCurrent.includes(order.status)) continue
 
@@ -137,10 +147,6 @@ export async function POST(request: NextRequest) {
             ? `shipped_at = LEAST(COALESCE(shipped_at, $2::timestamptz), $2::timestamptz)`
             : `shipped_at = COALESCE(shipped_at, NOW())`
           )
-          // Write Delhivery EDD when first shipping — only if not already set
-          if (delhiveryEdd) {
-            setClauses.push(`estimated_delivery_date = COALESCE(estimated_delivery_date, '${delhiveryEdd}'::date)`)
-          }
         }
         if (syncRule.setDeliveredAt) {
           setClauses.push(statusDateTime

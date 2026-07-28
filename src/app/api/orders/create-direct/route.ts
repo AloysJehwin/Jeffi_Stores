@@ -28,6 +28,10 @@ const CreateDirectOrderSchema = z.object({
   notes: z.string().nullish(),
   couponId: z.string().nullish(),
   addressId: z.string().nullish(),
+  // Shipping the client quoted + displayed. The server re-quotes authoritatively,
+  // but falls back to this when the live quote is unavailable so the charged total
+  // never silently diverges from what the customer saw.
+  shippingAmount: z.number().nonnegative().nullish(),
 })
 
 
@@ -51,6 +55,7 @@ export async function POST(request: NextRequest) {
     const parsed = parseBody(CreateDirectOrderSchema, body)
     if (!parsed.ok) return parsed.response
     const { shippingAddress, notes, paymentMethod, couponId, addressId } = parsed.data
+    const clientShipping = parsed.data.shippingAmount ?? null
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = paymentMethod === 'cod'
 
@@ -152,7 +157,11 @@ export async function POST(request: NextRequest) {
     }
 
     const destinationPin = String(shippingAddress?.postalCode || shippingAddress?.postal_code || '')
-    const appliedShipping = destinationPin
+    // Authoritative server re-quote (with the correct COD flag). If the live quote
+    // is unavailable (Delhivery timeout/error → 0) but the client displayed a
+    // shipping amount, fall back to that so the charged total matches the shown
+    // total instead of silently dropping shipping to 0.
+    const quoted = destinationPin
       ? await quoteShipping({
           destinationPin,
           items: [{ productId: resolved.item.productId, variantId: resolved.item.variantId, quantity: resolved.item.qty }],
@@ -160,6 +169,7 @@ export async function POST(request: NextRequest) {
           isCod,
         })
       : 0
+    const appliedShipping = quoted > 0 ? quoted : (clientShipping != null ? round2(clientShipping) : 0)
 
     const gstRate = parseFloat(product.gst_percentage || '0')
 

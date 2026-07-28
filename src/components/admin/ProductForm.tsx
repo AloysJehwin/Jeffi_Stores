@@ -68,6 +68,7 @@ interface ProductFormProps {
   backUrl?: string
   perishableBatchTotal?: number
   serializedStockTotal?: number
+  isDraft?: boolean
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
@@ -199,7 +200,7 @@ function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: (
   )
 }
 
-export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0, serializedStockTotal = 0 }: ProductFormProps) {
+export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0, serializedStockTotal = 0, isDraft = false }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -386,6 +387,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [hasDraft, setHasDraft] = useState(false)
   const formRef = useRef<HTMLFormElement>(null)
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [serverSaveStatus, setServerSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const [variants, setVariants] = useState<VariantRow[]>(() => {
     if (product?.product_variants && product.product_variants.length > 0) {
@@ -410,6 +412,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         const mrpExStr = mrpEx != null ? String(mrpEx) : ''
         return ({
         id: v.id,
+        sku: v.sku || '',
         variant_name: v.variant_name,
         price,
         mrp: mrpInclStr,
@@ -430,9 +433,13 @@ export default function ProductForm({ categories, brands, action, product, produ
         breadth_cm: v.breadth_cm != null ? String(v.breadth_cm) : '',
         height_cm: v.height_cm != null ? String(v.height_cm) : '',
         sub_variant_type: v.sub_variant_type || '',
-        sub_variant_type_on: !!v.sub_variant_type || (Array.isArray(v.sub_variants) && v.sub_variants.length > 0),
+        sub_variant_type_on: v.sub_variant_type_on != null
+          ? !!v.sub_variant_type_on
+          : (!!v.sub_variant_type || (Array.isArray(v.sub_variants) && v.sub_variants.length > 0)),
         variant_type: v.variant_type || '',
-        use_own_images: !!(v.variant_images && v.variant_images.length > 0),
+        use_own_images: v.use_own_images != null
+          ? !!v.use_own_images
+          : !!(v.variant_images && v.variant_images.length > 0),
       })
       })
     }
@@ -517,6 +524,154 @@ export default function ProductForm({ categories, brands, action, product, produ
     basePrice, mrp, mrpExGst, salePrice, costPrice, discountPct,
     topPriceLockSide, topMrpLockSide,
     gstRate, isActive, draftKey,
+  ])
+
+  // Server autosave — fires 5s after last change, only in draft mode
+  const serverSaveInFlight = useRef(false)
+  const serverSavePending = useRef(false)
+  const variantsRef = useRef(variants)
+  variantsRef.current = variants  // always sync — no useEffect delay
+
+  async function serverSaveNow() {
+    if (!isDraft || !productId) return
+    const form = formRef.current
+    if (!form) return
+    if (serverSaveInFlight.current) { serverSavePending.current = true; return }
+    serverSaveInFlight.current = true
+    setServerSaveStatus('saving')
+    const formData = new FormData(form)
+    const fields: Record<string, unknown> = {}
+    for (const [k, v] of formData.entries()) {
+      if (typeof v === 'string') fields[k] = v
+    }
+    fields.has_variants = hasVariants
+    fields.base_price = basePrice
+    fields.mrp = mrp
+    fields.mrp_ex_gst = mrpExGst
+    fields.price_ex_gst = salePrice
+    fields.stock_status = hasVariants ? 'In Stock' : (fields.stock_status as string || 'In Stock')
+    fields.slug = productName ? productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : null
+    fields.cost_price = costPrice
+    fields.discount_pct = discountPct
+    fields.is_active = isActive
+    fields.is_featured = isFeatured
+    fields.fragile = fragile
+    fields.hazardous = hazardous
+    fields.flammable = flammable
+    fields.perishable = perishable
+    fields.serialized = serialized
+    fields.is_cod_allowed = isCodAllowed
+    fields.is_searchable = isSearchable
+    fields.is_oversized = isOversized
+    fields.is_digital = isDigital
+    fields.is_subscription = isSubscription
+    fields.is_bundle = isBundle
+    fields.inclusive_tax = inclusiveTax
+    fields.name = productName
+    fields.description = description
+    fields.brand_id = brandId || null
+    fields.category_id = categoryId || null
+    fields.sku = sku || null
+    fields.gst_percentage = gstRate
+    fields.package_type = productPackageType
+    fields.certifications = certifications
+    fields.compliance_standard = complianceStandard
+    fields.safety_rating = safetyRating
+    fields.warranty_months = warrantyMonths
+    fields.warranty_type = warrantyType
+    fields.condition = condition
+    fields.launch_date = launchDate || null
+    fields.discontinue_date = discontinueDate || null
+    fields.sort_order = sortOrderVal
+    fields.handling_days = handlingDays
+    fields.shipping_class = shippingClass
+    fields.download_url = downloadUrl || null
+    fields.license_type = licenseType || null
+    fields.file_format = fileFormat || null
+    fields.platform_compatibility = platformCompatibility
+    fields.subscription_interval = subscriptionInterval || null
+    fields.subscription_price = subscriptionPrice || null
+    fields.meta_title = metaTitle || null
+    fields.meta_description = metaDescription || null
+    fields.tax_class = taxClass
+    fields.age_min = ageMin || null
+    fields.age_max = ageMax || null
+    fields.target_gender = targetGender || null
+    fields.target_audience = targetAudience
+    fields.barcode = barcode || null
+    fields.isbn = isbn || null
+    fields.asin = asin || null
+    fields.brand_part_number = brandPartNumber || null
+    fields.country_of_origin = countryOfOrigin || null
+    fields.shelf_life_days = shelfLifeDays || null
+    fields.color = color || null
+    fields.color_hex = colorHex || null
+    fields.volume_ml = volumeMl || null
+    fields.net_weight_grams = netWeightGrams || null
+    fields.grade = grade || null
+    try {
+      const r = await fetch(`/api/admin/products/${productId}/draft`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields,
+          imageOrder,
+          existingImagesToKeep,
+          galleryImageIds,
+          variants: variantsRef.current.filter((v: any) => !v._isDeleted).map((v: any) => {
+            const clean: any = {}
+            for (const [k, val] of Object.entries(v)) {
+              clean[k] = (typeof val === 'string' && val === 'NaN') ? '' : val
+            }
+            return clean
+          }),
+        }),
+      })
+      setServerSaveStatus(r.ok ? 'saved' : 'error')
+    } catch {
+      setServerSaveStatus('error')
+    }
+    serverSaveInFlight.current = false
+    if (serverSavePending.current) {
+      serverSavePending.current = false
+      serverSaveNow()
+    } else {
+      setTimeout(() => setServerSaveStatus('idle'), 2000)
+    }
+  }
+
+  useEffect(() => {
+    if (!isDraft || !productId) return
+    void serverSaveNow()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    isDraft, productId,
+    // product identity & pricing
+    productName, description, brandId, categoryId, sku,
+    basePrice, mrp, mrpExGst, salePrice, costPrice, discountPct, gstRate,
+    hasVariants, isActive, isFeatured,
+    // physical
+    productPackageType, fragile, hazardous, flammable, perishable, serialized,
+    certifications, complianceStandard, safetyRating, warrantyMonths, warrantyType,
+    color, colorHex, volumeMl, netWeightGrams, grade,
+    // condition & lifecycle
+    condition, isCodAllowed, launchDate, discontinueDate, sortOrderVal,
+    // shipping
+    handlingDays, shippingClass, isOversized, extraDeliveryDays,
+    // digital
+    isDigital, downloadUrl, licenseType, fileFormat, platformCompatibility,
+    // subscription & bundle
+    isSubscription, subscriptionInterval, subscriptionPrice, isBundle,
+    // seo & tax
+    metaTitle, metaDescription, isSearchable, taxClass, inclusiveTax,
+    // audience
+    ageMin, ageMax, targetGender, targetAudience,
+    // identification
+    barcode, isbn, asin, brandPartNumber, countryOfOrigin, shelfLifeDays,
+    // images
+    imageOrder, existingImagesToKeep, galleryImageIds,
+    // variants
+    variants, groups,
   ])
 
   const wasPerishableOff = !(product?.perishable)
@@ -662,16 +817,17 @@ export default function ProductForm({ categories, brands, action, product, produ
           setVariantImageError(err.error || `Could not load images (${res.status})`)
         }
       }
-      if (!subVariantsMap[variantId]) {
-        const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`)
-        if (res.ok) {
-          const data = await res.json()
-          const loaded = data.sub_variants || []
-          setSubVariantsMap(m => ({ ...m, [variantId]: loaded }))
-        } else {
-          setSubVariantsMap(m => ({ ...m, [variantId]: [] }))
-        }
-      }
+    const svEndpoint = isDraft && productId
+      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
+    const res = await fetch(svEndpoint, { credentials: 'include' })
+    if (res.ok) {
+      const data = await res.json()
+      const loaded = data.sub_variants || []
+      setSubVariantsMap(m => ({ ...m, [variantId]: loaded }))
+    } else {
+      setSubVariantsMap(m => ({ ...m, [variantId]: [] }))
+    }
     }
   }
 
@@ -820,8 +976,12 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
     const draft = subVariantDrafts[variantId]
     if (!draft?.name) return
-    const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
+    const svUrl = isDraft
+      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
+    const res = await fetch(svUrl, {
       method: 'POST',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         sub_variant_name: draft.name,
@@ -844,11 +1004,16 @@ export default function ProductForm({ categories, brands, action, product, produ
   async function deleteSubVariant(variantId: string, subId: string) {
     if (!productId) return
     if (variantId.startsWith('temp-')) return
-    await fetch(`/api/admin/products/${productId}/variants/${variantId}/sub-variants`, {
+    const svUrl = isDraft
+      ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantId}`
+      : `/api/admin/products/${productId}/variants/${variantId}/sub-variants`
+    const res = await fetch(svUrl, {
       method: 'DELETE',
+      credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id: subId }),
     })
+    if (!res.ok) { setVariantImageError(`Failed to delete sub-variant: ${(await res.json().catch(() => ({}))).error || res.status}`); return }
     setSubVariantsMap(m => ({ ...m, [variantId]: (m[variantId] || []).filter((sv: any) => sv.id !== subId) }))
   }
 
@@ -871,6 +1036,13 @@ export default function ProductForm({ categories, brands, action, product, produ
 
     try {
       const formData = new FormData(e.currentTarget)
+
+      // Capture the submitter button's intent — new FormData(form) does not
+      // include the clicked submit button's name/value automatically.
+      const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+      if (submitter?.name === 'intent' && submitter.value) {
+        formData.set('intent', submitter.value)
+      }
 
       if (pendingPopupVariantIdRef.current) {
         formData.set('popup_variant_id', pendingPopupVariantIdRef.current)
@@ -1074,7 +1246,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
         </div>
       )}
-      <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+      <form ref={formRef} onSubmit={handleSubmit} onChange={isDraft ? () => { void serverSaveNow() } : undefined} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
         {hasDraft && (
@@ -2436,12 +2608,24 @@ export default function ProductForm({ categories, brands, action, product, produ
           <UnitsManager
             productId={productId}
             basePrice={basePrice}
+            isDraft={isDraft}
           />
         </div>
       )}
 
       {/* Form Actions */}
       <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default-default flex flex-col sm:flex-row justify-end gap-3 sm:gap-4">
+        {isDraft && serverSaveStatus !== 'idle' && (
+          <span className={`self-center text-xs mr-auto ${
+            serverSaveStatus === 'saving' ? 'text-foreground-muted' :
+            serverSaveStatus === 'saved' ? 'text-green-600 dark:text-green-400' :
+            'text-red-500'
+          }`}>
+            {serverSaveStatus === 'saving' ? 'Saving…' :
+             serverSaveStatus === 'saved' ? 'Saved' :
+             'Save failed'}
+          </span>
+        )}
         <Link
           href={ap('/admin/products')}
           className="px-6 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary transition-colors text-center"
@@ -2967,8 +3151,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1 pl-1 flex items-center gap-1">
                                     <button type="button" onClick={async () => {
                                       if (!ed) return
-                                      const res = await fetch(`/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`, {
-                                        method: 'PUT',
+                                      const svEditUrl = isDraft
+                                        ? `/api/admin/products/${productId}/draft/sub-variants?variant_id=${variantPopupId}`
+                                        : `/api/admin/products/${productId}/variants/${variantPopupId}/sub-variants`
+                                      const res = await fetch(svEditUrl, {
+                                        method: isDraft ? 'PATCH' : 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
                                         body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, discount_pct: parseFloat(discountPct) || 0, stock_status: ed.stock || 'In Stock', sku: ed.sku || null }),
                                       })
@@ -3004,6 +3191,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       variantId={variantPopupId}
                                       subVariantId={sv.id}
                                       basePrice={sv.price}
+                                      isDraft={isDraft}
                                     />
                                   </td>
                                 </tr>
@@ -3097,6 +3285,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                     variantId={variantPopupId}
                     basePrice={popupVariant?.price || (popupVariant?.price_ex_gst ? exToIncl(popupVariant.price_ex_gst, gstRate) : null)}
                     onUnitLoaded={(info) => { setPopupUnitKey(info.unitKey); setPopupUnitInfo(info) }}
+                    isDraft={isDraft}
                   />
                 </div>
               )}

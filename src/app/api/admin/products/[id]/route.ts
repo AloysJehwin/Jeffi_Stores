@@ -55,3 +55,33 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   return NextResponse.json({ ok: true })
 }
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const { id } = await params
+    const admin = await authenticateAdmin(request)
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (admin.role !== 'super_admin') return NextResponse.json({ error: 'Only super admins can delete products' }, { status: 403 })
+
+    const product = await query(
+      `SELECT id FROM products WHERE id = $1 AND is_active IS NOT NULL`,
+      [id]
+    )
+    if (!product.rowCount) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
+
+    // Hard delete — remove all child rows first then the product
+    await query(`DELETE FROM product_units WHERE product_id = $1`, [id])
+    await query(`DELETE FROM product_sub_variants WHERE product_id = $1`, [id])
+    await query(`DELETE FROM product_images WHERE product_id = $1`, [id])
+    await query(`DELETE FROM product_variants WHERE product_id = $1`, [id])
+    await query(`DELETE FROM products WHERE id = $1`, [id])
+
+    revalidatePath('/admin/products')
+    return NextResponse.json({ success: true })
+  } catch {
+    return NextResponse.json({ error: 'Failed to delete product' }, { status: 500 })
+  }
+}

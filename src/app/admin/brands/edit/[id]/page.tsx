@@ -2,9 +2,10 @@ import { redirect, notFound } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
-import { query, queryOne } from '@/lib/db'
+import { query, queryOne, withTransaction } from '@/lib/db'
 import BrandForm from '@/components/admin/BrandForm'
 import { ChevronLeft } from 'lucide-react'
+import type { PoolClient } from 'pg'
 
 async function getBrand(id: string) {
   const data = await queryOne('SELECT * FROM brands WHERE id = $1', [id])
@@ -25,26 +26,66 @@ async function updateBrand(brandId: string, formData: FormData) {
   const return_window_days = Math.max(1, parseInt(formData.get('return_window_days') as string) || 7)
   const replacement_allowed = formData.get('replacement_allowed') !== 'false'
   const replacement_window_days = Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
+  const intent = formData.get('intent') as string | null
+  const host = await getHost()
+
+  const draftRow = await queryOne<{ brand_id: string }>(
+    `SELECT brand_id FROM brand_drafts WHERE brand_id = $1`, [brandId]
+  )
+  const hasDraft = !!draftRow
+
+  const draftFields = { name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days }
 
   try {
-    const existing = await queryOne<any>('SELECT is_active FROM brands WHERE id = $1', [brandId])
+    if (hasDraft || intent === 'draft') {
+      if (intent === 'discard') {
+        await query(`DELETE FROM brand_drafts WHERE brand_id = $1`, [brandId])
+        revalidatePath(`/admin/brands/edit/${brandId}`)
+        redirect(ap(`/admin/brands/edit/${brandId}`, host))
+      }
 
-    await query(
-      `UPDATE brands SET name = $1, slug = $2, description = $3, website = $4, logo_url = $5, is_active = $6,
-        return_allowed = $7, return_window_days = $8, replacement_allowed = $9, replacement_window_days = $10
-       WHERE id = $11`,
-      [name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days, brandId]
-    )
+      await query(
+        `INSERT INTO brand_drafts (brand_id, fields, updated_at)
+         VALUES ($1, $2::jsonb, NOW())
+         ON CONFLICT (brand_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
+        [brandId, JSON.stringify(draftFields)]
+      )
 
-    if (existing && existing.is_active !== is_active) {
-      await query('UPDATE products SET is_active = $1 WHERE brand_id = $2', [is_active, brandId])
+      if (intent === 'publish') {
+        const prevIsActive = await queryOne<{ is_active: boolean }>('SELECT is_active FROM brands WHERE id = $1', [brandId])
+        await withTransaction(async (client: PoolClient) => {
+          await client.query(
+            `UPDATE brands SET name=$1, slug=$2, description=$3, website=$4, logo_url=$5,
+             is_active=$6, return_allowed=$7, return_window_days=$8,
+             replacement_allowed=$9, replacement_window_days=$10, updated_at=NOW() WHERE id=$11`,
+            [name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days, brandId]
+          )
+          if (prevIsActive && prevIsActive.is_active !== is_active) {
+            await client.query('UPDATE products SET is_active=$1 WHERE brand_id=$2', [is_active, brandId])
+          }
+          await client.query('DELETE FROM brand_drafts WHERE brand_id=$1', [brandId])
+        })
+        revalidatePath('/admin/brands')
+        redirect(ap('/admin/brands', host))
+      }
+
+      revalidatePath(`/admin/brands/edit/${brandId}`)
+      const back = formData.get('_back') as string | null
+      redirect(ap(back && back.startsWith('/admin/brands') ? back : `/admin/brands/edit/${brandId}`, host))
     }
 
+    // No draft — direct live update
+    const existing = await queryOne<any>('SELECT is_active FROM brands WHERE id=$1', [brandId])
+    await query(
+      `UPDATE brands SET name=$1, slug=$2, description=$3, website=$4, logo_url=$5, is_active=$6,
+       return_allowed=$7, return_window_days=$8, replacement_allowed=$9, replacement_window_days=$10
+       WHERE id=$11`,
+      [name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days, brandId]
+    )
+    if (existing && existing.is_active !== is_active) {
+      await query('UPDATE products SET is_active=$1 WHERE brand_id=$2', [is_active, brandId])
+    }
     revalidatePath('/admin/brands')
-    revalidatePath('/admin/products/add')
-    revalidatePath('/admin/products/edit/[id]', 'page')
-
-    const host = await getHost()
     const back = formData.get('_back') as string | null
     redirect(ap(back && back.startsWith('/admin/brands') ? back : '/admin/brands', host))
   } catch (err: any) {
@@ -57,13 +98,31 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
   const { id } = await params
   const { back } = await searchParams
   const brand = await getBrand(id).catch(() => null)
+  if (!brand) notFound()
 
-  if (!brand) {
-    notFound()
+  // Auto-create draft for active brands on first edit visit
+  let draftRow = await queryOne<{ brand_id: string; fields: Record<string, unknown> }>(
+    `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`, [id]
+  )
+  if (!draftRow && brand.is_active) {
+    await query(
+      `INSERT INTO brand_drafts (brand_id, fields)
+       SELECT id, to_jsonb(b) - 'id' - 'created_at' - 'updated_at'
+       FROM brands b WHERE b.id = $1
+       ON CONFLICT (brand_id) DO NOTHING`,
+      [id]
+    )
+    draftRow = await queryOne<{ brand_id: string; fields: Record<string, unknown> }>(
+      `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`, [id]
+    )
   }
+
+  const isDraft = !!draftRow
+  const brandForForm = isDraft && draftRow?.fields ? { ...brand, ...draftRow.fields } : brand
 
   const host = await getHost()
   const backUrl = back && back.startsWith('/admin/brands') ? back : '/admin/brands'
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
@@ -72,14 +131,28 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
           Brands
         </a>
         <span className="text-border-default">/</span>
-        <span className="text-foreground font-medium">Edit Brand</span>
-      </div>
-      <div className="mb-6">
-        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Edit Brand</h1>
-        <p className="text-foreground-secondary mt-1">Update brand information</p>
+        <span className="text-foreground font-medium">{isDraft ? 'Edit Draft' : 'Edit Brand'}</span>
       </div>
 
-      <BrandForm brand={brand} action={updateBrand.bind(null, id)} backUrl={backUrl} />
+      {isDraft && (
+        <div className="mb-6 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
+            <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Changes are saved to draft. The live brand stays unchanged until you publish.</p>
+          </div>
+          <form action={updateBrand.bind(null, id)}>
+            <input type="hidden" name="intent" value="discard" />
+            <button type="submit" className="text-xs text-amber-600 hover:underline ml-4">Discard draft</button>
+          </form>
+        </div>
+      )}
+
+      <div className="mb-6">
+        <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">{isDraft ? 'Edit Draft' : 'Edit Brand'}</h1>
+        <p className="text-foreground-secondary mt-1">{isDraft ? 'Changes are saved to the draft only' : 'Update brand information'}</p>
+      </div>
+
+      <BrandForm brand={brandForForm} action={updateBrand.bind(null, id)} backUrl={backUrl} isDraft={isDraft} />
     </div>
   )
 }

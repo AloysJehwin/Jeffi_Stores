@@ -10,18 +10,24 @@ import ProductImage from '@/components/admin/ProductImage'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
 import ProductDetailModal from '@/components/admin/ProductDetailModal'
 import ProductLabelModal from '@/components/admin/ProductLabelModal'
+import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import HoverCard from '@/components/ui/HoverCard'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Props {
   products: any[]
   featuredCount: number
   backUrl?: string
+  isSuperAdmin?: boolean
 }
 
-export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products' }: Props) {
+export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products', isSuperAdmin = false }: Props) {
+  const confirm = useConfirm()
   const [selected, setSelected] = useState<any>(null)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({})
+  const [draftProduct, setDraftProduct] = useState<{ id: string; name: string; sku: string | null; backUrl: string } | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   async function handleToggleActive(productId: string, currentActive: boolean) {
     const next = !currentActive
@@ -35,6 +41,18 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
       if (!res.ok) setActiveStates(prev => ({ ...prev, [productId]: currentActive }))
     } catch {
       setActiveStates(prev => ({ ...prev, [productId]: currentActive }))
+    }
+  }
+
+  async function handleDelete(productId: string, productName: string) {
+    const ok = await confirm({ message: `Permanently delete "${productName}"? This cannot be undone.`, variant: 'danger', confirmLabel: 'Delete' })
+    if (!ok) return
+    setDeletingId(productId)
+    try {
+      const res = await fetch(`/api/admin/products/${productId}`, { method: 'DELETE' })
+      if (res.ok) window.location.reload()
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -315,15 +333,27 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                       <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                     </svg>
                   </Link>
-                  <Link
-                    href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`)}
-                    title="Edit Product"
-                    className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
-                  >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </Link>
+                  {product.is_active ? (
+                    <button
+                      onClick={() => setDraftProduct({ id: product.id, name: String(product.name || ''), sku: product.sku ? String(product.sku) : null, backUrl })}
+                      title="Edit Product"
+                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                  ) : (
+                    <Link
+                      href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`)}
+                      title="Edit Product"
+                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors"
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </Link>
+                  )}
                   <button
                     onClick={() => setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })}
                     title="Print Label"
@@ -334,6 +364,22 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                     </svg>
                   </button>
                   <DownloadAdButton productId={product.id} productName={product.name} productSlug={product.slug} />
+                  {isSuperAdmin && (
+                    <button
+                      onClick={() => handleDelete(product.id, product.name)}
+                      disabled={deletingId === product.id}
+                      title="Delete Product"
+                      className="p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-600 dark:hover:text-red-400 transition-colors disabled:opacity-40"
+                    >
+                      {deletingId === product.id ? (
+                        <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin inline-block" />
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      )}
+                    </button>
+                  )}
                 </div>
               </td>
             </tr>
@@ -349,6 +395,16 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
 
       <ProductDetailModal product={selected} onClose={() => setSelected(null)} />
       <ProductLabelModal product={labelProduct} onClose={() => setLabelProduct(null)} />
+      {draftProduct && (
+        <DraftConfirmModal
+          productId={draftProduct.id}
+          productName={draftProduct.name}
+          productSku={draftProduct.sku}
+          existingDraftId={null}
+          backUrl={draftProduct.backUrl}
+          onClose={() => setDraftProduct(null)}
+        />
+      )}
     </>
   )
 }

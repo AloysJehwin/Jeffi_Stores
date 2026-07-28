@@ -211,6 +211,45 @@ describe('aiChat — ollama provider', () => {
     delete process.env.OLLAMA_SQL_MODEL
   })
 
+  it('returns toolCalls when Ollama responds with native tool_calls', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        message: {
+          content: '',
+          tool_calls: [
+            { id: 'call_1', function: { name: 'search_products', arguments: { query: 'hex bolt' } } },
+          ],
+        },
+        model: 'gemma4:12b',
+      }),
+      text: async () => '',
+    })
+
+    const result = await aiChat({
+      messages: [{ role: 'user', content: 'Find hex bolts' }],
+      tools: [{ type: 'function', function: { name: 'search_products', description: 'Search', parameters: {} } }],
+    })
+
+    expect(result.content).toBe('')
+    expect(result.toolCalls).toHaveLength(1)
+    expect(result.toolCalls![0].name).toBe('search_products')
+    expect(result.toolCalls![0].arguments).toEqual({ query: 'hex bolt' })
+    expect(result.provider).toBe('ollama')
+  })
+
+  it('passes tools array to Ollama request body', async () => {
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
+    mockFetch.mockResolvedValueOnce(makeOllamaOkResponse('answer'))
+
+    const tools = [{ type: 'function' as const, function: { name: 'my_tool', description: 'desc', parameters: {} } }]
+    await aiChat({ messages: [{ role: 'user', content: 'test' }], tools })
+
+    const body = JSON.parse(mockFetch.mock.calls[1][1].body)
+    expect(body.tools).toEqual(tools)
+  })
+
   it('falls back to OpenAI when Ollama call throws and fallback enabled', async () => {
     process.env.OLLAMA_FALLBACK_TO_OPENAI = 'true'
 
@@ -221,5 +260,111 @@ describe('aiChat — ollama provider', () => {
     const result = await aiChat({ messages: [{ role: 'user', content: 'test' }] })
     expect(result.content).toBe('openai fallback')
     expect(result.fallbackUsed).toBe(true)
+  })
+
+  it('falls back to OpenAI with tool calls when Ollama times out', async () => {
+    process.env.OLLAMA_FALLBACK_TO_OPENAI = 'true'
+    process.env.OPENAI_API_KEY = 'sk-test'
+
+    const tools = [{ type: 'function' as const, function: { name: 'search', description: 'search', parameters: {} } }]
+
+    mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, text: async () => '', json: async () => ({}) }) // ollama fails
+    // OpenAI returns tool call
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{ message: { tool_calls: [{ function: { name: 'search', arguments: '{"q":"test"}' } }] } }],
+      }),
+    })
+
+    const result = await aiChat({ messages: [{ role: 'user', content: 'test' }], tools })
+    expect(result.toolCalls).toHaveLength(1)
+    expect(result.toolCalls![0].name).toBe('search')
+    expect(result.fallbackUsed).toBe(true)
+  })
+})
+
+describe('aiChat — openai provider with tools', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    process.env.AI_PROVIDER = 'openai'
+    process.env.OPENAI_API_KEY = 'sk-test'
+  })
+
+  afterEach(() => {
+    delete process.env.AI_PROVIDER
+    delete process.env.OPENAI_API_KEY
+  })
+
+  it('returns toolCalls when OpenAI responds with tool_calls', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            tool_calls: [
+              { function: { name: 'get_products', arguments: '{"query":"shelf"}' } },
+            ],
+          },
+        }],
+      }),
+    })
+
+    const result = await aiChat({ messages: [{ role: 'user', content: 'find products' }] })
+    expect(result.toolCalls).toHaveLength(1)
+    expect(result.toolCalls![0].name).toBe('get_products')
+    expect(result.toolCalls![0].arguments).toEqual({ query: 'shelf' })
+    expect(result.content).toBe('')
+  })
+
+  it('passes tools to OpenAI request body', async () => {
+    const tools = [{ type: 'function' as const, function: { name: 'fn', description: 'd', parameters: {} } }]
+    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('ok'))
+
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }], tools })
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect(body.tools).toEqual(tools)
+    expect(body.tool_choice).toBe('auto')
+  })
+
+  it('does not set tool_choice when no tools provided', async () => {
+    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('ok'))
+
+    await aiChat({ messages: [{ role: 'user', content: 'hi' }] })
+
+    const body = JSON.parse(mockFetch.mock.calls[0][1].body)
+    expect(body.tool_choice).toBeUndefined()
+  })
+
+  it('parses tool_call arguments when they are a JSON string', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        choices: [{
+          message: {
+            tool_calls: [
+              { function: { name: 'search', arguments: '{"q":"bolts","limit":5}' } },
+            ],
+          },
+        }],
+      }),
+    })
+
+    const result = await aiChat({ messages: [{ role: 'user', content: 'find bolts' }] })
+    expect(result.toolCalls![0].arguments).toEqual({ q: 'bolts', limit: 5 })
+  })
+
+  it('uses forceProvider to bypass env AI_PROVIDER', async () => {
+    process.env.AI_PROVIDER = 'ollama'
+    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('forced openai'))
+
+    const result = await aiChat({
+      messages: [{ role: 'user', content: 'hi' }],
+      forceProvider: 'openai',
+    })
+    expect(result.content).toBe('forced openai')
+    expect(result.provider).toBe('openai')
   })
 })

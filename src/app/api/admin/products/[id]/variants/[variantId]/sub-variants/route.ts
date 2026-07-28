@@ -139,6 +139,6 @@ export async function DELETE(request: NextRequest, { params }: Params) {
   if (!parsedDel.ok) return parsedDel.response
   const { id } = parsedDel.data
 
-  await query(`DELETE FROM product_sub_variants WHERE id = $1 AND variant_id = $2`, [id, variantId])
+  await query(`DELETE FROM product_sub_variants WHERE id = $1`, [id])
   return NextResponse.json({ success: true })
 }

@@ -18,8 +18,18 @@ vi.mock('@/lib/customer-agent/tools', () => ({
       name: 'search_products',
       description: 'Search for products',
       inputSchema: {
+        type: 'object',
         properties: { query: { type: 'string', description: 'search term' } },
         required: ['query'],
+      },
+    },
+    {
+      name: 'get_my_order',
+      description: 'Get details of a specific order',
+      inputSchema: {
+        type: 'object',
+        properties: { orderNumber: { type: 'string' } },
+        required: ['orderNumber'],
       },
     },
   ],
@@ -50,7 +60,7 @@ function makeRequest(body: object) {
 }
 
 describe('POST /api/customer-agent/chat', () => {
-  beforeEach(() => { vi.clearAllMocks() })
+  beforeEach(() => { vi.resetAllMocks() })
 
   it('returns 401 when not authenticated', async () => {
     mockAuth.mockResolvedValueOnce(null)
@@ -77,60 +87,69 @@ describe('POST /api/customer-agent/chat', () => {
 
   it('returns final text when AI responds without tool calls', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    const finalResponse = { content: 'Here are some products for you!', provider: 'openai', model: 'gpt-4o' } as any
-    // iter<2 forces tool call on first two plain-text responses; third is accepted
-    mockAiChat
-      .mockResolvedValueOnce(finalResponse)
-      .mockResolvedValueOnce(finalResponse)
-      .mockResolvedValueOnce(finalResponse)
+    // Native tools API: no toolCalls on response → prose answer returned directly
+    mockAiChat.mockResolvedValueOnce({
+      content: 'Here are some products for you!',
+      toolCalls: undefined,
+      provider: 'ollama',
+      model: 'gemma4:12b',
+      latencyMs: 1200,
+      fallbackUsed: false,
+    } as any)
 
     const res = await POST(makeRequest({ message: 'Show me hex bolts' }) as any)
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.message).toBe('Here are some products for you!')
     expect(json.toolCalls).toEqual([])
-    expect(json.provider).toBe('openai')
-    expect(json.model).toBe('gpt-4o')
+    expect(json.provider).toBe('ollama')
   })
 
-  it('executes a tool call when AI emits tool_use XML', async () => {
+  it('executes a native tool call and returns server-formatted result for product tools', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
 
-    const finalResponse = { content: 'I found some hex bolts for you.', provider: 'openai', model: 'gpt-4o' } as any
-    // First call returns tool_use; second and third return plain text (iter<2 forces one retry)
-    mockAiChat
-      .mockResolvedValueOnce({
-        content: '<tool_use name="search_products">\n{"query":"hex bolt"}\n</tool_use>',
-        provider: 'openai',
-        model: 'gpt-4o',
-      } as any)
-      .mockResolvedValueOnce(finalResponse)
-      .mockResolvedValueOnce(finalResponse)
+    // Model returns native toolCalls array (not XML)
+    mockAiChat.mockResolvedValueOnce({
+      content: '',
+      toolCalls: [{ name: 'search_products', arguments: { query: 'hex bolt' } }],
+      provider: 'ollama',
+      model: 'gemma4:12b',
+      latencyMs: 800,
+      fallbackUsed: false,
+    } as any)
 
-    const mockTool = { handler: vi.fn().mockResolvedValueOnce([{ id: 'p1', name: 'Hex Bolt' }]) }
+    const mockTool = {
+      handler: vi.fn().mockResolvedValueOnce({
+        products: [{ id: 'p1', name: 'Hex Bolt M10', slug: 'hex-bolt-m10', price: '85.00' }],
+      }),
+    }
     mockGetTool.mockReturnValueOnce(mockTool as any)
 
     const res = await POST(makeRequest({ message: 'Find hex bolts' }) as any)
     expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.message).toBe('I found some hex bolts for you.')
+    // search_products is in SELF_FORMATTING_TOOLS — response is formatted server-side
+    expect(json.message).toContain('hex-bolt-m10')
     expect(json.toolCalls).toHaveLength(1)
     expect(json.toolCalls[0].tool).toBe('search_products')
     expect(mockTool.handler).toHaveBeenCalledWith({ query: 'hex bolt' }, { authenticatedUserId: USER_ID })
   })
 
-  it('records tool error when tool not allowed', async () => {
+  it('records tool error when tool not found and loops back for prose', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
 
-    const finalResponse = { content: 'Sorry, I cannot do that.', provider: 'openai', model: 'gpt-4o' } as any
+    // First call: unknown tool; second call: prose answer
     mockAiChat
       .mockResolvedValueOnce({
-        content: '<tool_use name="forbidden_tool">\n{}\n</tool_use>',
-        provider: 'openai',
-        model: 'gpt-4o',
+        content: '',
+        toolCalls: [{ name: 'forbidden_tool', arguments: {} }],
+        provider: 'ollama', model: 'gemma4:12b', latencyMs: 500, fallbackUsed: false,
       } as any)
-      .mockResolvedValueOnce(finalResponse)
-      .mockResolvedValueOnce(finalResponse)
+      .mockResolvedValueOnce({
+        content: 'Sorry, I cannot do that.',
+        toolCalls: undefined,
+        provider: 'ollama', model: 'gemma4:12b', latencyMs: 400, fallbackUsed: false,
+      } as any)
 
     mockGetTool.mockReturnValueOnce(null) // tool not found
 
@@ -138,33 +157,38 @@ describe('POST /api/customer-agent/chat', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.toolCalls[0].isError).toBe(true)
+    expect(json.toolCalls[0].tool).toBe('forbidden_tool')
   })
 
-  it('records tool error when tool handler throws', async () => {
+  it('records tool error when tool handler throws and loops back', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
 
-    const finalResponse = { content: 'Something went wrong.', provider: 'openai', model: 'gpt-4o' } as any
     mockAiChat
       .mockResolvedValueOnce({
-        content: '<tool_use name="search_products">\n{"query":"test"}\n</tool_use>',
-        provider: 'openai',
-        model: 'gpt-4o',
+        content: '',
+        toolCalls: [{ name: 'get_my_order', arguments: { orderNumber: 'ORD-123' } }],
+        provider: 'ollama', model: 'gemma4:12b', latencyMs: 600, fallbackUsed: false,
       } as any)
-      .mockResolvedValueOnce(finalResponse)
-      .mockResolvedValueOnce(finalResponse)
+      .mockResolvedValueOnce({
+        content: 'Something went wrong with that order.',
+        toolCalls: undefined,
+        provider: 'ollama', model: 'gemma4:12b', latencyMs: 400, fallbackUsed: false,
+      } as any)
 
     const mockTool = { handler: vi.fn().mockRejectedValueOnce(new Error('DB error')) }
     mockGetTool.mockReturnValueOnce(mockTool as any)
 
-    const res = await POST(makeRequest({ message: 'Search for something' }) as any)
+    const res = await POST(makeRequest({ message: 'Look up invoice ORD-123' }) as any)
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.toolCalls[0].isError).toBe(true)
+    // After tool error, loop returns to LLM which gives the final prose
+    expect(json.message).toBe('Something went wrong with that order.')
   })
 
-  it('degrades gracefully to a friendly message when aiChat throws AiClientError', async () => {
+  it('degrades gracefully to a friendly message when aiChat throws', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
-    mockAiChat.mockRejectedValueOnce(new AiClientError('Model unavailable', 'anthropic'))
+    mockAiChat.mockRejectedValueOnce(new AiClientError('Model unavailable', 'ollama'))
 
     const res = await POST(makeRequest({ message: 'Hello there' }) as any)
     expect(res.status).toBe(200)
@@ -184,25 +208,24 @@ describe('POST /api/customer-agent/chat', () => {
     expect(json.error).toBeUndefined()
   })
 
-  it('uses fallback message when max iterations exhausted with only tool calls', async () => {
+  it('returns fallback message when max iterations exhausted with only tool calls', async () => {
     mockAuth.mockResolvedValueOnce({ userId: USER_ID } as any)
 
-    // AI keeps returning tool calls without ever giving a plain text response
-    const toolCallContent = '<tool_use name="search_products">\n{"query":"test"}\n</tool_use>'
+    // AI keeps returning tool calls for a non-self-formatting tool, never prose
     mockAiChat.mockResolvedValue({
-      content: toolCallContent,
-      provider: 'openai',
-      model: 'gpt-4o',
+      content: '',
+      toolCalls: [{ name: 'get_my_order', arguments: { orderNumber: 'ORD-999' } }],
+      provider: 'ollama', model: 'gemma4:12b', latencyMs: 300, fallbackUsed: false,
     } as any)
 
-    const mockTool = { handler: vi.fn().mockResolvedValue([]) }
+    const mockTool = { handler: vi.fn().mockResolvedValue({ order: null }) }
     mockGetTool.mockReturnValue(mockTool as any)
 
-    const res = await POST(makeRequest({ message: 'Help me' }) as any)
+    const res = await POST(makeRequest({ message: 'Track shipment ORD-999' }) as any)
     expect(res.status).toBe(200)
     const json = await res.json()
-    // Should have fallback message
-    expect(json.message).toContain('trouble answering')
+    // Exhausted MAX_ITERATIONS with no prose — finalText stays empty → fallback message
+    expect(json.message).toMatch(/trouble|try again/i)
   })
 
   it('handles malformed JSON body gracefully', async () => {
@@ -212,7 +235,6 @@ describe('POST /api/customer-agent/chat', () => {
       body: 'not-json',
     })
     const res = await POST(req as any)
-    // message will be empty string after trim
     expect(res.status).toBe(400)
   })
 })
