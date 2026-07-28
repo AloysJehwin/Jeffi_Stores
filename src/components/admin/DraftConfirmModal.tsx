@@ -87,7 +87,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
         {/* Already has draft */}
         {existingDraftId && (
           <div className="mb-4 rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
-            A draft already exists for this product. Clicking "Edit Draft" will open it.
+            A draft already exists for this product. Clicking &quot;Edit Draft&quot; will open it.
           </div>
         )}
 
