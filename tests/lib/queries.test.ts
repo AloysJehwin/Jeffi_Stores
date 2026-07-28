@@ -351,6 +351,14 @@ describe('getFilteredOrders', () => {
     expect(args).toContain('2026-01-01')
   })
 
+  it('applies date_to filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredOrders({ date_to: '2026-07-31' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('2026-07-31')
+  })
+
   it('applies amount_min and amount_max filters', async () => {
     mockQueryMany.mockResolvedValue([])
     mockQueryCount.mockResolvedValue(0)
@@ -376,6 +384,23 @@ describe('getFilteredOrders', () => {
     expect(args).toContain('delivered')
     expect(args).toContain('cod')
     expect(args).toContain('SAVE10')
+  })
+
+  it('handles all new filters together', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredOrders({
+      date_from: '2026-01-01', date_to: '2026-07-31',
+      amount_min: '100', amount_max: '5000',
+      awb: 'AWB456', shipment_status: 'in_transit',
+      payment_mode: 'prepaid', coupon_code: 'OFF20',
+    })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('2026-01-01')
+    expect(args).toContain('2026-07-31')
+    expect(args).toContain('100')
+    expect(args).toContain('5000')
+    expect(args).toContain('AWB456')
   })
 })
 
@@ -498,6 +523,89 @@ describe('getFilteredProducts', () => {
     await getFilteredProducts({ is_featured: 'true' })
     const args = mockQueryMany.mock.calls[0][1] as any[]
     expect(args).toContain(true)
+  })
+
+  it('applies is_featured=false filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ is_featured: 'false' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain(false)
+  })
+
+  it('applies has_variants=false filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ has_variants: 'false' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain(false)
+  })
+
+  it('applies is_digital=false filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ is_digital: 'false' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain(false)
+  })
+
+  it('applies is_bundle=false filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ is_bundle: 'false' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain(false)
+  })
+
+  it('applies is_cod_allowed=false filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ is_cod_allowed: 'false' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain(false)
+  })
+
+  it('applies is_oversized=false filter', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ is_oversized: 'false' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain(false)
+  })
+
+  it('applies perishable and serialized flags', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ perishable: 'true', serialized: 'true' })
+    const sql = mockQueryMany.mock.calls[0][0] as string
+    expect(sql).toContain('p.perishable = true')
+    expect(sql).toContain('p.serialized = true')
+  })
+
+  it('applies shipping_class and country_of_origin filters', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({ shipping_class: 'express', country_of_origin: 'IN' })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain('express')
+    expect(args).toContain('IN')
+  })
+
+  it('applies all new boolean and range filters together', async () => {
+    mockQueryMany.mockResolvedValue([])
+    mockQueryCount.mockResolvedValue(0)
+    await getFilteredProducts({
+      is_featured: 'true', has_variants: 'true', is_digital: 'true',
+      is_bundle: 'true', is_cod_allowed: 'true', is_oversized: 'true',
+      fragile: 'true', hazardous: 'true', perishable: 'true', serialized: 'true',
+      price_min: '50', price_max: '1000', gst_percentage: '18',
+      condition: 'new', grade: 'A', shipping_class: 'standard',
+      country_of_origin: 'CN',
+    })
+    const args = mockQueryMany.mock.calls[0][1] as any[]
+    expect(args).toContain(true)
+    expect(args).toContain('50')
+    expect(args).toContain('1000')
   })
 
   it('applies price_min and price_max filters', async () => {
@@ -1031,18 +1139,46 @@ describe('getDashboardAnalytics', () => {
     expect(typeof result).toBe('object')
   })
 
-  it('accepts month range', async () => {
+  it('accepts today range', async () => {
     mockQueryOne.mockResolvedValue(null)
     mockQueryMany.mockResolvedValue([])
-    const result = await getDashboardAnalytics('month')
+    const result = await getDashboardAnalytics('today')
     expect(result).toBeDefined()
   })
 
-  it('accepts year range', async () => {
+  it('accepts 7d range', async () => {
     mockQueryOne.mockResolvedValue(null)
     mockQueryMany.mockResolvedValue([])
-    const result = await getDashboardAnalytics('year')
+    const result = await getDashboardAnalytics('7d')
     expect(result).toBeDefined()
+  })
+
+  it('accepts 90d range', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany.mockResolvedValue([])
+    const result = await getDashboardAnalytics('90d')
+    expect(result).toBeDefined()
+  })
+
+  it('processes trend rows, payment, topCategories, topBrands', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ cur_revenue: '5000', prev_revenue: '4000', cur_orders: '50', prev_orders: '40', cur_customers: '30', prev_customers: '25', cur_aov: '100', prev_aov: '90' }) // kpiRow
+      .mockResolvedValueOnce({ online: '3000', cod: '1000', other: '500', cod_outstanding: '200', cod_outstanding_count: '5' }) // payRow
+      .mockResolvedValueOnce({ new_cust: '20', returning_cust: '10' }) // custSplit
+      .mockResolvedValueOnce({ total_buyers: '30', repeat_buyers: '10' }) // buyerRow
+      .mockResolvedValueOnce({ total: '100', fulfilled: '80', avg_days: '2.5' }) // invRow
+      .mockResolvedValueOnce({ total: '5', fulfilled: '3' }) // retRow
+    mockQueryMany
+      .mockResolvedValueOnce([{ bucket: '2026-07-01', revenue: '1000', orders: '10' }]) // trendRows
+      .mockResolvedValueOnce([{ name: 'Fasteners', units: '50', revenue: '2000' }]) // topCats
+      .mockResolvedValueOnce([{ name: 'Brand A', units: '30', revenue: '1500' }]) // topBrandsRows
+      .mockResolvedValueOnce([{ name: 'Product 1', qty: '20', revenue: '500' }]) // topProductsRows
+
+    const result = await getDashboardAnalytics('7d')
+    expect(result).toBeDefined()
+    expect(result.trend?.length).toBeGreaterThan(0)
+    expect(result.topCategories?.length).toBeGreaterThan(0)
+    expect(result.topBrands?.length).toBeGreaterThan(0)
   })
 })
 
