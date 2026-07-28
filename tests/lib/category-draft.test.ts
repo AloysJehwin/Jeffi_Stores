@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const mockQueryOne = vi.fn()
 const mockQuery = vi.fn()
-const mockClientQuery = vi.fn()
+const mockClientQuery = vi.fn() as any
 const mockWithTransaction = vi.fn()
 
 vi.mock('@/lib/db', () => ({
