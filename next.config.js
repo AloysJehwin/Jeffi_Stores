@@ -68,16 +68,21 @@ const nextConfig = {
   },
   webpack(config, { isServer }) {
     if (!isServer) {
-      config.resolve.fallback = {
-        ...config.resolve.fallback,
-        stream: false,
-        crypto: false,
-        dns: false,
-        net: false,
-        tls: false,
-        fs: false,
-        path: false,
-      }
+      const ioredisStub = require.resolve('./src/lib/ioredis-stub.js')
+      if (!config.resolve) config.resolve = {}
+      if (!config.resolve.alias) config.resolve.alias = {}
+      config.resolve.alias['ioredis'] = ioredisStub
+    } else {
+      const existingExternals = config.externals || []
+      config.externals = [
+        ...(Array.isArray(existingExternals) ? existingExternals : [existingExternals]),
+        function(context, request, callback) {
+          if (request === 'ioredis' || request.startsWith('ioredis/')) {
+            return callback(null, 'commonjs ' + request)
+          }
+          callback()
+        },
+      ]
     }
     return config
   },
