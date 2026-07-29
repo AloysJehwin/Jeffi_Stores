@@ -72,7 +72,7 @@ export default async function CouponViewPage({ params, searchParams }: {
       SELECT cu.id, cu.user_id, cu.order_id, cu.discount_amount, cu.created_at,
         u.email AS user_email,
         TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')) AS user_name,
-        o.display_id AS order_display_id
+        o.order_number AS order_display_id
       FROM coupon_usage cu
       LEFT JOIN users u ON u.id = cu.user_id
       LEFT JOIN orders o ON o.id = cu.order_id
