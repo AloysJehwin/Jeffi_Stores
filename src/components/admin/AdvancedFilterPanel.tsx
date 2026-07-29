@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import FilterValueHelp from './FilterValueHelp'
+import AdminSelect from './AdminSelect'
 
 export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'boolean' | 'text' | 'multi-select' | 'value-help'
 
@@ -80,6 +82,71 @@ function FilterSection({ title, activeCount, children }: { title: string; active
   )
 }
 
+function MultiSelectField({ name, options, value, onChange }: { name: string; options: { value: string; label: string }[]; value: string; onChange: (v: string) => void }) {
+  const selected = value ? value.split(',').filter(Boolean) : []
+  const [isOpen, setIsOpen] = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const [rect, setRect] = useState<{ top: number; left: number; width: number } | null>(null)
+
+  useEffect(() => {
+    if (!isOpen) return
+    function onDown(e: MouseEvent) {
+      if (!(e.target as Element).closest('[data-msf-dropdown]') && !(e.target as Element).closest(`[data-msf-btn="${name}"]`)) setIsOpen(false)
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [isOpen, name])
+
+  function open() {
+    if (!btnRef.current) return
+    const r = btnRef.current.getBoundingClientRect()
+    setRect({ top: r.bottom + 4, left: r.left, width: r.width })
+    setIsOpen(o => !o)
+  }
+
+  function toggle(val: string) {
+    const next = selected.includes(val) ? selected.filter(s => s !== val) : [...selected, val]
+    onChange(next.join(','))
+  }
+
+  const label = selected.length > 0
+    ? selected.map(v => options.find(o => o.value === v)?.label || v).join(', ')
+    : 'Any'
+
+  return (
+    <div className="relative">
+      <button ref={btnRef} type="button" data-msf-btn={name}
+        onClick={open}
+        className={`w-full bg-surface border text-left transition-all cursor-pointer flex items-center justify-between rounded-lg px-2 py-1.5 text-sm gap-2
+          ${isOpen ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-secondary hover:border-border-default'}
+          ${selected.length > 0 ? 'text-foreground' : 'text-foreground-muted'}`}>
+        <span className="truncate min-w-0">{label}</span>
+        <svg className={`text-foreground-muted shrink-0 w-4 h-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {isOpen && rect && typeof document !== 'undefined' && createPortal(
+        <div data-msf-dropdown className="fixed z-[9999] bg-surface-elevated border border-border-default rounded-lg shadow-xl overflow-hidden py-1"
+          style={{ top: rect.top, left: rect.left, width: Math.max(rect.width, 160) }}>
+          {options.map(o => {
+            const isSel = selected.includes(o.value)
+            return (
+              <button key={o.value} type="button" onClick={() => toggle(o.value)}
+                className={`w-full flex items-center gap-2 px-3 py-1.5 text-sm text-left hover:bg-surface-secondary transition-colors ${isSel ? 'text-accent-600 dark:text-accent-400 font-medium' : 'text-foreground-secondary'}`}>
+                <span className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${isSel ? 'bg-accent-500 border-accent-500' : 'border-border-secondary'}`}>
+                  {isSel && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}
+                </span>
+                {o.label}
+              </button>
+            )
+          })}
+        </div>,
+        document.body
+      )}
+    </div>
+  )
+}
+
 // Exported trigger-only button for inline placement in filter bar
 export function AdvancedFilterTrigger({ activeCount, expanded, onToggle }: { activeCount: number; expanded: boolean; onToggle: () => void }) {
   return (
@@ -100,7 +167,6 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
   const searchParams = useSearchParams()
   const expanded = forceExpanded ?? (searchParams.get('_adv') === '1')
   const [local, setLocal] = useState<Record<string, string>>({})
-  const [popup, setPopup] = useState<string | null>(null)
 
   function toggleExpanded() {
     const params = new URLSearchParams(searchParams.toString())
@@ -172,33 +238,19 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
         </div>
       )
     }
-    if (f.type === 'select' || f.type === 'multi-select') {
-      const selected = local[name] ? local[name].split(',').filter(Boolean) : []
-      const selectedLabels = selected.map(v => f.options?.find(o => o.value === v)?.label || v)
+    if (f.type === 'select') {
       return (
-        <div className="relative">
-          <button type="button" onClick={() => setPopup(popup === name ? null : name)}
-            className={`w-full flex items-center justify-between px-3 py-1.5 text-sm border rounded-lg bg-surface text-left transition-colors ${selected.length > 0 ? 'border-accent-400 text-accent-700' : 'border-border-secondary text-foreground-muted hover:border-border-default'}`}>
-            <span className="truncate">{selected.length > 0 ? selectedLabels.join(', ') : 'Any'}</span>
-            <ChevronDown className="w-3.5 h-3.5 flex-shrink-0 ml-1 text-foreground-muted" />
-          </button>
-          {popup === name && (
-            <div className="absolute z-[600] top-full left-0 mt-1 bg-surface-elevated border border-border-default rounded-xl shadow-xl min-w-[160px] py-1">
-              {f.options?.map(o => {
-                const isSel = selected.includes(o.value)
-                return (
-                  <button key={o.value} type="button"
-                    onClick={() => { if (f.type !== 'multi-select') { setLocalVal(name, isSel ? '' : o.value); setPopup(null) } else { const next = isSel ? selected.filter(s => s !== o.value) : [...selected, o.value]; setLocalVal(name, next.join(',')) } }}
-                    className={`w-full flex items-center gap-2 px-3 py-2 text-sm text-left hover:bg-surface-secondary transition-colors ${isSel ? 'text-accent-600 font-medium' : 'text-foreground'}`}>
-                    {f.type === 'multi-select' && <span className={`w-4 h-4 rounded border flex-shrink-0 flex items-center justify-center ${isSel ? 'bg-accent-500 border-accent-500' : 'border-border-secondary'}`}>{isSel && <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>}</span>}
-                    {o.label}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+        <AdminSelect
+          sm
+          value={local[name] || ''}
+          placeholder="Any"
+          options={[{ value: '', label: 'Any' }, ...(f.options || [])]}
+          onChange={v => setLocalVal(name, v)}
+        />
       )
+    }
+    if (f.type === 'multi-select') {
+      return <MultiSelectField name={name} options={f.options || []} value={local[name] || ''} onChange={v => setLocalVal(name, v)} />
     }
     if (f.type === 'range') {
       const [minName, maxName] = Array.isArray(f.name) ? f.name : [`${f.name}_min`, `${f.name}_max`]
