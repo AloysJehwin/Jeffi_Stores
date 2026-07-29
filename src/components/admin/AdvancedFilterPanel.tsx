@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronDown, ChevronUp, X, SlidersHorizontal } from 'lucide-react'
+import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
+import FilterValueHelp from './FilterValueHelp'
 
-export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'text' | 'multi-select'
+export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'text' | 'multi-select' | 'value-help'
 
 export interface AdvancedFilterField {
   name: string | [string, string]
@@ -287,6 +288,19 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
           value={local[name] || ''} onChange={e => setLocalVal(name, e.target.value)} />
       )
     }
+
+    if (f.type === 'value-help') {
+      return (
+        <FilterValueHelp
+          field={name}
+          label={f.label}
+          value={local[name] || ''}
+          onChange={v => setLocalVal(name, v)}
+          placeholder={f.placeholder}
+          multi
+        />
+      )
+    }
     return null
   }
 
@@ -297,17 +311,19 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
         <button
           type="button"
           onClick={() => setExpanded(e => !e)}
-          className={`flex items-center gap-1.5 px-3 py-2 text-sm rounded-lg border transition-colors
+          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition-colors
             ${activeCount > 0
               ? 'bg-accent-50 dark:bg-accent-900/20 border-accent-400 text-accent-700 dark:text-accent-300'
-              : 'border-border-secondary bg-surface text-foreground hover:bg-surface-secondary'}`}
+              : 'border-border-secondary bg-surface text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
+          title="Advanced Filters"
         >
-          <SlidersHorizontal className="w-4 h-4" />
-          Filters
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 8h12M9 12h6M11 16h2" />
+          </svg>
           {activeCount > 0 && (
-            <span className="ml-0.5 px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>
+            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>
           )}
-          {expanded ? <ChevronUp className="w-3.5 h-3.5 ml-0.5" /> : <ChevronDown className="w-3.5 h-3.5 ml-0.5" />}
+          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
         </button>
         {activeCount > 0 && (
           <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline">
