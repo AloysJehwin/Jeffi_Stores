@@ -365,7 +365,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           { name: 'has_variants', label: 'Has Variants', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
           { name: 'is_digital', label: 'Digital Product', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
           { name: 'is_bundle', label: 'Bundle', type: 'toggle', section: 'Product Type', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-          { name: 'condition', label: 'Condition', type: 'multi-select', section: 'Product Type', options: [{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }, { value: 'refurbished', label: 'Refurbished' }] },
+          { name: 'condition', label: 'Condition', type: 'toggle', section: 'Product Type', options: [{ value: 'new', label: 'New' }, { value: 'used', label: 'Used' }, { value: 'refurbished', label: 'Refurbished' }] },
           { name: ['price_min', 'price_max'], label: 'Price Range', type: 'range', section: 'Pricing & Tax', unit: '₹' },
           { name: 'gst_percentage', label: 'GST %', type: 'multi-select', section: 'Pricing & Tax', options: [{ value: '0', label: '0%' }, { value: '5', label: '5%' }, { value: '12', label: '12%' }, { value: '18', label: '18%' }, { value: '28', label: '28%' }] },
           { name: 'is_cod_allowed', label: 'COD Allowed', type: 'toggle', section: 'Pricing & Tax', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },

@@ -131,17 +131,17 @@ function FilterSection({ title, activeCount, children }: { title: string; active
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-4 py-2.5 bg-surface-secondary hover:bg-surface-secondary/80 transition-colors"
+        className="w-full flex items-center justify-between px-3 py-2 bg-surface-secondary hover:bg-surface-secondary/80 transition-colors"
       >
         <div className="flex items-center gap-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">{title}</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">{title}</span>
           {activeCount > 0 && (
             <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>
           )}
         </div>
-        {open ? <ChevronUp className="w-4 h-4 text-foreground-muted" /> : <ChevronDown className="w-4 h-4 text-foreground-muted" />}
+        {open ? <ChevronUp className="w-3.5 h-3.5 text-foreground-muted" /> : <ChevronDown className="w-3.5 h-3.5 text-foreground-muted" />}
       </button>
-      {open && <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{children}</div>}
+      {open && <div className="px-3 py-2.5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">{children}</div>}
     </div>
   )
 }
@@ -205,14 +205,14 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
     if (f.type === 'toggle') {
       const opts = f.options || [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]
       return (
-        <div className="flex gap-1.5 flex-wrap">
+        <div className="flex gap-1 flex-wrap">
           <button type="button" onClick={() => setLocalVal(name, '')}
-            className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${!local[name] ? 'bg-accent-500 text-white border-accent-500' : 'border-border-secondary text-foreground hover:bg-surface-secondary'}`}>
+            className={`px-2 py-1 text-[11px] rounded-md border transition-colors ${!local[name] ? 'bg-accent-500 text-white border-accent-500' : 'border-border-secondary text-foreground hover:bg-surface-secondary'}`}>
             Any
           </button>
           {opts.map(o => (
             <button key={o.value} type="button" onClick={() => setLocalVal(name, o.value)}
-              className={`px-2.5 py-1 text-xs rounded-lg border transition-colors ${local[name] === o.value ? 'bg-accent-500 text-white border-accent-500' : 'border-border-secondary text-foreground hover:bg-surface-secondary'}`}>
+              className={`px-2 py-1 text-[11px] rounded-md border transition-colors ${local[name] === o.value ? 'bg-accent-500 text-white border-accent-500' : 'border-border-secondary text-foreground hover:bg-surface-secondary'}`}>
               {o.label}
             </button>
           ))}
@@ -311,10 +311,10 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
         <button
           type="button"
           onClick={() => setExpanded(e => !e)}
-          className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border transition-colors
+          className={`flex items-center gap-1 p-1.5 rounded transition-colors
             ${activeCount > 0
-              ? 'bg-accent-50 dark:bg-accent-900/20 border-accent-400 text-accent-700 dark:text-accent-300'
-              : 'border-border-secondary bg-surface text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
+              ? 'text-accent-600 dark:text-accent-400'
+              : 'text-foreground-muted hover:text-foreground'}`}
           title="Advanced Filters"
         >
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -358,7 +358,7 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
                   const isWide = f.type === 'range' || f.type === 'date-range'
                   return (
                     <div key={i} className={isWide ? 'col-span-2' : ''}>
-                      <label className="block text-xs font-medium text-foreground-secondary mb-1.5">{f.label}</label>
+                      <label className="block text-[11px] font-medium text-foreground-muted mb-1">{f.label}</label>
                       {renderField(f)}
                     </div>
                   )
@@ -369,11 +369,11 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
 
           <div className="flex items-center justify-between pt-2">
             <button type="button" onClick={reset}
-              className="px-4 py-2 text-sm font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">
+              className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">
               Reset All
             </button>
             <button type="button" onClick={() => { apply(); setExpanded(false) }}
-              className="px-6 py-2 text-sm font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">
+              className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">
               Apply Filters
             </button>
           </div>
