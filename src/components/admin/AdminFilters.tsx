@@ -134,7 +134,6 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                   </form>
                 )}
               </div>
-              {/* Advanced filter trigger — sits right of search */}
               {advancedPanel && <div className="self-end flex-shrink-0">{advancedPanel}</div>}
             </div>
           )}
