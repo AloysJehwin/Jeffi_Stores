@@ -1,12 +1,12 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { Star, MessageSquare, FileText } from 'lucide-react'
 import { queryMany, queryCount } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
 import DraftRowActions from '@/components/admin/DraftRowActions'
+import ReviewFormTableRow from '@/components/admin/ReviewFormTableRow'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
@@ -157,64 +157,9 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {(forms as FormRow[]).map(f => {
-                const formUrl = `${FORMS_BASE_URL}/${f.slug}`
-                return (
-                  <tr key={f.id} className="hover:bg-surface-secondary/50 transition-colors">
-                    <td className="px-4 py-3 font-medium">
-                      <Link
-                        href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                        className="text-foreground hover:text-accent-500 transition-colors"
-                      >
-                        {f.title}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium inline-flex items-center gap-1 ${
-                        f.template_type === 'google_review' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-                        f.template_type === 'product_feedback' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
-                        'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
-                      }`}>
-                        {f.template_type === 'google_review'
-                          ? <><Star className="w-3 h-3 fill-current" /> Google</>
-                          : f.template_type === 'product_feedback'
-                          ? <><MessageSquare className="w-3 h-3" /> Feedback</>
-                          : <><FileText className="w-3 h-3" /> Testimonial</>}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 max-w-[260px]">
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={formUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-accent-500 hover:underline text-xs shrink-0"
-                        >
-                          Open ↗
-                        </a>
-                        <CopyLinkButton url={formUrl} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-foreground-secondary">{f.coupon_code || <span className="text-foreground-muted">None</span>}</td>
-                    <td className="px-4 py-3">
-                      <Link href={ap(`/admin/review-forms/${f.id}/submissions`, host)} className="text-accent-500 hover:underline font-medium">
-                        {f.submissions_count} view
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${f.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                        {f.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <Link href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 hover:underline text-sm">Edit</Link>
-                        <DeleteReviewFormButton id={f.id} title={f.title} />
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+              {(forms as FormRow[]).map(f => (
+                <ReviewFormTableRow key={f.id} form={f} backUrl={currentListUrl} />
+              ))}
               {forms.length === 0 && (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">No review forms yet. Create your first one!</td></tr>
               )}
