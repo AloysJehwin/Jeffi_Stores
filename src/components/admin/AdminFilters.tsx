@@ -23,10 +23,11 @@ interface AdminFiltersProps {
   searchPlaceholder?: string
   searchParam?: string
   suggestType?: string
-  advancedPanel?: React.ReactNode
+  advancedPanel?: React.ReactNode        // trigger — rendered inline next to search
+  advancedPanelContent?: React.ReactNode // content — rendered full-width below
 }
 
-export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search', suggestType, advancedPanel }: AdminFiltersProps) {
+export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search', suggestType, advancedPanel, advancedPanelContent }: AdminFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -134,7 +135,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                   </form>
                 )}
               </div>
-              {/* advanced panel trigger is inside search input above */}
+              {advancedPanel && <div className="self-end flex-shrink-0">{advancedPanel}</div>}
             </div>
           )}
 
@@ -146,8 +147,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
           )}
         </div>
 
-        {/* Advanced filter sections — full width below filter row */}
-        {advancedPanel}
+        {advancedPanelContent}
       </div>
     </div>
   )

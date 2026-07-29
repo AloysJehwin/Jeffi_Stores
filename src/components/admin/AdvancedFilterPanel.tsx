@@ -21,6 +21,7 @@ export interface AdvancedFilterField {
 interface Props {
   fields: AdvancedFilterField[]
   paramNames?: string[]
+  mode?: 'trigger' | 'content' | 'both'
 }
 
 function fieldParamNames(f: AdvancedFilterField): string[] {
@@ -93,12 +94,18 @@ export function AdvancedFilterTrigger({ activeCount, expanded, onToggle }: { act
   )
 }
 
-export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
+export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both' }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [expanded, setExpanded] = useState(false)
+  const expanded = searchParams.get('_adv') === '1'
   const [local, setLocal] = useState<Record<string, string>>({})
   const [popup, setPopup] = useState<string | null>(null)
+
+  function toggleExpanded() {
+    const params = new URLSearchParams(searchParams.toString())
+    if (expanded) { params.delete('_adv') } else { params.set('_adv', '1') }
+    router.push(`?${params.toString()}`, { scroll: false })
+  }
 
   useEffect(() => {
     const state: Record<string, string> = {}
@@ -120,17 +127,17 @@ export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
     allParams.forEach(n => params.delete(n))
     Object.entries(local).forEach(([k, v]) => { if (v) params.set(k, v) })
     params.delete('page')
+    params.delete('_adv')
     router.push(`?${params.toString()}`)
-    setExpanded(false)
   }
 
   function reset() {
     const params = new URLSearchParams(searchParams.toString())
     allParams.forEach(n => params.delete(n))
     params.delete('page')
+    params.delete('_adv')
     setLocal({})
     router.push(`?${params.toString()}`)
-    setExpanded(false)
   }
 
   function removeChip(f: AdvancedFilterField) {
@@ -218,30 +225,30 @@ export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
     return null
   }
 
-  // Single component — AdminFilters renders this via advancedPanel prop
-  // The trigger is inline, the expanded panel is a sibling div inside the card
-  // AdminFilters must use overflow-visible and render advancedPanel in a w-full slot
-  return (
-    <div className="w-full">
-      {/* Row: trigger button (AdminFilters renders this div inline) */}
-      <div className="flex justify-end">
-        <AdvancedFilterTrigger activeCount={activeCount} expanded={expanded} onToggle={() => setExpanded(e => !e)} />
-      </div>
+  // mode='trigger' → inline button only (placed next to search in AdminFilters)
+  // mode='content' → sections only (placed full-width below filter row)
+  // mode='both' (default) → trigger + sections together (legacy)
 
-      {/* Expanded panel — renders below, full width inside the card */}
-      {expanded && (
-        <div className="mt-3 pt-3 border-t border-border-default space-y-2">
-          {activeCount > 0 && (
-            <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border-default">
-              {activeFields.map((f, i) => (
-                <span key={i} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded-full">
-                  {chipLabel(f, searchParams)}
-                  <button type="button" onClick={() => removeChip(f)}><X className="w-3 h-3" /></button>
-                </span>
-              ))}
-              <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline">Clear all</button>
-            </div>
-          )}
+  if (mode === 'trigger') {
+    return <AdvancedFilterTrigger activeCount={activeCount} expanded={expanded} onToggle={toggleExpanded} />
+  }
+
+  if (mode === 'content') {
+    if (!expanded && activeCount === 0) return null
+    return (
+      <div className="mt-2 pt-3 border-t border-border-default space-y-2">
+        {activeCount > 0 && (
+          <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border-default">
+            {activeFields.map((f, i) => (
+              <span key={i} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded-full">
+                {chipLabel(f, searchParams)}
+                <button type="button" onClick={() => removeChip(f)}><X className="w-3 h-3" /></button>
+              </span>
+            ))}
+            <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline">Clear all</button>
+          </div>
+        )}
+        {expanded && <>
           {sections.map(section => {
             const sectionFields = fields.filter(f => (f.section || 'General') === section)
             const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
@@ -263,6 +270,53 @@ export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
             <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
             <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
           </div>
+        </>}
+      </div>
+    )
+  }
+
+  // mode='both': trigger right-aligned + content below (default)
+  return (
+    <div className="w-full">
+      <div className="flex justify-end">
+        <AdvancedFilterTrigger activeCount={activeCount} expanded={expanded} onToggle={toggleExpanded} />
+      </div>
+      {(expanded || activeCount > 0) && (
+        <div className="mt-2 pt-3 border-t border-border-default space-y-2">
+          {activeCount > 0 && (
+            <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border-default">
+              {activeFields.map((f, i) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded-full">
+                  {chipLabel(f, searchParams)}
+                  <button type="button" onClick={() => removeChip(f)}><X className="w-3 h-3" /></button>
+                </span>
+              ))}
+              <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline">Clear all</button>
+            </div>
+          )}
+          {expanded && <>
+            {sections.map(section => {
+              const sectionFields = fields.filter(f => (f.section || 'General') === section)
+              const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
+              return (
+                <FilterSection key={section} title={section} activeCount={sectionActive}>
+                  {sectionFields.map((f, i) => {
+                    const isWide = f.type === 'range' || f.type === 'date-range'
+                    return (
+                      <div key={i} className={isWide ? 'col-span-2' : ''}>
+                        <label className="block text-[11px] font-medium text-foreground-muted mb-1">{f.label}</label>
+                        {renderField(f)}
+                      </div>
+                    )
+                  })}
+                </FilterSection>
+              )
+            })}
+            <div className="flex items-center justify-between pt-1">
+              <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
+              <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
+            </div>
+          </>}
         </div>
       )}
     </div>
