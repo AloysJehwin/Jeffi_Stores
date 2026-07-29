@@ -360,7 +360,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         searchPlaceholder="Search by name or SKU..."
         searchParam="search"
         suggestType="products"
-        advancedPanel={<AdvancedFilterPanel fields={[
+        advancedContent={<AdvancedFilterPanel fields={[
           { name: 'is_featured', label: 'Featured', type: 'boolean', section: 'Product Type' },
           { name: 'has_variants', label: 'Has Variants', type: 'boolean', section: 'Product Type' },
           { name: 'is_digital', label: 'Digital Product', type: 'boolean', section: 'Product Type' },
@@ -379,7 +379,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           { name: 'grade', label: 'Grade', type: 'value-help', section: 'Specifications', placeholder: 'Any grade' },
           { name: 'compliance_standard', label: 'Compliance Standard', type: 'value-help', section: 'Specifications', placeholder: 'Any standard' },
           { name: 'safety_rating', label: 'Safety Rating', type: 'value-help', section: 'Specifications', placeholder: 'Any rating' },
-        ]} />}
+        ]} mode="content" />}
       />
 
       <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} />
