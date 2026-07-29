@@ -386,7 +386,7 @@ export default function NewCampaignPage() {
             )}
 
             <div className="flex gap-3 pt-2">
-              <button type="button" onClick={() => setStep(1)} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">Back</button>
+              <button type="button" onClick={() => setStep(1)} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">Back</button>
               <button type="button" onClick={() => setStep(3)} disabled={!subject} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50">Continue</button>
             </div>
           </div>
@@ -442,7 +442,7 @@ export default function NewCampaignPage() {
             {error && <p className="text-sm text-red-600">{error}</p>}
 
             <div className="flex flex-wrap gap-3 pt-2">
-              <button type="button" onClick={() => setStep(2)} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">Back</button>
+              <button type="button" onClick={() => setStep(2)} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">Back</button>
               <button type="button" onClick={() => handleSubmit(false)} disabled={submitting} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm disabled:opacity-50">
                 {scheduledAt ? 'Schedule' : 'Save as Draft'}
               </button>
