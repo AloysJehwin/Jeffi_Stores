@@ -6,7 +6,7 @@ import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import FilterValueHelp from './FilterValueHelp'
 
-export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'text' | 'multi-select' | 'value-help'
+export type AdvancedFilterFieldType = 'select' | 'range' | 'date-range' | 'toggle' | 'boolean' | 'text' | 'multi-select' | 'value-help'
 
 export interface AdvancedFilterField {
   name: string | [string, string]
@@ -201,6 +201,27 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
 
   function renderField(f: AdvancedFilterField) {
     const name = Array.isArray(f.name) ? f.name[0] : f.name
+
+    if (f.type === 'boolean') {
+      const isOn = local[name] === 'true'
+      return (
+        <button
+          type="button"
+          onClick={() => setLocalVal(name, isOn ? '' : 'true')}
+          className="flex items-center gap-2 mt-0.5"
+          title={isOn ? 'Click to disable filter' : 'Click to filter for Yes only'}
+        >
+          <span className={`relative inline-flex h-5 w-9 flex-shrink-0 rounded-full border-2 transition-colors duration-200
+            ${isOn ? 'bg-accent-500 border-accent-500' : 'bg-border-secondary border-border-secondary'}`}>
+            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform duration-200
+              ${isOn ? 'translate-x-4' : 'translate-x-0'}`} />
+          </span>
+          <span className={`text-xs ${isOn ? 'text-accent-600 dark:text-accent-400 font-medium' : 'text-foreground-muted'}`}>
+            {isOn ? 'Yes only' : 'Any'}
+          </span>
+        </button>
+      )
+    }
 
     if (f.type === 'toggle') {
       const opts = f.options || [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }]
