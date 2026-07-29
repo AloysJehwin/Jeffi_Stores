@@ -47,7 +47,7 @@ async function createCoupon(formData: FormData) {
 
   revalidatePath('/admin/coupons')
   const host = await getHost()
-  redirect(ap('/admin/coupons', host))
+  redirect(ap(`/admin/coupons/edit/${couponId}`, host))
 }
 
 export default async function AddCouponPage() {

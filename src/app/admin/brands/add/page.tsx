@@ -21,19 +21,19 @@ async function createBrand(formData: FormData) {
   const replacement_window_days = Math.max(1, parseInt(formData.get('replacement_window_days') as string) || 7)
 
   try {
-    await query(
+    const result = await query<{ id: string }>(
       `INSERT INTO brands (name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
       [name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days]
     )
+    const brandId = result.rows[0].id
 
     revalidatePath('/admin/brands')
     revalidatePath('/admin/products/add')
     revalidatePath('/admin/products/edit/[id]', 'page')
 
-    
     const host = await getHost()
-  redirect(ap('/admin/brands', host))
+    redirect(ap(`/admin/brands/edit/${brandId}`, host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error('Failed to create brand')

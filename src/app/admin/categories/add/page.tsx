@@ -28,11 +28,12 @@ async function createCategory(formData: FormData) {
   const manualIcon = (formData.get('icon_name') as string || '').trim()
   const iconName = manualIcon || await suggestIcon(name)
 
-  await query(
+  const result = await query<{ id: string }>(
     `INSERT INTO categories (name, slug, description, parent_category_id, sku_prefix, display_order, is_active, google_product_category, icon_name, return_allowed, return_window_days, replacement_allowed, replacement_window_days)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`,
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
     [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, iconName, returnAllowed, returnWindowDays, replacementAllowed, replacementWindowDays]
   )
+  const categoryId = result.rows[0].id
 
   revalidatePath('/admin/categories')
   revalidatePath('/admin/categories/add')
@@ -40,9 +41,8 @@ async function createCategory(formData: FormData) {
   revalidatePath('/admin/products/add')
   revalidatePath('/admin/products/edit/[id]', 'page')
 
-  
   const host = await getHost()
-  redirect(ap('/admin/categories', host))
+  redirect(ap(`/admin/categories/edit/${categoryId}`, host))
 }
 
 export default async function AddCategoryPage() {
