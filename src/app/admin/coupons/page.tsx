@@ -11,6 +11,7 @@ import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import DraftRowActions from '@/components/admin/DraftRowActions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -152,21 +153,17 @@ async function CouponsStats() {
             </div>
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
               {pendingDrafts.map((d) => (
-                <div key={d.coupon_id} className="flex items-center justify-between px-4 py-2">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
-                    <span className="text-sm font-mono font-medium text-foreground truncate">{d.code}</span>
-                    <span className="text-xs text-foreground-muted hidden sm:inline">
-                      {new Date(d.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </span>
-                  </div>
-                  <Link
-                    href={ap(`/admin/coupons/edit/${d.coupon_id}`, host)}
-                    className="text-xs text-amber-700 dark:text-amber-400 hover:underline font-medium ml-4 flex-shrink-0"
-                  >
-                    Review draft →
-                  </Link>
-                </div>
+                <DraftRowActions
+                  key={d.coupon_id}
+                  entityId={d.coupon_id}
+                  name={d.code}
+                  subtitle={null}
+                  updatedAt={d.updated_at}
+                  editHref={ap(`/admin/coupons/${d.coupon_id}`, host)}
+                  publishPath={`/api/admin/coupons/${d.coupon_id}/publish`}
+                  discardPath={`/api/admin/coupons/${d.coupon_id}/draft`}
+                  entityLabel="coupon"
+                />
               ))}
             </div>
           </div>

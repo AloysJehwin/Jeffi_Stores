@@ -6,6 +6,7 @@ import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
+import DraftRowActions from '@/components/admin/DraftRowActions'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
@@ -63,7 +64,51 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
         suggestType="review_forms"
       />
 
+      <Suspense fallback={null}>
+        <ReviewFormsDraftsBanner host={host} />
+      </Suspense>
+
       <ReviewFormsListSection searchParams={searchParams} host={host} />
+    </div>
+  )
+}
+
+async function ReviewFormsDraftsBanner({ host }: { host: string }) {
+  const pendingDrafts = await queryMany<{ form_id: string; name: string; updated_at: string }>(
+    `SELECT rfd.form_id, rf.title AS name, rfd.updated_at
+     FROM review_form_drafts rfd
+     JOIN review_forms rf ON rf.id = rfd.form_id
+     ORDER BY rfd.updated_at DESC
+     LIMIT 20`
+  )
+
+  const pendingDraftsCount = pendingDrafts.length
+  if (pendingDraftsCount === 0) return null
+
+  return (
+    <div className="mb-6">
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            Pending Drafts ({pendingDraftsCount})
+          </p>
+          <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
+        </div>
+        <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+          {pendingDrafts.map((d) => (
+            <DraftRowActions
+              key={d.form_id}
+              entityId={d.form_id}
+              name={d.name}
+              updatedAt={d.updated_at}
+              editHref={ap(`/admin/review-forms/edit/${d.form_id}`, host)}
+              publishPath={`/api/admin/review-forms/${d.form_id}/publish`}
+              discardPath={`/api/admin/review-forms/${d.form_id}/draft`}
+              entityLabel="review form"
+            />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
