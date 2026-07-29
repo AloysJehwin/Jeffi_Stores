@@ -121,13 +121,13 @@ export default function ProductImageGallery({ images, productName, variantImages
               <div
                 key={image.id}
                 onClick={() => setSelectedImageIndex(index)}
-                className={`relative bg-surface-elevated rounded-lg cursor-pointer border-2 transition-all hover:scale-[1.03] active:scale-95 ${
+                className={`relative bg-surface-elevated rounded-lg overflow-hidden cursor-pointer border-2 transition-all hover:scale-[1.03] active:scale-95 ${
                   index === selectedImageIndex
                     ? 'border-accent-500 scale-[1.02]'
                     : 'border-border-default hover:border-accent-300'
                 }`}
               >
-                <div className="w-full h-20 flex items-center justify-center overflow-hidden rounded-md">
+                <div className="w-full h-20 flex items-center justify-center">
                   <ImgWithSkeleton
                     src={image.thumbnail_url}
                     alt={`${productName} - Thumbnail ${index + 1}`}
