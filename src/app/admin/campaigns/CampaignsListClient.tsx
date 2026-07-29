@@ -167,6 +167,7 @@ export default function CampaignsListClient() {
 
       {campaigns.filter(c => c.kind !== 'broadcast').map(c => (
         <div key={c.kind} className="bg-surface-elevated rounded-xl border border-border-default p-5">
+          <div className="flex items-start justify-between gap-4 flex-wrap">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-3 flex-wrap">
                 <Link href={ap(`/admin/campaigns/${c.kind}`)} className="font-semibold text-foreground hover:text-accent-500 transition-colors">
