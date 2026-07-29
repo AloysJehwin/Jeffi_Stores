@@ -23,11 +23,10 @@ interface AdminFiltersProps {
   searchPlaceholder?: string
   searchParam?: string
   suggestType?: string
-  advancedPanel?: React.ReactNode        // trigger — rendered inline next to search
-  advancedPanelContent?: React.ReactNode // content — rendered full-width below
+  advancedContent?: React.ReactNode // advanced filters — revealed below card via chevron toggle
 }
 
-export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search', suggestType, advancedPanel, advancedPanelContent }: AdminFiltersProps) {
+export default function AdminFilters({ filters, searchPlaceholder, searchParam = 'search', suggestType, advancedContent }: AdminFiltersProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -135,7 +134,6 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                   </form>
                 )}
               </div>
-              {advancedPanel && <div className="self-end flex-shrink-0">{advancedPanel}</div>}
             </div>
           )}
 
@@ -147,7 +145,26 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
           )}
         </div>
 
-        {advancedPanelContent}
+        {advancedContent && (
+          <>
+            {advancedContent}
+            <div className="flex justify-center mt-2 -mb-1">
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams(searchParams.toString())
+                  if (searchParams.get('_adv') === '1') { params.delete('_adv') } else { params.set('_adv', '1') }
+                  router.push(`?${params.toString()}`, { scroll: false })
+                }}
+                className="flex items-center gap-1 px-3 py-1 text-xs text-foreground-muted hover:text-foreground transition-colors rounded-full hover:bg-surface-secondary"
+              >
+                <svg className={`w-4 h-4 transition-transform ${searchParams.get('_adv') === '1' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
