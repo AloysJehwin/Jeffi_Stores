@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
@@ -328,46 +329,39 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
 
   return (
     <div className="w-full">
-      {/* Trigger row */}
-      <div className="flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setExpanded(e => !e)}
-          className={`flex items-center gap-1 p-1.5 rounded transition-colors
-            ${activeCount > 0
-              ? 'text-accent-600 dark:text-accent-400'
-              : 'text-foreground-muted hover:text-foreground'}`}
-          title="Advanced Filters"
-        >
-          {activeCount > 0 && (
-            <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>
-          )}
-          {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-        </button>
+      {/* Trigger button */}
+      <button
+        type="button"
+        onClick={() => setExpanded(e => !e)}
+        className={`flex items-center gap-1 p-1.5 rounded transition-colors
+          ${activeCount > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted hover:text-foreground'}`}
+        title="Advanced Filters"
+      >
         {activeCount > 0 && (
-          <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline">
-            Clear all
-          </button>
+          <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>
         )}
-      </div>
+        {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      </button>
 
       {/* Active chips */}
       {activeCount > 0 && (
-        <div className="flex flex-wrap gap-1.5 mt-2">
+        <div className="flex flex-wrap gap-1.5 mt-1.5">
           {activeFields.map((f, i) => (
             <span key={i} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded-full">
               {chipLabel(f, searchParams)}
-              <button type="button" onClick={() => removeChip(f)} className="hover:text-accent-900">
-                <X className="w-3 h-3" />
-              </button>
+              <button type="button" onClick={() => removeChip(f)} className="hover:text-accent-900"><X className="w-3 h-3" /></button>
             </span>
           ))}
+          <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline">Clear all</button>
         </div>
       )}
 
-      {/* Collapsible filter panel */}
-      {expanded && (
-        <div className="mt-3 space-y-2">
+      {/* Expanded panel — breaks out full width using fixed positioning below filter bar */}
+      {expanded && typeof document !== 'undefined' && createPortal(
+        <div
+          className="fixed z-[199] left-0 right-0 bg-surface-elevated border-b border-border-default shadow-lg px-4 py-3 space-y-2"
+          style={{ top: document.querySelector('.sticky.top-0')?.getBoundingClientRect().bottom ?? 64 }}
+        >
           {sections.map(section => {
             const sectionFields = fields.filter(f => (f.section || 'General') === section)
             const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
@@ -385,8 +379,7 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
               </FilterSection>
             )
           })}
-
-          <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center justify-between pt-1">
             <button type="button" onClick={reset}
               className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">
               Reset All
@@ -396,7 +389,8 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
               Apply Filters
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )
