@@ -94,7 +94,6 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
         </svg>
       </button>
 
-      {/* Filter fields — hidden on mobile when collapsed, always visible on sm+ */}
       <div className={`${mobileOpen ? 'mt-4' : 'hidden'} sm:block`}>
         <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 sm:gap-4">
           {filters.map((filter) => (
@@ -180,12 +179,12 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
               Clear Filters
             </button>
           )}
-          {advancedPanel && (
-            <div className="sm:self-end pb-0">
-              {advancedPanel}
-            </div>
-          )}
         </div>
+        {advancedPanel && (
+          <div className="mt-3 w-full">
+            {advancedPanel}
+          </div>
+        )}
       </div>
     </div>
   )
