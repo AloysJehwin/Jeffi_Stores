@@ -153,7 +153,9 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
   const searchParams = useSearchParams()
   const [expanded, setExpanded] = useState(false)
   const [local, setLocal] = useState<Record<string, string>>({})
+  const [mounted, setMounted] = useState(false)
   const [popup, setPopup] = useState<string | null>(null)
+  useEffect(() => { setMounted(true) }, [])
 
   // Sync local state from URL
   useEffect(() => {
@@ -357,10 +359,10 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
       )}
 
       {/* Expanded panel — breaks out full width using fixed positioning below filter bar */}
-      {expanded && typeof document !== 'undefined' && createPortal(
+      {mounted && expanded && createPortal(
         <div
-          className="fixed z-[199] left-0 right-0 bg-surface-elevated border-b border-border-default shadow-lg px-4 py-3 space-y-2"
-          style={{ top: document.querySelector('.sticky.top-0')?.getBoundingClientRect().bottom ?? 64 }}
+          className="fixed z-[199] left-0 right-0 bg-surface-elevated border-b border-border-default shadow-lg px-4 py-3 space-y-2 overflow-y-auto max-h-[70vh]"
+          style={{ top: document.querySelector('[class*="sticky"][class*="top-0"]')?.getBoundingClientRect().bottom ?? 60 }}
         >
           {sections.map(section => {
             const sectionFields = fields.filter(f => (f.section || 'General') === section)
