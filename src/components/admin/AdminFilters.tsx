@@ -169,7 +169,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                   </form>
                 )}
               </div>
-              {advancedPanel && <div className="self-end pb-0.5 shrink-0">{advancedPanel}</div>}
+              {advancedPanel && <div className="self-end flex-shrink-0">{advancedPanel}</div>}
             </div>
           )}
 
