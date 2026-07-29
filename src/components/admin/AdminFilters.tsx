@@ -32,6 +32,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
   const pathname = usePathname()
   const [mobileOpen, setMobileOpen] = useState(false)
   const [searchValue, setSearchValue] = useState(searchParams.get(searchParam) || '')
+  const [advOpen, setAdvOpen] = useState(false)
 
   const createQueryString = useCallback(
     (name: string, value: string) => {
@@ -147,18 +148,14 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
 
         {advancedContent && (
           <>
-            {advancedContent}
+            {advOpen && advancedContent}
             <div className="flex justify-center mt-2 -mb-1">
               <button
                 type="button"
-                onClick={() => {
-                  const params = new URLSearchParams(searchParams.toString())
-                  if (searchParams.get('_adv') === '1') { params.delete('_adv') } else { params.set('_adv', '1') }
-                  router.push(`?${params.toString()}`, { scroll: false })
-                }}
+                onClick={() => setAdvOpen(o => !o)}
                 className="flex items-center gap-1 px-3 py-1 text-xs text-foreground-muted hover:text-foreground transition-colors rounded-full hover:bg-surface-secondary"
               >
-                <svg className={`w-4 h-4 transition-transform ${searchParams.get('_adv') === '1' ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className={`w-4 h-4 transition-transform ${advOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>

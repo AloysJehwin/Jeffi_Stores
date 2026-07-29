@@ -331,7 +331,7 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
             { value: 'prepaid', label: 'Prepaid' },
           ]},
           { name: 'coupon_code', label: 'Coupon Code', type: 'text', section: 'Payment', placeholder: 'Search by coupon code' },
-        ]} mode="content" />}
+        ]} mode="content" forceExpanded />}
       />
 
       <OrdersListSection searchParams={searchParams} />
