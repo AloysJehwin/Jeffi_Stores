@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import HoverCard from '@/components/ui/HoverCard'
 import DeleteCouponButton from '@/components/admin/DeleteCouponButton'
 import { ap } from '@/lib/admin-path'
@@ -25,6 +26,7 @@ interface CouponRow {
 export default function CouponTableRow({ coupon: c, backUrl = '/admin/coupons' }: { coupon: CouponRow; backUrl?: string }) {
   const isExpired = c.valid_until && new Date(c.valid_until) < new Date()
   const [open, setOpen] = useState(false)
+  const router = useRouter()
 
   return (
     <>
@@ -111,13 +113,13 @@ export default function CouponTableRow({ coupon: c, backUrl = '/admin/coupons' }
         </div>,
         document.body
       )}
-      <tr className="hover:bg-surface-secondary/50 transition-colors cursor-pointer" onClick={() => setOpen(true)}>
+      <tr className="hover:bg-surface-secondary/50 transition-colors cursor-pointer" onClick={() => router.push(ap(`/admin/coupons/${c.id}?back=${encodeURIComponent(backUrl)}`))}>
         <td className="px-4 py-3 font-mono font-bold">
           <div className="flex flex-col gap-1">
             <HoverCard
               trigger={
                 <Link
-                  href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(backUrl)}`)}
+                  href={ap(`/admin/coupons/${c.id}?back=${encodeURIComponent(backUrl)}`)}
                   className="text-accent-500 hover:text-accent-600 hover:underline transition-colors"
                   onClick={e => e.stopPropagation()}
                 >

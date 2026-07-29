@@ -102,12 +102,23 @@ async function AddCouponButton() {
 }
 
 async function CouponsStats() {
-  const allStats = await getFilteredCoupons({})
+  const host = await getHost()
+  const [allStats, pendingDrafts] = await Promise.all([
+    getFilteredCoupons({}),
+    queryMany<{ coupon_id: string; code: string; updated_at: string }>(
+      `SELECT cd.coupon_id, c.code, cd.updated_at
+       FROM coupon_drafts cd
+       JOIN coupons c ON c.id = cd.coupon_id
+       ORDER BY cd.updated_at DESC
+       LIMIT 20`
+    ),
+  ])
 
   const totalCoupons = allStats.total
   const activeCoupons = (allStats.coupons as { is_active: boolean }[]).filter(c => c.is_active).length
   const expiredCoupons = (allStats.coupons as { valid_until: string | null; is_active: boolean }[]).filter(c => c.valid_until && new Date(c.valid_until) < new Date()).length
   const campaignCoupons = (allStats.coupons as { auto_generated: boolean }[]).filter(c => c.auto_generated).length
+  const pendingDraftsCount = pendingDrafts.length
 
   return (
     <div className="animate-fade-in">
@@ -129,6 +140,38 @@ async function CouponsStats() {
           <p className="text-2xl sm:text-3xl font-bold text-purple-600 mt-2">{campaignCoupons}</p>
         </div>
       </div>
+
+      {pendingDraftsCount > 0 && (
+        <div className="mb-6">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Pending Drafts ({pendingDraftsCount})
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">Changes not yet published to live</p>
+            </div>
+            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+              {pendingDrafts.map((d) => (
+                <div key={d.coupon_id} className="flex items-center justify-between px-4 py-2">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <span className="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0" />
+                    <span className="text-sm font-mono font-medium text-foreground truncate">{d.code}</span>
+                    <span className="text-xs text-foreground-muted hidden sm:inline">
+                      {new Date(d.updated_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                  </div>
+                  <Link
+                    href={ap(`/admin/coupons/edit/${d.coupon_id}`, host)}
+                    className="text-xs text-amber-700 dark:text-amber-400 hover:underline font-medium ml-4 flex-shrink-0"
+                  >
+                    Review draft →
+                  </Link>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -230,6 +273,7 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
                 {c.valid_until && ` · Expires ${new Date(c.valid_until).toLocaleDateString('en-IN')}`}
               </div>
               <div className="flex gap-3 pt-1">
+                <Link href={ap(`/admin/coupons/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">View</Link>
                 <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">Edit</Link>
                 <DeleteCouponButton id={c.id} code={c.code} />
               </div>
