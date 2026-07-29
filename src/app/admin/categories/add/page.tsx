@@ -67,6 +67,7 @@ export default async function AddCategoryPage() {
       <CategoryForm
         categories={categories || []}
         action={createCategory}
+        submitLabel="Save as Draft"
       />
     </div>
   )

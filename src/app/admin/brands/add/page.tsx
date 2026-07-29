@@ -57,7 +57,7 @@ export default async function AddBrandPage() {
         <p className="text-foreground-secondary mt-1">Create a new product brand</p>
       </div>
 
-      <BrandForm action={createBrand} />
+      <BrandForm action={createBrand} submitLabel="Save as Draft" />
     </div>
   )
 }
