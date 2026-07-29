@@ -123,7 +123,7 @@ export default function ProductImageGallery({ images, productName, variantImages
                 onClick={() => setSelectedImageIndex(index)}
                 className={`relative bg-surface-elevated rounded-lg cursor-pointer border-2 transition-all hover:scale-[1.03] active:scale-95 ${
                   index === selectedImageIndex
-                    ? 'border-accent-500 ring-2 ring-accent-200 scale-[1.02]'
+                    ? 'border-accent-500 ring-2 ring-accent-400 ring-offset-2 scale-[1.02]'
                     : 'border-border-default hover:border-gray-400'
                 }`}
               >
