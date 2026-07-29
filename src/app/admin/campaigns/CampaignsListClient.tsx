@@ -51,6 +51,16 @@ export default function CampaignsListClient() {
 
   useEffect(() => { load(0) }, [])
 
+  async function discardDraft(c: CampaignRow) {
+    const ok = await confirm({ message: `Discard all unsaved changes for "${c.name}"? This cannot be undone.`, variant: 'danger', confirmLabel: 'Discard' })
+    if (!ok) return
+    setBusy(c.kind)
+    try {
+      await fetch(`/api/admin/campaigns/${c.kind}/draft`, { method: 'DELETE', credentials: 'include' })
+      await load(offset)
+    } finally { setBusy(null) }
+  }
+
   async function toggle(c: CampaignRow) {
     setBusy(c.kind)
     try {
@@ -152,12 +162,22 @@ export default function CampaignsListClient() {
                   <Link href={ap(`/admin/campaigns/${d.kind}`)} className="flex-1 min-w-0 mr-4">
                     <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{d.name}</p>
                   </Link>
-                  <Link
-                    href={ap(`/admin/campaigns/${d.kind}`)}
-                    className="px-2.5 py-1 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
-                  >
-                    Review →
-                  </Link>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href={ap(`/admin/campaigns/${d.kind}`)}
+                      className="px-2.5 py-1 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
+                    >
+                      Publish
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => discardDraft(d)}
+                      disabled={busy === d.kind}
+                      className="px-2.5 py-1 text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors disabled:opacity-50"
+                    >
+                      {busy === d.kind ? '…' : 'Discard'}
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
