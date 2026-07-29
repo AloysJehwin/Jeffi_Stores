@@ -282,11 +282,14 @@ async function ProductsStats() {
               {pendingDrafts.map((d) => (
                 <DraftRowActions
                   key={d.product_id}
-                  productId={d.product_id}
+                  entityId={d.product_id}
                   name={d.name}
-                  sku={d.sku}
+                  subtitle={d.sku}
                   updatedAt={d.updated_at}
                   editHref={ap(`/admin/products/edit/${d.product_id}`, host)}
+                  publishPath={`/api/admin/products/${d.product_id}/publish`}
+                  discardPath={`/api/admin/products/${d.product_id}/draft`}
+                  entityLabel="product"
                 />
               ))}
             </div>

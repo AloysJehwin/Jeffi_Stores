@@ -8,13 +8,15 @@ import AdminFilters from '@/components/admin/AdminFilters'
 import CategoriesClient from '@/components/admin/CategoriesClient'
 import BrochureButton from '@/components/admin/BrochureButton'
 import MisassignedProductsBanner from '@/components/admin/MisassignedProductsBanner'
+import DraftRowActions from '@/components/admin/DraftRowActions'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
 type SP = { [key: string]: string | undefined }
 
 async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams: SP }) {
-  const [categories, misassignedRows] = await Promise.all([
+  const [host, categories, misassignedRows, pendingDrafts] = await Promise.all([
+    getHost(),
     getFilteredCategories({
       is_active: resolvedSearchParams.is_active }),
     queryMany<{ id: string; name: string; category_id: string; category_name: string }>(
@@ -25,12 +27,20 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
          AND EXISTS (SELECT 1 FROM categories sub WHERE sub.parent_category_id = p.category_id)
        ORDER BY c.name, p.name`
     ),
+    queryMany<{ category_id: string; name: string; updated_at: string }>(
+      `SELECT cd.category_id, c.name, cd.updated_at
+       FROM category_drafts cd
+       JOIN categories c ON c.id = cd.category_id
+       ORDER BY cd.updated_at DESC
+       LIMIT 20`
+    ),
   ])
 
   const allCategories = categories || []
   const mainCategoriesCount = allCategories.filter(c => !c.parent_category_id).length
   const totalCategories = allCategories.length
   const subCategoriesCount = totalCategories - mainCategoriesCount
+  const pendingDraftsCount = pendingDrafts.length
 
   return (
     <div className="animate-fade-in">
@@ -48,6 +58,33 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
           <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{subCategoriesCount}</p>
         </div>
       </div>
+
+      {pendingDraftsCount > 0 && (
+        <div className="mb-6">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Pending Drafts ({pendingDraftsCount})
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
+            </div>
+            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+              {pendingDrafts.map((d) => (
+                <DraftRowActions
+                  key={d.category_id}
+                  entityId={d.category_id}
+                  name={d.name}
+                  updatedAt={d.updated_at}
+                  editHref={ap(`/admin/categories/${d.category_id}`, host)}
+                  publishPath={`/api/admin/categories/${d.category_id}/publish`}
+                  discardPath={`/api/admin/categories/${d.category_id}/draft`}
+                  entityLabel="category"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {misassignedRows.length > 0 && (
         <MisassignedProductsBanner

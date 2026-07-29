@@ -138,7 +138,7 @@ export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { br
           <HoverCard
             trigger={
               <Link
-                href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)}
+                href={ap(`/admin/brands/${brand.id}?back=${encodeURIComponent(backUrl)}`)}
                 className="text-sm font-semibold text-foreground hover:text-accent-500 transition-colors"
                 onClick={e => e.stopPropagation()}
               >

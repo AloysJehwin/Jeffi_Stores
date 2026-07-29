@@ -370,7 +370,7 @@ function SortableRow({
             trigger={
               <div onClick={e => e.stopPropagation()}>
                 <Link
-                  href={ap(`/admin/categories/edit/${category.id}?back=${encodeURIComponent(backUrl)}`)}
+                  href={ap(`/admin/categories/${category.id}?back=${encodeURIComponent(backUrl)}`)}
                   className={`text-sm hover:text-accent-500 transition-colors cursor-pointer ${isSubcat ? 'text-foreground' : 'font-semibold text-foreground'}`}
                   onClick={e => e.stopPropagation()}
                 >
