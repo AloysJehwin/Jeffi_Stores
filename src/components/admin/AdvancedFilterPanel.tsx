@@ -125,7 +125,8 @@ function OptionsPopup({ options, value, multi, onChange, onClose }: {
 
 // Collapsible section
 function FilterSection({ title, activeCount, children }: { title: string; activeCount: number; children: React.ReactNode }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
+  const isOpen = open || activeCount > 0
   return (
     <div className="border border-border-default rounded-lg overflow-hidden">
       <button
@@ -139,9 +140,9 @@ function FilterSection({ title, activeCount, children }: { title: string; active
             <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>
           )}
         </div>
-        {open ? <ChevronUp className="w-3.5 h-3.5 text-foreground-muted" /> : <ChevronDown className="w-3.5 h-3.5 text-foreground-muted" />}
+        {isOpen ? <ChevronUp className="w-3.5 h-3.5 text-foreground-muted" /> : <ChevronDown className="w-3.5 h-3.5 text-foreground-muted" />}
       </button>
-      {open && <div className="px-3 py-2.5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">{children}</div>}
+      {isOpen && <div className="px-3 py-2.5 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-4 gap-y-3">{children}</div>}
     </div>
   )
 }
@@ -338,9 +339,6 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
               : 'text-foreground-muted hover:text-foreground'}`}
           title="Advanced Filters"
         >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h18M6 8h12M9 12h6M11 16h2" />
-          </svg>
           {activeCount > 0 && (
             <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>
           )}
