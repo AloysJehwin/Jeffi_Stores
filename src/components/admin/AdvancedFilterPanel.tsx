@@ -291,7 +291,11 @@ export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
 
       {/* Full-width dropdown panel via portal */}
       {mounted && expanded && createPortal(
-        <div ref={panelRef} style={getPanelStyle()} className="bg-surface-elevated border-y border-border-default shadow-xl px-6 py-4 overflow-y-auto max-h-[60vh]">
+        <>
+          {/* Backdrop */}
+          <div className="fixed inset-0 z-[299]" onClick={() => setExpanded(false)} />
+          {/* Panel */}
+          <div ref={panelRef} style={getPanelStyle()} className="bg-surface-elevated border-t-2 border-t-accent-500 border-b border-border-default shadow-2xl px-6 py-4 overflow-y-auto max-h-[60vh]">
           {/* Active chips at top */}
           {activeCount > 0 && (
             <div className="flex flex-wrap gap-1.5 mb-3 pb-3 border-b border-border-default">
@@ -331,7 +335,8 @@ export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
             <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
             <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
           </div>
-        </div>,
+        </div>
+        </>,
         document.body
       )}
     </div>
