@@ -371,12 +371,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           { name: 'is_cod_allowed', label: 'COD Allowed', type: 'toggle', section: 'Pricing & Tax', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
           { name: 'shipping_class', label: 'Shipping Class', type: 'multi-select', section: 'Logistics', options: [{ value: 'standard', label: 'Standard' }, { value: 'express', label: 'Express' }, { value: 'freight', label: 'Freight' }] },
           { name: 'is_oversized', label: 'Oversized', type: 'toggle', section: 'Logistics', options: [{ value: 'true', label: 'Yes' }, { value: 'false', label: 'No' }] },
-          { name: 'country_of_origin', label: 'Country of Origin', type: 'text', section: 'Logistics', placeholder: 'e.g. IN' },
+          { name: 'country_of_origin', label: 'Country of Origin', type: 'value-help', section: 'Logistics', placeholder: 'Any country' },
           { name: 'fragile', label: 'Fragile', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
           { name: 'hazardous', label: 'Hazardous', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
           { name: 'perishable', label: 'Perishable', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
           { name: 'serialized', label: 'Serialized', type: 'toggle', section: 'Product Flags', options: [{ value: 'true', label: 'Yes' }] },
-          { name: 'grade', label: 'Grade', type: 'multi-select', section: 'Other', options: [{ value: 'A', label: 'Grade A' }, { value: 'B', label: 'Grade B' }, { value: 'C', label: 'Grade C' }] },
+          { name: 'grade', label: 'Grade', type: 'value-help', section: 'Specifications', placeholder: 'Any grade' },
+          { name: 'compliance_standard', label: 'Compliance Standard', type: 'value-help', section: 'Specifications', placeholder: 'Any standard' },
+          { name: 'safety_rating', label: 'Safety Rating', type: 'value-help', section: 'Specifications', placeholder: 'Any rating' },
         ]} />}
       />
 
