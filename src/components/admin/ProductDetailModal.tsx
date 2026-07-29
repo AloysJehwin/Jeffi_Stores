@@ -114,10 +114,10 @@ export default function ProductDetailModal({ product, onClose }: Props) {
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
-              href={ap(`/admin/products/edit/${product.id}`)}
+              href={ap(`/admin/products/${product.id}`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
             >
-              Edit
+              View Product
             </Link>
             <button
               onClick={onClose}
