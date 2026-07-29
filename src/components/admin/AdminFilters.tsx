@@ -134,7 +134,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                   </form>
                 )}
               </div>
-              {/* advanced panel trigger is rendered below the row */}
+              {/* advanced panel trigger is inside search input above */}
             </div>
           )}
 
@@ -146,7 +146,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
           )}
         </div>
 
-        {/* Advanced filter panel — full width, trigger + sections all in one */}
+        {/* Advanced filter sections — full width below filter row */}
         {advancedPanel}
       </div>
     </div>

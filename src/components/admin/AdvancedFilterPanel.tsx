@@ -82,9 +82,13 @@ function FilterSection({ title, activeCount, children }: { title: string; active
 export function AdvancedFilterTrigger({ activeCount, expanded, onToggle }: { activeCount: number; expanded: boolean; onToggle: () => void }) {
   return (
     <button type="button" onClick={onToggle}
-      className={`flex items-center gap-1 p-1.5 rounded transition-colors ${activeCount > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted hover:text-foreground'}`}>
-      {activeCount > 0 && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>}
-      {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+      className={`inline-flex items-center gap-1.5 px-3 py-1 text-xs rounded-full border transition-colors
+        ${activeCount > 0
+          ? 'bg-accent-50 dark:bg-accent-900/20 border-accent-400 text-accent-700 dark:text-accent-300'
+          : 'border-border-secondary bg-surface text-foreground-secondary hover:bg-surface-secondary hover:border-border-default'}`}>
+      {activeCount > 0
+        ? <><span className="font-semibold">{activeCount} filter{activeCount > 1 ? 's' : ''}</span>{expanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}</>
+        : <>{expanded ? <><ChevronUp className="w-3 h-3" /> Hide filters</> : <><ChevronDown className="w-3 h-3" /> More filters</>}</>}
     </button>
   )
 }
