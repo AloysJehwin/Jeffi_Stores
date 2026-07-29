@@ -140,7 +140,7 @@ function FilterSection({ title, activeCount, children }: { title: string; active
         </div>
         {open ? <ChevronUp className="w-4 h-4 text-foreground-muted" /> : <ChevronDown className="w-4 h-4 text-foreground-muted" />}
       </button>
-      {open && <div className="px-4 py-3 grid grid-cols-1 sm:grid-cols-2 gap-3">{children}</div>}
+      {open && <div className="px-4 py-3 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">{children}</div>}
     </div>
   )
 }
@@ -250,7 +250,7 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
       const [minName, maxName] = Array.isArray(f.name) ? f.name : [`${f.name}_min`, `${f.name}_max`]
       const u = f.unit || ''
       return (
-        <div className="sm:col-span-2 flex items-center gap-2">
+        <div className="col-span-2 flex items-center gap-2">
           <div className="relative flex-1">
             {u && <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-foreground-muted">{u}</span>}
             <input type="number" min={0} placeholder="Min" className={`${inputCls} ${u ? 'pl-6' : ''}`}
@@ -269,7 +269,7 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
     if (f.type === 'date-range') {
       const [fromName, toName] = Array.isArray(f.name) ? f.name : [`${f.name}_from`, `${f.name}_to`]
       return (
-        <div className="sm:col-span-2 flex items-center gap-2">
+        <div className="col-span-2 flex items-center gap-2">
           <div className="flex-1">
             <DatePicker value={local[fromName] || ''} onChange={v => setLocalVal(fromName, v)} placeholder="From date" />
           </div>
@@ -341,7 +341,7 @@ export default function AdvancedFilterPanel({ fields, paramNames }: AdvancedFilt
                 {sectionFields.map((f, i) => {
                   const isWide = f.type === 'range' || f.type === 'date-range'
                   return (
-                    <div key={i} className={isWide ? 'sm:col-span-2' : ''}>
+                    <div key={i} className={isWide ? 'col-span-2' : ''}>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1.5">{f.label}</label>
                       {renderField(f)}
                     </div>
