@@ -328,7 +328,7 @@ function SortableRow({
       ref={setNodeRef}
       style={style}
       className={`${isSubcat ? 'bg-surface' : 'bg-surface-elevated'} hover:bg-surface-secondary cursor-pointer`}
-      onClick={onView}
+      onClick={() => router.push(ap(`/admin/categories/${category.id}?back=${encodeURIComponent(backUrl)}`))}
     >
       <td className="px-4 py-3 whitespace-nowrap">
         <div className={`flex items-center gap-2 ${isSubcat ? 'ml-8' : ''}`}>
