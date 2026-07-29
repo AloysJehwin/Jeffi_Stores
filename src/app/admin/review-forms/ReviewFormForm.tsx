@@ -8,6 +8,7 @@ import type { LucideIcon } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from '@/components/forms/FormsPreview'
 import Toggle from '@/components/ui/Toggle'
+import AIFillForm from '@/components/admin/AIFillForm'
 import { ap } from '@/lib/admin-path'
 
 interface Coupon {
@@ -192,8 +193,33 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
     }
   }
 
+  function handleAIFill(values: Record<string, unknown>) {
+    if (values.title) setTitle(String(values.title))
+    if (values.slug) setSlug(String(values.slug).toLowerCase().replace(/[^a-z0-9-]/g, '-'))
+    if (values.template_type && ['google_review', 'product_feedback', 'testimonial'].includes(String(values.template_type))) {
+      setTemplateType(values.template_type as TemplateType)
+    }
+    if (values.google_review_url) setGoogleUrl(String(values.google_review_url))
+    if (values.description) setDescription(String(values.description))
+    if (values.is_active != null) setIsActive(Boolean(values.is_active))
+  }
+
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+      <div className="xl:col-span-2">
+        <AIFillForm
+          fields={[
+            { name: 'title', label: 'Form Title', type: 'text' },
+            { name: 'slug', label: 'URL Slug', type: 'text' },
+            { name: 'template_type', label: 'Template (google_review, product_feedback, or testimonial)', type: 'text' },
+            { name: 'google_review_url', label: 'Google Review URL', type: 'text' },
+            { name: 'description', label: 'Description', type: 'textarea' },
+            { name: 'is_active', label: 'Active', type: 'boolean' },
+          ]}
+          onFill={handleAIFill}
+          context="Review form for jeffistores.com hardware store"
+        />
+      </div>
       <div className="space-y-5">
         <div>
           <label className={labelClass}>Template *</label>
