@@ -42,8 +42,7 @@ export async function POST(req: NextRequest, { params }: Params) {
            return_allowed = COALESCE($8::boolean, return_allowed),
            return_window_days = COALESCE($9::integer, return_window_days),
            replacement_allowed = COALESCE($10::boolean, replacement_allowed),
-           replacement_window_days = COALESCE($11::integer, replacement_window_days),
-           updated_at = NOW()
+           replacement_window_days = COALESCE($11::integer, replacement_window_days)
          WHERE id = $1`,
         [
           id,

@@ -108,7 +108,7 @@ async function BrandsStats() {
                   entityId={d.brand_id}
                   name={d.name}
                   updatedAt={d.updated_at}
-                  editHref={ap(`/admin/brands/${d.brand_id}`, host)}
+                  editHref={ap(`/admin/brands/edit/${d.brand_id}`, host)}
                   publishPath={`/api/admin/brands/${d.brand_id}/publish`}
                   discardPath={`/api/admin/brands/${d.brand_id}/draft`}
                   entityLabel="brand"

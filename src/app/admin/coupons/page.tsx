@@ -159,7 +159,7 @@ async function CouponsStats() {
                   name={d.code}
                   subtitle={null}
                   updatedAt={d.updated_at}
-                  editHref={ap(`/admin/coupons/${d.coupon_id}`, host)}
+                  editHref={ap(`/admin/coupons/edit/${d.coupon_id}`, host)}
                   publishPath={`/api/admin/coupons/${d.coupon_id}/publish`}
                   discardPath={`/api/admin/coupons/${d.coupon_id}/draft`}
                   entityLabel="coupon"
