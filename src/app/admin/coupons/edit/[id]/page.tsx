@@ -182,8 +182,8 @@ export default async function EditCouponPage({ params, searchParams }: { params:
       revalidatePath(`/admin/coupons/edit/${id}`)
       redirect(ap(destination, host))
     } catch (err: any) {
-      if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
-      throw new Error('Failed to update coupon')
+      if (err?.digest?.startsWith('NEXT_REDIRECT') || err?.type === 'NEXT_REDIRECT') throw err
+      throw new Error(err?.message || 'Failed to update coupon')
     }
   }
 
