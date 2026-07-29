@@ -237,7 +237,7 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
   if (mode === 'content') {
     if (!expanded && activeCount === 0) return null
     return (
-      <div className="mt-2 pt-3 border-t border-border-default space-y-2">
+      <div className="mt-2 pt-2 border-t border-border-default space-y-1.5">
         {activeCount > 0 && (
           <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border-default">
             {activeFields.map((f, i) => (
@@ -267,7 +267,7 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
               </FilterSection>
             )
           })}
-          <div className="flex items-center justify-end gap-3 pt-1">
+          <div className="flex items-center justify-end gap-3">
             <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
             <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
           </div>
@@ -283,7 +283,7 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
         <AdvancedFilterTrigger activeCount={activeCount} expanded={expanded} onToggle={toggleExpanded} />
       </div>
       {(expanded || activeCount > 0) && (
-        <div className="mt-2 pt-3 border-t border-border-default space-y-2">
+        <div className="mt-2 pt-2 border-t border-border-default space-y-1.5">
           {activeCount > 0 && (
             <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border-default">
               {activeFields.map((f, i) => (
@@ -313,7 +313,7 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both',
                 </FilterSection>
               )
             })}
-            <div className="flex items-center justify-end gap-3 pt-1">
+            <div className="flex items-center justify-end gap-3">
               <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
               <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
             </div>

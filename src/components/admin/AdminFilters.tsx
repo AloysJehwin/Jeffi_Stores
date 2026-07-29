@@ -149,7 +149,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
         {advancedContent && (
           <>
             {advOpen && advancedContent}
-            <div className="flex justify-center mt-2 -mb-1">
+            <div className="flex justify-center mt-1 -mb-1">
               <button
                 type="button"
                 onClick={() => setAdvOpen(o => !o)}
