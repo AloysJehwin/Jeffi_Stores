@@ -123,8 +123,8 @@ export default function ProductImageGallery({ images, productName, variantImages
                 onClick={() => setSelectedImageIndex(index)}
                 className={`relative bg-surface-elevated rounded-lg cursor-pointer border-2 transition-all hover:scale-[1.03] active:scale-95 ${
                   index === selectedImageIndex
-                    ? 'border-accent-500 ring-2 ring-accent-400 ring-offset-2 scale-[1.02]'
-                    : 'border-border-default hover:border-gray-400'
+                    ? 'border-accent-500 scale-[1.02]'
+                    : 'border-border-default hover:border-accent-300'
                 }`}
               >
                 <div className="w-full h-20 flex items-center justify-center overflow-hidden rounded-md">
@@ -209,8 +209,8 @@ export default function ProductImageGallery({ images, productName, variantImages
                   }}
                   className={`flex-shrink-0 w-16 h-16 rounded border-2 transition-all ${
                     index === selectedImageIndex
-                      ? 'border-accent-500 ring-2 ring-accent-300'
-                      : 'border-transparent hover:border-gray-400'
+                      ? 'border-accent-500'
+                      : 'border-transparent hover:border-accent-300'
                   }`}
                 >
                   <ImgWithSkeleton
