@@ -185,6 +185,12 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
         return
       }
 
+      const data = await res.json()
+      // After creation redirect to edit so draft auto-creates
+      if (!formId && data.form?.id) {
+        router.push(ap(`/admin/review-forms/edit/${data.form.id}`))
+        return
+      }
       const destination = backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms'
       router.push(ap(destination))
       router.refresh()
@@ -330,7 +336,7 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
         {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>}
 
         <div className="flex items-center gap-3 pt-2">
-          <Link href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
+          <Link href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">
             Cancel
           </Link>
           {isDraft ? (
