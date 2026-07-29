@@ -22,6 +22,7 @@ interface Props {
   fields: AdvancedFilterField[]
   paramNames?: string[]
   mode?: 'trigger' | 'content' | 'both'
+  forceExpanded?: boolean
 }
 
 function fieldParamNames(f: AdvancedFilterField): string[] {
@@ -94,10 +95,10 @@ export function AdvancedFilterTrigger({ activeCount, expanded, onToggle }: { act
   )
 }
 
-export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both' }: Props) {
+export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both', forceExpanded }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const expanded = searchParams.get('_adv') === '1'
+  const expanded = forceExpanded ?? (searchParams.get('_adv') === '1')
   const [local, setLocal] = useState<Record<string, string>>({})
   const [popup, setPopup] = useState<string | null>(null)
 
@@ -266,7 +267,7 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both' 
               </FilterSection>
             )
           })}
-          <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center justify-end gap-3 pt-1">
             <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
             <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
           </div>
@@ -312,7 +313,7 @@ export default function AdvancedFilterPanel({ fields, paramNames, mode = 'both' 
                 </FilterSection>
               )
             })}
-            <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center justify-end gap-3 pt-1">
               <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
               <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
             </div>

@@ -379,7 +379,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           { name: 'grade', label: 'Grade', type: 'value-help', section: 'Specifications', placeholder: 'Any grade' },
           { name: 'compliance_standard', label: 'Compliance Standard', type: 'value-help', section: 'Specifications', placeholder: 'Any standard' },
           { name: 'safety_rating', label: 'Safety Rating', type: 'value-help', section: 'Specifications', placeholder: 'Any rating' },
-        ]} mode="content" />}
+        ]} mode="content" forceExpanded />}
       />
 
       <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} />
