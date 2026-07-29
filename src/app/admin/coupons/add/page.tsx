@@ -27,8 +27,8 @@ async function createCoupon(formData: FormData) {
   try {
     const result = await query<{ id: string }>(
       `INSERT INTO coupons (code, description, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-      [code, description || null, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active]
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false) RETURNING id`,
+      [code, description || null, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until]
     )
     couponId = result.rows[0].id
   } catch (err) {
@@ -64,7 +64,7 @@ export default async function AddCouponPage() {
         </div>
       </div>
 
-      <CouponForm action={createCoupon} submitLabel="Create Coupon" showUserSelector />
+      <CouponForm action={createCoupon} submitLabel="Save as Draft" showUserSelector />
     </div>
   )
 }
