@@ -115,13 +115,13 @@ export default function ProductImageGallery({ images, productName, variantImages
               <div
                 key={image.id}
                 onClick={() => setSelectedImageIndex(index)}
-                className={`relative bg-surface-elevated rounded-lg overflow-hidden cursor-pointer border-2 transition-all hover:scale-[1.03] active:scale-95 ${
+                className={`relative bg-surface-elevated rounded-lg cursor-pointer border-2 transition-all hover:scale-[1.03] active:scale-95 ${
                   index === selectedImageIndex
                     ? 'border-accent-500 ring-2 ring-accent-200 scale-[1.02]'
                     : 'border-border-default hover:border-gray-400'
                 }`}
               >
-                <div className="w-full h-20 flex items-center justify-center">
+                <div className="w-full h-20 flex items-center justify-center overflow-hidden rounded-md">
                   <ImgWithSkeleton
                     src={image.thumbnail_url}
                     alt={`${productName} - Thumbnail ${index + 1}`}
@@ -201,7 +201,7 @@ export default function ProductImageGallery({ images, productName, variantImages
                     e.stopPropagation()
                     setSelectedImageIndex(index)
                   }}
-                  className={`flex-shrink-0 w-16 h-16 rounded overflow-hidden border-2 transition-all ${
+                  className={`flex-shrink-0 w-16 h-16 rounded border-2 transition-all ${
                     index === selectedImageIndex
                       ? 'border-accent-500 ring-2 ring-accent-300'
                       : 'border-transparent hover:border-gray-400'
@@ -210,7 +210,7 @@ export default function ProductImageGallery({ images, productName, variantImages
                   <ImgWithSkeleton
                     src={image.thumbnail_url}
                     alt={`Thumbnail ${index + 1}`}
-                    className="w-full h-full object-contain bg-surface-secondary"
+                    className="w-full h-full object-contain bg-surface-secondary overflow-hidden rounded"
                   />
                 </button>
               ))}
