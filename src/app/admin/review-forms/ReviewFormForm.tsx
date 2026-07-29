@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Star, MessageSquare, FileText, X } from 'lucide-react'
@@ -79,35 +79,39 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstRender = useRef(true)
 
-  const buildPayload = useCallback(() => ({
-    title: title.trim(),
-    slug: slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
-    template_type: templateType,
-    google_review_url: templateType === 'google_review' ? googleUrl.trim() : '',
-    coupon_id: couponId || null,
-    description: description.trim() || null,
-    is_active: isActive,
-    custom_fields: customFields,
-  }), [title, slug, templateType, googleUrl, couponId, description, isActive, customFields])
+  // Keep a ref to current values so the debounced callback always has fresh data
+  const valuesRef = useRef({ title, slug, templateType, googleUrl, couponId, description, isActive, customFields })
+  valuesRef.current = { title, slug, templateType, googleUrl, couponId, description, isActive, customFields }
 
   useEffect(() => {
     if (!isDraft || !formId) return
     if (isFirstRender.current) { isFirstRender.current = false; return }
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     autoSaveTimer.current = setTimeout(async () => {
+      const v = valuesRef.current
       setAutoSaveStatus('saving')
       try {
         await fetch(`/api/admin/review-forms/${formId}/draft`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(buildPayload()),
+          body: JSON.stringify({
+            title: v.title.trim(),
+            slug: v.slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
+            template_type: v.templateType,
+            google_review_url: v.templateType === 'google_review' ? v.googleUrl.trim() : '',
+            coupon_id: v.couponId || null,
+            description: v.description.trim() || null,
+            is_active: v.isActive,
+            custom_fields: v.customFields,
+          }),
         })
         setAutoSaveStatus('saved')
         setTimeout(() => setAutoSaveStatus('idle'), 2000)
       } catch { setAutoSaveStatus('idle') }
     }, 1500)
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
-  }, [title, slug, templateType, googleUrl, couponId, description, isActive, customFields, isDraft, formId, buildPayload])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, slug, templateType, googleUrl, couponId, description, isActive, customFields])
 
   const couponOptions = [
     { value: '', label: '— No coupon —' },
@@ -134,7 +138,17 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
     setSubmitting(true)
     setError('')
     try {
-      const payload = buildPayload()
+      const v = valuesRef.current
+      const payload = {
+        title: v.title.trim(),
+        slug: v.slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
+        template_type: v.templateType,
+        google_review_url: v.templateType === 'google_review' ? v.googleUrl.trim() : '',
+        coupon_id: v.couponId || null,
+        description: v.description.trim() || null,
+        is_active: v.isActive,
+        custom_fields: v.customFields,
+      }
 
       if (isDraft && formId) {
         // Determine intent from the clicked button
