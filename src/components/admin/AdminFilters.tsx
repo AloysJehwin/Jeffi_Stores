@@ -119,55 +119,55 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
           ))}
 
           {searchPlaceholder && (
-            <div className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[400px] flex items-end gap-1.5">
+            <div className="w-full sm:flex-1 sm:min-w-[200px] flex items-end gap-1.5">
               <div className="flex-1">
-              <label
-                htmlFor={`filter-${searchParam}`}
-                className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider"
-              >
-                Search
-              </label>
-              {suggestType ? (
-                <AdminTypeahead
-                  type={suggestType}
-                  value={searchValue}
-                  onChange={setSearchValue}
-                  onSelect={item => {
-                    if (item.href) {
-                      router.push(item.href)
-                    } else {
-                      const qs = createQueryString(searchParam, searchValue.trim())
+                <label
+                  htmlFor={`filter-${searchParam}`}
+                  className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider"
+                >
+                  Search
+                </label>
+                {suggestType ? (
+                  <AdminTypeahead
+                    type={suggestType}
+                    value={searchValue}
+                    onChange={setSearchValue}
+                    onSelect={item => {
+                      if (item.href) {
+                        router.push(item.href)
+                      } else {
+                        const qs = createQueryString(searchParam, searchValue.trim())
+                        router.push(`${pathname}${qs ? `?${qs}` : ''}`)
+                      }
+                    }}
+                    onEnter={val => {
+                      const qs = createQueryString(searchParam, val.trim())
                       router.push(`${pathname}${qs ? `?${qs}` : ''}`)
-                    }
-                  }}
-                  onEnter={val => {
-                    const qs = createQueryString(searchParam, val.trim())
-                    router.push(`${pathname}${qs ? `?${qs}` : ''}`)
-                  }}
-                  placeholder={searchPlaceholder}
-                />
-              ) : (
-                <form onSubmit={handleSearchSubmit}>
-                  <div className="relative">
-                    <input
-                      id={`filter-${searchParam}`}
-                      type="text"
-                      name={searchParam}
-                      defaultValue={searchParams.get(searchParam) || ''}
-                      placeholder={searchPlaceholder}
-                      className="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
-                    />
-                    <button
-                      type="submit"
-                      className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-accent-500 transition-colors"
-                    >
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </button>
-                  </div>
-                </form>
-              )}
+                    }}
+                    placeholder={searchPlaceholder}
+                  />
+                ) : (
+                  <form onSubmit={handleSearchSubmit}>
+                    <div className="relative">
+                      <input
+                        id={`filter-${searchParam}`}
+                        type="text"
+                        name={searchParam}
+                        defaultValue={searchParams.get(searchParam) || ''}
+                        placeholder={searchPlaceholder}
+                        className="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+                      />
+                      <button
+                        type="submit"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 text-foreground-muted hover:text-accent-500 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                        </svg>
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
               {advancedPanel && <div className="self-end pb-0.5 shrink-0">{advancedPanel}</div>}
             </div>
