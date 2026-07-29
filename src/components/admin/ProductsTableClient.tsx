@@ -66,7 +66,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
             <tr
               key={product.id}
               className={`hover:bg-surface-secondary cursor-pointer ${product.is_featured ? 'bg-yellow-50/40 dark:bg-yellow-900/5' : ''}`}
-              onClick={() => router.push(ap(`/admin/products/${product.id}?back=${encodeURIComponent(backUrl)}`))}
+              onClick={() => setSelected(product)}
             >
               <td className="px-4 py-3 overflow-hidden">
                 <div className="flex items-center gap-2 min-w-0 overflow-hidden">

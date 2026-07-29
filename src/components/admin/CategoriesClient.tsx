@@ -316,7 +316,6 @@ function SortableRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
   })
-  const router = useRouter()
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -329,7 +328,7 @@ function SortableRow({
       ref={setNodeRef}
       style={style}
       className={`${isSubcat ? 'bg-surface' : 'bg-surface-elevated'} hover:bg-surface-secondary cursor-pointer`}
-      onClick={() => router.push(ap(`/admin/categories/${category.id}?back=${encodeURIComponent(backUrl)}`))}
+      onClick={onView}
     >
       <td className="px-4 py-3 whitespace-nowrap">
         <div className={`flex items-center gap-2 ${isSubcat ? 'ml-8' : ''}`}>

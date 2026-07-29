@@ -135,8 +135,7 @@ export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { br
         </div>,
         document.body
       )}
-      <tr className="hover:bg-surface-secondary cursor-pointer" onClick={() => router.push(ap(`/admin/brands/${brand.id}?back=${encodeURIComponent(backUrl)}`))}>
-        <td className="px-6 py-4 whitespace-nowrap">
+      <tr className="hover:bg-surface-secondary cursor-pointer" onClick={() => setOpen(true)}>        <td className="px-6 py-4 whitespace-nowrap">
           <HoverCard
             trigger={
               <Link
