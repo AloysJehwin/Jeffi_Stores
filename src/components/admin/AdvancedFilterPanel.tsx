@@ -70,7 +70,7 @@ function FilterSection({ title, activeCount, children }: { title: string; active
   return (
     <div className="border border-border-default rounded-lg">
       <button type="button" onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between px-3 py-2 bg-surface-secondary hover:bg-surface-secondary/80 transition-colors">
+        className={`w-full flex items-center justify-between px-3 py-2 bg-surface-secondary hover:bg-surface-secondary/80 transition-colors rounded-t-lg ${!isOpen ? 'rounded-b-lg' : ''}`}>
         <div className="flex items-center gap-2">
           <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">{title}</span>
           {activeCount > 0 && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>}
