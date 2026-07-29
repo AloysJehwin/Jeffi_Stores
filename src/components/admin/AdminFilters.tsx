@@ -134,7 +134,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                   </form>
                 )}
               </div>
-              {advancedPanel && <div className="self-end flex-shrink-0">{advancedPanel}</div>}
+              {/* advanced panel trigger is rendered below the row */}
             </div>
           )}
 
@@ -145,6 +145,9 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
             </button>
           )}
         </div>
+
+        {/* Advanced filter panel — full width, trigger + sections all in one */}
+        {advancedPanel}
       </div>
     </div>
   )

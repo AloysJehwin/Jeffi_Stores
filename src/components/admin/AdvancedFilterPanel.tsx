@@ -18,6 +18,11 @@ export interface AdvancedFilterField {
   unit?: string
 }
 
+interface Props {
+  fields: AdvancedFilterField[]
+  paramNames?: string[]
+}
+
 function fieldParamNames(f: AdvancedFilterField): string[] {
   return Array.isArray(f.name) ? f.name : [f.name]
 }
@@ -73,9 +78,15 @@ function FilterSection({ title, activeCount, children }: { title: string; active
   )
 }
 
-interface Props {
-  fields: AdvancedFilterField[]
-  paramNames?: string[]
+// Exported trigger-only button for inline placement in filter bar
+export function AdvancedFilterTrigger({ activeCount, expanded, onToggle }: { activeCount: number; expanded: boolean; onToggle: () => void }) {
+  return (
+    <button type="button" onClick={onToggle}
+      className={`flex items-center gap-1 p-1.5 rounded transition-colors ${activeCount > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted hover:text-foreground'}`}>
+      {activeCount > 0 && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>}
+      {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+    </button>
+  )
 }
 
 export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
@@ -203,61 +214,50 @@ export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
     return null
   }
 
-  // Single self-contained component:
-  // - Trigger button sits inline (placed by AdminFilters next to search)
-  // - When expanded, panel renders below using negative margin to escape flex row
+  // Single component — AdminFilters renders this via advancedPanel prop
+  // The trigger is inline, the expanded panel is a sibling div inside the card
+  // AdminFilters must use overflow-visible and render advancedPanel in a w-full slot
   return (
-    <div className="self-end">
-      {/* Trigger */}
-      <button type="button" onClick={() => setExpanded(e => !e)}
-        className={`flex items-center gap-1 p-1.5 rounded transition-colors ${activeCount > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted hover:text-foreground'}`}>
-        {activeCount > 0 && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>}
-        {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
-      </button>
+    <div className="w-full">
+      {/* Row: trigger button (AdminFilters renders this div inline) */}
+      <div className="flex justify-end">
+        <AdvancedFilterTrigger activeCount={activeCount} expanded={expanded} onToggle={() => setExpanded(e => !e)} />
+      </div>
 
-      {/* Panel — breaks out of inline position using negative margins */}
-      {(expanded || activeCount > 0) && (
-        <div className="relative">
-          <div className="absolute right-0 top-1 z-50 bg-surface-elevated border border-border-default rounded-xl shadow-2xl p-4 space-y-2"
-            style={{ width: 'calc(100vw - 2rem)', maxWidth: '1400px', right: 0 }}>
-
-            {activeCount > 0 && (
-              <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border-default">
-                {activeFields.map((f, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded-full">
-                    {chipLabel(f, searchParams)}
-                    <button type="button" onClick={() => removeChip(f)}><X className="w-3 h-3" /></button>
-                  </span>
-                ))}
-                <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline">Clear all</button>
-              </div>
-            )}
-
-            {expanded && (
-              <>
-                {sections.map(section => {
-                  const sectionFields = fields.filter(f => (f.section || 'General') === section)
-                  const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
+      {/* Expanded panel — renders below, full width inside the card */}
+      {expanded && (
+        <div className="mt-3 pt-3 border-t border-border-default space-y-2">
+          {activeCount > 0 && (
+            <div className="flex flex-wrap gap-1.5 pb-2 border-b border-border-default">
+              {activeFields.map((f, i) => (
+                <span key={i} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded-full">
+                  {chipLabel(f, searchParams)}
+                  <button type="button" onClick={() => removeChip(f)}><X className="w-3 h-3" /></button>
+                </span>
+              ))}
+              <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline">Clear all</button>
+            </div>
+          )}
+          {sections.map(section => {
+            const sectionFields = fields.filter(f => (f.section || 'General') === section)
+            const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
+            return (
+              <FilterSection key={section} title={section} activeCount={sectionActive}>
+                {sectionFields.map((f, i) => {
+                  const isWide = f.type === 'range' || f.type === 'date-range'
                   return (
-                    <FilterSection key={section} title={section} activeCount={sectionActive}>
-                      {sectionFields.map((f, i) => {
-                        const isWide = f.type === 'range' || f.type === 'date-range'
-                        return (
-                          <div key={i} className={isWide ? 'col-span-2' : ''}>
-                            <label className="block text-[11px] font-medium text-foreground-muted mb-1">{f.label}</label>
-                            {renderField(f)}
-                          </div>
-                        )
-                      })}
-                    </FilterSection>
+                    <div key={i} className={isWide ? 'col-span-2' : ''}>
+                      <label className="block text-[11px] font-medium text-foreground-muted mb-1">{f.label}</label>
+                      {renderField(f)}
+                    </div>
                   )
                 })}
-                <div className="flex items-center justify-between pt-1">
-                  <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
-                  <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
-                </div>
-              </>
-            )}
+              </FilterSection>
+            )
+          })}
+          <div className="flex items-center justify-between pt-1">
+            <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
+            <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
           </div>
         </div>
       )}
