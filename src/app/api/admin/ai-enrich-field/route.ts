@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json()
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
@@ -55,7 +54,7 @@ export async function POST(request: NextRequest) {
         ],
         options: { temperature: 0.3 },
       }),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(60000),
     })
 
     if (!res.ok) {
@@ -68,8 +67,7 @@ export async function POST(request: NextRequest) {
     let obj: { result?: string }
     try {
       obj = JSON.parse(raw)
-    } catch (err) {
-      console.error('[route]', err)
+    } catch {
       const m = raw.match(/\{[\s\S]*\}/)
       if (!m) return NextResponse.json({ error: 'AI returned unparseable response' }, { status: 502 })
       obj = JSON.parse(m[0])
