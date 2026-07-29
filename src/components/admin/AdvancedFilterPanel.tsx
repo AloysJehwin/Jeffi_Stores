@@ -66,7 +66,7 @@ function FilterSection({ title, activeCount, children }: { title: string; active
   const [open, setOpen] = useState(false)
   const isOpen = open || activeCount > 0
   return (
-    <div className="border border-border-default rounded-lg overflow-hidden">
+    <div className="border border-border-default rounded-lg">
       <button type="button" onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between px-3 py-2 bg-surface-secondary hover:bg-surface-secondary/80 transition-colors">
         <div className="flex items-center gap-2">
