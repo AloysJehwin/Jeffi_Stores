@@ -15,9 +15,10 @@ interface ProductImageGalleryProps {
   productName: string
   variantImages?: ProductImage[]
   discountPct?: number | null
+  ribbonLabel?: string
 }
 
-export default function ProductImageGallery({ images, productName, variantImages, discountPct }: ProductImageGalleryProps) {
+export default function ProductImageGallery({ images, productName, variantImages, discountPct, ribbonLabel }: ProductImageGalleryProps) {
   const displayImages = (variantImages && variantImages.length > 0) ? variantImages : images
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [isZoomed, setIsZoomed] = useState(false)
@@ -71,6 +72,11 @@ export default function ProductImageGallery({ images, productName, variantImages
           onMouseMove={handleMouseMove}
           onClick={() => setShowLightbox(true)}
         >
+          {ribbonLabel && (
+            <div className="absolute top-6 right-[-36px] w-44 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[11px] font-bold text-center py-1.5 shadow-md pointer-events-none select-none z-10">
+              {ribbonLabel}
+            </div>
+          )}
           <div className="w-full aspect-[5/3] relative overflow-hidden flex items-center justify-center">
             <img
               src={currentImage.image_url}

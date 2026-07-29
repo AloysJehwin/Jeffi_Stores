@@ -313,12 +313,8 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
             productName={product.name}
             variantImages={variantImages}
             discountPct={businessDiscountPct > 0 ? null : (product.discount_pct != null ? Number(product.discount_pct) : null)}
+            ribbonLabel={businessDiscountPct > 0 ? 'Business offer' : undefined}
           />
-          {businessDiscountPct > 0 && (
-            <div className="absolute top-6 right-[-36px] w-44 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[11px] font-bold text-center py-1.5 shadow-md pointer-events-none select-none z-10">
-              Business offer
-            </div>
-          )}
         </div>
 
         <div className="hidden lg:block mt-4">
