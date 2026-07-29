@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Star } from 'lucide-react'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { ap } from '@/lib/admin-path'
@@ -23,6 +24,7 @@ interface Props {
 
 export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products', isSuperAdmin = false }: Props) {
   const confirm = useConfirm()
+  const router = useRouter()
   const [selected, setSelected] = useState<any>(null)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({})
@@ -64,7 +66,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
             <tr
               key={product.id}
               className={`hover:bg-surface-secondary cursor-pointer ${product.is_featured ? 'bg-yellow-50/40 dark:bg-yellow-900/5' : ''}`}
-              onClick={() => setSelected(product)}
+              onClick={() => router.push(ap(`/admin/products/${product.id}?back=${encodeURIComponent(backUrl)}`))}
             >
               <td className="px-4 py-3 overflow-hidden">
                 <div className="flex items-center gap-2 min-w-0 overflow-hidden">
