@@ -316,6 +316,7 @@ function SortableRow({
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: category.id,
   })
+  const router = useRouter()
 
   const style = {
     transform: CSS.Transform.toString(transform),
