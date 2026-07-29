@@ -95,9 +95,9 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
       </button>
 
       <div className={`${mobileOpen ? 'mt-4' : 'hidden'} sm:block`}>
-        <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-end gap-3 sm:gap-4">
+        <div className="flex flex-wrap sm:items-end gap-3 sm:gap-4">
           {filters.map((filter) => (
-            <div key={filter.name} className="w-full sm:flex-1 sm:min-w-[160px] sm:max-w-[220px]">
+            <div key={filter.name} className="w-full sm:flex-none sm:w-[180px]">
               <label
                 htmlFor={`filter-${filter.name}`}
                 className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider"
@@ -119,7 +119,8 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
           ))}
 
           {searchPlaceholder && (
-            <div className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[300px]">
+            <div className="w-full sm:flex-1 sm:min-w-[200px] sm:max-w-[400px] flex items-end gap-1.5">
+              <div className="flex-1">
               <label
                 htmlFor={`filter-${searchParam}`}
                 className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider"
@@ -167,6 +168,8 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                   </div>
                 </form>
               )}
+              </div>
+              {advancedPanel && <div className="self-end pb-0.5 shrink-0">{advancedPanel}</div>}
             </div>
           )}
 
@@ -174,17 +177,12 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
             <button
               type="button"
               onClick={handleClearAll}
-              className="px-3 py-1.5 text-sm font-medium text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-border-secondary transition-colors whitespace-nowrap"
+              className="px-3 py-1.5 text-sm font-medium text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-border-secondary transition-colors whitespace-nowrap sm:self-end"
             >
               Clear Filters
             </button>
           )}
         </div>
-        {advancedPanel && (
-          <div className="mt-3 w-full">
-            {advancedPanel}
-          </div>
-        )}
       </div>
     </div>
   )
