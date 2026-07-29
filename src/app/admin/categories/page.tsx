@@ -75,7 +75,7 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
                   entityId={d.category_id}
                   name={d.name}
                   updatedAt={d.updated_at}
-                  editHref={ap(`/admin/categories/${d.category_id}`, host)}
+                  editHref={ap(`/admin/categories/edit/${d.category_id}`, host)}
                   publishPath={`/api/admin/categories/${d.category_id}/publish`}
                   discardPath={`/api/admin/categories/${d.category_id}/draft`}
                   entityLabel="category"
