@@ -234,7 +234,7 @@ export default function CouponForm({ action, submitLabel, isDraft = false, showU
       )}
 
       <div className="flex gap-3 pt-2 sticky bottom-0 bg-surface/90 backdrop-blur py-3 -mx-4 sm:-mx-6 px-4 sm:px-6 border-t border-border-default">
-        <Link href={ap(backUrl ?? '/admin/coupons')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
+        <Link href={ap(backUrl ?? '/admin/coupons')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">
           Cancel
         </Link>
         {isDraft ? (
