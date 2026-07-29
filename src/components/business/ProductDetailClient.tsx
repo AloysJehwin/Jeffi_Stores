@@ -307,7 +307,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
     <>
       {/* Image column — order-1 on mobile, natural on desktop */}
       <div className="order-1 lg:order-none">
-        <div className="relative overflow-hidden rounded-xl">
+        <div className="relative rounded-xl">
           <ProductImageGallery
             images={product.product_images || []}
             productName={product.name}
