@@ -124,11 +124,11 @@ function ViewModal({ category, subCount, productCount, onClose, backUrl = '/admi
           </div>
           <div className="flex gap-3 pt-1 border-t border-border-default">
             <Link
-              href={ap(`/admin/categories/edit/${category.id}?back=${encodeURIComponent(backUrl)}`)}
+              href={ap(`/admin/categories/${category.id}?back=${encodeURIComponent(backUrl)}`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
               onClick={onClose}
             >
-              Edit Category
+              View Category
             </Link>
             <a
               href={`/categories/${category.slug}`}
