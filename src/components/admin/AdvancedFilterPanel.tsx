@@ -1,8 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { createPortal } from 'react-dom'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import DatePicker from '@/components/ui/DatePicker'
 import FilterValueHelp from './FilterValueHelp'
@@ -85,31 +84,12 @@ export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [local, setLocal] = useState<Record<string, string>>({})
   const [popup, setPopup] = useState<string | null>(null)
-  const [mounted, setMounted] = useState(false)
-  const triggerRef = useRef<HTMLButtonElement>(null)
-  const panelRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => { setMounted(true) }, [])
 
   useEffect(() => {
     const state: Record<string, string> = {}
     fields.forEach(f => fieldParamNames(f).forEach(n => { const v = searchParams.get(n); if (v) state[n] = v }))
     setLocal(state)
   }, [searchParams])
-
-  // Close panel on outside click
-  useEffect(() => {
-    if (!expanded) return
-    function handler(e: MouseEvent) {
-      if (
-        triggerRef.current?.contains(e.target as Node) ||
-        panelRef.current?.contains(e.target as Node)
-      ) return
-      setExpanded(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [expanded])
 
   const activeFields = fields.filter(f => fieldIsActive(f, searchParams))
   const activeCount = activeFields.length
@@ -249,95 +229,64 @@ export default function AdvancedFilterPanel({ fields, paramNames }: Props) {
     return null
   }
 
-  // Get panel position anchored to trigger
-  function getPanelStyle(): React.CSSProperties {
-    if (!triggerRef.current) return {}
-    const rect = triggerRef.current.getBoundingClientRect()
-    return {
-      position: 'fixed',
-      top: rect.bottom + 4,
-      left: 0,
-      right: 0,
-      zIndex: 300,
-    }
-  }
-
   return (
-    <div className="relative">
-      {/* Trigger */}
+    // This whole component renders inside AdminFilters' sticky card
+    // Trigger sits inline (via AdminFilters placing it next to search)
+    // Expanded panel renders below — AdminFilters handles full-width layout via advancedPanelExpanded prop
+    <div className="contents">
+      {/* TRIGGER — rendered inline next to search by AdminFilters */}
       <button
-        ref={triggerRef}
         type="button"
         onClick={() => setExpanded(e => !e)}
-        className={`flex items-center gap-1 p-1.5 rounded transition-colors
+        className={`flex items-center gap-1 p-1.5 rounded transition-colors self-end
           ${activeCount > 0 ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted hover:text-foreground'}`}
         title="Advanced Filters"
+        data-advanced-trigger
       >
         {activeCount > 0 && <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-500 text-white rounded-full leading-none">{activeCount}</span>}
         {expanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
       </button>
 
-      {/* Active chips below trigger */}
-      {activeCount > 0 && !expanded && (
-        <div className="absolute right-0 top-full mt-1 flex flex-wrap gap-1 z-50 max-w-[400px]">
-          {activeFields.map((f, i) => (
-            <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded-full whitespace-nowrap">
-              {chipLabel(f, searchParams)}
-              <button type="button" onClick={() => removeChip(f)}><X className="w-3 h-3" /></button>
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Full-width dropdown panel via portal */}
-      {mounted && expanded && createPortal(
-        <>
-          {/* Backdrop */}
-          <div className="fixed inset-0 z-[299]" onClick={() => setExpanded(false)} />
-          {/* Panel */}
-          <div ref={panelRef} style={getPanelStyle()} className="bg-surface-elevated border-t-2 border-t-accent-500 border-b border-border-default shadow-2xl px-6 py-4 overflow-y-auto max-h-[60vh]">
-          {/* Active chips at top */}
+      {/* EXPANDED PANEL — full width, rendered below flex row via w-full */}
+      {(expanded || activeCount > 0) && (
+        <div className="w-full order-last">
           {activeCount > 0 && (
-            <div className="flex flex-wrap gap-1.5 mb-3 pb-3 border-b border-border-default">
+            <div className="flex flex-wrap gap-1.5 py-2 border-t border-border-default mt-1">
               {activeFields.map((f, i) => (
                 <span key={i} className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700 rounded-full">
                   {chipLabel(f, searchParams)}
                   <button type="button" onClick={() => removeChip(f)}><X className="w-3 h-3" /></button>
                 </span>
               ))}
-              <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline ml-1">Clear all</button>
+              <button type="button" onClick={reset} className="text-xs text-foreground-muted hover:text-foreground underline">Clear all</button>
             </div>
           )}
-
-          {/* Sections */}
-          <div className="space-y-2">
-            {sections.map(section => {
-              const sectionFields = fields.filter(f => (f.section || 'General') === section)
-              const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
-              return (
-                <FilterSection key={section} title={section} activeCount={sectionActive}>
-                  {sectionFields.map((f, i) => {
-                    const isWide = f.type === 'range' || f.type === 'date-range'
-                    return (
-                      <div key={i} className={isWide ? 'col-span-2' : ''}>
-                        <label className="block text-[11px] font-medium text-foreground-muted mb-1">{f.label}</label>
-                        {renderField(f)}
-                      </div>
-                    )
-                  })}
-                </FilterSection>
-              )
-            })}
-          </div>
-
-          {/* Footer */}
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border-default">
-            <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
-            <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
-          </div>
+          {expanded && (
+            <div className="border-t border-border-default pt-3 space-y-2">
+              {sections.map(section => {
+                const sectionFields = fields.filter(f => (f.section || 'General') === section)
+                const sectionActive = sectionFields.filter(f => fieldIsActive(f, searchParams)).length
+                return (
+                  <FilterSection key={section} title={section} activeCount={sectionActive}>
+                    {sectionFields.map((f, i) => {
+                      const isWide = f.type === 'range' || f.type === 'date-range'
+                      return (
+                        <div key={i} className={isWide ? 'col-span-2' : ''}>
+                          <label className="block text-[11px] font-medium text-foreground-muted mb-1">{f.label}</label>
+                          {renderField(f)}
+                        </div>
+                      )
+                    })}
+                  </FilterSection>
+                )
+              })}
+              <div className="flex items-center justify-between pt-1">
+                <button type="button" onClick={reset} className="px-3 py-1.5 text-xs font-medium text-foreground-secondary border border-border-secondary rounded-lg hover:bg-surface transition-colors">Reset All</button>
+                <button type="button" onClick={apply} className="px-5 py-1.5 text-xs font-semibold bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors">Apply Filters</button>
+              </div>
+            </div>
+          )}
         </div>
-        </>,
-        document.body
       )}
     </div>
   )
