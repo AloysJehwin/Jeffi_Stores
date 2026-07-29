@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Star, MessageSquare, FileText, X } from 'lucide-react'
@@ -75,6 +75,39 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
   const [customFields, setCustomFields] = useState<CustomField[]>(d.custom_fields || [])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstRender = useRef(true)
+
+  const buildPayload = useCallback(() => ({
+    title: title.trim(),
+    slug: slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
+    template_type: templateType,
+    google_review_url: templateType === 'google_review' ? googleUrl.trim() : '',
+    coupon_id: couponId || null,
+    description: description.trim() || null,
+    is_active: isActive,
+    custom_fields: customFields,
+  }), [title, slug, templateType, googleUrl, couponId, description, isActive, customFields])
+
+  useEffect(() => {
+    if (!isDraft || !formId) return
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(async () => {
+      setAutoSaveStatus('saving')
+      try {
+        await fetch(`/api/admin/review-forms/${formId}/draft`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildPayload()),
+        })
+        setAutoSaveStatus('saved')
+        setTimeout(() => setAutoSaveStatus('idle'), 2000)
+      } catch { setAutoSaveStatus('idle') }
+    }, 1500)
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
+  }, [title, slug, templateType, googleUrl, couponId, description, isActive, customFields, isDraft, formId, buildPayload])
 
   const couponOptions = [
     { value: '', label: '— No coupon —' },
@@ -101,16 +134,7 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
     setSubmitting(true)
     setError('')
     try {
-      const payload = {
-        title: title.trim(),
-        slug: slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
-        template_type: templateType,
-        google_review_url: templateType === 'google_review' ? googleUrl.trim() : '',
-        coupon_id: couponId || null,
-        description: description.trim() || null,
-        is_active: isActive,
-        custom_fields: customFields,
-      }
+      const payload = buildPayload()
 
       if (isDraft && formId) {
         // Determine intent from the clicked button
@@ -265,7 +289,7 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
 
         {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>}
 
-        <div className="flex gap-3 pt-2">
+        <div className="flex items-center gap-3 pt-2">
           <Link href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
             Cancel
           </Link>
@@ -277,6 +301,8 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
               <button type="submit" value="publish" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
                 {submitting ? 'Publishing…' : 'Publish'}
               </button>
+              {autoSaveStatus === 'saving' && <span className="text-xs text-foreground-muted">Saving…</span>}
+              {autoSaveStatus === 'saved' && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
             </>
           ) : (
             <button type="submit" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
