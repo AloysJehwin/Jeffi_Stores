@@ -398,6 +398,7 @@ function CheckoutPage() {
         },
         theme: { color: '#f97316' },
         redirect: false,
+        callback_url: `${window.location.origin}/checkout/payment-callback`,
         modal: {
           ondismiss: function () {
             razorpayOpen.current = false
