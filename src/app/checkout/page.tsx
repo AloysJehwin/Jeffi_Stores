@@ -76,15 +76,21 @@ function CheckoutPage() {
   } | null>(null)
 
   useEffect(() => {
-    // Recover payment verification after page reload mid-payment
+    // Recover payment after page reload mid-payment (e.g. 3DS opened new tab)
     try {
       const raw = sessionStorage.getItem('rzp_pending')
       if (raw) {
         const pending = JSON.parse(raw)
         const age = Date.now() - (pending.ts || 0)
-        if (age < 1800_000 && pending.draftToken && pending.razorpayOrderId && pending.razorpayPaymentId && pending.razorpaySignature) {
+        if (age < 1800_000 && pending.draftToken && pending.razorpayOrderId) {
           sessionStorage.removeItem('rzp_pending')
-          setPendingVerify(pending)
+          if (pending.razorpayPaymentId && pending.razorpaySignature) {
+            // Payment IDs present — verify directly
+            setPendingVerify(pending)
+          } else {
+            // No payment IDs yet — check if Razorpay captured it server-side
+            setPendingVerify({ ...pending, razorpayPaymentId: '', razorpaySignature: '' })
+          }
         } else {
           sessionStorage.removeItem('rzp_pending')
         }
@@ -94,16 +100,50 @@ function CheckoutPage() {
 
   // Auto-retry verify on mount if all payment tokens are present
   useEffect(() => {
-    if (!pendingVerify?.razorpayPaymentId) return
-    setIsSubmitting(true)
-    verifyPayment(
-      pendingVerify.razorpayOrderId,
-      pendingVerify.razorpayPaymentId,
-      pendingVerify.razorpaySignature,
-      { draftToken: pendingVerify.draftToken },
-    ).finally(() => setPendingVerify(null))
+    if (!pendingVerify) return
+    if (pendingVerify.razorpayPaymentId && pendingVerify.razorpaySignature) {
+      // Full tokens — verify directly
+      setIsSubmitting(true)
+      verifyPayment(
+        pendingVerify.razorpayOrderId,
+        pendingVerify.razorpayPaymentId,
+        pendingVerify.razorpaySignature,
+        { draftToken: pendingVerify.draftToken },
+      ).finally(() => setPendingVerify(null))
+    } else {
+      // No payment IDs — ask server to check Razorpay order status and commit if paid
+      setIsSubmitting(true)
+      fetch('/api/razorpay/check-pending', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ razorpayOrderId: pendingVerify.razorpayOrderId, draftToken: pendingVerify.draftToken }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.order) {
+            try { sessionStorage.removeItem('rzp_pending') } catch {}
+            clearCart()
+            showToast('Payment confirmed!', 'success')
+            window.location.href = `/account/orders/${data.order.id}`
+          } else if (data.status === 'pending') {
+            setError('Payment is still processing — please wait a moment and refresh, or check My Orders.')
+            setIsSubmitting(false)
+            setPendingVerify(null)
+          } else {
+            setError(data.error || 'Could not confirm payment. Check My Orders or contact support.')
+            setIsSubmitting(false)
+            setPendingVerify(null)
+          }
+        })
+        .catch(() => {
+          setError('Could not confirm payment. Check My Orders or contact support.')
+          setIsSubmitting(false)
+          setPendingVerify(null)
+        })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingVerify?.razorpayPaymentId])
+  }, [!!pendingVerify])
       router.push('/login?redirect=/checkout')
       return
     }

@@ -91,9 +91,13 @@ function CheckoutPage() {
       if (raw) {
         const pending = JSON.parse(raw)
         const age = Date.now() - (pending.ts || 0)
-        if (age < 1800_000 && pending.draftToken && pending.razorpayOrderId && pending.razorpayPaymentId && pending.razorpaySignature) {
+        if (age < 1800_000 && pending.draftToken && pending.razorpayOrderId) {
           sessionStorage.removeItem('rzp_pending_biz')
-          setPendingVerify(pending)
+          if (pending.razorpayPaymentId && pending.razorpaySignature) {
+            setPendingVerify(pending)
+          } else {
+            setPendingVerify({ ...pending, razorpayPaymentId: '', razorpaySignature: '' })
+          }
         } else {
           sessionStorage.removeItem('rzp_pending_biz')
         }
@@ -101,16 +105,48 @@ function CheckoutPage() {
     } catch {}
   }, [])
   useEffect(() => {
-    if (!pendingVerify?.razorpayPaymentId) return
-    setIsSubmitting(true)
-    verifyPayment(
-      pendingVerify.razorpayOrderId,
-      pendingVerify.razorpayPaymentId,
-      pendingVerify.razorpaySignature,
-      { draftToken: pendingVerify.draftToken },
-    ).finally(() => setPendingVerify(null))
+    if (!pendingVerify) return
+    if (pendingVerify.razorpayPaymentId && pendingVerify.razorpaySignature) {
+      setIsSubmitting(true)
+      verifyPayment(
+        pendingVerify.razorpayOrderId,
+        pendingVerify.razorpayPaymentId,
+        pendingVerify.razorpaySignature,
+        { draftToken: pendingVerify.draftToken },
+      ).finally(() => setPendingVerify(null))
+    } else {
+      setIsSubmitting(true)
+      fetch('/api/razorpay/check-pending', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+        body: JSON.stringify({ razorpayOrderId: pendingVerify.razorpayOrderId, draftToken: pendingVerify.draftToken }),
+      })
+        .then(r => r.json())
+        .then(data => {
+          if (data.order) {
+            try { sessionStorage.removeItem('rzp_pending_biz') } catch {}
+            clearCart()
+            showToast('Payment confirmed!', 'success')
+            window.location.href = bp(`/business/account/orders/${data.order.id}`)
+          } else if (data.status === 'pending') {
+            setError('Payment is still processing — please wait a moment and refresh, or check My Orders.')
+            setIsSubmitting(false)
+            setPendingVerify(null)
+          } else {
+            setError(data.error || 'Could not confirm payment. Check My Orders or contact support.')
+            setIsSubmitting(false)
+            setPendingVerify(null)
+          }
+        })
+        .catch(() => {
+          setError('Could not confirm payment. Check My Orders or contact support.')
+          setIsSubmitting(false)
+          setPendingVerify(null)
+        })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pendingVerify?.razorpayPaymentId])
+  }, [!!pendingVerify])
 
   useEffect(() => {
     if (!isBuyNow || !buyNowItem) return
