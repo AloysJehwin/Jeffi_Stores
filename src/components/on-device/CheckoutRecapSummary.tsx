@@ -3,37 +3,74 @@
 import { useEffect, useRef, useState } from 'react'
 import { canRunOnDeviceSummary, generateRecap, disposeSummarizer } from '@/lib/on-device/runtime'
 import { getViewedProducts, getSearches } from '@/lib/on-device/session-signals'
+import { readUserProfile } from '@/lib/on-device/user-profile'
 import type { SessionSignals, CartLine } from '@/lib/on-device/prompt'
 
-/**
- * On-device cart recap on the checkout review page. Renders NOTHING unless the
- * device is capable (flag on + WebGPU + memory + GPU limits). The ~400MB model
- * downloads lazily in a Web Worker and the summary streams in — fully
- * non-blocking; checkout works identically whether or not this appears.
- *
- * The parent supplies the resolved line items + total, so this works for BOTH
- * the persisted-cart and buy-now flows (buy-now items aren't in useCart()).
- */
+const FEEDBACK_KEY = 'jeffi_od_feedback'
+const WIFI_DISMISSED_KEY = 'jeffi_od_wifi_dismissed'
+const MOBILE_TOAST_KEY = 'jeffi_od_mobile_shown'
+
+function readFeedbackStyle(): 'concise' | 'detailed' | null {
+  try {
+    const raw = localStorage.getItem(FEEDBACK_KEY)
+    if (!raw) return null
+    const entries: { v: 'liked' | 'disliked'; style: string }[] = JSON.parse(raw)
+    const liked = entries.filter(e => e.v === 'liked').length
+    const disliked = entries.filter(e => e.v === 'disliked').length
+    if (liked > disliked * 2) return 'detailed'
+    if (disliked > liked) return 'concise'
+    return null
+  } catch { return null }
+}
+
+function saveFeedback(vote: 'liked' | 'disliked', text: string) {
+  try {
+    const raw = localStorage.getItem(FEEDBACK_KEY)
+    const entries = raw ? JSON.parse(raw) : []
+    entries.push({ v: vote, style: text.length > 100 ? 'detailed' : 'concise', ts: Date.now() })
+    localStorage.setItem(FEEDBACK_KEY, JSON.stringify(entries.slice(-20)))
+  } catch {}
+}
+
 export default function CheckoutRecapSummary({ items, total }: { items: CartLine[]; total: number }) {
-  const [capable, setCapable] = useState<boolean | null>(null)
+  const [verdict, setVerdict] = useState<{ capable: boolean; reason: string; isMobile: boolean } | null>(null)
   const [text, setText] = useState('')
   const [errMsg, setErrMsg] = useState('')
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [feedback, setFeedback] = useState<'liked' | 'disliked' | null>(null)
+  const [wifiDismissed, setWifiDismissed] = useState(false)
+  const [showMobileToast, setShowMobileToast] = useState(false)
   const started = useRef(false)
 
-  // Gate check (runs the capability probe once).
   useEffect(() => {
     let alive = true
-    canRunOnDeviceSummary().then(ok => { if (alive) setCapable(ok) })
+    canRunOnDeviceSummary().then(v => {
+      if (!alive) return
+      setVerdict(v)
+      // Check dismissal state
+      try {
+        if (sessionStorage.getItem(WIFI_DISMISSED_KEY)) setWifiDismissed(true)
+      } catch {}
+      // Show mobile explainer once
+      if (v.capable && v.isMobile) {
+        try {
+          if (!localStorage.getItem(MOBILE_TOAST_KEY)) {
+            setShowMobileToast(true)
+            localStorage.setItem(MOBILE_TOAST_KEY, '1')
+          }
+        } catch {}
+      }
+    })
     return () => { alive = false; disposeSummarizer() }
   }, [])
 
-  // Kick off generation once capable + items are known (only once).
   useEffect(() => {
-    if (!capable || started.current) return
+    if (!verdict?.capable || started.current) return
     if (!items || items.length === 0) return
     started.current = true
 
+    const profile = readUserProfile()
+    const recapStyle = readFeedbackStyle()
     const itemCount = items.reduce((s, c) => s + c.qty, 0)
     const signals: SessionSignals = {
       cart: items,
@@ -41,37 +78,109 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
       itemCount,
       viewed: getViewedProducts(),
       searches: getSearches(),
+      userProfile: profile.purchaseCount > 0 ? profile : null,
+      recapStyle,
     }
 
     setState('loading')
-    generateRecap(signals, (partial) => setText(partial))
+    generateRecap(signals, verdict.isMobile, (partial) => setText(partial))
       .then(final => { setText(final); setState('done') })
       .catch((e) => { setErrMsg(e?.message || String(e)); setState('error') })
-  }, [capable, items, total])
+  }, [verdict, items, total])
 
-  // Silent on incapable devices or empty output. (Error is shown on-screen in
-  // development to aid debugging; hidden in production.)
-  if (capable !== true) return null
+  // Not-wifi banner
+  if (verdict?.reason === 'not-wifi' && !wifiDismissed) {
+    return (
+      <div className="rounded-xl border border-border-default bg-surface-elevated px-4 py-3 mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <svg className="w-4 h-4 text-foreground-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
+          </svg>
+          <p className="text-xs text-foreground-secondary">Connect to Wi-Fi to enable on-device AI summary</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setWifiDismissed(true)
+            try { sessionStorage.setItem(WIFI_DISMISSED_KEY, '1') } catch {}
+          }}
+          className="text-foreground-muted hover:text-foreground transition-colors flex-shrink-0"
+          aria-label="Dismiss"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+    )
+  }
+
+  if (!verdict?.capable) return null
   if (state === 'error' && process.env.NODE_ENV === 'production') return null
   if (state === 'idle') return null
   if (state === 'done' && !text.trim()) return null
 
   return (
-    <div className="rounded-xl border border-border-default bg-surface-elevated p-4 mb-4">
-      <div className="flex items-center gap-2 mb-1.5">
-        <svg className="w-4 h-4 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-        <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Your order at a glance</span>
-        <span className="text-[9px] text-foreground-muted ml-auto">on-device · private</span>
-      </div>
-      {state === 'error' ? (
-        <p className="text-xs text-red-600 break-words font-mono">[dev] {errMsg || 'unknown error'}</p>
-      ) : state === 'loading' && !text ? (
-        <p className="text-sm text-foreground-muted animate-pulse">Preparing your summary…</p>
-      ) : (
-        <p className="text-sm text-foreground leading-relaxed">{text}{state === 'loading' && <span className="animate-pulse">▍</span>}</p>
+    <>
+      {/* Mobile explainer toast */}
+      {showMobileToast && (
+        <div className="rounded-lg border border-accent-200 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/20 px-3 py-2 mb-3 flex items-center justify-between gap-2">
+          <p className="text-xs text-accent-700 dark:text-accent-300">✨ This summary runs on your device's AI chip — no data leaves your phone</p>
+          <button type="button" onClick={() => setShowMobileToast(false)} className="text-accent-400 hover:text-accent-600 flex-shrink-0">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
       )}
-    </div>
+
+      <div className="rounded-xl border border-border-default bg-surface-elevated p-4 mb-4">
+        <div className="flex items-center gap-2 mb-1.5">
+          <svg className="w-4 h-4 text-accent-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Your order at a glance</span>
+          <span className="text-[9px] text-foreground-muted ml-auto">on-device · private</span>
+        </div>
+
+        {state === 'loading' && !text && (
+          <p className="text-sm text-foreground-muted animate-pulse">
+            {verdict.isMobile ? 'Downloading AI model (~200MB)…' : 'Preparing your summary…'}
+          </p>
+        )}
+        {state === 'error' && (
+          <p className="text-xs text-red-600 break-words font-mono">[dev] {errMsg || 'unknown error'}</p>
+        )}
+        {(text || state === 'loading') && state !== 'error' && (
+          <p className="text-sm text-foreground leading-relaxed">
+            {text}{state === 'loading' && <span className="animate-pulse">▍</span>}
+          </p>
+        )}
+
+        {/* 👍/👎 feedback — only shown after completion */}
+        {state === 'done' && text && !feedback && (
+          <div className="flex items-center gap-2 mt-2 pt-2 border-t border-border-default">
+            <span className="text-[10px] text-foreground-muted">Helpful?</span>
+            <button
+              type="button"
+              onClick={() => { setFeedback('liked'); saveFeedback('liked', text) }}
+              className="text-sm hover:scale-110 transition-transform"
+              aria-label="Liked"
+            >👍</button>
+            <button
+              type="button"
+              onClick={() => { setFeedback('disliked'); saveFeedback('disliked', text) }}
+              className="text-sm hover:scale-110 transition-transform"
+              aria-label="Disliked"
+            >👎</button>
+          </div>
+        )}
+        {feedback && (
+          <p className="text-[10px] text-foreground-muted mt-2 pt-2 border-t border-border-default">
+            {feedback === 'liked' ? 'Thanks! We'll keep this style.' : 'Got it — we'll adjust next time.'}
+          </p>
+        )}
+      </div>
+    </>
   )
 }
