@@ -109,6 +109,7 @@ async function updateProduct(productId: string, formData: FormData) {
   const mrpExGst = formData.get('mrp_ex_gst') ? round2(parseFloat(formData.get('mrp_ex_gst') as string)) : null
   const salePrice = formData.get('price_ex_gst') ? round2(parseFloat(formData.get('price_ex_gst') as string)) : null
   const costPrice = formData.get('cost_price') ? round2(parseFloat(formData.get('cost_price') as string)) : 0
+  const supplierId = (formData.get('supplier_id') as string || '').trim() || null
   const discountPct = formData.get('discount_pct') ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2)) : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
@@ -209,7 +210,7 @@ async function updateProduct(productId: string, formData: FormData) {
         is_featured: isFeatured, has_variants: hasVariants, variant_type: variantType,
         sub_variant_type: subVariantType, weight_grams: weightGrams, package_type: packageType,
         length_cm: lengthCm, breadth_cm: breadthCm, height_cm: heightCm,
-        cost_price: costPrice, discount_pct: discountPct,
+        cost_price: costPrice, discount_pct: discountPct, supplier_id: supplierId,
         sku: skuFromForm,
         mpn: hasVariants ? null : mpn, gtin: hasVariants ? null : gtin,
         extra_delivery_days: extraDeliveryDays,
@@ -298,6 +299,8 @@ async function updateProduct(productId: string, formData: FormData) {
       costPrice, discountPct,
       new Date().toISOString(),
     ]
+    setClauses.push(`supplier_id = $${params.length + 1}`)
+    params.push(supplierId)
     if (skuFromForm) {
       setClauses.push(`sku = $${params.length + 1}`)
       params.push(skuFromForm)
