@@ -111,36 +111,39 @@ function CheckoutPage() {
         { draftToken: pendingVerify.draftToken },
       ).finally(() => setPendingVerify(null))
     } else {
-      // No payment IDs — ask server to check Razorpay order status and commit if paid
+      // No payment IDs — poll until Razorpay order is paid or times out (~60s)
       setIsSubmitting(true)
-      fetch('/api/razorpay/check-pending', {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ razorpayOrderId: pendingVerify.razorpayOrderId, draftToken: pendingVerify.draftToken }),
-      })
-        .then(r => r.json())
-        .then(data => {
-          if (data.order) {
-            try { sessionStorage.removeItem('rzp_pending') } catch {}
-            clearCart()
-            showToast('Payment confirmed!', 'success')
-            window.location.href = `/account/orders/${data.order.id}`
-          } else if (data.status === 'pending') {
-            setError('Payment is still processing — please wait a moment and refresh, or check My Orders.')
-            setIsSubmitting(false)
-            setPendingVerify(null)
-          } else {
-            setError(data.error || 'Could not confirm payment. Check My Orders or contact support.')
-            setIsSubmitting(false)
-            setPendingVerify(null)
-          }
+      const maxAttempts = 20
+      let attempts = 0
+      const poll = () => {
+        fetch('/api/razorpay/check-pending', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ razorpayOrderId: pendingVerify.razorpayOrderId, draftToken: pendingVerify.draftToken }),
         })
-        .catch(() => {
-          setError('Could not confirm payment. Check My Orders or contact support.')
-          setIsSubmitting(false)
-          setPendingVerify(null)
-        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.order) {
+              try { sessionStorage.removeItem('rzp_pending') } catch {}
+              clearCart()
+              showToast('Payment confirmed!', 'success')
+              window.location.href = `/account/orders/${data.order.id}`
+            } else if (data.status === 'pending' && attempts < maxAttempts) {
+              attempts++
+              setTimeout(poll, 3000)
+            } else {
+              setError(data.error || 'Could not confirm payment. Check My Orders or contact support.')
+              setIsSubmitting(false)
+              setPendingVerify(null)
+            }
+          })
+          .catch(() => {
+            if (attempts < maxAttempts) { attempts++; setTimeout(poll, 3000) }
+            else { setError('Could not confirm payment. Check My Orders or contact support.'); setIsSubmitting(false); setPendingVerify(null) }
+          })
+      }
+      poll()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!pendingVerify])
