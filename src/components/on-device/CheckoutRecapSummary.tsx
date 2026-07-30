@@ -177,7 +177,7 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
         )}
         {feedback && (
           <p className="text-[10px] text-foreground-muted mt-2 pt-2 border-t border-border-default">
-            {feedback === 'liked' ? 'Thanks! We'll keep this style.' : 'Got it — we'll adjust next time.'}
+            {feedback === 'liked' ? "Thanks! We'll keep this style." : "Got it — we'll adjust next time."}
           </p>
         )}
       </div>
