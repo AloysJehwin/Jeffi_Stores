@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { queryOne } from '@/lib/db'
+import { query, queryOne } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
@@ -88,6 +88,14 @@ async function handleDraftToken(token: string, userId: string) {
     receipt,
     notes: { user_id: userId, mode: draft.mode },
   })
+
+  // Store intent so webhook can recover if verify never completes
+  await query(
+    `INSERT INTO pending_payment_intents (razorpay_order_id, draft_token, user_id, amount_paise)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (razorpay_order_id) DO NOTHING`,
+    [razorpayOrder.id, token, userId, amountInPaise]
+  )
 
   return NextResponse.json({
     razorpayOrderId: razorpayOrder.id,
