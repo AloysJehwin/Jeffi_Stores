@@ -422,6 +422,7 @@ function CheckoutPage() {
           contact: address?.phone || '',
         },
         theme: { color: '#f97316' },
+        redirect: false,
         modal: {
           ondismiss: function () {
             razorpayOpen.current = false
