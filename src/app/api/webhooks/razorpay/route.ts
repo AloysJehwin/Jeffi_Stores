@@ -4,6 +4,14 @@ import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { attributeConversion } from '@/lib/marketing'
+import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
+import {
+  loadActiveCart, cartSubtotal, cartTaxAmount, cartItemsForHash,
+  validateCouponForUser, commitOrder,
+} from '@/lib/order-commit'
+import { createDraftInvoice } from '@/lib/invoice'
+import { logActivity } from '@/lib/activity'
+import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 
 export async function POST(request: NextRequest) {
   try {
@@ -15,15 +23,17 @@ export async function POST(request: NextRequest) {
     }
 
     const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET
-    if (webhookSecret) {
-      const expectedSignature = crypto
-        .createHmac('sha256', webhookSecret)
-        .update(rawBody)
-        .digest('hex')
+    if (!webhookSecret) {
+      return NextResponse.json({ error: 'Webhook not configured' }, { status: 500 })
+    }
 
-      if (expectedSignature !== webhookSignature) {
-        return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
-      }
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(rawBody)
+      .digest('hex')
+
+    if (expectedSignature !== webhookSignature) {
+      return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
     }
 
     const event = JSON.parse(rawBody)
@@ -62,7 +72,11 @@ async function handlePaymentCaptured(payment: any) {
     [razorpayOrderId]
   )
 
-  if (!paymentRecord) return
+  if (!paymentRecord) {
+    // Draft-token flow: no payments row yet — try pending_payment_intents fallback
+    await commitDraftFromWebhook(razorpayOrderId, razorpayPaymentId, payment)
+    return
+  }
   if (paymentRecord.payment_status === 'paid') return
 
   const orderId = paymentRecord.order_id
@@ -225,4 +239,119 @@ async function handlePaymentLinkExpired(paymentLink: any) {
      WHERE payment_link_id = $1 AND payment_link_status = 'created'`,
     [paymentLink.id]
   )
+}
+
+async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId: string, payment: any) {
+  // Atomically claim the intent — prevents double-commit with verify route
+  const intent = await queryOne<{
+    id: string; draft_token: string; user_id: string; amount_paise: number
+  }>(
+    `UPDATE pending_payment_intents SET committed = true
+     WHERE razorpay_order_id = $1 AND committed = false
+     RETURNING id, draft_token, user_id, amount_paise`,
+    [razorpayOrderId]
+  )
+  if (!intent) return // already committed or not a draft-token payment
+
+  const draft = await verifyDraftToken(intent.draft_token)
+  if (!draft) {
+    // Token expired — alert admin to manually refund/create order
+    await createAutoTask({
+      userId: intent.user_id,
+      sourceKind: 'contact_failed_payment',
+      sourceRefId: intent.id,
+      title: `Payment captured but draft expired — manual action needed (${razorpayPaymentId})`,
+      description: `Razorpay captured ₹${(intent.amount_paise / 100).toFixed(2)} but the checkout session expired. Manually create the order or issue a refund. Payment ID: ${razorpayPaymentId}`,
+      priority: 'high',
+      dueInDays: 0,
+    }).catch(() => {})
+    return
+  }
+
+  // Amount validation — abort if Razorpay amount doesn't match intent
+  const capturedPaise = payment.amount
+  if (Math.abs(capturedPaise - intent.amount_paise) > 1) {
+    await createAutoTask({
+      userId: intent.user_id,
+      sourceKind: 'contact_failed_payment',
+      sourceRefId: intent.id,
+      title: `Payment amount mismatch — manual action needed (${razorpayPaymentId})`,
+      description: `Expected ₹${(intent.amount_paise / 100).toFixed(2)}, captured ₹${(capturedPaise / 100).toFixed(2)}. Payment ID: ${razorpayPaymentId}`,
+      priority: 'high',
+      dueInDays: 0,
+    }).catch(() => {})
+    return
+  }
+
+  const user = await queryOne<any>(`SELECT * FROM users WHERE id = $1`, [intent.user_id])
+  if (!user) return
+
+  let subtotal = 0
+  let taxAmount = 0
+  let cartItems: Awaited<ReturnType<typeof loadActiveCart>> = []
+  let buyNowSnapshot: { product: any; variant: any | null; subVariant: any | null } | null = null
+
+  if (draft.mode === 'cart') {
+    cartItems = await loadActiveCart(intent.user_id)
+    if (cartItems.length === 0) return
+    subtotal = cartSubtotal(cartItems)
+    taxAmount = cartTaxAmount(cartItems)
+  } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
+    const product = await queryOne<any>(`SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`, [draft.buyNowItem.productId])
+    if (!product) return
+    const variant = draft.buyNowItem.variantId
+      ? await queryOne<any>(`SELECT id, variant_name, sku, mrp FROM product_variants WHERE id = $1`, [draft.buyNowItem.variantId])
+      : null
+    const subVariant = draft.buyNowItem.subVariantId
+      ? await queryOne<any>(`SELECT id, sub_variant_name, sku, mrp FROM product_sub_variants WHERE id = $1`, [draft.buyNowItem.subVariantId])
+      : null
+    buyNowSnapshot = { product, variant, subVariant }
+    subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
+    const gstRate = parseFloat(String(product.gst_percentage || '0'))
+    taxAmount = subtotal - subtotal / (1 + gstRate / 100)
+  } else {
+    return
+  }
+
+  let appliedDiscount = 0
+  if (draft.couponId) {
+    const r = await validateCouponForUser({ couponId: draft.couponId, userId: intent.user_id, subtotal })
+    if (r.ok) appliedDiscount = r.appliedDiscount
+  }
+
+  const created = draft.mode === 'cart'
+    ? await commitOrder({
+        mode: 'cart', userId: intent.user_id, user, addressId: draft.addressId,
+        notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
+        cartItems, subtotal, taxAmount, appliedDiscount,
+        businessDiscountAmount: draft.businessDiscountAmount,
+        paymentRecord: {
+          gatewayOrderId: razorpayOrderId, paymentId: razorpayPaymentId,
+          signature: '', amountPaise: capturedPaise,
+        },
+      })
+    : await commitOrder({
+        mode: 'buyNow', userId: intent.user_id, user, addressId: draft.addressId,
+        notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
+        item: draft.buyNowItem!, product: buyNowSnapshot!.product,
+        variant: buyNowSnapshot!.variant, subVariant: buyNowSnapshot!.subVariant,
+        subtotal, taxAmount, appliedDiscount,
+        businessDiscountAmount: draft.businessDiscountAmount,
+        paymentRecord: {
+          gatewayOrderId: razorpayOrderId, paymentId: razorpayPaymentId,
+          signature: '', amountPaise: capturedPaise,
+        },
+      })
+
+  const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
+  createDraftInvoice(created.id).catch(() => {})
+  const fullOrder = await queryOne('SELECT * FROM orders WHERE id = $1', [created.id])
+  const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
+  sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
+  sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
+  sendPaymentStatusUpdate(user.email, userName, created.order_number, created.id, 'paid', parseFloat(created.total_amount)).catch(() => {})
+  logActivity({ userId: intent.user_id, kind: 'order_placed', referenceId: created.id, referenceType: 'orders',
+    summary: `Placed order #${created.order_number} via webhook recovery`, metadata: { orderNumber: created.order_number, total: created.total_amount } }).catch(() => {})
+  recordImplicitSignalsForProducts(intent.user_id, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
+  attributeConversion(intent.user_id, created.id).catch(() => {})
 }
