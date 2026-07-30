@@ -147,7 +147,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
         </div>
 
         {advancedContent && (
-          <>
+          <div>
             {advOpen && advancedContent}
             <div className="flex justify-center mt-1 -mb-1">
               <button
@@ -160,7 +160,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
                 </svg>
               </button>
             </div>
-          </>
+          </div>
         )}
       </div>
     </div>
