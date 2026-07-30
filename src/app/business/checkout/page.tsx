@@ -63,6 +63,7 @@ function CheckoutPage() {
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
   const razorpayOpen = useRef(false)
+  const razorpayCleanup = useRef<(() => void) | null>(null)
   const [pendingVerify, setPendingVerify] = useState<{ razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string; draftToken: string } | null>(null)
 
   const [buyNowItem, setBuyNowItem] = useState<{
@@ -427,6 +428,9 @@ function CheckoutPage() {
         modal: {
           ondismiss: function () {
             razorpayOpen.current = false
+            razorpayCleanup.current?.()
+            razorpayCleanup.current = null
+            try { sessionStorage.removeItem('rzp_pending_biz') } catch {}
             if (payload.orderId) {
               fetch(`/api/orders/${payload.orderId}`, {
                 method: 'DELETE',
@@ -444,8 +448,8 @@ function CheckoutPage() {
       const rzp = new (window as any).Razorpay(options)
       rzp.on('payment.failed', function (response: any) {
         razorpayOpen.current = false
-        if (payload.orderId) {
-          fetch(`/api/orders/${payload.orderId}/payment-failed`, {
+        razorpayCleanup.current?.()
+        razorpayCleanup.current = null
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
@@ -470,6 +474,17 @@ function CheckoutPage() {
           }))
         } catch {}
       }
+
+      const onBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (!razorpayOpen.current) return
+        e.preventDefault()
+        e.returnValue = ''
+      }
+      window.addEventListener('beforeunload', onBeforeUnload)
+      razorpayCleanup.current = () => {
+        window.removeEventListener('beforeunload', onBeforeUnload)
+      }
+
       rzp.open()
     } catch (err: any) {
       if (payload.orderId) {
