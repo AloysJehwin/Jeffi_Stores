@@ -93,8 +93,6 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const razorpayOpen = useRef(false)
   const razorpayCleanup = useRef<(() => void) | null>(null)
   const [pendingVerify, setPendingVerify] = useState<{ razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string; draftToken: string } | null>(null)
-  const razorpayCleanup = useRef<(() => void) | null>(null)
-  const [pendingVerify, setPendingVerify] = useState<{ razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string; draftToken: string } | null>(null)
 
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
