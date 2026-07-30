@@ -148,6 +148,9 @@ function CheckoutPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [!!pendingVerify])
+
+  useEffect(() => {
+    if (!authLoading && !user && authWasLoading.current) {
       router.push('/login?redirect=/checkout')
       return
     }
