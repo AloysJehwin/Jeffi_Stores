@@ -10,6 +10,8 @@
  * PII (honors ADR-0001's constraint). Inference is on-device regardless.
  */
 
+import type { UserProfile } from './user-profile'
+
 export interface CartLine {
   name: string
   category?: string | null
@@ -18,18 +20,16 @@ export interface CartLine {
 }
 
 export interface SessionSignals {
-  /** Items currently in the cart. */
   cart: CartLine[]
-  /** Product names viewed this session (most-recent first), deduped. */
   viewed?: string[]
-  /** Category names of the user's past orders (anonymized, no order detail). */
   pastCategories?: string[]
-  /** Search terms used this visit. */
   searches?: string[]
-  /** Cart total in INR (rounded). */
   total?: number | null
-  /** Item count (sum of quantities). */
   itemCount?: number | null
+  /** Persistent user profile — adds personalisation across sessions. */
+  userProfile?: UserProfile | null
+  /** Recap feedback preference derived from past 👍/👎. */
+  recapStyle?: 'concise' | 'detailed' | null
 }
 
 const MAX_CART = 12
@@ -94,6 +94,25 @@ export function serializeSignals(sig: SessionSignals): string {
   if (searches.length) {
     lines.push('### Searched for')
     lines.push(searches.join(', '))
+  }
+
+  // User profile — personalises the recap across sessions
+  const profile = sig.userProfile
+  if (profile && (profile.topCategories.length || profile.topBrands.length || profile.purchaseCount > 0)) {
+    const bits: string[] = []
+    if (profile.topCategories.length) bits.push(`Frequent: ${profile.topCategories.slice(0, 3).join(', ')}`)
+    if (profile.topBrands.length) bits.push(`Brands: ${profile.topBrands.slice(0, 3).join(', ')}`)
+    if (profile.priceRange) bits.push(`Budget: Rs.${Math.round(profile.priceRange.min)}–Rs.${Math.round(profile.priceRange.max)}`)
+    if (profile.purchaseCount > 0) bits.push(`Orders: ${profile.purchaseCount}`)
+    if (bits.length) {
+      lines.push('### Profile')
+      lines.push(bits.join(' | '))
+    }
+  }
+
+  if (sig.recapStyle) {
+    lines.push('### Style')
+    lines.push(sig.recapStyle)
   }
 
   lines.push('### Recap')
