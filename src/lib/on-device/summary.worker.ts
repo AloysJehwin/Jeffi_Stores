@@ -92,8 +92,9 @@ async function generate(id: number, prompt: string) {
   // drop the prompt tokens, then decode just the newly generated ids.
   const output = await model.generate({
     ...inputs,
-    max_new_tokens: 90,
+    max_new_tokens: 80,
     do_sample: false,
+    repetition_penalty: 1.3,
     streamer,
   })
 

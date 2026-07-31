@@ -26,6 +26,23 @@ export function getLastOnDeviceError(): string | null {
   return lastError
 }
 
+// Strip repetition loops — e.g. "Build Your Quality Build Your Quality..."
+function deloop(text: string): string {
+  const words = text.trim().split(/\s+/)
+  // Try window sizes 2–6 words; find the first repeating sequence
+  for (let w = 2; w <= 6; w++) {
+    for (let i = 0; i + w * 2 <= words.length; i++) {
+      const chunk = words.slice(i, i + w).join(' ')
+      const rest = words.slice(i + w).join(' ')
+      if (rest.startsWith(chunk)) {
+        // Repetition found — keep text up to first occurrence
+        return words.slice(0, i + w).join(' ')
+      }
+    }
+  }
+  return text
+}
+
 function ensureWorker(isMobile: boolean): Worker {
   if (worker) return worker
   workerMobile = isMobile
@@ -41,11 +58,11 @@ function ensureWorker(isMobile: boolean): Worker {
     if (msg.type === 'token' && pending.has(msg.id)) {
       const p = pending.get(msg.id)!
       p.acc += msg.text
-      p.onToken?.(p.acc)
+      p.onToken?.(deloop(p.acc))
     } else if (msg.type === 'result' && pending.has(msg.id)) {
       const p = pending.get(msg.id)!
       pending.delete(msg.id)
-      p.resolve(msg.text || p.acc)
+      p.resolve(deloop(msg.text || p.acc))
     } else if (msg.type === 'error' && pending.has(msg.id)) {
       const p = pending.get(msg.id)!
       pending.delete(msg.id)
