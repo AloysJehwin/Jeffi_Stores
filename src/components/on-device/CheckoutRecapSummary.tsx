@@ -125,7 +125,7 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
       {/* Mobile explainer toast */}
       {showMobileToast && (
         <div className="rounded-lg border border-accent-200 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/20 px-3 py-2 mb-3 flex items-center justify-between gap-2">
-          <p className="text-xs text-accent-700 dark:text-accent-300">✨ This summary runs on your device's AI chip — no data leaves your phone</p>
+          <p className="text-xs text-accent-700 dark:text-accent-300">This summary runs on your device's AI chip — no data leaves your phone</p>
           <button type="button" onClick={() => setShowMobileToast(false)} className="text-accent-400 hover:text-accent-600 flex-shrink-0">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -164,15 +164,23 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
             <button
               type="button"
               onClick={() => { setFeedback('liked'); saveFeedback('liked', text) }}
-              className="text-sm hover:scale-110 transition-transform"
+              className="text-foreground-muted hover:text-accent-500 transition-colors"
               aria-label="Liked"
-            >👍</button>
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017a2 2 0 01-1.789-1.106l-3.5-7A2 2 0 017.736 10H12V5a2 2 0 012-2h.5a.5.5 0 01.5.5V10z" />
+              </svg>
+            </button>
             <button
               type="button"
               onClick={() => { setFeedback('disliked'); saveFeedback('disliked', text) }}
-              className="text-sm hover:scale-110 transition-transform"
+              className="text-foreground-muted hover:text-red-500 transition-colors"
               aria-label="Disliked"
-            >👎</button>
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 011.789 1.106l3.5 7A2 2 0 0116.264 14H12v5a2 2 0 01-2 2h-.5a.5.5 0 01-.5-.5V14z" />
+              </svg>
+            </button>
           </div>
         )}
         {feedback && (
