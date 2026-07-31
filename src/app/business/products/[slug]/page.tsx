@@ -15,6 +15,7 @@ import ProductCard from '@/components/business/ProductCard'
 import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import PdpCompareSection from '@/components/visitor/PdpCompareSection'
+import ProductPitchLine from '@/components/on-device/ProductPitchLine'
 
 const getProductBySlug = cache(async (slug: string) => {
   return queryOne(`
@@ -641,12 +642,25 @@ export default async function ProductDetailPage({
         })()}
 
         {/* Description */}
-        {product.description && (
+        {product.description ? (
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-6 sm:p-8 mb-8">
             <h2 className="text-2xl font-bold text-foreground mb-4">Product Description</h2>
             <p className="text-foreground-secondary leading-relaxed whitespace-pre-line">
               {product.description}
             </p>
+            <ProductPitchLine
+              productName={product.name}
+              brand={product.brands?.name || null}
+              category={product.categories?.name || null}
+            />
+          </div>
+        ) : (
+          <div className="mb-8">
+            <ProductPitchLine
+              productName={product.name}
+              brand={product.brands?.name || null}
+              category={product.categories?.name || null}
+            />
           </div>
         )}
 
