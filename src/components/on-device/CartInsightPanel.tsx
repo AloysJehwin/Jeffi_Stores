@@ -44,7 +44,7 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
   if (state === 'idle' || (state === 'done' && !text.trim())) return null
 
   return (
-    <div className="flex items-start gap-2.5 px-4 py-3 mb-4 bg-surface-elevated rounded-xl border border-border-default">
+    <div className="flex items-start gap-2.5 px-4 py-3 mt-4 mb-4 bg-surface-elevated rounded-xl border border-border-default">
       <svg className="w-4 h-4 text-accent-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
