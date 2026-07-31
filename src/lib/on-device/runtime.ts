@@ -6,7 +6,14 @@
  * All work happens in the Web Worker so the checkout thread never blocks.
  */
 import { detectOnDeviceCapability } from './capability'
-import { buildRecapPrompt, type SessionSignals } from './prompt'
+import {
+  buildRecapPrompt,
+  buildCartInsightPrompt,
+  buildProductPitchPrompt,
+  buildAffirmationPrompt,
+  type SessionSignals,
+} from './prompt'
+import type { UserProfile } from './user-profile'
 
 let worker: Worker | null = null
 let workerMobile = false
@@ -69,6 +76,33 @@ export function generateRecap(
     pending.set(id, { resolve, reject, onToken, acc: '' })
     w.postMessage({ type: 'generate', id, prompt })
   })
+}
+
+function runPrompt(prompt: string, isMobile: boolean, onToken?: (partial: string) => void): Promise<string> {
+  const w = ensureWorker(isMobile)
+  const id = nextId++
+  return new Promise<string>((resolve, reject) => {
+    pending.set(id, { resolve, reject, onToken, acc: '' })
+    w.postMessage({ type: 'generate', id, prompt })
+  })
+}
+
+export function generateCartInsight(signals: SessionSignals, isMobile: boolean, onToken?: (partial: string) => void): Promise<string> {
+  return runPrompt(buildCartInsightPrompt(signals), isMobile, onToken)
+}
+
+export function generateProductPitch(
+  productName: string, brand: string | null, category: string | null,
+  profile: UserProfile | null, isMobile: boolean, onToken?: (partial: string) => void
+): Promise<string> {
+  return runPrompt(buildProductPitchPrompt(productName, brand, category, profile), isMobile, onToken)
+}
+
+export function generateAffirmation(
+  itemNames: string[], total: number,
+  profile: UserProfile | null, isMobile: boolean, onToken?: (partial: string) => void
+): Promise<string> {
+  return runPrompt(buildAffirmationPrompt(itemNames, total, profile), isMobile, onToken)
 }
 
 export function disposeSummarizer() {

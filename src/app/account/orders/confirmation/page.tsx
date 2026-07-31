@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { CheckCircle } from 'lucide-react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
+import OrderAffirmation from '@/components/on-device/OrderAffirmation'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -215,6 +216,14 @@ function OrderConfirmationPage() {
             A confirmation email has been sent to your email address with your order details.
           </p>
         </div>
+
+        {/* On-device affirmation + profile update */}
+        {order && (
+          <OrderAffirmation
+            items={order.items}
+            total={order.totalAmount}
+          />
+        )}
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4">

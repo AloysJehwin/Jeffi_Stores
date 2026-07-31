@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import CartInsightPanel from '@/components/on-device/CartInsightPanel'
 
 interface AppliedCoupon {
   couponId: string
@@ -519,6 +520,13 @@ export default function CartPage() {
                 </div>
               </div>
             )}
+
+            <CartInsightPanel items={cartItems.map(i => ({
+              name: i.products?.name || '',
+              brand: i.products?.brand_name || null,
+              category: null,
+              qty: Number(i.quantity),
+            }))} />
 
             <RecommendedProducts title="You Might Also Like" limit={4} />
           </div>

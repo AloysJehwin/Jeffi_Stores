@@ -7,6 +7,7 @@ import { buildSearchClause, buildSearchRank } from '@/lib/search'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/visitor/ProductCard'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
+import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
 
 const PAGE_SIZE = 21
 
@@ -423,6 +424,17 @@ export default async function ProductsPage({
 
             {/* Compare strip — shows selected products + Compare button */}
             <CompareStripLazy />
+
+            {/* Profile-based insight banner */}
+            <SearchInsightBanner
+              activeBrands={(brands as any[])
+                .filter((b: any) => resolvedSearchParams.brand?.split(',').includes(String(b.id)) || resolvedSearchParams.brand?.split(',').includes(b.slug))
+                .map((b: any) => b.name)}
+              activeCategories={(categories as any[])
+                .filter((c: any) => resolvedSearchParams.category?.split(',').includes(String(c.id)) || resolvedSearchParams.category?.split(',').includes(c.slug))
+                .map((c: any) => c.name)}
+              resultCount={total}
+            />
 
             {/* Products Grid */}
             {products.length > 0 ? (
