@@ -101,7 +101,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
           ))}
 
           {searchPlaceholder && (
-            <div className="w-full sm:flex-1 sm:min-w-[200px] flex items-end gap-1.5">
+            <div key="search" className="w-full sm:flex-1 sm:min-w-[200px] flex items-end gap-1.5">
               <div className="flex-1">
                 <label htmlFor={`filter-${searchParam}`} className="block text-xs font-medium text-foreground-muted mb-1.5 uppercase tracking-wider">
                   Search
@@ -139,7 +139,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
           )}
 
           {hasActiveFilters && (
-            <button type="button" onClick={handleClearAll}
+            <button key="clear" type="button" onClick={handleClearAll}
               className="px-3 py-1.5 text-sm font-medium text-foreground-secondary hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg border border-border-secondary transition-colors whitespace-nowrap sm:self-end">
               Clear Filters
             </button>
@@ -147,7 +147,7 @@ export default function AdminFilters({ filters, searchPlaceholder, searchParam =
         </div>
 
         {advancedContent && (
-          <div>
+          <div key="advanced-panel">
             {advOpen && advancedContent}
             <div className="flex justify-center mt-1 -mb-1">
               <button
