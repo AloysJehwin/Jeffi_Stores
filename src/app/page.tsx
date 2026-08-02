@@ -209,7 +209,7 @@ async function getCategoryShowcase() {
 }
 
 export default async function HomePage() {
-  const [featuredProducts, newArrivals, mainCategories, heroSlides, categoryShowcase, bestSellers, topBrands, dealOfTheDay, freeShippingThreshold] = await Promise.all([
+  const [featuredProducts, newArrivals, mainCategories, heroSlides, categoryShowcase, bestSellers, topBrands, freeShippingThreshold] = await Promise.all([
     getFeaturedProducts(),
     getNewArrivals(),
     getMainCategories(),
@@ -217,7 +217,6 @@ export default async function HomePage() {
     getCategoryShowcase(),
     getBestSellers(),
     getTopBrands(),
-    getDealOfTheDay(),
     getFreeShippingThreshold(),
   ])
 
@@ -285,59 +284,6 @@ export default async function HomePage() {
                   </div>
                 </Link>
               ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* ── Deal of the Day ── */}
-      {dealOfTheDay.length > 0 && (
-        <section className="py-10 md:py-14 bg-surface">
-          <div className="container mx-auto px-4">
-            <div className="flex items-end justify-between mb-6">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="inline-flex items-center gap-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full">
-                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.381z" clipRule="evenodd"/></svg>
-                    Deal of the Day
-                  </span>
-                </div>
-                <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">Today&apos;s Best Deals</h2>
-              </div>
-              <Link href="/products?sort=featured" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
-                View all deals
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
-              </Link>
-            </div>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {dealOfTheDay.map((product: any) => {
-                const props = productCardProps(product)
-                const discount = props.mrpDiscount
-                return (
-                  <Link key={product.id} href={`/products/${product.slug}`}
-                    className="group bg-surface-elevated rounded-2xl border border-border-default hover:border-red-400/50 hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col">
-                    <div className="relative aspect-square bg-surface p-3">
-                      {props.primaryImage && (
-                        <img src={props.primaryImage.thumbnail_url || props.primaryImage.image_url} alt={product.name}
-                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
-                      )}
-                      {discount > 0 && (
-                        <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{discount}% OFF</span>
-                      )}
-                      <span className="absolute top-2 right-2 bg-green-500/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">Ships 24h</span>
-                    </div>
-                    <div className="p-3 flex flex-col gap-1 flex-1">
-                      <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">{product.name}</p>
-                      <div className="mt-auto flex items-baseline gap-1.5 pt-1">
-                        <span className="text-sm font-black text-foreground">₹{props.displayPrice.toLocaleString('en-IN')}</span>
-                        {props.mrp && props.mrp > props.displayPrice && (
-                          <span className="text-[11px] text-foreground-muted line-through">₹{props.mrp.toLocaleString('en-IN')}</span>
-                        )}
-                      </div>
-                    </div>
-                  </Link>
-                )
-              })}
             </div>
           </div>
         </section>
