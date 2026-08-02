@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { queryMany } from '@/lib/db'
+import { queryMany, queryOne } from '@/lib/db'
 import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
@@ -116,7 +116,69 @@ function productCardProps(product: any) {
     extraDeliveryDays: Number(product.extra_delivery_days ?? 0) }
 }
 
-async function getCategoryShowcase() {
+async function getBestSellers() {
+  return queryMany(`
+    SELECT p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images,
+      ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
+      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp,
+      COALESCE((SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.product_id = p.id), 0) AS total_sold
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE p.is_active = true
+    ORDER BY total_sold DESC, p.created_at DESC
+    LIMIT 8
+  `)
+}
+
+async function getTopBrands() {
+  return queryMany<{ id: string; name: string; slug: string; product_count: number }>(`
+    SELECT b.id, b.name, b.slug, COUNT(p.id)::int AS product_count
+    FROM brands b
+    JOIN products p ON p.brand_id = b.id AND p.is_active = true
+    GROUP BY b.id, b.name, b.slug
+    HAVING COUNT(p.id) >= 2
+    ORDER BY COUNT(p.id) DESC
+    LIMIT 8
+  `)
+}
+
+async function getDealOfTheDay() {
+  return queryMany(`
+    SELECT p.*,
+      json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
+      json_build_object('id', b.id, 'name', b.name) AS brands,
+      COALESCE(
+        (SELECT json_agg(pi ORDER BY pi.display_order)
+         FROM product_images pi WHERE pi.product_id = p.id),
+        '[]'::json
+      ) AS product_images,
+      ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
+      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
+    FROM products p
+    LEFT JOIN categories c ON p.category_id = c.id
+    LEFT JOIN brands b ON p.brand_id = b.id
+    WHERE p.is_active = true AND p.is_featured = true
+    ORDER BY RANDOM()
+    LIMIT 4
+  `)
+}
+
+async function getFreeShippingThreshold() {
+  const row = await queryOne<{ value: string }>(`SELECT value FROM site_settings WHERE key = 'free_shipping_threshold'`, [])
+  return parseInt(row?.value || '500', 10)
+}
+
+
   const categories = await queryMany<{ id: string; name: string; slug: string }>(`
     SELECT c.id, c.name, c.slug FROM categories c
     JOIN categories sub ON sub.parent_category_id = c.id
@@ -147,12 +209,16 @@ async function getCategoryShowcase() {
 }
 
 export default async function HomePage() {
-  const [featuredProducts, newArrivals, mainCategories, heroSlides, categoryShowcase] = await Promise.all([
+  const [featuredProducts, newArrivals, mainCategories, heroSlides, categoryShowcase, bestSellers, topBrands, dealOfTheDay, freeShippingThreshold] = await Promise.all([
     getFeaturedProducts(),
     getNewArrivals(),
     getMainCategories(),
     getHeroSlides(),
     getCategoryShowcase(),
+    getBestSellers(),
+    getTopBrands(),
+    getDealOfTheDay(),
+    getFreeShippingThreshold(),
   ])
 
   const host = await getHost()
@@ -166,6 +232,27 @@ export default async function HomePage() {
 
       {/* ── Hero Carousel ── */}
       <HeroCarousel slides={heroSlides} />
+
+      {/* ── Trust Strip ── */}
+      <div className="bg-surface-elevated border-b border-border-default">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 divide-x-0 sm:divide-x divide-border-default">
+            {[
+              { icon: 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h2m0 0h6m-6 0a2 2 0 104 0m6 0a2 2 0 104 0m1-10h2l3 5v4h-2', label: `Free delivery above ₹${freeShippingThreshold.toLocaleString('en-IN')}` },
+              { icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', label: 'GST invoice on every order' },
+              { icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10', label: '10,000+ products in stock' },
+              { icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z', label: 'Cash on delivery available' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-center gap-3 px-4 py-3 sm:justify-center">
+                <svg className="w-5 h-5 text-accent-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                </svg>
+                <span className="text-xs font-semibold text-foreground-secondary">{item.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
 
       {/* ── Shop by Category ── */}
       {mainCategories.length > 0 && (
@@ -198,6 +285,59 @@ export default async function HomePage() {
                   </div>
                 </Link>
               ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Deal of the Day ── */}
+      {dealOfTheDay.length > 0 && (
+        <section className="py-10 md:py-14 bg-surface">
+          <div className="container mx-auto px-4">
+            <div className="flex items-end justify-between mb-6">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="inline-flex items-center gap-1 bg-red-500 text-white text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-full">
+                    <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.381z" clipRule="evenodd"/></svg>
+                    Deal of the Day
+                  </span>
+                </div>
+                <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">Today&apos;s Best Deals</h2>
+              </div>
+              <Link href="/products?sort=featured" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
+                View all deals
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {dealOfTheDay.map((product: any) => {
+                const props = productCardProps(product)
+                const discount = props.mrpDiscount
+                return (
+                  <Link key={product.id} href={`/products/${product.slug}`}
+                    className="group bg-surface-elevated rounded-2xl border border-border-default hover:border-red-400/50 hover:shadow-lg transition-all duration-200 overflow-hidden flex flex-col">
+                    <div className="relative aspect-square bg-surface p-3">
+                      {props.primaryImage && (
+                        <img src={props.primaryImage.thumbnail_url || props.primaryImage.image_url} alt={product.name}
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
+                      )}
+                      {discount > 0 && (
+                        <span className="absolute top-2 left-2 bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">{discount}% OFF</span>
+                      )}
+                      <span className="absolute top-2 right-2 bg-green-500/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded-full">Ships 24h</span>
+                    </div>
+                    <div className="p-3 flex flex-col gap-1 flex-1">
+                      <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">{product.name}</p>
+                      <div className="mt-auto flex items-baseline gap-1.5 pt-1">
+                        <span className="text-sm font-black text-foreground">₹{props.displayPrice.toLocaleString('en-IN')}</span>
+                        {props.mrp && props.mrp > props.displayPrice && (
+                          <span className="text-[11px] text-foreground-muted line-through">₹{props.mrp.toLocaleString('en-IN')}</span>
+                        )}
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
             </div>
           </div>
         </section>
@@ -245,8 +385,36 @@ export default async function HomePage() {
         </section>
       )}
 
-      {/* ── New Arrivals ── */}
-      {newArrivals.length > 0 && (
+      {/* ── Shop by Brand ── */}
+      {topBrands.length > 0 && (
+        <section className="py-8 bg-surface-elevated border-y border-border-default">
+          <div className="container mx-auto px-4">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <p className="text-primary-500 text-[10px] font-black uppercase tracking-[0.2em] mb-0.5">Trusted Names</p>
+                <h2 className="text-xl md:text-2xl font-black text-foreground tracking-tight">Shop by Brand</h2>
+              </div>
+              <Link href="/brands" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
+                All brands <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+              </Link>
+            </div>
+            <div className="grid grid-cols-4 sm:grid-cols-8 gap-3">
+              {topBrands.map(brand => (
+                <Link key={brand.id} href={`/brands/${brand.slug}`}
+                  className="flex flex-col items-center gap-2 p-3 rounded-xl bg-surface border border-border-default hover:border-accent-500/40 hover:bg-surface-secondary transition-all group">
+                  <div className="w-10 h-10 rounded-full bg-accent-500/10 flex items-center justify-center">
+                    <span className="text-accent-600 dark:text-accent-400 text-xs font-black">{brand.name.slice(0, 2).toUpperCase()}</span>
+                  </div>
+                  <span className="text-[11px] font-semibold text-foreground text-center leading-tight line-clamp-2">{brand.name}</span>
+                  <span className="text-[10px] text-foreground-muted">{brand.product_count} items</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── New Arrivals ── */}      {newArrivals.length > 0 && (
         <section className="py-12 md:py-20 bg-surface">
           <div className="container mx-auto px-4">
             <div className="flex items-end justify-between mb-7">
@@ -328,6 +496,53 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* ── Best Sellers ── */}
+      {bestSellers.length > 0 && (
+        <section className="py-12 md:py-16 bg-surface-secondary">
+          <div className="container mx-auto px-4">
+            <div className="flex items-end justify-between mb-7">
+              <div>
+                <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Most Ordered</p>
+                <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">Best Sellers</h2>
+              </div>
+              <Link href="/products?sort=bestsellers" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
+                View all <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+              </Link>
+            </div>
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+              {bestSellers.map((product: any) => (
+                <ProductCard key={product.id} {...productCardProps(product)} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── GST & Business Benefits ── */}
+      <section className="py-8 bg-surface border-y border-border-default">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', title: 'Save up to 18% with GST', sub: 'Claim input tax credit on every purchase with a valid GSTIN invoice' },
+              { icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z', title: 'Bulk order discounts', sub: 'Special pricing for businesses ordering in volume — contact us for a quote' },
+              { icon: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z', title: 'Dedicated account manager', sub: 'Registered businesses get priority support and a personal account manager' },
+            ].map((item, i) => (
+              <div key={i} className="flex items-start gap-3 p-4 rounded-xl bg-surface-elevated border border-border-default">
+                <div className="w-10 h-10 rounded-lg bg-accent-500/10 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
+                  </svg>
+                </div>
+                <div>
+                  <p className="text-sm font-bold text-foreground">{item.title}</p>
+                  <p className="text-xs text-foreground-secondary mt-0.5 leading-relaxed">{item.sub}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ── Why Jeffi Stores ── */}
       <section className="py-12 md:py-20 bg-surface-secondary">
