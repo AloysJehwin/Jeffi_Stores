@@ -155,9 +155,10 @@ interface PolicyProps {
   replacementAllowed: boolean
   replacementDays: number
   isCodAllowed?: boolean
+  freeShippingThreshold?: number
 }
 
-const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed }: PolicyProps) => {
+const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed, freeShippingThreshold = 500 }: PolicyProps) => {
   const items = [
     {
       icon: (
@@ -377,7 +378,7 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
   const replacementDays = replacementAllowed
     ? (brand?.replacement_allowed === false ? (brand.replacement_window_days ?? 7) : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7))
     : 0
-  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed: product.is_cod_allowed ?? false }
+  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed: product.is_cod_allowed ?? false, freeShippingThreshold }
 
   const handleWishlist = useCallback(async () => {
     if (!user) {
