@@ -116,12 +116,40 @@ function productCardProps(product: any) {
     extraDeliveryDays: Number(product.extra_delivery_days ?? 0) }
 }
 
-export default async function HomePage() {
-  const [featuredProducts, newArrivals, mainCategories, heroSlides] = await Promise.all([
+async function getCategoryShowcase() {
+  // Get top 4 active parent categories with 4-5 products each
+  const categories = await queryMany<{ id: string; name: string; slug: string }>(`
+    SELECT id, name, slug FROM categories
+    WHERE parent_category_id IS NULL AND is_active = true
+    ORDER BY display_order ASC LIMIT 4
+  `)
+  const result = await Promise.all(categories.map(async cat => {
+    const products = await queryMany(`
+      SELECT p.id, p.name, p.slug, p.has_variants,
+        p.base_price, p.discount_pct,
+        json_build_object('name', b.name) AS brands,
+        (SELECT json_agg(json_build_object('image_url', pi2.image_url, 'thumbnail_url', pi2.thumbnail_url, 'is_primary', pi2.is_primary))
+          FROM product_images pi2 WHERE pi2.product_id = p.id LIMIT 1) AS product_images,
+        MIN(pv.price) FILTER (WHERE pv.is_active) AS variant_min_price,
+        SUM(pv.inventory_quantity) FILTER (WHERE pv.is_active) AS variant_stock_total
+      FROM products p
+      LEFT JOIN brands b ON b.id = p.brand_id
+      LEFT JOIN product_variants pv ON pv.product_id = p.id
+      WHERE p.category_id = $1 AND p.is_active = true
+      GROUP BY p.id, b.name
+      ORDER BY p.is_featured DESC, p.created_at DESC
+      LIMIT 5
+    `, [cat.id])
+    return { ...cat, products }
+  }))
+  return result.filter(c => c.products.length >= 2)
+}
+  const [featuredProducts, newArrivals, mainCategories, heroSlides, categoryShowcase] = await Promise.all([
     getFeaturedProducts(),
     getNewArrivals(),
     getMainCategories(),
     getHeroSlides(),
+    getCategoryShowcase(),
   ])
 
   const host = await getHost()
@@ -237,6 +265,59 @@ export default async function HomePage() {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
               {newArrivals.map((product) => (
                 <ProductCard key={product.id} {...productCardProps(product)} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ── Category Showcase ── */}
+      {categoryShowcase.length > 0 && (
+        <section className="py-10 md:py-16">
+          <div className="container mx-auto px-4">
+            <div className="flex items-end justify-between mb-6">
+              <div>
+                <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Shop by Category</p>
+                <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">Top Categories</h2>
+              </div>
+              <Link href="/categories" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
+                All categories
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7"/></svg>
+              </Link>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {categoryShowcase.map((cat: any) => (
+                <div key={cat.id} className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden hover:shadow-md transition-shadow">
+                  {/* Card header */}
+                  <div className="flex items-center justify-between px-4 py-3 border-b border-border-default">
+                    <Link href={`/categories/${cat.slug}`} className="font-bold text-foreground hover:text-accent-500 transition-colors text-sm">
+                      {cat.name}
+                    </Link>
+                    <Link href={`/products?category=${cat.id}`} className="text-xs text-accent-500 hover:text-accent-400 font-semibold transition-colors">
+                      See all →
+                    </Link>
+                  </div>
+                  {/* Product grid */}
+                  <div className="grid grid-cols-2 gap-px bg-border-default">
+                    {cat.products.slice(0, 4).map((p: any, i: number) => {
+                      const img = p.product_images?.[0]
+                      const price = p.has_variants && p.variant_min_price ? Number(p.variant_min_price) : Number(p.base_price)
+                      return (
+                        <Link key={p.id} href={`/products/${p.slug}`}
+                          className={`bg-surface-elevated p-3 flex flex-col gap-1.5 hover:bg-surface-secondary transition-colors group ${i === 0 ? 'col-span-2' : ''}`}>
+                          {img && (
+                            <div className={`relative overflow-hidden rounded-lg bg-surface ${i === 0 ? 'h-32' : 'h-20'}`}>
+                              <img src={img.thumbnail_url || img.image_url} alt={p.name}
+                                className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300" />
+                            </div>
+                          )}
+                          <p className="text-xs font-medium text-foreground line-clamp-2 leading-tight">{p.name}</p>
+                          <p className="text-xs font-bold text-accent-500">₹{price.toLocaleString('en-IN')}</p>
+                        </Link>
+                      )
+                    })}
+                  </div>
+                </div>
               ))}
             </div>
           </div>

@@ -132,6 +132,7 @@ interface ProductDetailClientProps {
     is_cod_allowed?: boolean | null
   }
   initialSkuParam?: string
+  freeShippingThreshold?: number
 }
 
 interface PolicyProps {
@@ -152,7 +153,7 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
         </svg>
       ),
       label: 'Free Delivery',
-      sub: 'On orders above ₹500',
+      sub: `On orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}`,
       color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
       href: '/legal/shipping-policy',
     },
@@ -235,7 +236,7 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
   )
 }
 
-export default function ProductDetailClient({ product, initialSkuParam }: ProductDetailClientProps) {
+export default function ProductDetailClient({ product, initialSkuParam, freeShippingThreshold = 500 }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
