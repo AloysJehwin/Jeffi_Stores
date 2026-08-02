@@ -144,6 +144,8 @@ async function getCategoryShowcase() {
   }))
   return result.filter(c => c.products.length >= 2)
 }
+
+export default async function HomePage() {
   const [featuredProducts, newArrivals, mainCategories, heroSlides, categoryShowcase] = await Promise.all([
     getFeaturedProducts(),
     getNewArrivals(),
@@ -294,7 +296,7 @@ async function getCategoryShowcase() {
                       {cat.name}
                     </Link>
                     <Link href={`/products?category=${cat.id}`} className="text-xs text-accent-500 hover:text-accent-400 font-semibold transition-colors">
-                      See all →
+                      See all &rarr;
                     </Link>
                   </div>
                   {/* Product grid */}
