@@ -308,7 +308,11 @@ export default async function ProductDetailPage({
   const hdrs = await headers()
   const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
 
-  const relatedProducts = await getRelatedProducts(product.id, product.category_id, product.name)
+  const [relatedProducts, freeShippingSetting] = await Promise.all([
+    getRelatedProducts(product.id, product.category_id, product.name),
+    queryOne<{ value: string }>(`SELECT value FROM site_settings WHERE key = 'free_shipping_threshold'`, []),
+  ])
+  const freeShippingThreshold = parseInt(freeShippingSetting?.value || '500', 10)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
   const jsonLd = buildProductJsonLd(product, baseUrl)
   const skuParam = typeof resolvedSearchParams.sku === 'string' ? resolvedSearchParams.sku : undefined
@@ -378,7 +382,7 @@ export default async function ProductDetailPage({
         {/* Product Details */}
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 lg:items-start">
-            <ProductDetailClient product={product} initialSkuParam={skuParam} />
+            <ProductDetailClient product={product} initialSkuParam={skuParam} freeShippingThreshold={freeShippingThreshold} />
           </div>
         </div>
 
