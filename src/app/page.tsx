@@ -178,7 +178,7 @@ async function getFreeShippingThreshold() {
   return parseInt(row?.value || '500', 10)
 }
 
-
+async function getCategoryShowcase() {
   const categories = await queryMany<{ id: string; name: string; slug: string }>(`
     SELECT c.id, c.name, c.slug FROM categories c
     JOIN categories sub ON sub.parent_category_id = c.id
