@@ -7,7 +7,7 @@ import { isInterState, calculateGST, round2 } from '@/lib/gst'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
-import { quoteShipping } from '@/lib/order-commit'
+import { quoteShipping, validateCouponForUser } from '@/lib/order-commit'
 import { computeEdd } from '@/lib/edd'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { createDraftInvoice } from '@/lib/invoice'
@@ -271,38 +271,9 @@ export async function POST(request: NextRequest) {
 
       let appliedDiscount = 0
       if (couponId) {
-        const couponRes = await client.query(
-          `SELECT * FROM coupons WHERE id = $1 FOR UPDATE`,
-          [couponId]
-        )
-        const coupon = couponRes.rows[0]
-        if (coupon && coupon.is_active) {
-          const now = new Date()
-          const validFrom = coupon.valid_from ? new Date(coupon.valid_from) : null
-          const validUntil = coupon.valid_until ? new Date(coupon.valid_until) : null
-          const withinWindow = (!validFrom || validFrom <= now) && (!validUntil || validUntil >= now)
-          const underGlobalLimit = coupon.usage_limit === null || coupon.times_used < coupon.usage_limit
-          let underPerUserLimit = true
-          if (coupon.usage_limit_per_user !== null) {
-            const usageRes = await client.query(
-              `SELECT COUNT(*) AS cnt FROM coupon_usage WHERE coupon_id = $1 AND user_id = $2`,
-              [coupon.id, userId]
-            )
-            underPerUserLimit = parseInt(usageRes.rows[0]?.cnt || '0') < coupon.usage_limit_per_user
-          }
-          const meetsMinPurchase = coupon.min_purchase_amount === null || subtotal >= coupon.min_purchase_amount
-          if (withinWindow && underGlobalLimit && underPerUserLimit && meetsMinPurchase) {
-            if (coupon.discount_type === 'percentage') {
-              appliedDiscount = (subtotal * Number(coupon.discount_value)) / 100
-              if (coupon.max_discount_amount !== null) {
-                appliedDiscount = Math.min(appliedDiscount, Number(coupon.max_discount_amount))
-              }
-            } else {
-              appliedDiscount = Number(coupon.discount_value)
-            }
-            appliedDiscount = Math.min(appliedDiscount, subtotal)
-            appliedDiscount = round2(appliedDiscount)
-          }
+        const couponResult = await validateCouponForUser({ couponId, userId, subtotal })
+        if (couponResult.ok) {
+          appliedDiscount = couponResult.appliedDiscount
         }
       }
       const txTotal = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
