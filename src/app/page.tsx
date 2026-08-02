@@ -117,26 +117,27 @@ function productCardProps(product: any) {
 }
 
 async function getCategoryShowcase() {
-  // Get top 4 active parent categories with 4-5 products each
   const categories = await queryMany<{ id: string; name: string; slug: string }>(`
-    SELECT id, name, slug FROM categories
-    WHERE parent_category_id IS NULL AND is_active = true
-    ORDER BY display_order ASC LIMIT 4
+    SELECT c.id, c.name, c.slug FROM categories c
+    JOIN categories sub ON sub.parent_category_id = c.id
+    JOIN products p ON p.category_id = sub.id AND p.is_active = true
+    WHERE c.parent_category_id IS NULL AND c.is_active = true
+    GROUP BY c.id, c.name, c.slug
+    HAVING COUNT(p.id) >= 2
+    ORDER BY COUNT(p.id) DESC LIMIT 4
   `)
   const result = await Promise.all(categories.map(async cat => {
     const products = await queryMany(`
       SELECT p.id, p.name, p.slug, p.has_variants,
         p.base_price, p.discount_pct,
-        json_build_object('name', b.name) AS brands,
-        (SELECT json_agg(json_build_object('image_url', pi2.image_url, 'thumbnail_url', pi2.thumbnail_url, 'is_primary', pi2.is_primary))
+        (SELECT json_agg(json_build_object('image_url', pi2.image_url, 'thumbnail_url', pi2.thumbnail_url))
           FROM product_images pi2 WHERE pi2.product_id = p.id LIMIT 1) AS product_images,
-        MIN(pv.price) FILTER (WHERE pv.is_active) AS variant_min_price,
-        SUM(pv.inventory_quantity) FILTER (WHERE pv.is_active) AS variant_stock_total
+        MIN(pv.price) FILTER (WHERE pv.is_active) AS variant_min_price
       FROM products p
-      LEFT JOIN brands b ON b.id = p.brand_id
+      JOIN categories sub ON p.category_id = sub.id AND sub.parent_category_id = $1
       LEFT JOIN product_variants pv ON pv.product_id = p.id
-      WHERE p.category_id = $1 AND p.is_active = true
-      GROUP BY p.id, b.name
+      WHERE p.is_active = true
+      GROUP BY p.id
       ORDER BY p.is_featured DESC, p.created_at DESC
       LIMIT 5
     `, [cat.id])
