@@ -8,21 +8,12 @@ export const dynamic = 'force-dynamic'
 const OLLAMA_URL = () =>
   (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
 const OLLAMA_MODEL = () =>
-  process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_ENRICH_MODEL || 'gemma4:12b'
+  process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_ENRICH_MODEL || 'gemma3:4b'
 
-const SYSTEM_PROMPT = `You are an email-copywriting assistant for Jeffi Stores, an Indian B2B/B2C industrial hardware and tools store.
-
-Generate a clean, professional email body in INLINE-STYLED HTML based on the scenario given.
-
-Rules:
-- Return ONLY a JSON object: {"html":"<email body html>"}
-- HTML must use inline styles only. Use only: p, h2, h3, strong, em, br, ul, li, a, hr.
-- Do NOT include <html>, <head>, <body> or <!DOCTYPE>.
-- Colors: headings #1a3a4a, body #444, links/accent #e07b3f.
-- Keep it short: 3-5 paragraphs max, bullet lists for items.
-- Include ONE call-to-action button styled as: <a href="https://jeffistores.in" style="display:inline-block;background:#e07b3f;color:#fff;text-decoration:none;padding:10px 22px;border-radius:5px;font-weight:600;">Shop Now</a>
-- Use {customer_first_name} for greeting. Never hardcode real names.
-- Strict JSON only. No markdown, no explanation.`
+const SYSTEM_PROMPT = `Email writer for Jeffi Stores (Indian hardware store).
+Return ONLY: {"html":"<body html>"}
+Rules: inline styles, no <html>/<head>/<body>, max 3 paragraphs, one CTA button in orange (#e07b3f), use {customer_first_name} for greeting.
+CTA style: display:inline-block;background:#e07b3f;color:#fff;padding:10px 22px;border-radius:5px;font-weight:600;text-decoration:none`
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -59,7 +50,7 @@ export async function POST(request: NextRequest) {
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
         ],
-        options: { temperature: 0.5 },
+        options: { temperature: 0.3, num_predict: 600 },
       }),
     })
 

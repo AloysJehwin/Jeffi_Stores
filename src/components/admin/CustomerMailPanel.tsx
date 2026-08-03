@@ -73,6 +73,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
   const [scenarioPrompt, setScenarioPrompt] = useState('')
   const [scenarioLoading, setScenarioLoading] = useState(false)
   const [scenarioError, setScenarioError] = useState<string | null>(null)
+  const [streamingTokens, setStreamingTokens] = useState('')
   const [showPreview, setShowPreview] = useState(false)
   const [previewHtml, setPreviewHtml] = useState<string | null>(null)
   const [previewLoading, setPreviewLoading] = useState(false)
