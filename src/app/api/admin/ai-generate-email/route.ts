@@ -45,6 +45,7 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: OLLAMA_MODEL(),
         stream: true,
+        format: 'json',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
@@ -86,10 +87,12 @@ export async function POST(request: NextRequest) {
           }
 
           // Parse final JSON and send result
+          // Strip markdown fences if present
+          const stripped = fullContent.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim()
           let obj: { html?: string } = {}
-          try { obj = JSON.parse(fullContent) } catch {
-            const m = fullContent.match(/\{[\s\S]*\}/)
-            if (m) obj = JSON.parse(m[0])
+          try { obj = JSON.parse(stripped) } catch {
+            const m = stripped.match(/\{[\s\S]*\}/)
+            if (m) { try { obj = JSON.parse(m[0]) } catch { /* ignore */ } }
           }
           const html = String(obj.html || '').trim()
           if (html) {
