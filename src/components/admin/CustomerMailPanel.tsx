@@ -95,6 +95,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
     if (scenarioPrompt.trim().length < 10 || scenarioLoading) return
     setScenarioLoading(true)
     setScenarioError(null)
+    setBody('')
     try {
       const ctx = `Order #${orderNumber} for ${customerName}.`
       const res = await fetch('/api/admin/ai-generate-email', {
@@ -102,12 +103,29 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenario: `${ctx} ${scenarioPrompt}`, subject }),
       })
-      const data = await res.json() as { html?: string; error?: string }
-      if (!res.ok || !data.html) {
+      if (!res.ok || !res.body) {
+        const data = await res.json() as { error?: string }
         setScenarioError(data.error || 'Generation failed')
         return
       }
-      setBody(data.html)
+      const reader = res.body.getReader()
+      const decoder = new TextDecoder()
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        const chunk = decoder.decode(value, { stream: true })
+        for (const line of chunk.split('\n')) {
+          const t = line.trim()
+          if (!t.startsWith('data:')) continue
+          const raw = t.slice(5).trim()
+          if (raw === '[DONE]') break
+          try {
+            const msg = JSON.parse(raw) as { html?: string; token?: string; error?: string }
+            if (msg.error) { setScenarioError(msg.error); return }
+            if (msg.html) { setBody(msg.html); return }
+          } catch { /* partial */ }
+        }
+      }
     } catch {
       setScenarioError('Network error')
     } finally {
