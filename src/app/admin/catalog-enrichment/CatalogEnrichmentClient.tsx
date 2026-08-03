@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, Fragment } from 'react'
 import { CheckCircle, XCircle, Loader2, Sparkles, Play, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
@@ -257,8 +257,8 @@ export default function CatalogEnrichmentPage() {
               </thead>
               <tbody className="divide-y divide-border-default">
                 {items.map(item => (
-                  <>
-                    <tr key={item.id} className={`hover:bg-surface-secondary/50 transition-colors ${selected.has(item.id) ? 'bg-accent-50/30 dark:bg-accent-900/10' : ''}`}>
+                  <Fragment key={item.id}>
+                    <tr className={`hover:bg-surface-secondary/50 transition-colors ${selected.has(item.id) ? 'bg-accent-50/30 dark:bg-accent-900/10' : ''}`}>
                       {statusFilter === 'proposed' && (
                         <td className="pl-4 py-3 w-8">
                           {item.status === 'proposed' && (
@@ -387,7 +387,7 @@ export default function CatalogEnrichmentPage() {
                         </td>
                       </tr>
                     )}
-                  </>
+                  </Fragment>
                 ))}
               </tbody>
             </table>

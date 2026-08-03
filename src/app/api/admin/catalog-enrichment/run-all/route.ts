@@ -138,6 +138,7 @@ export async function POST(req: NextRequest) {
         const res = await fetch(`${OLLAMA_URL}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(45000),
           body: JSON.stringify({
             model: OLLAMA_MODEL,
             stream: false,
