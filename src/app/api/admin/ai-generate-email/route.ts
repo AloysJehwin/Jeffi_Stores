@@ -45,7 +45,6 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         model: OLLAMA_MODEL(),
         stream: true,
-        format: 'json',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           { role: 'user', content: userPrompt },
@@ -96,8 +95,7 @@ export async function POST(request: NextRequest) {
           if (html) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ html })}\n\n`))
           } else {
-            // Send raw content for debugging
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `Empty html. Raw: ${fullContent.slice(0, 200)}` })}\n\n`))
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'AI returned empty result' })}\n\n`))
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'unknown'
