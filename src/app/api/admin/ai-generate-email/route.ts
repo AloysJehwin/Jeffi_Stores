@@ -6,7 +6,7 @@ import { TEMPLATE_VARS } from '@/lib/template-vars'
 const OLLAMA_URL = () =>
   (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
 const OLLAMA_MODEL = () =>
-  process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
+  process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_ENRICH_MODEL || 'gemma3:4b'
 
 const VAR_LIST = TEMPLATE_VARS.map(v => `{${v.key}} (${v.description})`).join('\n')
 
@@ -40,8 +40,7 @@ export async function POST(request: NextRequest) {
   let body: { scenario?: string; subject?: string }
   try {
     body = await request.json()
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
@@ -71,7 +70,7 @@ export async function POST(request: NextRequest) {
         ],
         options: { temperature: 0.5 },
       }),
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(90000),
     })
 
     if (!res.ok) {
@@ -84,8 +83,7 @@ export async function POST(request: NextRequest) {
     let obj: { html?: string }
     try {
       obj = JSON.parse(raw)
-    } catch (err) {
-      console.error('[route]', err)
+    } catch {
       const m = raw.match(/\{[\s\S]*\}/)
       if (!m) return NextResponse.json({ error: 'AI returned unparseable response' }, { status: 502 })
       obj = JSON.parse(m[0])
