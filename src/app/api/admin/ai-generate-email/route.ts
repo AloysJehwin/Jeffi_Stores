@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 
 export const maxDuration = 120
+export const dynamic = 'force-dynamic'
 
 const OLLAMA_URL = () =>
   (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
@@ -50,41 +51,51 @@ export async function POST(request: NextRequest) {
   ].filter(Boolean).join('\n')
 
   try {
-    const ctrl = new AbortController()
-    const timer = setTimeout(() => ctrl.abort(), 120000)
-    let res: Response
-    try {
-      res = await fetch(`${OLLAMA_URL()}/api/chat`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: OLLAMA_MODEL(),
-          stream: false,
-          format: 'json',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: userPrompt },
-          ],
-          options: { temperature: 0.5 },
-        }),
-        signal: ctrl.signal,
-      })
-    } finally {
-      clearTimeout(timer)
-    }
+    // Use streaming=true so bytes flow continuously — prevents dev proxy idle timeout
+    const res = await fetch(`${OLLAMA_URL()}/api/chat`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL(),
+        stream: true,
+        format: 'json',
+        messages: [
+          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'user', content: userPrompt },
+        ],
+        options: { temperature: 0.5 },
+      }),
+    })
 
-    if (!res.ok) {
+    if (!res.ok || !res.body) {
       return NextResponse.json({ error: `AI service error (${res.status})` }, { status: 503 })
     }
 
-    const data = (await res.json()) as { message?: { content?: string } }
-    const raw = data.message?.content || ''
+    // Collect streamed chunks into full response
+    const reader = res.body.getReader()
+    const decoder = new TextDecoder()
+    let fullContent = ''
+
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      const chunk = decoder.decode(value, { stream: true })
+      for (const line of chunk.split('\n')) {
+        const t = line.trim()
+        if (!t) continue
+        try {
+          const msg = JSON.parse(t) as { message?: { content?: string }; done?: boolean }
+          if (msg.message?.content) fullContent += msg.message.content
+          if (msg.done) break
+        } catch { /* partial line */ }
+      }
+    }
 
     let obj: { html?: string }
     try {
-      obj = JSON.parse(raw)
+      obj = JSON.parse(fullContent)
     } catch {
-      const m = raw.match(/\{[\s\S]*\}/)
+      const m = fullContent.match(/\{[\s\S]*\}/)
       if (!m) return NextResponse.json({ error: 'AI returned unparseable response' }, { status: 502 })
       obj = JSON.parse(m[0])
     }
@@ -94,11 +105,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ html })
   } catch (err: unknown) {
-    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
     const msg = err instanceof Error ? err.message : 'unknown'
-    return NextResponse.json(
-      { error: isTimeout ? 'AI request timed out' : `AI service error: ${msg}` },
-      { status: 503 }
-    )
+    return NextResponse.json({ error: `AI service error: ${msg}` }, { status: 503 })
   }
 }
