@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       })
     } finally {
       clearTimeout(timer)
-    })
+    }
 
     if (!res.ok) {
       return NextResponse.json({ error: `AI service error (${res.status})` }, { status: 503 })
