@@ -1,34 +1,25 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { TEMPLATE_VARS } from '@/lib/template-vars'
 
 const OLLAMA_URL = () =>
   (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
 const OLLAMA_MODEL = () =>
   process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_ENRICH_MODEL || 'gemma3:4b'
 
-const VAR_LIST = TEMPLATE_VARS.map(v => `{${v.key}} (${v.description})`).join('\n')
-
 const SYSTEM_PROMPT = `You are an email-copywriting assistant for Jeffi Stores, an Indian B2B/B2C industrial hardware and tools store.
 
-You will be given a SCENARIO describing the email the user wants to send. Generate a clean, friendly, professional email body in INLINE-STYLED HTML suitable for an email client.
+Generate a clean, professional email body in INLINE-STYLED HTML based on the scenario given.
 
 Rules:
-- Return ONLY a JSON object with a single key "html" containing the email body HTML.
-- HTML must be email-safe: inline styles only (no external CSS, no <style> blocks, no <script>).
-- Use these tags only: p, h1-h4, strong, em, u, br, ul, ol, li, a, table, tr, td, blockquote, hr.
-- Do not include <html>, <head>, <body>, or <!DOCTYPE> — output only the BODY content; the layout will be wrapped by our email shell.
-- For colors, prefer: heading #1a3a4a, body #444, links + accent #e07b3f.
-- Keep paragraphs short (1-3 sentences). Use bullet lists when listing items.
-- Include exactly ONE call-to-action where it makes sense, styled like:
-  <a href="https://jeffistores.in" style="display:inline-block;background:#e07b3f;color:#fff;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:600;">Shop Now</a>
-- Personalisation: insert {customer_first_name} for the greeting and {customer_name} where a full name fits. NEVER hardcode a real name.
-- Other available variables (use them where appropriate):
-${VAR_LIST}
-- Strict JSON output. No prose, no markdown fences, no extra keys.
-
-Schema: {"html":"<email body html>"}`
+- Return ONLY a JSON object: {"html":"<email body html>"}
+- HTML must use inline styles only. Use only: p, h2, h3, strong, em, br, ul, li, a, hr.
+- Do NOT include <html>, <head>, <body> or <!DOCTYPE>.
+- Colors: headings #1a3a4a, body #444, links/accent #e07b3f.
+- Keep it short: 3-5 paragraphs max, bullet lists for items.
+- Include ONE call-to-action button styled as: <a href="https://jeffistores.in" style="display:inline-block;background:#e07b3f;color:#fff;text-decoration:none;padding:10px 22px;border-radius:5px;font-weight:600;">Shop Now</a>
+- Use {customer_first_name} for greeting. Never hardcode real names.
+- Strict JSON only. No markdown, no explanation.`
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -70,7 +61,7 @@ export async function POST(request: NextRequest) {
         ],
         options: { temperature: 0.5 },
       }),
-      signal: AbortSignal.timeout(45000),
+      signal: AbortSignal.timeout(120000),
     })
 
     if (!res.ok) {
