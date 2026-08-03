@@ -65,7 +65,7 @@ async function isOllamaReachable(): Promise<boolean> {
 }
 
 async function callOllama(req: AiChatRequest): Promise<{ content: string; toolCalls?: AiToolCall[]; model: string }> {
-  const agentModel = process.env.OLLAMA_AGENT_MODEL || 'glm4'
+  const agentModel = process.env.OLLAMA_AGENT_MODEL || 'gemma3:4b'
   const model = req.modelHint === 'sql'
     ? (process.env.OLLAMA_SQL_MODEL || agentModel)
     : req.modelHint === 'agent'
