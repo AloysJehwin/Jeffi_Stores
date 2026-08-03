@@ -70,7 +70,7 @@ export async function POST(request: NextRequest) {
         ],
         options: { temperature: 0.5 },
       }),
-      signal: AbortSignal.timeout(90000),
+      signal: AbortSignal.timeout(45000),
     })
 
     if (!res.ok) {
