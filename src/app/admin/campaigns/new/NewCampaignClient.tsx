@@ -124,6 +124,8 @@ export default function NewCampaignClient() {
       } else {
         showToast(data.error || 'Generation failed', 'error')
       }
+    } catch {
+      showToast('Generation failed — please try again', 'error')
     } finally {
       setAiGenerating(false)
     }
