@@ -1,3 +1,5 @@
+export const maxDuration = 120
+
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
