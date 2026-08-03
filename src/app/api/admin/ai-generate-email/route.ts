@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
 
   const scenario = (body.scenario || '').trim()
   if (scenario.length < 10) {
-    return NextResponse.json({ error: 'Describe the scenario in at least 10 characters' }, { status: 400 })
+    return NextResponse.json({ error: 'Scenario too short' }, { status: 400 })
   }
 
   const userPrompt = [
@@ -36,69 +36,45 @@ export async function POST(request: NextRequest) {
     scenario,
   ].filter(Boolean).join('\n')
 
-  // Use ReadableStream to keep connection alive while Ollama generates
-  const encoder = new TextEncoder()
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        // Send a heartbeat immediately so client knows we're alive
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ status: 'generating' })}\n\n`))
+  try {
+    const res = await fetch(`${OLLAMA_URL()}/api/generate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: OLLAMA_MODEL(),
+        prompt: `${SYSTEM_PROMPT}\n\nUser: ${userPrompt}\n\nAssistant:`,
+        stream: false,
+        format: 'json',
+        options: { temperature: 0.3, num_predict: 600 },
+      }),
+    })
 
-        const res = await fetch(`${OLLAMA_URL()}/api/chat`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            model: OLLAMA_MODEL(),
-            stream: false,
-            format: 'json',
-            messages: [
-              { role: 'system', content: SYSTEM_PROMPT },
-              { role: 'user', content: userPrompt },
-            ],
-            options: { temperature: 0.3, num_predict: 600 },
-          }),
-        })
+    if (!res.ok) {
+      return NextResponse.json({ error: `AI service error (${res.status})` }, { status: 503 })
+    }
 
-        if (!res.ok) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `AI service error (${res.status})` })}\n\n`))
-          return
-        }
+    const data = await res.json() as { response?: string }
+    const raw = (data.response || '').trim()
 
-        const data = await res.json() as { message?: { content?: string } }
-        const raw = (data.message?.content || '').trim()
-
-        let obj: { html?: string } = {}
-        try {
-          obj = JSON.parse(raw)
-        } catch {
-          const m = raw.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim()
-          try { obj = JSON.parse(m) } catch {
-            const match = raw.match(/\{[\s\S]*\}/)
-            if (match) obj = JSON.parse(match[0])
-          }
-        }
-
-        const html = String(obj.html || '').trim()
-        if (html) {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ html })}\n\n`))
-        } else {
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'AI returned empty result' })}\n\n`))
-        }
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : 'unknown'
-        controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `AI error: ${msg}` })}\n\n`))
-      } finally {
-        controller.enqueue(encoder.encode('data: [DONE]\n\n'))
-        controller.close()
+    let obj: { html?: string } = {}
+    try {
+      obj = JSON.parse(raw)
+    } catch {
+      const stripped = raw.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').trim()
+      try { obj = JSON.parse(stripped) } catch {
+        const match = raw.match(/\{[\s\S]*\}/)
+        if (match) { try { obj = JSON.parse(match[0]) } catch { /* ignore */ } }
       }
     }
-  })
 
-  return new Response(stream, {
-    headers: {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-    },
-  })
+    const html = String(obj.html || '').trim()
+    if (!html) {
+      return NextResponse.json({ error: 'AI returned empty result' }, { status: 502 })
+    }
+
+    return NextResponse.json({ html })
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : 'unknown'
+    return NextResponse.json({ error: `AI error: ${msg}` }, { status: 503 })
+  }
 }

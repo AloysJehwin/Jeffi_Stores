@@ -134,29 +134,12 @@ export default function NewCampaignPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ scenario: scenarioPrompt, subject }),
       })
-      if (!res.ok || !res.body) {
-        const data = await res.json() as { error?: string }
+      const data = await res.json() as { html?: string; error?: string }
+      if (!res.ok || !data.html) {
         setScenarioError(data.error || 'Generation failed')
         return
       }
-      const reader = res.body.getReader()
-      const decoder = new TextDecoder()
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        const chunk = decoder.decode(value, { stream: true })
-        for (const line of chunk.split('\n')) {
-          const t = line.trim()
-          if (!t.startsWith('data:')) continue
-          const raw = t.slice(5).trim()
-          if (raw === '[DONE]') break
-          try {
-            const msg = JSON.parse(raw) as { html?: string; error?: string }
-            if (msg.error) { setScenarioError(msg.error); return }
-            if (msg.html) { setField('htmlBody', msg.html); return }
-          } catch { /* partial */ }
-        }
-      }
+      setField('htmlBody', data.html)
     } catch {
       setScenarioError('Network error')
     } finally {
