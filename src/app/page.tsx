@@ -5,6 +5,7 @@ import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 import ProductCard from '@/components/visitor/ProductCard'
 import HeroCarousel from '@/components/visitor/HeroCarousel'
+import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import { getHost } from '@/lib/get-host'
 
 export const revalidate = 120
@@ -442,6 +443,9 @@ export default async function HomePage() {
           </div>
         </section>
       )}
+
+      {/* ── Featured For You (personalised; hidden for logged-out) ── */}
+      <FeaturedForYou />
 
       {/* ── Best Sellers ── */}
       {bestSellers.length > 0 && (
