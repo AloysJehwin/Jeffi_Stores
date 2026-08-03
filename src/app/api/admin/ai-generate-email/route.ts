@@ -95,8 +95,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ html })
   } catch (err: unknown) {
     const isTimeout = err instanceof Error && err.name === 'TimeoutError'
+    const msg = err instanceof Error ? err.message : 'unknown'
     return NextResponse.json(
-      { error: isTimeout ? 'AI request timed out' : 'AI service error' },
+      { error: isTimeout ? 'AI request timed out' : `AI service error: ${msg}` },
       { status: 503 }
     )
   }
