@@ -50,20 +50,27 @@ export async function POST(request: NextRequest) {
   ].filter(Boolean).join('\n')
 
   try {
-    const res = await fetch(`${OLLAMA_URL()}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: OLLAMA_MODEL(),
-        stream: false,
-        format: 'json',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userPrompt },
-        ],
-        options: { temperature: 0.5 },
-      }),
-      signal: AbortSignal.timeout(120000),
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 120000)
+    let res: Response
+    try {
+      res = await fetch(`${OLLAMA_URL()}/api/chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: OLLAMA_MODEL(),
+          stream: false,
+          format: 'json',
+          messages: [
+            { role: 'system', content: SYSTEM_PROMPT },
+            { role: 'user', content: userPrompt },
+          ],
+          options: { temperature: 0.5 },
+        }),
+        signal: ctrl.signal,
+      })
+    } finally {
+      clearTimeout(timer)
     })
 
     if (!res.ok) {
@@ -87,7 +94,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ html })
   } catch (err: unknown) {
-    const isTimeout = err instanceof Error && err.name === 'TimeoutError'
+    const isTimeout = err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')
     const msg = err instanceof Error ? err.message : 'unknown'
     return NextResponse.json(
       { error: isTimeout ? 'AI request timed out' : `AI service error: ${msg}` },
