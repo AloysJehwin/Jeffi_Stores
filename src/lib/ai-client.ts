@@ -45,7 +45,7 @@ export class AiClientError extends Error {
   }
 }
 
-const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '')
+const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
 const OLLAMA_HEALTH_TIMEOUT_MS = 2000
 // Per-request Ollama timeout. Kept modest so a hung/unreachable Ollama (e.g. the
 // Razer laptop asleep) fails fast and the OpenAI fallback can trigger within the
