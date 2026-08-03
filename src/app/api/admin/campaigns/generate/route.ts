@@ -100,7 +100,7 @@ If the scenario is one of these built-in kinds, follow the convention:
   let text = ''
   try {
     const r = await aiChat({
-      modelHint: 'copy',
+      modelHint: 'fast',
       jsonMode: true,
       temperature: 0.6,
       maxTokens: 2000,
@@ -118,9 +118,17 @@ If the scenario is one of these built-in kinds, follow the convention:
   let parsed: { name?: string; kind?: string; subject_template?: string; body_template?: string }
   try {
     parsed = JSON.parse(text)
-  } catch (err) {
-    console.error('[route]', err)
-    return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 502 })
+  } catch {
+    // Tolerate markdown fences / leading prose around the JSON object.
+    const match = text.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').match(/\{[\s\S]*\}/)
+    if (!match) {
+      return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 502 })
+    }
+    try {
+      parsed = JSON.parse(match[0])
+    } catch {
+      return NextResponse.json({ error: 'Failed to parse AI response' }, { status: 502 })
+    }
   }
 
   if (!parsed.subject_template || !parsed.body_template) {
