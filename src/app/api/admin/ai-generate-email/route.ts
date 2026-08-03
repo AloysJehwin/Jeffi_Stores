@@ -67,7 +67,8 @@ export async function POST(request: NextRequest) {
         let fullContent = ''
 
         try {
-          while (true) {
+          let isDone = false
+          while (!isDone) {
             const { done, value } = await reader.read()
             if (done) break
             const chunk = decoder.decode(value, { stream: true })
@@ -78,10 +79,9 @@ export async function POST(request: NextRequest) {
                 const msg = JSON.parse(t) as { message?: { content?: string }; done?: boolean }
                 if (msg.message?.content) {
                   fullContent += msg.message.content
-                  // Send token progress as SSE
                   controller.enqueue(encoder.encode(`data: ${JSON.stringify({ token: msg.message.content })}\n\n`))
                 }
-                if (msg.done) break
+                if (msg.done) { isDone = true; break }
               } catch { /* partial chunk */ }
             }
           }
