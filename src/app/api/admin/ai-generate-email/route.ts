@@ -96,7 +96,8 @@ export async function POST(request: NextRequest) {
           if (html) {
             controller.enqueue(encoder.encode(`data: ${JSON.stringify({ html })}\n\n`))
           } else {
-            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: 'AI returned empty result' })}\n\n`))
+            // Send raw content for debugging
+            controller.enqueue(encoder.encode(`data: ${JSON.stringify({ error: `Empty html. Raw: ${fullContent.slice(0, 200)}` })}\n\n`))
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : 'unknown'
