@@ -300,11 +300,13 @@ export default async function ProductDetailPage({
     notFound()
   }
 
-  const [relatedProducts, freeShippingSetting] = await Promise.all([
+  const [relatedProducts, deliverySettings] = await Promise.all([
     getRelatedProducts(product.id, product.category_id, product.name),
-    queryOne<{ value: string }>(`SELECT value FROM site_settings WHERE key = 'free_shipping_threshold'`, []),
+    // Use the authoritative delivery setting (same one checkout uses), not the
+    // stale separate 'free_shipping_threshold' key.
+    (await import('@/lib/delivery-settings')).getDeliverySettings(),
   ])
-  const freeShippingThreshold = parseInt(freeShippingSetting?.value || '500', 10)
+  const freeShippingThreshold = deliverySettings.freeThreshold
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
   const jsonLd = buildProductJsonLd(product, baseUrl)
   const skuParam = typeof resolvedSearchParams.sku === 'string' ? resolvedSearchParams.sku : undefined
