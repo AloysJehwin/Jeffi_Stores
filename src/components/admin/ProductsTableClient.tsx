@@ -52,7 +52,17 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
     setDeletingId(productId)
     try {
       const res = await fetch(`/api/admin/products/${productId}`, { method: 'DELETE' })
-      if (res.ok) window.location.reload()
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        window.location.reload()
+      } else {
+        await confirm({
+          title: 'Could not delete',
+          message: data.error || 'Failed to delete product.',
+          confirmLabel: 'OK',
+          cancelLabel: 'Close',
+        })
+      }
     } finally {
       setDeletingId(null)
     }
