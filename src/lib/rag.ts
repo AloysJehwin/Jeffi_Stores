@@ -216,7 +216,10 @@ export async function findSimilarProductIds(query: string, limit = 20): Promise<
 
   merged.sort((a, b) => b.similarity - a.similarity)
 
-  const MIN_SIM = 0.50
+  // Concept→product queries ("hang a portrait" → screws) legitimately score
+  // ~0.4-0.5 with nomic-embed; 0.50 was too strict and dropped good matches,
+  // forcing a weak keyword fallback. 0.35 keeps relevant hits while excluding noise.
+  const MIN_SIM = 0.35
   const seenProducts = new Set<string>()
   const out: SimilarProductId[] = []
   for (const r of merged) {
