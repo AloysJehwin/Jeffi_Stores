@@ -1,0 +1,26 @@
+services:
+  app_blue:
+    image: ghcr.io/aloysjehwin/jeffi_stores:latest
+    container_name: jeffi-app-blue
+    env_file: .env.production
+    environment:
+      - REDIS_URL=redis://redis:6379
+      - WEB_CONCURRENCY=4
+    volumes:
+      - ./certs:/app/certs:ro
+      - ./jeffi-stores-76e9ecaecdd6.json:/app/jeffi-stores-76e9ecaecdd6.json:ro
+    depends_on:
+      - redis
+    restart: unless-stopped
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+
+networks:
+  internal:
+    external: true

@@ -23,7 +23,6 @@ CREATE TABLE public.business_rfq_items (
 );
 
 
-
 --
 -- Name: business_rfqs; Type: TABLE; Schema: public; Owner: -
 --
@@ -41,7 +40,6 @@ CREATE TABLE public.business_rfqs (
     reviewed_by uuid,
     reviewed_at timestamp with time zone
 );
-
 
 
 --
@@ -67,7 +65,6 @@ CREATE TABLE public.purchase_order_items (
 );
 
 
-
 --
 -- Name: purchase_orders; Type: TABLE; Schema: public; Owner: -
 --
@@ -87,7 +84,6 @@ CREATE TABLE public.purchase_orders (
     updated_at timestamp with time zone DEFAULT now(),
     view_token uuid DEFAULT gen_random_uuid()
 );
-
 
 
 --
@@ -116,7 +112,6 @@ CREATE TABLE public.quotation_items (
     applied_rules jsonb,
     buy_unit character varying(20)
 );
-
 
 
 --
@@ -161,7 +156,6 @@ CREATE TABLE public.quotations (
 );
 
 
-
 --
 -- Name: rfq_messages; Type: TABLE; Schema: public; Owner: -
 --
@@ -175,4 +169,3 @@ CREATE TABLE public.rfq_messages (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT rfq_messages_sender_check CHECK ((sender = ANY (ARRAY['admin'::text, 'customer'::text])))
 );
-

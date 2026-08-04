@@ -170,4 +170,3 @@ CREATE TABLE public.users (
     policies_accepted_version text,
     policies_accepted_at timestamp with time zone
 );
-

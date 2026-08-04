@@ -14,7 +14,6 @@ CREATE TABLE public._debug_log (
 );
 
 
-
 --
 -- Name: _debug_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
@@ -26,14 +25,8 @@ CREATE SEQUENCE public._debug_log_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
-
---
--- Name: _debug_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
 ALTER SEQUENCE public._debug_log_id_seq OWNED BY public._debug_log.id;
-
+ALTER TABLE ONLY public._debug_log ALTER COLUMN id SET DEFAULT nextval('public._debug_log_id_seq'::regclass);
 
 
 --
@@ -53,7 +46,6 @@ CREATE TABLE public.admin_audit_log (
     user_agent text,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
-
 
 
 --
@@ -82,7 +74,6 @@ CREATE TABLE public.email_logs (
 );
 
 
-
 --
 -- Name: merchant_sync_log; Type: TABLE; Schema: public; Owner: -
 --
@@ -98,7 +89,6 @@ CREATE TABLE public.merchant_sync_log (
 );
 
 
-
 --
 -- Name: merchant_sync_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
 --
@@ -111,14 +101,8 @@ CREATE SEQUENCE public.merchant_sync_log_id_seq
     NO MAXVALUE
     CACHE 1;
 
-
-
---
--- Name: merchant_sync_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
 ALTER SEQUENCE public.merchant_sync_log_id_seq OWNED BY public.merchant_sync_log.id;
-
+ALTER TABLE ONLY public.merchant_sync_log ALTER COLUMN id SET DEFAULT nextval('public.merchant_sync_log_id_seq'::regclass);
 
 
 --
@@ -136,7 +120,6 @@ CREATE TABLE public.page_events (
     user_agent text,
     created_at timestamp with time zone DEFAULT now()
 );
-
 
 
 --
@@ -159,7 +142,6 @@ CREATE TABLE public.price_inflation_log (
 );
 
 
-
 --
 -- Name: replication_runs; Type: TABLE; Schema: public; Owner: -
 --
@@ -179,7 +161,6 @@ CREATE TABLE public.replication_runs (
 );
 
 
-
 --
 -- Name: schema_migrations; Type: TABLE; Schema: public; Owner: -
 --
@@ -188,7 +169,6 @@ CREATE TABLE public.schema_migrations (
     filename text NOT NULL,
     applied_at timestamp with time zone DEFAULT now() NOT NULL
 );
-
 
 
 --
@@ -205,7 +185,6 @@ CREATE TABLE public.search_logs (
 );
 
 
-
 --
 -- Name: search_queries; Type: TABLE; Schema: public; Owner: -
 --
@@ -220,7 +199,6 @@ CREATE TABLE public.search_queries (
 );
 
 
-
 --
 -- Name: user_search_history; Type: TABLE; Schema: public; Owner: -
 --
@@ -231,7 +209,6 @@ CREATE TABLE public.user_search_history (
     query character varying(200) NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
-
 
 
 --
@@ -245,4 +222,3 @@ CREATE TABLE public.websocket_connections (
     role character varying(10) NOT NULL,
     connected_at timestamp with time zone DEFAULT now()
 );
-

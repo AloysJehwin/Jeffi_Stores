@@ -18,8 +18,11 @@ function getPool(): Pool {
     const dbUrl = process.env.DATABASE_URL || ''
     const useIamAuth = process.env.RDS_IAM_AUTH === 'true'
 
+    const workers = parseInt(process.env.WEB_CONCURRENCY || '1', 10)
+    const poolMax = Math.max(2, Math.floor(15 / workers))
+
     const config: any = {
-      max: 20,
+      max: poolMax,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 5000,
     }

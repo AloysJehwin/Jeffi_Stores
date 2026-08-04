@@ -18,7 +18,6 @@ CREATE TABLE public.shipping_zones (
 );
 
 
-
 --
 -- Name: site_settings; Type: TABLE; Schema: public; Owner: -
 --
@@ -32,7 +31,6 @@ CREATE TABLE public.site_settings (
     updated_at timestamp with time zone DEFAULT now(),
     updated_by uuid
 );
-
 
 
 --
@@ -57,19 +55,3 @@ CREATE TABLE public.suppliers (
     ifsc text,
     upi_id text
 );
-
-
-
---
--- Name: warehouses; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.warehouses (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    name text NOT NULL,
-    code text NOT NULL,
-    address text,
-    is_active boolean DEFAULT true NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-

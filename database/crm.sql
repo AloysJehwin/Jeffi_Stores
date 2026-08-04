@@ -17,7 +17,6 @@ CREATE TABLE public.business_discounts (
 );
 
 
-
 --
 -- Name: business_profiles; Type: TABLE; Schema: public; Owner: -
 --
@@ -38,7 +37,6 @@ CREATE TABLE public.business_profiles (
 );
 
 
-
 --
 -- Name: customer_activity_log; Type: TABLE; Schema: public; Owner: -
 --
@@ -54,7 +52,6 @@ CREATE TABLE public.customer_activity_log (
     metadata jsonb DEFAULT '{}'::jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
-
 
 
 --
@@ -80,7 +77,6 @@ CREATE TABLE public.customer_health (
 );
 
 
-
 --
 -- Name: customer_health_history; Type: TABLE; Schema: public; Owner: -
 --
@@ -94,7 +90,6 @@ CREATE TABLE public.customer_health_history (
 );
 
 
-
 --
 -- Name: customer_notes; Type: TABLE; Schema: public; Owner: -
 --
@@ -106,7 +101,6 @@ CREATE TABLE public.customer_notes (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     admin_id uuid
 );
-
 
 
 --
@@ -125,7 +119,6 @@ CREATE TABLE public.customer_profiles (
 );
 
 
-
 --
 -- Name: customer_tag_definitions; Type: TABLE; Schema: public; Owner: -
 --
@@ -140,7 +133,6 @@ CREATE TABLE public.customer_tag_definitions (
 );
 
 
-
 --
 -- Name: customer_tags; Type: TABLE; Schema: public; Owner: -
 --
@@ -152,7 +144,6 @@ CREATE TABLE public.customer_tags (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     created_by uuid
 );
-
 
 
 --
@@ -181,7 +172,6 @@ CREATE TABLE public.customer_tasks (
 );
 
 
-
 --
 -- Name: notifications; Type: TABLE; Schema: public; Owner: -
 --
@@ -196,4 +186,3 @@ CREATE TABLE public.notifications (
     is_read boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now()
 );
-

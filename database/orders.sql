@@ -16,7 +16,6 @@ CREATE TABLE public.back_in_stock_notify (
 );
 
 
-
 --
 -- Name: cart_items; Type: TABLE; Schema: public; Owner: -
 --
@@ -38,7 +37,6 @@ CREATE TABLE public.cart_items (
 );
 
 
-
 --
 -- Name: delhivery_pickup_requests; Type: TABLE; Schema: public; Owner: -
 --
@@ -53,7 +51,6 @@ CREATE TABLE public.delhivery_pickup_requests (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     pickup_status character varying(32) DEFAULT 'pending'::character varying NOT NULL
 );
-
 
 
 --
@@ -87,9 +84,10 @@ CREATE TABLE public.order_items (
     sold_unit_factor numeric(14,6),
     base_quantity numeric(14,4),
     applied_rules jsonb,
-    mrp numeric(12,2) DEFAULT NULL::numeric
+    mrp numeric(12,2) DEFAULT NULL::numeric,
+    batch_id uuid,
+    discount_pct numeric DEFAULT 0 NOT NULL
 );
-
 
 
 --
@@ -104,7 +102,6 @@ CREATE TABLE public.order_status_history (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now()
 );
-
 
 
 --
@@ -176,11 +173,12 @@ CREATE TABLE public.orders (
     business_discount_amount numeric(12,2) DEFAULT 0 NOT NULL,
     shipment_status text,
     estimated_delivery_date date,
+    cod_remitted_at timestamp with time zone,
+    draft_of_id uuid,
     CONSTRAINT orders_shipment_status_check CHECK (((shipment_status IS NULL) OR (shipment_status = ANY (ARRAY['created'::text, 'picked_up'::text, 'in_transit'::text, 'out_for_delivery'::text, 'delivery_attempted'::text, 'delivered'::text, 'rto_initiated'::text, 'rto_in_transit'::text, 'rto_out_for_return'::text, 'rto_delivered'::text]))))
 );
 
 COMMENT ON COLUMN public.orders.shipment_status IS 'Stable internal shipment progress enum, resolved from Delhivery scan history. Set to created when AWB is assigned; updated on each track API call.';
-
 
 
 --
@@ -203,18 +201,22 @@ CREATE TABLE public.return_requests (
     created_at timestamp with time zone DEFAULT now(),
     updated_at timestamp with time zone DEFAULT now(),
     rvp_awb_number character varying(64),
-    rvp_created_at timestamp with time zone
+    rvp_created_at timestamp with time zone,
+    image_urls text[] DEFAULT '{}'::text[],
+    valuation_status character varying(20) DEFAULT NULL::character varying,
+    valuation_condition character varying(20) DEFAULT NULL::character varying,
+    valuation_notes text,
+    valuated_at timestamp with time zone,
+    reviewed_by uuid,
+    reviewed_at timestamp with time zone
 );
 
--- Live migration (idempotent)
-ALTER TABLE orders ADD COLUMN IF NOT EXISTS estimated_delivery_date date;
-ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS image_urls text[] DEFAULT '{}';
-ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuation_status character varying(20) DEFAULT NULL;
-ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuation_condition character varying(20) DEFAULT NULL;
-ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuation_notes text DEFAULT NULL;
-ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS valuated_at timestamp with time zone DEFAULT NULL;
 
-CREATE TABLE IF NOT EXISTS public.return_request_items (
+--
+-- Name: return_request_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.return_request_items (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     return_request_id uuid NOT NULL,
     order_item_id uuid NOT NULL,
@@ -226,13 +228,20 @@ CREATE TABLE IF NOT EXISTS public.return_request_items (
     product_name character varying(255),
     variant_name character varying(255),
     created_at timestamp with time zone DEFAULT now(),
-    CONSTRAINT return_request_items_pkey PRIMARY KEY (id),
-    CONSTRAINT return_request_items_return_request_id_fkey FOREIGN KEY (return_request_id) REFERENCES return_requests(id) ON DELETE CASCADE,
-    CONSTRAINT return_request_items_order_item_id_fkey FOREIGN KEY (order_item_id) REFERENCES order_items(id) ON DELETE CASCADE
+    CONSTRAINT return_request_items_pkey PRIMARY KEY (id)
 );
-CREATE INDEX IF NOT EXISTS idx_return_request_items_return_request_id ON public.return_request_items(return_request_id);
-CREATE INDEX IF NOT EXISTS idx_return_request_items_order_item_id ON public.return_request_items(order_item_id);
 
-ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS reviewed_by uuid REFERENCES admins(id) ON DELETE SET NULL;
-ALTER TABLE return_requests ADD COLUMN IF NOT EXISTS reviewed_at timestamp with time zone DEFAULT NULL;
 
+-- FK: return_request_items cross-references return_requests and order_items (same file)
+ALTER TABLE ONLY public.return_request_items
+    ADD CONSTRAINT return_request_items_return_request_id_fkey
+    FOREIGN KEY (return_request_id) REFERENCES public.return_requests(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.return_request_items
+    ADD CONSTRAINT return_request_items_order_item_id_fkey
+    FOREIGN KEY (order_item_id) REFERENCES public.order_items(id) ON DELETE CASCADE;
+
+-- FK: return_requests.reviewed_by references admins (defined in users.sql)
+ALTER TABLE ONLY public.return_requests
+    ADD CONSTRAINT return_requests_reviewed_by_fkey
+    FOREIGN KEY (reviewed_by) REFERENCES public.admins(id) ON DELETE SET NULL;
