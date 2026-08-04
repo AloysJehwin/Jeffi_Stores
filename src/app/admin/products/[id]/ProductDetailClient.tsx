@@ -530,18 +530,12 @@ export default function ProductDetailClient({ id }: { id: string }) {
           <Link href={ap(`/admin/products/${p.id}/analytics`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Analytics
           </Link>
-          {p.is_active ? (
-            <button
-              onClick={() => setShowDraftModal(true)}
-              className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
-            >
-              Edit
-            </button>
-          ) : (
-            <Link href={ap(`/admin/products/edit/${p.id}`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
-              Edit
-            </Link>
-          )}
+          <button
+            onClick={() => setShowDraftModal(true)}
+            className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+          >
+            Edit
+          </button>
           {showDraftModal && (
             <DraftConfirmModal
               productId={p.id}

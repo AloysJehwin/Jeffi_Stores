@@ -692,9 +692,11 @@ export default async function EditProductPage({ params, searchParams }: { params
   )
   const isDraft = !!draftRow
 
-  // For active products without a draft, redirect to detail page.
-  // Editing active products requires going through a draft (via the Edit button).
-  if (product.is_active && !isDraft) {
+  // Editing ALWAYS goes through a draft. Direct navigation to the edit URL for a
+  // product with no draft (active or inactive) is blocked — redirect to the detail
+  // page, where the Edit button creates a draft first. This guarantees the live
+  // product is never mutated directly and every edit flows through the draft system.
+  if (!isDraft) {
     const host = await getHost()
     redirect(ap(`/admin/products/${id}`, host))
   }
