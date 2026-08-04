@@ -3,26 +3,66 @@ import { headers } from 'next/headers'
 import Link from 'next/link'
 import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
 import AnalyticsDashboardClient from '@/components/admin/dashboard/AnalyticsDashboardClient'
+import MoreActionsMenu from '@/components/admin/dashboard/MoreActionsMenu'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-function statusBadgeClass(status: string) {
-  if (status === 'delivered') return 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-  if (status === 'processing' || status === 'confirmed') return 'bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
-  if (status === 'shipped') return 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300'
-  if (status === 'out_for_delivery') return 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
-  if (status === 'cancelled') return 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-  if (status === 'cancel_requested') return 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-  return 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300'
+// Quick-action command bar. `d` is an inline SVG path (no icon lib, no emoji).
+// `primary` marks the two creation actions that get the accent chip treatment.
+const QUICK_ACTIONS: { label: string; d: string; path: string; primary?: boolean }[] = [
+  { label: 'New Product', path: '/admin/products/add', primary: true, d: 'M12 4v16m8-8H4' },
+  { label: 'Cash Sale', path: '/admin/cash-sale', d: 'M9 7h6m-6 4h6m-6 4h4M6 3h12a1 1 0 011 1v17l-3-2-3 2-3-2-3 2V4a1 1 0 011-1z' },
+  { label: 'Inventory', path: '/admin/inventory', d: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
+  { label: 'New PO', path: '/admin/inventory/po/new', d: 'M3 7h11v8H3zM14 10h4l3 3v2h-7M7 18a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4z' },
+  { label: 'Quotation', path: '/admin/quotations', d: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+]
+
+const MORE_ACTIONS: { label: string; path: string }[] = [
+  { label: 'Packing Slips', path: '/admin/packing-slips' },
+  { label: 'Labels', path: '/admin/labels' },
+  { label: 'Campaigns', path: '/admin/campaigns' },
+  { label: 'GST', path: '/admin/gst' },
+  { label: 'Financial', path: '/admin/financial' },
+  { label: 'CRM', path: '/admin/crm' },
+  { label: 'RFQs', path: '/admin/business/rfqs' },
+  { label: 'Delhivery', path: '/admin/delhivery' },
+  { label: 'Settings', path: '/admin/settings' },
+]
+
+function ActionTile({ label, d, path, primary, host }: { label: string; d: string; path: string; primary?: boolean; host: string }) {
+  return (
+    <Link
+      href={ap(path, host)}
+      className="group flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated transition-colors duration-200"
+    >
+      <span className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${primary ? 'bg-accent-500/10 text-accent-600 group-hover:bg-accent-500 group-hover:text-white' : 'bg-surface-secondary text-foreground-secondary group-hover:text-foreground'}`}>
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d={d} />
+        </svg>
+      </span>
+      <span className="text-center leading-tight">{label}</span>
+    </Link>
+  )
 }
 
-function statusLabel(s: string) {
-  if (s === 'out_for_delivery') return 'Out for Delivery'
-  if (s === 'cancel_requested') return 'Cancel Req.'
-  return s.replace(/_/g, ' ')
+// Renders a status chip only when count > 0; returns null otherwise.
+function AlertChip({ label, count, tone, href }: { label: string; count: number; tone: 'amber' | 'red'; href: string }) {
+  if (!count) return null
+  const tones = {
+    amber: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 hover:bg-amber-500/15',
+    red: 'bg-red-500/10 text-red-700 dark:text-red-400 hover:bg-red-500/15',
+  }
+  const dots = { amber: 'bg-amber-500', red: 'bg-red-500' }
+  return (
+    <Link href={href} className={`inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium shrink-0 transition-colors ${tones[tone]}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${dots[tone]}`} />
+      <span className="tabular-nums font-semibold">{count}</span>
+      <span>{label}</span>
+    </Link>
+  )
 }
 
 export default async function AdminDashboard() {
@@ -35,125 +75,59 @@ export default async function AdminDashboard() {
     getDashboardAnalytics('30d'),
   ])
 
-  const funnelTotal = metrics.funnel.pending + metrics.funnel.processing + metrics.funnel.shipped + metrics.funnel.outForDelivery + metrics.funnel.delivered + metrics.funnel.cancelled
-  const funnelSteps = [
-    { label: 'Pending', value: metrics.funnel.pending, color: 'bg-yellow-400 dark:bg-yellow-500', status: 'pending' },
-    { label: 'Processing', value: metrics.funnel.processing, color: 'bg-blue-400 dark:bg-blue-500', status: 'processing' },
-    { label: 'Shipped', value: metrics.funnel.shipped, color: 'bg-indigo-400 dark:bg-indigo-500', status: 'shipped' },
-    { label: 'Out for Delivery', value: metrics.funnel.outForDelivery, color: 'bg-violet-400 dark:bg-violet-500', status: 'out_for_delivery' },
-    { label: 'Delivered', value: metrics.funnel.delivered, color: 'bg-green-400 dark:bg-green-500', status: 'delivered' },
-    { label: 'Cancelled', value: metrics.funnel.cancelled, color: 'bg-red-400 dark:bg-red-500', status: 'cancelled' },
-  ]
+  const hasAlerts =
+    metrics.funnel.pending > 0 ||
+    analytics.inventory.lowStock > 0 ||
+    analytics.inventory.outOfStock > 0 ||
+    analytics.returns.total > 0 ||
+    analytics.returns.rtoInTransit > 0
 
-  const topProductsMax = metrics.topProducts.reduce((m, p) => Math.max(m, p.qty), 1)
-
-  return (
-    <div className="p-4 sm:p-6 space-y-5">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Welcome back, {username}</h1>
-          <p className="text-sm text-foreground-muted mt-0.5">Store analytics at a glance.</p>
-        </div>
-      </div>
-
+  // B/C/D — server-static ops block, passed into the client island as children
+  // so it renders between the range header and the KPIs without refetch coupling.
+  const opsBlock = (
+    <div className="space-y-4">
       <SupportRequestsAlert />
 
-      {/* Interactive commerce analytics (range-aware KPIs, trend, splits, inventory) */}
-      <AnalyticsDashboardClient initial={analytics} />
-
-      {/* Order funnel + Top products (all-time snapshot) */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Order Funnel</h2>
-            <span className="text-xs text-foreground-muted">{funnelTotal} total</span>
-          </div>
-          <div className="space-y-2.5">
-            {funnelSteps.map(step => {
-              const pct = funnelTotal > 0 ? Math.max(4, Math.round((step.value / funnelTotal) * 100)) : 4
-              return (
-                <Link
-                  key={step.label}
-                  href={ap(`/admin/orders?status=${step.status}`, host)}
-                  className="flex items-center gap-3 group rounded-md px-1 -mx-1 hover:bg-surface-secondary transition-colors"
-                >
-                  <span className="text-xs text-foreground-muted w-28 shrink-0 group-hover:text-foreground transition-colors">{step.label}</span>
-                  <div className="flex-1 h-2 bg-surface-secondary rounded-full overflow-hidden">
-                    <div className={`h-full rounded-full transition-all ${step.color}`} style={{ width: `${pct}%` }} />
-                  </div>
-                  <span className="text-xs font-semibold text-foreground w-7 text-right group-hover:text-accent-500 transition-colors">{step.value}</span>
-                </Link>
-              )
-            })}
-          </div>
-          <div className="pt-2 border-t border-border-default">
-            <Link href={ap('/admin/orders', host)} className="text-xs text-accent-500 font-medium hover:text-accent-600">
-              View all orders →
-            </Link>
-          </div>
-        </div>
-
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Top Products</h2>
-            <Link href={ap('/admin/products', host)} className="text-xs text-accent-500 font-medium hover:text-accent-600">View all →</Link>
-          </div>
-          {metrics.topProducts.length > 0 ? (
-            <div className="space-y-3">
-              {metrics.topProducts.map((p, i) => (
-                <Link key={p.id} href={ap(`/admin/products/edit/${p.id}`, host)} className="flex items-center gap-3 group rounded-md px-1 -mx-1 hover:bg-surface-secondary transition-colors">
-                  <span className="text-xs font-bold text-foreground-muted w-4 shrink-0">{i + 1}</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs font-medium text-foreground truncate group-hover:text-accent-500 transition-colors">{p.name}</p>
-                    <div className="mt-1 h-1.5 bg-surface-secondary rounded-full overflow-hidden">
-                      <div className="h-full bg-accent-500 rounded-full" style={{ width: `${Math.round((p.qty / topProductsMax) * 100)}%` }} />
-                    </div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-xs font-semibold text-foreground">{p.qty} units</p>
-                    <p className="text-xs text-foreground-muted">Rs {p.revenue.toLocaleString('en-IN')}</p>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-foreground-muted">No sales this month yet.</p>
-          )}
-        </div>
-
-        <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">Recent Orders</h2>
-            <Link href={ap('/admin/orders', host)} className="text-xs text-accent-500 font-medium hover:text-accent-600">View all →</Link>
-          </div>
-          {metrics.recentOrders.length > 0 ? (
-            <div className="space-y-2">
-              {metrics.recentOrders.map((order: any) => (
-                <Link
-                  key={order.id}
-                  href={ap(`/admin/orders/${order.id}`, host)}
-                  className="block p-2.5 rounded-lg border border-border-default hover:bg-surface-secondary transition-colors"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-accent-500">#{order.order_number || order.id.slice(0, 8)}</span>
-                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${statusBadgeClass(order.status)}`}>
-                      {statusLabel(order.status)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-foreground-muted truncate max-w-[120px]">
-                      {order.users?.first_name ? `${order.users.first_name} ${order.users.last_name || ''}`.trim() : order.customer_name || 'Guest'}
-                    </span>
-                    <span className="text-xs font-semibold text-foreground">Rs {Number(order.total_amount).toLocaleString('en-IN')}</span>
-                  </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <p className="text-xs text-foreground-muted py-4 text-center">No orders yet.</p>
-          )}
+      {/* C. Command Bar */}
+      <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-2">
+        <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1">
+          {QUICK_ACTIONS.map(a => (
+            <ActionTile key={a.label} label={a.label} d={a.d} path={a.path} primary={a.primary} host={host} />
+          ))}
+          <MoreActionsMenu actions={MORE_ACTIONS} host={host} />
         </div>
       </div>
+
+      {/* D. Needs-Attention card — always shown; empty/cleared state when nothing pending */}
+      <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5">
+        <p className="text-xs uppercase tracking-wide text-foreground-muted font-medium mb-3">Needs Attention</p>
+        {hasAlerts ? (
+          <div className="flex gap-2 overflow-x-auto pb-1 snap-x">
+            <AlertChip label="pending orders" count={metrics.funnel.pending} tone="amber" href={ap('/admin/orders?status=pending', host)} />
+            <AlertChip label="low stock" count={analytics.inventory.lowStock} tone="amber" href={ap('/admin/inventory', host)} />
+            <AlertChip label="out of stock" count={analytics.inventory.outOfStock} tone="red" href={ap('/admin/inventory', host)} />
+            <AlertChip label="open returns" count={analytics.returns.total} tone="red" href={ap('/admin/returns', host)} />
+            <AlertChip label="RTO in transit" count={analytics.returns.rtoInTransit} tone="amber" href={ap('/admin/returns', host)} />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2.5 py-1 text-foreground-muted">
+            <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-500/10 text-green-600 dark:text-green-400 shrink-0">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+              </svg>
+            </span>
+            <span className="text-sm">All clear — nothing needs your attention right now.</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="p-4 sm:p-6 lg:p-8">
+      <AnalyticsDashboardClient initial={analytics} metrics={metrics} host={host} username={username}>
+        {opsBlock}
+      </AnalyticsDashboardClient>
     </div>
   )
 }
