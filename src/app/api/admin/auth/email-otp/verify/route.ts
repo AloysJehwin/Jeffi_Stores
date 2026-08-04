@@ -45,7 +45,6 @@ export async function POST(request: NextRequest) {
     const purpose = admin.mfa_enabled ? 'verify' : 'enroll'
     const ticket = await issueMfaTicket({
       adminId: admin.id,
-      username: admin.username,
       purpose,
       certCN: gate.certCN,
     })

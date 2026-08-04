@@ -39,8 +39,8 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
       const lim = clamp(typeof limit === 'number' ? limit : 20, 1, 100)
       const rows = await queryMany(
         `SELECT n.id::text, n.body, n.created_at,
-                a.username AS admin_username,
-                COALESCE(NULLIF(TRIM(au.first_name || ' ' || COALESCE(au.last_name, '')), ''), a.username) AS admin_name
+                COALESCE(NULLIF(TRIM(au.first_name || ' ' || COALESCE(au.last_name, '')), ''), au.email) AS admin_username,
+                COALESCE(NULLIF(TRIM(au.first_name || ' ' || COALESCE(au.last_name, '')), ''), au.email) AS admin_name
            FROM customer_notes n
            LEFT JOIN admins a ON a.id = n.admin_id
            LEFT JOIN users  au ON au.id = a.user_id
@@ -74,10 +74,11 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
       const rows = await queryMany(
         `SELECT ct.id::text, ct.title, ct.description, ct.priority, ct.status,
                 ct.due_date, ct.completed_at, ct.created_at,
-                aa.username AS assigned_to_username,
+                COALESCE(NULLIF(TRIM(aau.first_name || ' ' || COALESCE(aau.last_name, '')), ''), aau.email) AS assigned_to_username,
                 ct.assigned_to::text
            FROM customer_tasks ct
            LEFT JOIN admins aa ON aa.id = ct.assigned_to
+           LEFT JOIN users aau ON aau.id = aa.user_id
           WHERE ${wheres.join(' AND ')}
           ORDER BY
             CASE ct.status WHEN 'pending' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
@@ -207,10 +208,11 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
                 ct.user_id::text AS customer_id,
                 u.email AS customer_email,
                 COALESCE(NULLIF(TRIM(u.first_name || ' ' || COALESCE(u.last_name,'')), ''), u.email) AS customer_name,
-                aa.username AS assigned_to_username
+                COALESCE(NULLIF(TRIM(aau.first_name || ' ' || COALESCE(aau.last_name, '')), ''), aau.email) AS assigned_to_username
            FROM customer_tasks ct
            LEFT JOIN users u ON u.id = ct.user_id
            LEFT JOIN admins aa ON aa.id = ct.assigned_to
+           LEFT JOIN users aau ON aau.id = aa.user_id
           WHERE ${wheres.join(' AND ')}
           ORDER BY
             CASE ct.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
@@ -376,11 +378,13 @@ export const CUSTOMER_OPS_TOOLS: ToolDef[] = [
       const assignee = assignedToAdminId ? String(assignedToAdminId) : null
       let assigneeLabel = 'Self (acting admin)'
       if (assignee) {
-        const a = await queryOne<{ username: string }>(
-          `SELECT username FROM admins WHERE id = $1::uuid LIMIT 1`,
+        const a = await queryOne<{ label: string }>(
+          `SELECT COALESCE(NULLIF(TRIM(u.first_name || ' ' || COALESCE(u.last_name, '')), ''), u.email) AS label
+             FROM admins a JOIN users u ON u.id = a.user_id
+            WHERE a.id = $1::uuid LIMIT 1`,
           [assignee]
         )
-        assigneeLabel = a?.username ? `@${a.username}` : assignee
+        assigneeLabel = a?.label ? `@${a.label}` : assignee
       }
       return {
         proposed: true,

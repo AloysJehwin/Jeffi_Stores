@@ -8,9 +8,9 @@ export async function POST(request: NextRequest) {
 
   const token = await generateToken({
     adminId: admin.adminId,
-    username: admin.username,
     first_name: admin.first_name,
     last_name: admin.last_name,
+    email: admin.email,
     role: admin.role,
     scopes: admin.scopes,
   })

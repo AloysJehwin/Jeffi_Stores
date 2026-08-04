@@ -223,7 +223,7 @@ export async function middleware(request: NextRequest) {
         const response = NextResponse.rewrite(rewriteUrl)
         response.headers.set('x-pathname', `/admin${slug}`)
         response.headers.set('x-user-id', payload.adminId)
-        response.headers.set('x-username', payload.username)
+        response.headers.set('x-username', `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || payload.email || '')
         response.headers.set('x-user-role', payload.role)
         response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
         return addSecurityHeaders(response)
@@ -259,7 +259,7 @@ export async function middleware(request: NextRequest) {
     }
 
     const certCN = request.headers.get('x-client-cert-cn') || ''
-    const tokenCertCN = payload.authCertCN || payload.username
+    const tokenCertCN = payload.authCertCN
     if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
       return NextResponse.json(
         { error: 'Certificate does not match authenticated user' },
@@ -314,7 +314,7 @@ export async function middleware(request: NextRequest) {
     }
 
     const certCN = request.headers.get('x-client-cert-cn') || ''
-    const tokenCertCN = payload.authCertCN || payload.username
+    const tokenCertCN = payload.authCertCN
     if (certCN && !certCN.includes(' ') && tokenCertCN !== certCN) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
@@ -334,7 +334,7 @@ export async function middleware(request: NextRequest) {
     const response = NextResponse.next()
     response.headers.set('x-pathname', pathname)
     response.headers.set('x-user-id', payload.adminId)
-    response.headers.set('x-username', payload.username)
+    response.headers.set('x-username', `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || payload.email || '')
     response.headers.set('x-user-role', payload.role)
     response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
     return addSecurityHeaders(response)

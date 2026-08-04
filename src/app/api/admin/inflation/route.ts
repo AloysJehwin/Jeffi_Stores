@@ -247,7 +247,7 @@ export async function POST(request: NextRequest) {
         `INSERT INTO price_inflation_log (id, category_id, category_name, percentage, applied_fields, product_count, applied_by, snapshot)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
         [inflationId, category_id, category_name, percentage, PRODUCT_COLS, products.length,
-          (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.username) || 'admin',
+          (admin.first_name && admin.last_name ? `${admin.first_name} ${admin.last_name}` : admin.email) || 'admin',
           JSON.stringify(snapshotProducts)]
       )
     })

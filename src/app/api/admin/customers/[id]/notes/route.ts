@@ -14,7 +14,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const notes = await queryMany(`
     SELECT n.id, n.body, n.created_at,
-           a.username AS admin_username, u.first_name AS admin_first_name, u.last_name AS admin_last_name
+           COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS admin_username, u.first_name AS admin_first_name, u.last_name AS admin_last_name
     FROM customer_notes n
     LEFT JOIN admins a ON n.admin_id = a.id
     LEFT JOIN users u ON a.user_id = u.id

@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
 
     const requesterName = admin.first_name && admin.last_name
       ? `${admin.first_name} ${admin.last_name}`
-      : admin.username
+      : admin.email
     const toEmails = superAdmins.map(r => r.email).join(', ')
 
     await transporter.sendMail({
@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
           <div class="card">
             <h2 style="margin:0 0 20px;font-size:18px;">Scope Access Request</h2>
             <div class="label">Requested by</div>
-            <div class="value">${requesterName} <span style="font-weight:400;color:#888;">(${admin.username})</span></div>
+            <div class="value">${requesterName} <span style="font-weight:400;color:#888;">(${admin.email})</span></div>
             <div class="label">Requires scope</div>
             <div class="value"><span class="badge">${scopeLabel || scopeKey}</span></div>
             <div class="label">Attempted page</div>

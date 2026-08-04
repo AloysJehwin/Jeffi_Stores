@@ -1040,7 +1040,7 @@ export async function getCustomerById(id: string) {
     admin_username: string | null; admin_first_name: string | null; admin_last_name: string | null
   }>(`
     SELECT n.id, n.body, n.created_at,
-           a.username AS admin_username, u.first_name AS admin_first_name, u.last_name AS admin_last_name
+           COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS admin_username, u.first_name AS admin_first_name, u.last_name AS admin_last_name
     FROM customer_notes n
     LEFT JOIN admins a ON n.admin_id = a.id
     LEFT JOIN users u ON a.user_id = u.id
@@ -1362,7 +1362,7 @@ export interface DashboardAnalytics {
     aov: number; aovPrev: number; aovPct: number | null
     customers: number; customersPrev: number; customersPct: number | null
   }
-  trend: { bucket: string; label: string; revenue: number; orders: number }[]
+  trend: { bucket: string; label: string; revenue: number; orders: number; paidOrders: number; customers: number; units: number; aov: number }[]
   payment: { online: number; cod: number; other: number; codOutstanding: number; codOutstandingCount: number }
   topCategories: { name: string; units: number; revenue: number }[]
   topBrands: { name: string; units: number; revenue: number }[]
@@ -1404,15 +1404,28 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         COUNT(DISTINCT user_id) FILTER (WHERE created_at >= ${prevStartExpr} AND created_at < ${prevEndExpr}) AS cust_prev
       FROM orders
     `),
-    // Trend series over the range
+    // Trend series over the range. Two aggregations joined by bucket so the
+    // order_items fan-out doesn't inflate order-level sums (revenue/counts).
     queryMany<Record<string, string>>(`
-      SELECT
-        date_trunc('${bucket}', created_at) AS bucket,
-        COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0) AS revenue,
-        COUNT(*) AS orders
-      FROM orders
-      WHERE created_at >= ${startExpr}
-      GROUP BY 1 ORDER BY 1 ASC
+      WITH ord AS (
+        SELECT date_trunc('${bucket}', created_at) AS bucket,
+               COALESCE(SUM(total_amount) FILTER (WHERE payment_status = 'paid'), 0) AS revenue,
+               COUNT(*) AS orders,
+               COUNT(*) FILTER (WHERE payment_status = 'paid') AS paid_orders,
+               COUNT(DISTINCT user_id) AS customers
+        FROM orders WHERE created_at >= ${startExpr}
+        GROUP BY 1
+      ),
+      itm AS (
+        SELECT date_trunc('${bucket}', o.created_at) AS bucket, COALESCE(SUM(oi.quantity), 0) AS units
+        FROM orders o JOIN order_items oi ON oi.order_id = o.id
+        WHERE o.created_at >= ${startExpr}
+        GROUP BY 1
+      )
+      SELECT ord.bucket, ord.revenue, ord.orders, ord.paid_orders, ord.customers,
+             COALESCE(itm.units, 0) AS units
+      FROM ord LEFT JOIN itm ON itm.bucket = ord.bucket
+      ORDER BY ord.bucket ASC
     `),
     // Payment split + COD outstanding
     queryOne<Record<string, string>>(`
@@ -1500,12 +1513,20 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
       aov: Math.round(aov), aovPrev: Math.round(aovPrev), aovPct: pctDelta(aov, aovPrev),
       customers: cust, customersPrev: custPrev, customersPct: pctDelta(cust, custPrev),
     },
-    trend: trendRows.map(r => ({
-      bucket: String(r.bucket),
-      label: String(r.bucket),
-      revenue: num(r.revenue),
-      orders: int(r.orders),
-    })),
+    trend: trendRows.map(r => {
+      const revenue = num(r.revenue)
+      const paidOrders = int(r.paid_orders)
+      return {
+        bucket: String(r.bucket),
+        label: String(r.bucket),
+        revenue,
+        orders: int(r.orders),
+        paidOrders,
+        customers: int(r.customers),
+        units: int(r.units),
+        aov: paidOrders > 0 ? Math.round(revenue / paidOrders) : 0,
+      }
+    }),
     payment: {
       online: num(payRow?.online),
       cod: num(payRow?.cod),

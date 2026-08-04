@@ -4,7 +4,7 @@ import { cookieDomainOption } from '@/lib/cookie-domain'
 
 export interface AdminSessionAdmin {
   id: string
-  username: string
+  email?: string | null
   first_name?: string | null
   last_name?: string | null
   role: string
@@ -16,18 +16,20 @@ export async function issueAdminSession(
   certCN?: string,
   extraBody?: Record<string, unknown>,
 ) {
+  const displayName =
+    `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || admin.email || ''
   const token = await generateToken({
     adminId: admin.id,
-    username: admin.username,
     first_name: admin.first_name || undefined,
     last_name: admin.last_name || undefined,
+    email: admin.email || undefined,
     role: admin.role,
     scopes: admin.scopes || [],
     authCertCN: certCN || undefined,
   })
   const response = NextResponse.json({
     success: true,
-    admin: { username: admin.username, role: admin.role },
+    admin: { name: displayName, email: admin.email || undefined, role: admin.role },
     ...(extraBody || {}),
   })
   response.cookies.set('admin_token', token, {
