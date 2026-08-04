@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
     `SELECT l.id::text, l.admin_id::text, l.action, l.entity_type, l.entity_id,
             l.summary, l.diff, l.metadata, l.ip_address::text, l.created_at,
             u.first_name AS admin_first_name, u.last_name AS admin_last_name,
-            a.username AS admin_username
+            COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS admin_username
        FROM admin_audit_log l
        LEFT JOIN admins a ON a.id = l.admin_id
        LEFT JOIN users u ON u.id = a.user_id

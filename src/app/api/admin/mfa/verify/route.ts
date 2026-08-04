@@ -20,7 +20,7 @@ export async function POST(request: Request) {
 
     const admin = await queryOne<{
       id: string
-      username: string
+      email: string | null
       first_name: string | null
       last_name: string | null
       role: string
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
       mfa_enabled: boolean
       mfa_secret_enc: string | null
     }>(
-      `SELECT a.id, a.username, u.first_name, u.last_name, a.role, a.scopes, a.mfa_enabled, a.mfa_secret_enc
+      `SELECT a.id, u.email, u.first_name, u.last_name, a.role, a.scopes, a.mfa_enabled, a.mfa_secret_enc
          FROM admins a LEFT JOIN users u ON u.id = a.user_id
          WHERE a.id = $1 AND a.is_active = true`,
       [t.adminId]

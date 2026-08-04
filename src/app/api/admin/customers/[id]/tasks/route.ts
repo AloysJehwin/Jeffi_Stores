@@ -26,9 +26,9 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       ct.id, ct.title, ct.description, ct.due_date, ct.priority, ct.status,
       ct.completed_at, ct.created_at, ct.updated_at,
       ct.auto_created, ct.source_kind, ct.source_ref_id,
-      ca.username AS created_by_username,
+      COALESCE(NULLIF(TRIM(cuser.first_name || ' ' || cuser.last_name), ''), cuser.email) AS created_by_username,
       cuser.first_name AS created_by_first_name, cuser.last_name AS created_by_last_name,
-      aa.username AS assigned_to_username,
+      COALESCE(NULLIF(TRIM(auser.first_name || ' ' || auser.last_name), ''), auser.email) AS assigned_to_username,
       auser.first_name AS assigned_to_first_name, auser.last_name AS assigned_to_last_name,
       ct.assigned_to
     FROM customer_tasks ct

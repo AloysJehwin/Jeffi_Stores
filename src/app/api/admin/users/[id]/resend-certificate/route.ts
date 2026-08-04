@@ -14,7 +14,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
     }
 
     const row = await queryOne<any>(
-      `SELECT a.username, u.email,
+      `SELECT COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS username, u.email,
               ac.serial_number, ac.expires_at, ac.p12_data, ac.p12_password, a.role
        FROM admins a
        JOIN users u ON u.id = a.user_id

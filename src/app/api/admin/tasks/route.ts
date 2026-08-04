@@ -85,7 +85,7 @@ export async function GET(req: NextRequest) {
       cu.first_name AS customer_first_name, cu.last_name AS customer_last_name, cu.email AS customer_email,
       ct.assigned_to,
       au.first_name AS assigned_first_name, au.last_name AS assigned_last_name,
-      a.username AS assigned_username
+      COALESCE(NULLIF(TRIM(au.first_name || ' ' || au.last_name), ''), au.email) AS assigned_username
     FROM customer_tasks ct
     LEFT JOIN users cu ON ct.user_id = cu.id
     LEFT JOIN admins a ON ct.assigned_to = a.id

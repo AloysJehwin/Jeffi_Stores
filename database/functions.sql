@@ -25,6 +25,20 @@ BEGIN
     RETURN NULL;
   END;
 
+  -- Admin actor columns: resolve display name via the linked users row
+  -- (admins.username was removed; identity now lives on users).
+  IF col_name IN ('admin_id', 'created_by', 'updated_by', 'completed_by', 'assigned_to') THEN
+    BEGIN
+      SELECT COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email)
+        INTO v_result
+        FROM public.admins a JOIN public.users u ON u.id = a.user_id
+       WHERE a.id = v_uuid LIMIT 1;
+    EXCEPTION WHEN others THEN
+      RETURN NULL;
+    END;
+    RETURN v_result;
+  END IF;
+
   CASE
     WHEN col_name IN ('category_id', 'parent_category_id', 'parent_id') THEN
       v_lookup_table := 'categories'; v_display_expr := 'name';
@@ -40,8 +54,6 @@ BEGIN
       v_lookup_table := 'suppliers'; v_display_expr := 'name';
     WHEN col_name = 'coupon_id' THEN
       v_lookup_table := 'coupons'; v_display_expr := 'code';
-    WHEN col_name IN ('admin_id', 'created_by', 'updated_by', 'completed_by', 'assigned_to') THEN
-      v_lookup_table := 'admins'; v_display_expr := 'username';
     WHEN col_name = 'user_id' THEN
       v_lookup_table := 'users'; v_display_expr := 'email';
     ELSE

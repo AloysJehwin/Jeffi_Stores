@@ -7,7 +7,6 @@ import { queryOne } from '@/lib/db'
 export interface ResolvedAdmin {
   id: string
   user_id: string
-  username: string
   role: string
   scopes: string[]
   mfa_enabled: boolean
@@ -22,7 +21,7 @@ export interface ResolvedAdmin {
 export async function resolveAdminByEmail(email: string): Promise<ResolvedAdmin | null> {
   if (!email) return null
   const row = await queryOne<ResolvedAdmin & { scopes: unknown }>(
-    `SELECT a.id, a.user_id::text AS user_id, a.username, a.role, a.scopes, a.mfa_enabled,
+    `SELECT a.id, a.user_id::text AS user_id, a.role, a.scopes, a.mfa_enabled,
             u.email, u.first_name, u.last_name, u.google_id
        FROM admins a
        JOIN users u ON u.id = a.user_id
@@ -91,7 +90,15 @@ export async function enforceCertGate(
       return { ok: false, status: 403, error: 'Certificate not authorized for this account' }
     }
   } else if (certCN && certCN !== 'Admin User') {
-    const certOwnerAccount = await queryOne<{ id: string; role: string }>(`SELECT id, role FROM admins WHERE username = $1`, [certCN])
+    // Match the CN against the cert's own stored common_name (admin_certificates),
+    // not admins.username. Works for legacy CN=username certs and new email-CN certs.
+    const certOwnerAccount = await queryOne<{ id: string; role: string }>(
+      `SELECT a.id, a.role FROM admin_certificates ac
+         JOIN admins a ON a.id = ac.admin_id
+        WHERE ac.common_name = $1 AND ac.is_revoked = FALSE AND ac.expires_at > NOW()
+        LIMIT 1`,
+      [certCN]
+    )
     if (!certOwnerAccount) {
       return { ok: false, status: 403, error: 'Certificate not recognized. Please contact your administrator.' }
     }

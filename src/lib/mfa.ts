@@ -15,7 +15,6 @@ export type MfaPurpose = 'enroll' | 'verify'
 
 export interface MfaTicketPayload {
   adminId: string
-  username: string
   purpose: MfaPurpose
   [key: string]: any
 }
@@ -70,8 +69,8 @@ export async function generateTotpSecret(): Promise<string> {
   return await generateSecret()
 }
 
-export async function buildOtpauthUrl(username: string, secret: string): Promise<string> {
-  return await generateURI({ secret, label: username, issuer: ISSUER })
+export async function buildOtpauthUrl(label: string, secret: string): Promise<string> {
+  return await generateURI({ secret, label, issuer: ISSUER })
 }
 
 export async function verifyTotp(secret: string, code: string): Promise<boolean> {

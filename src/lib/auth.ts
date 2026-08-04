@@ -1,23 +1,14 @@
 import { queryOne, query } from './db'
-import bcrypt from 'bcrypt'
-import { randomBytes } from 'crypto'
 
 export async function createAdminUser(userData: {
   email: string
   first_name: string
   last_name: string
   phone?: string
-  username: string
-  password?: string
   role?: string
   scopes?: string[]
 }) {
   try {
-    // Password login is removed (admins use email-OTP / Google + TOTP). The
-    // password_hash column is still NOT NULL, so store a random unusable hash.
-    const secret = userData.password || randomBytes(32).toString('hex')
-    const passwordHash = await bcrypt.hash(secret, 10)
-
     let user = await queryOne(
       `SELECT u.* FROM users u
        LEFT JOIN admins a ON a.user_id = u.id
@@ -42,10 +33,10 @@ export async function createAdminUser(userData: {
     if (!user) throw new Error('Failed to create user')
 
     const admin = await queryOne(
-      `INSERT INTO admins (user_id, username, password_hash, role, scopes)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO admins (user_id, role, scopes)
+       VALUES ($1, $2, $3)
        RETURNING *`,
-      [user.id, userData.username, passwordHash, userData.role || 'admin', JSON.stringify(userData.scopes || [])]
+      [user.id, userData.role || 'admin', JSON.stringify(userData.scopes || [])]
     )
 
     if (!admin) throw new Error('Failed to create admin')

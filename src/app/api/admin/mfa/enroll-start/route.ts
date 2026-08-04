@@ -11,15 +11,17 @@ export async function POST(request: Request) {
     const t = await verifyMfaTicket(ticket, 'enroll')
     if (!t) return NextResponse.json({ error: 'Invalid or expired ticket' }, { status: 401 })
 
-    const admin = await queryOne<{ id: string; username: string; mfa_enabled: boolean }>(
-      `SELECT id, username, mfa_enabled FROM admins WHERE id = $1 AND is_active = true`,
+    const admin = await queryOne<{ id: string; email: string | null; mfa_enabled: boolean }>(
+      `SELECT a.id, u.email, a.mfa_enabled
+         FROM admins a LEFT JOIN users u ON u.id = a.user_id
+         WHERE a.id = $1 AND a.is_active = true`,
       [t.adminId]
     )
     if (!admin) return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
     if (admin.mfa_enabled) return NextResponse.json({ error: 'Already enrolled' }, { status: 400 })
 
     const secret = await generateTotpSecret()
-    const otpauthUrl = await buildOtpauthUrl(admin.username, secret)
+    const otpauthUrl = await buildOtpauthUrl(admin.email || admin.id, secret)
     const qrDataUrl = await QRCode.toDataURL(otpauthUrl, { width: 240 })
 
     return NextResponse.json({

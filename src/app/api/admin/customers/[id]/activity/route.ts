@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       cal.summary, cal.metadata, cal.created_at,
       cal.actor_id,
       u.first_name AS actor_first_name, u.last_name AS actor_last_name,
-      a.username AS actor_username
+      COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS actor_username
     FROM customer_activity_log cal
     LEFT JOIN admins a ON cal.actor_id = a.id
     LEFT JOIN users u ON u.id = a.user_id
