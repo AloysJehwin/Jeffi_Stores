@@ -20,7 +20,7 @@ function Tile({ label, icon, path, primary, host }: Action & { host: string }) {
   return (
     <Link
       href={ap(path, host)}
-      className="group flex flex-1 flex-col items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated transition-colors duration-200"
+      className="group flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated transition-colors duration-200"
     >
       <span className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${primary ? 'bg-accent-500/10 text-accent-600 group-hover:bg-accent-500 group-hover:text-white' : 'bg-surface-secondary text-foreground-secondary group-hover:text-foreground'} [&_svg]:w-5 [&_svg]:h-5`}>
         {NAV_ICONS[icon] ?? fallbackIcon()}
@@ -30,9 +30,9 @@ function Tile({ label, icon, path, primary, host }: Action & { host: string }) {
   )
 }
 
-// Command bar: primary quick actions always visible, spread across the full
-// width; a centered chevron expands the rest in-place (mirrors the products-list
-// AdvancedFilterPanel toggle).
+// Command bar: primary quick actions in a fixed 8-column grid; a centered
+// chevron expands the rest in-place into the same grid (mirrors the
+// products-list AdvancedFilterPanel toggle).
 export default function QuickActionBar({ primary, more, host }: {
   primary: Action[]
   more: Action[]
@@ -43,7 +43,7 @@ export default function QuickActionBar({ primary, more, host }: {
 
   return (
     <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-2">
-      <div className={expanded ? 'grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1' : 'flex flex-wrap gap-1'}>
+      <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1">
         {actions.map(a => (
           <Tile key={a.label} {...a} host={host} />
         ))}
