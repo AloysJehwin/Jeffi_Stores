@@ -564,7 +564,7 @@ describe('admin-agent/tools/customer-ops', () => {
       // loadCustomerLite
       mockQueryOne.mockResolvedValueOnce(fakeDbUser)
       // admin lookup
-      mockQueryOne.mockResolvedValueOnce({ username: 'admin_bob' })
+      mockQueryOne.mockResolvedValueOnce({ label: 'admin_bob' })
       const result = await getTool('propose_create_customer_task').handler({
         customerId: 'u1',
         title: 'Task',

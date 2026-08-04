@@ -74,7 +74,7 @@ describe('POST /api/admin/ai-generate-email', () => {
     vi.mocked(hasScope).mockReturnValue(true)
     const res = await POST(makePost({ scenario: 'short' }))
     expect(res.status).toBe(400)
-    expect(await res.json()).toMatchObject({ error: expect.stringContaining('10 characters') })
+    expect(await res.json()).toMatchObject({ error: 'Scenario too short' })
   })
 
   it('returns 400 when scenario is empty', async () => {
@@ -98,7 +98,7 @@ describe('POST /api/admin/ai-generate-email', () => {
     vi.mocked(hasScope).mockReturnValue(true)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ message: { content: JSON.stringify({ html: '<p>Hello world</p>' }) } }),
+      json: async () => ({ response: JSON.stringify({ html: '<p>Hello world</p>' }) }),
     }))
     const res = await POST(makePost({ scenario: 'send a promotional email about a new product launch', subject: 'New arrivals' }))
     expect(res.status).toBe(200)
@@ -110,7 +110,7 @@ describe('POST /api/admin/ai-generate-email', () => {
     vi.mocked(hasScope).mockReturnValue(true)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ message: { content: 'Here is the output:\n{"html":"<p>body</p>"}' } }),
+      json: async () => ({ response: 'Here is the output:\n{"html":"<p>body</p>"}' }),
     }))
     const res = await POST(makePost({ scenario: 'send a promotional email about a new product launch' }))
     expect(res.status).toBe(200)
@@ -122,11 +122,11 @@ describe('POST /api/admin/ai-generate-email', () => {
     vi.mocked(hasScope).mockReturnValue(true)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ message: { content: 'no json here at all' } }),
+      json: async () => ({ response: 'no json here at all' }),
     }))
     const res = await POST(makePost({ scenario: 'send a promotional email about a new product launch' }))
     expect(res.status).toBe(502)
-    expect(await res.json()).toMatchObject({ error: 'AI returned unparseable response' })
+    expect(await res.json()).toMatchObject({ error: 'AI returned empty result' })
   })
 
   it('returns 502 when AI returns empty html field', async () => {
@@ -134,7 +134,7 @@ describe('POST /api/admin/ai-generate-email', () => {
     vi.mocked(hasScope).mockReturnValue(true)
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ message: { content: '{"html":""}' } }),
+      json: async () => ({ response: '{"html":""}' }),
     }))
     const res = await POST(makePost({ scenario: 'send a promotional email about a new product launch' }))
     expect(res.status).toBe(502)
@@ -147,16 +147,16 @@ describe('POST /api/admin/ai-generate-email', () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('network failure')))
     const res = await POST(makePost({ scenario: 'send a promotional email about a new product launch' }))
     expect(res.status).toBe(503)
-    expect(await res.json()).toMatchObject({ error: 'AI service error' })
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining('AI error') })
   })
 
-  it('returns 503 with timeout message on TimeoutError', async () => {
+  it('returns 504 with timeout message on AbortError', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    const timeoutErr = Object.assign(new Error('timeout'), { name: 'TimeoutError' })
+    const timeoutErr = Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(timeoutErr))
     const res = await POST(makePost({ scenario: 'send a promotional email about a new product launch' }))
-    expect(res.status).toBe(503)
+    expect(res.status).toBe(504)
     expect(await res.json()).toMatchObject({ error: 'AI request timed out' })
   })
 })

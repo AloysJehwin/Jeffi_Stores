@@ -109,7 +109,7 @@ async function runFineTune(examples: FineTuneExample[]): Promise<number> {
     for (const ex of trainingExamples.slice(0, 5)) {
       try {
         const fullText = `${ex.prompt}\n${ex.completion}`
-        const inputs = await tokenizer(fullText, { return_tensors: 'pt' })
+        const inputs = await tokenizer(fullText, { return_tensors: 'pt' } as any)
         if ((model as any).train_step) {
           await (model as any).train_step(inputs)
           stepsRun++

@@ -132,8 +132,8 @@ describe('POST /api/admin/inflation — zero mrp_ex_gst snapshot branches', () =
     expect(variantSnap.before).toEqual(variantSnap.after)
   })
 
-  it('falls back to username in snapshot log when admin has no first/last name', async () => {
-    mockAuth.mockResolvedValue({ adminId: 'a2', username: 'nomame', role: 'super_admin', scopes: ['inflation'] } as any)
+  it('falls back to email in snapshot log when admin has no first/last name', async () => {
+    mockAuth.mockResolvedValue({ adminId: 'a2', email: 'noname@jeffistores.in', role: 'super_admin', scopes: ['inflation'] } as any)
     mockHasScope.mockReturnValue(true)
     mockParseBody.mockReturnValue({ ok: true, data: { percentage: 5, categoryId: 'cat-1' } } as any)
     mockQueryMany.mockResolvedValue([
@@ -152,7 +152,7 @@ describe('POST /api/admin/inflation — zero mrp_ex_gst snapshot branches', () =
 
     const res = await INFLATION_POST(makePost({ category_id: 'cat-1', category_name: 'Bolts', percentage: 5 }))
     expect(res.status).toBe(200)
-    expect(appliedBy).toBe('nomame')
+    expect(appliedBy).toBe('noname@jeffistores.in')
   })
 })
 

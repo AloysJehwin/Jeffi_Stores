@@ -86,7 +86,7 @@ export default async function BrandViewPage({ params, searchParams }: {
             <p className="text-xs text-foreground-muted mt-0.5">Created {new Date(brand.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
           </div>
         </div>
-        <DraftEditButton entity="brands" id={id} name={brand.name} hasDraft={hasDraft} backUrl={backUrl} />
+        <DraftEditButton entity="brands" id={id} name={brand.name} hasDraft={!!hasDraft} backUrl={backUrl} />
       </div>
 
       {hasDraft && (
@@ -123,9 +123,9 @@ export default async function BrandViewPage({ params, searchParams }: {
             </div>
             <div className="px-5 divide-y divide-border-default">
               {[
-                ['Slug', <span className="font-mono">{brand.slug}</span>],
+                ['Slug', <span key="slug" className="font-mono">{brand.slug}</span>],
                 ['Website', brand.website
-                  ? <a href={brand.website} target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline">{brand.website.replace(/^https?:\/\//, '')}</a>
+                  ? <a key="website" href={brand.website} target="_blank" rel="noopener noreferrer" className="text-accent-500 hover:underline">{brand.website.replace(/^https?:\/\//, '')}</a>
                   : '—'],
                 ['Logo', brand.logo_url ? 'Set' : '—'],
                 ['Returns', brand.return_allowed ? `${brand.return_window_days} days` : 'Not allowed'],

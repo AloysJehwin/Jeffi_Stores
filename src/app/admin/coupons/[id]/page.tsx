@@ -177,7 +177,7 @@ export default async function CouponViewPage({ params, searchParams }: {
             </div>
             <div className="px-5 divide-y divide-border-default">
               {[
-                ['Type', <span className="capitalize">{coupon.discount_type}</span>],
+                ['Type', <span key="type" className="capitalize">{coupon.discount_type}</span>],
                 ['Value', coupon.discount_type === 'percentage' ? `${coupon.discount_value}% off` : `₹${coupon.discount_value} off`],
                 ['Min Purchase', coupon.min_purchase_amount ? `₹${coupon.min_purchase_amount}` : '—'],
                 ['Max Discount', coupon.max_discount_amount ? `₹${coupon.max_discount_amount}` : '—'],
@@ -185,7 +185,7 @@ export default async function CouponViewPage({ params, searchParams }: {
                 ['Per-User Limit', coupon.usage_limit_per_user ? `${coupon.usage_limit_per_user} per user` : 'Unlimited'],
                 ['Valid From', coupon.valid_from ? new Date(coupon.valid_from).toLocaleString('en-IN') : '—'],
                 ['Valid Until', coupon.valid_until
-                  ? <span className={isExpired ? 'text-red-500' : ''}>{new Date(coupon.valid_until).toLocaleString('en-IN')}</span>
+                  ? <span key="valid" className={isExpired ? 'text-red-500' : ''}>{new Date(coupon.valid_until).toLocaleString('en-IN')}</span>
                   : '—'],
                 ['Auto Generated', coupon.auto_generated ? 'Yes' : 'No'],
                 ['Source', coupon.generated_for_campaign || (isPersonal ? 'Personal' : 'Manual')],

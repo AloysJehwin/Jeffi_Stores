@@ -216,7 +216,6 @@ function NavIcon({ label }: { label: string }) {
 interface Props {
   navLinks: NavLink[]
   collapsed: boolean
-  onToggle: () => void
 }
 
 function isNavActive(link: NavLink, currentPath: string | null): boolean {
@@ -228,7 +227,7 @@ function isNavActive(link: NavLink, currentPath: string | null): boolean {
 }
 
 
-export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props) {
+export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
   const pathname = usePathname()
 
   const ungrouped = navLinks.filter(l => !l.group)
@@ -242,19 +241,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
 
   if (collapsed) {
     return (
-      <aside className={`hidden md:flex flex-col w-12 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-hidden`}>
-        <div className="h-12 flex items-center justify-center shrink-0">
-          <button
-            type="button"
-            onClick={onToggle}
-            title="Expand sidebar"
-            className="flex items-center justify-center w-7 h-7 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7" />
-            </svg>
-          </button>
-        </div>
+      <aside className={`hidden md:flex flex-col w-12 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-full overflow-hidden`}>
         <nav className="flex flex-col items-center gap-0 p-1.5 flex-1 overflow-y-auto pt-2">
           {ungrouped.map(link => {
             const isActive = isNavActive(link, pathname)
@@ -300,20 +287,7 @@ export default function AdminSidebarNav({ navLinks, collapsed, onToggle }: Props
   }
 
   return (
-    <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-screen overflow-hidden">
-      <div className="h-12 flex items-center gap-2 px-3 shrink-0">
-        <button
-          type="button"
-          onClick={onToggle}
-          title="Collapse sidebar"
-          className="flex items-center justify-center w-7 h-7 rounded-lg text-white/70 hover:bg-white/10 hover:text-white transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M19 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <span className="font-bold text-white text-sm select-none">Jeffi Stores</span>
-      </div>
+    <aside className="hidden md:flex flex-col w-56 shrink-0 bg-secondary-500 dark:bg-secondary-700 text-white h-full overflow-hidden">
       <nav className="flex flex-col gap-0.5 p-3 flex-1 overflow-y-auto">
         {ungrouped.map(link => (
           <a

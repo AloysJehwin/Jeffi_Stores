@@ -17,11 +17,11 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   try {
     const product = await queryOne<{ id: string; name: string; sku: string }>(
-      `SELECT id, name, sku FROM products WHERE id = $1 AND is_active = true`,
+      `SELECT id, name, sku FROM products WHERE id = $1`,
       [id]
     )
     if (!product) {
-      return NextResponse.json({ error: 'Product not found or not a live product' }, { status: 404 })
+      return NextResponse.json({ error: 'Product not found' }, { status: 404 })
     }
 
     const existingDraft = await queryOne<{ product_id: string }>(

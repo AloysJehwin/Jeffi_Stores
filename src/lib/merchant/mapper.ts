@@ -30,15 +30,17 @@ function buildAdditionalImages(product: any, primaryId?: string): Array<{ link: 
     .map((img: any) => ({ link: img.image_url }))
 }
 
-function buildHighlights(product: any): Array<{ title: string }> {
-  return buildProductHighlights(product).map(h => ({ title: h }))
+function buildHighlights(product: any): string[] {
+  // Content API v2.1: productHighlights is an array of plain strings.
+  return buildProductHighlights(product)
 }
 
-function buildDetails(product: any): Array<{ sectionName: string; attributeName: string; attributeValue: { value: string } }> {
+function buildDetails(product: any): Array<{ sectionName: string; attributeName: string; attributeValue: string }> {
+  // Content API v2.1: attributeValue is a scalar string, NOT an object.
   return buildProductDetails(product).map(d => ({
     sectionName: d.section,
     attributeName: d.attribute,
-    attributeValue: { value: d.value },
+    attributeValue: d.value,
   }))
 }
 
@@ -72,7 +74,7 @@ export function productToGmcItems(product: any): any[] {
     shippingWeight: product.weight ? { value: String(product.weight), unit: 'kg' } : undefined,
     googleProductCategory: googleProductCategory || undefined,
     productTypes: productType ? [productType] : undefined,
-    highlights: highlights.length ? highlights : undefined,
+    productHighlights: highlights.length ? highlights : undefined,
     productDetails: details.length ? details : undefined,
     isBundle: false,
     taxCategory: product.hsn_code || undefined,
@@ -96,7 +98,7 @@ export function productToGmcItems(product: any): any[] {
           salePrice: hasSale ? { value: price.toFixed(2), currency: 'INR' } : undefined,
           availability: v.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock',
           itemGroupId: buildOfferId(product.sku),
-          size: v.variant_name || undefined,
+          sizes: v.variant_name ? [v.variant_name] : undefined,
           gtin: v.gtin || product.gtin || undefined,
           mpn: v.mpn || product.mpn || undefined,
           identifierExists: !!(v.mpn || product.mpn || v.gtin || product.gtin || brandName),
@@ -122,7 +124,7 @@ export function productToGmcItems(product: any): any[] {
     price: { value: (hasSale ? price : (mrp || price)).toFixed(2), currency: 'INR' },
     salePrice: hasSale ? { value: price.toFixed(2), currency: 'INR' } : undefined,
     availability: product.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock',
-    size: product.size || undefined,
+    sizes: product.size ? [product.size] : undefined,
     customLabel0: cl0,
     customLabel1: cl1,
     customLabel2: cl2,

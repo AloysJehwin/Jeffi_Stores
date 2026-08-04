@@ -450,6 +450,8 @@ function CheckoutPage() {
         razorpayOpen.current = false
         razorpayCleanup.current?.()
         razorpayCleanup.current = null
+        if (payload.orderId) {
+          fetch(`/api/orders/${payload.orderId}/payment-failed`, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
@@ -643,7 +645,7 @@ function CheckoutPage() {
             </svg>
           </div>
           <h2 className="text-lg font-semibold text-foreground">Confirming your payment…</h2>
-          <p className="text-sm text-foreground-secondary">Your payment was received. We're confirming your order — please don't close this page.</p>
+          <p className="text-sm text-foreground-secondary">Your payment was received. We&apos;re confirming your order — please don&apos;t close this page.</p>
           <button
             type="button"
             className="text-sm text-accent-600 hover:underline"

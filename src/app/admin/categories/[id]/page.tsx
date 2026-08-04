@@ -105,7 +105,7 @@ export default async function CategoryViewPage({ params, searchParams }: {
             <p className="text-xs text-foreground-muted mt-0.5">Created {new Date(category.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
           </div>
         </div>
-        <DraftEditButton entity="categories" id={id} name={category.name} hasDraft={hasDraft} backUrl={backUrl} />
+        <DraftEditButton entity="categories" id={id} name={category.name} hasDraft={!!hasDraft} backUrl={backUrl} />
       </div>
 
       {hasDraft && (
@@ -142,16 +142,16 @@ export default async function CategoryViewPage({ params, searchParams }: {
             </div>
             <div className="px-5 divide-y divide-border-default">
               {[
-                ['Slug', <span className="font-mono">{category.slug}</span>],
+                ['Slug', <span key="slug" className="font-mono">{category.slug}</span>],
                 ['Parent', parent
-                  ? <Link href={ap(`/admin/categories/${parent.id}`, host)} className="text-accent-500 hover:underline">{parent.name}</Link>
+                  ? <Link key="parent" href={ap(`/admin/categories/${parent.id}`, host)} className="text-accent-500 hover:underline">{parent.name}</Link>
                   : '— (top level)'],
                 ['SKU Prefix', category.sku_prefix || '—'],
                 ['Google Category', category.google_product_category || '—'],
                 ['Icon', category.icon_name || '—'],
                 ['Policy Source', isInherited
-                  ? <span className="text-blue-600 dark:text-blue-400">Inherited from {parent?.name ?? 'parent'}</span>
-                  : <span>Overridden</span>],
+                  ? <span key="policy" className="text-blue-600 dark:text-blue-400">Inherited from {parent?.name ?? 'parent'}</span>
+                  : <span key="policy">Overridden</span>],
                 ['Returns', effReturnAllowed ? `${effReturnDays} days` : 'Not allowed'],
                 ['Replacement', effReplaceAllowed ? `${effReplaceDays} days` : 'Not allowed'],
               ].map(([label, value], i) => (

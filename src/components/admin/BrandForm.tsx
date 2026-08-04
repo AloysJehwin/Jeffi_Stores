@@ -14,8 +14,6 @@ interface BrandFormProps {
   isDraft?: boolean
   submitLabel?: string
 }
-  isDraft?: boolean
-}
 
 export default function BrandForm({ action, brand, backUrl, isDraft = false, submitLabel }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
