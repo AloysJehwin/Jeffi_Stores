@@ -85,6 +85,18 @@ function nowMs(): number {
   try { return Date.now() } catch { return 0 }
 }
 
+// Reject if a promise doesn't settle within ms — used to fast-fail the vector
+// tier when the RAG store is unreachable, so we degrade quickly.
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('rec-timeout')), ms)
+    p.then(
+      v => { clearTimeout(timer); resolve(v) },
+      e => { clearTimeout(timer); reject(e) }
+    )
+  })
+}
+
 // ── Hydration ─────────────────────────────────────────────────────────────
 // Selects the SAME shape as the homepage getBestSellers/getFeaturedProducts
 // queries so productCardProps() (page.tsx) / the client mapper render cards
@@ -199,10 +211,12 @@ export async function getCandidates(
   const seedQuery = signals.seedNames.join(' ')
 
   // Tier 1 — vector similarity (RAG). Wrapped: embed()/RAG DB throw when the
-  // Ollama box or vector store is unreachable.
+  // Ollama box or vector store is unreachable. Raced against a hard deadline so
+  // an unreachable RAG store degrades fast (~6s) instead of hanging on pg
+  // connect timeouts and blocking the homepage.
   if (seedQuery) {
     try {
-      const similar = await findSimilarProductIds(seedQuery, limit)
+      const similar = await withTimeout(findSimilarProductIds(seedQuery, limit), 6000)
       const excl = new Set(excludeIds)
       const ids: string[] = []
       const variantIds: string[] = []
@@ -254,8 +268,8 @@ export async function getCandidates(
 // ── 3. LLM curation ───────────────────────────────────────────────────────
 const CURATE_SYSTEM = `You are a product recommender for Jeffi Stores, an Indian industrial tools & hardware store.
 Given a shopper's recent interests and a numbered list of candidate products, pick and ORDER the best products for THIS shopper.
-Return ONLY valid JSON: {"picks":[{"id":"<candidate id>","reason":"<short>"}]}
-Rules: pick only from the candidate ids given (never invent ids); order best-first; prefer variety across categories; return between 4 and the requested count.`
+Return ONLY valid JSON using the candidate NUMBERS: {"picks":[<number>, <number>, ...]}
+Rules: use only the numbers shown; order best-first; prefer variety across categories; return the requested count.`
 
 interface CandidateMeta { id: string; name: string; category: string | null; brand: string | null; price: number }
 
@@ -271,36 +285,51 @@ async function curate(
     signals.seedNames.length ? `Recently interested in: ${signals.seedNames.slice(0, 6).join(', ')}.` : '',
   ].filter(Boolean).join(' ')
 
+  // Reference candidates by short 1-based INDEX, not UUID — small models (gemma3:4b)
+  // reliably echo small integers but mangle/drop 36-char UUIDs.
   const list = candidates
-    .map((c, i) => `${i + 1}. id=${c.id} | ${c.name}${c.brand ? ` | ${c.brand}` : ''}${c.category ? ` | ${c.category}` : ''} | ₹${c.price}`)
+    .map((c, i) => `${i + 1}. ${c.name}${c.brand ? ` | ${c.brand}` : ''}${c.category ? ` | ${c.category}` : ''} | ₹${c.price}`)
     .join('\n')
 
-  const userPrompt = `${interest}\n\nCandidates:\n${list}\n\nPick the best ${want} for this shopper.`
+  const userPrompt = `${interest}\n\nCandidates (numbered):\n${list}\n\nReturn the best ${want} as their numbers.`
 
   try {
     const r = await aiChat({
       modelHint: 'fast',
       jsonMode: true,
       temperature: 0.2,
-      maxTokens: 600,
+      maxTokens: 400,
       messages: [
         { role: 'system', content: CURATE_SYSTEM },
         { role: 'user', content: userPrompt },
       ],
     })
-    let parsed: { picks?: Array<{ id?: string }> }
+    let parsed: { picks?: Array<number | string> }
     try {
       parsed = JSON.parse(r.content)
     } catch {
       const m = r.content.replace(/^```[\w]*\n?/, '').replace(/\n?```$/, '').match(/\{[\s\S]*\}/)
       parsed = m ? JSON.parse(m[0]) : {}
     }
-    const valid = new Set(candidates.map(c => c.id))
+    // Map returned 1-based indexes → candidate ids; keep model order, dedup, drop out-of-range.
     const picks: string[] = []
-    for (const p of parsed.picks || []) {
-      if (p?.id && valid.has(p.id) && !picks.includes(p.id)) picks.push(p.id)
+    for (const raw of parsed.picks || []) {
+      const n = typeof raw === 'number' ? raw : parseInt(String(raw), 10)
+      const idx = n - 1
+      if (Number.isInteger(idx) && idx >= 0 && idx < candidates.length) {
+        const id = candidates[idx].id
+        if (!picks.includes(id)) picks.push(id)
+      }
     }
-    if (picks.length < 4) return { ids: fallback, curated: false, model: r.model, responseMs: r.latencyMs }
+    // Top up from the original candidate order if the model under-picked, so we
+    // always fill the row — the curation just reorders the front.
+    if (picks.length < want) {
+      for (const c of candidates) {
+        if (!picks.includes(c.id)) picks.push(c.id)
+        if (picks.length >= want) break
+      }
+    }
+    if (picks.length === 0) return { ids: fallback, curated: false, model: r.model, responseMs: r.latencyMs }
     return {
       ids: picks.slice(0, want),
       curated: true,
