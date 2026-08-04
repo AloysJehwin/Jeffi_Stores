@@ -533,7 +533,7 @@ export default function CartPage() {
 
           {/* Order Summary */}
           {cartItems.length > 0 && (
-          <div className="lg:col-span-1 lg:self-start lg:sticky lg:top-20">
+          <div className="lg:col-span-1 lg:self-start lg:sticky lg:top-24">
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
 
