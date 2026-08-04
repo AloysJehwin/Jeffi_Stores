@@ -1,14 +1,19 @@
 'use client'
 
+import { useState } from 'react'
+
 /**
- * Hand-rolled SVG revenue trend chart (area + line) — no chart library, matching
- * the codebase's inline-SVG convention. Renders a smooth-ish polyline over an
- * area gradient with hover tooltips per point.
+ * Hand-rolled SVG trend chart (no chart library) plotting two representations of
+ * the same time series in one graph: revenue as an area+line (left scale) and
+ * order count as bars (right scale). Each series can be toggled via chips.
  */
 export function TrendChart({ points, height = 160 }: {
   points: { label: string; revenue: number; orders: number }[]
   height?: number
 }) {
+  const [showRevenue, setShowRevenue] = useState(true)
+  const [showOrders, setShowOrders] = useState(true)
+
   if (!points.length) {
     return <div className="flex items-center justify-center text-xs text-foreground-muted" style={{ height }}>No data in this range</div>
   }
@@ -18,36 +23,58 @@ export function TrendChart({ points, height = 160 }: {
   const padX = 8
   const padY = 12
   const maxRev = Math.max(1, ...points.map(p => p.revenue))
+  const maxOrders = Math.max(1, ...points.map(p => p.orders))
   const n = points.length
   const x = (i: number) => padX + (n === 1 ? (W - padX * 2) / 2 : (i / (n - 1)) * (W - padX * 2))
-  const y = (v: number) => padY + (1 - v / maxRev) * (H - padY * 2)
+  const y = (v: number) => padY + (1 - v / maxRev) * (H - padY * 2)          // revenue scale (left)
+  const yO = (v: number) => padY + (1 - v / maxOrders) * (H - padY * 2)       // orders scale (right)
 
   const linePts = points.map((p, i) => `${x(i)},${y(p.revenue)}`).join(' ')
   const areaPts = `${x(0)},${H - padY} ${linePts} ${x(n - 1)},${H - padY}`
+  // Bar width: a fraction of the per-point slot, capped so sparse data isn't blocky.
+  const slot = (W - padX * 2) / Math.max(1, n)
+  const barW = Math.min(22, Math.max(3, slot * 0.5))
 
   const fmtDate = (iso: string) => {
     const d = new Date(iso)
     return isNaN(d.getTime()) ? iso : d.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
   }
 
+  const ORANGE = 'rgb(224 123 63)'   // accent — orders
+  const GREEN = 'rgb(16 185 129)'    // revenue
+
   return (
     <div className="w-full">
+      <div className="flex items-center gap-2 mb-2">
+        <SeriesChip label="Revenue" color={GREEN} active={showRevenue} onClick={() => setShowRevenue(v => !v)} />
+        <SeriesChip label="Orders" color={ORANGE} active={showOrders} onClick={() => setShowOrders(v => !v)} />
+      </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height }} preserveAspectRatio="none">
         <defs>
           <linearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="rgb(16 185 129)" stopOpacity="0.28" />
-            <stop offset="100%" stopColor="rgb(16 185 129)" stopOpacity="0" />
+            <stop offset="0%" stopColor={GREEN} stopOpacity="0.28" />
+            <stop offset="100%" stopColor={GREEN} stopOpacity="0" />
           </linearGradient>
         </defs>
-        <polygon points={areaPts} fill="url(#trendFill)" />
-        <polyline points={linePts} fill="none" stroke="rgb(16 185 129)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />
+
+        {/* Orders bars (behind, right scale) */}
+        {showOrders && points.map((p, i) => {
+          const h = (H - padY) - yO(p.orders)
+          return <rect key={`b${i}`} x={x(i) - barW / 2} y={yO(p.orders)} width={barW} height={Math.max(0, h)} rx={1.5} fill={ORANGE} fillOpacity={0.35} />
+        })}
+
+        {/* Revenue area + line (front, left scale) */}
+        {showRevenue && <polygon points={areaPts} fill="url(#trendFill)" />}
+        {showRevenue && <polyline points={linePts} fill="none" stroke={GREEN} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" vectorEffect="non-scaling-stroke" />}
+        {showRevenue && points.map((p, i) => (
+          <circle key={`c${i}`} cx={x(i)} cy={y(p.revenue)} r={2.5} fill={GREEN} />
+        ))}
+
+        {/* Hover targets — tooltip shows both metrics regardless of toggle */}
         {points.map((p, i) => (
-          <g key={i}>
-            <circle cx={x(i)} cy={y(p.revenue)} r={2.5} fill="rgb(16 185 129)" />
-            <rect x={x(i) - (W / n) / 2} y={0} width={(W / n)} height={H} fill="transparent">
-              <title>{`${fmtDate(p.label)}: Rs ${Math.round(p.revenue).toLocaleString('en-IN')} · ${p.orders} orders`}</title>
-            </rect>
-          </g>
+          <rect key={`h${i}`} x={x(i) - slot / 2} y={0} width={slot} height={H} fill="transparent">
+            <title>{`${fmtDate(p.label)}: Rs ${Math.round(p.revenue).toLocaleString('en-IN')} · ${p.orders} orders`}</title>
+          </rect>
         ))}
       </svg>
       <div className="flex justify-between text-[10px] text-foreground-muted mt-1 px-1">
@@ -56,6 +83,24 @@ export function TrendChart({ points, height = 160 }: {
         <span>{fmtDate(points[n - 1].label)}</span>
       </div>
     </div>
+  )
+}
+
+function SeriesChip({ label, color, active, onClick }: { label: string; color: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium border transition-colors ${
+        active
+          ? 'border-border-default text-foreground bg-surface-secondary'
+          : 'border-border-secondary text-foreground-muted opacity-60 hover:opacity-100'
+      }`}
+    >
+      <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: active ? color : 'transparent', border: `1.5px solid ${color}` }} />
+      {label}
+    </button>
   )
 }
 
