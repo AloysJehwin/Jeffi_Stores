@@ -173,7 +173,9 @@ export async function middleware(request: NextRequest) {
   }
 
   const publicApiPaths = [
-    '/api/admin/login',
+    '/api/admin/auth/email-otp/start',
+    '/api/admin/auth/email-otp/verify',
+    '/api/admin/auth/google',
     '/api/admin/check-session',
     '/api/admin/delhivery/sync-statuses',
     '/api/admin/mfa/enroll-start',
