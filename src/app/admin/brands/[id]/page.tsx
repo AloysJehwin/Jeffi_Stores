@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import type { ReactNode } from 'react'
+import DraftEditButton from '@/components/admin/DraftEditButton'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { queryOne, queryMany } from '@/lib/db'
@@ -85,12 +86,7 @@ export default async function BrandViewPage({ params, searchParams }: {
             <p className="text-xs text-foreground-muted mt-0.5">Created {new Date(brand.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
           </div>
         </div>
-        <Link
-          href={ap(`/admin/brands/edit/${id}?back=${encodeURIComponent(backUrl)}`, host)}
-          className="flex-shrink-0 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors"
-        >
-          {hasDraft ? 'Edit Draft' : 'Edit'}
-        </Link>
+        <DraftEditButton entity="brands" id={id} name={brand.name} hasDraft={hasDraft} backUrl={backUrl} />
       </div>
 
       {hasDraft && (

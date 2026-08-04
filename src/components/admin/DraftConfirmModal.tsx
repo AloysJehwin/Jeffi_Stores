@@ -11,10 +11,11 @@ interface Props {
   existingDraftId: string | null
   backUrl?: string
   apPrefix?: string
+  entity?: string            // API + route segment; defaults to 'products'
   onClose?: () => void  // when provided, Cancel calls this instead of router.back()
 }
 
-export default function DraftConfirmModal({ productId, productName, productSku, existingDraftId, backUrl, apPrefix = '', onClose }: Props) {
+export default function DraftConfirmModal({ productId, productName, productSku, existingDraftId, backUrl, apPrefix = '', entity = 'products', onClose }: Props) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -27,19 +28,19 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`/api/admin/products/${productId}/draft`, { method: 'POST' })
+      const res = await fetch(`/api/admin/${entity}/${productId}/draft`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) {
         // 409 = draft already exists — reload this same edit page to show the draft form
         if (res.status === 409) {
-          router.push(`${apPrefix}/admin/products/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`)
+          router.push(`${apPrefix}/admin/${entity}/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`)
           return
         }
         setError(data.error || 'Failed to create draft')
         return
       }
-      // Draft created — reload the same edit page (original product id); it will detect the draft
-      router.push(`${apPrefix}/admin/products/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`)
+      // Draft created — reload the same edit page (original record id); it will detect the draft
+      router.push(`${apPrefix}/admin/${entity}/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`)
     } catch {
       setError('Something went wrong. Please try again.')
     } finally {
@@ -50,7 +51,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
   function goBack() {
     if (onClose) { onClose(); return }
     if (backUrl) router.push(backUrl)
-    else router.push(`${apPrefix}/admin/products`)
+    else router.push(`${apPrefix}/admin/${entity}`)
   }
 
   if (!mounted) return null
@@ -67,7 +68,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
           </div>
           <div>
             <h2 className="text-base font-bold text-foreground">Create draft to edit</h2>
-            <p className="text-xs text-foreground-muted">This product is live on the storefront</p>
+            <p className="text-xs text-foreground-muted">Edits are staged as a draft</p>
           </div>
         </div>
 
@@ -76,11 +77,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
           <p className="text-sm font-semibold text-foreground leading-tight">{productName || 'Product'}</p>
           {productSku && <p className="text-xs text-foreground-muted mt-1">SKU: {productSku}</p>}
           <div className="flex items-center gap-1.5 mt-2">
-            <span className="inline-flex items-center gap-1 text-xs text-green-700 dark:text-green-400 bg-green-100 dark:bg-green-900/30 px-2 py-0.5 rounded-full font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              Live
-            </span>
-            <span className="text-xs text-foreground-muted">→ a draft copy will be created</span>
+            <span className="text-xs text-foreground-muted">A draft copy will be created — the original stays unchanged until you publish.</span>
           </div>
         </div>
 
@@ -110,7 +107,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
             Cancel
           </button>
           <button
-            onClick={existingDraftId ? () => router.push(`${apPrefix}/admin/products/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`) : createDraft}
+            onClick={existingDraftId ? () => router.push(`${apPrefix}/admin/${entity}/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`) : createDraft}
             disabled={loading}
             className="flex-1 px-4 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
           >

@@ -79,28 +79,17 @@ async function updateCategory(categoryId: string, formData: FormData) {
     redirect(ap(back && back.startsWith('/admin/categories') ? back : `/admin/categories/edit/${categoryId}`, host))
   }
 
-  // No draft — direct live update (inactive categories or first time)
-  const existing = await queryOne<any>('SELECT is_active FROM categories WHERE id = $1', [categoryId])
+  // Unreachable: no draft means the edit page redirected before rendering the form.
+  // Defensive fallback — write to the draft only, never mutate the live category.
+  // (The is_active → products/subcategories cascade lives in publishCategoryDraft.)
   await query(
-    `UPDATE categories SET
-      name = $1, slug = $2, description = $3, parent_category_id = $4,
-      sku_prefix = $5, display_order = $6, is_active = $7, google_product_category = $8,
-      icon_name = $9, return_allowed = $10, return_window_days = $11,
-      replacement_allowed = $12, replacement_window_days = $13, updated_at = $14
-    WHERE id = $15`,
-    [name, slug, description, parentCategoryId, skuPrefix, displayOrder, isActive, googleProductCategory, iconName, returnAllowed, returnWindowDays, replacementAllowed, replacementWindowDays, new Date().toISOString(), categoryId]
+    `INSERT INTO category_drafts (category_id, fields, updated_at)
+     VALUES ($1, $2::jsonb, NOW())
+     ON CONFLICT (category_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
+    [categoryId, JSON.stringify(draftFields)]
   )
-  if (existing && existing.is_active !== isActive) {
-    await query('UPDATE products SET is_active = $1 WHERE category_id = $2', [isActive, categoryId])
-    const subcatResult = await query<{ id: string }>('SELECT id FROM categories WHERE parent_category_id = $1', [categoryId])
-    for (const sub of subcatResult.rows) {
-      await query('UPDATE products SET is_active = $1 WHERE category_id = $2', [isActive, sub.id])
-    }
-  }
-  revalidatePath('/admin/categories')
-  revalidatePath('/admin/categories/edit/[id]', 'page')
-  const back = formData.get('_back') as string | null
-  redirect(ap(back && back.startsWith('/admin/categories') ? back : '/admin/categories', host))
+  revalidatePath(`/admin/categories/edit/${categoryId}`)
+  redirect(ap(`/admin/categories/edit/${categoryId}`, host))
 }
 
 export default async function EditCategoryPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ [key: string]: string | undefined }> }) {
@@ -109,30 +98,23 @@ export default async function EditCategoryPage({ params, searchParams }: { param
   const category = await getCategory(id).catch(() => null)
   if (!category) notFound()
 
-  let draftRow = await queryOne<{ category_id: string; fields: Record<string, unknown> }>(
+  const host = await getHost()
+
+  // Editing ALWAYS goes through a draft. Direct navigation to the edit URL for a
+  // category with no draft (active or inactive) redirects to the detail page,
+  // where the Edit button creates a draft first. Live category is never edited directly.
+  const draftRow = await queryOne<{ category_id: string; fields: Record<string, unknown> }>(
     `SELECT category_id, fields FROM category_drafts WHERE category_id = $1`, [id]
   )
-
-  // Auto-create draft for active categories on first edit visit
-  if (!draftRow && category.is_active) {
-    await query(
-      `INSERT INTO category_drafts (category_id, fields)
-       SELECT id, to_jsonb(c) - 'id' - 'created_at' - 'updated_at' - 'search_vector'
-       FROM categories c WHERE c.id = $1
-       ON CONFLICT (category_id) DO NOTHING`,
-      [id]
-    )
-    draftRow = await queryOne<{ category_id: string; fields: Record<string, unknown> }>(
-      `SELECT category_id, fields FROM category_drafts WHERE category_id = $1`, [id]
-    )
+  const isDraft = !!draftRow
+  if (!isDraft) {
+    redirect(ap(`/admin/categories/${id}`, host))
   }
 
-  const isDraft = !!draftRow
-  const categoryForForm = isDraft && draftRow?.fields
+  const categoryForForm = draftRow?.fields
     ? { ...category, ...draftRow.fields }
     : category
 
-  const host = await getHost()
   const categories = await getAllCategories()
   const backUrl = back && back.startsWith('/admin/categories') ? back : '/admin/categories'
 
