@@ -1,52 +1,37 @@
 import { getDashboardStats, getDashboardMetrics, getDashboardAnalytics } from '@/lib/queries'
-import { headers } from 'next/headers'
+import { headers, cookies } from 'next/headers'
+import { verifyToken } from '@/lib/jwt'
 import Link from 'next/link'
 import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
 import AnalyticsDashboardClient from '@/components/admin/dashboard/AnalyticsDashboardClient'
-import MoreActionsMenu from '@/components/admin/dashboard/MoreActionsMenu'
+import QuickActionBar from '@/components/admin/dashboard/QuickActionBar'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-// Quick-action command bar. `d` is an inline SVG path (no icon lib, no emoji).
-// `primary` marks the two creation actions that get the accent chip treatment.
-const QUICK_ACTIONS: { label: string; d: string; path: string; primary?: boolean }[] = [
-  { label: 'New Product', path: '/admin/products/add', primary: true, d: 'M12 4v16m8-8H4' },
-  { label: 'Cash Sale', path: '/admin/cash-sale', d: 'M9 7h6m-6 4h6m-6 4h4M6 3h12a1 1 0 011 1v17l-3-2-3 2-3-2-3 2V4a1 1 0 011-1z' },
-  { label: 'Inventory', path: '/admin/inventory', d: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4' },
-  { label: 'New PO', path: '/admin/inventory/po/new', d: 'M3 7h11v8H3zM14 10h4l3 3v2h-7M7 18a2 2 0 100-4 2 2 0 000 4zm10 0a2 2 0 100-4 2 2 0 000 4z' },
-  { label: 'Quotation', path: '/admin/quotations', d: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
+// Quick-action command bar. `icon` is a key into NAV_ICONS (shared with the
+// sidebar) so the tiles use the same iconography. `primary` = accent chip.
+const QUICK_ACTIONS: { label: string; icon: string; path: string; primary?: boolean }[] = [
+  { label: 'New Product', path: '/admin/products/add', icon: 'Products', primary: true },
+  { label: 'Cash Sale', path: '/admin/cash-sale', icon: 'Cash Sale' },
+  { label: 'Inventory', path: '/admin/inventory', icon: 'Inventory' },
+  { label: 'New PO', path: '/admin/inventory/po/new', icon: 'Inventory' },
+  { label: 'Quotation', path: '/admin/quotations', icon: 'Quotations' },
 ]
 
-const MORE_ACTIONS: { label: string; path: string }[] = [
-  { label: 'Packing Slips', path: '/admin/packing-slips' },
-  { label: 'Labels', path: '/admin/labels' },
-  { label: 'Campaigns', path: '/admin/campaigns' },
-  { label: 'GST', path: '/admin/gst' },
-  { label: 'Financial', path: '/admin/financial' },
-  { label: 'CRM', path: '/admin/crm' },
-  { label: 'RFQs', path: '/admin/business/rfqs' },
-  { label: 'Delhivery', path: '/admin/delhivery' },
-  { label: 'Settings', path: '/admin/settings' },
+const MORE_ACTIONS: { label: string; path: string; icon: string }[] = [
+  { label: 'Packing Slips', path: '/admin/packing-slips', icon: 'Packing Slips' },
+  { label: 'Labels', path: '/admin/labels', icon: 'Labels' },
+  { label: 'Campaigns', path: '/admin/campaigns', icon: 'Campaigns' },
+  { label: 'GST', path: '/admin/gst', icon: 'GST Compliance' },
+  { label: 'Financial', path: '/admin/financial', icon: 'Financial' },
+  { label: 'CRM', path: '/admin/crm', icon: 'CRM' },
+  { label: 'RFQs', path: '/admin/business/rfqs', icon: 'Business RFQs' },
+  { label: 'Delhivery', path: '/admin/delhivery', icon: 'Pickup Request' },
+  { label: 'Settings', path: '/admin/settings', icon: 'Settings' },
 ]
-
-function ActionTile({ label, d, path, primary, host }: { label: string; d: string; path: string; primary?: boolean; host: string }) {
-  return (
-    <Link
-      href={ap(path, host)}
-      className="group flex flex-col items-center justify-center gap-1.5 py-3 rounded-lg text-xs font-medium text-foreground-secondary hover:bg-surface-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 focus-visible:ring-offset-surface-elevated transition-colors duration-200"
-    >
-      <span className={`w-9 h-9 rounded-lg flex items-center justify-center transition-colors ${primary ? 'bg-accent-500/10 text-accent-600 group-hover:bg-accent-500 group-hover:text-white' : 'bg-surface-secondary text-foreground-secondary group-hover:text-foreground'}`}>
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d={d} />
-        </svg>
-      </span>
-      <span className="text-center leading-tight">{label}</span>
-    </Link>
-  )
-}
 
 // Renders a status chip only when count > 0; returns null otherwise.
 function AlertChip({ label, count, tone, href }: { label: string; count: number; tone: 'amber' | 'red'; href: string }) {
@@ -67,7 +52,19 @@ function AlertChip({ label, count, tone, href }: { label: string; count: number;
 
 export default async function AdminDashboard() {
   const headersList = await headers()
-  const username = headersList.get('x-username') || 'Admin'
+  // Prefer the admin's full name (first + last) over the username for the greeting.
+  const cookieStore = await cookies()
+  const token = cookieStore.get('admin_token')?.value
+  let displayName = headersList.get('x-username') || 'Admin'
+  if (token) {
+    try {
+      const payload = await verifyToken(token) as { first_name?: string; last_name?: string; username?: string } | null
+      const full = [payload?.first_name, payload?.last_name].filter(Boolean).join(' ').trim()
+      if (full) displayName = full
+      else if (payload?.username) displayName = payload.username
+    } catch { /* fall back to x-username */ }
+  }
+  const username = displayName
   const host = await getHost()
   const [stats, metrics, analytics] = await Promise.all([
     getDashboardStats(),
@@ -89,14 +86,7 @@ export default async function AdminDashboard() {
       <SupportRequestsAlert />
 
       {/* C. Command Bar */}
-      <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-2">
-        <div className="grid grid-cols-4 sm:grid-cols-6 lg:grid-cols-8 gap-1">
-          {QUICK_ACTIONS.map(a => (
-            <ActionTile key={a.label} label={a.label} d={a.d} path={a.path} primary={a.primary} host={host} />
-          ))}
-          <MoreActionsMenu actions={MORE_ACTIONS} host={host} />
-        </div>
-      </div>
+      <QuickActionBar primary={QUICK_ACTIONS} more={MORE_ACTIONS} host={host} />
 
       {/* D. Needs-Attention card — always shown; empty/cleared state when nothing pending */}
       <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5">
