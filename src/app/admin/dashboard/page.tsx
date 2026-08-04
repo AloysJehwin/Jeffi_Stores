@@ -1,4 +1,5 @@
 import { getDashboardStats, getDashboardMetrics, getDashboardAnalytics } from '@/lib/queries'
+import { queryMany } from '@/lib/db'
 import { headers, cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
@@ -60,6 +61,37 @@ function AlertChip({ label, count, tone, href }: { label: string; count: number;
   )
 }
 
+interface PendingTask {
+  id: string
+  title: string
+  priority: string
+  due_date: string | null
+  overdue: boolean
+  customer_name: string | null
+}
+
+// Top open tasks assigned to the current admin — overdue first, then by
+// priority (urgent→low), then soonest due. Used for the dashboard widget.
+async function getMyPendingTasks(adminId: string): Promise<PendingTask[]> {
+  if (!adminId) return []
+  return queryMany<PendingTask>(
+    `SELECT ct.id::text, ct.title, ct.priority,
+            ct.due_date::text,
+            (ct.due_date IS NOT NULL AND ct.due_date < CURRENT_DATE) AS overdue,
+            NULLIF(TRIM(COALESCE(u.first_name,'') || ' ' || COALESCE(u.last_name,'')), '') AS customer_name
+       FROM customer_tasks ct
+       LEFT JOIN users u ON u.id = ct.user_id
+      WHERE ct.assigned_to = $1::uuid
+        AND ct.status IN ('pending', 'in_progress')
+      ORDER BY (ct.due_date IS NOT NULL AND ct.due_date < CURRENT_DATE) DESC,
+               CASE ct.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
+               ct.due_date ASC NULLS LAST,
+               ct.created_at DESC
+      LIMIT 5`,
+    [adminId]
+  )
+}
+
 export default async function AdminDashboard() {
   const headersList = await headers()
   // Prefer the admin's full name (first + last) over the username for the greeting.
@@ -69,15 +101,17 @@ export default async function AdminDashboard() {
   // Role + scopes gate which quick actions are shown (same as the sidebar nav).
   // Prefer the middleware-injected, verified headers; fall back to the JWT.
   let role = headersList.get('x-user-role') || ''
+  let adminId = headersList.get('x-user-id') || ''
   let scopes: string[] = []
   try { scopes = JSON.parse(headersList.get('x-user-scopes') || '[]') } catch { scopes = [] }
   if (token) {
     try {
-      const payload = await verifyToken(token) as { first_name?: string; last_name?: string; username?: string; role?: string; scopes?: string[] } | null
+      const payload = await verifyToken(token) as { adminId?: string; first_name?: string; last_name?: string; username?: string; role?: string; scopes?: string[] } | null
       const full = [payload?.first_name, payload?.last_name].filter(Boolean).join(' ').trim()
       if (full) displayName = full
       else if (payload?.username) displayName = payload.username
       if (!role && payload?.role) role = payload.role
+      if (!adminId && payload?.adminId) adminId = payload.adminId
       if (scopes.length === 0 && Array.isArray(payload?.scopes)) scopes = payload!.scopes as string[]
     } catch { /* fall back to x-username */ }
   }
@@ -100,6 +134,10 @@ export default async function AdminDashboard() {
   const visibleQuick = QUICK_ACTIONS.filter(a => hasScope(role, scopes, a.scope))
   const visibleMore = MORE_ACTIONS.filter(a => hasScope(role, scopes, a.scope))
 
+  // My pending tasks — only if the admin can access the tasks/CRM area.
+  const canSeeTasks = hasScope(role, scopes, 'customers:read')
+  const myTasks = canSeeTasks ? await getMyPendingTasks(adminId) : []
+
   // B/C/D — server-static ops block, passed into the client island as children
   // so it renders between the range header and the KPIs without refetch coupling.
   const opsBlock = (
@@ -108,6 +146,38 @@ export default async function AdminDashboard() {
 
       {/* C. Command Bar */}
       <QuickActionBar primary={visibleQuick} more={visibleMore} host={host} />
+
+      {/* C2. My Pending Tasks — assigned to this admin (only when they can access tasks) */}
+      {canSeeTasks && (
+        <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5">
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-xs uppercase tracking-wide text-foreground-muted font-medium">My Pending Tasks</p>
+            <Link href={ap('/admin/tasks', host)} className="text-xs font-medium text-accent-600 hover:text-accent-500 transition-colors">View all</Link>
+          </div>
+          {myTasks.length > 0 ? (
+            <ul className="divide-y divide-border-default/70">
+              {myTasks.map(t => (
+                <li key={t.id}>
+                  <Link href={ap('/admin/tasks', host)} className="flex items-center gap-3 py-2.5 group">
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.priority === 'urgent' ? 'bg-red-500' : t.priority === 'high' ? 'bg-amber-500' : 'bg-foreground-muted/50'}`} />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm text-foreground group-hover:text-accent-600 transition-colors truncate">{t.title}</span>
+                      {t.customer_name && <span className="block text-xs text-foreground-muted truncate">{t.customer_name}</span>}
+                    </span>
+                    {t.due_date && (
+                      <span className={`text-xs font-medium shrink-0 ${t.overdue ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted'}`}>
+                        {t.overdue ? 'Overdue' : new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                      </span>
+                    )}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-foreground-muted py-2">No pending tasks assigned to you. 🎉</p>
+          )}
+        </div>
+      )}
 
       {/* D. Needs-Attention card — always shown; empty/cleared state when nothing pending */}
       <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5">
