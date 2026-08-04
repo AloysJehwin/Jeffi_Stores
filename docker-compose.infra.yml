@@ -29,4 +29,5 @@ volumes:
 
 networks:
   internal:
+    name: jeffi_internal
     driver: bridge
