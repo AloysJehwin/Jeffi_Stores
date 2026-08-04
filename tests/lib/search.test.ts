@@ -28,6 +28,7 @@ describe('buildProductSearchClause', () => {
 
   it('builds clause for special-char-only input (tsQuery still produces ":*")', () => {
     // '!!!' → each word stripped of non-word chars → '' + ':*' = ':*', which is truthy
+    // '!!!' strips to empty, so searchWords() yields no per-word fuzzy params.
     const result = buildProductSearchClause('!!!', NAME, SKU, VEC, 1)
     expect(result.nextIdx).toBe(4)
     expect(result.params[0]).toBe(':*')
@@ -37,20 +38,23 @@ describe('buildProductSearchClause', () => {
 
   it('builds clause for a single word at startIdx=1', () => {
     const result = buildProductSearchClause('bolt', NAME, SKU, VEC, 1)
-    expect(result.nextIdx).toBe(4)
-    expect(result.params).toEqual(['bolt:*', 'bolt', 'bolt%'])
+    // tsq($1), similarity($2), sku ILIKE($3), per-word word_similarity($4)
+    expect(result.nextIdx).toBe(5)
+    expect(result.params).toEqual(['bolt:*', 'bolt', 'bolt%', 'bolt'])
     expect(result.clause).toContain(`${VEC} @@ to_tsquery('english', $1)`)
     expect(result.clause).toContain(`similarity(${NAME}, $2::text) > 0.12`)
     expect(result.clause).toContain(`${SKU} ILIKE $3`)
+    expect(result.clause).toContain(`word_similarity($4::text, ${NAME}) > 0.5`)
   })
 
   it('builds clause at a custom startIdx', () => {
     const result = buildProductSearchClause('bolt', NAME, SKU, VEC, 5)
-    expect(result.nextIdx).toBe(8)
-    expect(result.params).toEqual(['bolt:*', 'bolt', 'bolt%'])
+    expect(result.nextIdx).toBe(9)
+    expect(result.params).toEqual(['bolt:*', 'bolt', 'bolt%', 'bolt'])
     expect(result.clause).toContain('$5')
     expect(result.clause).toContain('$6')
     expect(result.clause).toContain('$7')
+    expect(result.clause).toContain('$8')
   })
 
   it('builds tsQuery with multiple words joined by &', () => {
@@ -58,7 +62,10 @@ describe('buildProductSearchClause', () => {
     expect(result.params[0]).toBe('hex:* & bolt:*')
     expect(result.params[1]).toBe('hex bolt')
     expect(result.params[2]).toBe('hex bolt%')
-    expect(result.nextIdx).toBe(4)
+    // one per-word fuzzy param per word: 'hex' and 'bolt'
+    expect(result.params[3]).toBe('hex')
+    expect(result.params[4]).toBe('bolt')
+    expect(result.nextIdx).toBe(6)
   })
 
   it('strips non-word characters in tsQuery', () => {
@@ -93,19 +100,22 @@ describe('buildProductSearchRank', () => {
 
   it('builds rank for single word at startIdx=1', () => {
     const result = buildProductSearchRank('bolt', NAME, VEC, 1)
-    expect(result.nextIdx).toBe(4)
-    expect(result.params).toEqual(['bolt%', '%bolt%', 'bolt:*'])
+    // params: [prefix, contains, tsq, per-word word_similarity term]
+    expect(result.nextIdx).toBe(5)
+    expect(result.params).toEqual(['bolt%', '%bolt%', 'bolt:*', 'bolt'])
     expect(result.rank).toContain(`${NAME} ILIKE $1`)
     expect(result.rank).toContain(`${NAME} ILIKE $2`)
     expect(result.rank).toContain(`${VEC}, to_tsquery('english', $3)`)
+    expect(result.rank).toContain(`word_similarity($4::text, ${NAME})`)
   })
 
   it('builds rank at a custom startIdx', () => {
     const result = buildProductSearchRank('nut', NAME, VEC, 7)
-    expect(result.nextIdx).toBe(10)
+    expect(result.nextIdx).toBe(11)
     expect(result.rank).toContain('$7')
     expect(result.rank).toContain('$8')
     expect(result.rank).toContain('$9')
+    expect(result.rank).toContain('$10')
   })
 
   it('uses ":*" tsQuery for special-char-only input (never falls back to "\'\'")', () => {
@@ -119,7 +129,9 @@ describe('buildProductSearchRank', () => {
     expect(result.params[0]).toBe('hex bolt%')
     expect(result.params[1]).toBe('%hex bolt%')
     expect(result.params[2]).toBe('hex:* & bolt:*')
-    expect(result.nextIdx).toBe(4)
+    // whole-query term feeds the per-word word_similarity rank component
+    expect(result.params[3]).toBe('hex bolt')
+    expect(result.nextIdx).toBe(5)
   })
 
   it('trims input before building', () => {
@@ -251,28 +263,28 @@ describe('buildSearchClause', () => {
   it('builds clause for single word, single column at default startIdx', () => {
     const result = buildSearchClause('bolt', ['p.name'])
     expect(result.nextIdx).toBe(3)
-    // params: ['%bolt%', 'bolt'] — one ILIKE param + one trgm param
+    // params: ['%bolt%', 'bolt'] — one ILIKE param + one per-word trgm param
     expect(result.params).toEqual(['%bolt%', 'bolt'])
     expect(result.clause).toContain('p.name ILIKE $1')
-    expect(result.clause).toContain("similarity(COALESCE(p.name,''), $2::text) > 0.12")
+    expect(result.clause).toContain("word_similarity($2::text, COALESCE(p.name,'')) > 0.5")
   })
 
   it('builds clause for single word, multiple columns', () => {
     const result = buildSearchClause('bolt', ['p.name', 'p.sku'])
     expect(result.nextIdx).toBe(4)
-    // params: ['%bolt%', '%bolt%', 'bolt']
+    // params: ['%bolt%', '%bolt%', 'bolt'] — ILIKE per column + one shared trgm param
     expect(result.params).toEqual(['%bolt%', '%bolt%', 'bolt'])
     expect(result.clause).toContain('p.name ILIKE $1')
     expect(result.clause).toContain('p.sku ILIKE $2')
-    expect(result.clause).toContain("similarity(COALESCE(p.name,''), $3::text) > 0.12")
-    expect(result.clause).toContain("similarity(COALESCE(p.sku,''), $3::text) > 0.12")
+    expect(result.clause).toContain("word_similarity($3::text, COALESCE(p.name,'')) > 0.5")
+    expect(result.clause).toContain("word_similarity($3::text, COALESCE(p.sku,'')) > 0.5")
   })
 
   it('builds clause for multi-word input (AND within each column)', () => {
     const result = buildSearchClause('hex bolt', ['p.name'])
-    // Each word creates one ILIKE per column → 2 params for ILIKE + 1 trgm
-    expect(result.nextIdx).toBe(4)
-    expect(result.params).toEqual(['%hex%', '%bolt%', 'hex bolt'])
+    // 2 ILIKE params (one per word) + one per-word trgm param per word (hex, bolt)
+    expect(result.nextIdx).toBe(5)
+    expect(result.params).toEqual(['%hex%', '%bolt%', 'hex', 'bolt'])
     expect(result.clause).toContain('p.name ILIKE $1')
     expect(result.clause).toContain('p.name ILIKE $2')
     // The word clauses for one column are AND-ed
@@ -288,9 +300,9 @@ describe('buildSearchClause', () => {
 
   it('multi-word, multi-column: params ordered column-first', () => {
     const result = buildSearchClause('hex bolt', ['p.name', 'p.sku'])
-    // p.name gets [%hex%, %bolt%], p.sku gets [%hex%, %bolt%], then trgm raw
-    expect(result.params).toEqual(['%hex%', '%bolt%', '%hex%', '%bolt%', 'hex bolt'])
-    expect(result.nextIdx).toBe(6)
+    // p.name gets [%hex%, %bolt%], p.sku gets [%hex%, %bolt%], then one per-word trgm param per word
+    expect(result.params).toEqual(['%hex%', '%bolt%', '%hex%', '%bolt%', 'hex', 'bolt'])
+    expect(result.nextIdx).toBe(7)
   })
 
   it('trgm params share the same index across all columns', () => {
@@ -299,9 +311,9 @@ describe('buildSearchClause', () => {
     expect(result.params).toHaveLength(4)
     expect(result.params[3]).toBe('bolt')
     // All trgm clauses reference the same idx
-    expect(result.clause).toContain("similarity(COALESCE(p.name,''), $4::text) > 0.12")
-    expect(result.clause).toContain("similarity(COALESCE(p.sku,''), $4::text) > 0.12")
-    expect(result.clause).toContain("similarity(COALESCE(p.barcode,''), $4::text) > 0.12")
+    expect(result.clause).toContain("word_similarity($4::text, COALESCE(p.name,'')) > 0.5")
+    expect(result.clause).toContain("word_similarity($4::text, COALESCE(p.sku,'')) > 0.5")
+    expect(result.clause).toContain("word_similarity($4::text, COALESCE(p.barcode,'')) > 0.5")
   })
 })
 
@@ -380,7 +392,7 @@ describe('buildProductSearchRank – empty tsq fallback', () => {
     const result = buildProductSearchRank('!!!', NAME, VEC, 1)
     // tsq = ':*' (truthy), so fallback branch NOT taken — still works
     expect(result.params[2]).toBe(':*')
-    expect(result.nextIdx).toBe(4)
+    expect(result.nextIdx).toBe(5)
   })
 
   it("rank uses \"''\" when tsq resolves to empty (simulated by passing empty after trim)", () => {

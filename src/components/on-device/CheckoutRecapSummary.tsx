@@ -126,7 +126,7 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
       {/* Mobile explainer toast */}
       {showMobileToast && (
         <div className="rounded-lg border border-accent-200 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/20 px-3 py-2 mb-3 flex items-center justify-between gap-2">
-          <p className="text-xs text-accent-700 dark:text-accent-300">This summary runs on your device's AI chip — no data leaves your phone</p>
+          <p className="text-xs text-accent-700 dark:text-accent-300">This summary runs on your device&apos;s AI chip — no data leaves your phone</p>
           <button type="button" onClick={() => setShowMobileToast(false)} className="text-accent-400 hover:text-accent-600 flex-shrink-0">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

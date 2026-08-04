@@ -94,8 +94,10 @@ describe('vision', () => {
       const result = await ocrImage(imageBuffer, 'image/jpeg')
       expect(result.ok).toBe(true)
       expect((result as any).text).toContain('Direct ollama response')
+      // OLLAMA_BASE_URL is captured as a module-level const at import time,
+      // so it uses the frozen default host (Tailscale IP) + /api/chat endpoint.
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('localhost:11434'),
+        expect.stringContaining('/api/chat'),
         expect.any(Object)
       )
     })

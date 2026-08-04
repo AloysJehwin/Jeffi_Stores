@@ -76,8 +76,8 @@ export default async function AdminLayout({
     { href: '/admin/agent/logs', label: 'Agent Logs', scope: 'agent:read', group: 'AI' },
     { href: '/admin/business/customers', label: 'Business Customers', scope: 'business_customers:read', group: 'Business' },
     { href: '/admin/business/rfqs', label: 'Business RFQs', scope: 'business_rfqs:read', group: 'Business' },
-    { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings', superAdminOnly: true },
-    { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings', superAdminOnly: true },
+    { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings' },
+    { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings' },
     { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', superAdminOnly: true },
     { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings' },
   ]
@@ -90,8 +90,8 @@ export default async function AdminLayout({
 
   const displayName = session?.first_name && session?.last_name
     ? `${session.first_name} ${session.last_name}`
-    : session?.username || 'Admin'
-  const usernameInitial = (session?.first_name || session?.username || 'A')[0].toUpperCase()
+    : session?.email || 'Admin'
+  const usernameInitial = (session?.first_name || session?.email || 'A')[0].toUpperCase()
 
   const logoutForm = (
     <form action={logoutAction}>

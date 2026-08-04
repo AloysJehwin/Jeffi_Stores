@@ -88,3 +88,56 @@ Once you're happy with the list, apply for real:
 ```bash
 bash deploy/run-migrations.sh
 ```
+
+---
+
+## Schema changes — two paths
+
+The DB stays in sync with the repo through **two complementary mechanisms**. Know which to use:
+
+### 1. Additive schema changes → edit the entity SQL, let schema-diff apply it
+
+For **adding a column, table, or index**, just edit the entity file in `database/*.sql`
+(e.g. add `gst_hsn_code text` to the `products` block in `database/catalog.sql`). On the
+next deploy the pipeline runs `deploy/schema-diff.sh`, which:
+
+1. Spins up a throwaway Postgres and loads all `database/*.sql` (the desired state)
+2. Runs `migra` to diff desired vs live RDS
+3. Applies **only additive statements** (`ADD COLUMN`, `CREATE TABLE`, `CREATE INDEX IF NOT EXISTS`,
+   `CREATE EXTENSION`, PK/UNIQUE constraints) — it never drops columns/tables automatically
+
+Preview what it would apply without changing anything:
+
+```bash
+cd /opt/jeffi-stores
+export RDS_HOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
+export RDS_PORT=5432
+export RDS_USER=app_user
+export RDS_DB=jeffi_stores
+export AWS_REGION=us-east-1
+bash deploy/schema-diff.sh --dry-run
+```
+
+Drop the `--dry-run` to apply. Requires Docker (temp Postgres) + `migra` (auto-installed by the script).
+
+### 2. Destructive / data changes → write a migration file
+
+For anything schema-diff won't do — **dropping columns/tables, renaming, data backfills, or
+one-off fixes** — add a timestamped file to `database/migrations/`:
+
+```
+database/migrations/YYYY-MM-DD_description.sql
+```
+
+`deploy/run-migrations.sh` applies each unapplied file in filename order and records it in the
+`schema_migrations` table (so it never re-runs). Use `--dry-run` (above) to preview pending files.
+
+> Keep the entity SQL (`database/*.sql`) in sync when you write a migration, so `schema-diff.sh`
+> reports a clean diff afterward. Example: the admins `username`/`password_hash` removal shipped as
+> `database/migrations/2026-08-05_admins_drop_username_password.sql` **and** edits to
+> `database/users.sql` / `constraints.sql` / `functions.sql`.
+
+| Change | Use |
+|---|---|
+| Add column / table / index | Edit `database/*.sql` → schema-diff applies it |
+| Drop column/table, rename, backfill, data fix | New file in `database/migrations/` → run-migrations applies it |

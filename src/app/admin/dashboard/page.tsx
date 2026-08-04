@@ -106,10 +106,10 @@ export default async function AdminDashboard() {
   try { scopes = JSON.parse(headersList.get('x-user-scopes') || '[]') } catch { scopes = [] }
   if (token) {
     try {
-      const payload = await verifyToken(token) as { adminId?: string; first_name?: string; last_name?: string; username?: string; role?: string; scopes?: string[] } | null
+      const payload = await verifyToken(token) as { adminId?: string; first_name?: string; last_name?: string; email?: string; role?: string; scopes?: string[] } | null
       const full = [payload?.first_name, payload?.last_name].filter(Boolean).join(' ').trim()
       if (full) displayName = full
-      else if (payload?.username) displayName = payload.username
+      else if (payload?.email) displayName = payload.email
       if (!role && payload?.role) role = payload.role
       if (!adminId && payload?.adminId) adminId = payload.adminId
       if (scopes.length === 0 && Array.isArray(payload?.scopes)) scopes = payload!.scopes as string[]
@@ -174,7 +174,14 @@ export default async function AdminDashboard() {
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-foreground-muted py-2">No pending tasks assigned to you. 🎉</p>
+            <div className="flex items-center gap-2.5 py-1 text-foreground-muted">
+              <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-500/10 text-green-600 dark:text-green-400 shrink-0">
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+              </span>
+              <span className="text-sm">No pending tasks assigned to you.</span>
+            </div>
           )}
         </div>
       )}

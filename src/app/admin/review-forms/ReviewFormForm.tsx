@@ -310,15 +310,16 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
             {customFields.map((field, idx) => (
               <div key={field.id} className="flex items-start gap-3 p-3 bg-surface-secondary rounded-lg border border-border-default">
                 <span className="text-xs text-foreground-muted mt-2 shrink-0 w-4">{idx + 1}.</span>
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="flex-1 flex flex-col sm:flex-row gap-2">
                   <input
                     value={field.label}
                     onChange={e => updateField(field.id, { label: e.target.value })}
                     placeholder="Field label"
-                    className="px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    className="flex-1 basis-0 min-w-0 px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
                   />
                   <AdminSelect
                     sm
+                    className="flex-1 basis-0 min-w-0"
                     value={field.type}
                     onChange={v => updateField(field.id, { type: v as CustomField['type'] })}
                     options={FIELD_TYPES}

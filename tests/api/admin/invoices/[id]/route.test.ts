@@ -49,6 +49,10 @@ vi.mock('@/lib/email', () => ({
   sendInvoiceFinalizedEmail: vi.fn(),
 }))
 
+vi.mock('@/lib/inventory-deduct', () => ({
+  deleteBatchIfEmpty: vi.fn().mockResolvedValue(undefined),
+}))
+
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
@@ -61,6 +65,8 @@ import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
 import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
+import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/shelf'
+import { deleteBatchIfEmpty } from '@/lib/inventory-deduct'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -147,6 +153,9 @@ describe('PATCH /api/admin/invoices/[id]', () => {
     vi.mocked(lineItemFromMrpIncl).mockReturnValue(100)
     vi.mocked(logStockMovement).mockResolvedValue(undefined)
     vi.mocked(sendInvoiceFinalizedEmail).mockResolvedValue(undefined as any)
+    vi.mocked(syncPerishableStock).mockResolvedValue(undefined as any)
+    vi.mocked(decrementNonPerishableShelfStock).mockResolvedValue(undefined as any)
+    vi.mocked(deleteBatchIfEmpty).mockResolvedValue(undefined as any)
   })
 
   // --- Auth / permission guards ---
@@ -371,5 +380,318 @@ describe('PATCH /api/admin/invoices/[id]', () => {
 
     const res = await PATCH(patchReq(bodyNoProductId), { params: Promise.resolve({ id: ORDER_ID }) })
     expect(res.status).toBe(200)
+  })
+
+  // --- Insufficient stock on variant / sub-variant (lines 145, 156) ---
+
+  it('reports insufficient variant stock (moveToDraft) with variant_name label', async () => {
+    const bodyVariant = {
+      ...VALID_BODY,
+      items: [
+        {
+          ...VALID_BODY.items[0],
+          product_id: '111e4567-e89b-12d3-a456-426614174001',
+          variant_id: '222e4567-e89b-12d3-a456-426614174002',
+          sub_variant_id: null,
+          variant_name: 'Blue',
+        },
+      ],
+    }
+
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      // 0=SELECT order_items (empty existing so previousQty=0, rawExtra=2>0)
+      // 1=unitRow, 2=SELECT product_variants stock (insufficient: 1 < 2)
+      return fn(makeMockClient({
+        0: { rows: [] },
+        1: { rows: [{ factor: null, dimension: null }] },
+        2: { rows: [{ inventory_quantity: '1' }] },
+        // after moveToDraft: 3=UPDATE orders, 4=DELETE invoices, 5=UPDATE addresses, 6=DELETE order_items, 7=INSERT
+        7: { rows: [{ id: 'item-1' }] },
+      }))
+    })
+
+    const res = await PATCH(patchReq(bodyVariant), { params: Promise.resolve({ id: ORDER_ID }) })
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.movedToDraft).toBe(true)
+    expect(json.insufficientItems[0]).toMatch(/Blue/)
+  })
+
+  it('reports insufficient sub_variant stock (moveToDraft)', async () => {
+    const bodySV = {
+      ...VALID_BODY,
+      items: [
+        {
+          ...VALID_BODY.items[0],
+          product_id: '111e4567-e89b-12d3-a456-426614174001',
+          variant_id: '222e4567-e89b-12d3-a456-426614174002',
+          sub_variant_id: '333e4567-e89b-12d3-a456-426614174003',
+          variant_name: 'Small',
+        },
+      ],
+    }
+
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      return fn(makeMockClient({
+        0: { rows: [] },
+        1: { rows: [{ factor: null, dimension: null }] },
+        2: { rows: [{ inventory_quantity: '0' }] },   // sub_variant stock insufficient
+        7: { rows: [{ id: 'item-1' }] },
+      }))
+    })
+
+    const res = await PATCH(patchReq(bodySV), { params: Promise.resolve({ id: ORDER_ID }) })
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.movedToDraft).toBe(true)
+    expect(json.insufficientItems[0]).toMatch(/Small/)
+  })
+
+  // --- Deduction: plain product with count-dimension unit factor (extraQty scaling) ---
+
+  it('scales extra qty by unit factor when dimension is count', async () => {
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      // 0=SELECT order_items(empty), 1=unitRow(count,factor 5), 2=SELECT products stock(sufficient 100)
+      // 3=UPDATE orders, 4=UPDATE addresses, 5=DELETE order_items, 6=INSERT
+      // deduction: 7=unitRow2(count,factor 5), 8=perishable check, 9=SELECT products FOR UPDATE, 10=UPDATE products
+      return fn(makeMockClient({
+        0: { rows: [] },
+        1: { rows: [{ factor: '5', dimension: 'count' }] },
+        6: { rows: [{ id: 'item-1' }] },
+        7: { rows: [{ factor: '5', dimension: 'count', qty_step: '1' }] },
+        8: { rows: [{ perishable: false, serialized: false }] },
+      }))
+    })
+
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
+    expect(res.status).toBe(200)
+    // extraQty = rawExtra(2) * factor(5) = 10 deducted
+    expect(logStockMovement).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ quantityChange: -10 }),
+    )
+  })
+
+  // --- Deduction: perishable product (batch FIFO path, lines 268-308) ---
+
+  it('deducts from batches FIFO for perishable product', async () => {
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      // 0=SELECT order_items(empty), 1=unitRow, 2=SELECT products stock(sufficient)
+      // 3=UPDATE orders, 4=UPDATE addresses, 5=DELETE order_items, 6=INSERT
+      // deduction: 7=unitRow2, 8=perishable check(true), 9=SELECT product_batches
+      // per batch: 10=UPDATE product_batches
+      return fn(makeMockClient({
+        0: { rows: [] },
+        6: { rows: [{ id: 'item-1' }] },
+        8: { rows: [{ perishable: true, serialized: false }] },
+        9: { rows: [
+          { id: 'batch-1', quantity_remaining: '1', lot_number: 'L1', expiry_date: '2025-01-01' },
+          { id: 'batch-2', quantity_remaining: '10', lot_number: 'L2', expiry_date: '2025-06-01' },
+        ] },
+      }))
+    })
+
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.success).toBe(true)
+    // Two batches consumed to satisfy qty 2 (1 from batch-1, 1 from batch-2)
+    expect(logStockMovement).toHaveBeenCalledTimes(2)
+    expect(deleteBatchIfEmpty).toHaveBeenCalled()
+    expect(syncPerishableStock).toHaveBeenCalled()
+  })
+
+  // --- Deduction: serialized product (serial FEFO path, lines 309-367) ---
+
+  it('marks serials sold for serialized product with batch-carrying serials', async () => {
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      // 0=SELECT order_items(empty), 1=unitRow, 2=stock check(sufficient)
+      // 3=UPDATE orders, 4=UPDATE addresses, 5=DELETE order_items, 6=INSERT
+      // deduction: 7=unitRow2(qty_step '1'), 8=perishable check(serialized true)
+      // 9=SELECT product_serials, 10=SELECT inventory FOR UPDATE
+      // per serial(2): update serial + update batch (has batch_id)
+      let queryCall = 0
+      const client: any = {
+        query: vi.fn().mockImplementation(async () => {
+          const idx = queryCall++
+          switch (idx) {
+            case 0: return { rows: [] }
+            case 6: return { rows: [{ id: 'item-1' }] }
+            case 7: return { rows: [{ factor: null, dimension: null, qty_step: '1' }] }
+            case 8: return { rows: [{ perishable: false, serialized: true }] }
+            case 9: return { rows: [
+              { id: 's1', serial_number: 'SN1', batch_id: 'b1' },
+              { id: 's2', serial_number: 'SN2', batch_id: null },
+            ] }
+            case 10: return { rows: [{ inventory_quantity: '50' }] }
+            // UPDATE product_batches RETURNING for serial s1
+            default: return { rows: [{ lot_number: 'L1', expiry_date: '2025-01-01', inventory_quantity: '50' }] }
+          }
+        }),
+        release: vi.fn(),
+      }
+      return fn(client)
+    })
+
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.success).toBe(true)
+    // Two serials marked sold => two stock movements of -1 each
+    expect(logStockMovement).toHaveBeenCalledTimes(2)
+    expect(logStockMovement).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ quantityChange: -1, serialNumber: 'SN1' }),
+    )
+    // batch cleanup called for the touched batch
+    expect(deleteBatchIfEmpty).toHaveBeenCalledWith(expect.anything(), 'b1')
+    expect(syncPerishableStock).toHaveBeenCalled()
+  })
+
+  // --- Deduction: plain variant + sub_variant branches (lines 370-400) ---
+
+  it('deducts plain stock from variant when item has variant_id (no sub_variant)', async () => {
+    const bodyVariant = {
+      ...VALID_BODY,
+      items: [
+        {
+          ...VALID_BODY.items[0],
+          variant_id: '222e4567-e89b-12d3-a456-426614174002',
+          sub_variant_id: null,
+        },
+      ],
+    }
+
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      // 0=SELECT order_items(empty), 1=unitRow, 2=SELECT product_variants stock(sufficient 100)
+      // 3=UPDATE orders, 4=UPDATE addresses, 5=DELETE order_items, 6=INSERT
+      // deduction: 7=unitRow2, 8=perishable check(both false), 9=SELECT product_variants FOR UPDATE, 10=UPDATE product_variants
+      return fn(makeMockClient({
+        0: { rows: [] },
+        6: { rows: [{ id: 'item-1' }] },
+        8: { rows: [{ perishable: false, serialized: false }] },
+      }))
+    })
+
+    const res = await PATCH(patchReq(bodyVariant), { params: Promise.resolve({ id: ORDER_ID }) })
+    expect(res.status).toBe(200)
+    expect(decrementNonPerishableShelfStock).toHaveBeenCalled()
+  })
+
+  it('deducts plain stock from sub_variant when item has sub_variant_id', async () => {
+    const bodySV = {
+      ...VALID_BODY,
+      items: [
+        {
+          ...VALID_BODY.items[0],
+          variant_id: '222e4567-e89b-12d3-a456-426614174002',
+          sub_variant_id: '333e4567-e89b-12d3-a456-426614174003',
+        },
+      ],
+    }
+
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      return fn(makeMockClient({
+        0: { rows: [] },
+        6: { rows: [{ id: 'item-1' }] },
+        8: { rows: [{ perishable: false, serialized: false }] },
+      }))
+    })
+
+    const res = await PATCH(patchReq(bodySV), { params: Promise.resolve({ id: ORDER_ID }) })
+    expect(res.status).toBe(200)
+    expect(decrementNonPerishableShelfStock).toHaveBeenCalled()
+  })
+
+  // --- rawExtra <= 0 skip: quantity not increased vs existing order_items ---
+
+  it('skips deduction when quantity is not increased (rawExtra <= 0)', async () => {
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      // existing order_items already has qty 5 for same key; new qty 2 => rawExtra negative => skip stock check AND deduction
+      // 0=SELECT order_items(existing qty 5), 1=UPDATE orders, 2=UPDATE addresses, 3=DELETE order_items, 4=INSERT
+      return fn(makeMockClient({
+        0: { rows: [{
+          product_id: '111e4567-e89b-12d3-a456-426614174001',
+          variant_id: null,
+          sub_variant_id: null,
+          quantity: '5',
+        }] },
+        4: { rows: [{ id: 'item-1' }] },
+      }))
+    })
+
+    const res = await PATCH(patchReq(VALID_BODY), { params: Promise.resolve({ id: ORDER_ID }) })
+    expect(res.status).toBe(200)
+    // No stock movement because nothing extra was deducted
+    expect(logStockMovement).not.toHaveBeenCalled()
+  })
+
+  // --- no addressLine1 => skip address update; no email when order lacks invoice_number ---
+
+  it('skips address update and email when addressLine1 and invoice_number absent', async () => {
+    vi.mocked(queryOne).mockResolvedValue({ ...OFFLINE_ORDER, invoice_number: null } as any)
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      // no addressLine1 => 0=SELECT order_items, 1=unitRow, 2=stock check
+      // 3=UPDATE orders, 4=DELETE order_items, 5=INSERT
+      // deduction: 6=unitRow2, 7=perishable check, 8=SELECT products FOR UPDATE, 9=UPDATE products
+      return fn(makeMockClient({
+        0: { rows: [] },
+        5: { rows: [{ id: 'item-1' }] },
+        7: { rows: [{ perishable: false, serialized: false }] },
+      }))
+    })
+
+    const res = await PATCH(
+      patchReq({ ...VALID_BODY, addressLine1: null }),
+      { params: Promise.resolve({ id: ORDER_ID }) },
+    )
+    expect(res.status).toBe(200)
+    expect(sendInvoiceFinalizedEmail).not.toHaveBeenCalled()
+  })
+
+  // --- credit payment mode => payment_status unpaid; invoiceDate default ---
+
+  it('handles credit payment mode and defaults invoiceDate when absent', async () => {
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      return fn(makeMockClient({
+        0: { rows: [] },
+        6: { rows: [{ id: 'item-1' }] },
+        8: { rows: [{ perishable: false, serialized: false }] },
+      }))
+    })
+
+    const res = await PATCH(
+      patchReq({ ...VALID_BODY, paymentMode: 'credit', invoiceDate: null }),
+      { params: Promise.resolve({ id: ORDER_ID }) },
+    )
+    expect(res.status).toBe(200)
+  })
+
+  // --- discount + sold_unit_factor path (line-item branches) ---
+
+  it('applies discount and sell_unit_factor when computing line items', async () => {
+    const bodyDisc = {
+      ...VALID_BODY,
+      items: [
+        {
+          ...VALID_BODY.items[0],
+          discount_pct: '10',
+          sell_unit_factor: 3,
+        },
+      ],
+    }
+
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
+      return fn(makeMockClient({
+        0: { rows: [] },
+        6: { rows: [{ id: 'item-1' }] },
+        8: { rows: [{ perishable: false, serialized: false }] },
+      }))
+    })
+
+    const res = await PATCH(patchReq(bodyDisc), { params: Promise.resolve({ id: ORDER_ID }) })
+    expect(res.status).toBe(200)
+    // discount_amount should be non-zero, base qty multiplied by factor
+    expect(lineItemFromMrpIncl).toHaveBeenCalledWith(6, 100, 10, 18)
   })
 })

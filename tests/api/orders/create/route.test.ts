@@ -21,7 +21,10 @@ vi.mock('@/lib/gst', () => ({
 vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/auto-tasks', () => ({ createAutoTask: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/ai-feedback', () => ({ recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined) }))
-vi.mock('@/lib/order-commit', () => ({ quoteShipping: vi.fn().mockResolvedValue(0) }))
+vi.mock('@/lib/order-commit', () => ({
+  quoteShipping: vi.fn().mockResolvedValue(0),
+  validateCouponForUser: vi.fn().mockResolvedValue({ appliedDiscount: 0, ok: false, reason: 'not_found' }),
+}))
 vi.mock('@/lib/invoice', () => ({ createDraftInvoice: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/business-discount', () => ({ getBusinessDiscountMap: vi.fn().mockResolvedValue({}) }))
 vi.mock('@/lib/validate', async (importOriginal) => {
@@ -123,6 +126,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     vi.mocked(bizDiscount.getBusinessDiscountMap).mockResolvedValue({})
     vi.mocked(gstLib.isInterState).mockReturnValue(false)
     vi.mocked(orderCommit.quoteShipping).mockResolvedValue(0)
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({ appliedDiscount: 0, ok: false, reason: 'not_found' } as any)
   })
 
   it('returns 422 when cart contains inactive product', async () => {
@@ -220,26 +224,20 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       .mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
 
-    const futureCoupon = {
-      id: 'coupon-future',
-      is_active: true,
-      discount_type: 'percentage',
-      discount_value: 20,
-      valid_from: new Date(Date.now() + 86400000).toISOString(), // tomorrow
-      valid_until: null,
-      usage_limit: null,
-      usage_limit_per_user: null,
-      times_used: 0,
-      min_purchase_amount: null,
-      max_discount_amount: null,
-    }
+    // Coupon validation is delegated to validateCouponForUser; a not-yet-valid
+    // coupon returns ok:false so no discount is applied.
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
+      appliedDiscount: 0,
+      ok: false,
+      reason: 'not_yet_valid',
+    } as any)
+
     let discountApplied = -1
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn() }
-      client.query.mockImplementation(async (sql: string) => {
-        if (sql.includes('FROM coupons WHERE id')) return { rows: [futureCoupon], rowCount: 1 }
+      client.query.mockImplementation(async (sql: string, params: any[]) => {
         if (sql.includes('INSERT INTO orders')) {
-          discountApplied = 0 // Coupon should skip; discount_amount is params[9]
+          discountApplied = Number(params[9])
           return { rows: [CREATED_ORDER], rowCount: 1 }
         }
         return { rows: [], rowCount: 0 }
@@ -259,24 +257,16 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       .mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()]) // subtotal 200
 
-    const coupon = {
-      id: 'coupon-min',
-      is_active: true,
-      discount_type: 'percentage',
-      discount_value: 20,
-      valid_from: null,
-      valid_until: null,
-      usage_limit: null,
-      usage_limit_per_user: null,
-      times_used: 0,
-      min_purchase_amount: 5000, // way above subtotal
-      max_discount_amount: null,
-    }
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
+      appliedDiscount: 0,
+      ok: false,
+      reason: 'below_min_purchase',
+    } as any)
+
     let captured = -1
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn() }
       client.query.mockImplementation(async (sql: string, params: any[]) => {
-        if (sql.includes('FROM coupons WHERE id')) return { rows: [coupon], rowCount: 1 }
         if (sql.includes('INSERT INTO orders')) {
           captured = Number(params[9])
           return { rows: [CREATED_ORDER], rowCount: 1 }
@@ -298,24 +288,17 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       .mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()]) // subtotal 200
 
-    const coupon = {
-      id: 'coupon-capped',
-      is_active: true,
-      discount_type: 'percentage',
-      discount_value: 50, // 50% of 200 = 100
-      valid_from: null,
-      valid_until: null,
-      usage_limit: null,
-      usage_limit_per_user: null,
-      times_used: 0,
-      min_purchase_amount: null,
-      max_discount_amount: 30, // cap at 30
-    }
+    // 50% of 200 = 100, capped at 30 by max_discount_amount — validateCouponForUser
+    // performs the capping and returns the final appliedDiscount.
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
+      appliedDiscount: 30,
+      ok: true,
+    } as any)
+
     let captured = -1
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn() }
       client.query.mockImplementation(async (sql: string, params: any[]) => {
-        if (sql.includes('FROM coupons WHERE id')) return { rows: [coupon], rowCount: 1 }
         if (sql.includes('INSERT INTO orders')) {
           captured = Number(params[9])
           return { rows: [CREATED_ORDER], rowCount: 1 }
@@ -337,13 +320,16 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       .mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
 
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
+      appliedDiscount: 0,
+      ok: false,
+      reason: 'inactive',
+    } as any)
+
     let captured = -1
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn() }
       client.query.mockImplementation(async (sql: string, params: any[]) => {
-        if (sql.includes('FROM coupons WHERE id')) {
-          return { rows: [{ id: 'c-inactive', is_active: false }], rowCount: 1 }
-        }
         if (sql.includes('INSERT INTO orders')) {
           captured = Number(params[9])
           return { rows: [CREATED_ORDER], rowCount: 1 }
@@ -364,11 +350,16 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       .mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
 
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
+      appliedDiscount: 0,
+      ok: false,
+      reason: 'not_found',
+    } as any)
+
     let captured = -1
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn() }
       client.query.mockImplementation(async (sql: string, params: any[]) => {
-        if (sql.includes('FROM coupons WHERE id')) return { rows: [], rowCount: 0 }
         if (sql.includes('INSERT INTO orders')) {
           captured = Number(params[9])
           return { rows: [CREATED_ORDER], rowCount: 1 }

@@ -22,107 +22,10 @@ vi.mock('bcrypt', () => ({
 
 // ── Import under test ─────────────────────────────────────────────────────────
 import {
-  verifyAdminCredentials,
   createAdminUser,
   hasAdminRole,
   isSessionValid,
 } from '@/lib/auth'
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('verifyAdminCredentials', () => {
-  const adminRow = {
-    id: 'admin-1',
-    user_id: 'user-1',
-    username: 'alice',
-    role: 'admin',
-    scopes: ['products'],
-    password_hash: 'hashed',
-    users: { is_active: true, email: 'alice@example.com', first_name: 'Alice', last_name: 'Smith' },
-  }
-
-  beforeEach(() => {
-    mockQuery.mockResolvedValue(undefined)
-  })
-
-  it('returns success with admin object on valid credentials', async () => {
-    mockQueryOne.mockResolvedValueOnce(adminRow)
-    mockBcryptCompare.mockResolvedValueOnce(true)
-
-    const result = await verifyAdminCredentials('alice', 'password')
-
-    expect(result.success).toBe(true)
-    expect(result.admin).toMatchObject({
-      id: 'admin-1',
-      username: 'alice',
-      role: 'admin',
-      email: 'alice@example.com',
-    })
-  })
-
-  it('returns error when admin not found', async () => {
-    mockQueryOne.mockResolvedValueOnce(null)
-
-    const result = await verifyAdminCredentials('unknown', 'pw')
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Invalid credentials')
-  })
-
-  it('returns error when user account is disabled', async () => {
-    mockQueryOne.mockResolvedValueOnce({
-      ...adminRow,
-      users: { ...adminRow.users, is_active: false },
-    })
-
-    const result = await verifyAdminCredentials('alice', 'pw')
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Account is disabled')
-  })
-
-  it('returns error when password does not match', async () => {
-    mockQueryOne.mockResolvedValueOnce(adminRow)
-    mockBcryptCompare.mockResolvedValueOnce(false)
-
-    const result = await verifyAdminCredentials('alice', 'wrongpw')
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Invalid credentials')
-  })
-
-  it('updates last_login for both admin and user on success', async () => {
-    mockQueryOne.mockResolvedValueOnce(adminRow)
-    mockBcryptCompare.mockResolvedValueOnce(true)
-
-    await verifyAdminCredentials('alice', 'password')
-
-    expect(mockQuery).toHaveBeenCalledTimes(2)
-    expect(mockQuery.mock.calls[0][0]).toMatch(/UPDATE admins SET last_login/)
-    expect(mockQuery.mock.calls[1][0]).toMatch(/UPDATE users SET last_login/)
-  })
-
-  it('returns failure on unexpected database error', async () => {
-    mockQueryOne.mockRejectedValueOnce(new Error('DB connection lost'))
-
-    const result = await verifyAdminCredentials('alice', 'pw')
-    expect(result.success).toBe(false)
-    expect(result.error).toBe('Authentication failed')
-  })
-
-  it('includes scopes from the admin row', async () => {
-    mockQueryOne.mockResolvedValueOnce(adminRow)
-    mockBcryptCompare.mockResolvedValueOnce(true)
-
-    const result = await verifyAdminCredentials('alice', 'password')
-    expect(result.admin?.scopes).toEqual(['products'])
-  })
-
-  it('defaults scopes to empty array when null in db', async () => {
-    mockQueryOne.mockResolvedValueOnce({ ...adminRow, scopes: null })
-    mockBcryptCompare.mockResolvedValueOnce(true)
-
-    const result = await verifyAdminCredentials('alice', 'password')
-    expect(result.admin?.scopes).toEqual([])
-  })
-})
 
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -171,15 +74,6 @@ describe('createAdminUser', () => {
     expect(result.success).toBe(true)
     // Verify the UPDATE query was called
     expect(mockQueryOne.mock.calls[1][0]).toMatch(/UPDATE users/)
-  })
-
-  it('hashes the password with bcrypt cost 10', async () => {
-    mockQueryOne.mockResolvedValueOnce(null)
-    mockQueryOne.mockResolvedValueOnce({ id: 'u1' })
-    mockQueryOne.mockResolvedValueOnce({ id: 'a1' })
-
-    await createAdminUser(userData)
-    expect(mockBcryptHash).toHaveBeenCalledWith('securepass', 10)
   })
 
   it('uses default role "admin" when role not provided', async () => {

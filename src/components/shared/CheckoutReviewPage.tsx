@@ -791,7 +791,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
             </svg>
           </div>
           <h2 className="text-lg font-semibold text-foreground">Confirming your payment…</h2>
-          <p className="text-sm text-foreground-secondary">Your payment was received. We're confirming your order — please don't close this page.</p>
+          <p className="text-sm text-foreground-secondary">Your payment was received. We&apos;re confirming your order — please don&apos;t close this page.</p>
           {submitError && (
             <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-3">{submitError}</div>
           )}
