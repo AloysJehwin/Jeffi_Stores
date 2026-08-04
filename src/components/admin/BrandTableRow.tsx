@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import HoverCard from '@/components/ui/HoverCard'
 import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
 import { ap } from '@/lib/admin-path'
@@ -24,6 +25,7 @@ export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { br
   const [open, setOpen] = useState(false)
   const [isActive, setIsActive] = useState(brand.is_active)
   const [toggling, setToggling] = useState(false)
+  const router = useRouter()
 
   async function toggleStatus(e: React.MouseEvent) {
     e.stopPropagation()
@@ -121,11 +123,11 @@ export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { br
               </div>
               <div className="flex gap-3 pt-1 border-t border-border-default">
                 <Link
-                  href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)}
+                  href={ap(`/admin/brands/${brand.id}?back=${encodeURIComponent(backUrl)}`)}
                   className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
                   onClick={() => setOpen(false)}
                 >
-                  Edit Brand
+                  View Brand
                 </Link>
               </div>
             </div>
@@ -133,12 +135,11 @@ export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { br
         </div>,
         document.body
       )}
-      <tr className="hover:bg-surface-secondary cursor-pointer" onClick={() => setOpen(true)}>
-        <td className="px-6 py-4 whitespace-nowrap">
+      <tr className="hover:bg-surface-secondary cursor-pointer" onClick={() => setOpen(true)}>        <td className="px-6 py-4 whitespace-nowrap">
           <HoverCard
             trigger={
               <Link
-                href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)}
+                href={ap(`/admin/brands/${brand.id}?back=${encodeURIComponent(backUrl)}`)}
                 className="text-sm font-semibold text-foreground hover:text-accent-500 transition-colors"
                 onClick={e => e.stopPropagation()}
               >

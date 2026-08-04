@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { username, password, email, first_name, last_name, role, scopes } = body
+    const { email, first_name, last_name, role, scopes } = body
 
-    if (!username || !password || !email || !first_name || !last_name) {
+    if (!email || !first_name || !last_name) {
       return NextResponse.json(
-        { error: 'Missing required fields: username, password, email, first_name, last_name' },
+        { error: 'Missing required fields: email, first_name, last_name' },
         { status: 400 }
       )
     }
@@ -41,8 +41,6 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await createAdminUser({
-      username,
-      password,
       email,
       first_name,
       last_name,
@@ -54,17 +52,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 })
     }
 
-    const cert = await generateClientCertificate(username, result.admin!.id)
+    // Certificate CN is the admin's email (sanitized for x509 CN if needed).
+    const certCN = email.replace(/[^a-zA-Z0-9._@-]/g, '_')
+
+    const cert = await generateClientCertificate(certCN, result.admin!.id)
 
     await query(
       `INSERT INTO admin_certificates (admin_id, serial_number, common_name, expires_at, download_token, p12_data, p12_password)
        VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-      [result.admin!.id, cert.serialNumber, username, cert.expiresAt, cert.downloadToken, cert.p12Buffer, cert.p12Password]
+      [result.admin!.id, cert.serialNumber, certCN, cert.expiresAt, cert.downloadToken, cert.p12Buffer, cert.p12Password]
     )
 
     const emailResult = await sendAdminCertificateEmail(
       email,
-      username,
+      `${first_name} ${last_name}`.trim() || email,
       cert.p12Buffer,
       cert.p12Password,
       cert.serialNumber,
@@ -77,7 +78,7 @@ export async function POST(request: NextRequest) {
       emailSent: emailResult.success,
       admin: {
         id: result.admin!.id,
-        username,
+        email,
         role: role || 'admin',
         scopes: scopes || [],
       },

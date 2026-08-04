@@ -6,14 +6,17 @@ import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Props {
-  productId: string
+  entityId: string
   name: string
-  sku: string | null
+  subtitle?: string | null
   updatedAt: string
   editHref: string
+  publishPath: string
+  discardPath: string
+  entityLabel?: string
 }
 
-export default function DraftRowActions({ productId, name, sku, updatedAt, editHref }: Props) {
+export default function DraftRowActions({ name, subtitle, updatedAt, editHref, publishPath, discardPath, entityLabel = 'item' }: Props) {
   const router = useRouter()
   const confirm = useConfirm()
   const [publishing, setPublishing] = useState(false)
@@ -21,12 +24,12 @@ export default function DraftRowActions({ productId, name, sku, updatedAt, editH
   const [error, setError] = useState<string | null>(null)
 
   async function handlePublish() {
-    const ok = await confirm({ message: `Apply all staged changes for "${name}" to the live product?`, confirmLabel: 'Publish' })
+    const ok = await confirm({ message: `Apply all staged changes for "${name}" to the live ${entityLabel}?`, confirmLabel: 'Publish' })
     if (!ok) return
     setPublishing(true)
     setError(null)
     try {
-      const res = await fetch(`/api/admin/products/${productId}/publish`, { method: 'POST', credentials: 'include' })
+      const res = await fetch(publishPath, { method: 'POST', credentials: 'include' })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Publish failed'); return }
       router.refresh()
@@ -40,7 +43,7 @@ export default function DraftRowActions({ productId, name, sku, updatedAt, editH
     setDiscarding(true)
     setError(null)
     try {
-      const res = await fetch(`/api/admin/products/${productId}/draft`, { method: 'DELETE', credentials: 'include' })
+      const res = await fetch(discardPath, { method: 'DELETE', credentials: 'include' })
       const data = await res.json()
       if (!res.ok) { setError(data.error || 'Discard failed'); return }
       router.refresh()
@@ -52,7 +55,7 @@ export default function DraftRowActions({ productId, name, sku, updatedAt, editH
     <div className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
       <Link href={editHref} className="flex-1 min-w-0 mr-4">
         <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{name}</p>
-        {sku && <p className="text-xs text-amber-600 dark:text-amber-400">{sku}</p>}
+        {subtitle && <p className="text-xs text-amber-600 dark:text-amber-400">{subtitle}</p>}
         {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
       </Link>
       <div className="flex items-center gap-2 shrink-0">

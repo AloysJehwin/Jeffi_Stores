@@ -60,8 +60,6 @@ const regularAdmin = {
 }
 
 const validBody = {
-  username: 'newadmin',
-  password: 'SecureP@ss123',
   email: 'newadmin@example.com',
   first_name: 'New',
   last_name: 'Admin',
@@ -77,7 +75,7 @@ const mockCert = {
   p12Password: 'certpassword',
 }
 
-const mockCreatedAdmin = { id: 'new-admin-uuid', username: 'newadmin' }
+const mockCreatedAdmin = { id: 'new-admin-uuid', email: 'newadmin@example.com' }
 
 function makeRequest(body: unknown) {
   return new NextRequest('http://localhost/api/admin/users', {
@@ -104,22 +102,6 @@ describe('POST /api/admin/users', () => {
     mockAuth.mockResolvedValue(regularAdmin)
     const res = await POST(makeRequest(validBody))
     expect(res.status).toBe(403)
-  })
-
-  it('returns 400 when username is missing', async () => {
-    mockAuth.mockResolvedValue(superAdmin)
-    const { username, ...body } = validBody
-    const res = await POST(makeRequest(body))
-    expect(res.status).toBe(400)
-    const resBody = await res.json()
-    expect(resBody.error).toMatch(/missing required fields/i)
-  })
-
-  it('returns 400 when password is missing', async () => {
-    mockAuth.mockResolvedValue(superAdmin)
-    const { password, ...body } = validBody
-    const res = await POST(makeRequest(body))
-    expect(res.status).toBe(400)
   })
 
   it('returns 400 when email is missing', async () => {
@@ -187,7 +169,7 @@ describe('POST /api/admin/users', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
-    expect(body.admin.username).toBe('newadmin')
+    expect(body.admin.email).toBe('newadmin@example.com')
     expect(body.certificate.serialNumber).toBe('SERIAL-001')
     expect(body.certificate.p12Password).toBe('certpassword')
     expect(body.emailSent).toBe(true)

@@ -21,6 +21,8 @@ interface CampaignRow {
   revenue_attributed: string | number
   sent_last_24h: string | null
   last_run_at: string | null
+  draft_fields: Record<string, unknown> | null
+  updated_at: string | null
 }
 
 export default function CampaignsListClient() {
@@ -48,6 +50,16 @@ export default function CampaignsListClient() {
   }
 
   useEffect(() => { load(0) }, [])
+
+  async function discardDraft(c: CampaignRow) {
+    const ok = await confirm({ message: `Discard all unsaved changes for "${c.name}"? This cannot be undone.`, variant: 'danger', confirmLabel: 'Discard' })
+    if (!ok) return
+    setBusy(c.kind)
+    try {
+      await fetch(`/api/admin/campaigns/${c.kind}/draft`, { method: 'DELETE', credentials: 'include' })
+      await load(offset)
+    } finally { setBusy(null) }
+  }
 
   async function toggle(c: CampaignRow) {
     setBusy(c.kind)
@@ -135,6 +147,44 @@ export default function CampaignsListClient() {
         </Link>
       </div>
 
+      {(() => {
+        const pendingDrafts = campaigns.filter(c => c.kind !== 'broadcast' && c.draft_fields != null)
+        if (!pendingDrafts.length) return null
+        return (
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Pending Drafts ({pendingDrafts.length})</p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
+            </div>
+            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+              {pendingDrafts.map(d => (
+                <div key={d.kind} className="flex items-center justify-between px-4 py-2.5 hover:bg-amber-100 dark:hover:bg-amber-900/30 transition-colors">
+                  <Link href={ap(`/admin/campaigns/${d.kind}`)} className="flex-1 min-w-0 mr-4">
+                    <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{d.name}</p>
+                  </Link>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <Link
+                      href={ap(`/admin/campaigns/${d.kind}`)}
+                      className="px-2.5 py-1 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors"
+                    >
+                      Publish
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => discardDraft(d)}
+                      disabled={busy === d.kind}
+                      className="px-2.5 py-1 text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors disabled:opacity-50"
+                    >
+                      {busy === d.kind ? '…' : 'Discard'}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {campaigns.filter(c => c.kind !== 'broadcast').map(c => (
         <div key={c.kind} className="bg-surface-elevated rounded-xl border border-border-default p-5">
           <div className="flex items-start justify-between gap-4 flex-wrap">
@@ -150,6 +200,11 @@ export default function CampaignsListClient() {
                 }`}>
                   {c.enabled ? 'Active' : 'Paused'}
                 </span>
+                {c.draft_fields != null && (
+                  <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
+                    Draft pending
+                  </span>
+                )}
                 {c.discount_percent > 0 && (
                   <span className="px-2 py-0.5 text-[10px] font-semibold rounded-full bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300">
                     {c.discount_percent}% off

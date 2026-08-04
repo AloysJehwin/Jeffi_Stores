@@ -10,6 +10,8 @@
  * PII (honors ADR-0001's constraint). Inference is on-device regardless.
  */
 
+import type { UserProfile } from './user-profile'
+
 export interface CartLine {
   name: string
   category?: string | null
@@ -18,18 +20,16 @@ export interface CartLine {
 }
 
 export interface SessionSignals {
-  /** Items currently in the cart. */
   cart: CartLine[]
-  /** Product names viewed this session (most-recent first), deduped. */
   viewed?: string[]
-  /** Category names of the user's past orders (anonymized, no order detail). */
   pastCategories?: string[]
-  /** Search terms used this visit. */
   searches?: string[]
-  /** Cart total in INR (rounded). */
   total?: number | null
-  /** Item count (sum of quantities). */
   itemCount?: number | null
+  /** Persistent user profile — adds personalisation across sessions. */
+  userProfile?: UserProfile | null
+  /** Recap feedback preference derived from past 👍/👎. */
+  recapStyle?: 'concise' | 'detailed' | null
 }
 
 const MAX_CART = 12
@@ -96,6 +96,25 @@ export function serializeSignals(sig: SessionSignals): string {
     lines.push(searches.join(', '))
   }
 
+  // User profile — personalises the recap across sessions
+  const profile = sig.userProfile
+  if (profile && (profile.topCategories.length || profile.topBrands.length || profile.purchaseCount > 0)) {
+    const bits: string[] = []
+    if (profile.topCategories.length) bits.push(`Frequent: ${profile.topCategories.slice(0, 3).join(', ')}`)
+    if (profile.topBrands.length) bits.push(`Brands: ${profile.topBrands.slice(0, 3).join(', ')}`)
+    if (profile.priceRange) bits.push(`Budget: Rs.${Math.round(profile.priceRange.min)}–Rs.${Math.round(profile.priceRange.max)}`)
+    if (profile.purchaseCount > 0) bits.push(`Orders: ${profile.purchaseCount}`)
+    if (bits.length) {
+      lines.push('### Profile')
+      lines.push(bits.join(' | '))
+    }
+  }
+
+  if (sig.recapStyle) {
+    lines.push('### Style')
+    lines.push(sig.recapStyle)
+  }
+
   lines.push('### Recap')
   return lines.join('\n')
 }
@@ -109,4 +128,53 @@ export const RECAP_INSTRUCTION =
 /** Full prompt (instruction + signals) for chat-style inference/training. */
 export function buildRecapPrompt(sig: SessionSignals): string {
   return `${RECAP_INSTRUCTION}\n\n${serializeSignals(sig)}`
+}
+
+/** Prompt for cart insight — narrates what the cart collectively adds up to. */
+export function buildCartInsightPrompt(sig: SessionSignals): string {
+  const instruction =
+    'You are a friendly shopping assistant for an industrial hardware store. ' +
+    'In one short sentence (max 20 words), describe what the customer is building or working on based on their cart. ' +
+    'Be specific and practical. Do not mention prices.'
+  return `${instruction}\n\n${serializeSignals(sig)}\n### Insight`
+}
+
+/** Prompt for a personalised 1-sentence product pitch. */
+export function buildProductPitchPrompt(
+  productName: string,
+  brand: string | null,
+  category: string | null,
+  profile: import('./user-profile').UserProfile | null
+): string {
+  const instruction =
+    'You are a friendly shopping assistant for an industrial hardware store. ' +
+    'Write exactly one sentence (max 20 words) explaining why this product fits the customer\'s needs based on their history. ' +
+    'Be specific. Do not mention prices or make things up.'
+  const lines = [`### Product\n${productName}${brand ? ` (${brand})` : ''}${category ? ` — ${category}` : ''}`]
+  if (profile && (profile.topCategories.length || profile.topBrands.length)) {
+    const bits: string[] = []
+    if (profile.topCategories.length) bits.push(`Frequent: ${profile.topCategories.slice(0, 3).join(', ')}`)
+    if (profile.topBrands.length) bits.push(`Brands: ${profile.topBrands.slice(0, 3).join(', ')}`)
+    lines.push(`### Profile\n${bits.join(' | ')}`)
+  }
+  lines.push('### Pitch')
+  return `${instruction}\n\n${lines.join('\n')}`
+}
+
+/** Prompt for post-purchase affirmation on the order confirmation page. */
+export function buildAffirmationPrompt(
+  itemNames: string[],
+  total: number,
+  profile: import('./user-profile').UserProfile | null
+): string {
+  const instruction =
+    'You are a friendly shopping assistant for an industrial hardware store. ' +
+    'Write one warm sentence (max 20 words) affirming the customer\'s purchase decision. ' +
+    'Reference what they bought. Do not mention prices.'
+  const lines = [`### Purchased\n${itemNames.slice(0, 5).map(n => `- ${n}`).join('\n')}`]
+  if (profile?.topCategories.length) {
+    lines.push(`### Profile\nFrequent: ${profile.topCategories.slice(0, 3).join(', ')}`)
+  }
+  lines.push('### Affirmation')
+  return `${instruction}\n\n${lines.join('\n')}`
 }

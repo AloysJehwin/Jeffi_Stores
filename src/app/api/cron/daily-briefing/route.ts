@@ -11,7 +11,6 @@ import {
 export const dynamic = 'force-dynamic'
 
 interface AdminRecipient {
-  username: string
   email: string | null
 }
 
@@ -51,7 +50,7 @@ export async function GET(req: NextRequest) {
   const { subject, html } = renderBriefingEmail(data, narration)
 
   const admins = await queryMany<AdminRecipient>(
-    `SELECT a.username, u.email
+    `SELECT u.email
      FROM admins a
      LEFT JOIN users u ON u.id = a.user_id
      WHERE a.is_active = TRUE AND u.email IS NOT NULL`,

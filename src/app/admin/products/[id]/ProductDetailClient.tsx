@@ -258,6 +258,140 @@ function CollapsibleCard({ title, children }: { title: string; children: React.R
   )
 }
 
+function SupplierDetailsCard({ productId }: { productId: string }) {
+  const [open, setOpen] = useState(false)
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+
+  function toggle() {
+    setOpen(o => {
+      if (!o && !loaded) {
+        setLoading(true)
+        fetch(`/api/admin/products/${productId}/supplier-details`, { credentials: 'include' })
+          .then(r => r.json())
+          .then(d => { setData(d); setLoaded(true) })
+          .catch(() => setLoaded(true))
+          .finally(() => setLoading(false))
+      }
+      return !o
+    })
+  }
+
+  return (
+    <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+      <button
+        type="button"
+        onClick={toggle}
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors"
+      >
+        <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Supplier Details</p>
+        <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 pt-1">
+          {loading && <p className="text-xs text-foreground-muted py-2">Loading…</p>}
+          {!loading && data && (
+            <div className="space-y-4">
+              {/* Primary Supplier */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-2">Primary Supplier</p>
+                {data.primarySupplier ? (
+                  <div className="bg-surface rounded-lg border border-border-default p-3 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <Link href={`/admin/suppliers/${data.primarySupplier.id}`} className="text-sm font-semibold text-accent-600 hover:underline">
+                        {data.primarySupplier.name}
+                      </Link>
+                      {data.primarySupplier.gstin && <span className="text-xs text-foreground-muted font-mono">{data.primarySupplier.gstin}</span>}
+                    </div>
+                    {data.primarySupplier.contact_name && <p className="text-xs text-foreground-secondary">{data.primarySupplier.contact_name}</p>}
+                    <div className="flex gap-3 text-xs text-foreground-muted">
+                      {data.primarySupplier.phone && <span>{data.primarySupplier.phone}</span>}
+                      {data.primarySupplier.email && <span>{data.primarySupplier.email}</span>}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-xs text-foreground-muted italic">No primary supplier set — edit product to assign one.</p>
+                )}
+              </div>
+
+              {/* Last Purchase Price */}
+              {data.lastPurchasePrice != null && (
+                <div className="flex items-center gap-3 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg px-3 py-2">
+                  <div>
+                    <p className="text-[11px] text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide">Last Purchase Price</p>
+                    <p className="text-lg font-bold text-accent-700 dark:text-accent-300">
+                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(data.lastPurchasePrice)}
+                    </p>
+                  </div>
+                  {data.lastPurchaseDate && (
+                    <p className="text-xs text-foreground-muted ml-auto">
+                      {new Date(data.lastPurchaseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                    </p>
+                  )}
+                </div>
+              )}
+
+              {/* Purchase History */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted">Purchase History</p>
+                  <Link href={`/admin/inventory?tab=pos`} className="text-xs text-accent-600 hover:underline">View all POs →</Link>
+                </div>
+                {data.purchaseHistory?.length > 0 ? (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-border-default text-foreground-muted">
+                          <th className="text-left pb-1.5 pr-3 font-medium">PO #</th>
+                          <th className="text-left pb-1.5 pr-3 font-medium">Date</th>
+                          <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
+                          <th className="text-left pb-1.5 pr-3 font-medium">Variant</th>
+                          <th className="text-right pb-1.5 pr-3 font-medium">Qty</th>
+                          <th className="text-right pb-1.5 pr-3 font-medium">Unit Cost</th>
+                          <th className="text-right pb-1.5 font-medium">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-default">
+                        {data.purchaseHistory.map((row: any) => (
+                          <tr key={`${row.po_id}-${row.variant_name}`} className="hover:bg-surface-secondary transition-colors">
+                            <td className="py-1.5 pr-3 font-mono text-accent-600">
+                              <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">{row.po_number}</Link>
+                            </td>
+                            <td className="py-1.5 pr-3 text-foreground-secondary">
+                              {new Date(row.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
+                            <td className="py-1.5 pr-3 text-foreground-muted">{row.variant_name ?? '—'}</td>
+                            <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
+                            <td className="py-1.5 pr-3 text-right text-foreground">
+                              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}
+                            </td>
+                            <td className="py-1.5 text-right text-foreground">
+                              {row.line_total_incl_gst != null
+                                ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.line_total_incl_gst))
+                                : '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <p className="text-xs text-foreground-muted italic">No purchase history found for this product.</p>
+                )}
+              </div>
+            </div>
+          )}
+          {!loading && loaded && !data && (
+            <p className="text-xs text-foreground-muted py-2">Failed to load supplier details.</p>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 type ShelfRow = { location_display_code: string; quantity: number; variant_id: string | null; sub_variant_id: string | null }
 
 function ShelfBadges({ rows }: { rows: ShelfRow[] }) {
@@ -396,18 +530,12 @@ export default function ProductDetailClient({ id }: { id: string }) {
           <Link href={ap(`/admin/products/${p.id}/analytics`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Analytics
           </Link>
-          {p.is_active ? (
-            <button
-              onClick={() => setShowDraftModal(true)}
-              className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
-            >
-              Edit
-            </button>
-          ) : (
-            <Link href={ap(`/admin/products/edit/${p.id}`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
-              Edit
-            </Link>
-          )}
+          <button
+            onClick={() => setShowDraftModal(true)}
+            className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+          >
+            Edit
+          </button>
           {showDraftModal && (
             <DraftConfirmModal
               productId={p.id}
@@ -536,6 +664,9 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 <Field label="Sub. Price" value={p.subscription_price != null ? formatINR(Number(p.subscription_price)) : null} />
               </>}
             </CollapsibleCard>
+
+            {/* — Supplier Details — */}
+            <SupplierDetailsCard productId={id} />
 
             {/* — Physical & Compliance — */}
             <CollapsibleCard title="Physical & Compliance">

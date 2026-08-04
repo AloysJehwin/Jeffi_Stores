@@ -4,6 +4,7 @@ services:
     env_file: .env.production
     environment:
       - REDIS_URL=redis://redis:6379
+      - WEB_CONCURRENCY=4
     volumes:
       - ./certs:/app/certs:ro
       - ./jeffi-stores-76e9ecaecdd6.json:/app/jeffi-stores-76e9ecaecdd6.json:ro

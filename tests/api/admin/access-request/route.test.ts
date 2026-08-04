@@ -30,7 +30,7 @@ const mockSendMail = vi.mocked(transporter.sendMail)
 
 const adminPayload = {
   adminId: 'admin-1',
-  username: 'testadmin',
+  email: 'testadmin@example.com',
   first_name: 'Test',
   last_name: 'Admin',
   role: 'admin',
@@ -105,7 +105,7 @@ describe('POST /api/admin/access-request', () => {
     expect(mailArgs.subject).toContain('Orders')
   })
 
-  it('uses username as requester name when first/last name absent', async () => {
+  it('falls back to email as requester name when first/last name absent', async () => {
     const adminNoName = { ...adminPayload, first_name: undefined, last_name: undefined }
     mockAuth.mockResolvedValue(adminNoName as any)
     mockQueryMany.mockResolvedValue(superAdmins)
@@ -114,7 +114,7 @@ describe('POST /api/admin/access-request', () => {
     await POST(makeRequest({ scopeKey: 'orders', pagePath: '/admin/orders' }))
 
     const mailArgs = mockSendMail.mock.calls[0][0] as any
-    expect(mailArgs.subject).toContain('testadmin')
+    expect(mailArgs.subject).toContain('testadmin@example.com')
   })
 
   it('returns 500 on sendMail error', async () => {

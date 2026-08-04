@@ -10,6 +10,7 @@ import ProductCard from '@/components/visitor/ProductCard'
 import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
 import PdpCompareSection from '@/components/visitor/PdpCompareSection'
+import ProductPitchLine from '@/components/on-device/ProductPitchLine'
 
 const getProductBySlug = cache(async (slug: string) => {
   return queryOne(`
@@ -299,7 +300,13 @@ export default async function ProductDetailPage({
     notFound()
   }
 
-  const relatedProducts = await getRelatedProducts(product.id, product.category_id, product.name)
+  const [relatedProducts, deliverySettings] = await Promise.all([
+    getRelatedProducts(product.id, product.category_id, product.name),
+    // Use the authoritative delivery setting (same one checkout uses), not the
+    // stale separate 'free_shipping_threshold' key.
+    (await import('@/lib/delivery-settings')).getDeliverySettings(),
+  ])
+  const freeShippingThreshold = deliverySettings.freeThreshold
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
   const jsonLd = buildProductJsonLd(product, baseUrl)
   const skuParam = typeof resolvedSearchParams.sku === 'string' ? resolvedSearchParams.sku : undefined
@@ -369,7 +376,7 @@ export default async function ProductDetailPage({
         {/* Product Details */}
         <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden mb-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 lg:gap-8 p-4 sm:p-6 lg:p-8 lg:items-start">
-            <ProductDetailClient product={product} initialSkuParam={skuParam} />
+            <ProductDetailClient product={product} initialSkuParam={skuParam} freeShippingThreshold={freeShippingThreshold} />
           </div>
         </div>
 
@@ -642,6 +649,11 @@ export default async function ProductDetailPage({
             <p className="text-foreground-secondary leading-relaxed whitespace-pre-line">
               {product.description}
             </p>
+            <ProductPitchLine
+              productName={product.name}
+              brand={product.brands?.name || null}
+              category={product.categories?.name || null}
+            />
           </div>
         )}
 

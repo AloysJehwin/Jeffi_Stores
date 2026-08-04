@@ -61,8 +61,7 @@ export async function POST(req: NextRequest, { params }: Params) {
        coupon_id = $6::uuid,
        description = $7,
        is_active = COALESCE($8::boolean, is_active),
-       custom_fields = COALESCE($9::jsonb, custom_fields),
-       updated_at = NOW()
+       custom_fields = COALESCE($9::jsonb, custom_fields)
      WHERE id = $1`,
     [
       id,

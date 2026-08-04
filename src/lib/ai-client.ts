@@ -45,7 +45,7 @@ export class AiClientError extends Error {
   }
 }
 
-const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '')
+const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
 const OLLAMA_HEALTH_TIMEOUT_MS = 2000
 // Per-request Ollama timeout. Kept modest so a hung/unreachable Ollama (e.g. the
 // Razer laptop asleep) fails fast and the OpenAI fallback can trigger within the
@@ -65,12 +65,18 @@ async function isOllamaReachable(): Promise<boolean> {
 }
 
 async function callOllama(req: AiChatRequest): Promise<{ content: string; toolCalls?: AiToolCall[]; model: string }> {
-  const agentModel = process.env.OLLAMA_AGENT_MODEL || 'glm4'
+  const agentModel = process.env.OLLAMA_AGENT_MODEL || 'gemma3:4b'
+  // 'fast' → small low-latency model (gemma3:4b). The larger copy model (gemma4:12b)
+  // can take 90s+ for long JSON bodies, which blows past web-request/dev-server
+  // timeouts. Use 'fast' for latency-sensitive JSON copy (e.g. campaign templates).
+  const fastModel = process.env.OLLAMA_EMAIL_MODEL || process.env.OLLAMA_FAST_MODEL || 'gemma3:4b'
   const model = req.modelHint === 'sql'
     ? (process.env.OLLAMA_SQL_MODEL || agentModel)
     : req.modelHint === 'agent'
       ? agentModel
-      : (process.env.OLLAMA_COPY_MODEL || agentModel)
+      : req.modelHint === 'fast'
+        ? fastModel
+        : (process.env.OLLAMA_COPY_MODEL || agentModel)
   const ctrl = new AbortController()
   const t = setTimeout(() => ctrl.abort(), OLLAMA_REQUEST_TIMEOUT_MS)
   try {

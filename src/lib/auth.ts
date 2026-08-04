@@ -1,68 +1,14 @@
 import { queryOne, query } from './db'
-import bcrypt from 'bcrypt'
-
-export async function verifyAdminCredentials(username: string, password: string) {
-  try {
-    const admin = await queryOne(`
-      SELECT
-        a.*,
-        json_build_object(
-          'id', u.id, 'email', u.email, 'first_name', u.first_name,
-          'last_name', u.last_name, 'is_active', u.is_active
-        ) AS users
-      FROM admins a
-      LEFT JOIN users u ON a.user_id = u.id
-      WHERE a.username = $1
-    `, [username])
-
-    if (!admin) {
-      return { success: false, error: 'Invalid credentials' }
-    }
-
-    if (!admin.users?.is_active) {
-      return { success: false, error: 'Account is disabled' }
-    }
-
-    const passwordMatch = await bcrypt.compare(password, admin.password_hash)
-    if (!passwordMatch) {
-      return { success: false, error: 'Invalid credentials' }
-    }
-
-    await query('UPDATE admins SET last_login = NOW() WHERE id = $1', [admin.id])
-    await query('UPDATE users SET last_login = NOW() WHERE id = $1', [admin.user_id])
-
-    return {
-      success: true,
-      admin: {
-        id: admin.id,
-        user_id: admin.user_id,
-        username: admin.username,
-        role: admin.role,
-        scopes: admin.scopes || [],
-        email: admin.users.email,
-        first_name: admin.users.first_name,
-        last_name: admin.users.last_name,
-      },
-    }
-  } catch (err) {
-    console.error('[route]', err)
-    return { success: false, error: 'Authentication failed' }
-  }
-}
 
 export async function createAdminUser(userData: {
   email: string
   first_name: string
   last_name: string
   phone?: string
-  username: string
-  password: string
   role?: string
   scopes?: string[]
 }) {
   try {
-    const passwordHash = await bcrypt.hash(userData.password, 10)
-
     let user = await queryOne(
       `SELECT u.* FROM users u
        LEFT JOIN admins a ON a.user_id = u.id
@@ -87,10 +33,10 @@ export async function createAdminUser(userData: {
     if (!user) throw new Error('Failed to create user')
 
     const admin = await queryOne(
-      `INSERT INTO admins (user_id, username, password_hash, role, scopes)
-       VALUES ($1, $2, $3, $4, $5)
+      `INSERT INTO admins (user_id, role, scopes)
+       VALUES ($1, $2, $3)
        RETURNING *`,
-      [user.id, userData.username, passwordHash, userData.role || 'admin', JSON.stringify(userData.scopes || [])]
+      [user.id, userData.role || 'admin', JSON.stringify(userData.scopes || [])]
     )
 
     if (!admin) throw new Error('Failed to create admin')

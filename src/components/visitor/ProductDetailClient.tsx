@@ -146,6 +146,7 @@ interface ProductDetailClientProps {
     is_cod_allowed?: boolean | null
   }
   initialSkuParam?: string
+  freeShippingThreshold?: number
 }
 
 interface PolicyProps {
@@ -154,9 +155,10 @@ interface PolicyProps {
   replacementAllowed: boolean
   replacementDays: number
   isCodAllowed?: boolean
+  freeShippingThreshold?: number
 }
 
-const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed }: PolicyProps) => {
+const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed, freeShippingThreshold = 500 }: PolicyProps) => {
   const items = [
     {
       icon: (
@@ -166,7 +168,7 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
         </svg>
       ),
       label: 'Free Delivery',
-      sub: 'On orders above ₹500',
+      sub: `On orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}`,
       color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
       href: '/legal/shipping-policy',
     },
@@ -290,7 +292,7 @@ const PincodeChecker = ({ pincode, setPincode, pincodeResult, setPincodeResult, 
   </div>
 )
 
-export default function ProductDetailClient({ product, initialSkuParam }: ProductDetailClientProps) {
+export default function ProductDetailClient({ product, initialSkuParam, freeShippingThreshold = 500 }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
@@ -376,7 +378,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const replacementDays = replacementAllowed
     ? (brand?.replacement_allowed === false ? (brand.replacement_window_days ?? 7) : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7))
     : 0
-  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed: product.is_cod_allowed ?? false }
+  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed: product.is_cod_allowed ?? false, freeShippingThreshold }
 
   const handleWishlist = useCallback(async () => {
     if (!user) {

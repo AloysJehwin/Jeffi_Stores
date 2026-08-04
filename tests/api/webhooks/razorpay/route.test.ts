@@ -227,7 +227,7 @@ describe('POST /api/webhooks/razorpay', () => {
     expect(mockQuery).toHaveBeenCalled()
   })
 
-  it('skips signature check when RAZORPAY_WEBHOOK_SECRET is unset', async () => {
+  it('returns 500 when RAZORPAY_WEBHOOK_SECRET is unset', async () => {
     delete process.env.RAZORPAY_WEBHOOK_SECRET
     const body = { event: 'unknown.event', payload: {} }
     const raw = JSON.stringify(body)
@@ -237,7 +237,9 @@ describe('POST /api/webhooks/razorpay', () => {
       body: raw,
     })
     const res = await POST(req as any)
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(500)
+    const json = await res.json()
+    expect(json.error).toBe('Webhook not configured')
   })
 
   it('returns ok on thrown exception (catch-all)', async () => {

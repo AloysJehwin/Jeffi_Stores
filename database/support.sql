@@ -15,7 +15,6 @@ CREATE TABLE public.support_messages (
 );
 
 
-
 --
 -- Name: support_sessions; Type: TABLE; Schema: public; Owner: -
 --
@@ -28,4 +27,3 @@ CREATE TABLE public.support_sessions (
     created_at timestamp with time zone DEFAULT now(),
     closed_at timestamp with time zone
 );
-

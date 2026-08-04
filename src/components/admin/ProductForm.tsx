@@ -271,6 +271,14 @@ export default function ProductForm({ categories, brands, action, product, produ
     return ''
   })
   const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '')
+  const [supplierId, setSupplierId] = useState<string>(product?.supplier_id || '')
+  const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
+  useEffect(() => {
+    fetch('/api/admin/suppliers/list', { credentials: 'include' })
+      .then(r => r.ok ? r.json() : [])
+      .then(setSuppliers)
+      .catch(() => {})
+  }, [])
   const [extraDeliveryDays, setExtraDeliveryDays] = useState(
     product?.extra_delivery_days != null ? String(product.extra_delivery_days) : '0'
   )
@@ -510,7 +518,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       const snapshot = {
         uncontrolled,
         hasVariants, variants, groups,
-        basePrice, mrp, mrpExGst, salePrice, costPrice,
+        basePrice, mrp, mrpExGst, salePrice, costPrice, supplierId,
         discountPct,
         topPriceLockSide, topMrpLockSide,
         gstRate, isActive,
@@ -552,6 +560,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     fields.stock_status = hasVariants ? 'In Stock' : (fields.stock_status as string || 'In Stock')
     fields.slug = productName ? productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : null
     fields.cost_price = costPrice
+    fields.supplier_id = supplierId || null
     fields.discount_pct = discountPct
     fields.is_active = isActive
     fields.is_featured = isFeatured
@@ -1071,6 +1080,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         formData.set('discount_pct', discountPct || '0')
       }
       formData.set('cost_price', costPrice || '0')
+      formData.set('supplier_id', supplierId || '')
       formData.set('extra_delivery_days', extraDeliveryDays || '0')
       // Identification & Compliance
       formData.set('barcode', barcode)
@@ -1557,6 +1567,22 @@ export default function ProductForm({ categories, brands, action, product, produ
               placeholder="Your purchase / landed cost"
             />
             <p className="text-xs text-foreground-muted mt-1">Used for P&amp;L gross margin — not shown to customers</p>
+          </div>
+
+          <div>
+            <AdminSelect
+              id="supplier_id"
+              name="supplier_id"
+              label="Primary Supplier"
+              value={supplierId}
+              placeholder="None"
+              onChange={setSupplierId}
+              options={[
+                { value: '', label: 'None' },
+                ...suppliers.map(s => ({ value: s.id, label: s.name })),
+              ]}
+            />
+            <p className="text-xs text-foreground-muted mt-1">The supplier this product is typically sourced from</p>
           </div>
 
           <div>

@@ -393,7 +393,7 @@ export async function POST(request: NextRequest) {
         `INSERT INTO controls_operation_log (operation, product_ids, value, snapshot, applied_by, admin_id, product_count)
          VALUES ($1, $2, $3, $4, $5, $6, $7)
          RETURNING id`,
-        [operation, ids, JSON.stringify(value ?? null), JSON.stringify(snapshot), admin.username ?? null, admin.adminId ?? null, ids.length]
+        [operation, ids, JSON.stringify(value ?? null), JSON.stringify(snapshot), admin.email ?? null, admin.adminId ?? null, ids.length]
       )
       logId = logRes.rows[0]?.id ?? null
     })

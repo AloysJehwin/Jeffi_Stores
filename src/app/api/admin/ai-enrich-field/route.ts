@@ -1,10 +1,12 @@
+export const maxDuration = 120
+
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 
 const OLLAMA_URL = () =>
   (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
 const OLLAMA_MODEL = () =>
-  process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
+  process.env.OLLAMA_ENRICH_MODEL || 'gemma3:4b'
 
 const SYSTEM_PROMPT = `You are a copywriting assistant for an Indian B2B/B2C hardware and tools store (jeffistores.com).
 Enrich the given field value to be clearer, more professional, and more useful to buyers and staff.
@@ -25,7 +27,6 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json()
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
@@ -55,7 +56,7 @@ export async function POST(request: NextRequest) {
         ],
         options: { temperature: 0.3 },
       }),
-      signal: AbortSignal.timeout(20000),
+      signal: AbortSignal.timeout(60000),
     })
 
     if (!res.ok) {
@@ -68,8 +69,7 @@ export async function POST(request: NextRequest) {
     let obj: { result?: string }
     try {
       obj = JSON.parse(raw)
-    } catch (err) {
-      console.error('[route]', err)
+    } catch {
       const m = raw.match(/\{[\s\S]*\}/)
       if (!m) return NextResponse.json({ error: 'AI returned unparseable response' }, { status: 502 })
       obj = JSON.parse(m[0])

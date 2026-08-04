@@ -89,6 +89,9 @@ COPY --from=deps /app/node_modules/pngjs ./node_modules/pngjs
 COPY --from=deps /app/node_modules/dijkstrajs ./node_modules/dijkstrajs
 COPY --from=deps /app/node_modules/bwip-js ./node_modules/bwip-js
 
+# Copy cluster server wrapper
+COPY --from=builder --chown=nextjs:nodejs /app/cluster-server.js ./cluster-server.js
+
 # Copy database migration files
 COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 
@@ -122,4 +125,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "server.js"]
+CMD ["node", "cluster-server.js"]

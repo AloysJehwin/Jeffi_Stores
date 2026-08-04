@@ -10,6 +10,7 @@ vi.mock('@/lib/jwt', () => ({
 vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
   queryMany: vi.fn(),
+  query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
   withTransaction: vi.fn(),
 }))
 vi.mock('@/lib/email', () => ({
@@ -100,6 +101,13 @@ const MOCK_USER = {
 describe('POST /api/razorpay/verify', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    // clearAllMocks clears call history but NOT the mockResolvedValueOnce queue,
+    // so leftover once-values from one test can leak into the next. Fully reset the
+    // db query mocks (clears queued once-values), then restore safe defaults.
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(db.queryMany).mockReset().mockResolvedValue([] as any)
+    vi.mocked(db.query).mockReset().mockResolvedValue({ rows: [], rowCount: 0 } as any)
+    vi.mocked(db.withTransaction).mockReset()
   })
 
   it('returns 401 when unauthenticated', async () => {
@@ -245,7 +253,10 @@ describe('POST /api/razorpay/verify', () => {
       notes: null,
     } as any)
 
-    vi.mocked(db.queryOne).mockResolvedValue(MOCK_USER)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)       // idempotency check: no existing payment
+      .mockResolvedValueOnce(MOCK_USER)  // user lookup
+      .mockResolvedValue(MOCK_ORDER)     // post-commit order/item lookups
     vi.mocked(db.queryMany).mockResolvedValue([])
 
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
@@ -327,7 +338,9 @@ describe('POST /api/razorpay/verify', () => {
       addressId: null,
       notes: null,
     } as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce(null) // user not found
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null) // idempotency check: no existing payment
+      .mockResolvedValueOnce(null) // user not found
 
     const res = await POST(makeRequest({
       razorpay_order_id: RZP_ORDER_ID,
@@ -353,7 +366,9 @@ describe('POST /api/razorpay/verify', () => {
       addressId: null,
       notes: null,
     } as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)      // idempotency check: no existing payment
+      .mockResolvedValueOnce(MOCK_USER) // user lookup
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([] as any)
 
     const res = await POST(makeRequest({
@@ -380,7 +395,9 @@ describe('POST /api/razorpay/verify', () => {
       addressId: null,
       notes: null,
     } as any)
-    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)      // idempotency check: no existing payment
+      .mockResolvedValueOnce(MOCK_USER) // user lookup
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
     vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
     vi.mocked(hashCartItems).mockReturnValue('different-hash')
@@ -411,6 +428,7 @@ describe('POST /api/razorpay/verify', () => {
       notes: null,
     } as any)
     vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)                          // idempotency check: no existing payment
       .mockResolvedValueOnce(MOCK_USER)                     // user
       .mockResolvedValueOnce({ id: 'prod-1', name: 'Bolt', sku: 'B001', gst_percentage: '18', hsn_code: '7318' }) // product
       .mockResolvedValueOnce(MOCK_USER)                     // post-commit queryOne calls
@@ -509,7 +527,10 @@ describe('POST /api/razorpay/verify', () => {
       addressId: null,
       notes: null,
     } as any)
-    vi.mocked(db.queryOne).mockResolvedValue(MOCK_USER)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)       // idempotency check: no existing payment
+      .mockResolvedValueOnce(MOCK_USER)  // user lookup
+      .mockResolvedValue(MOCK_ORDER)     // post-commit order/item lookups
     vi.mocked(db.queryMany).mockResolvedValue([])
     vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
     vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)

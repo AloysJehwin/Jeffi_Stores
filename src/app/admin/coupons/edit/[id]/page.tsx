@@ -171,7 +171,7 @@ export default async function EditCouponPage({ params, searchParams }: { params:
         await query(
           `UPDATE coupons SET code=$1, description=$2, discount_type=$3, discount_value=$4,
            min_purchase_amount=$5, max_discount_amount=$6, usage_limit=$7, usage_limit_per_user=$8,
-           valid_from=$9, valid_until=$10, is_active=$11, updated_at=NOW() WHERE id=$12`,
+           valid_from=$9, valid_until=$10, is_active=$11 WHERE id=$12`,
           [code, description || null, discount_type, isNaN(discount_value) ? 0 : discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active, id]
         )
         await query(`DELETE FROM coupon_drafts WHERE coupon_id = $1`, [id])
@@ -182,8 +182,8 @@ export default async function EditCouponPage({ params, searchParams }: { params:
       revalidatePath(`/admin/coupons/edit/${id}`)
       redirect(ap(destination, host))
     } catch (err: any) {
-      if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
-      throw new Error('Failed to update coupon')
+      if (err?.digest?.startsWith('NEXT_REDIRECT') || err?.type === 'NEXT_REDIRECT') throw err
+      throw new Error(err?.message || 'Failed to update coupon')
     }
   }
 

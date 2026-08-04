@@ -1,19 +1,21 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
+import AIFillForm from './AIFillForm'
 
 interface BrandFormProps {
   action: (formData: FormData) => Promise<void>
   brand?: any
   backUrl?: string
   isDraft?: boolean
+  submitLabel?: string
 }
 
-export default function BrandForm({ action, brand, backUrl, isDraft = false }: BrandFormProps) {
+export default function BrandForm({ action, brand, backUrl, isDraft = false, submitLabel }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>(brand?.name || '')
@@ -23,6 +25,24 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false }: B
   const [returnDays, setReturnDays] = useState<number>(brand?.return_window_days ?? 7)
   const [replacementAllowed, setReplacementAllowed] = useState<boolean>(brand?.replacement_allowed ?? true)
   const [replacementDays, setReplacementDays] = useState<number>(brand?.replacement_window_days ?? 7)
+  const formRef = useRef<HTMLFormElement>(null)
+
+  function setInput(name: string, value: string) {
+    const el = formRef.current?.elements.namedItem(name) as HTMLInputElement | null
+    if (el) el.value = value
+  }
+
+  function handleAIFill(values: Record<string, unknown>) {
+    if (values.name) setBrandName(String(values.name))
+    if (values.slug) setInput('slug', String(values.slug).toLowerCase().replace(/[^a-z0-9-]/g, '-'))
+    if (values.description) setDescription(String(values.description))
+    if (values.website) setInput('website', String(values.website))
+    if (values.is_active != null) setIsActive(Boolean(values.is_active))
+    if (values.return_allowed != null) setReturnAllowed(Boolean(values.return_allowed))
+    if (values.return_window_days != null) setReturnDays(Number(values.return_window_days))
+    if (values.replacement_allowed != null) setReplacementAllowed(Boolean(values.replacement_allowed))
+    if (values.replacement_window_days != null) setReplacementDays(Number(values.replacement_window_days))
+  }
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
@@ -44,7 +64,7 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false }: B
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
+    <form ref={formRef} onSubmit={handleSubmit} className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
       <div className="p-4 sm:p-6">
         {error && (
@@ -52,6 +72,23 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false }: B
             {error}
           </div>
         )}
+        <div className="mb-6">
+          <AIFillForm
+            fields={[
+              { name: 'name', label: 'Brand Name', type: 'text' },
+              { name: 'slug', label: 'URL Slug', type: 'text' },
+              { name: 'description', label: 'Description', type: 'textarea' },
+              { name: 'website', label: 'Website URL', type: 'text' },
+              { name: 'is_active', label: 'Active', type: 'boolean' },
+              { name: 'return_allowed', label: 'Returns Allowed', type: 'boolean' },
+              { name: 'return_window_days', label: 'Return Window Days', type: 'number' },
+              { name: 'replacement_allowed', label: 'Replacement Allowed', type: 'boolean' },
+              { name: 'replacement_window_days', label: 'Replacement Window Days', type: 'number' },
+            ]}
+            onFill={handleAIFill}
+            context="Hardware/tools brand for jeffistores.com"
+          />
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           <div>
@@ -226,7 +263,7 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false }: B
         ) : (
           <button type="submit" disabled={isSubmitting}
             className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {isSubmitting ? 'Saving...' : brand ? 'Update Brand' : 'Create Brand'}
+            {isSubmitting ? 'Saving...' : submitLabel || (brand ? 'Update Brand' : 'Create Brand')}
           </button>
         )}
       </div>

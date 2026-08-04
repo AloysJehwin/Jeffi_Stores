@@ -176,9 +176,10 @@ describe('merchant/mapper', () => {
       expect(items[0].productTypes).toEqual(['Tools > Hand Tools'])
     })
 
-    it('sets highlights from helper', () => {
+    it('sets productHighlights from helper', () => {
+      // Content API v2.1: productHighlights is an array of plain strings.
       const items = productToGmcItems(makeProduct())
-      expect(items[0].highlights).toEqual([{ title: 'Durable' }, { title: 'Lightweight' }])
+      expect(items[0].productHighlights).toEqual(['Durable', 'Lightweight'])
     })
 
     it('sets productDetails from helper', () => {
@@ -187,10 +188,10 @@ describe('merchant/mapper', () => {
       expect(items[0].productDetails[0].sectionName).toBe('Specs')
     })
 
-    it('omits highlights when empty', () => {
+    it('omits productHighlights when empty', () => {
       mockBuildProductHighlights.mockReturnValueOnce([])
       const items = productToGmcItems(makeProduct())
-      expect(items[0].highlights).toBeUndefined()
+      expect(items[0].productHighlights).toBeUndefined()
     })
 
     it('omits productDetails when empty', () => {
@@ -342,11 +343,12 @@ describe('merchant/mapper', () => {
       expect(items[0].salePrice).toBeDefined()
     })
 
-    it('sets size from variant_name', () => {
+    it('sets sizes from variant_name', () => {
+      // Content API v2.1: sizes is an array of strings.
       const items = productToGmcItems(makeVariantProduct([
         { sku: 'VAR-1', variant_name: 'XL', price: 199, mrp: 249, stock_status: 'In Stock' },
       ]))
-      expect(items[0].size).toBe('XL')
+      expect(items[0].sizes).toEqual(['XL'])
     })
 
     it('sets availability per variant stock_status', () => {

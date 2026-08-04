@@ -991,7 +991,7 @@ export async function sendPaymentStatusUpdate(
 
 export async function sendAdminCertificateEmail(
   email: string,
-  username: string,
+  displayName: string,
   p12Buffer: Buffer,
   p12Password: string,
   serialNumber: string,
@@ -1000,6 +1000,7 @@ export async function sendAdminCertificateEmail(
 ) {
   const from = `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`
   const subject = 'Your Admin Certificate - Jeffi Stores'
+  const certFileSlug = (displayName || email).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-|-$/g, '') || 'admin'
   const html = `
       <!DOCTYPE html>
       <html>
@@ -1084,12 +1085,12 @@ export async function sendAdminCertificateEmail(
               <p style="color: #666;">Admin Panel Access</p>
             </div>
 
-            <h2>Welcome, ${username}!</h2>
+            <h2>Welcome, ${displayName}!</h2>
             <p>You have been added as an <strong>${role}</strong> on the Jeffi Stores admin panel. Your client certificate is attached to this email.</p>
 
             <div class="credential-box">
-              <div class="label">Username</div>
-              <div class="value">${username}</div>
+              <div class="label">Email</div>
+              <div class="value">${email}</div>
               <hr>
               <div class="label">Certificate Password</div>
               <div class="value">${p12Password}</div>
@@ -1114,7 +1115,7 @@ export async function sendAdminCertificateEmail(
             <div class="info">
               <strong>How to install:</strong>
               <ol style="margin: 8px 0 0 0; padding-left: 20px;">
-                <li>Download the attached <code>${username}-admin-cert.p12</code> file.</li>
+                <li>Download the attached <code>${certFileSlug}-admin-cert.p12</code> file.</li>
                 <li>Double-click the file to open it in your system's certificate manager.</li>
                 <li>Enter the certificate password shown above when prompted.</li>
                 <li>Navigate to <strong>https://admin.jeffistores.in/admin/login</strong> to access the admin panel.</li>
@@ -1134,7 +1135,7 @@ export async function sendAdminCertificateEmail(
     `
   const attachments = [
     {
-      filename: `${username}-admin-cert.p12`,
+      filename: `${certFileSlug}-admin-cert.p12`,
       content: p12Buffer,
       contentType: 'application/x-pkcs12',
     },

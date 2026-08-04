@@ -15,9 +15,10 @@ interface ProductImageGalleryProps {
   productName: string
   variantImages?: ProductImage[]
   discountPct?: number | null
+  ribbonLabel?: string
 }
 
-export default function ProductImageGallery({ images, productName, variantImages, discountPct }: ProductImageGalleryProps) {
+export default function ProductImageGallery({ images, productName, variantImages, discountPct, ribbonLabel }: ProductImageGalleryProps) {
   const displayImages = (variantImages && variantImages.length > 0) ? variantImages : images
   const [selectedImageIndex, setSelectedImageIndex] = useState(0)
   const [isZoomed, setIsZoomed] = useState(false)
@@ -71,6 +72,11 @@ export default function ProductImageGallery({ images, productName, variantImages
           onMouseMove={handleMouseMove}
           onClick={() => setShowLightbox(true)}
         >
+          {ribbonLabel && (
+            <div className="absolute top-6 right-[-36px] w-44 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[11px] font-bold text-center py-1.5 shadow-md pointer-events-none select-none z-10">
+              {ribbonLabel}
+            </div>
+          )}
           <div className="w-full aspect-[5/3] relative overflow-hidden flex items-center justify-center">
             <img
               src={currentImage.image_url}
@@ -117,8 +123,8 @@ export default function ProductImageGallery({ images, productName, variantImages
                 onClick={() => setSelectedImageIndex(index)}
                 className={`relative bg-surface-elevated rounded-lg overflow-hidden cursor-pointer border-2 transition-all hover:scale-[1.03] active:scale-95 ${
                   index === selectedImageIndex
-                    ? 'border-accent-500 ring-2 ring-accent-200 scale-[1.02]'
-                    : 'border-border-default hover:border-gray-400'
+                    ? 'border-accent-500 scale-[1.02]'
+                    : 'border-border-default hover:border-accent-300'
                 }`}
               >
                 <div className="w-full h-20 flex items-center justify-center">
@@ -201,16 +207,16 @@ export default function ProductImageGallery({ images, productName, variantImages
                     e.stopPropagation()
                     setSelectedImageIndex(index)
                   }}
-                  className={`flex-shrink-0 w-16 h-16 rounded overflow-hidden border-2 transition-all ${
+                  className={`flex-shrink-0 w-16 h-16 rounded border-2 transition-all ${
                     index === selectedImageIndex
-                      ? 'border-accent-500 ring-2 ring-accent-300'
-                      : 'border-transparent hover:border-gray-400'
+                      ? 'border-accent-500'
+                      : 'border-transparent hover:border-accent-300'
                   }`}
                 >
                   <ImgWithSkeleton
                     src={image.thumbnail_url}
                     alt={`Thumbnail ${index + 1}`}
-                    className="w-full h-full object-contain bg-surface-secondary"
+                    className="w-full h-full object-contain bg-surface-secondary overflow-hidden rounded"
                   />
                 </button>
               ))}

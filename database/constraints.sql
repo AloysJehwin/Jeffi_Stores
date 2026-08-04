@@ -126,14 +126,6 @@ ALTER TABLE ONLY public.admins
 
 
 
---
--- Name: admins admins_username_key; Type: CONSTRAINT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.admins
-    ADD CONSTRAINT admins_username_key UNIQUE (username);
-
-
 
 --
 -- Name: ai_briefing_log ai_briefing_log_briefing_date_key; Type: CONSTRAINT; Schema: public; Owner: -

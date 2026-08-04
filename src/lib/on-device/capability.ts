@@ -5,20 +5,18 @@
  * Gemma 3 270M checkout-summary model. Pure feature detection — no model
  * download, no heavy work. Runs client-side only.
  *
- * Policy (strict): WebGPU adapter present AND navigator.deviceMemory >= 4 GB
- * AND the GPU adapter's limits are large enough for the model's tensors. Devices
- * that fail are silently excluded (the summary UI simply never renders).
- *
- * The whole check is additionally gated by the feature flag — when the flag is
- * off, the gate short-circuits to reason:'disabled' before any probing.
+ * Policy:
+ * - Feature flag must be on
+ * - WebGPU adapter present
+ * - Memory >= 4 GB (desktop) or WebGPU passes (mobile — deviceMemory unreliable)
+ * - GPU buffer limits large enough (relaxed thresholds for mobile)
+ * - Real Wi-Fi or ethernet (blocks cellular/hotspot, respects saveData)
  */
 
 import { isOnDeviceSummaryEnabled } from './flag'
 
-// ── Minimal local WebGPU typings (avoids adding @webgpu/types as a dep) ──────
 interface GPUAdapterLike {
   limits: Record<string, number>
-  // Some browsers expose adapter.info; optional.
   info?: { vendor?: string; architecture?: string; device?: string; description?: string }
   requestAdapterInfo?: () => Promise<{ vendor?: string; architecture?: string; description?: string }>
 }
@@ -28,11 +26,15 @@ interface GPULike {
 interface NavigatorWithGPU extends Navigator {
   gpu?: GPULike
   deviceMemory?: number
+  connection?: {
+    type?: string
+    effectiveType?: string
+    saveData?: boolean
+  }
 }
 
 export interface CapabilityVerdict {
   capable: boolean
-  /** Machine-readable reason when not capable (for telemetry/debug). */
   reason:
     | 'ok'
     | 'disabled'
@@ -41,6 +43,7 @@ export interface CapabilityVerdict {
     | 'no-adapter'
     | 'low-memory'
     | 'gpu-limits-too-small'
+    | 'not-wifi'
     | 'error'
   details: {
     hasWebGPU: boolean
@@ -51,33 +54,49 @@ export interface CapabilityVerdict {
     gpuVendor: string | null
     storageQuotaMB: number | null
     modelCached: boolean
+    isWifi: boolean | null
+    isMobile: boolean
   }
 }
 
-// Minimum thresholds. Kept conservative for a smooth experience where it runs.
+// Desktop thresholds
 const MIN_DEVICE_MEMORY_GB = 4
-// Gemma 3 270M (q4) tensors — a single weight buffer can be a few hundred MB.
-// Require headroom so binding a large buffer won't fail.
 const MIN_MAX_BUFFER_MB = 512
 const MIN_MAX_STORAGE_BINDING_MB = 256
 
-/** Cache key for the model blob in the Cache Storage API. */
+// Mobile relaxed thresholds — mobile GPUs have smaller limits but can still run q4
+const MIN_MAX_BUFFER_MB_MOBILE = 256
+const MIN_MAX_STORAGE_BINDING_MB_MOBILE = 128
+
 export const MODEL_CACHE_NAME = 'jeffi-on-device-model-v1'
 
 function mb(bytes: number | undefined): number | null {
   return typeof bytes === 'number' && bytes > 0 ? Math.round(bytes / (1024 * 1024)) : null
 }
 
-/** Whether the model has already been downloaded & cached on this device. */
+function detectMobile(): boolean {
+  try {
+    if ((navigator as any).userAgentData?.mobile) return true
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+  } catch { return false }
+}
+
+function detectWifi(nav: NavigatorWithGPU): boolean | null {
+  const conn = nav.connection
+  if (!conn) return null // API not available — don't block (desktop browsers)
+  if (conn.saveData) return false
+  const t = conn.type
+  if (!t || t === 'unknown') return null // unknown → allow
+  return t === 'wifi' || t === 'ethernet'
+}
+
 async function isModelCached(): Promise<boolean> {
   try {
     if (typeof caches === 'undefined') return false
     const c = await caches.open(MODEL_CACHE_NAME)
     const keys = await c.keys()
     return keys.length > 0
-  } catch {
-    return false
-  }
+  } catch { return false }
 }
 
 async function storageQuotaMB(): Promise<number | null> {
@@ -85,15 +104,9 @@ async function storageQuotaMB(): Promise<number | null> {
     if (!navigator.storage?.estimate) return null
     const est = await navigator.storage.estimate()
     return mb(est.quota)
-  } catch {
-    return null
-  }
+  } catch { return null }
 }
 
-/**
- * Run the full capability check. Safe to call anywhere — never throws.
- * Returns capable:false with a reason on any failure or unsupported environment.
- */
 export async function detectOnDeviceCapability(): Promise<CapabilityVerdict> {
   const details: CapabilityVerdict['details'] = {
     hasWebGPU: false,
@@ -104,9 +117,10 @@ export async function detectOnDeviceCapability(): Promise<CapabilityVerdict> {
     gpuVendor: null,
     storageQuotaMB: null,
     modelCached: false,
+    isWifi: null,
+    isMobile: false,
   }
 
-  // Feature flag first — when off, do nothing at all.
   if (!isOnDeviceSummaryEnabled()) {
     return { capable: false, reason: 'disabled', details }
   }
@@ -117,21 +131,25 @@ export async function detectOnDeviceCapability(): Promise<CapabilityVerdict> {
 
   try {
     const nav = navigator as NavigatorWithGPU
-
-    // Device memory (coarse RAM proxy). Undefined on some browsers (Safari/FF) —
-    // treat unknown as failing the strict gate rather than optimistically pass.
+    details.isMobile = detectMobile()
+    details.isWifi = detectWifi(nav)
     details.deviceMemoryGB = typeof nav.deviceMemory === 'number' ? nav.deviceMemory : null
     details.storageQuotaMB = await storageQuotaMB()
     details.modelCached = await isModelCached()
 
-    // WebGPU present?
+    // Wi-Fi gate — block cellular/hotspot. null means API absent → pass through.
+    if (details.isWifi === false) {
+      return { capable: false, reason: 'not-wifi', details }
+    }
+
     if (!nav.gpu) {
       return { capable: false, reason: 'no-webgpu', details }
     }
     details.hasWebGPU = true
 
-    // Adapter available? (high-performance to prefer the discrete GPU)
-    const adapter = await nav.gpu.requestAdapter({ powerPreference: 'high-performance' })
+    // On mobile don't request high-performance (may return null on integrated-only devices)
+    const adapterOpts = details.isMobile ? undefined : { powerPreference: 'high-performance' as const }
+    const adapter = await nav.gpu.requestAdapter(adapterOpts)
     if (!adapter) {
       return { capable: false, reason: 'no-adapter', details }
     }
@@ -141,7 +159,6 @@ export async function detectOnDeviceCapability(): Promise<CapabilityVerdict> {
     details.maxBufferSizeMB = mb(limits.maxBufferSize)
     details.maxStorageBufferBindingSizeMB = mb(limits.maxStorageBufferBindingSize)
 
-    // GPU vendor (best-effort; API varies across browsers)
     try {
       if (adapter.info?.vendor) details.gpuVendor = adapter.info.vendor
       else if (adapter.requestAdapterInfo) {
@@ -150,14 +167,22 @@ export async function detectOnDeviceCapability(): Promise<CapabilityVerdict> {
       }
     } catch { /* ignore */ }
 
-    // Memory gate
-    if (details.deviceMemoryGB == null || details.deviceMemoryGB < MIN_DEVICE_MEMORY_GB) {
+    // Memory gate — relaxed for mobile (Safari/Firefox don't expose deviceMemory)
+    if (!details.isMobile) {
+      if (details.deviceMemoryGB == null || details.deviceMemoryGB < MIN_DEVICE_MEMORY_GB) {
+        return { capable: false, reason: 'low-memory', details }
+      }
+    }
+    // On mobile: if deviceMemory is known and < 3 GB, block (budget phones)
+    if (details.isMobile && details.deviceMemoryGB != null && details.deviceMemoryGB < 3) {
       return { capable: false, reason: 'low-memory', details }
     }
 
-    // GPU limits gate
-    const bufOk = (details.maxBufferSizeMB ?? 0) >= MIN_MAX_BUFFER_MB
-    const bindOk = (details.maxStorageBufferBindingSizeMB ?? 0) >= MIN_MAX_STORAGE_BINDING_MB
+    // GPU limits gate — use relaxed thresholds on mobile
+    const bufMin = details.isMobile ? MIN_MAX_BUFFER_MB_MOBILE : MIN_MAX_BUFFER_MB
+    const bindMin = details.isMobile ? MIN_MAX_STORAGE_BINDING_MB_MOBILE : MIN_MAX_STORAGE_BINDING_MB
+    const bufOk = (details.maxBufferSizeMB ?? 0) >= bufMin
+    const bindOk = (details.maxStorageBufferBindingSizeMB ?? 0) >= bindMin
     if (!bufOk || !bindOk) {
       return { capable: false, reason: 'gpu-limits-too-small', details }
     }

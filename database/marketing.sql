@@ -14,7 +14,6 @@ CREATE TABLE public.campaign_send_counts (
 );
 
 
-
 --
 -- Name: campaigns; Type: TABLE; Schema: public; Owner: -
 --
@@ -33,9 +32,9 @@ CREATE TABLE public.campaigns (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     scenario_kind character varying(64),
     parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
-    coupon_id uuid
+    coupon_id uuid,
+    draft_fields jsonb
 );
-
 
 
 --
@@ -47,7 +46,6 @@ CREATE TABLE public.coupon_eligible_users (
     user_id uuid NOT NULL,
     added_at timestamp with time zone DEFAULT now() NOT NULL
 );
-
 
 
 --
@@ -62,7 +60,6 @@ CREATE TABLE public.coupon_usage (
     discount_amount numeric(12,2) NOT NULL,
     created_at timestamp with time zone DEFAULT now()
 );
-
 
 
 --
@@ -90,6 +87,18 @@ CREATE TABLE public.coupons (
 );
 
 
+--
+-- Name: coupon_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.coupon_drafts (
+    coupon_id uuid NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT coupon_drafts_pkey PRIMARY KEY (coupon_id)
+);
+
 
 --
 -- Name: email_campaign_logs; Type: TABLE; Schema: public; Owner: -
@@ -103,7 +112,6 @@ CREATE TABLE public.email_campaign_logs (
     error text,
     sent_at timestamp with time zone DEFAULT now()
 );
-
 
 
 --
@@ -127,7 +135,6 @@ CREATE TABLE public.email_campaigns (
 );
 
 
-
 --
 -- Name: email_campaigns_sent; Type: TABLE; Schema: public; Owner: -
 --
@@ -149,3 +156,56 @@ CREATE TABLE public.email_campaigns_sent (
     metadata jsonb DEFAULT '{}'::jsonb
 );
 
+
+--
+-- Name: custom_scenarios; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.custom_scenarios (
+    kind character varying(64) NOT NULL,
+    name character varying(128) NOT NULL,
+    description text,
+    ai_prompt text NOT NULL,
+    generated_sql text NOT NULL,
+    dry_run_count integer,
+    dry_run_at timestamp with time zone,
+    approved_by uuid,
+    approved_at timestamp with time zone,
+    enabled boolean DEFAULT false NOT NULL,
+    parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    product_sql text
+);
+
+
+--
+-- Name: scenarios; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.scenarios (
+    kind character varying(64) NOT NULL,
+    name character varying(128) NOT NULL,
+    description text,
+    default_parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: scenario_audit_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.scenario_audit_log (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    scenario_kind character varying(64),
+    admin_id uuid,
+    action character varying(32) NOT NULL,
+    ai_prompt text,
+    ai_response text,
+    generated_sql text,
+    validation jsonb,
+    result jsonb,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);

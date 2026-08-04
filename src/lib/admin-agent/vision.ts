@@ -1,4 +1,4 @@
-const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://localhost:11434').replace(/\/$/, '')
+const OLLAMA_BASE_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
 const OLLAMA_VISION_MODEL = process.env.OLLAMA_VISION_MODEL || 'llava:13b'
 const VISION_TIMEOUT_MS = 120_000
 const PADDLE_OCR_URL = (process.env.PADDLE_OCR_URL || 'http://localhost:8866').replace(/\/$/, '')

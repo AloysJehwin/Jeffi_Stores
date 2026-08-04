@@ -91,6 +91,8 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
   const razorpayOpen = useRef(false)
+  const razorpayCleanup = useRef<(() => void) | null>(null)
+  const [pendingVerify, setPendingVerify] = useState<{ razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string; draftToken: string } | null>(null)
 
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
@@ -110,6 +112,68 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     imageUrl: string | null
     extraDeliveryDays: number
   } | null>(null)
+
+  const storageKey = isBusiness ? 'rzp_pending_biz' : 'rzp_pending'
+  const callbackPath = isBusiness ? '/business/checkout/payment-callback' : '/checkout/payment-callback'
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(storageKey)
+      if (raw) {
+        const pending = JSON.parse(raw)
+        const age = Date.now() - (pending.ts || 0)
+        if (age < 1800_000 && pending.draftToken && pending.razorpayOrderId) {
+          sessionStorage.removeItem(storageKey)
+          setPendingVerify(pending.razorpayPaymentId && pending.razorpaySignature
+            ? pending
+            : { ...pending, razorpayPaymentId: '', razorpaySignature: '' })
+        } else {
+          sessionStorage.removeItem(storageKey)
+        }
+      }
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    if (!pendingVerify) return
+    if (pendingVerify.razorpayPaymentId && pendingVerify.razorpaySignature) {
+      setIsSubmitting(true)
+      verifyPayment(pendingVerify.razorpayOrderId, pendingVerify.razorpayPaymentId, pendingVerify.razorpaySignature, { draftToken: pendingVerify.draftToken })
+        .finally(() => setPendingVerify(null))
+    } else {
+      setIsSubmitting(true)
+      const maxAttempts = 20
+      let attempts = 0
+      const poll = () => {
+        fetch('/api/razorpay/check-pending', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json', ...portalHeader },
+          body: JSON.stringify({ razorpayOrderId: pendingVerify.razorpayOrderId, draftToken: pendingVerify.draftToken }),
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.order) {
+              try { sessionStorage.removeItem(storageKey) } catch {}
+              clearCart()
+              showToast('Payment confirmed!', 'success')
+              window.location.href = `${ordersPath}/${data.order.id}`
+            } else if (data.status === 'pending' && attempts < maxAttempts) {
+              attempts++; setTimeout(poll, 3000)
+            } else {
+              setSubmitError(data.error || 'Could not confirm payment. Check My Orders or contact support.')
+              setIsSubmitting(false); setPendingVerify(null)
+            }
+          })
+          .catch(() => {
+            if (attempts < maxAttempts) { attempts++; setTimeout(poll, 3000) }
+            else { setSubmitError('Could not confirm payment. Check My Orders or contact support.'); setIsSubmitting(false); setPendingVerify(null) }
+          })
+      }
+      poll()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!pendingVerify])
 
   useEffect(() => {
     fetch('/api/store-settings', { credentials: 'include' }).then(r => r.json()).then(d => {
@@ -449,11 +513,15 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Payment verification failed')
+      try { sessionStorage.removeItem(storageKey) } catch {}
       clearCart()
       showToast('Payment successful!', 'success')
       window.location.href = `${ordersPath}/${data.order.id}`
     } catch (err: any) {
-      setSubmitError(err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.')
+      const msg = razorpay_payment_id
+        ? `Payment received but confirmation failed. Check My Orders — if no order appears in 2 minutes, contact support with payment ID: ${razorpay_payment_id}`
+        : (err?.message || 'Payment verification failed. Please contact support.')
+      setSubmitError(msg)
       setIsSubmitting(false)
     }
   }
@@ -477,6 +545,19 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         description: 'Order Payment',
         order_id: rzpData.razorpayOrderId,
         handler: async function (response: any) {
+          if (payload.draftToken) {
+            try {
+              sessionStorage.setItem(storageKey, JSON.stringify({
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+                draftToken: payload.draftToken,
+                ts: Date.now(),
+              }))
+            } catch {}
+          }
+          razorpayCleanup.current?.()
+          razorpayCleanup.current = null
           await verifyPayment(
             response.razorpay_order_id,
             response.razorpay_payment_id,
@@ -490,9 +571,14 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
           contact: selectedAddress?.phone || '',
         },
         theme: { color: '#f97316' },
+        redirect: false,
+        callback_url: `${window.location.origin}${callbackPath}`,
         modal: {
           ondismiss: function () {
             razorpayOpen.current = false
+            razorpayCleanup.current?.()
+            razorpayCleanup.current = null
+            try { sessionStorage.removeItem(storageKey) } catch {}
             if (payload.orderId) {
               fetch(`/api/orders/${payload.orderId}`, {
                 method: 'DELETE',
@@ -509,6 +595,8 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       const rzp = new (window as any).Razorpay(options)
       rzp.on('payment.failed', function (response: any) {
         razorpayOpen.current = false
+        razorpayCleanup.current?.()
+        razorpayCleanup.current = null
         if (payload.orderId) {
           fetch(`/api/orders/${payload.orderId}/payment-failed`, {
             method: 'POST',
@@ -523,7 +611,30 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
           setIsSubmitting(false)
         }
       })
+
       razorpayOpen.current = true
+      if (payload.draftToken) {
+        try {
+          sessionStorage.setItem(storageKey, JSON.stringify({
+            razorpayOrderId: rzpData.razorpayOrderId,
+            razorpayPaymentId: '',
+            razorpaySignature: '',
+            draftToken: payload.draftToken,
+            ts: Date.now(),
+          }))
+        } catch {}
+      }
+
+      const onBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (!razorpayOpen.current) return
+        e.preventDefault()
+        e.returnValue = ''
+      }
+      window.addEventListener('beforeunload', onBeforeUnload)
+      razorpayCleanup.current = () => {
+        window.removeEventListener('beforeunload', onBeforeUnload)
+      }
+
       rzp.open()
     } catch (err: any) {
       if (payload.orderId) {
@@ -667,6 +778,26 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       setSubmitError(err.message)
       setIsSubmitting(false)
     }
+  }
+
+  if (pendingVerify) {
+    return (
+      <div className="min-h-screen bg-surface px-4 py-8 flex items-center justify-center">
+        <div className="max-w-md w-full bg-surface-elevated rounded-xl border border-border-default p-8 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center mx-auto">
+            <svg className="w-6 h-6 text-accent-500 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">Confirming your payment…</h2>
+          <p className="text-sm text-foreground-secondary">Your payment was received. We&apos;re confirming your order — please don&apos;t close this page.</p>
+          {submitError && (
+            <div className="text-sm text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 rounded-lg px-4 py-3">{submitError}</div>
+          )}
+        </div>
+      </div>
+    )
   }
 
   if (authLoading || cartLoading || (intentToken && isBuyNow && !buyNowItem)) {

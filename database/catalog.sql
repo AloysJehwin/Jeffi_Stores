@@ -2,7 +2,6 @@
 -- Schema-only dump, no owner, no acl
 
 
-
 --
 -- Name: brands; Type: TABLE; Schema: public; Owner: -
 --
@@ -22,6 +21,18 @@ CREATE TABLE public.brands (
     replacement_window_days integer DEFAULT 7 NOT NULL
 );
 
+
+--
+-- Name: brand_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.brand_drafts (
+    brand_id uuid NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT brand_drafts_pkey PRIMARY KEY (brand_id)
+);
 
 
 --
@@ -51,6 +62,18 @@ CREATE TABLE public.categories (
 );
 
 
+--
+-- Name: category_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.category_drafts (
+    category_id uuid NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT category_drafts_pkey PRIMARY KEY (category_id)
+);
+
 
 --
 -- Name: gallery_images; Type: TABLE; Schema: public; Owner: -
@@ -73,7 +96,6 @@ CREATE TABLE public.gallery_images (
     custom_name character varying(255),
     category_id uuid
 );
-
 
 
 --
@@ -101,7 +123,6 @@ CREATE TABLE public.product_images (
 );
 
 
-
 --
 -- Name: product_sub_variants; Type: TABLE; Schema: public; Owner: -
 --
@@ -127,7 +148,6 @@ CREATE TABLE public.product_sub_variants (
 );
 
 
-
 --
 -- Name: product_unit_rules; Type: TABLE; Schema: public; Owner: -
 --
@@ -142,7 +162,6 @@ CREATE TABLE public.product_unit_rules (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT product_unit_rules_rule_type_check CHECK ((rule_type = ANY (ARRAY['tiered_price'::text, 'gst_threshold'::text, 'bonus_qty'::text, 'bundle_split'::text, 'physical_variance'::text])))
 );
-
 
 
 --
@@ -171,7 +190,6 @@ CREATE TABLE public.product_units (
     CONSTRAINT product_units_dimension_check CHECK (((dimension)::text = ANY ((ARRAY['count'::character varying, 'length'::character varying, 'area'::character varying, 'volume'::character varying, 'weight'::character varying, 'custom'::character varying])::text[]))),
     CONSTRAINT product_units_factor_check CHECK ((factor > (0)::numeric))
 );
-
 
 
 --
@@ -215,7 +233,6 @@ CREATE TABLE public.product_variants (
 );
 
 
-
 --
 -- Name: products; Type: TABLE; Schema: public; Owner: -
 --
@@ -257,7 +274,6 @@ CREATE TABLE public.products (
     height_cm numeric(6,2) DEFAULT 10,
     package_type character varying(30),
     cost_price numeric(12,2) DEFAULT 0,
-    extra_delivery_days integer DEFAULT 0 NOT NULL,
     inventory_quantity numeric(14,3) DEFAULT 0 NOT NULL,
     mrp_ex_gst numeric(12,2),
     sub_variant_type character varying(100),
@@ -273,6 +289,7 @@ CREATE TABLE public.products (
     discount_pct numeric(5,2) DEFAULT 0 NOT NULL,
     sell_unit_id uuid,
     stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
+    extra_delivery_days integer DEFAULT 0 NOT NULL,
     -- Identification & Compliance
     barcode character varying(50),
     isbn character varying(20),
@@ -285,6 +302,7 @@ CREATE TABLE public.products (
     color_hex character varying(7),
     volume_ml numeric(10,2),
     net_weight_grams integer,
+    volumetric_weight_grams integer,
     fragile boolean DEFAULT false NOT NULL,
     hazardous boolean DEFAULT false NOT NULL,
     flammable boolean DEFAULT false NOT NULL,
@@ -296,14 +314,14 @@ CREATE TABLE public.products (
     warranty_months integer,
     warranty_type character varying(30),
     -- Condition & Lifecycle
-    condition character varying(20) DEFAULT 'new' NOT NULL,
+    condition character varying(20) DEFAULT 'new'::character varying NOT NULL,
     is_cod_allowed boolean DEFAULT false NOT NULL,
     launch_date date,
     discontinue_date date,
     sort_order integer DEFAULT 0 NOT NULL,
     -- Shipping & Logistics
     handling_days integer DEFAULT 2 NOT NULL,
-    shipping_class character varying(30) DEFAULT 'standard' NOT NULL,
+    shipping_class character varying(30) DEFAULT 'standard'::character varying NOT NULL,
     is_oversized boolean DEFAULT false NOT NULL,
     -- Digital / Content
     is_digital boolean DEFAULT false NOT NULL,
@@ -321,19 +339,102 @@ CREATE TABLE public.products (
     -- SEO & Merchandising
     meta_title character varying(160),
     meta_description character varying(320),
+    meta_keywords text[],
     is_searchable boolean DEFAULT true NOT NULL,
     -- Tax & Finance
-    tax_class character varying(30) DEFAULT 'standard' NOT NULL,
-    customs_tariff_code character varying(20),
+    tax_class character varying(30) DEFAULT 'standard'::character varying NOT NULL,
     inclusive_tax boolean DEFAULT false NOT NULL,
     -- Age / Audience
     age_min integer,
     age_max integer,
     target_gender character varying(20),
     target_audience text[],
+    -- Serialization & Specs
+    serialized boolean DEFAULT false NOT NULL,
+    grade character varying(50),
+    specifications jsonb,
+    image_url text,
+    supplier_id uuid,
     CONSTRAINT products_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 
+
+--
+-- Name: product_batches; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_batches (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    product_id uuid NOT NULL,
+    variant_id uuid,
+    sub_variant_id uuid,
+    lot_number character varying(100),
+    manufacture_date date,
+    expiry_date date,
+    quantity numeric(14,3) DEFAULT 0 NOT NULL,
+    notes text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    grn_id uuid,
+    quantity_remaining numeric(14,3) DEFAULT 0 NOT NULL,
+    location_id uuid
+);
+
+
+--
+-- Name: product_serials; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_serials (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    product_id uuid NOT NULL,
+    variant_id uuid,
+    sub_variant_id uuid,
+    batch_id uuid,
+    grn_id uuid,
+    serial_number character varying(100) NOT NULL,
+    status character varying(20) DEFAULT 'in_stock'::character varying NOT NULL,
+    order_id uuid,
+    order_item_id uuid,
+    notes text,
+    received_at timestamp with time zone DEFAULT now() NOT NULL,
+    sold_at timestamp with time zone,
+    returned_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_serials_status_check CHECK ((status = ANY (ARRAY['in_stock'::text, 'sold'::text, 'returned'::text, 'damaged'::text, 'lost'::text]))),
+    CONSTRAINT product_serials_pkey PRIMARY KEY (id)
+);
+
+
+--
+-- Name: product_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.product_drafts (
+    product_id uuid NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    variants jsonb DEFAULT '[]'::jsonb NOT NULL,
+    images jsonb DEFAULT '[]'::jsonb NOT NULL,
+    sub_variants jsonb DEFAULT '[]'::jsonb NOT NULL,
+    units jsonb DEFAULT '[]'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT product_drafts_pkey PRIMARY KEY (product_id)
+);
+
+
+--
+-- Name: supplier_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.supplier_drafts (
+    supplier_id uuid NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT supplier_drafts_pkey PRIMARY KEY (supplier_id)
+);
 
 
 --
@@ -361,132 +462,11 @@ CREATE TABLE public.variant_images (
 );
 
 
--- Live migration (idempotent)
-ALTER TABLE products ADD COLUMN IF NOT EXISTS extra_delivery_days integer DEFAULT 0 NOT NULL;
--- Drop stale non-partial unique constraint superseded by partial indexes uniq_product_units_product_unit + uniq_product_units_variant_unit
-ALTER TABLE product_units DROP CONSTRAINT IF EXISTS product_units_product_id_unit_key;
+--
+-- Name: controls_operation_log; Type: TABLE; Schema: public; Owner: -
+--
 
--- Generic catalog expansion migrations (idempotent)
-ALTER TABLE products ADD COLUMN IF NOT EXISTS barcode character varying(50);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS isbn character varying(20);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS asin character varying(20);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS brand_part_number character varying(100);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS country_of_origin character varying(2);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS shelf_life_days integer;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS color character varying(100);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS color_hex character varying(7);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS volume_ml numeric(10,2);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS net_weight_grams integer;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS fragile boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS hazardous boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS flammable boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS perishable boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS certifications text[];
-ALTER TABLE products ADD COLUMN IF NOT EXISTS compliance_standard character varying(100);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS safety_rating character varying(100);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_months integer;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS warranty_type character varying(30);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS condition character varying(20) DEFAULT 'new' NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS is_cod_allowed boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS launch_date date;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS discontinue_date date;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS sort_order integer DEFAULT 0 NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS handling_days integer DEFAULT 2 NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS shipping_class character varying(30) DEFAULT 'standard' NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS is_oversized boolean DEFAULT false NOT NULL;
-ALTER TABLE products DROP COLUMN IF EXISTS volumetric_weight_grams;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS is_digital boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS download_url text;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS license_type character varying(30);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS file_format character varying(50);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS platform_compatibility text[];
-ALTER TABLE products ADD COLUMN IF NOT EXISTS is_subscription boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS subscription_interval character varying(20);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS subscription_price numeric(12,2);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS is_bundle boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS bundle_items jsonb;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS meta_title character varying(160);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS meta_description character varying(320);
-ALTER TABLE products DROP COLUMN IF EXISTS meta_keywords;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS is_searchable boolean DEFAULT true NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS tax_class character varying(30) DEFAULT 'standard' NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS customs_tariff_code character varying(20);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS inclusive_tax boolean DEFAULT false NOT NULL;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS age_min integer;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS age_max integer;
-ALTER TABLE products ADD COLUMN IF NOT EXISTS target_gender character varying(20);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS target_audience text[];
-
--- product_batches: per-intake batch tracking (manufacture/expiry dates, lot numbers)
-CREATE TABLE IF NOT EXISTS public.product_batches (
-    id               uuid DEFAULT gen_random_uuid() NOT NULL,
-    product_id       uuid NOT NULL,
-    variant_id       uuid,
-    sub_variant_id   uuid,
-    lot_number       character varying(100),
-    manufacture_date date,
-    expiry_date      date,
-    quantity         numeric(14,3) DEFAULT 0 NOT NULL,
-    notes            text,
-    created_at       timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at       timestamp with time zone DEFAULT now() NOT NULL
-);
-
--- Update column defaults for is_cod_allowed and handling_days
-ALTER TABLE products ALTER COLUMN is_cod_allowed SET DEFAULT false;
-ALTER TABLE products ALTER COLUMN handling_days SET DEFAULT 2;
-
--- product_batches: add grn traceability, FIFO remaining qty, and shelf location
-ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS grn_id uuid REFERENCES grns(id);
-ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS quantity_remaining numeric(14,3) NOT NULL DEFAULT 0;
-ALTER TABLE product_batches ADD COLUMN IF NOT EXISTS location_id uuid REFERENCES shelf_locations(id) ON DELETE SET NULL;
-
--- order_items: link to assigned batch (set at stock deduction time)
-ALTER TABLE order_items ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id) ON DELETE SET NULL;
-
--- inventory_transactions: full batch audit trail
-ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS batch_id uuid REFERENCES product_batches(id) ON DELETE SET NULL;
-
--- snapshot columns: store lot_number, expiry_date, serial_number at write time so ledger is immutable
-ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS lot_number varchar(100);
-ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS expiry_date date;
-ALTER TABLE inventory_transactions ADD COLUMN IF NOT EXISTS serial_number varchar(100);
-
--- serialized flag: products whose individual units get unique serial numbers
-ALTER TABLE products ADD COLUMN IF NOT EXISTS serialized boolean DEFAULT false NOT NULL;
-
--- product_serials: unique unit tracking per serialized product
-CREATE TABLE IF NOT EXISTS public.product_serials (
-    id               uuid DEFAULT gen_random_uuid() NOT NULL,
-    product_id       uuid NOT NULL,
-    variant_id       uuid,
-    sub_variant_id   uuid,
-    batch_id         uuid REFERENCES product_batches(id) ON DELETE SET NULL,
-    grn_id           uuid REFERENCES grns(id) ON DELETE SET NULL,
-    serial_number    character varying(100) NOT NULL,
-    status           character varying(20) DEFAULT 'in_stock' NOT NULL,
-    order_id         uuid,
-    order_item_id    uuid,
-    notes            text,
-    received_at      timestamp with time zone DEFAULT now() NOT NULL,
-    sold_at          timestamp with time zone,
-    returned_at      timestamp with time zone,
-    created_at       timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at       timestamp with time zone DEFAULT now() NOT NULL,
-    CONSTRAINT product_serials_status_check CHECK (status = ANY (ARRAY['in_stock', 'sold', 'returned', 'damaged', 'lost']))
-);
-
--- Remove unused fields
-ALTER TABLE products DROP COLUMN IF EXISTS meta_keywords;
-ALTER TABLE products DROP COLUMN IF EXISTS volumetric_weight_grams;
-ALTER TABLE products DROP COLUMN IF EXISTS customs_tariff_code;
-
--- Technical specification fields
-ALTER TABLE products ADD COLUMN IF NOT EXISTS grade character varying(50);
-ALTER TABLE products ADD COLUMN IF NOT EXISTS specifications jsonb;
-
--- Controls operation log (rollback snapshots)
-CREATE TABLE IF NOT EXISTS public.controls_operation_log (
+CREATE TABLE public.controls_operation_log (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     operation text NOT NULL,
     product_ids uuid[] NOT NULL,
@@ -494,10 +474,15 @@ CREATE TABLE IF NOT EXISTS public.controls_operation_log (
     snapshot jsonb,
     applied_by text,
     admin_id uuid,
-    product_count integer NOT NULL DEFAULT 0,
-    is_rollback boolean NOT NULL DEFAULT false,
+    product_count integer DEFAULT 0 NOT NULL,
+    is_rollback boolean DEFAULT false NOT NULL,
     rolled_back_at timestamp with time zone,
     rolled_back_by text,
     applied_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT controls_operation_log_pkey PRIMARY KEY (id)
 );
+
+
+-- Drop stale non-partial unique constraint superseded by partial indexes
+-- uniq_product_units_product_unit + uniq_product_units_variant_unit
+ALTER TABLE product_units DROP CONSTRAINT IF EXISTS product_units_product_id_unit_key;

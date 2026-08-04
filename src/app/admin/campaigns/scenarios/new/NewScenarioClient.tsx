@@ -200,7 +200,7 @@ export default function NewScenarioClient() {
             >
               {generating ? 'Generating…' : 'Generate SQL with AI'}
             </button>
-            <Link href={ap('/admin/campaigns/scenarios')} className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors">Cancel</Link>
+            <Link href={ap('/admin/campaigns/scenarios')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">Cancel</Link>
           </div>
         </div>
       )}

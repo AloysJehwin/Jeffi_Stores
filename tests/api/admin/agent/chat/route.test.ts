@@ -216,11 +216,12 @@ describe('POST /api/admin/agent/chat', () => {
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    // First call: model emits a tool_use block
+    // First call: model emits a native tool call
     // Second call: model gives final answer
     mockAiChat
       .mockResolvedValueOnce({
-        content: '<tool_use name="search_products">{"query":"bolt"}</tool_use>',
+        content: '',
+        toolCalls: [{ name: 'search_products', arguments: { query: 'bolt' } }],
         provider: 'openai',
         model: 'gpt-4',
       } as any)
@@ -254,7 +255,8 @@ describe('POST /api/admin/agent/chat', () => {
 
     mockAiChat
       .mockResolvedValueOnce({
-        content: '<tool_use name="nonexistent_tool">{"x":"y"}</tool_use>',
+        content: '',
+        toolCalls: [{ name: 'nonexistent_tool', arguments: { x: 'y' } }],
         provider: 'openai',
         model: 'gpt-4',
       } as any)
@@ -280,7 +282,8 @@ describe('POST /api/admin/agent/chat', () => {
 
     mockAiChat
       .mockResolvedValueOnce({
-        content: '<tool_use name="search_products">{"query":"bolt"}</tool_use>',
+        content: '',
+        toolCalls: [{ name: 'search_products', arguments: { query: 'bolt' } }],
         provider: 'openai',
         model: 'gpt-4',
       } as any)
@@ -312,7 +315,8 @@ describe('POST /api/admin/agent/chat', () => {
 
     mockAiChat
       .mockResolvedValueOnce({
-        content: '<tool_use name="update_product_price">{"product_id":"p1","price":200}</tool_use>',
+        content: '',
+        toolCalls: [{ name: 'update_product_price', arguments: { product_id: 'p1', price: 200 } }],
         provider: 'openai',
         model: 'gpt-4',
       } as any)
@@ -355,7 +359,8 @@ describe('POST /api/admin/agent/chat', () => {
 
     mockAiChat
       .mockResolvedValueOnce({
-        content: '<tool_use name="update_product_price">{"product_id":"p1","price":300}</tool_use>',
+        content: '',
+        toolCalls: [{ name: 'update_product_price', arguments: { product_id: 'p1', price: 300 } }],
         provider: 'openai',
         model: 'gpt-4',
       } as any)
@@ -399,7 +404,8 @@ describe('POST /api/admin/agent/chat', () => {
 
     mockAiChat
       .mockResolvedValueOnce({
-        content: '<tool_use name="search_products">{"query":"bolt"}</tool_use>',
+        content: '',
+        toolCalls: [{ name: 'search_products', arguments: { query: 'bolt' } }],
         provider: 'openai',
         model: 'gpt-4',
       } as any)
@@ -433,43 +439,18 @@ describe('POST /api/admin/agent/chat', () => {
     expect(data.pickers[0].options).toHaveLength(2)
   })
 
-  it('retries when AI responds with stall text (no tool call)', async () => {
-    mockAuth.mockResolvedValue(admin as any)
-    mockHasScope.mockReturnValue(true)
-    setupDbMocks()
-
-    // First response: stall text
-    // Second response: actual answer
-    mockAiChat
-      .mockResolvedValueOnce({
-        content: "Let me fetch that for you.",
-        provider: 'openai',
-        model: 'gpt-4',
-      } as any)
-      .mockResolvedValueOnce({
-        content: "Here is the data.",
-        provider: 'openai',
-        model: 'gpt-4',
-      } as any)
-
-    const res = await POST(makePost({ message: 'show me products' }))
-    expect(res.status).toBe(200)
-    const data = await res.json()
-    expect(mockAiChat).toHaveBeenCalledTimes(2)
-    expect(data.message).toBe('Here is the data.')
-  })
-
   it('returns fallback message when AI hits iteration limit', async () => {
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)
     setupDbMocks()
 
-    // Simulate model always calling a tool — it will loop up to MAX_ITERATIONS
+    // Simulate model always emitting a native tool call — it will loop up to MAX_ITERATIONS
     let callCount = 0
     mockAiChat.mockImplementation(async () => {
       callCount++
       return {
-        content: '<tool_use name="search_products">{"query":"bolt"}</tool_use>',
+        content: '',
+        toolCalls: [{ name: 'search_products', arguments: { query: 'bolt' } }],
         provider: 'openai',
         model: 'gpt-4',
       } as any
@@ -588,5 +569,578 @@ describe('POST /api/admin/agent/chat', () => {
       (m: any) => m.role === 'system' && m.content === 'System message'
     )
     expect(systemFromHistory).toBeUndefined()
+  })
+
+  // ── __call_admin_api_immediate__ marker branch ───────────────────────────────
+
+  it('invokes admin API internally for __call_admin_api_immediate__ marker (success)', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    setupDbMocks()
+
+    mockAiChat
+      .mockResolvedValueOnce({
+        content: '',
+        toolCalls: [{ name: 'call_admin_api', arguments: { path: '/api/admin/orders' } }],
+        provider: 'ollama',
+        model: 'qwen2.5',
+      } as any)
+      .mockResolvedValueOnce({
+        content: 'Done.',
+        provider: 'ollama',
+        model: 'qwen2.5',
+      } as any)
+
+    mockGetTool.mockReturnValue({
+      name: 'call_admin_api',
+      description: 'Call admin API',
+      mutating: false,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        marker: '__call_admin_api_immediate__',
+        method: 'GET',
+        path: '/api/admin/orders',
+      }),
+    } as any)
+
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue({
+      ok: true,
+      status: 200,
+      json: async () => ({ orders: [] }),
+      text: async () => '',
+    } as any)
+
+    const res = await POST(makePost({ message: 'list orders via api endpoint route' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    // The tool-call record is replaced by the API invocation result
+    expect(data.toolCalls[0].tool).toBe('call_admin_api')
+    expect(data.toolCalls[0].isError).toBe(false)
+    expect(data.toolCalls[0].output.ok).toBe(true)
+    expect(fetchSpy).toHaveBeenCalledOnce()
+    fetchSpy.mockRestore()
+  })
+
+  it('marks isError when admin API invocation returns non-ok', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    setupDbMocks()
+
+    mockAiChat
+      .mockResolvedValueOnce({
+        content: '',
+        toolCalls: [{ name: 'call_admin_api', arguments: {} }],
+        provider: 'ollama',
+        model: 'qwen2.5',
+      } as any)
+      .mockResolvedValueOnce({ content: 'Failed.', provider: 'ollama', model: 'qwen2.5' } as any)
+
+    mockGetTool.mockReturnValue({
+      name: 'call_admin_api',
+      description: 'Call admin API',
+      mutating: false,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        marker: '__call_admin_api_immediate__',
+        method: 'POST',
+        path: '/api/admin/orders',
+      }),
+    } as any)
+
+    // fetch throws → invokeAdminApiInternal returns { ok:false, status:0, ... }
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockRejectedValue(new Error('ECONNREFUSED'))
+
+    const res = await POST(makePost({ message: 'call the api endpoint route' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.toolCalls[0].isError).toBe(true)
+    expect(data.toolCalls[0].output.ok).toBe(false)
+    fetchSpy.mockRestore()
+  })
+
+  // ── uiBlocks hoisting + tool result branch ───────────────────────────────────
+
+  it('hoists uiBlocks embedded in a non-mutating tool result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    setupDbMocks()
+
+    mockAiChat
+      .mockResolvedValueOnce({
+        content: '',
+        toolCalls: [{ name: 'search_products', arguments: { query: 'x' } }],
+        provider: 'ollama',
+        model: 'qwen2.5',
+      } as any)
+      .mockResolvedValueOnce({ content: 'Here.', provider: 'ollama', model: 'qwen2.5' } as any)
+
+    mockGetTool.mockReturnValue({
+      name: 'search_products',
+      description: 'Search',
+      mutating: false,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        uiBlocks: [{ type: 'callout', tone: 'warn', message: 'hi' }],
+      }),
+    } as any)
+
+    const res = await POST(makePost({ message: 'find x' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.uiBlocks).toEqual([{ type: 'callout', tone: 'warn', message: 'hi' }])
+  })
+
+  // ── Deterministic quotation auto-advance inside LLM loop ──────────────────────
+
+  it('auto-proposes quotation when match_quotation_items resolves all lines in the loop', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    // history must contain a user message carrying the email so it is extracted
+    mockQueryMany.mockResolvedValue([
+      { role: 'user', content: 'prepare quote for buyer@example.com' },
+    ])
+    mockQueryOne.mockResolvedValue({ id: 'q-action-1' } as any)
+
+    // Model emits one tool call to match_quotation_items, then loop should end deterministically
+    mockAiChat.mockResolvedValueOnce({
+      content: '',
+      toolCalls: [{ name: 'match_quotation_items', arguments: { lines: '[]' } }],
+      provider: 'ollama',
+      model: 'qwen2.5',
+    } as any)
+
+    const matchTool = {
+      name: 'match_quotation_items',
+      description: 'Match',
+      mutating: false,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          counts: { matched: 1, ambiguous: 0, unmatched: 0 },
+          lines: [{ status: 'matched', qty: 2, candidates: [{ productId: 'p1' }] }],
+        },
+      }),
+    }
+    const proposeTool = {
+      name: 'propose_create_quotation',
+      description: 'Propose',
+      mutating: true,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        proposed: true,
+        kind: 'create_quotation',
+        payload: { foo: 'bar' },
+        confirmation: 'Confirm?',
+        ui_blocks: [{ type: 'heading', value: 'Quote', level: 2 }],
+      }),
+    }
+    mockGetTool.mockImplementation((name: string) =>
+      name === 'match_quotation_items' ? (matchTool as any) : (proposeTool as any)
+    )
+
+    // message avoids the server-side numbered-list short-circuit (no numbered lines)
+    const res = await POST(makePost({ message: 'match these items and quote buyer@example.com' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.message).toMatch(/All items matched/i)
+    expect(data.proposedActions).toHaveLength(1)
+    expect(data.proposedActions[0].kind).toBe('create_quotation')
+    expect(data.uiBlocks).toContainEqual({ type: 'heading', value: 'Quote', level: 2 })
+    expect(proposeTool.handler).toHaveBeenCalledOnce()
+  })
+
+  it('handles error thrown by auto-propose in quotation advance', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryMany.mockResolvedValue([
+      { role: 'user', content: 'quote buyer@example.com' },
+    ])
+
+    mockAiChat
+      .mockResolvedValueOnce({
+        content: '',
+        toolCalls: [{ name: 'match_quotation_items', arguments: { lines: '[]' } }],
+        provider: 'ollama',
+        model: 'qwen2.5',
+      } as any)
+      .mockResolvedValueOnce({ content: 'Recovered.', provider: 'ollama', model: 'qwen2.5' } as any)
+
+    const matchTool = {
+      name: 'match_quotation_items',
+      mutating: false,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          counts: { matched: 1, ambiguous: 0, unmatched: 0 },
+          lines: [{ status: 'matched', qty: 1, candidates: [{ productId: 'p1' }] }],
+        },
+      }),
+    }
+    const proposeTool = {
+      name: 'propose_create_quotation',
+      mutating: true,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockRejectedValue(new Error('propose boom')),
+    }
+    mockGetTool.mockImplementation((name: string) =>
+      name === 'match_quotation_items' ? (matchTool as any) : (proposeTool as any)
+    )
+
+    const res = await POST(makePost({ message: 'resolve items and quote buyer@example.com' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    // auto-advance sets done=true even after error, finalText defaults to "All items matched"
+    expect(data.message).toMatch(/All items matched/i)
+  })
+
+  // ── __quotation_confirm__ short-circuit ──────────────────────────────────────
+
+  it('confirms quotation and inserts proposed action (__quotation_confirm__)', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    // prior user messages hold the customer email
+    mockQueryMany.mockResolvedValue([
+      { role: 'user', content: 'quote for buyer@example.com please' },
+    ])
+    mockQueryOne.mockResolvedValue({ id: 'qc-action-1' } as any)
+
+    const proposeTool = {
+      name: 'propose_create_quotation',
+      mutating: true,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        proposed: true,
+        kind: 'create_quotation',
+        payload: { total: 5000 },
+        confirmation: 'Create quote?',
+        ui_blocks: [{ type: 'heading', value: 'Quote', level: 2 }],
+      }),
+    }
+    mockGetTool.mockReturnValue(proposeTool as any)
+
+    const items = [
+      { productId: 'p1', quantity: 2 },
+      { skipped: true, requestedText: 'unknown widget', quantity: 1 },
+    ]
+    const res = await POST(makePost({ message: '__quotation_confirm__' + JSON.stringify(items) }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.proposedActions).toHaveLength(1)
+    expect(data.proposedActions[0].kind).toBe('create_quotation')
+    expect(data.message).toMatch(/Quotation ready/i)
+    expect(data.message).toMatch(/1 item skipped/i)
+    expect(data.uiBlocks).toContainEqual({ type: 'heading', value: 'Quote', level: 2 })
+    // propose called with the non-skipped item only
+    expect(proposeTool.handler).toHaveBeenCalledWith({
+      customerEmail: 'buyer@example.com',
+      items: JSON.stringify([{ productId: 'p1', quantity: 2 }]),
+    })
+  })
+
+  it('surfaces address picker on needs_choice during __quotation_confirm__', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryMany.mockResolvedValue([{ role: 'user', content: 'buyer@example.com' }])
+
+    mockGetTool.mockReturnValue({
+      name: 'propose_create_quotation',
+      mutating: true,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        needs_choice: true,
+        choice_kind: 'address',
+        options: [{ id: 'a1', label: 'Home' }, { id: 'a2', label: 'Office' }],
+        note: 'Pick address',
+      }),
+    } as any)
+
+    const res = await POST(makePost({ message: '__quotation_confirm__' + JSON.stringify([{ productId: 'p1', quantity: 1 }]) }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.pickers).toHaveLength(1)
+    expect(data.pickers[0].choice_kind).toBe('address')
+    expect(data.message).toMatch(/pick one/i)
+  })
+
+  it('returns reason when __quotation_confirm__ has no customer email', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryMany.mockResolvedValue([{ role: 'user', content: 'no email here' }])
+
+    mockGetTool.mockReturnValue({
+      name: 'propose_create_quotation',
+      mutating: true,
+      inputSchema: { properties: {} },
+      handler: vi.fn(),
+    } as any)
+
+    const res = await POST(makePost({ message: '__quotation_confirm__' + JSON.stringify([{ productId: 'p1', quantity: 1 }]) }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.message).toMatch(/customer email not found/i)
+    expect(data.proposedActions).toEqual([])
+  })
+
+  it('returns reason when all items were skipped in __quotation_confirm__', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryMany.mockResolvedValue([{ role: 'user', content: 'buyer@example.com' }])
+
+    mockGetTool.mockReturnValue({
+      name: 'propose_create_quotation',
+      mutating: true,
+      inputSchema: { properties: {} },
+      handler: vi.fn(),
+    } as any)
+
+    const items = [{ skipped: true, requestedText: 'a', quantity: 1 }, { skipped: true, requestedText: 'b', quantity: 1 }]
+    const res = await POST(makePost({ message: '__quotation_confirm__' + JSON.stringify(items) }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.message).toMatch(/were skipped/i)
+  })
+
+  it('returns 500 when __quotation_confirm__ JSON is malformed', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+
+    const res = await POST(makePost({ message: '__quotation_confirm__not-json' }))
+    expect(res.status).toBe(500)
+    const data = await res.json()
+    expect(data.error).toMatch(/Quotation confirm failed/i)
+  })
+
+  it('returns summary when __quotation_confirm__ propose is not proposed', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryMany.mockResolvedValue([{ role: 'user', content: 'buyer@example.com' }])
+
+    mockGetTool.mockReturnValue({
+      name: 'propose_create_quotation',
+      mutating: true,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({ proposed: false, summary: 'No matching products.' }),
+    } as any)
+
+    const res = await POST(makePost({ message: '__quotation_confirm__' + JSON.stringify([{ productId: 'p1', quantity: 1 }]) }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.message).toBe('No matching products.')
+    expect(data.proposedActions).toEqual([])
+  })
+
+  // ── parseQuotationRequest server-side numbered-list short-circuit ─────────────
+
+  it('short-circuits numbered-list quotation and auto-proposes when all matched', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryOne.mockResolvedValue({ id: 'nl-action-1' } as any)
+
+    const matchTool = {
+      name: 'match_quotation_items',
+      mutating: false,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          lines: [
+            { status: 'matched', qty: 2, candidates: [{ productId: 'p1' }] },
+            { status: 'matched', qty: 5, candidates: [{ productId: 'p2' }] },
+          ],
+        },
+      }),
+    }
+    const proposeTool = {
+      name: 'propose_create_quotation',
+      mutating: true,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        proposed: true,
+        kind: 'create_quotation',
+        payload: { total: 1 },
+        confirmation: 'ok?',
+        ui_blocks: [{ type: 'callout', tone: 'info', message: 'ready' }],
+      }),
+    }
+    mockGetTool.mockImplementation((name: string) =>
+      name === 'match_quotation_items' ? (matchTool as any) : (proposeTool as any)
+    )
+
+    const message = 'Prepare a quotation for buyer@example.com\n1. Hex bolt M6 2 nos\n2. Washer 5 pcs'
+    const res = await POST(makePost({ message }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.message).toMatch(/All items matched/i)
+    expect(data.uiBlocks[0].type).toBe('quotation_resolver')
+    expect(data.proposedActions).toHaveLength(1)
+    // aiChat must NOT be invoked — short-circuited before the LLM loop
+    expect(mockAiChat).not.toHaveBeenCalled()
+  })
+
+  it('short-circuits numbered-list quotation with ambiguous/unmatched counts', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+
+    const matchTool = {
+      name: 'match_quotation_items',
+      mutating: false,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({
+        ok: true,
+        data: {
+          lines: [
+            { status: 'matched', qty: 2, candidates: [{ productId: 'p1' }] },
+            { status: 'ambiguous', qty: 1, candidates: [{ productId: 'p2' }, { productId: 'p3' }] },
+            { status: 'unmatched', qty: 3, candidates: [] },
+          ],
+        },
+      }),
+    }
+    mockGetTool.mockImplementation((name: string) =>
+      name === 'match_quotation_items' ? (matchTool as any) : null
+    )
+
+    const message = 'Create a quote for buyer@example.com\n1. Hex bolt M6 2 nos\n2. Mystery item 1 no\n3. Ghost part 3 pcs'
+    const res = await POST(makePost({ message }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.uiBlocks[0].type).toBe('quotation_resolver')
+    expect(data.message).toMatch(/1 matched/)
+    expect(data.message).toMatch(/1 need review/)
+    expect(data.message).toMatch(/1 not found/)
+    expect(mockAiChat).not.toHaveBeenCalled()
+  })
+
+  it('falls through to LLM when numbered-list match batch fails', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryMany.mockResolvedValue([])
+
+    const matchTool = {
+      name: 'match_quotation_items',
+      mutating: false,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockResolvedValue({ ok: false }),
+    }
+    mockGetTool.mockImplementation((name: string) =>
+      name === 'match_quotation_items' ? (matchTool as any) : null
+    )
+    mockAiChat.mockResolvedValue({ content: 'LLM fallback.', provider: 'ollama', model: 'qwen2.5' } as any)
+
+    const message = 'Generate a quotation for buyer@example.com\n1. Hex bolt M6 2 nos\n2. Washer 5 pcs'
+    const res = await POST(makePost({ message }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    // batch failed → allLines cleared → falls through to LLM
+    expect(mockAiChat).toHaveBeenCalled()
+    expect(data.message).toBe('LLM fallback.')
+  })
+
+  it('falls through to LLM when match_quotation_items handler throws', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryMany.mockResolvedValue([])
+
+    const matchTool = {
+      name: 'match_quotation_items',
+      mutating: false,
+      inputSchema: { properties: {} },
+      handler: vi.fn().mockRejectedValue(new Error('embedding down')),
+    }
+    mockGetTool.mockImplementation((name: string) =>
+      name === 'match_quotation_items' ? (matchTool as any) : null
+    )
+    mockAiChat.mockResolvedValue({ content: 'LLM path.', provider: 'ollama', model: 'qwen2.5' } as any)
+
+    const message = 'Draft a quote for buyer@example.com\n1. Hex bolt M6 2 nos\n2. Washer 5 pcs'
+    const res = await POST(makePost({ message }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(mockAiChat).toHaveBeenCalled()
+    expect(data.message).toBe('LLM path.')
+  })
+
+  it('does not short-circuit numbered-list quotation when match tool missing', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
+    mockQueryMany.mockResolvedValue([])
+    mockGetTool.mockReturnValue(null)
+    mockAiChat.mockResolvedValue({ content: 'No match tool.', provider: 'ollama', model: 'qwen2.5' } as any)
+
+    const message = 'Make a quotation for buyer@example.com\n1. Hex bolt 2 nos\n2. Washer 5 pcs'
+    const res = await POST(makePost({ message }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(mockAiChat).toHaveBeenCalled()
+    expect(data.message).toBe('No match tool.')
+  })
+
+  // ── RAG context enrichment ───────────────────────────────────────────────────
+
+  it('includes RAG context in system prompt when findSimilar returns rows', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    setupDbMocks()
+
+    const { findSimilar } = await import('@/lib/rag')
+    vi.mocked(findSimilar).mockResolvedValueOnce([
+      { source_table: 'products', source_id: 'p1', content: 'Hex bolt M6' } as any,
+    ])
+
+    mockAiChat.mockResolvedValue({ content: 'ok', provider: 'ollama', model: 'qwen2.5' } as any)
+
+    const res = await POST(makePost({ message: 'tell me about products' }))
+    expect(res.status).toBe(200)
+    const systemMsg = mockAiChat.mock.calls[0][0].messages.find((m: any) => m.role === 'system')
+    expect(systemMsg).toBeDefined()
+    expect(systemMsg!.content).toMatch(/STORE DATA CONTEXT/)
+    expect(systemMsg!.content).toMatch(/Hex bolt M6/)
+  })
+
+  it('tolerates findSimilar throwing (RAG unavailable)', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    setupDbMocks()
+
+    const { findSimilar } = await import('@/lib/rag')
+    vi.mocked(findSimilar).mockRejectedValueOnce(new Error('pgvector down'))
+
+    mockAiChat.mockResolvedValue({ content: 'still ok', provider: 'ollama', model: 'qwen2.5' } as any)
+
+    const res = await POST(makePost({ message: 'anything' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.message).toBe('still ok')
+  })
+
+  // ── Sanitised 502 for provider/billing internals ─────────────────────────────
+
+  it('maps provider/billing errors to a generic 502 message', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    setupDbMocks()
+
+    mockAiChat.mockRejectedValue(new AiClientError('OpenAI: no credits remaining', 'openai'))
+
+    const res = await POST(makePost({ message: 'hello' }))
+    expect(res.status).toBe(502)
+    const data = await res.json()
+    expect(data.error).toMatch(/temporarily unavailable/i)
+    expect(data.error).not.toMatch(/credits/i)
   })
 })
