@@ -1,54 +1,6 @@
 import { queryOne, query } from './db'
 import bcrypt from 'bcrypt'
-
-export async function verifyAdminCredentials(username: string, password: string) {
-  try {
-    const admin = await queryOne(`
-      SELECT
-        a.*,
-        json_build_object(
-          'id', u.id, 'email', u.email, 'first_name', u.first_name,
-          'last_name', u.last_name, 'is_active', u.is_active
-        ) AS users
-      FROM admins a
-      LEFT JOIN users u ON a.user_id = u.id
-      WHERE a.username = $1
-    `, [username])
-
-    if (!admin) {
-      return { success: false, error: 'Invalid credentials' }
-    }
-
-    if (!admin.users?.is_active) {
-      return { success: false, error: 'Account is disabled' }
-    }
-
-    const passwordMatch = await bcrypt.compare(password, admin.password_hash)
-    if (!passwordMatch) {
-      return { success: false, error: 'Invalid credentials' }
-    }
-
-    await query('UPDATE admins SET last_login = NOW() WHERE id = $1', [admin.id])
-    await query('UPDATE users SET last_login = NOW() WHERE id = $1', [admin.user_id])
-
-    return {
-      success: true,
-      admin: {
-        id: admin.id,
-        user_id: admin.user_id,
-        username: admin.username,
-        role: admin.role,
-        scopes: admin.scopes || [],
-        email: admin.users.email,
-        first_name: admin.users.first_name,
-        last_name: admin.users.last_name,
-      },
-    }
-  } catch (err) {
-    console.error('[route]', err)
-    return { success: false, error: 'Authentication failed' }
-  }
-}
+import { randomBytes } from 'crypto'
 
 export async function createAdminUser(userData: {
   email: string
@@ -56,12 +8,15 @@ export async function createAdminUser(userData: {
   last_name: string
   phone?: string
   username: string
-  password: string
+  password?: string
   role?: string
   scopes?: string[]
 }) {
   try {
-    const passwordHash = await bcrypt.hash(userData.password, 10)
+    // Password login is removed (admins use email-OTP / Google + TOTP). The
+    // password_hash column is still NOT NULL, so store a random unusable hash.
+    const secret = userData.password || randomBytes(32).toString('hex')
+    const passwordHash = await bcrypt.hash(secret, 10)
 
     let user = await queryOne(
       `SELECT u.* FROM users u
