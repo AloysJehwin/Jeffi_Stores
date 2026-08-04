@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { queryMany, queryOne } from '@/lib/db'
+import { queryMany } from '@/lib/db'
 import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
@@ -175,8 +175,12 @@ async function getDealOfTheDay() {
 }
 
 async function getFreeShippingThreshold() {
-  const row = await queryOne<{ value: string }>(`SELECT value FROM site_settings WHERE key = 'free_shipping_threshold'`, [])
-  return parseInt(row?.value || '500', 10)
+  // Use the SAME setting checkout/shipping uses (delivery_free_threshold) so the
+  // homepage always matches the real free-delivery threshold — not the stale,
+  // separate 'free_shipping_threshold' key.
+  const { getDeliverySettings } = await import('@/lib/delivery-settings')
+  const { freeThreshold } = await getDeliverySettings()
+  return freeThreshold
 }
 
 async function getCategoryShowcase() {
@@ -238,7 +242,7 @@ export default async function HomePage() {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-2 sm:grid-cols-4 divide-y sm:divide-y-0 divide-x-0 sm:divide-x divide-border-default">
             {[
-              { icon: 'M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10l2 2h2m0 0h6m-6 0a2 2 0 104 0m6 0a2 2 0 104 0m1-10h2l3 5v4h-2', label: `Free delivery above ₹${freeShippingThreshold.toLocaleString('en-IN')}` },
+              { icon: 'M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z M13 16V6a1 1 0 00-1-1H4a1 1 0 00-1 1v10a1 1 0 001 1h1m8-1a1 1 0 01-1 1H9m4-1V8a1 1 0 011-1h2.586a1 1 0 01.707.293l3.414 3.414a1 1 0 01.293.707V16a1 1 0 01-1 1h-1m-6-1a1 1 0 001 1h1M5 17a2 2 0 104 0m6 0a2 2 0 104 0', label: `Free delivery above ₹${freeShippingThreshold.toLocaleString('en-IN')}` },
               { icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z', label: 'GST invoice on every order' },
               { icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10', label: '10,000+ products in stock' },
               { icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z', label: 'Cash on delivery available' },
