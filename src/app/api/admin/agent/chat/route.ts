@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
-import { aiChat, AiClientError } from '@/lib/ai-client'
+import { aiChat, AiClientError, type AiToolDef, type AiChatMessage } from '@/lib/ai-client'
 import { TOOLS, getTool } from '@/lib/admin-agent/tools'
 import { findSimilar } from '@/lib/rag'
 import crypto from 'crypto'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120
 
-const MAX_ITERATIONS = 8
+const MAX_ITERATIONS = 4
 const HISTORY_TRUNCATE = 20
 
 interface IncomingMessage {
@@ -24,26 +25,54 @@ interface ToolCallRecord {
   isError?: boolean
 }
 
-function compactToolList(): string {
-  return TOOLS.map(t => {
-    // Only required args with type — no descriptions (saves ~60% tokens)
-    const requiredArgs = (t.inputSchema.required || []).map(k => {
-      const v = t.inputSchema.properties[k]
-      return `${k}: ${v?.type ?? 'string'}`
-    }).join(', ')
-    const optionalArgs = Object.entries(t.inputSchema.properties || {})
-      .filter(([k]) => !(t.inputSchema.required || []).includes(k))
-      .map(([k, v]: [string, any]) => `${k}?: ${v.type}`)
-      .join(', ')
-    const args = [requiredArgs, optionalArgs].filter(Boolean).join(', ')
-    // First sentence of description only
-    const desc = t.description.split(/\.\s/)[0].replace(/\.$/, '')
-    return `- ${t.name}${t.mutating ? '!' : ''}: ${desc} {${args}}`
-  }).join('\n')
+// Core read tools — always available. Kept small because sending every tool
+// schema to the model each turn is the dominant latency cost (26 schemas ≈ 26s/turn
+// on the local box). Niche/mutating groups are added only when the query implies them.
+const CORE_TOOLS = new Set([
+  'search_products', 'get_product', 'get_product_variants',
+  'search_customers', 'get_customer',
+  'get_recent_orders', 'get_order', 'find_customer_orders',
+  'get_low_stock_products', 'run_sql_readonly', 'list_admin_tools',
+])
+
+// Extra tool groups, gated by keywords in the user's message.
+const TOOL_GROUPS: { test: RegExp; tools: string[] }[] = [
+  { test: /\b(email|campaign|mail|announce|newsletter|audience|subscriber|send|blast|promo)\b/i,
+    tools: ['get_campaign_stats', 'send_test_email', 'toggle_campaign_enabled', 'estimate_email_audience', 'propose_product_announcement_email', 'propose_order_delay_email'] },
+  { test: /\b(ship|shipped|dispatch|delivery|delivered|track|awb|fulfil)\b/i,
+    tools: ['mark_order_shipped'] },
+  { test: /\b(schema|table|column|sql|query|database|db)\b/i,
+    tools: ['describe_schema'] },
+  { test: /\b(file|repo|code|route|api|endpoint|source)\b/i,
+    tools: ['list_repo_files', 'read_repo_file', 'list_admin_api_routes', 'call_admin_api'] },
+  { test: /\b(similar|recommend|like this|related)\b/i,
+    tools: ['find_similar_products'] },
+  { test: /\b(recent|latest|new)\b/i,
+    tools: ['get_recent_customers', 'get_recent_products'] },
+]
+
+// Build the native tools array, selecting a query-relevant subset to keep the
+// per-turn prompt small. Falls back to core-only when nothing matches.
+function selectToolNames(userMessage: string): Set<string> {
+  const selected = new Set(CORE_TOOLS)
+  for (const g of TOOL_GROUPS) {
+    if (g.test.test(userMessage)) for (const t of g.tools) selected.add(t)
+  }
+  return selected
 }
 
-function buildSystemPrompt(): string {
-  return buildSystemPromptBody(compactToolList(), '')
+function buildToolsDef(userMessage?: string): AiToolDef[] {
+  const allow = userMessage ? selectToolNames(userMessage) : null
+  return TOOLS
+    .filter(t => !allow || allow.has(t.name))
+    .map(t => ({
+      type: 'function' as const,
+      function: {
+        name: t.name,
+        description: t.description,
+        parameters: t.inputSchema as unknown as Record<string, unknown>,
+      },
+    }))
 }
 
 async function buildSystemPromptWithDynamic(userMessage?: string): Promise<string> {
@@ -63,58 +92,31 @@ async function buildSystemPromptWithDynamic(userMessage?: string): Promise<strin
       // RAG unavailable — fall through to tool-only mode
     }
   }
-  return buildSystemPromptBody(compactToolList(), ragContext)
+  return buildSystemPromptBody(ragContext)
 }
 
-function buildSystemPromptBody(toolList: string, dynamicList: string): string {
+function buildSystemPromptBody(dynamicList: string): string {
   return `/no_think
 You are the Jeffi Stores admin assistant. You help store operators run their business.
 
-## TOOL CALLING — MANDATORY FORMAT
+## TOOL CALLING
 
-Every tool call MUST use this exact XML block. No other format is accepted:
-<tool_use name="TOOL_NAME">
-{"arg":"value"}
-</tool_use>
-
-Example — user asks "show top products":
-<tool_use name="run_sql_readonly">
-{"sql":"SELECT id, name, sku FROM products ORDER BY created_at DESC LIMIT 5"}
-</tool_use>
-
-Example — user asks "find bolt products":
-<tool_use name="search_products">
-{"query":"bolt"}
-</tool_use>
-
-Example — user asks "send test featured products email to x@y.com":
-<tool_use name="list_featured_products">
-{"limit":10}
-</tool_use>
-[after getting productIds from result]
-<tool_use name="propose_product_announcement_email">
-{"productIds":["<id1>","<id2>"],"audience":"test_only","testEmail":"x@y.com","subject":"Featured Products","intro":"Check out our featured products."}
-</tool_use>
-
-NEVER write: run_sql_readonly{"sql":"..."}
-NEVER write: search_products\n{"query":"..."}
-ALWAYS write the full <tool_use name="..."> opening tag, JSON body, and </tool_use> closing tag.
-
-After each tool result you will decide the next step. Max ${MAX_ITERATIONS} tool calls per turn. When done, write the final answer — no XML.
+You have access to a set of tools (declared to you natively). Call them via the native tool-calling
+mechanism — do NOT write tool calls as text. When you need data or want to perform an action, invoke
+the appropriate tool with its arguments. After each tool result you decide the next step. Max ${MAX_ITERATIONS}
+tool calls per turn. When you are done, reply with the final answer in plain text (with a ui_blocks block
+for any data display, as described below).
 
 RULES (non-negotiable):
 - You have ZERO knowledge of this store's data. Call a tool for EVERY data question.
 - NEVER invent product names, SKUs, prices, stock, order numbers, or customer details.
-- Your first output for any data request must be a <tool_use> block. Not a sentence. Not "I'll fetch". Just the block.
+- For any data request, call a tool first — do not answer from memory and do not say "I'll fetch" without calling a tool.
 - Use ONLY values the tools returned. If a tool returns no results, say so — do not fill in from training.
-- Tools marked with ! are mutating — when they return {proposed:true}, tell the user "I've proposed this — review the action card."
-- If {needs_choice:true}: write "Multiple matches — pick one above." and stop.
+- Mutating tools (those that change data) return {proposed:true} — when they do, tell the user "I've proposed this — review the action card."
+- If a tool returns {needs_choice:true}: write "Multiple matches — pick one above." and stop.
 - If the user says "Use address id <uuid> ..." (from the address picker): call propose_create_quotation again with the same customerEmail and items, and pass addressId=<uuid>. Do NOT ask for confirmation — just call the tool.
 - Be concise. Numbers and bullet points beat paragraphs. No filler.
-
-## TOOLS
-
-${toolList}${dynamicList}
+${dynamicList}
 
 ## DOMAIN RULES
 
@@ -149,11 +151,6 @@ STEP 2 — Wait for match_quotation_items result. It returns a quotation_resolve
 STEP 3 — If all lines are matched: call propose_create_quotation with the productIds from the result.
          If some are ambiguous: show the resolver block and ask the admin to confirm those lines first.
          If some are unmatched: show the resolver block and tell the admin which items were not found.
-
-Example — user gives 26 items for customer x@y.com:
-<tool_use name="match_quotation_items">
-{"lines":"[{\"requestedText\":\"pneumatic grease pump 25kg\",\"qty\":1},{\"requestedText\":\"impact deep socket 48mm\",\"qty\":1},...]"}
-</tool_use>
 NEVER call search_products for items in a quotation request. NEVER call match_quotation_items more than once per turn.
 
 Marketing emails:
@@ -163,30 +160,6 @@ Marketing emails:
 - CRITICAL: "featured_products" is NOT a valid campaignKind. NEVER pass it to send_test_email.
 
 Currency: INR (₹). Dates: Asia/Kolkata.`
-}
-
-function parseToolCalls(text: string): { calls: { name: string; rawInput: string }[]; remainder: string } {
-  const calls: { name: string; rawInput: string }[] = []
-  const xmlRe = /<tool_use\s+name="([^"]+)">\s*([\s\S]*?)\s*<\/tool_use>/g
-  let m
-  while ((m = xmlRe.exec(text)) !== null) {
-    calls.push({ name: m[1], rawInput: m[2] })
-  }
-  let remainder = text.replace(xmlRe, '').trim()
-
-  if (calls.length === 0) {
-    const plainRe = new RegExp(
-      '(?:^|\\n)(' + TOOLS.map(t => t.name).join('|') + ')\\s*\\n(\\{[\\s\\S]*?\\})(?=\\n|$)',
-      'g'
-    )
-    let pm
-    while ((pm = plainRe.exec(text)) !== null) {
-      calls.push({ name: pm[1], rawInput: pm[2] })
-    }
-    if (calls.length > 0) remainder = text.replace(plainRe, '').trim()
-  }
-
-  return { calls, remainder }
 }
 
 const QUOTATION_TRIGGER_RE = /\b(prepare|create|make|generate|draft)\b.{0,20}\b(quotation|quote|rfq)\b/i
@@ -477,7 +450,7 @@ export async function POST(req: NextRequest) {
   )
 
   const systemPrompt = await buildSystemPromptWithDynamic(userMessage)
-  const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = [
+  const messages: AiChatMessage[] = [
     { role: 'system', content: systemPrompt },
   ]
   for (const h of history) {
@@ -486,6 +459,7 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const toolsDef = buildToolsDef(userMessage)
   const toolCallRecords: ToolCallRecord[] = []
   const proposedActions: Array<{ id: string; kind: string; payload: any; confirmation: string }> = []
   const pickers: Array<{ choice_kind: string; options: Array<{ id: string; label: string; sublabel?: string }>; note?: string }> = []
@@ -493,7 +467,6 @@ export async function POST(req: NextRequest) {
   let finalUiBlocks: any[] = []
   let provider = ''
   let model = ''
-  let consecutiveStalls = 0
   let done = false
 
   try {
@@ -502,76 +475,49 @@ export async function POST(req: NextRequest) {
         modelHint: 'agent',
         jsonMode: false,
         temperature: 0.2,
-        maxTokens: 3000,
+        maxTokens: 1200,
         messages,
+        tools: toolsDef,
       })
       provider = r.provider
       model = r.model
 
-      const { calls, remainder } = parseToolCalls(r.content)
-
-      if (calls.length === 0) {
-        const text = remainder || r.content
-        const stallRe = /\b(let me|i'?ll|i will|now i|first,? i|i'?m going to|let's start|hold on|please hold|fetching|i'?ll fetch|i'?ll check|i'?ll look|i'?ll retrieve|moment|step 1|retrieving|i need to)\b/i
-        const isShortPromise = text.length < 320 && stallRe.test(text)
-        // Detect hallucinated answers: model answered with product/order/price data without calling a tool
-        const looksLikeDataAnswer = iter === 0 && /\b(₹|\bsku\b|in stock|out of stock|\bprice\b.*\d|\bstock\b.*\d|\border number\b)/i.test(text)
-        // Detect false proposal claim: model says "I've proposed" but no proposed action was actually created
-        const claimsProposed = /i'?ve proposed|review the action card|has been proposed/i.test(text)
-        const falseProposal = claimsProposed && proposedActions.length === 0 && consecutiveStalls < 2 && iter < MAX_ITERATIONS - 1
-        const shouldRetry = (isShortPromise || looksLikeDataAnswer || falseProposal) && consecutiveStalls < 2 && iter < MAX_ITERATIONS - 1
-        if (shouldRetry) {
-          consecutiveStalls++
-          messages.push({ role: 'assistant', content: r.content })
-          // For false proposals: extract productIds from prior tool results to give glm4 a concrete nudge
-          let nudge: string
-          if (falseProposal) {
-            const featuredCall = toolCallRecords.find(tc => tc.tool === 'list_featured_products' && !tc.isError)
-            const productIds: string[] = featuredCall
-              ? ((featuredCall.output as any)?.data?.products ?? []).map((p: any) => p.id).filter(Boolean)
-              : []
-            nudge = productIds.length > 0
-              ? `[system] No action was proposed yet. Call propose_product_announcement_email now with these productIds: ${JSON.stringify(productIds)}, audience="test_only", testEmail from the user message, subject="Featured Products", intro="Check out our featured products."  Emit only the <tool_use> block.`
-              : '[system] No action was proposed yet. Call the appropriate mutating tool (propose_product_announcement_email) with the correct arguments. Emit only the <tool_use> block.'
-          } else {
-            nudge = '[system] You answered without calling a tool. That data is INVENTED — it does not come from this store\'s database. You MUST call a tool to get real data. Emit the <tool_use> block now. Do not write any text before it.'
-          }
-          messages.push({ role: 'user', content: nudge })
-          continue
-        }
-        consecutiveStalls = 0
-        const ui = parseUiBlocks(text)
+      // No native tool calls — the model's prose is the final answer.
+      if (!r.toolCalls || r.toolCalls.length === 0) {
+        const ui = parseUiBlocks(r.content)
         finalText = ui.remainder
         finalUiBlocks = finalUiBlocks.concat(ui.blocks)
         break
       }
-      consecutiveStalls = 0
 
-      messages.push({ role: 'assistant', content: r.content })
+      // Record the assistant's tool-call turn so the model has the full context on the next iteration.
+      messages.push({
+        role: 'assistant',
+        content: '',
+        tool_calls: r.toolCalls.map(tc => ({ function: { name: tc.name, arguments: tc.arguments } })),
+      })
 
-      const toolOutputs: string[] = []
-      for (const c of calls) {
+      for (const tc of r.toolCalls) {
         if (done) break
-        const tool = getTool(c.name)
-        let parsed: Record<string, unknown> = {}
-        try { parsed = JSON.parse(c.rawInput || '{}') } catch { /* invalid JSON input — use empty object */ }
+        const parsed = tc.arguments || {}
+        const tool = getTool(tc.name)
 
         if (!tool) {
-          const err = `Unknown tool: ${c.name}`
-          toolCallRecords.push({ tool: c.name, input: parsed, output: err, isError: true })
-          toolOutputs.push(`<tool_result name="${c.name}">${err}</tool_result>`)
+          const err = `Unknown tool: ${tc.name}`
+          toolCallRecords.push({ tool: tc.name, input: parsed, output: err, isError: true })
+          messages.push({ role: 'tool', content: err })
           continue
         }
 
         try {
           const out = await tool.handler(parsed)
-          toolCallRecords.push({ tool: c.name, input: parsed, output: out })
+          toolCallRecords.push({ tool: tc.name, input: parsed, output: out })
 
           if (out && typeof out === 'object' && (out as any).marker === '__call_admin_api_immediate__') {
             const o = out as any
             const apiOut = await invokeAdminApiInternal(o.method, o.path, null, req)
-            toolCallRecords[toolCallRecords.length - 1] = { tool: c.name, input: parsed, output: apiOut, isError: !apiOut.ok }
-            toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(apiOut).slice(0, 8000)}</tool_result>`)
+            toolCallRecords[toolCallRecords.length - 1] = { tool: tc.name, input: parsed, output: apiOut, isError: !apiOut.ok }
+            messages.push({ role: 'tool', content: JSON.stringify(apiOut).slice(0, 8000) })
           } else if (tool.mutating && out && typeof out === 'object' && (out as any).proposed === true) {
             const o = out as any
             const inserted = await queryOne<{ id: string }>(
@@ -583,7 +529,7 @@ export async function POST(req: NextRequest) {
             if (inserted) {
               proposedActions.push({ id: inserted.id, kind: o.kind, payload: o.payload, confirmation: o.confirmation })
             }
-            toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify({ ...o, action_id: inserted?.id })}</tool_result>`)
+            messages.push({ role: 'tool', content: JSON.stringify({ ...o, action_id: inserted?.id }).slice(0, 8000) })
           } else if (
             tool.mutating &&
             out &&
@@ -603,7 +549,7 @@ export async function POST(req: NextRequest) {
             if (inserted) {
               proposedActions.push({ id: inserted.id, kind: a.kind, payload: a.payload, confirmation: a.confirmation })
             }
-            toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify({ ...o, action_id: inserted?.id })}</tool_result>`)
+            messages.push({ role: 'tool', content: JSON.stringify({ ...o, action_id: inserted?.id }).slice(0, 8000) })
           } else if (out && typeof out === 'object' && (out as any).needs_choice === true) {
             const o = out as any
             pickers.push({
@@ -611,17 +557,17 @@ export async function POST(req: NextRequest) {
               options: o.options || [],
               note: o.note,
             })
-            toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(out).slice(0, 4000)}</tool_result>`)
+            messages.push({ role: 'tool', content: JSON.stringify(out).slice(0, 4000) })
           } else {
             // Hoist any uiBlocks the tool embedded (e.g. quotation_resolver from match_quotation_items)
             if (out && typeof out === 'object' && Array.isArray((out as any).uiBlocks)) {
               finalUiBlocks = finalUiBlocks.concat((out as any).uiBlocks)
             }
-            toolOutputs.push(`<tool_result name="${c.name}">${JSON.stringify(out).slice(0, 8000)}</tool_result>`)
+            messages.push({ role: 'tool', content: JSON.stringify(out).slice(0, 8000) })
 
             // Deterministic quotation advance: if match_quotation_items resolved all lines, auto-call propose_create_quotation
             if (
-              c.name === 'match_quotation_items' &&
+              tc.name === 'match_quotation_items' &&
               out && typeof out === 'object' &&
               (out as any).ok === true &&
               (out as any).data?.counts?.ambiguous === 0 &&
@@ -665,9 +611,9 @@ export async function POST(req: NextRequest) {
                       finalUiBlocks = finalUiBlocks.concat(o.ui_blocks)
                     }
                   }
-                  toolOutputs.push(`<tool_result name="propose_create_quotation">${JSON.stringify(proposeOut).slice(0, 8000)}</tool_result>`)
+                  messages.push({ role: 'tool', content: JSON.stringify(proposeOut).slice(0, 8000) })
                 } catch (autoErr: any) {
-                  toolOutputs.push(`<tool_result name="propose_create_quotation">Error: ${String(autoErr?.message || autoErr)}</tool_result>`)
+                  messages.push({ role: 'tool', content: `Error: ${String(autoErr?.message || autoErr)}` })
                 }
                 // All done deterministically — no need for another LLM turn
                 done = true
@@ -677,15 +623,19 @@ export async function POST(req: NextRequest) {
           }
         } catch (err: any) {
           const msg = String(err?.message || err)
-          toolCallRecords.push({ tool: c.name, input: parsed, output: msg, isError: true })
-          toolOutputs.push(`<tool_result name="${c.name}">Error: ${msg}</tool_result>`)
+          toolCallRecords.push({ tool: tc.name, input: parsed, output: msg, isError: true })
+          messages.push({ role: 'tool', content: `Error: ${msg}` })
         }
       }
-
-      messages.push({ role: 'user', content: toolOutputs.join('\n') })
     }
   } catch (err: any) {
-    const msg = err instanceof AiClientError ? err.message : String(err?.message || 'AI request failed')
+    const raw = err instanceof AiClientError ? err.message : String(err?.message || 'AI request failed')
+    // Never surface provider/billing internals (e.g. OpenAI "no credits", Ollama
+    // unreachable) to the admin — map those to a clean, generic message.
+    const unavailable = /no credits|unreachable|fallback disabled|billing|quota|rate limit|timeout|abort|ECONNREFUSED|fetch failed/i.test(raw)
+    const msg = unavailable
+      ? 'The assistant is temporarily unavailable. Please try again in a moment.'
+      : raw
     return NextResponse.json({ error: msg }, { status: 502 })
   }
 
