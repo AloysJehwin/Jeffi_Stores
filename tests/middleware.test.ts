@@ -211,12 +211,12 @@ describe('middleware', () => {
       expect(body.error).toMatch(/permission/i)
     })
 
-    it('passes through /api/admin/login with rate limiting only (no auth)', async () => {
-      const req = makeNextRequest('http://localhost/api/admin/login', {
+    it('passes through public admin auth path (email-OTP) with rate limiting only (no auth)', async () => {
+      const req = makeNextRequest('http://localhost/api/admin/auth/email-otp/start', {
         host: 'localhost',
       })
       const res = await middleware(req)
-      // Public path — must NOT be 401
+      // Public auth path — must NOT be 401
       expect(res.status).not.toBe(401)
       expect(mockApplyRateLimit).toHaveBeenCalled()
     })
@@ -228,7 +228,7 @@ describe('middleware', () => {
       )
       mockApplyRateLimit.mockResolvedValue(limitedRes)
 
-      const req = makeNextRequest('http://localhost/api/admin/login', {
+      const req = makeNextRequest('http://localhost/api/admin/auth/email-otp/start', {
         host: 'localhost',
       })
       const res = await middleware(req)
@@ -433,11 +433,10 @@ describe('middleware', () => {
   // Certificate CN mismatch on admin API path
   // -------------------------------------------------------------------------
   describe('certificate CN mismatch', () => {
-    it('returns 403 when cert CN does not match token username', async () => {
+    it('returns 403 when cert CN does not match the token-bound cert CN', async () => {
       mockVerifyToken.mockResolvedValue({
         ...ADMIN_PAYLOAD,
-        username: 'alice',
-        authCertCN: undefined,
+        authCertCN: 'alice',
       })
       const req = makeNextRequest('http://localhost/api/admin/orders', {
         headers: {
@@ -452,11 +451,10 @@ describe('middleware', () => {
       expect(body.error).toMatch(/certificate/i)
     })
 
-    it('passes through when cert CN matches token username', async () => {
+    it('passes through when cert CN matches the token-bound cert CN', async () => {
       mockVerifyToken.mockResolvedValue({
         ...ADMIN_PAYLOAD,
-        username: 'alice',
-        authCertCN: undefined,
+        authCertCN: 'alice',
       })
       const req = makeNextRequest('http://localhost/api/admin/orders', {
         headers: {

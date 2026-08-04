@@ -43,7 +43,7 @@ export default function MobileDrawer({ isOpen, onClose }: MobileDrawerProps) {
         <div className="flex flex-col h-full overflow-y-auto">
           <div className="flex items-center justify-between p-4 border-b border-border-default">
             <Link href="/" className="flex items-center gap-2" onClick={onClose}>
-              <img src="/images/logo.svg" alt="Jeffi Stores" className="h-10 w-auto" />
+              <img src="/images/logo.png" alt="Jeffi Stores" className="h-10 w-auto" />
               <span className="font-bold text-secondary-500 dark:text-primary-400">Jeffi Stores</span>
             </Link>
             <button

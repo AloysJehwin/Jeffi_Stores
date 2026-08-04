@@ -74,20 +74,16 @@ async function updateBrand(brandId: string, formData: FormData) {
       redirect(ap(back && back.startsWith('/admin/brands') ? back : `/admin/brands/edit/${brandId}`, host))
     }
 
-    // No draft — direct live update
-    const existing = await queryOne<any>('SELECT is_active FROM brands WHERE id=$1', [brandId])
+    // Unreachable: no draft means the edit page redirected before rendering the
+    // form. Defensive fallback — write to the draft only, never mutate the live brand.
     await query(
-      `UPDATE brands SET name=$1, slug=$2, description=$3, website=$4, logo_url=$5, is_active=$6,
-       return_allowed=$7, return_window_days=$8, replacement_allowed=$9, replacement_window_days=$10
-       WHERE id=$11`,
-      [name, slug, description, website, logo_url, is_active, return_allowed, return_window_days, replacement_allowed, replacement_window_days, brandId]
+      `INSERT INTO brand_drafts (brand_id, fields, updated_at)
+       VALUES ($1, $2::jsonb, NOW())
+       ON CONFLICT (brand_id) DO UPDATE SET fields = EXCLUDED.fields, updated_at = NOW()`,
+      [brandId, JSON.stringify(draftFields)]
     )
-    if (existing && existing.is_active !== is_active) {
-      await query('UPDATE products SET is_active=$1 WHERE brand_id=$2', [is_active, brandId])
-    }
-    revalidatePath('/admin/brands')
-    const back = formData.get('_back') as string | null
-    redirect(ap(back && back.startsWith('/admin/brands') ? back : '/admin/brands', host))
+    revalidatePath(`/admin/brands/edit/${brandId}`)
+    redirect(ap(`/admin/brands/edit/${brandId}`, host))
   } catch (err: any) {
     if (err?.digest?.startsWith('NEXT_REDIRECT')) throw err
     throw new Error('Failed to update brand')
@@ -100,27 +96,21 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
   const brand = await getBrand(id).catch(() => null)
   if (!brand) notFound()
 
-  // Auto-create draft for active brands on first edit visit
-  let draftRow = await queryOne<{ brand_id: string; fields: Record<string, unknown> }>(
+  const host = await getHost()
+
+  // Editing ALWAYS goes through a draft. Direct navigation to the edit URL for a
+  // brand with no draft (active or inactive) redirects to the detail page, where
+  // the Edit button creates a draft first. The live brand is never edited directly.
+  const draftRow = await queryOne<{ brand_id: string; fields: Record<string, unknown> }>(
     `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`, [id]
   )
-  if (!draftRow && brand.is_active) {
-    await query(
-      `INSERT INTO brand_drafts (brand_id, fields)
-       SELECT id, to_jsonb(b) - 'id' - 'created_at' - 'updated_at'
-       FROM brands b WHERE b.id = $1
-       ON CONFLICT (brand_id) DO NOTHING`,
-      [id]
-    )
-    draftRow = await queryOne<{ brand_id: string; fields: Record<string, unknown> }>(
-      `SELECT brand_id, fields FROM brand_drafts WHERE brand_id = $1`, [id]
-    )
+  const isDraft = !!draftRow
+  if (!isDraft) {
+    redirect(ap(`/admin/brands/${id}`, host))
   }
 
-  const isDraft = !!draftRow
-  const brandForForm = isDraft && draftRow?.fields ? { ...brand, ...draftRow.fields } : brand
+  const brandForForm = draftRow?.fields ? { ...brand, ...draftRow.fields } : brand
 
-  const host = await getHost()
   const backUrl = back && back.startsWith('/admin/brands') ? back : '/admin/brands'
 
   return (

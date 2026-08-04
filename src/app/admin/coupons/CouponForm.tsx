@@ -1,12 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
 import AdminSelect from '@/components/admin/AdminSelect'
 import Toggle from '@/components/ui/Toggle'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import AIFillForm from '@/components/admin/AIFillForm'
 import CouponUserSelector from '@/components/admin/CouponUserSelector'
 
 interface CouponFormProps {
@@ -43,10 +44,44 @@ export default function CouponForm({ action, submitLabel, isDraft = false, showU
   const [validFrom, setValidFrom] = useState(d.valid_from ?? '')
   const [validUntil, setValidUntil] = useState(d.valid_until ?? '')
   const [couponDescription, setCouponDescription] = useState(d.description ?? '')
+  const [discountType, setDiscountType] = useState(d.discount_type || 'percentage')
+  const formRef = useRef<HTMLFormElement>(null)
+
+  function setInput(name: string, value: string) {
+    const el = formRef.current?.elements.namedItem(name) as HTMLInputElement | null
+    if (el) { el.value = value }
+  }
+
+  function handleAIFill(values: Record<string, unknown>) {
+    if (values.code) setInput('code', String(values.code).toUpperCase())
+    if (values.discount_type) setDiscountType(String(values.discount_type))
+    if (values.discount_value != null) setInput('discount_value', String(values.discount_value))
+    if (values.max_discount_amount != null) setInput('max_discount_amount', String(values.max_discount_amount))
+    if (values.min_purchase_amount != null) setInput('min_purchase_amount', String(values.min_purchase_amount))
+    if (values.usage_limit != null) setInput('usage_limit', String(values.usage_limit))
+    if (values.usage_limit_per_user != null) setInput('usage_limit_per_user', String(values.usage_limit_per_user))
+    if (values.description) setCouponDescription(String(values.description))
+    if (values.is_active != null) setIsActive(Boolean(values.is_active))
+  }
 
   return (
-    <form action={action} className="space-y-5">
+    <form ref={formRef} action={action} className="space-y-5">
       {backUrl && <input type="hidden" name="_back" value={backUrl} />}
+      <AIFillForm
+        fields={[
+          { name: 'code', label: 'Coupon Code', type: 'text' },
+          { name: 'discount_type', label: 'Discount Type (percentage or fixed)', type: 'text' },
+          { name: 'discount_value', label: 'Discount Value', type: 'number' },
+          { name: 'max_discount_amount', label: 'Max Discount Amount (₹)', type: 'number' },
+          { name: 'min_purchase_amount', label: 'Min Purchase Amount (₹)', type: 'number' },
+          { name: 'usage_limit', label: 'Total Usage Limit', type: 'number' },
+          { name: 'usage_limit_per_user', label: 'Per-User Limit', type: 'number' },
+          { name: 'description', label: 'Description', type: 'textarea' },
+          { name: 'is_active', label: 'Active', type: 'boolean' },
+        ]}
+        onFill={handleAIFill}
+        context="Indian B2B/B2C hardware and tools store coupon"
+      />
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         <div className="xl:col-span-2 space-y-5">
           <div className="bg-surface-elevated rounded-lg border border-border-default p-6 space-y-5">
@@ -67,7 +102,8 @@ export default function CouponForm({ action, submitLabel, isDraft = false, showU
                 name="discount_type"
                 label="Discount Type *"
                 options={DISCOUNT_TYPE_OPTIONS}
-                defaultValue={d.discount_type || 'percentage'}
+                value={discountType}
+                onChange={setDiscountType}
                 required
               />
             </div>
@@ -198,7 +234,7 @@ export default function CouponForm({ action, submitLabel, isDraft = false, showU
       )}
 
       <div className="flex gap-3 pt-2 sticky bottom-0 bg-surface/90 backdrop-blur py-3 -mx-4 sm:-mx-6 px-4 sm:px-6 border-t border-border-default">
-        <Link href={ap(backUrl ?? '/admin/coupons')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
+        <Link href={ap(backUrl ?? '/admin/coupons')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">
           Cancel
         </Link>
         {isDraft ? (

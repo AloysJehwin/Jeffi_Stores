@@ -28,13 +28,59 @@ vi.mock('@/lib/marketing', () => ({
   attributeConversion: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/lib/order-draft', () => ({
+  verifyDraftToken: vi.fn().mockResolvedValue(null),
+  hashCartItems: vi.fn().mockReturnValue('hash'),
+}))
+
+vi.mock('@/lib/order-commit', () => ({
+  loadActiveCart: vi.fn().mockResolvedValue([]),
+  cartSubtotal: vi.fn().mockReturnValue(100),
+  cartTaxAmount: vi.fn().mockReturnValue(18),
+  cartItemsForHash: vi.fn().mockReturnValue([]),
+  validateCouponForUser: vi.fn().mockResolvedValue({ ok: false }),
+  commitOrder: vi.fn().mockResolvedValue({ id: 'ord-1', order_number: 'JS-001', total_amount: '100' }),
+}))
+
+vi.mock('@/lib/invoice', () => ({
+  createDraftInvoice: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('@/lib/activity', () => ({
+  logActivity: vi.fn().mockResolvedValue(undefined),
+}))
+
+vi.mock('@/lib/ai-feedback', () => ({
+  recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined),
+}))
+
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/webhooks/razorpay/route'
+import * as db from '@/lib/db'
+import * as email from '@/lib/email'
+import * as autoTasks from '@/lib/auto-tasks'
+import * as orderDraft from '@/lib/order-draft'
+import * as orderCommit from '@/lib/order-commit'
+import * as invoice from '@/lib/invoice'
+import * as activity from '@/lib/activity'
+import * as aiFeedback from '@/lib/ai-feedback'
+import * as marketing from '@/lib/marketing'
+
+const queryOne = db.queryOne as unknown as ReturnType<typeof vi.fn>
+const queryMany = db.queryMany as unknown as ReturnType<typeof vi.fn>
+const query = db.query as unknown as ReturnType<typeof vi.fn>
+const withTransaction = db.withTransaction as unknown as ReturnType<typeof vi.fn>
+const verifyDraftToken = orderDraft.verifyDraftToken as unknown as ReturnType<typeof vi.fn>
+const loadActiveCart = orderCommit.loadActiveCart as unknown as ReturnType<typeof vi.fn>
+const validateCouponForUser = orderCommit.validateCouponForUser as unknown as ReturnType<typeof vi.fn>
+const commitOrder = orderCommit.commitOrder as unknown as ReturnType<typeof vi.fn>
+const createAutoTask = autoTasks.createAutoTask as unknown as ReturnType<typeof vi.fn>
 
 const WEBHOOK_SECRET = 'test-webhook-secret'
 
-function buildSignedRequest(body: string, secret = WEBHOOK_SECRET) {
+function signedRequest(bodyObj: any, secret = WEBHOOK_SECRET) {
+  const body = JSON.stringify(bodyObj)
   const sig = crypto.createHmac('sha256', secret).update(body).digest('hex')
   return new Request('http://localhost/api/webhooks/razorpay', {
     method: 'POST',
@@ -43,91 +89,465 @@ function buildSignedRequest(body: string, secret = WEBHOOK_SECRET) {
       'x-razorpay-signature': sig,
     },
     body,
-  })
+  }) as any
+}
+
+// Convenience event envelopes ------------------------------------------------
+
+function paymentCaptured(entity: any) {
+  return { event: 'payment.captured', payload: { payment: { entity } } }
+}
+function paymentFailed(entity: any) {
+  return { event: 'payment.failed', payload: { payment: { entity } } }
+}
+function paymentLinkPaid(entity: any) {
+  return { event: 'payment_link.paid', payload: { payment_link: { entity } } }
+}
+function paymentLinkExpired(entity: any) {
+  return { event: 'payment_link.expired', payload: { payment_link: { entity } } }
+}
+function qrCredited(entity: any) {
+  return { event: 'qr_code.credited', payload: { qr_code: { entity } } }
 }
 
 beforeEach(() => {
   process.env.RAZORPAY_WEBHOOK_SECRET = WEBHOOK_SECRET
+  // Reset default resolved values that vi.clearAllMocks() wipes.
+  queryOne.mockResolvedValue(null)
+  queryMany.mockResolvedValue([])
+  query.mockResolvedValue({ rows: [], rowCount: 0 })
+  withTransaction.mockImplementation(async (fn: any) =>
+    fn({ query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }) })
+  )
+  verifyDraftToken.mockResolvedValue(null)
+  loadActiveCart.mockResolvedValue([])
+  validateCouponForUser.mockResolvedValue({ ok: false })
+  commitOrder.mockResolvedValue({ id: 'ord-1', order_number: 'JS-001', total_amount: '100' })
 })
 
-describe('POST /api/webhooks/razorpay', () => {
+// ===========================================================================
+// Signature / envelope guards (POST outer branches)
+// ===========================================================================
+
+describe('POST signature & envelope guards', () => {
   it('returns 400 when x-razorpay-signature header is missing', async () => {
     const req = new Request('http://localhost/api/webhooks/razorpay', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ event: 'payment.captured' }),
+      body: JSON.stringify(paymentCaptured({ id: 'p', order_id: 'o' })),
     })
     const res = await POST(req as any)
     expect(res.status).toBe(400)
-    const body = await res.json()
-    expect(body.error).toMatch(/signature/i)
+    expect((await res.json()).error).toMatch(/signature/i)
+  })
+
+  it('returns 500 when RAZORPAY_WEBHOOK_SECRET is not configured', async () => {
+    delete process.env.RAZORPAY_WEBHOOK_SECRET
+    const req = new Request('http://localhost/api/webhooks/razorpay', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-razorpay-signature': 'ignored' },
+      body: JSON.stringify(paymentLinkExpired({ id: 'plink' })),
+    })
+    const res = await POST(req as any)
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).toMatch(/not configured/i)
   })
 
   it('returns 400 when signature does not match', async () => {
-    const payload = JSON.stringify({ event: 'payment.captured', payload: {} })
+    const body = JSON.stringify(paymentCaptured({ id: 'p', order_id: 'o' }))
     const req = new Request('http://localhost/api/webhooks/razorpay', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-razorpay-signature': 'totally-wrong-sig',
-      },
-      body: payload,
+      headers: { 'content-type': 'application/json', 'x-razorpay-signature': 'wrong' },
+      body,
     })
     const res = await POST(req as any)
     expect(res.status).toBe(400)
-    const body = await res.json()
-    expect(body.error).toMatch(/signature/i)
+    expect((await res.json()).error).toMatch(/signature/i)
   })
 
-  it('returns 200 ok for a valid payment.captured event', async () => {
-    const payload = JSON.stringify({
-      event: 'payment.captured',
-      payload: {
-        payment: {
-          entity: { id: 'pay_123', order_id: 'order_abc', amount: 10000 },
-        },
-      },
-    })
-    const res = await POST(buildSignedRequest(payload) as any)
+  it('returns 200 ok for an unhandled event type (no handler branch)', async () => {
+    const res = await POST(signedRequest({ event: 'refund.processed', payload: {} }))
     expect(res.status).toBe(200)
-    const body = await res.json()
-    expect(body.status).toBe('ok')
+    expect((await res.json()).status).toBe('ok')
   })
 
-  it('returns 200 ok for a valid payment.failed event', async () => {
-    const payload = JSON.stringify({
-      event: 'payment.failed',
-      payload: {
-        payment: {
-          entity: { id: 'pay_456', order_id: 'order_def' },
-        },
-      },
-    })
-    const res = await POST(buildSignedRequest(payload) as any)
-    expect(res.status).toBe(200)
-  })
-
-  it('returns 200 ok for an unhandled event type (graceful)', async () => {
-    const payload = JSON.stringify({ event: 'refund.processed', payload: {} })
-    const res = await POST(buildSignedRequest(payload) as any)
-    expect(res.status).toBe(200)
-  })
-
-  it('processes without secret check when RAZORPAY_WEBHOOK_SECRET is not set', async () => {
-    delete process.env.RAZORPAY_WEBHOOK_SECRET
-    const payload = JSON.stringify({
-      event: 'payment_link.expired',
-      payload: { payment_link: { entity: { id: 'plink_123' } } },
-    })
+  it('returns 200 ok even when JSON body is invalid (outer catch)', async () => {
+    const body = 'not-json{'
+    const sig = crypto.createHmac('sha256', WEBHOOK_SECRET).update(body).digest('hex')
     const req = new Request('http://localhost/api/webhooks/razorpay', {
       method: 'POST',
-      headers: {
-        'content-type': 'application/json',
-        'x-razorpay-signature': 'any-sig-ignored',
-      },
-      body: payload,
+      headers: { 'content-type': 'application/json', 'x-razorpay-signature': sig },
+      body,
     })
     const res = await POST(req as any)
     expect(res.status).toBe(200)
+    expect((await res.json()).status).toBe('ok')
+  })
+})
+
+// ===========================================================================
+// handlePaymentCaptured
+// ===========================================================================
+
+describe('payment.captured', () => {
+  it('no payment record → falls into draft flow (intent claim returns null → no-op)', async () => {
+    // paymentRecord lookup null, then commitDraftFromWebhook: intent claim null
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // intent claim
+    const res = await POST(signedRequest(paymentCaptured({ id: 'pay_1', order_id: 'order_1', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(verifyDraftToken).not.toHaveBeenCalled()
+  })
+
+  it('payment already paid → returns early, no transaction', async () => {
+    queryOne.mockResolvedValueOnce({ order_id: 'o1', payment_status: 'paid', user_id: 'u1' })
+    const res = await POST(signedRequest(paymentCaptured({ id: 'pay_2', order_id: 'order_2', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(withTransaction).not.toHaveBeenCalled()
+  })
+
+  it('unpaid record with user_id → runs transaction, deletes cart, sends emails (email failures swallowed by .catch)', async () => {
+    queryOne
+      .mockResolvedValueOnce({ order_id: 'o1', payment_status: 'unpaid', user_id: 'u1', order_number: 'N1', total_amount: '100' }) // paymentRecord
+      .mockResolvedValueOnce({ id: 'u1', email: 'a@b.com', first_name: 'Jo', last_name: 'Do' }) // user
+      .mockResolvedValueOnce({ id: 'o1', order_number: 'N1', total_amount: '100' }) // order
+    queryMany.mockResolvedValueOnce([{ product_id: 'pr1' }]) // orderItems
+    // Force the fire-and-forget promises to reject so their .catch(() => {}) arrows execute.
+    ;(email.sendOrderConfirmationEmail as any).mockRejectedValueOnce(new Error('smtp down'))
+    ;(email.sendNewOrderNotification as any).mockRejectedValueOnce(new Error('smtp down'))
+    ;(email.sendPaymentStatusUpdate as any).mockRejectedValueOnce(new Error('smtp down'))
+    ;(marketing.attributeConversion as any).mockRejectedValueOnce(new Error('attr down'))
+    const res = await POST(signedRequest(paymentCaptured({ id: 'pay_3', order_id: 'order_3', amount: 10000 })))
+    // Let the microtask queue drain so the rejected promises hit their .catch handlers.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(res.status).toBe(200)
+    expect(withTransaction).toHaveBeenCalled()
+    expect(email.sendOrderConfirmationEmail).toHaveBeenCalledWith('a@b.com', expect.anything(), expect.anything())
+    expect(marketing.attributeConversion).toHaveBeenCalledWith('u1', 'o1')
+  })
+
+  it('unpaid record with NO user_id → transaction runs but no email/cart delete', async () => {
+    queryOne.mockResolvedValueOnce({ order_id: 'o2', payment_status: 'unpaid', user_id: null })
+    const res = await POST(signedRequest(paymentCaptured({ id: 'pay_4', order_id: 'order_4', amount: 5000 })))
+    expect(res.status).toBe(200)
+    expect(withTransaction).toHaveBeenCalled()
+    expect(email.sendOrderConfirmationEmail).not.toHaveBeenCalled()
+  })
+
+  it('unpaid record with user_id but user/order missing → no emails', async () => {
+    queryOne
+      .mockResolvedValueOnce({ order_id: 'o3', payment_status: 'unpaid', user_id: 'u9' }) // paymentRecord
+      .mockResolvedValueOnce(null) // user null
+      .mockResolvedValueOnce(null) // order null
+    const res = await POST(signedRequest(paymentCaptured({ id: 'pay_5', order_id: 'order_5', amount: 5000 })))
+    expect(res.status).toBe(200)
+    expect(email.sendOrderConfirmationEmail).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// handlePaymentFailed
+// ===========================================================================
+
+describe('payment.failed', () => {
+  it('no payment record → early return, no order update task', async () => {
+    queryOne.mockResolvedValueOnce(null)
+    const res = await POST(signedRequest(paymentFailed({ id: 'p', order_id: 'order_x' })))
+    expect(res.status).toBe(200)
+    expect(createAutoTask).not.toHaveBeenCalled()
+  })
+
+  it('record found + order has user_id → creates follow-up task', async () => {
+    queryOne
+      .mockResolvedValueOnce({ order_id: 'o1' }) // paymentRecord
+      .mockResolvedValueOnce(undefined) // UPDATE payments
+      .mockResolvedValueOnce(undefined) // UPDATE orders
+      .mockResolvedValueOnce({ user_id: 'u1', order_number: 'N1', total_amount: '250' }) // orderRow
+    ;(createAutoTask as any).mockRejectedValueOnce(new Error('task fail'))
+    const res = await POST(signedRequest(paymentFailed({ id: 'p', order_id: 'order_y' })))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(res.status).toBe(200)
+    expect(createAutoTask).toHaveBeenCalledWith(expect.objectContaining({ sourceKind: 'contact_failed_payment', userId: 'u1' }))
+  })
+
+  it('record found but order has no user_id → no task', async () => {
+    queryOne
+      .mockResolvedValueOnce({ order_id: 'o2' })
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce(undefined)
+      .mockResolvedValueOnce({ user_id: null, order_number: 'N2', total_amount: '10' })
+    const res = await POST(signedRequest(paymentFailed({ id: 'p', order_id: 'order_z' })))
+    expect(res.status).toBe(200)
+    expect(createAutoTask).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// handlePaymentLinkPaid
+// ===========================================================================
+
+describe('payment_link.paid', () => {
+  it('no matching order → early return', async () => {
+    queryOne.mockResolvedValueOnce(null)
+    const res = await POST(signedRequest(paymentLinkPaid({ id: 'plink_1' })))
+    expect(res.status).toBe(200)
+    expect(withTransaction).not.toHaveBeenCalled()
+  })
+
+  it('order already paid → early return', async () => {
+    queryOne.mockResolvedValueOnce({ id: 'o1', payment_status: 'paid' })
+    const res = await POST(signedRequest(paymentLinkPaid({ id: 'plink_2' })))
+    expect(res.status).toBe(200)
+    expect(withTransaction).not.toHaveBeenCalled()
+  })
+
+  it('unpaid order with user_id + payments array → transaction, emails (failures swallowed)', async () => {
+    queryOne
+      .mockResolvedValueOnce({ id: 'o1', payment_status: 'unpaid', user_id: 'u1', order_number: 'N1', total_amount: '300' }) // order
+      .mockResolvedValueOnce({ id: 'u1', email: 'x@y.com', first_name: 'A', last_name: 'B' }) // user
+      .mockResolvedValueOnce({ id: 'o1', order_number: 'N1', total_amount: '300' }) // fullOrder
+    queryMany.mockResolvedValueOnce([])
+    ;(email.sendOrderConfirmationEmail as any).mockRejectedValueOnce(new Error('x'))
+    ;(email.sendNewOrderNotification as any).mockRejectedValueOnce(new Error('x'))
+    ;(email.sendPaymentStatusUpdate as any).mockRejectedValueOnce(new Error('x'))
+    const res = await POST(signedRequest(paymentLinkPaid({ id: 'plink_3', payments: [{ payment_id: 'pl_pay_1' }] })))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(res.status).toBe(200)
+    expect(withTransaction).toHaveBeenCalled()
+    expect(email.sendPaymentStatusUpdate).toHaveBeenCalled()
+  })
+
+  it('unpaid order without user_id (uses fallback link id for txn) → no emails', async () => {
+    queryOne.mockResolvedValueOnce({ id: 'o2', payment_status: 'unpaid', user_id: null, order_number: 'N2', total_amount: '50' })
+    const res = await POST(signedRequest(paymentLinkPaid({ id: 'plink_4' })))
+    expect(res.status).toBe(200)
+    expect(withTransaction).toHaveBeenCalled()
+    expect(email.sendOrderConfirmationEmail).not.toHaveBeenCalled()
+  })
+
+  it('unpaid order with user_id but user/fullOrder missing → no emails', async () => {
+    queryOne
+      .mockResolvedValueOnce({ id: 'o3', payment_status: 'unpaid', user_id: 'u3', order_number: 'N3', total_amount: '99' })
+      .mockResolvedValueOnce(null) // user
+      .mockResolvedValueOnce(null) // fullOrder
+    queryMany.mockResolvedValueOnce([])
+    const res = await POST(signedRequest(paymentLinkPaid({ id: 'plink_5' })))
+    expect(res.status).toBe(200)
+    expect(email.sendOrderConfirmationEmail).not.toHaveBeenCalled()
+  })
+})
+
+// ===========================================================================
+// handleQrCodeCredited
+// ===========================================================================
+
+describe('qr_code.credited', () => {
+  it('no qr id → early return', async () => {
+    const res = await POST(signedRequest(qrCredited({})))
+    expect(res.status).toBe(200)
+    expect(query).not.toHaveBeenCalled()
+  })
+
+  it('no matching order → early return', async () => {
+    queryOne.mockResolvedValueOnce(null)
+    const res = await POST(signedRequest(qrCredited({ id: 'qr_1' })))
+    expect(res.status).toBe(200)
+    expect(query).not.toHaveBeenCalled()
+  })
+
+  it('order already paid → early return', async () => {
+    queryOne.mockResolvedValueOnce({ id: 'o1', payment_status: 'paid', total_amount: '100' })
+    const res = await POST(signedRequest(qrCredited({ id: 'qr_2' })))
+    expect(res.status).toBe(200)
+    expect(query).not.toHaveBeenCalled()
+  })
+
+  it('unpaid order with payments array → updates + inserts payment', async () => {
+    queryOne.mockResolvedValueOnce({ id: 'o1', payment_status: 'unpaid', total_amount: '100' })
+    const res = await POST(signedRequest(qrCredited({ id: 'qr_3', payments: [{ razorpay_payment_id: 'qrp1' }] })))
+    expect(res.status).toBe(200)
+    expect(query).toHaveBeenCalledTimes(2)
+  })
+
+  it('unpaid order without payments array → falls back to qr id', async () => {
+    queryOne.mockResolvedValueOnce({ id: 'o2', payment_status: 'unpaid', total_amount: '200' })
+    const res = await POST(signedRequest(qrCredited({ id: 'qr_4' })))
+    expect(res.status).toBe(200)
+    expect(query).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ===========================================================================
+// handlePaymentLinkExpired
+// ===========================================================================
+
+describe('payment_link.expired', () => {
+  it('runs the expiry update', async () => {
+    const res = await POST(signedRequest(paymentLinkExpired({ id: 'plink_exp' })))
+    expect(res.status).toBe(200)
+    expect(queryOne).toHaveBeenCalledWith(expect.stringContaining("payment_link_status = 'expired'"), ['plink_exp'])
+  })
+})
+
+// ===========================================================================
+// commitDraftFromWebhook (reached via payment.captured with no payment record)
+// ===========================================================================
+
+function draftCaptured(entity: any) {
+  return paymentCaptured(entity)
+}
+
+describe('commitDraftFromWebhook (draft-token recovery)', () => {
+  function claimIntent(overrides: any = {}) {
+    return { id: 'intent1', draft_token: 'tok', user_id: 'u1', amount_paise: 10000, ...overrides }
+  }
+
+  it('intent claim null → no-op', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // claim
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_d', order_id: 'ro1', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(verifyDraftToken).not.toHaveBeenCalled()
+  })
+
+  it('draft token expired → creates high-priority manual task', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(claimIntent()) // claim
+    verifyDraftToken.mockResolvedValueOnce(null) // expired
+    ;(createAutoTask as any).mockRejectedValueOnce(new Error('task fail'))
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_e', order_id: 'ro2', amount: 10000 })))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(res.status).toBe(200)
+    expect(createAutoTask).toHaveBeenCalledWith(expect.objectContaining({ priority: 'high' }))
+    expect(commitOrder).not.toHaveBeenCalled()
+  })
+
+  it('amount mismatch → creates high-priority mismatch task', async () => {
+    queryOne.mockResolvedValueOnce(null)
+    queryOne.mockResolvedValueOnce(claimIntent({ amount_paise: 10000 }))
+    verifyDraftToken.mockResolvedValueOnce({ mode: 'cart', addressId: 'a1' })
+    // captured amount far off
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_m', order_id: 'ro3', amount: 99999 })))
+    expect(res.status).toBe(200)
+    expect(createAutoTask).toHaveBeenCalledWith(expect.objectContaining({ title: expect.stringContaining('mismatch') }))
+    expect(commitOrder).not.toHaveBeenCalled()
+  })
+
+  it('user missing → early return', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(claimIntent()) // claim
+    verifyDraftToken.mockResolvedValueOnce({ mode: 'cart', addressId: 'a1' })
+    queryOne.mockResolvedValueOnce(null) // user null
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_u', order_id: 'ro4', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(commitOrder).not.toHaveBeenCalled()
+  })
+
+  it('cart mode with empty cart → early return', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(claimIntent()) // claim
+    verifyDraftToken.mockResolvedValueOnce({ mode: 'cart', addressId: 'a1' })
+    queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com' }) // user
+    loadActiveCart.mockResolvedValueOnce([]) // empty cart
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_c0', order_id: 'ro5', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(commitOrder).not.toHaveBeenCalled()
+  })
+
+  it('cart mode with items + coupon applied → commits order + full follow-ups', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(claimIntent()) // claim
+    verifyDraftToken.mockResolvedValueOnce({
+      mode: 'cart', addressId: 'a1', notes: 'n', couponId: 'c1',
+      shippingAmount: 0, businessDiscountAmount: 0,
+    })
+    queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com', first_name: 'A', last_name: 'B' }) // user
+    loadActiveCart.mockResolvedValueOnce([{ productId: 'p1' }]) // has items
+    validateCouponForUser.mockResolvedValueOnce({ ok: true, appliedDiscount: 10 })
+    queryMany.mockResolvedValueOnce([{ product_id: 'p1' }]) // order_items
+    queryOne.mockResolvedValueOnce({ id: 'ord-1', order_number: 'JS-001', total_amount: '100' }) // fullOrder
+    // Force every fire-and-forget follow-up to reject so their .catch(() => {}) arrows run.
+    ;(invoice.createDraftInvoice as any).mockRejectedValueOnce(new Error('inv'))
+    ;(email.sendOrderConfirmationEmail as any).mockRejectedValueOnce(new Error('e'))
+    ;(email.sendNewOrderNotification as any).mockRejectedValueOnce(new Error('e'))
+    ;(email.sendPaymentStatusUpdate as any).mockRejectedValueOnce(new Error('e'))
+    ;(activity.logActivity as any).mockRejectedValueOnce(new Error('a'))
+    ;(aiFeedback.recordImplicitSignalsForProducts as any).mockRejectedValueOnce(new Error('s'))
+    ;(marketing.attributeConversion as any).mockRejectedValueOnce(new Error('c'))
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_c1', order_id: 'ro6', amount: 10000 })))
+    await new Promise((r) => setTimeout(r, 0))
+    expect(res.status).toBe(200)
+    expect(commitOrder).toHaveBeenCalledWith(expect.objectContaining({ mode: 'cart', appliedDiscount: 10 }))
+    expect(invoice.createDraftInvoice).toHaveBeenCalledWith('ord-1')
+    expect(activity.logActivity).toHaveBeenCalled()
+    expect(aiFeedback.recordImplicitSignalsForProducts).toHaveBeenCalledWith('u1', ['p1'], 'purchased')
+  })
+
+  it('buyNow mode with product found → commits buyNow order', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(claimIntent()) // claim
+    verifyDraftToken.mockResolvedValueOnce({
+      mode: 'buyNow', addressId: 'a1', shippingAmount: 0,
+      buyNowItem: { productId: 'p1', variantId: 'v1', subVariantId: 's1', price: 100, qty: 1 },
+    })
+    queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com', first_name: '', last_name: '' }) // user
+    queryOne.mockResolvedValueOnce({ id: 'p1', name: 'Prod', gst_percentage: '18' }) // product
+    queryOne.mockResolvedValueOnce({ id: 'v1', variant_name: 'V', mrp: 100 }) // variant
+    queryOne.mockResolvedValueOnce({ id: 's1', sub_variant_name: 'S', mrp: 100 }) // subVariant
+    queryMany.mockResolvedValueOnce([{ product_id: 'p1' }]) // order_items
+    queryOne.mockResolvedValueOnce({ id: 'ord-1', order_number: 'JS-002', total_amount: '100' }) // fullOrder
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_bn', order_id: 'ro7', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(commitOrder).toHaveBeenCalledWith(expect.objectContaining({ mode: 'buyNow' }))
+  })
+
+  it('buyNow mode with product NOT found → early return', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(claimIntent()) // claim
+    verifyDraftToken.mockResolvedValueOnce({
+      mode: 'buyNow', addressId: 'a1', shippingAmount: 0,
+      buyNowItem: { productId: 'pX', price: 100, qty: 1 },
+    })
+    queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com' }) // user
+    queryOne.mockResolvedValueOnce(null) // product null
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_bn0', order_id: 'ro8', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(commitOrder).not.toHaveBeenCalled()
+  })
+
+  it('buyNow mode with no buyNowItem → falls to else branch, early return', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(claimIntent()) // claim
+    verifyDraftToken.mockResolvedValueOnce({ mode: 'buyNow', addressId: 'a1' }) // no buyNowItem
+    queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com' }) // user
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_bn1', order_id: 'ro9', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(commitOrder).not.toHaveBeenCalled()
+  })
+
+  it('unknown draft mode → else branch early return', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(claimIntent()) // claim
+    verifyDraftToken.mockResolvedValueOnce({ mode: 'weird', addressId: 'a1' })
+    queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com' }) // user
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_um', order_id: 'ro10', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(commitOrder).not.toHaveBeenCalled()
+  })
+
+  it('buyNow without variant/subVariant ids → skips variant lookups', async () => {
+    queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(claimIntent()) // claim
+    verifyDraftToken.mockResolvedValueOnce({
+      mode: 'buyNow', addressId: 'a1', shippingAmount: 0,
+      buyNowItem: { productId: 'p1', price: 100, qty: 2 },
+    })
+    queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com', first_name: 'X', last_name: 'Y' }) // user
+    queryOne.mockResolvedValueOnce({ id: 'p1', name: 'Prod', gst_percentage: null }) // product, null gst
+    queryMany.mockResolvedValueOnce([]) // order_items empty
+    queryOne.mockResolvedValueOnce({ id: 'ord-1', order_number: 'JS-003', total_amount: '200' }) // fullOrder
+    const res = await POST(signedRequest(draftCaptured({ id: 'pay_bn2', order_id: 'ro11', amount: 10000 })))
+    expect(res.status).toBe(200)
+    expect(commitOrder).toHaveBeenCalledWith(expect.objectContaining({ mode: 'buyNow' }))
   })
 })

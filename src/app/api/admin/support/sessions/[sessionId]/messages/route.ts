@@ -55,7 +55,7 @@ export async function POST(
 
     const adminDisplayName = (admin.first_name && admin.last_name)
       ? `${admin.first_name} ${admin.last_name}`
-      : admin.username
+      : (admin.email || 'Support')
 
     await queryOne(
       `UPDATE support_sessions SET admin_name = COALESCE(admin_name, $1) WHERE id = $2`,

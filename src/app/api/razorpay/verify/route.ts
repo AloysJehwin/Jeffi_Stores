@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { z } from 'zod'
-import { queryOne, queryMany, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
 import { createDraftInvoice } from '@/lib/invoice'
@@ -87,6 +87,17 @@ async function commitDraft(args: {
   if (!draft) return NextResponse.json({ error: 'Invalid or expired checkout session' }, { status: 400 })
   if (draft.userId !== args.userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
+  // Idempotency: if payment already committed return existing order
+  const existing = await queryOne<{ id: string; order_number: string }>(
+    `SELECT o.id, o.order_number FROM payments p
+     JOIN orders o ON o.id = p.order_id
+     WHERE p.transaction_id = $1 LIMIT 1`,
+    [args.razorpay_payment_id]
+  )
+  if (existing) {
+    return NextResponse.json({ success: true, order: { id: existing.id, orderNumber: existing.order_number, paymentStatus: 'paid' } })
+  }
+
   const user = await queryOne<any>(`SELECT * FROM users WHERE id = $1`, [args.userId])
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
@@ -100,6 +111,15 @@ async function commitDraft(args: {
     if (cartItems.length === 0) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
     const hash = hashCartItems(cartItemsForHash(cartItems))
     if (draft.cartHash && draft.cartHash !== hash) {
+      createAutoTask({
+        userId: args.userId,
+        sourceKind: 'contact_failed_payment',
+        sourceRefId: args.razorpay_order_id,
+        title: `Payment captured but cart changed — manual order needed (${args.razorpay_payment_id})`,
+        description: `Razorpay captured payment but cart hash mismatched at verify time. Manually create the order or refund. Payment ID: ${args.razorpay_payment_id}`,
+        priority: 'high',
+        dueInDays: 0,
+      }).catch(() => {})
       return NextResponse.json({
         error: 'Cart changed during payment. Payment captured — contact support to release.',
       }, { status: 409 })
@@ -180,6 +200,12 @@ async function commitDraft(args: {
       })
 
   const userName = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
+
+  // Mark intent committed — prevents webhook double-commit
+  query(
+    `UPDATE pending_payment_intents SET committed = true WHERE razorpay_order_id = $1 AND committed = false`,
+    [args.razorpay_order_id]
+  ).catch(() => {})
 
   const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
   createDraftInvoice(created.id).catch(() => {})

@@ -19,7 +19,7 @@ export async function GET(request: NextRequest) {
     const result = await query<any>(
       `SELECT
         m.id, m.conversation_id, m.created_at, m.tool_calls,
-        a.username as admin_username,
+        COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) as admin_username,
         u.first_name as admin_first_name, u.last_name as admin_last_name
        FROM admin_agent_messages m
        LEFT JOIN admins a ON a.id = m.admin_id

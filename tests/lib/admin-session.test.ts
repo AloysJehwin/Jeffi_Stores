@@ -34,15 +34,28 @@ describe('issueAdminSession', () => {
   })
 
   it('calls generateToken with admin fields', async () => {
-    const admin = { id: 'admin-1', username: 'alice', role: 'superadmin', scopes: ['read', 'write'] }
+    const admin = {
+      id: 'admin-1',
+      email: 'alice@example.com',
+      first_name: 'Alice',
+      last_name: 'Smith',
+      role: 'superadmin',
+      scopes: ['read', 'write'],
+    }
     await issueAdminSession(admin)
     expect(mockGenerateToken).toHaveBeenCalledWith(
-      expect.objectContaining({ adminId: 'admin-1', username: 'alice', role: 'superadmin' })
+      expect.objectContaining({
+        adminId: 'admin-1',
+        email: 'alice@example.com',
+        first_name: 'Alice',
+        last_name: 'Smith',
+        role: 'superadmin',
+      })
     )
   })
 
   it('sets admin_token cookie on the response', async () => {
-    const admin = { id: 'admin-2', username: 'bob', role: 'admin', scopes: null }
+    const admin = { id: 'admin-2', email: 'bob@example.com', role: 'admin', scopes: null }
     const response = await issueAdminSession(admin)
     const mockSet = (response as any)._mockCookieSet ?? (response.cookies as any).set
     expect(mockSet).toHaveBeenCalledWith(
@@ -53,7 +66,7 @@ describe('issueAdminSession', () => {
   })
 
   it('returns NextResponse.json with success:true', async () => {
-    const admin = { id: 'a1', username: 'test', role: 'admin', scopes: [] }
+    const admin = { id: 'a1', email: 'test@example.com', role: 'admin', scopes: [] }
     const response = await issueAdminSession(admin)
     expect(NextResponse.json).toHaveBeenCalledWith(
       expect.objectContaining({ success: true })
@@ -62,7 +75,7 @@ describe('issueAdminSession', () => {
   })
 
   it('includes certCN in token when provided', async () => {
-    const admin = { id: 'a1', username: 'test', role: 'admin', scopes: [] }
+    const admin = { id: 'a1', email: 'test@example.com', role: 'admin', scopes: [] }
     await issueAdminSession(admin, 'client-cert-cn')
     expect(mockGenerateToken).toHaveBeenCalledWith(
       expect.objectContaining({ authCertCN: 'client-cert-cn' })
@@ -70,7 +83,7 @@ describe('issueAdminSession', () => {
   })
 
   it('merges extraBody into response body', async () => {
-    const admin = { id: 'a1', username: 'test', role: 'admin', scopes: [] }
+    const admin = { id: 'a1', email: 'test@example.com', role: 'admin', scopes: [] }
     await issueAdminSession(admin, undefined, { redirectTo: '/dashboard' })
     expect(NextResponse.json).toHaveBeenCalledWith(
       expect.objectContaining({ redirectTo: '/dashboard' })
@@ -78,7 +91,7 @@ describe('issueAdminSession', () => {
   })
 
   it('handles null scopes by defaulting to empty array', async () => {
-    const admin = { id: 'a1', username: 'test', role: 'admin', scopes: null }
+    const admin = { id: 'a1', email: 'test@example.com', role: 'admin', scopes: null }
     await issueAdminSession(admin)
     expect(mockGenerateToken).toHaveBeenCalledWith(
       expect.objectContaining({ scopes: [] })

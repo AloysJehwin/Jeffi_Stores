@@ -29,17 +29,20 @@ export default function DeleteProductButton({ productId, productName }: DeletePr
     setIsDeleting(true)
 
     try {
-      const response = await fetch(`/api/products/${productId}`, {
+      const response = await fetch(`/api/admin/products/${productId}`, {
         method: 'DELETE',
       })
 
+      const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        throw new Error('Failed to delete product')
+        throw new Error(data.error || 'Failed to delete product')
       }
 
+      showToast(`"${productName}" deleted successfully.`, 'success')
+      router.push('/admin/products')
       router.refresh()
-    } catch (error) {
-      showToast('Failed to delete product. Please try again.', 'error')
+    } catch (error: any) {
+      showToast(error.message || 'Failed to delete product. Please try again.', 'error')
     } finally {
       setIsDeleting(false)
     }

@@ -1,0 +1,32 @@
+services:
+  nginx:
+    image: nginx:alpine
+    container_name: jeffi-nginx
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/active-upstream.conf:/etc/nginx/conf.d/upstream.conf:ro
+      - ./deploy/nginx-servers.conf:/etc/nginx/conf.d/servers.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - ./certbot-webroot:/var/www/certbot:ro
+      - ./certs:/etc/nginx/certs:ro
+    restart: always
+    networks:
+      - internal
+
+  redis:
+    image: redis:7-alpine
+    container_name: jeffi-redis
+    volumes:
+      - redis-data:/data
+    restart: always
+    networks:
+      - internal
+
+volumes:
+  redis-data:
+
+networks:
+  internal:
+    driver: bridge

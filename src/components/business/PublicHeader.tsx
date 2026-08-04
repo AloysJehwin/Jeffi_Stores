@@ -92,7 +92,7 @@ export default function BusinessPublicHeader({ authState = 'guest' }: { authStat
         <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20 gap-2">
           <Link href={bp('/business')} className="flex items-center shrink-0 min-w-0" onClick={() => setMobileOpen(false)}>
             <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-              <img src="/images/logo.svg" alt="Jeffi Stores Logo" className="h-8 sm:h-10 lg:h-12 w-auto shrink-0" />
+              <img src="/images/logo.png" alt="Jeffi Stores Logo" className="h-8 sm:h-10 lg:h-12 w-auto shrink-0" />
               <div className="min-w-0">
                 <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 truncate leading-tight">
                   Jeffi Stores
@@ -137,7 +137,7 @@ export default function BusinessPublicHeader({ authState = 'guest' }: { authStat
           <div className="lg:hidden fixed top-0 left-0 bottom-0 z-50 w-4/5 max-w-xs bg-surface-elevated shadow-xl flex flex-col overflow-y-auto transition-transform duration-300 ease-in-out translate-x-0">
             <div className="flex items-center justify-between p-4 border-b border-border-default">
               <Link href={bp('/business')} className="flex items-center gap-2" onClick={() => setMobileOpen(false)}>
-                <img src="/images/logo.svg" alt="Jeffi Stores Logo" className="h-10 w-auto" />
+                <img src="/images/logo.png" alt="Jeffi Stores Logo" className="h-10 w-auto" />
                 <div>
                   <div className="font-bold text-secondary-500 dark:text-primary-400 leading-tight">Jeffi Stores</div>
                   <div className="text-xs text-accent-500 font-semibold leading-tight">Business</div>

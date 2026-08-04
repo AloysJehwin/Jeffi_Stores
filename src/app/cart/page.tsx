@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import RecommendedProducts from '@/components/visitor/RecommendedProducts'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import CartInsightPanel from '@/components/on-device/CartInsightPanel'
 
 interface AppliedCoupon {
   couponId: string
@@ -520,12 +521,19 @@ export default function CartPage() {
               </div>
             )}
 
+            <CartInsightPanel items={cartItems.map(i => ({
+              name: i.products?.name || '',
+              brand: i.products?.brand_name || null,
+              category: null,
+              qty: Number(i.quantity),
+            }))} />
+
             <RecommendedProducts title="You Might Also Like" limit={4} />
           </div>
 
           {/* Order Summary */}
           {cartItems.length > 0 && (
-          <div className="lg:col-span-1 lg:self-start lg:sticky lg:top-20">
+          <div className="lg:col-span-1 lg:self-start lg:sticky lg:top-24">
             <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
               <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
 

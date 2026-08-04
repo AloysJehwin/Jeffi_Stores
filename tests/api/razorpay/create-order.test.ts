@@ -4,6 +4,7 @@ vi.mock('@/lib/jwt', () => ({
   authenticateAnyUser: vi.fn(),
 }))
 vi.mock('@/lib/db', () => ({
+  query: vi.fn(),
   queryOne: vi.fn(),
 }))
 vi.mock('@/lib/razorpay', () => ({

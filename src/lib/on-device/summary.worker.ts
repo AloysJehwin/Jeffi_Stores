@@ -59,14 +59,15 @@ try {
 let tokenizer: any = null
 let model: any = null
 let loading: Promise<void> | null = null
+let isMobile = false
 
 async function load() {
   if (loading) return loading
   loading = (async () => {
     tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID)
     model = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
-      // Quantized weights (model_quantized.onnx) + WebGPU acceleration.
-      dtype: 'q8',
+      // q4 on mobile — smaller memory footprint, faster on mobile GPU
+      dtype: isMobile ? 'q4' : 'q8',
       device: 'webgpu',
     })
   })()
@@ -91,8 +92,9 @@ async function generate(id: number, prompt: string) {
   // drop the prompt tokens, then decode just the newly generated ids.
   const output = await model.generate({
     ...inputs,
-    max_new_tokens: 90,
+    max_new_tokens: 80,
     do_sample: false,
+    repetition_penalty: 1.3,
     streamer,
   })
 
@@ -105,7 +107,9 @@ async function generate(id: number, prompt: string) {
 self.addEventListener('message', async (e: MessageEvent) => {
   const msg = e.data
   try {
-    if (msg.type === 'load') {
+    if (msg.type === 'init') {
+      isMobile = !!msg.isMobile
+    } else if (msg.type === 'load') {
       await load()
       ;(self as any).postMessage({ type: 'ready' })
     } else if (msg.type === 'generate') {

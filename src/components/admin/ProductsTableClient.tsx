@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Star } from 'lucide-react'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { ap } from '@/lib/admin-path'
@@ -23,6 +24,7 @@ interface Props {
 
 export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products', isSuperAdmin = false }: Props) {
   const confirm = useConfirm()
+  const router = useRouter()
   const [selected, setSelected] = useState<any>(null)
   const [labelProduct, setLabelProduct] = useState<{ id: string; name: string; has_variants: boolean } | null>(null)
   const [activeStates, setActiveStates] = useState<Record<string, boolean>>({})
@@ -50,7 +52,17 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
     setDeletingId(productId)
     try {
       const res = await fetch(`/api/admin/products/${productId}`, { method: 'DELETE' })
-      if (res.ok) window.location.reload()
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        window.location.reload()
+      } else {
+        await confirm({
+          title: 'Could not delete',
+          message: data.error || 'Failed to delete product.',
+          confirmLabel: 'OK',
+          cancelLabel: 'Close',
+        })
+      }
     } finally {
       setDeletingId(null)
     }

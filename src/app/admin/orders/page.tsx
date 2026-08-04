@@ -314,10 +314,10 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
         searchPlaceholder="Search by order number or customer..."
         searchParam="search"
         suggestType="orders"
-        advancedPanel={<AdvancedFilterPanel fields={[
+        advancedContent={<AdvancedFilterPanel fields={[
           { name: ['date_from', 'date_to'], label: 'Order Date', type: 'date-range', section: 'Date & Amount' },
           { name: ['amount_min', 'amount_max'], label: 'Order Amount', type: 'range', section: 'Date & Amount', unit: '₹' },
-          { name: 'shipment_status', label: 'Shipment Status', type: 'select', section: 'Shipment', options: [
+          { name: 'shipment_status', label: 'Shipment Status', type: 'multi-select', section: 'Shipment', options: [
             { value: 'created', label: 'Created' },
             { value: 'in_transit', label: 'In Transit' },
             { value: 'out_for_delivery', label: 'Out for Delivery' },
@@ -326,12 +326,12 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
             { value: 'rto_delivered', label: 'RTO Delivered' },
           ]},
           { name: 'awb', label: 'AWB / Tracking No.', type: 'text', section: 'Shipment', placeholder: 'Search by AWB number' },
-          { name: 'payment_mode', label: 'Payment Mode', type: 'select', section: 'Payment', options: [
+          { name: 'payment_mode', label: 'Payment Mode', type: 'multi-select', section: 'Payment', options: [
             { value: 'cod', label: 'Cash on Delivery' },
             { value: 'prepaid', label: 'Prepaid' },
           ]},
           { name: 'coupon_code', label: 'Coupon Code', type: 'text', section: 'Payment', placeholder: 'Search by coupon code' },
-        ]} />}
+        ]} mode="content" forceExpanded />}
       />
 
       <OrdersListSection searchParams={searchParams} />

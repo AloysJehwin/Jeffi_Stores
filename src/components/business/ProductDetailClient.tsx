@@ -132,6 +132,7 @@ interface ProductDetailClientProps {
     is_cod_allowed?: boolean | null
   }
   initialSkuParam?: string
+  freeShippingThreshold?: number
 }
 
 interface PolicyProps {
@@ -140,9 +141,10 @@ interface PolicyProps {
   replacementAllowed: boolean
   replacementDays: number
   isCodAllowed?: boolean
+  freeShippingThreshold?: number
 }
 
-const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed }: PolicyProps) => {
+const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed, freeShippingThreshold = 500 }: PolicyProps) => {
   const items = [
     {
       icon: (
@@ -152,7 +154,7 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
         </svg>
       ),
       label: 'Free Delivery',
-      sub: 'On orders above ₹500',
+      sub: `On orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}`,
       color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
       href: '/legal/shipping-policy',
     },
@@ -235,7 +237,7 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
   )
 }
 
-export default function ProductDetailClient({ product, initialSkuParam }: ProductDetailClientProps) {
+export default function ProductDetailClient({ product, initialSkuParam, freeShippingThreshold = 500 }: ProductDetailClientProps) {
   const [variantImages, setVariantImages] = useState<ProductImage[] | undefined>(undefined)
   const [selectedVariantId, setSelectedVariantId] = useState<string | null>(null)
   const [selectedSubVariantId, setSelectedSubVariantId] = useState<string | null>(null)
@@ -282,7 +284,7 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
   const replacementDays = replacementAllowed
     ? (brand?.replacement_allowed === false ? (brand.replacement_window_days ?? 7) : (cat?.replacement_window_days ?? brand?.replacement_window_days ?? 7))
     : 0
-  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed: product.is_cod_allowed ?? false }
+  const policy: PolicyProps = { returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed: product.is_cod_allowed ?? false, freeShippingThreshold }
 
   const handleShare = useCallback(async () => {
     const url = window.location.href
@@ -307,18 +309,14 @@ export default function ProductDetailClient({ product, initialSkuParam }: Produc
     <>
       {/* Image column — order-1 on mobile, natural on desktop */}
       <div className="order-1 lg:order-none">
-        <div className="relative overflow-hidden rounded-xl">
+        <div className="relative rounded-xl">
           <ProductImageGallery
             images={product.product_images || []}
             productName={product.name}
             variantImages={variantImages}
             discountPct={businessDiscountPct > 0 ? null : (product.discount_pct != null ? Number(product.discount_pct) : null)}
+            ribbonLabel={businessDiscountPct > 0 ? 'Business offer' : undefined}
           />
-          {businessDiscountPct > 0 && (
-            <div className="absolute top-6 right-[-36px] w-44 rotate-45 bg-gradient-to-r from-amber-500 to-rose-500 text-white text-[11px] font-bold text-center py-1.5 shadow-md pointer-events-none select-none z-10">
-              Business offer
-            </div>
-          )}
         </div>
 
         <div className="hidden lg:block mt-4">

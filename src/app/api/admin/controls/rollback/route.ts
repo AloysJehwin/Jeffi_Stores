@@ -115,13 +115,13 @@ export async function POST(request: NextRequest) {
 
       await client.query(
         `UPDATE controls_operation_log SET rolled_back_at = NOW(), rolled_back_by = $2 WHERE id = $1`,
-        [log_id, admin.username ?? null]
+        [log_id, admin.email ?? null]
       )
 
       await client.query(
         `INSERT INTO controls_operation_log (operation, product_ids, value, snapshot, applied_by, admin_id, product_count, is_rollback)
          VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
-        [operation, snapshot.map(r => r.id), null, JSON.stringify(snapshot), admin.username ?? null, admin.adminId ?? null, snapshot.length]
+        [operation, snapshot.map(r => r.id), null, JSON.stringify(snapshot), admin.email ?? null, admin.adminId ?? null, snapshot.length]
       )
     })
 

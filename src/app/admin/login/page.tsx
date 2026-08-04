@@ -3,18 +3,22 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
+import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 
-type Step = 'password' | 'verify' | 'enroll'
+type Step = 'identity' | 'verify' | 'enroll'
+
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
 
 export default function AdminLogin() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || ap('/admin/dashboard')
-  const [formData, setFormData] = useState({
-    username: '',
-    password: '',
-  })
-  const [step, setStep] = useState<Step>('password')
+  const [email, setEmail] = useState('')
+  const [otp, setOtp] = useState('')
+  const [otpSent, setOtpSent] = useState(false)
+  const [resendCooldown, setResendCooldown] = useState(0)
+  const [googleLoading, setGoogleLoading] = useState(false)
+  const [step, setStep] = useState<Step>('identity')
   const [ticket, setTicket] = useState('')
   const [code, setCode] = useState('')
   const [enrollData, setEnrollData] = useState<{ secret: string; qr_data_url: string; otpauth_url: string } | null>(null)
@@ -50,57 +54,100 @@ export default function AdminLogin() {
     }
   }, [router])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    setIsCertError(false)
-    setLoading(true)
+  // Shared: both identity factors (email-OTP, Google) return {mfa_required|enroll_required, ticket}.
+  const handleIdentityResult = async (data: { mfa_required?: boolean; enroll_required?: boolean; ticket?: string }) => {
+    if (data.mfa_required && data.ticket) {
+      setTicket(data.ticket)
+      setStep('verify')
+      return
+    }
+    if (data.enroll_required && data.ticket) {
+      setTicket(data.ticket)
+      const startRes = await fetch('/api/admin/mfa/enroll-start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ticket: data.ticket }),
+      })
+      const startData = await startRes.json()
+      if (!startRes.ok) throw new Error(startData.error || 'Could not start enrollment')
+      setEnrollData({ secret: startData.secret, qr_data_url: startData.qr_data_url, otpauth_url: startData.otpauth_url })
+      setStep('enroll')
+      return
+    }
+    throw new Error('Unexpected response')
+  }
 
+  const handleSendOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(''); setIsCertError(false); setLoading(true)
     try {
-      const response = await fetch('/api/admin/login', {
+      const res = await fetch('/api/admin/auth/email-otp/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ email: email.trim() }),
       })
-
-      const data = await response.json()
-
-      if (!response.ok) {
-        if (response.status === 403) setIsCertError(true)
-        throw new Error(data.error || 'Login failed')
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 403) setIsCertError(true)
+        throw new Error(data.error || 'Could not send code')
       }
-
-      if (data.mfa_required && data.ticket) {
-        setTicket(data.ticket)
-        setStep('verify')
-        setLoading(false)
-        return
-      }
-
-      if (data.enroll_required && data.ticket) {
-        setTicket(data.ticket)
-        const startRes = await fetch('/api/admin/mfa/enroll-start', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ticket: data.ticket }),
-        })
-        const startData = await startRes.json()
-        if (!startRes.ok) throw new Error(startData.error || 'Could not start enrollment')
-        setEnrollData({
-          secret: startData.secret,
-          qr_data_url: startData.qr_data_url,
-          otpauth_url: startData.otpauth_url,
-        })
-        setStep('enroll')
-        setLoading(false)
-        return
-      }
-
-      window.location.href = ap('/admin/dashboard')
+      setOtpSent(true)
+      setResendCooldown(data.nextCooldown || 30)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Login failed')
+      setError(err instanceof Error ? err.message : 'Could not send code')
+    } finally {
       setLoading(false)
+    }
+  }
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setError(''); setIsCertError(false); setLoading(true)
+    try {
+      const res = await fetch('/api/admin/auth/email-otp/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: email.trim(), code: otp.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 403) setIsCertError(true)
+        throw new Error(data.error || 'Verification failed')
+      }
+      await handleIdentityResult(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Verification failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleGoogle = async () => {
+    setError(''); setIsCertError(false); setGoogleLoading(true)
+    try {
+      const { accessToken, error: gErr } = await openGoogleOAuthPopup({ clientId: GOOGLE_CLIENT_ID })
+      if (gErr || !accessToken) {
+        if (gErr && gErr !== 'popup_closed') setError(gErr)
+        return
+      }
+      const res = await fetch('/api/admin/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ accessToken }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 403) setIsCertError(true)
+        throw new Error(data.error || 'Google sign-in failed')
+      }
+      await handleIdentityResult(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google sign-in failed')
+    } finally {
+      setGoogleLoading(false)
     }
   }
 
@@ -146,13 +193,6 @@ export default function AdminLogin() {
     }
   }
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    })
-  }
-
   if (checkingSession) return null
 
   return (
@@ -162,7 +202,7 @@ export default function AdminLogin() {
             <h1 className="text-5xl font-bold text-white mb-3">Jeffi Stores</h1>
             <h2 className="text-2xl font-semibold text-white mb-2">Admin Panel</h2>
             <p className="text-gray-300">
-              {step === 'password' && 'Sign in to access the dashboard'}
+              {step === 'identity' && 'Sign in to access the dashboard'}
               {step === 'verify' && 'Enter the 6-digit code from your authenticator app'}
               {step === 'enroll' && !recoveryCodes && 'Set up two-factor authentication'}
               {step === 'enroll' && recoveryCodes && 'Save these recovery codes — shown only once'}
@@ -230,33 +270,78 @@ export default function AdminLogin() {
             </div>
           )}
 
-          {step === 'password' && (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div>
-                <label htmlFor="username" className="block text-sm font-medium text-white mb-2">Username</label>
-                <input
-                  type="text" id="username" name="username"
-                  value={formData.username} onChange={handleChange}
-                  required autoFocus autoComplete="username"
-                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
-                  placeholder="Enter your username"
-                />
-              </div>
-              <div>
-                <label htmlFor="password" className="block text-sm font-medium text-white mb-2">Password</label>
-                <input
-                  type="password" id="password" name="password"
-                  value={formData.password} onChange={handleChange}
-                  required autoComplete="current-password"
-                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
-                  placeholder="Enter your password"
-                />
-              </div>
-              <button type="submit" disabled={loading}
-                className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg">
-                {loading ? 'Logging in...' : 'Continue'}
-              </button>
-            </form>
+          {step === 'identity' && (
+            <div className="space-y-5">
+              {GOOGLE_CLIENT_ID && (
+                <>
+                  <button
+                    type="button"
+                    onClick={handleGoogle}
+                    disabled={googleLoading || loading}
+                    className="w-full flex items-center justify-center gap-3 px-4 py-3.5 rounded-lg border border-white/15 bg-black/30 hover:bg-black/40 transition-colors text-sm font-medium text-white disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {googleLoading ? (
+                      <div className="w-5 h-5 border-2 border-white/40 border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+                        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+                        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+                        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+                      </svg>
+                    )}
+                    {googleLoading ? 'Signing in…' : 'Continue with Google'}
+                  </button>
+                  <div className="flex items-center gap-3 text-gray-400 text-sm">
+                    <div className="flex-1 h-px bg-white/20" />
+                    <span>or</span>
+                    <div className="flex-1 h-px bg-white/20" />
+                  </div>
+                </>
+              )}
+
+              {!otpSent ? (
+                <form onSubmit={handleSendOtp} className="space-y-6">
+                  <div>
+                    <label htmlFor="email" className="block text-sm font-medium text-white mb-2">Admin email</label>
+                    <input
+                      type="email" id="email" name="email"
+                      value={email} onChange={(e) => setEmail(e.target.value)}
+                      required autoFocus autoComplete="email"
+                      className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
+                      placeholder="you@jeffistores.in"
+                    />
+                  </div>
+                  <button type="submit" disabled={loading}
+                    className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg">
+                    {loading ? 'Sending code…' : 'Send verification code'}
+                  </button>
+                </form>
+              ) : (
+                <form onSubmit={handleVerifyOtp} className="space-y-6">
+                  <div>
+                    <label htmlFor="otp" className="block text-sm font-medium text-white mb-2">
+                      Enter the code sent to <span className="text-white font-semibold">{email}</span>
+                    </label>
+                    <input
+                      type="text" id="otp" name="otp"
+                      value={otp} onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                      required autoFocus inputMode="numeric" autoComplete="one-time-code"
+                      className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all tracking-widest text-center text-xl"
+                      placeholder="000000"
+                    />
+                  </div>
+                  <button type="submit" disabled={loading || otp.length !== 6}
+                    className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg">
+                    {loading ? 'Verifying…' : 'Continue'}
+                  </button>
+                  <button type="button" onClick={() => { setOtpSent(false); setOtp(''); setError('') }}
+                    className="w-full text-sm text-gray-300 hover:text-white">
+                    ← Use a different email
+                  </button>
+                </form>
+              )}
+            </div>
           )}
 
           {step === 'verify' && (
@@ -277,7 +362,7 @@ export default function AdminLogin() {
                 className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg">
                 {loading ? 'Verifying...' : 'Verify and Continue'}
               </button>
-              <button type="button" onClick={() => { setStep('password'); setCode(''); setError('') }}
+              <button type="button" onClick={() => { setStep('identity'); setOtpSent(false); setOtp(''); setCode(''); setError('') }}
                 className="w-full text-sm text-gray-300 hover:text-white">
                 ← Use a different account
               </button>

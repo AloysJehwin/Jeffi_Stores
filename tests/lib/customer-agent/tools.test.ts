@@ -89,6 +89,8 @@ describe('customer-agent/tools', () => {
 
     it('returns empty results when no similar products found', async () => {
       mockFindSimilar.mockResolvedValueOnce([])
+      // vector path empty -> keyword/pg_trgm fallback runs and also finds nothing
+      mockQueryMany.mockResolvedValueOnce([])
 
       const result = await tool().handler({ query: 'unknown item' }, ctx)
       expect((result as any).products).toHaveLength(0)
@@ -96,14 +98,16 @@ describe('customer-agent/tools', () => {
 
     it('returns empty products when query is missing', async () => {
       mockFindSimilar.mockResolvedValueOnce([])
+      mockQueryMany.mockResolvedValueOnce([]) // fallback keyword search
       const result = await tool().handler({}, ctx)
       expect((result as any).products).toBeDefined()
     })
 
     it('respects custom limit and clamps within range', async () => {
       mockFindSimilar.mockResolvedValueOnce([])
+      mockQueryMany.mockResolvedValueOnce([]) // fallback keyword search
       await tool().handler({ query: 'test', limit: 3 }, ctx)
-      expect(mockFindSimilar).toHaveBeenCalledWith(expect.any(String), 6) // lim * 2
+      expect(mockFindSimilar).toHaveBeenCalledWith(expect.any(String), 9) // lim * 3
     })
   })
 
@@ -159,6 +163,7 @@ describe('customer-agent/tools', () => {
     it('returns empty products when no similar ids found', async () => {
       mockQueryOne.mockResolvedValueOnce({ name: 'Widget' })
       mockFindSimilar.mockResolvedValueOnce([])
+      mockQueryMany.mockResolvedValueOnce([]) // fallback keyword search finds nothing
       const result = await tool().handler({ productId: 'p1' }, ctx)
       expect((result as any).products).toHaveLength(0)
     })

@@ -4,7 +4,7 @@ const SECRET = new TextEncoder().encode(
   process.env.JWT_SECRET ?? (() => { throw new Error('JWT_SECRET not set') })()
 )
 
-const DRAFT_TTL_SECONDS = 600
+const DRAFT_TTL_SECONDS = 1800
 
 export interface DraftCartItem {
   productId: string

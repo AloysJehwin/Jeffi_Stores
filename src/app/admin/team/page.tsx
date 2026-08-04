@@ -9,8 +9,9 @@ import { getHost } from '@/lib/get-host'
 
 async function getAdminInfo(adminId: string) {
   return queryOne(
-    `SELECT a.id, a.username, a.role, a.scopes, a.created_at, a.last_login,
-      u.first_name, u.last_name
+    `SELECT a.id, a.role, a.scopes, a.created_at, a.last_login,
+      u.first_name, u.last_name,
+      COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS username
      FROM admins a LEFT JOIN users u ON u.id = a.user_id
      WHERE a.id = $1`,
     [adminId]
@@ -19,10 +20,11 @@ async function getAdminInfo(adminId: string) {
 
 async function getAllAdmins() {
   return queryMany(`
-    SELECT a.id, a.username, a.role, a.scopes, a.is_active, a.created_at, a.last_login,
+    SELECT a.id, a.role, a.scopes, a.is_active, a.created_at, a.last_login,
       a.mfa_enabled,
       (SELECT COUNT(*) FROM admin_mfa_recovery_codes WHERE admin_id = a.id AND used_at IS NULL) AS mfa_recovery_codes_remaining,
       u.first_name, u.last_name,
+      COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS username,
       (SELECT json_agg(json_build_object(
         'serial_number', ac.serial_number,
         'expires_at', ac.expires_at,

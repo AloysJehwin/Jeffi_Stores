@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, Fragment } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import DraftEditButton from '@/components/admin/DraftEditButton'
 import {
   DndContext,
   DragOverlay,
@@ -124,11 +125,11 @@ function ViewModal({ category, subCount, productCount, onClose, backUrl = '/admi
           </div>
           <div className="flex gap-3 pt-1 border-t border-border-default">
             <Link
-              href={ap(`/admin/categories/edit/${category.id}?back=${encodeURIComponent(backUrl)}`)}
+              href={ap(`/admin/categories/${category.id}?back=${encodeURIComponent(backUrl)}`)}
               className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors"
               onClick={onClose}
             >
-              Edit Category
+              View Category
             </Link>
             <a
               href={`/categories/${category.slug}`}
@@ -370,7 +371,7 @@ function SortableRow({
             trigger={
               <div onClick={e => e.stopPropagation()}>
                 <Link
-                  href={ap(`/admin/categories/edit/${category.id}?back=${encodeURIComponent(backUrl)}`)}
+                  href={ap(`/admin/categories/${category.id}?back=${encodeURIComponent(backUrl)}`)}
                   className={`text-sm hover:text-accent-500 transition-colors cursor-pointer ${isSubcat ? 'text-foreground' : 'font-semibold text-foreground'}`}
                   onClick={e => e.stopPropagation()}
                 >
@@ -472,9 +473,7 @@ function SortableRow({
         >
           Policy
         </button>
-        <Link href={ap(`/admin/categories/edit/${category.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 hover:text-accent-600 mr-4">
-          Edit
-        </Link>
+        <DraftEditButton entity="categories" id={category.id} name={category.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 hover:text-accent-600 mr-4 text-sm" />
         <DeleteCategoryButton categoryId={category.id} categoryName={category.name} onDeleted={onDeleted} />
       </td>
     </tr>
@@ -842,7 +841,7 @@ export default function CategoriesClient({
                   <span>Order: {sub.display_order}</span>
                 </div>
                 <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                  <Link href={ap(`/admin/categories/edit/${sub.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 font-medium">Edit</Link>
+                  <DraftEditButton entity="categories" id={sub.id} name={sub.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
                   <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                 </div>
               </div>
@@ -890,7 +889,7 @@ export default function CategoriesClient({
                     <span>Order: {cat.display_order}</span>
                   </div>
                   <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                    <Link href={ap(`/admin/categories/edit/${cat.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 font-medium">Edit</Link>
+                    <DraftEditButton entity="categories" id={cat.id} name={cat.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
                     <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} onDeleted={() => handleCategoryDeleted(cat.id)} />
                   </div>
                 </div>
@@ -920,7 +919,7 @@ export default function CategoriesClient({
                       <span>Order: {sub.display_order}</span>
                     </div>
                     <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                      <Link href={ap(`/admin/categories/edit/${sub.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 font-medium">Edit</Link>
+                      <DraftEditButton entity="categories" id={sub.id} name={sub.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
                       <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                     </div>
                   </div>

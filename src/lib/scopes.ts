@@ -114,7 +114,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'invoices:write',
     label: 'Invoices (Write)',
     description: 'Create offline invoices, cash sales and manage invoice drafts',
-    routes: ['/admin/invoices', '/admin/orders/new'],
+    routes: ['/admin/invoices'],
     group: 'Sales',
   },
   {

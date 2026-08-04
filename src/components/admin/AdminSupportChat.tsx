@@ -145,7 +145,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
       ])
       const meData = await meRes.json()
       const u = meData.user || {}
-      const username = (u.first_name && u.last_name) ? `${u.first_name} ${u.last_name}` : (u.username || '')
+      const username = (u.first_name && u.last_name) ? `${u.first_name} ${u.last_name}` : (u.email || '')
       setAdminUsername(username)
 
       if (!sessionRes.ok) { setIsLoading(false); return }

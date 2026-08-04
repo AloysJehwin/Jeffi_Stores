@@ -1,5 +1,4 @@
 import { queryOne, queryMany } from '@/lib/db'
-import ChangePasswordForm from '@/components/admin/ChangePasswordForm'
 import TwoFactorCard from '@/components/admin/TwoFactorCard'
 import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
 import StoreRulesForm from '@/components/admin/StoreRulesForm'
@@ -11,8 +10,9 @@ import { ADMIN_SCOPES } from '@/lib/scopes'
 
 async function getAdminInfo(adminId: string) {
   return queryOne(
-    `SELECT a.id, a.username, a.role, a.scopes, a.created_at, a.last_login,
-      u.first_name, u.last_name
+    `SELECT a.id, a.role, a.scopes, a.created_at, a.last_login,
+      u.first_name, u.last_name, u.email,
+      COALESCE(NULLIF(TRIM(u.first_name || ' ' || u.last_name), ''), u.email) AS username
      FROM admins a LEFT JOIN users u ON u.id = a.user_id
      WHERE a.id = $1`,
     [adminId]
@@ -59,12 +59,12 @@ export default async function SettingsPage() {
                 <p className="font-medium text-foreground">
                   {adminInfo.first_name && adminInfo.last_name
                     ? `${adminInfo.first_name} ${adminInfo.last_name}`
-                    : adminInfo.username}
+                    : adminInfo.email}
                 </p>
               </div>
               <div>
-                <p className="text-foreground-muted text-xs mb-0.5">Username</p>
-                <p className="font-medium text-foreground">{adminInfo.username}</p>
+                <p className="text-foreground-muted text-xs mb-0.5">Email</p>
+                <p className="font-medium text-foreground">{adminInfo.email}</p>
               </div>
               <div>
                 <p className="text-foreground-muted text-xs mb-0.5">Role</p>
@@ -100,15 +100,6 @@ export default async function SettingsPage() {
               </div>
             </div>
           )}
-        </div>
-
-        <div className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
-          <div className="px-5 py-4 border-b border-border-default">
-            <h2 className="text-sm font-semibold text-foreground">Change Password</h2>
-          </div>
-          <div className="p-5">
-            <ChangePasswordForm adminId={adminInfo?.id} />
-          </div>
         </div>
 
         <div className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">

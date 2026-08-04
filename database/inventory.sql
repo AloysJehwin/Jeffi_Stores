@@ -18,7 +18,6 @@ CREATE TABLE public.grn_items (
 );
 
 
-
 --
 -- Name: grns; Type: TABLE; Schema: public; Owner: -
 --
@@ -32,7 +31,6 @@ CREATE TABLE public.grns (
     notes text,
     created_at timestamp with time zone DEFAULT now()
 );
-
 
 
 --
@@ -55,9 +53,12 @@ CREATE TABLE public.inventory_transactions (
     unit_id uuid,
     unit_label character varying(80),
     unit_factor numeric(14,6),
-    quantity_in_unit numeric(14,6)
+    quantity_in_unit numeric(14,6),
+    lot_number character varying(100),
+    expiry_date date,
+    serial_number character varying(100),
+    batch_id uuid
 );
-
 
 
 --
@@ -78,7 +79,6 @@ CREATE TABLE public.shelf_locations (
 );
 
 
-
 --
 -- Name: shelf_stock; Type: TABLE; Schema: public; Owner: -
 --
@@ -92,7 +92,6 @@ CREATE TABLE public.shelf_stock (
     quantity integer DEFAULT 0 NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );
-
 
 
 --
@@ -113,3 +112,16 @@ CREATE TABLE public.shelf_stock_transactions (
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
+
+--
+-- Name: warehouses; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.warehouses (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    name text NOT NULL,
+    code text NOT NULL,
+    address text,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);

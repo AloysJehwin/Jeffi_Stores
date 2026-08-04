@@ -55,6 +55,8 @@ function CheckoutPage() {
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
   const razorpayOpen = useRef(false)
+  const razorpayCleanup = useRef<(() => void) | null>(null)
+  const [pendingVerify, setPendingVerify] = useState<{ razorpayOrderId: string; razorpayPaymentId: string; razorpaySignature: string; draftToken: string } | null>(null)
 
   const [buyNowItem, setBuyNowItem] = useState<{
     productId: string
@@ -73,6 +75,79 @@ function CheckoutPage() {
     brandName: string | null
     imageUrl: string | null
   } | null>(null)
+
+  useEffect(() => {
+    // Recover payment after page reload mid-payment (e.g. 3DS opened new tab)
+    try {
+      const raw = sessionStorage.getItem('rzp_pending')
+      if (raw) {
+        const pending = JSON.parse(raw)
+        const age = Date.now() - (pending.ts || 0)
+        if (age < 1800_000 && pending.draftToken && pending.razorpayOrderId) {
+          sessionStorage.removeItem('rzp_pending')
+          if (pending.razorpayPaymentId && pending.razorpaySignature) {
+            // Payment IDs present — verify directly
+            setPendingVerify(pending)
+          } else {
+            // No payment IDs yet — check if Razorpay captured it server-side
+            setPendingVerify({ ...pending, razorpayPaymentId: '', razorpaySignature: '' })
+          }
+        } else {
+          sessionStorage.removeItem('rzp_pending')
+        }
+      }
+    } catch {}
+  }, [])
+
+  // Auto-retry verify on mount if all payment tokens are present
+  useEffect(() => {
+    if (!pendingVerify) return
+    if (pendingVerify.razorpayPaymentId && pendingVerify.razorpaySignature) {
+      // Full tokens — verify directly
+      setIsSubmitting(true)
+      verifyPayment(
+        pendingVerify.razorpayOrderId,
+        pendingVerify.razorpayPaymentId,
+        pendingVerify.razorpaySignature,
+        { draftToken: pendingVerify.draftToken },
+      ).finally(() => setPendingVerify(null))
+    } else {
+      // No payment IDs — poll until Razorpay order is paid or times out (~60s)
+      setIsSubmitting(true)
+      const maxAttempts = 20
+      let attempts = 0
+      const poll = () => {
+        fetch('/api/razorpay/check-pending', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ razorpayOrderId: pendingVerify.razorpayOrderId, draftToken: pendingVerify.draftToken }),
+        })
+          .then(r => r.json())
+          .then(data => {
+            if (data.order) {
+              try { sessionStorage.removeItem('rzp_pending') } catch {}
+              clearCart()
+              showToast('Payment confirmed!', 'success')
+              window.location.href = `/account/orders/${data.order.id}`
+            } else if (data.status === 'pending' && attempts < maxAttempts) {
+              attempts++
+              setTimeout(poll, 3000)
+            } else {
+              setError(data.error || 'Could not confirm payment. Check My Orders or contact support.')
+              setIsSubmitting(false)
+              setPendingVerify(null)
+            }
+          })
+          .catch(() => {
+            if (attempts < maxAttempts) { attempts++; setTimeout(poll, 3000) }
+            else { setError('Could not confirm payment. Check My Orders or contact support.'); setIsSubmitting(false); setPendingVerify(null) }
+          })
+      }
+      poll()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [!!pendingVerify])
 
   useEffect(() => {
     if (!authLoading && !user && authWasLoading.current) {
@@ -269,11 +344,15 @@ function CheckoutPage() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Payment verification failed')
 
+      try { sessionStorage.removeItem('rzp_pending') } catch {}
       clearCart()
       showToast('Payment successful!', 'success')
       window.location.href = `/account/orders/${data.order.id}`
     } catch (err: any) {
-      setError(err?.message || 'Payment received but verification failed. Please contact support — your payment is safe.')
+      const msg = razorpay_payment_id
+        ? `Payment received but confirmation failed. Check My Orders — if no order appears in 2 minutes, contact support with payment ID: ${razorpay_payment_id}`
+        : (err?.message || 'Payment verification failed. Please contact support.')
+      setError(msg)
       setIsSubmitting(false)
     }
   }
@@ -297,6 +376,18 @@ function CheckoutPage() {
         description: 'Order Payment',
         order_id: rzpData.razorpayOrderId,
         handler: async function (response: any) {
+          // Update sessionStorage with actual payment IDs before verifying
+          if (payload.draftToken) {
+            try {
+              sessionStorage.setItem('rzp_pending', JSON.stringify({
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+                razorpaySignature: response.razorpay_signature,
+                draftToken: payload.draftToken,
+                ts: Date.now(),
+              }))
+            } catch {}
+          }
           await verifyPayment(
             response.razorpay_order_id,
             response.razorpay_payment_id,
@@ -310,9 +401,14 @@ function CheckoutPage() {
           contact: address?.phone || '',
         },
         theme: { color: '#f97316' },
+        redirect: false,
+        callback_url: `${window.location.origin}/checkout/payment-callback`,
         modal: {
           ondismiss: function () {
             razorpayOpen.current = false
+            razorpayCleanup.current?.()
+            razorpayCleanup.current = null
+            try { sessionStorage.removeItem('rzp_pending') } catch {}
             if (payload.orderId) {
               fetch(`/api/orders/${payload.orderId}`, {
                 method: 'DELETE',
@@ -329,6 +425,8 @@ function CheckoutPage() {
       const rzp = new (window as any).Razorpay(options)
       rzp.on('payment.failed', function (response: any) {
         razorpayOpen.current = false
+        razorpayCleanup.current?.()
+        razorpayCleanup.current = null
         if (payload.orderId) {
           fetch(`/api/orders/${payload.orderId}/payment-failed`, {
             method: 'POST',
@@ -343,7 +441,30 @@ function CheckoutPage() {
           setIsSubmitting(false)
         }
       })
+
       razorpayOpen.current = true
+      if (payload.draftToken) {
+        try {
+          sessionStorage.setItem('rzp_pending', JSON.stringify({
+            razorpayOrderId: rzpData.razorpayOrderId,
+            razorpayPaymentId: '',
+            razorpaySignature: '',
+            draftToken: payload.draftToken,
+            ts: Date.now(),
+          }))
+        } catch {}
+      }
+
+      const onBeforeUnload = (e: BeforeUnloadEvent) => {
+        if (!razorpayOpen.current) return
+        e.preventDefault()
+        e.returnValue = ''
+      }
+      window.addEventListener('beforeunload', onBeforeUnload)
+      razorpayCleanup.current = () => {
+        window.removeEventListener('beforeunload', onBeforeUnload)
+      }
+
       rzp.open()
     } catch (err: any) {
       if (payload.orderId) {
@@ -489,6 +610,38 @@ function CheckoutPage() {
       setError(err.message)
       setIsSubmitting(false)
     }
+  }
+
+  if (pendingVerify) {
+    return (
+      <div className="min-h-screen bg-surface px-4 py-8 flex items-center justify-center">
+        <div className="max-w-md w-full bg-surface-elevated rounded-xl border border-border-default p-8 text-center space-y-4">
+          <div className="w-12 h-12 rounded-full bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center mx-auto">
+            <svg className="w-6 h-6 text-accent-500 animate-spin" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
+            </svg>
+          </div>
+          <h2 className="text-lg font-semibold text-foreground">Confirming your payment…</h2>
+          <p className="text-sm text-foreground-secondary">Your payment was received. We&apos;re confirming your order — please don&apos;t close this page.</p>
+          <button
+            type="button"
+            className="text-sm text-accent-600 hover:underline"
+            onClick={() => {
+              setIsSubmitting(true)
+              verifyPayment(
+                pendingVerify.razorpayOrderId,
+                pendingVerify.razorpayPaymentId,
+                pendingVerify.razorpaySignature,
+                { draftToken: pendingVerify.draftToken },
+              ).finally(() => setPendingVerify(null))
+            }}
+          >
+            Retry confirmation
+          </button>
+        </div>
+      </div>
+    )
   }
 
   if (authLoading || cartLoading || isLoadingAddress) {

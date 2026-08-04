@@ -64,7 +64,7 @@ export async function PATCH(
 
     values.push(id)
     const updated = await queryOne(
-      `UPDATE admins SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, username, role, scopes, is_active`,
+      `UPDATE admins SET ${updates.join(', ')} WHERE id = $${i} RETURNING id, role, scopes, is_active`,
       values
     )
 
@@ -104,7 +104,7 @@ export async function DELETE(
 
     await query('DELETE FROM admin_certificates WHERE admin_id = $1', [id])
 
-    const deleted = await queryOne('DELETE FROM admins WHERE id = $1 RETURNING id, username, user_id', [id])
+    const deleted = await queryOne('DELETE FROM admins WHERE id = $1 RETURNING id, user_id', [id])
 
     if (!deleted) {
       return NextResponse.json({ error: 'Admin not found' }, { status: 404 })

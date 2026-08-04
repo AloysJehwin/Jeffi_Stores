@@ -217,7 +217,7 @@ describe('POST /api/admin/mfa/enroll-confirm', () => {
 
     const sessionResponse = NextResponse.json({
       success: true,
-      admin: { username: 'testadmin', role: 'admin' },
+      admin: { name: 'Test Admin', email: 'testadmin@example.com', role: 'admin' },
       recovery_codes: ['AAAAA-BBBBB', 'CCCCC-DDDDD'],
     })
     mockIssueAdminSession.mockResolvedValue(sessionResponse)
@@ -289,7 +289,7 @@ describe('POST /api/admin/mfa/verify', () => {
     mockDecryptSecret.mockReturnValue('PLAIN_SECRET')
     mockVerifyTotp.mockResolvedValue(true)
 
-    const sessionResponse = NextResponse.json({ success: true, admin: { username: 'testadmin', role: 'admin' } })
+    const sessionResponse = NextResponse.json({ success: true, admin: { name: 'Test Admin', email: 'testadmin@example.com', role: 'admin' } })
     mockIssueAdminSession.mockResolvedValue(sessionResponse)
 
     const req = makePostRequest('http://localhost/api/admin/mfa/verify', {
@@ -311,7 +311,7 @@ describe('POST /api/admin/mfa/verify', () => {
     mockHashRecoveryCode.mockReturnValue('code-hash-abc')
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
 
-    const sessionResponse = NextResponse.json({ success: true, admin: { username: 'testadmin', role: 'admin' } })
+    const sessionResponse = NextResponse.json({ success: true, admin: { name: 'Test Admin', email: 'testadmin@example.com', role: 'admin' } })
     mockIssueAdminSession.mockResolvedValue(sessionResponse)
 
     // Recovery code format: AAAAA-BBBBB (not 6 digits)

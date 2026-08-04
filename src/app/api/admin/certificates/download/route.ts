@@ -20,9 +20,8 @@ export async function GET(request: NextRequest) {
     }
 
     const cert = await queryOne(
-      `SELECT ac.*, a.username
+      `SELECT ac.*
        FROM admin_certificates ac
-       JOIN admins a ON ac.admin_id = a.id
        WHERE ac.download_token = $1`,
       [token]
     )

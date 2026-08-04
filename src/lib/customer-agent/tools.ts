@@ -1,9 +1,58 @@
 import { queryMany, queryOne } from '@/lib/db'
 import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import { findSimilarProductIds } from '@/lib/rag'
+import { buildProductSearchClause } from '@/lib/search'
 
 function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
 function clamp(n: number, min: number, max: number) { return Math.max(min, Math.min(max, n)) }
+
+// Reject if a promise doesn't settle within ms — fast-fails the vector search
+// when the RAG store is unreachable so we fall back promptly.
+function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('rag-timeout')), ms)
+    p.then(v => { clearTimeout(timer); resolve(v) }, e => { clearTimeout(timer); reject(e) })
+  })
+}
+
+// Resolve a natural-language query to active product ids. Tries RAG vector
+// search first; if it errors (Ollama/RAG store down) or returns nothing, falls
+// back to the main-DB keyword + pg_trgm fuzzy search (always available). This
+// keeps the assistant able to find products even when the vector store is down.
+async function resolveProductIds(query: string, limit: number): Promise<string[]> {
+  const productIds: string[] = []
+  try {
+    const similar = await withTimeout(findSimilarProductIds(query, limit * 3), 6000)
+    const variantIds: string[] = []
+    for (const r of similar) {
+      if (r.matchedVia === 'products' && r.productId && !productIds.includes(r.productId)) productIds.push(r.productId)
+      else if (r.matchedVia === 'product_variants' && r.variantId) variantIds.push(r.variantId)
+    }
+    if (variantIds.length) {
+      const vp = await queryMany<{ product_id: string }>(
+        `SELECT product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`, [variantIds]
+      )
+      for (const r of vp) if (!productIds.includes(r.product_id)) productIds.push(r.product_id)
+    }
+  } catch {
+    // vector path unavailable — fall through to keyword search
+  }
+
+  if (productIds.length === 0) {
+    // Main-DB fallback: full-text + pg_trgm fuzzy over name/sku (tolerates typos).
+    const sc = buildProductSearchClause(query, 'p.name', 'p.sku', 'p.search_vector', 1)
+    const rows = await queryMany<{ id: string }>(
+      `SELECT p.id::text FROM products p
+        WHERE p.is_active = TRUE AND ${sc.clause}
+        ORDER BY similarity(p.name, $${sc.nextIdx}::text) DESC
+        LIMIT $${sc.nextIdx + 1}`,
+      [...sc.params, query, limit * 2]
+    )
+    for (const r of rows) if (!productIds.includes(r.id)) productIds.push(r.id)
+  }
+
+  return productIds.slice(0, limit)
+}
 
 export interface CustomerToolInputSchema {
   type: 'object'
@@ -37,20 +86,7 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
     handler: async ({ query: q, limit }) => {
       const queryStr = String(q).slice(0, 500)
       const lim = clamp(typeof limit === 'number' ? limit : 8, 1, 12)
-      const similar = await findSimilarProductIds(queryStr, lim * 3)
-
-      const productIds: string[] = []
-      const variantIds: string[] = []
-      for (const r of similar) {
-        if (r.matchedVia === 'products' && r.productId && !productIds.includes(r.productId)) productIds.push(r.productId)
-        else if (r.matchedVia === 'product_variants' && r.variantId) variantIds.push(r.variantId)
-      }
-      if (variantIds.length) {
-        const vp = await queryMany<{ product_id: string }>(
-          `SELECT product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`, [variantIds]
-        )
-        for (const r of vp) if (!productIds.includes(r.product_id)) productIds.push(r.product_id)
-      }
+      const productIds = await resolveProductIds(queryStr, lim)
       if (productIds.length === 0) return { products: [], note: "Sorry, we don't carry products matching that description." }
 
       const rows = await queryMany<{
@@ -62,7 +98,7 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
                 p.short_description, p.stock_status
            FROM products p
           WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
-        [productIds.slice(0, lim)]
+        [productIds]
       )
       const order = new Map(productIds.map((id, i) => [id, i]))
       return { products: rows.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999)) }
@@ -81,21 +117,7 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
     },
     handler: async ({ query: q, limit }) => {
       const lim = clamp(typeof limit === 'number' ? limit : 5, 1, 10)
-      const ids = await findSimilarProductIds(String(q), lim * 2)
-      const productIds: string[] = []
-      for (const r of ids) {
-        if (r.matchedVia === 'products' && r.productId && !productIds.includes(r.productId)) {
-          productIds.push(r.productId)
-        }
-      }
-      const variantIds = ids.filter(r => r.matchedVia === 'product_variants' && r.variantId).map(r => r.variantId as string)
-      if (variantIds.length) {
-        const vp = await queryMany<{ product_id: string }>(
-          `SELECT product_id::text FROM product_variants WHERE id = ANY($1::uuid[])`,
-          [variantIds]
-        )
-        for (const r of vp) if (!productIds.includes(r.product_id)) productIds.push(r.product_id)
-      }
+      const productIds = await resolveProductIds(String(q), lim)
       if (productIds.length === 0) return { products: [], note: 'No matches found.' }
       const rows = await queryMany(
         `SELECT p.id::text, p.name, p.slug, p.sku,
@@ -148,13 +170,8 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
         [String(productId)]
       )
       if (!product) return { products: [], note: 'Product not found.' }
-      const ids = await findSimilarProductIds(product.name, lim * 2)
-      const productIds: string[] = []
-      for (const r of ids) {
-        if (r.matchedVia === 'products' && r.productId !== productId && !productIds.includes(r.productId)) {
-          productIds.push(r.productId)
-        }
-      }
+      const resolved = await resolveProductIds(product.name, lim + 1)
+      const productIds = resolved.filter(id => id !== String(productId)).slice(0, lim)
       if (productIds.length === 0) return { products: [] }
       const rows = await queryMany(
         `SELECT p.id::text, p.name, p.slug, p.sku,
@@ -162,7 +179,7 @@ export const CUSTOMER_TOOLS: CustomerToolDef[] = [
                 p.stock_status
            FROM products p
           WHERE p.id = ANY($1::uuid[]) AND p.is_active = TRUE`,
-        [productIds.slice(0, lim)]
+        [productIds]
       )
       return { products: rows }
     },

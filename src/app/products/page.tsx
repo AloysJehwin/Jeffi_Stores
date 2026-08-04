@@ -3,10 +3,11 @@ import { queryMany, queryOne } from '@/lib/db'
 import SortDropdown from '@/components/visitor/SortDropdown'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
-import { buildSearchClause, buildSearchRank } from '@/lib/search'
+import { buildProductSearchClause, buildProductSearchRank } from '@/lib/search'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/visitor/ProductCard'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
+import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
 
 const PAGE_SIZE = 21
 
@@ -49,7 +50,7 @@ async function getProducts(searchParams: any) {
   }
 
   if (searchParams.search) {
-    const sc = buildSearchClause(searchParams.search, ['p.name', 'p.sku'], paramIndex)
+    const sc = buildProductSearchClause(searchParams.search, 'p.name', 'p.sku', 'p.search_vector', paramIndex)
     conditions.push(sc.clause)
     params.push(...sc.params)
     paramIndex = sc.nextIdx
@@ -98,11 +99,20 @@ async function getProducts(searchParams: any) {
   const page = Math.max(1, parseInt(searchParams.page || '1', 10))
   const offset = (page - 1) * PAGE_SIZE
 
-  const orderBy = hasExplicitSort
-    ? `${sortColumn} ${sortOrder}`
-    : searchParams.search
-      ? `${buildSearchRank(searchParams.search, 'p.name')}, p.name ASC`
-      : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
+  // Relevance ranking for search. buildProductSearchRank needs its own bound
+  // params, which are appended AFTER the clause params (the count query above
+  // used only the clause params, so its placeholder numbering is unaffected).
+  const rankParams: unknown[] = []
+  let orderBy: string
+  if (hasExplicitSort) {
+    orderBy = `${sortColumn} ${sortOrder}`
+  } else if (searchParams.search) {
+    const rk = buildProductSearchRank(searchParams.search, 'p.name', 'p.search_vector', paramIndex)
+    rankParams.push(...rk.params)
+    orderBy = `${rk.rank}, p.name ASC`
+  } else {
+    orderBy = `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
+  }
 
   const sql = `
     SELECT p.*,
@@ -146,7 +156,7 @@ async function getProducts(searchParams: any) {
     LIMIT ${PAGE_SIZE} OFFSET ${offset}
   `
 
-  const products = await queryMany(sql, params)
+  const products = await queryMany(sql, [...params, ...rankParams])
   return { products, total, page, totalPages: Math.ceil(total / PAGE_SIZE) }
 }
 
@@ -423,6 +433,17 @@ export default async function ProductsPage({
 
             {/* Compare strip — shows selected products + Compare button */}
             <CompareStripLazy />
+
+            {/* Profile-based insight banner */}
+            <SearchInsightBanner
+              activeBrands={(brands as any[])
+                .filter((b: any) => resolvedSearchParams.brand?.split(',').includes(String(b.id)) || resolvedSearchParams.brand?.split(',').includes(b.slug))
+                .map((b: any) => b.name)}
+              activeCategories={(categories as any[])
+                .filter((c: any) => resolvedSearchParams.category?.split(',').includes(String(c.id)) || resolvedSearchParams.category?.split(',').includes(c.slug))
+                .map((c: any) => c.name)}
+              resultCount={total}
+            />
 
             {/* Products Grid */}
             {products.length > 0 ? (

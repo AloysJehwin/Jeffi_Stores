@@ -26,6 +26,14 @@ vi.mock('@/lib/activity', () => ({
 
 vi.mock('@/lib/search', () => ({
   buildProductSearchClause: vi.fn().mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 2 }),
+  // getStockValuation now reuses the shared buildSearchClause (per-word substring +
+  // pg_trgm word_similarity fuzzy fallback). Mirror its contract: the first param it
+  // emits for a single-word search is the substring `%word%`.
+  buildSearchClause: vi.fn((raw: string, _columns: string[], startIdx: number = 1) => ({
+    clause: 'TRUE',
+    params: [`%${raw}%`],
+    nextIdx: startIdx + 1,
+  })),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────

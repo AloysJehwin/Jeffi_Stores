@@ -1,6 +1,6 @@
 import { query, queryOne, queryMany, getClient } from './db'
 import { PoolClient } from 'pg'
-import { buildProductSearchClause } from './search'
+import { buildProductSearchClause, buildSearchClause } from './search'
 import { round2 } from './gst'
 
 export type TransactionType = 'purchase' | 'sale' | 'return' | 'adjustment'
@@ -240,13 +240,16 @@ export async function getStockValuation(filters: {
   let i = 1
 
   if (search) {
-    const q = `%${search.toLowerCase()}%`
-    havingClauses.push(`(
-      lower(rows.name) LIKE $${i} OR lower(rows.sku) LIKE $${i} OR lower(rows.row_sku) LIKE $${i}
-      OR lower(coalesce(rows.variant_name,'')) LIKE $${i}
-      OR lower(coalesce(rows.sub_variant_name,'')) LIKE $${i}
-    )`)
-    params.push(q); i++
+    // Reuse the shared search builder so valuation matches the ledger/main search:
+    // per-word substring + pg_trgm word_similarity fuzzy fallback (tolerates typos).
+    const sc = buildSearchClause(
+      search,
+      ['rows.name', 'rows.sku', 'rows.row_sku', 'rows.variant_name', 'rows.sub_variant_name'],
+      i
+    )
+    havingClauses.push(sc.clause)
+    params.push(...sc.params)
+    i = sc.nextIdx
   }
   if (categoryName) { havingClauses.push(`rows.category_name = $${i++}`); params.push(categoryName) }
   if (brandName)    { havingClauses.push(`rows.brand_name = $${i++}`);    params.push(brandName) }

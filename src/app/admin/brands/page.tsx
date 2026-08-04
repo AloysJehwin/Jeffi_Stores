@@ -11,6 +11,7 @@ import BrandStatusToggle from '@/components/admin/BrandStatusToggle'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import BrochureButton from '@/components/admin/BrochureButton'
+import DraftRowActions from '@/components/admin/DraftRowActions'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -57,11 +58,22 @@ async function AddBrandButton() {
 }
 
 async function BrandsStats() {
-  const allStats = await getFilteredBrands({})
+  const host = await getHost()
+  const [allStats, pendingDrafts] = await Promise.all([
+    getFilteredBrands({}),
+    queryMany<{ brand_id: string; name: string; updated_at: string }>(
+      `SELECT bd.brand_id, b.name, bd.updated_at
+       FROM brand_drafts bd
+       JOIN brands b ON b.id = bd.brand_id
+       ORDER BY bd.updated_at DESC
+       LIMIT 20`
+    ),
+  ])
 
   const totalBrands = allStats.total
   const activeBrands = allStats.brands?.filter((b: any) => b.is_active).length || 0
   const inactiveBrands = totalBrands - activeBrands
+  const pendingDraftsCount = pendingDrafts.length
 
   return (
     <div className="animate-fade-in">
@@ -79,6 +91,33 @@ async function BrandsStats() {
           <p className="text-2xl sm:text-3xl font-bold text-orange-600 mt-2">{inactiveBrands}</p>
         </div>
       </div>
+
+      {pendingDraftsCount > 0 && (
+        <div className="mb-6">
+          <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
+            <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
+              <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+                Pending Drafts ({pendingDraftsCount})
+              </p>
+              <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
+            </div>
+            <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+              {pendingDrafts.map((d) => (
+                <DraftRowActions
+                  key={d.brand_id}
+                  entityId={d.brand_id}
+                  name={d.name}
+                  updatedAt={d.updated_at}
+                  editHref={ap(`/admin/brands/edit/${d.brand_id}`, host)}
+                  publishPath={`/api/admin/brands/${d.brand_id}/publish`}
+                  discardPath={`/api/admin/brands/${d.brand_id}/draft`}
+                  entityLabel="brand"
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

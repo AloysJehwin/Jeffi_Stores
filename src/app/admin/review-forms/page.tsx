@@ -1,11 +1,12 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { Star, MessageSquare, FileText } from 'lucide-react'
 import { queryMany, queryCount } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
 import CopyLinkButton from '@/components/admin/CopyLinkButton'
+import DraftRowActions from '@/components/admin/DraftRowActions'
+import ReviewFormTableRow from '@/components/admin/ReviewFormTableRow'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
@@ -63,7 +64,51 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
         suggestType="review_forms"
       />
 
+      <Suspense fallback={null}>
+        <ReviewFormsDraftsBanner host={host} />
+      </Suspense>
+
       <ReviewFormsListSection searchParams={searchParams} host={host} />
+    </div>
+  )
+}
+
+async function ReviewFormsDraftsBanner({ host }: { host: string }) {
+  const pendingDrafts = await queryMany<{ form_id: string; name: string; updated_at: string }>(
+    `SELECT rfd.form_id, rf.title AS name, rfd.updated_at
+     FROM review_form_drafts rfd
+     JOIN review_forms rf ON rf.id = rfd.form_id
+     ORDER BY rfd.updated_at DESC
+     LIMIT 20`
+  )
+
+  const pendingDraftsCount = pendingDrafts.length
+  if (pendingDraftsCount === 0) return null
+
+  return (
+    <div className="mb-6">
+      <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-2.5 border-b border-amber-200 dark:border-amber-700/50">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">
+            Pending Drafts ({pendingDraftsCount})
+          </p>
+          <p className="text-xs text-amber-600 dark:text-amber-400">Unpublished edits — click to open</p>
+        </div>
+        <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
+          {pendingDrafts.map((d) => (
+            <DraftRowActions
+              key={d.form_id}
+              entityId={d.form_id}
+              name={d.name}
+              updatedAt={d.updated_at}
+              editHref={ap(`/admin/review-forms/edit/${d.form_id}`, host)}
+              publishPath={`/api/admin/review-forms/${d.form_id}/publish`}
+              discardPath={`/api/admin/review-forms/${d.form_id}/draft`}
+              entityLabel="review form"
+            />
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -112,64 +157,9 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
               </tr>
             </thead>
             <tbody className="divide-y divide-border-default">
-              {(forms as FormRow[]).map(f => {
-                const formUrl = `${FORMS_BASE_URL}/${f.slug}`
-                return (
-                  <tr key={f.id} className="hover:bg-surface-secondary/50 transition-colors">
-                    <td className="px-4 py-3 font-medium">
-                      <Link
-                        href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)}
-                        className="text-foreground hover:text-accent-500 transition-colors"
-                      >
-                        {f.title}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium inline-flex items-center gap-1 ${
-                        f.template_type === 'google_review' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' :
-                        f.template_type === 'product_feedback' ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' :
-                        'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300'
-                      }`}>
-                        {f.template_type === 'google_review'
-                          ? <><Star className="w-3 h-3 fill-current" /> Google</>
-                          : f.template_type === 'product_feedback'
-                          ? <><MessageSquare className="w-3 h-3" /> Feedback</>
-                          : <><FileText className="w-3 h-3" /> Testimonial</>}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 max-w-[260px]">
-                      <div className="flex items-center gap-2">
-                        <a
-                          href={formUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-accent-500 hover:underline text-xs shrink-0"
-                        >
-                          Open ↗
-                        </a>
-                        <CopyLinkButton url={formUrl} />
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-foreground-secondary">{f.coupon_code || <span className="text-foreground-muted">None</span>}</td>
-                    <td className="px-4 py-3">
-                      <Link href={ap(`/admin/review-forms/${f.id}/submissions`, host)} className="text-accent-500 hover:underline font-medium">
-                        {f.submissions_count} view
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${f.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
-                        {f.is_active ? 'Active' : 'Inactive'}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <Link href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 hover:underline text-sm">Edit</Link>
-                        <DeleteReviewFormButton id={f.id} title={f.title} />
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+              {(forms as FormRow[]).map(f => (
+                <ReviewFormTableRow key={f.id} form={f} backUrl={currentListUrl} />
+              ))}
               {forms.length === 0 && (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">No review forms yet. Create your first one!</td></tr>
               )}

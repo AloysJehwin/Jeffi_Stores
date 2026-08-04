@@ -37,6 +37,7 @@ interface CategoryFormProps {
   category?: any
   backUrl?: string
   isDraft?: boolean
+  submitLabel?: string
 }
 
 function IconPreview({ name, className }: { name: string; className?: string }) {
@@ -93,7 +94,7 @@ function resolveIconByName(name: string): string {
   return 'Package'
 }
 
-export default function CategoryForm({ categories, action, category, backUrl, isDraft = false }: CategoryFormProps) {
+export default function CategoryForm({ categories, action, category, backUrl, isDraft = false, submitLabel }: CategoryFormProps) {
   const isSubcat = !!category?.parent_category_id
   const isCurrentlyInherited = isSubcat && category?.return_allowed == null
 
@@ -481,7 +482,7 @@ export default function CategoryForm({ categories, action, category, backUrl, is
         ) : (
           <button type="submit" disabled={isSubmitting}
             className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {isSubmitting ? 'Saving…' : category ? 'Update Category' : 'Create Category'}
+            {isSubmitting ? 'Saving…' : submitLabel || (category ? 'Update Category' : 'Create Category')}
           </button>
         )}
       </div>

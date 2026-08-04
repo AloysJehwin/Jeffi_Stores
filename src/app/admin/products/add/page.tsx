@@ -23,6 +23,7 @@ async function createProduct(formData: FormData) {
   const mrpExGst = formData.get('mrp_ex_gst') ? round2(parseFloat(formData.get('mrp_ex_gst') as string)) : null
   const salePrice = formData.get('price_ex_gst') ? round2(parseFloat(formData.get('price_ex_gst') as string)) : null
   const costPrice = formData.get('cost_price') ? round2(parseFloat(formData.get('cost_price') as string)) : 0
+  const supplierId = (formData.get('supplier_id') as string || '').trim() || null
   const discountPct = formData.get('discount_pct') ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2)) : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
@@ -66,15 +67,15 @@ async function createProduct(formData: FormData) {
         base_price, mrp, mrp_ex_gst, price_ex_gst, gst_percentage, hsn_code, mpn, gtin,
         stock_status, weight, dimensions, is_active, is_featured,
         has_variants, variant_type, sub_variant_type,
-        weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price, discount_pct
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
+        weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price, discount_pct, supplier_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
       RETURNING *`,
       [
         name, slug, sku, description, categoryId, brandId || null,
         basePrice, mrp, mrpExGst, salePrice, gstPercentage, hsnCode, mpn, gtin,
         stockStatus, weight, dimensions, isActive, isFeatured,
         hasVariants, variantType, subVariantType,
-        weightGrams, packageType, lengthCm, breadthCm, heightCm, costPrice, discountPct,
+        weightGrams, packageType, lengthCm, breadthCm, heightCm, costPrice, discountPct, supplierId,
       ]
     )
 

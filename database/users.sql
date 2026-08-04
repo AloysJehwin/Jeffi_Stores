@@ -70,8 +70,6 @@ CREATE TABLE public.admin_mfa_recovery_codes (
 CREATE TABLE public.admins (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     user_id uuid,
-    username character varying(100) NOT NULL,
-    password_hash character varying(255) NOT NULL,
     role character varying(50) DEFAULT 'admin'::character varying,
     created_at timestamp with time zone DEFAULT now(),
     last_login timestamp with time zone,
@@ -170,4 +168,3 @@ CREATE TABLE public.users (
     policies_accepted_version text,
     policies_accepted_at timestamp with time zone
 );
-

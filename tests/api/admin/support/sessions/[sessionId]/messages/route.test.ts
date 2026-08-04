@@ -177,13 +177,22 @@ describe('POST /api/admin/support/sessions/[sessionId]/messages', () => {
     expect(mockSendAgentConnected).not.toHaveBeenCalled()
   })
 
-  it('uses username when admin has no first/last name', async () => {
-    mockAuth.mockResolvedValue({ ...ADMIN, first_name: undefined, last_name: undefined } as any)
+  it('falls back to email when admin has no first/last name', async () => {
+    mockAuth.mockResolvedValue({ ...ADMIN, first_name: undefined, last_name: undefined, email: 'jsmith@example.com' } as any)
     mockSendAgentConnected.mockResolvedValue(undefined as any)
     const res = await POST(makePost({ message: 'Hi' }), PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.message.sender_name).toBe('jsmith')
+    expect(body.message.sender_name).toBe('jsmith@example.com')
+  })
+
+  it('falls back to "Support" when admin has no name or email', async () => {
+    mockAuth.mockResolvedValue({ ...ADMIN, first_name: undefined, last_name: undefined, email: undefined } as any)
+    mockSendAgentConnected.mockResolvedValue(undefined as any)
+    const res = await POST(makePost({ message: 'Hi' }), PARAMS)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.message.sender_name).toBe('Support')
   })
 
   it('returns 500 on db error', async () => {

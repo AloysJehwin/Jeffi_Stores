@@ -1,3 +1,5 @@
+export const maxDuration = 120
+
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
@@ -73,8 +75,7 @@ function parseEnrichment(raw: string): Enrichment {
   let obj: Record<string, unknown>
   try {
     obj = JSON.parse(raw)
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     const m = raw.match(/\{[\s\S]*\}/)
     if (!m) throw new Error('No JSON in LLM response')
     obj = JSON.parse(m[0])
@@ -103,7 +104,7 @@ export async function POST(req: NextRequest) {
   }
 
   const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
-  const OLLAMA_MODEL = process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_AGENT_MODEL || 'qwen3:14b'
+  const OLLAMA_MODEL = process.env.OLLAMA_COPY_MODEL || process.env.OLLAMA_ENRICH_MODEL || 'gemma3:4b'
 
   const candidates = await queryMany<ProductRow>(
     `SELECT p.id::text, p.name, p.description, p.sku, p.material, p.size,
@@ -139,6 +140,7 @@ export async function POST(req: NextRequest) {
         const res = await fetch(`${OLLAMA_URL}/api/chat`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          signal: AbortSignal.timeout(45000),
           body: JSON.stringify({
             model: OLLAMA_MODEL,
             stream: false,
@@ -167,8 +169,7 @@ export async function POST(req: NextRequest) {
            e.ai_application, e.ai_product_type, e.ai_features, e.ai_search_tags,
            OLLAMA_MODEL]
         )
-      } catch (err) {
-        console.error('[route]', err)
+      } catch {
         void 0
       }
     }

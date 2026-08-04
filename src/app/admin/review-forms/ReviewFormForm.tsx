@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Star, MessageSquare, FileText, X } from 'lucide-react'
@@ -8,6 +8,7 @@ import type { LucideIcon } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import FormsPreview from '@/components/forms/FormsPreview'
 import Toggle from '@/components/ui/Toggle'
+import AIFillForm from '@/components/admin/AIFillForm'
 import { ap } from '@/lib/admin-path'
 
 interface Coupon {
@@ -75,6 +76,43 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
   const [customFields, setCustomFields] = useState<CustomField[]>(d.custom_fields || [])
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstRender = useRef(true)
+
+  // Keep a ref to current values so the debounced callback always has fresh data
+  const valuesRef = useRef({ title, slug, templateType, googleUrl, couponId, description, isActive, customFields })
+  valuesRef.current = { title, slug, templateType, googleUrl, couponId, description, isActive, customFields }
+
+  useEffect(() => {
+    if (!isDraft || !formId) return
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(async () => {
+      const v = valuesRef.current
+      setAutoSaveStatus('saving')
+      try {
+        await fetch(`/api/admin/review-forms/${formId}/draft`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: v.title.trim(),
+            slug: v.slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
+            template_type: v.templateType,
+            google_review_url: v.templateType === 'google_review' ? v.googleUrl.trim() : '',
+            coupon_id: v.couponId || null,
+            description: v.description.trim() || null,
+            is_active: v.isActive,
+            custom_fields: v.customFields,
+          }),
+        })
+        setAutoSaveStatus('saved')
+        setTimeout(() => setAutoSaveStatus('idle'), 2000)
+      } catch { setAutoSaveStatus('idle') }
+    }, 1500)
+    return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current) }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, slug, templateType, googleUrl, couponId, description, isActive, customFields])
 
   const couponOptions = [
     { value: '', label: '— No coupon —' },
@@ -101,15 +139,16 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
     setSubmitting(true)
     setError('')
     try {
+      const v = valuesRef.current
       const payload = {
-        title: title.trim(),
-        slug: slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
-        template_type: templateType,
-        google_review_url: templateType === 'google_review' ? googleUrl.trim() : '',
-        coupon_id: couponId || null,
-        description: description.trim() || null,
-        is_active: isActive,
-        custom_fields: customFields,
+        title: v.title.trim(),
+        slug: v.slug.toLowerCase().trim().replace(/[^a-z0-9-]/g, '-'),
+        template_type: v.templateType,
+        google_review_url: v.templateType === 'google_review' ? v.googleUrl.trim() : '',
+        coupon_id: v.couponId || null,
+        description: v.description.trim() || null,
+        is_active: v.isActive,
+        custom_fields: v.customFields,
       }
 
       if (isDraft && formId) {
@@ -146,6 +185,12 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
         return
       }
 
+      const data = await res.json()
+      // After creation redirect to edit so draft auto-creates
+      if (!formId && data.form?.id) {
+        router.push(ap(`/admin/review-forms/edit/${data.form.id}`))
+        return
+      }
       const destination = backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms'
       router.push(ap(destination))
       router.refresh()
@@ -154,8 +199,33 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
     }
   }
 
+  function handleAIFill(values: Record<string, unknown>) {
+    if (values.title) setTitle(String(values.title))
+    if (values.slug) setSlug(String(values.slug).toLowerCase().replace(/[^a-z0-9-]/g, '-'))
+    if (values.template_type && ['google_review', 'product_feedback', 'testimonial'].includes(String(values.template_type))) {
+      setTemplateType(values.template_type as TemplateType)
+    }
+    if (values.google_review_url) setGoogleUrl(String(values.google_review_url))
+    if (values.description) setDescription(String(values.description))
+    if (values.is_active != null) setIsActive(Boolean(values.is_active))
+  }
+
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
+      <div className="xl:col-span-2">
+        <AIFillForm
+          fields={[
+            { name: 'title', label: 'Form Title', type: 'text' },
+            { name: 'slug', label: 'URL Slug', type: 'text' },
+            { name: 'template_type', label: 'Template (google_review, product_feedback, or testimonial)', type: 'text' },
+            { name: 'google_review_url', label: 'Google Review URL', type: 'text' },
+            { name: 'description', label: 'Description', type: 'textarea' },
+            { name: 'is_active', label: 'Active', type: 'boolean' },
+          ]}
+          onFill={handleAIFill}
+          context="Review form for jeffistores.com hardware store"
+        />
+      </div>
       <div className="space-y-5">
         <div>
           <label className={labelClass}>Template *</label>
@@ -240,15 +310,16 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
             {customFields.map((field, idx) => (
               <div key={field.id} className="flex items-start gap-3 p-3 bg-surface-secondary rounded-lg border border-border-default">
                 <span className="text-xs text-foreground-muted mt-2 shrink-0 w-4">{idx + 1}.</span>
-                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <div className="flex-1 flex flex-col sm:flex-row gap-2">
                   <input
                     value={field.label}
                     onChange={e => updateField(field.id, { label: e.target.value })}
                     placeholder="Field label"
-                    className="px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
+                    className="flex-1 basis-0 min-w-0 px-3 py-1.5 border border-border-secondary rounded-lg bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
                   />
                   <AdminSelect
                     sm
+                    className="flex-1 basis-0 min-w-0"
                     value={field.type}
                     onChange={v => updateField(field.id, { type: v as CustomField['type'] })}
                     options={FIELD_TYPES}
@@ -265,8 +336,8 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
 
         {error && <p className="text-sm text-red-600 bg-red-50 dark:bg-red-900/20 px-3 py-2 rounded-lg">{error}</p>}
 
-        <div className="flex gap-3 pt-2">
-          <Link href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm">
+        <div className="flex items-center gap-3 pt-2">
+          <Link href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">
             Cancel
           </Link>
           {isDraft ? (
@@ -277,6 +348,8 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
               <button type="submit" value="publish" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
                 {submitting ? 'Publishing…' : 'Publish'}
               </button>
+              {autoSaveStatus === 'saving' && <span className="text-xs text-foreground-muted">Saving…</span>}
+              {autoSaveStatus === 'saved' && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
             </>
           ) : (
             <button type="submit" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">

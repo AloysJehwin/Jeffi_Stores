@@ -124,6 +124,8 @@ export default function NewCampaignClient() {
       } else {
         showToast(data.error || 'Generation failed', 'error')
       }
+    } catch {
+      showToast('Generation failed — please try again', 'error')
     } finally {
       setAiGenerating(false)
     }
@@ -315,12 +317,12 @@ export default function NewCampaignClient() {
               disabled={creating || !form.name.trim() || !form.kind.trim()}
               className="px-5 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
             >
-              {creating ? 'Creating…' : 'Create campaign'}
+              {creating ? 'Creating…' : 'Save as Draft'}
             </button>
             <button
               type="button"
               onClick={() => router.push(ap('/admin/campaigns'))}
-              className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors"
+              className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm"
             >
               Cancel
             </button>
