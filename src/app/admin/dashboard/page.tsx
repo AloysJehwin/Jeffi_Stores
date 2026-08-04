@@ -19,13 +19,13 @@ const QUICK_ACTIONS: { label: string; icon: string; path: string; primary?: bool
   { label: 'Inventory', path: '/admin/inventory', icon: 'Inventory' },
   { label: 'New PO', path: '/admin/inventory/po/new', icon: 'Inventory' },
   { label: 'Quotation', path: '/admin/quotations', icon: 'Quotations' },
+  { label: 'Packing Slips', path: '/admin/packing-slips', icon: 'Packing Slips' },
+  { label: 'Labels', path: '/admin/labels', icon: 'Labels' },
+  { label: 'GST', path: '/admin/gst', icon: 'GST Compliance' },
 ]
 
 const MORE_ACTIONS: { label: string; path: string; icon: string }[] = [
-  { label: 'Packing Slips', path: '/admin/packing-slips', icon: 'Packing Slips' },
-  { label: 'Labels', path: '/admin/labels', icon: 'Labels' },
   { label: 'Campaigns', path: '/admin/campaigns', icon: 'Campaigns' },
-  { label: 'GST', path: '/admin/gst', icon: 'GST Compliance' },
   { label: 'Financial', path: '/admin/financial', icon: 'Financial' },
   { label: 'CRM', path: '/admin/crm', icon: 'CRM' },
   { label: 'RFQs', path: '/admin/business/rfqs', icon: 'Business RFQs' },
