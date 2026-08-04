@@ -18,27 +18,36 @@ cd /opt/jeffi-stores
 # 1. Pull latest code (includes new compose files and deploy scripts)
 git fetch origin && git checkout main && git reset --hard origin/main
 
-# 2. Bootstrap the active slot tracker
+# 2. Create the shared external network (fixed name; both slots + infra attach to it)
+docker network create jeffi_internal 2>/dev/null || echo "network already exists"
+
+# 3. Bootstrap the active slot tracker
 echo "blue" > active_slot
 
-# 3. Copy initial upstream config (starts on blue)
+# 4. Copy initial upstream config (starts on blue)
 cp deploy/nginx-blue.conf deploy/active-upstream.conf
 
-# 4. Stop and remove the old docker-compose.prod.yml app containers
-#    (nginx and redis stay up — they're now managed by docker-compose.infra.yml)
-docker compose -f docker-compose.prod.yml stop app
-docker compose -f docker-compose.prod.yml rm -f app
+# 5. Start the initial blue slot on the shared network
+docker compose -f docker-compose.infra.yml -f docker-compose.blue.yml up -d --no-deps --force-recreate app_blue
 
-# 5. Recreate nginx with the new split config (active-upstream.conf + nginx-servers.conf)
-docker compose -f docker-compose.infra.yml up -d --force-recreate nginx
+# 6. Bring infra (nginx + redis) onto the shared network with the split config
+docker compose -f docker-compose.infra.yml up -d --force-recreate nginx redis
 
-# 6. Start the initial blue slot
-docker compose -f docker-compose.infra.yml -f docker-compose.blue.yml up -d app_blue
-
-# 7. Verify
+# 7. Verify — nginx must resolve app_blue and serve 200
 docker ps
-curl -s http://localhost:3000/api/health
+docker exec jeffi-nginx nginx -t
+curl -s -o /dev/null -w "%{http_code}\n" -H "Host: jeffistores.in" http://localhost/api/health
+
+# 8. Remove the OLD rolling-deploy app containers (only after step 7 shows 200)
+docker compose -f docker-compose.prod.yml stop app 2>/dev/null || true
+docker compose -f docker-compose.prod.yml rm -f app 2>/dev/null || true
 ```
+
+> **Why the explicit network (step 2):** the blue/green compose files reference the network
+> as `external` with the fixed name `jeffi_internal`. Without creating it first (or letting
+> Compose's project-prefixed auto-name diverge), `docker compose ... app_<slot>` fails with
+> *"network internal declared as external, but could not be found"*. All three compose files
+> pin `name: jeffi_internal`, so nginx and both slots always share one network and DNS resolves.
 
 After step 7 the site is live on the blue slot. The next CI deploy will switch to green,
 then the one after that back to blue — alternating every deploy.

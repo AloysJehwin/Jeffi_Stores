@@ -9,8 +9,6 @@ services:
     volumes:
       - ./certs:/app/certs:ro
       - ./jeffi-stores-76e9ecaecdd6.json:/app/jeffi-stores-76e9ecaecdd6.json:ro
-    depends_on:
-      - redis
     restart: unless-stopped
     networks:
       - internal
@@ -23,4 +21,5 @@ services:
 
 networks:
   internal:
+    name: jeffi_internal
     external: true
