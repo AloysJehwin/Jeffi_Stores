@@ -23,7 +23,6 @@ CREATE TABLE public.admin_agent_actions (
 );
 
 
-
 --
 -- Name: admin_agent_attachments; Type: TABLE; Schema: public; Owner: -
 --
@@ -39,7 +38,6 @@ CREATE TABLE public.admin_agent_attachments (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     expires_at timestamp with time zone DEFAULT (now() + '02:00:00'::interval) NOT NULL
 );
-
 
 
 --
@@ -58,7 +56,6 @@ CREATE TABLE public.admin_agent_messages (
     proposed_actions jsonb DEFAULT '[]'::jsonb NOT NULL,
     pickers jsonb DEFAULT '[]'::jsonb NOT NULL
 );
-
 
 
 --
@@ -87,7 +84,6 @@ CREATE TABLE public.admin_agent_proposed_tools (
 );
 
 
-
 --
 -- Name: ai_briefing_log; Type: TABLE; Schema: public; Owner: -
 --
@@ -100,7 +96,6 @@ CREATE TABLE public.ai_briefing_log (
     sections jsonb DEFAULT '{}'::jsonb,
     error text
 );
-
 
 
 --
@@ -116,7 +111,6 @@ CREATE TABLE public.ai_feedback (
     comment text,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
-
 
 
 --
@@ -140,28 +134,25 @@ CREATE TABLE public.ai_queries (
 );
 
 
-
 --
--- Name: custom_scenarios; Type: TABLE; Schema: public; Owner: -
+-- Name: embeddings; Type: TABLE; Schema: public; Owner: -
 --
 
-CREATE TABLE public.custom_scenarios (
-    kind character varying(64) NOT NULL,
-    name character varying(128) NOT NULL,
-    description text,
-    ai_prompt text NOT NULL,
-    generated_sql text NOT NULL,
-    dry_run_count integer,
-    dry_run_at timestamp with time zone,
-    approved_by uuid,
-    approved_at timestamp with time zone,
-    enabled boolean DEFAULT false NOT NULL,
-    parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL,
-    product_sql text
+CREATE TABLE public.embeddings (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    source_table character varying(64),
+    source_id text,
+    content text,
+    content_hash text,
+    embedding public.vector(768),
+    metadata jsonb,
+    updated_at timestamp with time zone,
+    CONSTRAINT embeddings_pkey PRIMARY KEY (id),
+    CONSTRAINT embeddings_source_table_source_id_key UNIQUE (source_table, source_id)
 );
 
+CREATE INDEX idx_embeddings_source_table ON public.embeddings USING btree (source_table);
+CREATE INDEX idx_embeddings_content_hash ON public.embeddings USING btree (content_hash);
 
 
 --
@@ -194,37 +185,4 @@ CREATE TABLE public.product_ai_enrichment_log (
     CONSTRAINT product_ai_enrichment_log_status_chk CHECK ((status = ANY (ARRAY['proposed'::text, 'approved'::text, 'rejected'::text, 'failed'::text])))
 );
 
-
-
---
--- Name: scenario_audit_log; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.scenario_audit_log (
-    id uuid DEFAULT gen_random_uuid() NOT NULL,
-    scenario_kind character varying(64),
-    admin_id uuid,
-    action character varying(32) NOT NULL,
-    ai_prompt text,
-    ai_response text,
-    generated_sql text,
-    validation jsonb,
-    result jsonb,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
-);
-
-
-
---
--- Name: scenarios; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public.scenarios (
-    kind character varying(64) NOT NULL,
-    name character varying(128) NOT NULL,
-    description text,
-    default_parameters jsonb DEFAULT '{}'::jsonb NOT NULL,
-    created_at timestamp with time zone DEFAULT now() NOT NULL,
-    updated_at timestamp with time zone DEFAULT now() NOT NULL
-);
 

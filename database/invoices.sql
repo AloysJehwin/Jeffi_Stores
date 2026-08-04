@@ -32,7 +32,6 @@ CREATE TABLE public.cash_sale_items (
 );
 
 
-
 --
 -- Name: cash_sales; Type: TABLE; Schema: public; Owner: -
 --
@@ -64,7 +63,6 @@ CREATE TABLE public.cash_sales (
 );
 
 
-
 --
 -- Name: invoices; Type: TABLE; Schema: public; Owner: -
 --
@@ -82,4 +80,3 @@ CREATE TABLE public.invoices (
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT invoices_status_check CHECK (((status)::text = ANY ((ARRAY['draft'::character varying, 'finalized'::character varying])::text[])))
 );
-

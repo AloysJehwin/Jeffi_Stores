@@ -19,9 +19,10 @@ CREATE TABLE public.product_reviews (
     updated_at timestamp with time zone DEFAULT now(),
     image_thumbnail_urls text[] DEFAULT '{}'::text[] NOT NULL,
     image_urls text[] DEFAULT '{}'::text[] NOT NULL,
+    order_id uuid,
+    tags jsonb DEFAULT '[]'::jsonb NOT NULL,
     CONSTRAINT product_reviews_rating_check CHECK (((rating >= 1) AND (rating <= 5)))
 );
-
 
 
 --
@@ -39,6 +40,18 @@ CREATE TABLE public.product_views (
 );
 
 
+--
+-- Name: review_form_drafts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.review_form_drafts (
+    form_id uuid NOT NULL,
+    fields jsonb DEFAULT '{}'::jsonb NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT review_form_drafts_pkey PRIMARY KEY (form_id)
+);
+
 
 --
 -- Name: review_form_submissions; Type: TABLE; Schema: public; Owner: -
@@ -55,7 +68,6 @@ CREATE TABLE public.review_form_submissions (
     email character varying(255),
     extra_fields jsonb DEFAULT '{}'::jsonb
 );
-
 
 
 --
@@ -77,7 +89,6 @@ CREATE TABLE public.review_forms (
 );
 
 
-
 --
 -- Name: wishlist_items; Type: TABLE; Schema: public; Owner: -
 --
@@ -91,4 +102,3 @@ CREATE TABLE public.wishlist_items (
     snapshot_in_stock boolean,
     snapshot_taken_at timestamp with time zone
 );
-

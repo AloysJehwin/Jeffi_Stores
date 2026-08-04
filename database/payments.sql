@@ -20,7 +20,6 @@ CREATE TABLE public.expense_payments (
 );
 
 
-
 --
 -- Name: expenses; Type: TABLE; Schema: public; Owner: -
 --
@@ -45,7 +44,6 @@ CREATE TABLE public.expenses (
 );
 
 
-
 --
 -- Name: payments; Type: TABLE; Schema: public; Owner: -
 --
@@ -63,3 +61,19 @@ CREATE TABLE public.payments (
     updated_at timestamp with time zone DEFAULT now()
 );
 
+
+--
+-- Name: pending_payment_intents; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.pending_payment_intents (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    razorpay_order_id text NOT NULL,
+    draft_token text NOT NULL,
+    user_id uuid NOT NULL,
+    amount_paise integer NOT NULL,
+    committed boolean DEFAULT false NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT pending_payment_intents_pkey PRIMARY KEY (id),
+    CONSTRAINT pending_payment_intents_razorpay_order_id_key UNIQUE (razorpay_order_id)
+);

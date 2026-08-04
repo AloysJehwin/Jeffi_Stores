@@ -17,7 +17,8 @@ concurrency:
 
 jobs:
   # ────────────────────────────────────────────────────────
-  # Stage 0 — Detect schema file changes  (main push only)
+  # Stage 0 — Detect entity schema changes  (main push only)
+  # Watches database/*.sql (not migrations/) — triggers schema-diff job
   # ────────────────────────────────────────────────────────
   check-schema:
     name: Check for Schema Changes
@@ -29,15 +30,40 @@ jobs:
         with:
           fetch-depth: 2
 
-      - name: Detect schema file changes
+      - name: Detect entity SQL file changes
         id: detect
         run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q '^database/.*\.sql'; then
+          if git diff --name-only HEAD~1 HEAD | grep -qP '^database/(?!migrations/)[^/]+\.sql'; then
             echo "schema_changed=true" >> $GITHUB_OUTPUT
-            echo "Schema files changed — will apply to RDS"
+            echo "Entity SQL files changed — will schema-diff against live RDS"
           else
             echo "schema_changed=false" >> $GITHUB_OUTPUT
-            echo "No schema files changed — skipping schema-apply job"
+            echo "No entity SQL changes — skipping schema-diff job"
+          fi
+
+  # ────────────────────────────────────────────────────────
+  # Stage 0 — Detect migration changes  (main push only)
+  # Watches database/migrations/*.sql — triggers run-migrations job
+  # ────────────────────────────────────────────────────────
+  check-migrations:
+    name: Check for Migration Changes
+    runs-on: ubuntu-latest
+    outputs:
+      migrations_changed: ${{ steps.detect.outputs.migrations_changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Detect migration file changes
+        id: detect
+        run: |
+          if git diff --name-only HEAD~1 HEAD | grep -q '^database/migrations/.*\.sql'; then
+            echo "migrations_changed=true" >> $GITHUB_OUTPUT
+            echo "Migration files changed — will apply to RDS after deploy"
+          else
+            echo "migrations_changed=false" >> $GITHUB_OUTPUT
+            echo "No migration files changed — skipping migrate job"
           fi
 
   # ────────────────────────────────────────────────────────
@@ -247,7 +273,7 @@ jobs:
             --output text)
           echo "host=$IP" >> $GITHUB_OUTPUT
 
-      - name: Rolling deploy (zero downtime)
+      - name: Blue-green deploy (zero downtime)
         uses: appleboy/ssh-action@v1
         env:
           GH_DEPLOY_TOKEN: ${{ secrets.GH_DEPLOY_TOKEN }}
@@ -269,41 +295,14 @@ jobs:
             git checkout main
             git reset --hard origin/main
 
-            echo "── Pulling new Docker image ──"
+            echo "── Logging in to GHCR ──"
             echo "$GH_DEPLOY_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
-            docker pull ghcr.io/$(echo "$GH_REPOSITORY" | tr '[:upper:]' '[:lower:]'):latest
 
-            echo "── Rolling restart app (nginx + redis stay up) ──"
-            docker compose -f docker-compose.prod.yml stop app 2>/dev/null || true
-            docker compose -f docker-compose.prod.yml rm -f app 2>/dev/null || true
-            docker compose -f docker-compose.prod.yml up -d --no-deps --pull never --force-recreate app
-
-            echo "── Waiting for app healthcheck to pass ──"
-            for i in $(seq 1 18); do
-              STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://localhost/api/health || echo "000")
-              echo "Attempt $i: HTTP $STATUS"
-              if [[ "$STATUS" == "200" ]]; then
-                echo "App is healthy."
-                break
-              fi
-              if [[ $i -eq 18 ]]; then
-                echo "App failed to become healthy after 3 minutes — rolling back."
-                docker compose -f docker-compose.prod.yml up -d --no-deps app
-                exit 1
-              fi
-              sleep 10
-            done
+            echo "── Blue-green deploy ──"
+            bash deploy/blue-green-deploy.sh
 
             echo "── Pruning old images ──"
             docker image prune -f
-
-            echo "── Reloading nginx config ──"
-            docker compose -f docker-compose.prod.yml exec -T nginx nginx -t && \
-              docker compose -f docker-compose.prod.yml exec -T nginx nginx -s reload || \
-              echo "nginx reload skipped (container may not be named nginx)"
-
-            echo "── Status ──"
-            docker compose -f docker-compose.prod.yml ps
 
       - name: Mark deployment success
         if: success()
@@ -335,16 +334,16 @@ jobs:
             });
 
   # ────────────────────────────────────────────────────────
-  # Stage 5 — Apply DB Schema  (main only, gate: deploy + schema changed)
+  # Stage 5 — Schema Diff + Apply  (main only, gate: deploy + schema changed)
+  # Loads database/*.sql into temp Postgres, diffs vs live RDS via migra,
+  # applies only the delta. You edit the entity file — pipeline handles the rest.
   # ────────────────────────────────────────────────────────
-  schema-apply:
-    name: Apply DB Schema
+  schema-diff:
+    name: Schema Diff & Apply
     runs-on: ubuntu-latest
     needs: [deploy, check-schema]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-schema.outputs.schema_changed == 'true'
     steps:
-      - uses: actions/checkout@v4
-
       - name: Get EC2 public IP
         id: ec2
         env:
@@ -358,7 +357,7 @@ jobs:
             --output text)
           echo "host=$IP" >> $GITHUB_OUTPUT
 
-      - name: Apply schema to RDS via EC2 tunnel
+      - name: Run schema diff and apply via EC2
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ steps.ec2.outputs.host }}
@@ -369,29 +368,56 @@ jobs:
             set -e
             cd /opt/jeffi-stores
 
-            echo "Generating IAM auth token..."
-            PGPASSWORD=$(aws rds generate-db-auth-token \
-              --hostname jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com \
-              --port 5432 \
-              --region us-east-1 \
-              --username app_user)
-            export PGPASSWORD
+            export RDS_HOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
+            export RDS_PORT=5432
+            export RDS_USER=app_user
+            export RDS_DB=jeffi_stores
+            export AWS_REGION=us-east-1
 
-            echo "Applying schema modules..."
-            for f in database/extensions.sql database/users.sql database/catalog.sql \
-                     database/inventory.sql database/orders.sql database/payments.sql \
-                     database/quotations.sql database/invoices.sql database/marketing.sql \
-                     database/reviews.sql database/crm.sql database/support.sql \
-                     database/ai.sql database/logs.sql database/settings.sql \
-                     database/indexes.sql database/functions.sql database/triggers.sql \
-                     database/constraints.sql; do
-              echo ">> $(basename "$f")"
-              PGSSLMODE=require psql \
-                -h jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com \
-                -p 5432 -U app_user -d jeffi_stores \
-                -v ON_ERROR_STOP=0 -f "$f"
-            done
-            echo "Schema apply complete."
+            bash deploy/schema-diff.sh
+
+  # ────────────────────────────────────────────────────────
+  # Stage 5 — Run DB Migrations  (main only, gate: deploy + migrations changed)
+  # Applies only unapplied files from database/migrations/ via run-migrations.sh.
+  # Tracks applied migrations in schema_migrations table on RDS.
+  # ────────────────────────────────────────────────────────
+  migrate:
+    name: Run DB Migrations
+    runs-on: ubuntu-latest
+    needs: [deploy, check-migrations]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-migrations.outputs.migrations_changed == 'true'
+    steps:
+      - name: Get EC2 public IP
+        id: ec2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' \
+            --output text)
+          echo "host=$IP" >> $GITHUB_OUTPUT
+
+      - name: Apply pending migrations via EC2
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ steps.ec2.outputs.host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 10m
+          script: |
+            set -e
+            cd /opt/jeffi-stores
+
+            export RDS_HOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
+            export RDS_PORT=5432
+            export RDS_USER=app_user
+            export RDS_DB=jeffi_stores
+            export AWS_REGION=us-east-1
+
+            bash deploy/run-migrations.sh
 
   # ────────────────────────────────────────────────────────
   # Stage 6 — Smoke test  (main only, gate: deploy)
@@ -466,7 +492,7 @@ jobs:
   summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, build, docker, deploy, schema-apply, smoke-test, invalidate-cdn]
+    needs: [lint, typecheck, test, build, docker, deploy, schema-diff, migrate, smoke-test, invalidate-cdn]
     if: always()
     steps:
       - name: Result
@@ -483,7 +509,8 @@ jobs:
           if [[ "$IS_MAIN" == "true" ]]; then
           echo "║  Docker Push:        ${{ needs.docker.result }}"
           echo "║  Deploy to EC2:      ${{ needs.deploy.result }}"
-          echo "║  Apply DB Schema:    ${{ needs.schema-apply.result }}"
+          echo "║  Schema Diff:        ${{ needs.schema-diff.result }}"
+          echo "║  Run DB Migrations:  ${{ needs.migrate.result }}"
           echo "║  Smoke Test:         ${{ needs.smoke-test.result }}"
           echo "║  Invalidate CDN:     ${{ needs.invalidate-cdn.result }}"
           fi
@@ -504,7 +531,8 @@ jobs:
           if [[ "$IS_MAIN" == "true" ]]; then
             if [[ "${{ needs.docker.result }}"         == "failure" ||
                   "${{ needs.deploy.result }}"         == "failure" ||
-                  "${{ needs.schema-apply.result }}"   == "failure" ||
+                  "${{ needs.schema-diff.result }}"    == "failure" ||
+                  "${{ needs.migrate.result }}"        == "failure" ||
                   "${{ needs.smoke-test.result }}"     == "failure" ||
                   "${{ needs.invalidate-cdn.result }}" == "failure" ]]; then
               echo "PIPELINE FAILED at deployment stage."
