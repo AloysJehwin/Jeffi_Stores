@@ -1,35 +1,26 @@
 import Link from 'next/link'
 import { queryMany } from '@/lib/db'
-import CategoryIcon from '@/components/visitor/CategoryIcon'
-
-const CATEGORY_BRANDS: Record<string, string> = {
-  'Bolts & Nuts': 'TVS, UNBRAKO',
-  'Screws': 'LandMark',
-  'Drill Bits': 'Miranda, Totem',
-  'Tools': 'Taparia, Forves Kento',
-  'V Belts': 'IPON VEE Grip, Fenner, Nickson, PIX',
-  'Timing Belts': 'Gates, Fenner, Contitech',
-  'SS Fasteners': 'APL, Unbrako, TVS, LPS',
-  'Welding Rods': 'Ador, Esab, Mangalam',
-  'Valves': 'Spirax, Forves Marshall, Exxon',
-}
-
-const CATEGORY_COLORS: Record<string, string> = {
-  'Bolts & Nuts': 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
-  'Screws': 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400',
-  'Drill Bits': 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
-  'Tools': 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400',
-  'V Belts': 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
-  'Timing Belts': 'bg-teal-100 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400',
-  'SS Fasteners': 'bg-slate-100 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300',
-  'Welding Rods': 'bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400',
-  'Valves': 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
-}
+import CategoryOffer, { type OfferCategory } from '@/components/visitor/CategoryOffer'
 
 export default async function AboutPage() {
-  const categories = await queryMany<{ id: string; name: string; icon_name: string | null }>(
-    `SELECT id, name, icon_name FROM categories WHERE is_active = true AND parent_category_id IS NULL ORDER BY display_order ASC`
+  // Load the full active category tree (top-level + subcategories) in one query, then group.
+  const rows = await queryMany<{ id: string; name: string; slug: string | null; icon_name: string | null; parent_category_id: string | null; display_order: number | null }>(
+    `SELECT id, name, slug, icon_name, parent_category_id, display_order
+       FROM categories WHERE is_active = true
+      ORDER BY display_order ASC NULLS LAST, name ASC`
   ).catch(() => [])
+
+  const subsByParent = new Map<string, Array<{ id: string; name: string; slug: string | null }>>()
+  for (const r of rows) {
+    if (r.parent_category_id) {
+      const list = subsByParent.get(r.parent_category_id) ?? []
+      list.push({ id: r.id, name: r.name, slug: r.slug })
+      subsByParent.set(r.parent_category_id, list)
+    }
+  }
+  const categories: OfferCategory[] = rows
+    .filter(r => !r.parent_category_id)
+    .map(r => ({ id: r.id, name: r.name, slug: r.slug, icon_name: r.icon_name, subcategories: subsByParent.get(r.id) ?? [] }))
   return (
     <div className="bg-surface">
       {/* Page Header */}
@@ -141,19 +132,7 @@ export default async function AboutPage() {
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">{categories.length} Categories</span>
           </div>
           <p className="text-foreground-secondary text-sm mb-6">Premium industrial hardware from the brands you trust</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {categories.map((cat) => (
-              <div key={cat.id} className="group flex items-start gap-4 border border-border-default rounded-xl p-4 hover:border-accent-400 hover:shadow-sm transition-all bg-surface hover:bg-surface-elevated">
-                <div className={`w-11 h-11 rounded-lg flex items-center justify-center flex-shrink-0 ${CATEGORY_COLORS[cat.name] ?? 'bg-accent-100 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400'}`}>
-                  <CategoryIcon iconName={cat.icon_name} categoryName={cat.name} className="w-6 h-6" />
-                </div>
-                <div className="min-w-0">
-                  <h3 className="font-semibold text-foreground mb-1 group-hover:text-accent-600 transition-colors">{cat.name}</h3>
-                  <p className="text-xs text-foreground-muted leading-relaxed">{CATEGORY_BRANDS[cat.name] ?? ''}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+          <CategoryOffer categories={categories} />
           <div className="mt-8 text-center">
             <Link
               href="/categories"
