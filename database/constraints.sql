@@ -659,6 +659,26 @@ ALTER TABLE ONLY public.merchant_sync_log
 
 
 --
+-- Name: merchant_gmc_status merchant_gmc_status_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.merchant_gmc_status
+    ADD CONSTRAINT merchant_gmc_status_pkey PRIMARY KEY (offer_id);
+
+
+--
+-- Name: merchant_gmc_refresh_meta merchant_gmc_refresh_meta_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.merchant_gmc_refresh_meta
+    ADD CONSTRAINT merchant_gmc_refresh_meta_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.merchant_gmc_refresh_meta
+    ADD CONSTRAINT merchant_gmc_refresh_meta_singleton CHECK (id = 1);
+
+
+
+--
 -- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 

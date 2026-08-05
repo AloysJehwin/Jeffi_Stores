@@ -110,6 +110,12 @@ export async function listProducts(pageToken?: string): Promise<{ resources?: an
   return gmcRequest('GET', `/products${qs}`)
 }
 
+export async function listProductStatuses(pageToken?: string): Promise<{ resources?: any[]; nextPageToken?: string }> {
+  const params = new URLSearchParams({ maxResults: '250' })
+  if (pageToken) params.set('pageToken', pageToken)
+  return gmcRequest('GET', `/productstatuses?${params.toString()}`)
+}
+
 export async function customBatchUpsert(entries: unknown[]): Promise<any> {
   const token = await getAccessToken()
   const res = await fetch(`${BATCH_URL}/products/batch`, {
