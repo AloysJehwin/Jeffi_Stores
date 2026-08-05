@@ -38,7 +38,6 @@ async function fetchAllActiveProducts() {
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.is_active = true
     ORDER BY p.created_at DESC
   `)
 }
@@ -199,22 +198,8 @@ export async function syncProductToMerchant(productId: string): Promise<void> {
 
   if (!product) return
 
-  if (!product.is_active) {
-    const skusToDelete: string[] = []
-    if (product.sku) skusToDelete.push(product.sku)
-    if (Array.isArray(product.product_variants)) {
-      for (const v of product.product_variants) {
-        if (v?.sku) skusToDelete.push(v.sku)
-      }
-    }
-    for (const sku of skusToDelete) {
-      try {
-        await deleteProductByOfferId(sku.replace(/[^a-zA-Z0-9_:.-]/g, '_'))
-      } catch (err) { console.error("[route]", err) }
-    }
-    return
-  }
-
+  // Inactive products stay in the feed as out_of_stock (handled by productToGmcItems),
+  // so we upsert them rather than delete.
   const items = productToGmcItems(product)
   for (const item of items) {
     await upsertProduct(item)
