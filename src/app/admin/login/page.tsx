@@ -124,6 +124,23 @@ export default function AdminLogin() {
     }
   }
 
+  // Exchange a Google access token for an MFA ticket (shared by popup flow and
+  // the URL-hash fallback below).
+  const exchangeGoogleToken = async (accessToken: string) => {
+    const res = await fetch('/api/admin/auth/google', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ accessToken }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      if (res.status === 403) setIsCertError(true)
+      throw new Error(data.error || 'Google sign-in failed')
+    }
+    await handleIdentityResult(data)
+  }
+
   const handleGoogle = async () => {
     setError(''); setIsCertError(false); setGoogleLoading(true)
     try {
@@ -132,24 +149,43 @@ export default function AdminLogin() {
         if (gErr && gErr !== 'popup_closed') setError(gErr)
         return
       }
-      const res = await fetch('/api/admin/auth/google', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ accessToken }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        if (res.status === 403) setIsCertError(true)
-        throw new Error(data.error || 'Google sign-in failed')
-      }
-      await handleIdentityResult(data)
+      await exchangeGoogleToken(accessToken)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Google sign-in failed')
     } finally {
       setGoogleLoading(false)
     }
   }
+
+  // Fallback for when Google's implicit flow returns to this page in the top-level
+  // window (e.g. #access_token=... in the URL) instead of the popup — the callback
+  // page's postMessage never reaches us. Detect the token in the hash on mount,
+  // complete the exchange, and strip it from the URL so it isn't reprocessed or left
+  // in history.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hash = window.location.hash.slice(1)
+    if (!hash) return
+    const params = new URLSearchParams(hash)
+    const accessToken = params.get('access_token')
+    const hashError = params.get('error')
+    if (!accessToken && !hashError) return
+
+    // Clear the hash immediately so a reload/re-render doesn't re-run this.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+
+    if (hashError) {
+      setError('Google sign-in failed. Please try again.')
+      return
+    }
+    if (accessToken) {
+      setError(''); setIsCertError(false); setGoogleLoading(true)
+      exchangeGoogleToken(accessToken)
+        .catch((err) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
+        .finally(() => setGoogleLoading(false))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
