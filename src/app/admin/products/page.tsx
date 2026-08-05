@@ -17,7 +17,7 @@ import ProductsTableClient from '@/components/admin/ProductsTableClient'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import MerchantSyncStatus from '@/components/admin/MerchantSyncStatus'
+
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
@@ -343,8 +343,6 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           Add New Product
         </Link>
       </div>
-
-      <MerchantSyncStatus />
 
       <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
         <ProductsStats />

@@ -1550,3 +1550,50 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
     },
   }
 }
+
+// Monthly paid-revenue trend split by order source (last 12 months). Pivoted server-side into
+// one continuous (zero-filled) points array per source, aligned to a shared months axis.
+export interface RevenueTrend {
+  months: string[]
+  series: Array<{ source: string; label: string; color: string; points: number[] }>
+}
+
+const REVENUE_SOURCES: Array<{ source: string; label: string; color: string }> = [
+  { source: 'online', label: 'Online', color: '#3b82f6' },      // blue
+  { source: 'business', label: 'Business', color: '#22c55e' },  // green
+  { source: 'offline', label: 'Offline', color: '#a855f7' },    // purple
+  { source: 'cash_sale', label: 'Cash Sale', color: '#f59e0b' },// amber
+]
+
+export async function getRevenueTrendBySource(): Promise<RevenueTrend> {
+  const rows = await queryMany<{ month: string; source: string; revenue: number }>(`
+    SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+           source,
+           SUM(total_amount)::float AS revenue
+      FROM orders
+     WHERE payment_status = 'paid'
+       AND created_at >= (date_trunc('month', now()) - INTERVAL '11 months')
+     GROUP BY 1, 2
+     ORDER BY 1
+  `).catch(() => [])
+
+  // Build a continuous 12-month axis ending with the current month.
+  const months: string[] = []
+  const now = new Date()
+  for (let k = 11; k >= 0; k--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - k, 1)
+    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  }
+  const monthIndex = new Map(months.map((m, idx) => [m, idx]))
+
+  const bySource = new Map<string, number[]>()
+  for (const s of REVENUE_SOURCES) bySource.set(s.source, new Array(months.length).fill(0))
+  for (const r of rows) {
+    const arr = bySource.get(r.source)
+    const idx = monthIndex.get(r.month)
+    if (arr && idx !== undefined) arr[idx] = Number(r.revenue) || 0
+  }
+
+  const series = REVENUE_SOURCES.map(s => ({ ...s, points: bySource.get(s.source)! }))
+  return { months, series }
+}
