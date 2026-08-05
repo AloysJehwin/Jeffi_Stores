@@ -200,6 +200,8 @@ async function createProduct(formData: FormData) {
     syncProductToSheet(data.id).catch(() => {})
     const { syncProductToMerchant } = await import('@/lib/merchant/sync')
     syncProductToMerchant(data.id).catch(() => {})
+    const { syncProductToAmazon } = await import('@/lib/amazon/sync')
+    syncProductToAmazon(data.id).catch(() => {})
 
     const host = await getHost()
   redirect(ap('/admin/products', host))

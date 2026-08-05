@@ -1,7 +1,7 @@
 import { queryOne, query } from '@/lib/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
 import { productToAmazonListings } from './mapper'
-import { putListingsItem, deleteListingsItem, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
+import { putListingsItem, validateListingsItem, deleteListingsItem, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
 // Unlike GMC (which has a /products/batch), SP-API Listings Items is one PUT per SKU, so we
@@ -154,6 +154,28 @@ export async function syncProductToAmazon(productId: string): Promise<void> {
 export async function deleteProductFromAmazon(sku: string): Promise<void> {
   if (AMAZON_PUSH_DISABLED || !SELLER_ID) return
   await deleteListingsItem(sku)
+}
+
+// Validate one product's listing(s) against Amazon's productType schema WITHOUT publishing.
+// Returns per-SKU issues so we can confirm the mapper before enabling real pushes. This does
+// NOT write anything, so it works even with AMAZON_PUSH_DISABLED=true.
+export async function validateProductForAmazon(
+  productId: string
+): Promise<Array<{ sku: string; productType: string; status?: string; issues: any[]; error?: string }>> {
+  if (!SELLER_ID) return [{ sku: '__config__', productType: '', issues: [], error: 'AMAZON_SELLER_ID is not set' }]
+  const product = await fetchProduct(productId)
+  if (!product) return [{ sku: '__notfound__', productType: '', issues: [], error: 'Product not found' }]
+
+  const out: Array<{ sku: string; productType: string; status?: string; issues: any[]; error?: string }> = []
+  for (const l of productToAmazonListings(product)) {
+    try {
+      const res = await validateListingsItem(l.sku, l)
+      out.push({ sku: l.sku, productType: l.productType, status: res?.status, issues: res?.issues || [] })
+    } catch (err: any) {
+      out.push({ sku: l.sku, productType: l.productType, issues: [], error: err.message })
+    }
+  }
+  return out
 }
 
 export async function getLastAmazonSyncStatus(): Promise<any> {
