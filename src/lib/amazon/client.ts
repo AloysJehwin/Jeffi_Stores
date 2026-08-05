@@ -121,6 +121,20 @@ export async function putListingsItem(sku: string, listing: unknown): Promise<an
   })
 }
 
+// Targeted JSON-Patch update of specific attributes (e.g. purchasable_offer, fulfillment_
+// availability). Amazon recommends patch (not a bundled PUT) for offer/availability — a bundled
+// offer-only PUT can silently drop purchasable_offer, leaving the listing DISCOVERABLE-not-BUYABLE.
+export async function patchListingsItem(
+  sku: string,
+  productType: string,
+  patches: Array<{ op: 'add' | 'replace' | 'delete' | 'merge'; path: string; value?: unknown }>,
+): Promise<any> {
+  return spApiRequest('PATCH', itemPath(sku), {
+    query: { marketplaceIds: MARKETPLACE_ID },
+    body: { productType, patches },
+  })
+}
+
 // Validate a listing against Amazon's productType schema WITHOUT publishing it. Returns the
 // same shape as a real PUT (status + issues[]), so we can preview mapper correctness safely.
 export async function validateListingsItem(sku: string, listing: unknown): Promise<any> {
