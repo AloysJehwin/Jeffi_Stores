@@ -761,6 +761,20 @@ CREATE INDEX idx_invoices_status ON public.invoices USING btree (status) WHERE (
 CREATE INDEX idx_merchant_sync_log_started_at ON public.merchant_sync_log USING btree (started_at DESC);
 
 
+--
+-- Name: idx_merchant_gmc_status_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_merchant_gmc_status_status ON public.merchant_gmc_status USING btree (status);
+
+
+--
+-- Name: idx_merchant_gmc_status_title; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_merchant_gmc_status_title ON public.merchant_gmc_status USING gin (to_tsvector('simple'::regconfig, COALESCE(title, ''::text)));
+
+
 
 --
 -- Name: idx_notifications_created_at; Type: INDEX; Schema: public; Owner: -

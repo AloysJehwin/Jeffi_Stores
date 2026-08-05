@@ -48,6 +48,7 @@ export default async function AdminLayout({
     { href: '/admin/categories', label: 'Categories', scope: 'categories:read', group: 'Catalogue' },
     { href: '/admin/brands', label: 'Brands', scope: 'brands:read', group: 'Catalogue' },
     { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'catalog_enrichment:read', group: 'Catalogue' },
+    { href: '/admin/merchant-sync', label: 'Merchant Sync', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations:read', group: 'Sales' },
     { href: '/admin/invoices', label: 'Invoices', scope: 'invoices:read', group: 'Sales' },
