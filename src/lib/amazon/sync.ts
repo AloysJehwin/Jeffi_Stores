@@ -1,7 +1,7 @@
 import { queryOne, query } from '@/lib/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
 import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
-import { putListingsItem, validateListingsItem, deleteListingsItem, matchAsin, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
+import { putListingsItem, patchListingsItem, validateListingsItem, deleteListingsItem, matchAsin, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
 // Unlike GMC (which has a /products/batch), SP-API Listings Items is one PUT per SKU, so we
@@ -37,13 +37,15 @@ async function saveSyncStatus(result: Partial<SyncResult> & { status: 'running' 
   } catch (_) {}
 }
 
-// PUT one listing with retry/backoff on HTTP 429 (rate limit).
-async function putWithBackoff(sku: string, listing: unknown): Promise<void> {
+// PUT one listing with retry/backoff on HTTP 429 (rate limit). For offer-only listings, follow
+// with a targeted PATCH of purchasable_offer — a bundled offer-only PUT silently drops the offer
+// (listing stays DISCOVERABLE-not-BUYABLE), so the offer must be patched in separately.
+async function putWithBackoff(sku: string, listing: any): Promise<void> {
   let attempt = 0
   for (;;) {
     try {
       await putListingsItem(sku, listing)
-      return
+      break
     } catch (err: any) {
       const is429 = err?.status === 429
       if (!is429 || attempt >= MAX_RETRIES) throw err
@@ -52,6 +54,15 @@ async function putWithBackoff(sku: string, listing: unknown): Promise<void> {
       const waitMs = retryAfter > 0 ? retryAfter * 1000 : 1000 * Math.pow(2, attempt)
       await new Promise(r => setTimeout(r, waitMs))
     }
+  }
+
+  const offer = listing?.attributes?.purchasable_offer
+  if (listing?.requirements === 'LISTING_OFFER_ONLY' && offer) {
+    try {
+      await patchListingsItem(sku, listing.productType, [
+        { op: 'replace', path: '/attributes/purchasable_offer', value: offer },
+      ])
+    } catch { /* offer patch failure is surfaced by the later status refresh */ }
   }
 }
 
