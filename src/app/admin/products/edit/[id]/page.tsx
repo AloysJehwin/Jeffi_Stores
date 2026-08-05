@@ -635,6 +635,8 @@ async function updateProduct(productId: string, formData: FormData) {
     syncProductToSheet(productId).catch(() => {})
     const { syncProductToMerchant } = await import('@/lib/merchant/sync')
     syncProductToMerchant(productId).catch(() => {})
+    const { syncProductToAmazon } = await import('@/lib/amazon/sync')
+    syncProductToAmazon(productId).catch(() => {})
     triggerEnrichment(productId)
 
     revalidatePath('/admin/products')

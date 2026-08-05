@@ -119,6 +119,15 @@ export async function putListingsItem(sku: string, listing: unknown): Promise<an
   })
 }
 
+// Validate a listing against Amazon's productType schema WITHOUT publishing it. Returns the
+// same shape as a real PUT (status + issues[]), so we can preview mapper correctness safely.
+export async function validateListingsItem(sku: string, listing: unknown): Promise<any> {
+  return spApiRequest('PUT', itemPath(sku), {
+    query: { marketplaceIds: MARKETPLACE_ID, mode: 'VALIDATION_PREVIEW' },
+    body: listing,
+  })
+}
+
 // Delete a listing for one SKU. Tolerates 404 (already absent), like GMC deleteProduct.
 export async function deleteListingsItem(sku: string): Promise<void> {
   try {

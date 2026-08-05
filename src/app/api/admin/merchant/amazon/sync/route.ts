@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { syncAllProductsToAmazon, syncProductToAmazon, sendAmazonSyncFailureEmail } from '@/lib/amazon/sync'
+import { syncAllProductsToAmazon, syncProductToAmazon, sendAmazonSyncFailureEmail, validateProductForAmazon } from '@/lib/amazon/sync'
 
 // Full push pages one PUT per SKU (~3000 variants) with backoff — allow up to 5 min.
 export const maxDuration = 300
@@ -36,8 +36,17 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}))
   const productId: string | undefined = body.productId
+  const mode: string | undefined = body.mode
 
   try {
+    // Validation preview: map one product and check it against Amazon's schema WITHOUT
+    // publishing. Safe even when AMAZON_PUSH_DISABLED=true.
+    if (mode === 'validate') {
+      if (!productId) return NextResponse.json({ error: 'productId required for validate mode' }, { status: 400 })
+      const results = await validateProductForAmazon(productId)
+      return NextResponse.json({ success: true, mode: 'validate', results })
+    }
+
     if (productId) {
       await syncProductToAmazon(productId)
       return NextResponse.json({ success: true, mode: 'single' })
