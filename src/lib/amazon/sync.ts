@@ -1,7 +1,7 @@
 import { queryOne, query } from '@/lib/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
 import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
-import { putListingsItem, validateListingsItem, deleteListingsItem, matchAsin, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
+import { putListingsItem, validateListingsItem, deleteListingsItem, matchAsin, getListingsRestrictions, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
 // Unlike GMC (which has a /products/batch), SP-API Listings Items is one PUT per SKU, so we
@@ -217,6 +217,73 @@ export async function validateProductForAmazon(
     }
   }
   return out
+}
+
+export interface AmazonDryRunRow {
+  productId: string
+  sku: string
+  name: string
+  brand: string
+  strategy: 'offer-only' | 'create'
+  asin: string | null
+  listable: boolean | null
+  restrictionReason?: string
+}
+
+export interface AmazonDryRunReport {
+  scanned: number
+  offerOnly: number
+  create: number
+  listableOffers: number
+  gatedOffers: number
+  rows: AmazonDryRunRow[]
+  truncated: boolean
+}
+
+// DRY RUN: for up to `limit` active products, report whether each matches an existing ASIN
+// (=> offer-only, bypassing brand gate) or would be a full-create, and whether the matched ASIN
+// is actually listable (getListingsRestrictions empty). Writes NOTHING to Amazon.
+export async function dryRunAmazonSync(limit = 100): Promise<AmazonDryRunReport> {
+  const products = await fetchAllActiveProducts()
+  const slice = products.slice(0, limit)
+  const rows: AmazonDryRunRow[] = []
+
+  for (const product of slice) {
+    const brand = product.brands?.name || ''
+    const v = product.has_variants ? (product.product_variants || [])[0] : null
+    const match = await safeMatchAsin({
+      gtin: v?.gtin || product.gtin, brand, mpn: v?.mpn || product.mpn,
+      name: `${brand} ${product.name} ${v?.variant_name || ''}`.trim(),
+    })
+
+    let listable: boolean | null = null
+    let restrictionReason: string | undefined
+    if (match?.asin) {
+      try {
+        const r = await getListingsRestrictions(match.asin)
+        const list = r.restrictions || []
+        listable = list.length === 0
+        if (!listable) restrictionReason = list[0]?.reasons?.[0]?.reasonCode || 'restricted'
+      } catch { listable = null }
+    }
+
+    rows.push({
+      productId: product.id, sku: product.sku, name: product.name, brand,
+      strategy: match?.asin ? 'offer-only' : 'create',
+      asin: match?.asin || null, listable, restrictionReason,
+    })
+  }
+
+  const offerOnly = rows.filter(r => r.strategy === 'offer-only').length
+  return {
+    scanned: rows.length,
+    offerOnly,
+    create: rows.length - offerOnly,
+    listableOffers: rows.filter(r => r.strategy === 'offer-only' && r.listable === true).length,
+    gatedOffers: rows.filter(r => r.strategy === 'offer-only' && r.listable === false).length,
+    rows,
+    truncated: products.length > slice.length,
+  }
 }
 
 export async function getLastAmazonSyncStatus(): Promise<any> {
