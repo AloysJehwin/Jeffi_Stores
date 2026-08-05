@@ -191,10 +191,52 @@ function toCatalogMatch(item: any): CatalogMatch {
   return { asin: item?.asin, title: s?.itemName, brand: s?.brand || s?.brandName }
 }
 
+// Distinguishing spec tokens for fasteners/tools: metric size (M12), dimensions (16mm / 16 mm),
+// inch fractions (1/2"), and product-TYPE words (the item kind). Both size AND type must agree,
+// because e.g. a Dowel Pin M4 and a Button Screw M4 share the size but are different products.
+const TYPE_WORDS = [
+  'bolt', 'screw', 'nut', 'washer', 'dowel', 'pin', 'stud', 'rivet', 'anchor',
+  'socket', 'cap', 'button', 'countersunk', 'csk', 'grub', 'set', 'hex', 'allen',
+  'lock', 'nyloc', 'flange', 'wrench', 'spanner', 'driver', 'drill', 'level',
+  'lug', 'terminal', 'durlok', 'shcs', 'taper',
+]
+
+function extractSpecTokens(text: string): { sizes: Set<string>; dims: Set<string>; types: Set<string> } {
+  const t = ` ${(text || '').toLowerCase()} `
+  const sizes = new Set<string>()
+  const dims = new Set<string>()
+  const types = new Set<string>()
+  for (const m of t.matchAll(/\bm\s?(\d{1,3})\b/g)) sizes.add(`m${m[1]}`)
+  for (const m of t.matchAll(/\b(\d{1,4})\s?mm\b/g)) dims.add(`${m[1]}mm`)
+  for (const m of t.matchAll(/\b(\d+\/\d+)\s?"?/g)) dims.add(m[1])
+  for (const w of TYPE_WORDS) if (t.includes(` ${w}`)) types.add(w)
+  return { sizes, dims, types }
+}
+
+// Score a candidate. HARD-REJECT (-1) unless BOTH (a) the metric size agrees when we have one,
+// and (b) at least one product-type word agrees. This is what stops different fasteners of the
+// same size, or different types, collapsing onto one ASIN. Returns a positive confidence score
+// only for genuinely comparable items.
+function scoreCandidate(ourName: string, candidateTitle: string): number {
+  const a = extractSpecTokens(ourName)
+  const b = extractSpecTokens(candidateTitle)
+
+  if (a.sizes.size && ![...a.sizes].some(s => b.sizes.has(s))) return -1
+  // Require product-type agreement when we can identify our type.
+  if (a.types.size && ![...a.types].some(x => b.types.has(x))) return -1
+
+  let score = 0
+  for (const s of a.sizes) if (b.sizes.has(s)) score += 3
+  for (const d of a.dims) if (b.dims.has(d)) score += 2
+  for (const x of a.types) if (b.types.has(x)) score += 1
+  return score
+}
+
 // Best-effort ASIN match for one of our products/variants:
 //  1) exact GTIN lookup (highest confidence)
-//  2) brand + keyword fallback, gated by brand-name equality to avoid wrong-page attach.
-// Returns null when no confident match (caller falls back to full-create).
+//  2) brand + keyword search, then require brand equality AND spec-token (size) agreement,
+//     picking the highest-scoring candidate. Returns null when nothing confident matches
+//     (caller falls back to full-create) — this prevents wrong-detail-page attachment.
 export async function matchAsin(input: {
   gtin?: string
   brand?: string
@@ -211,12 +253,19 @@ export async function matchAsin(input: {
 
   const kw = [input.mpn, input.name].filter(Boolean).join(' ').slice(0, 200)
   if (!kw) return null
-  const res = await searchCatalogItems({ keywords: kw, brandNames: input.brand || undefined, pageSize: 10 })
+  const res = await searchCatalogItems({ keywords: kw, brandNames: input.brand || undefined, pageSize: 20 })
   const brandLc = (input.brand || '').toLowerCase().trim()
-  const candidate = (res.items || [])
-    .map(toCatalogMatch)
-    .find((m: CatalogMatch) => m.asin && (!brandLc || (m.brand || '').toLowerCase().trim() === brandLc))
-  return candidate || null
+
+  let best: CatalogMatch | null = null
+  let bestScore = 0 // require a strictly positive score → at least one spec token agreed
+  for (const item of res.items || []) {
+    const m = toCatalogMatch(item)
+    if (!m.asin) continue
+    if (brandLc && (m.brand || '').toLowerCase().trim() !== brandLc) continue
+    const score = scoreCandidate(input.name, m.title || '')
+    if (score > bestScore) { bestScore = score; best = m }
+  }
+  return best
 }
 
 // Brand-gate check: whether we're allowed to create an offer on an ASIN. Empty restrictions
