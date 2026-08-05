@@ -1,22 +1,27 @@
 import { createSign } from 'crypto'
 import { queryMany } from './db'
 import {
-  getGoogleProductCategory,
-  buildProductType,
   buildProductHighlights,
   buildProductDetails,
-  buildCustomLabels,
 } from './google-merchant-helpers'
 
 const SPREADSHEET_ID = '1UYRNtdtvyEl2PF5yAXwtmsKqAKQ-Onqmu9PkR2T2PyU'
 const SHEET_NAME = 'Sheet1'
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
 
-const NEW_HEADERS = [
-  'google_product_category', 'product_type',
-  'custom_label_0', 'custom_label_1', 'custom_label_2', 'custom_label_3', 'custom_label_4',
-  'shipping_weight',
+// The exact 40-column Google Merchant feed template (order matters; column 31
+// "is bundle" is the only header with a space, matching the template verbatim).
+// 40 columns => spreadsheet range A:AN.
+const HEADERS = [
+  'id', 'title', 'description', 'availability', 'availability_date', 'expiration_date',
+  'link', 'mobile_link', 'image_link', 'price', 'sale_price', 'sale_price_effective_date',
+  'identifier_exists', 'gtin', 'mpn', 'brand', 'product_highlight', 'product_detail',
+  'additional_image_link', 'condition', 'adult', 'color', 'size', 'size_type', 'size_system',
+  'gender', 'material', 'pattern', 'age_group', 'multipack', 'is bundle', 'unit_pricing_measure',
+  'unit_pricing_base_measure', 'energy_efficiency_class', 'min_energy_efficiency_class',
+  'max_energy_efficiency', 'item_group_id', 'video_link', 'virtual_model_link', 'cost_of_goods_sold',
 ]
+const LAST_COL = 'AN' // 40th column
 
 interface ServiceAccountCreds {
   client_email: string
@@ -85,13 +90,18 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
   const description = (product.description || product.name || '').slice(0, 5000)
   const material = product.material || ''
   const hasVariants = product.has_variants && product.product_variants?.length > 0
+  const productActive = product.is_active !== false
 
-  const googleProductCat = getGoogleProductCategory(product)
-  const productType = buildProductType(product)
   const highlightsStr = buildProductHighlights(product).join(', ')
   const detailsStr = buildProductDetails(product)
     .map(d => `${d.section}:${d.attribute}:${d.value}`)
     .join(', ')
+
+  // cost_of_goods_sold: from variant/product cost_price, only when > 0.
+  const cogs = (cost: any): string => {
+    const n = Number(cost)
+    return n > 0 ? `${n.toFixed(2)} INR` : ''
+  }
 
   const rows: string[][] = []
 
@@ -101,110 +111,103 @@ function productToSheetRows(product: any, baseUrl: string): string[][] {
       if (sellingPrice == null) continue
       const variantMrp = variant.mrp ? Number(variant.mrp) : (product.mrp ? Number(product.mrp) : null)
       const hasSalePrice = variantMrp && variantMrp > Number(sellingPrice)
-      const [cl0, cl1, cl2, cl3, cl4] = buildCustomLabels(product, variant.stock_status)
+      // Inactive product => force out_of_stock regardless of stock_status.
+      const availability = !productActive
+        ? 'out_of_stock'
+        : (variant.stock_status !== 'Out of Stock' ? 'in_stock' : 'out_of_stock')
 
       rows.push([
-        variant.sku,
-        `${product.name} - ${variant.variant_name}`,
-        description,
-        variant.stock_status !== 'Out of Stock' ? 'in_stock' : 'out_of_stock',
-        '',
-        '',
-        `${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(variant.sku)}`,
-        '',
-        imageUrl,
-        `${Number(variantMrp || sellingPrice).toFixed(2)} INR`,
-        hasSalePrice ? `${Number(sellingPrice).toFixed(2)} INR` : '',
-        '',
-        (variant.mpn || product.mpn || variant.gtin || product.gtin || brandName) ? 'yes' : 'no',
-        variant.gtin || product.gtin || '',
-        variant.mpn || product.mpn || '',
-        brandName,
-        highlightsStr,
-        detailsStr,
-        additionalImages,
-        'new',
-        'no',
-        '',
-        variant.variant_name || '',
-        '',
-        '',
-        '',
-        material,
-        '',
-        '',
-        '',
-        'no',
-        product.weight ? `${product.weight} kg` : '',
-        '',
-        '',
-        '',
-        '',
-        product.sku,
-        variant.stock_status || 'In Stock',
-        googleProductCat,
-        productType,
-        cl0,
-        cl1,
-        cl2,
-        cl3,
-        cl4,
-        product.weight ? `${product.weight} kg` : '',
+        variant.sku,                                                         // 1  id
+        `${product.name} - ${variant.variant_name}`,                         // 2  title
+        description,                                                         // 3  description
+        availability,                                                        // 4  availability
+        '',                                                                  // 5  availability_date
+        '',                                                                  // 6  expiration_date
+        `${baseUrl}/products/${product.slug}?sku=${encodeURIComponent(variant.sku)}`, // 7 link
+        '',                                                                  // 8  mobile_link
+        imageUrl,                                                            // 9  image_link
+        `${Number(variantMrp || sellingPrice).toFixed(2)} INR`,              // 10 price
+        hasSalePrice ? `${Number(sellingPrice).toFixed(2)} INR` : '',        // 11 sale_price
+        '',                                                                  // 12 sale_price_effective_date
+        (variant.mpn || product.mpn || variant.gtin || product.gtin || brandName) ? 'yes' : 'no', // 13 identifier_exists
+        variant.gtin || product.gtin || '',                                  // 14 gtin
+        variant.mpn || product.mpn || '',                                    // 15 mpn
+        brandName,                                                           // 16 brand
+        highlightsStr,                                                       // 17 product_highlight
+        detailsStr,                                                          // 18 product_detail
+        additionalImages,                                                    // 19 additional_image_link
+        'new',                                                               // 20 condition
+        'no',                                                                // 21 adult
+        '',                                                                  // 22 color
+        variant.variant_name || '',                                          // 23 size
+        '',                                                                  // 24 size_type
+        '',                                                                  // 25 size_system
+        '',                                                                  // 26 gender
+        material,                                                            // 27 material
+        '',                                                                  // 28 pattern
+        '',                                                                  // 29 age_group
+        '',                                                                  // 30 multipack
+        'no',                                                                // 31 is bundle
+        '',                                                                  // 32 unit_pricing_measure
+        '',                                                                  // 33 unit_pricing_base_measure
+        '',                                                                  // 34 energy_efficiency_class
+        '',                                                                  // 35 min_energy_efficiency_class
+        '',                                                                  // 36 max_energy_efficiency
+        product.sku,                                                         // 37 item_group_id
+        '',                                                                  // 38 video_link
+        '',                                                                  // 39 virtual_model_link
+        cogs(variant.cost_price ?? product.cost_price),                      // 40 cost_of_goods_sold
       ])
     }
   } else {
     const sellingPrice = product.base_price
     const productMrp = product.mrp ? Number(product.mrp) : null
     const hasSalePrice = productMrp && productMrp > Number(sellingPrice)
-    const [cl0, cl1, cl2, cl3, cl4] = buildCustomLabels(product)
+    const availability = !productActive
+      ? 'out_of_stock'
+      : (product.stock_status !== 'Out of Stock' ? 'in_stock' : 'out_of_stock')
 
     rows.push([
-      product.sku,
-      product.name,
-      description,
-      product.stock_status !== 'Out of Stock' ? 'in_stock' : 'out_of_stock',
-      '',
-      '',
-      `${baseUrl}/products/${product.slug}`,
-      '',
-      imageUrl,
-      `${Number(productMrp || sellingPrice).toFixed(2)} INR`,
-      hasSalePrice ? `${Number(sellingPrice).toFixed(2)} INR` : '',
-      '',
-      (product.mpn || product.gtin || brandName) ? 'yes' : 'no',
-      product.gtin || '',
-      product.mpn || '',
-      brandName,
-      highlightsStr,
-      detailsStr,
-      additionalImages,
-      'new',
-      'no',
-      '',
-      product.size || '',
-      '',
-      '',
-      '',
-      material,
-      '',
-      '',
-      '',
-      'no',
-      product.weight ? `${product.weight} kg` : '',
-      '',
-      '',
-      '',
-      '',
-      '',
-      product.stock_status || 'In Stock',
-      googleProductCat,
-      productType,
-      cl0,
-      cl1,
-      cl2,
-      cl3,
-      cl4,
-      product.weight ? `${product.weight} kg` : '',
+      product.sku,                                                           // 1  id
+      product.name,                                                          // 2  title
+      description,                                                           // 3  description
+      availability,                                                          // 4  availability
+      '',                                                                    // 5  availability_date
+      '',                                                                    // 6  expiration_date
+      `${baseUrl}/products/${product.slug}`,                                 // 7  link
+      '',                                                                    // 8  mobile_link
+      imageUrl,                                                              // 9  image_link
+      `${Number(productMrp || sellingPrice).toFixed(2)} INR`,                // 10 price
+      hasSalePrice ? `${Number(sellingPrice).toFixed(2)} INR` : '',          // 11 sale_price
+      '',                                                                    // 12 sale_price_effective_date
+      (product.mpn || product.gtin || brandName) ? 'yes' : 'no',             // 13 identifier_exists
+      product.gtin || '',                                                    // 14 gtin
+      product.mpn || '',                                                     // 15 mpn
+      brandName,                                                             // 16 brand
+      highlightsStr,                                                         // 17 product_highlight
+      detailsStr,                                                            // 18 product_detail
+      additionalImages,                                                      // 19 additional_image_link
+      'new',                                                                 // 20 condition
+      'no',                                                                  // 21 adult
+      '',                                                                    // 22 color
+      product.size || '',                                                    // 23 size
+      '',                                                                    // 24 size_type
+      '',                                                                    // 25 size_system
+      '',                                                                    // 26 gender
+      material,                                                              // 27 material
+      '',                                                                    // 28 pattern
+      '',                                                                    // 29 age_group
+      '',                                                                    // 30 multipack
+      'no',                                                                  // 31 is bundle
+      '',                                                                    // 32 unit_pricing_measure
+      '',                                                                    // 33 unit_pricing_base_measure
+      '',                                                                    // 34 energy_efficiency_class
+      '',                                                                    // 35 min_energy_efficiency_class
+      '',                                                                    // 36 max_energy_efficiency
+      '',                                                                    // 37 item_group_id
+      '',                                                                    // 38 video_link
+      '',                                                                    // 39 virtual_model_link
+      cogs(product.cost_price),                                              // 40 cost_of_goods_sold
     ])
   }
 
@@ -235,7 +238,6 @@ async function fetchAllProducts(limit?: number) {
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN categories pc ON c.parent_category_id = pc.id
     LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.is_active = true
     ORDER BY p.created_at DESC
     ${limit ? `LIMIT ${limit}` : ''}
   `)
@@ -276,7 +278,7 @@ export async function syncAllProductsToSheet(testLimit?: number): Promise<{ inse
   const products = await fetchAllProducts(testLimit)
 
   const existingRes = await fetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:AT`,
+    `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:${LAST_COL}`,
     { headers: { Authorization: `Bearer ${token}` } }
   )
   const existingData = await existingRes.json()
@@ -307,7 +309,7 @@ export async function syncAllProductsToSheet(testLimit?: number): Promise<{ inse
         const changed = newRow.some((cell, idx) => (existing[idx] ?? '') !== cell)
         if (changed) {
           const rowNum = skuToRowIndex.get(sku)!
-          updateBatch.push({ range: `${SHEET_NAME}!A${rowNum}:AT${rowNum}`, values: [newRow] })
+          updateBatch.push({ range: `${SHEET_NAME}!A${rowNum}:${LAST_COL}${rowNum}`, values: [newRow] })
         } else {
           skipped++
         }
@@ -330,7 +332,7 @@ export async function syncAllProductsToSheet(testLimit?: number): Promise<{ inse
 
   if (toAppend.length > 0) {
     await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:AT:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:${LAST_COL}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
       {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -341,11 +343,11 @@ export async function syncAllProductsToSheet(testLimit?: number): Promise<{ inse
 
   if (existingRows.length === 0) {
     await fetch(
-      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!AM1:AT1?valueInputOption=RAW`,
+      `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A1:${LAST_COL}1?valueInputOption=RAW`,
       {
         method: 'PUT',
         headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ range: `${SHEET_NAME}!AM1:AT1`, majorDimension: 'ROWS', values: [NEW_HEADERS] }),
+        body: JSON.stringify({ range: `${SHEET_NAME}!A1:${LAST_COL}1`, majorDimension: 'ROWS', values: [HEADERS] }),
       }
     )
   }
@@ -359,8 +361,9 @@ export async function syncProductToSheet(productId: string): Promise<void> {
     const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
     const product = await fetchProduct(productId)
 
-    if (!product || !product.is_active) {
-      await removeProductFromSheet(product?.sku || '', token)
+    // Inactive products are kept in the feed as out_of_stock (handled by productToSheetRows).
+    // Only remove the row when the product no longer exists.
+    if (!product) {
       return
     }
 
@@ -402,7 +405,7 @@ export async function syncProductToSheet(productId: string): Promise<void> {
 
     if (newRows.length > 0) {
       await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:AT:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
+        `https://sheets.googleapis.com/v4/spreadsheets/${SPREADSHEET_ID}/values/${SHEET_NAME}!A:${LAST_COL}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
         {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
