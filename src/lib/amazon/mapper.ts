@@ -151,24 +151,22 @@ function buildImageAttributes(product: any): Record<string, unknown> {
   return out
 }
 
-// purchasable_offer: our_price[].schedule[].value_with_tax (number). currency + marketplace_id
-// are selectors on the offer object. A discounted_price schedule must be dated.
+// purchasable_offer: our_price[].schedule[].value_with_tax (number). On amazon.in the India MRP
+// law requires maximum_retail_price as a sibling of our_price (its absence is the hidden cause
+// of error 90183). MRP must be >= our_price. currency + marketplace_id are selectors.
 function buildPurchasableOffer(listPrice: number, salePrice: number | null) {
+  const price = Number(listPrice.toFixed(2))
+  const mrp = Math.max(price, Number(listPrice.toFixed(2))) // MRP >= our_price
   const offer: any = {
     marketplace_id: MARKETPLACE_ID,
     currency: CURRENCY,
-    our_price: [{ schedule: [{ value_with_tax: Number(listPrice.toFixed(2)) }] }],
+    our_price: [{ schedule: [{ value_with_tax: price }] }],
+    maximum_retail_price: [{ schedule: [{ value_with_tax: mrp }] }],
   }
   if (salePrice != null && salePrice < listPrice) {
-    const now = new Date()
-    const end = new Date(now.getTime() + 365 * 24 * 3600 * 1000)
-    offer.discounted_price = [{
-      schedule: [{
-        value_with_tax: Number(salePrice.toFixed(2)),
-        start_at: now.toISOString().replace(/\.\d{3}Z$/, 'Z'),
-        end_at: end.toISOString().replace(/\.\d{3}Z$/, 'Z'),
-      }],
-    }]
+    // Sale: our_price becomes the discounted price, MRP stays the list price.
+    offer.our_price = [{ schedule: [{ value_with_tax: Number(salePrice.toFixed(2)) }] }]
+    offer.maximum_retail_price = [{ schedule: [{ value_with_tax: price }] }]
   }
   return [offer]
 }
