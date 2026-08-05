@@ -775,6 +775,27 @@ CREATE INDEX idx_merchant_gmc_status_status ON public.merchant_gmc_status USING 
 CREATE INDEX idx_merchant_gmc_status_title ON public.merchant_gmc_status USING gin (to_tsvector('simple'::regconfig, COALESCE(title, ''::text)));
 
 
+--
+-- Name: idx_amazon_sync_log_started_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_amazon_sync_log_started_at ON public.amazon_sync_log USING btree (started_at DESC);
+
+
+--
+-- Name: idx_amazon_listing_status_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_amazon_listing_status_status ON public.amazon_listing_status USING btree (status);
+
+
+--
+-- Name: idx_amazon_listing_status_title; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_amazon_listing_status_title ON public.amazon_listing_status USING gin (to_tsvector('simple'::regconfig, COALESCE(title, ''::text)));
+
+
 
 --
 -- Name: idx_notifications_created_at; Type: INDEX; Schema: public; Owner: -

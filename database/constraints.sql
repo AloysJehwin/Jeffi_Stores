@@ -677,6 +677,34 @@ ALTER TABLE ONLY public.merchant_gmc_refresh_meta
     ADD CONSTRAINT merchant_gmc_refresh_meta_singleton CHECK (id = 1);
 
 
+--
+-- Name: amazon_sync_log amazon_sync_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.amazon_sync_log
+    ADD CONSTRAINT amazon_sync_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: amazon_listing_status amazon_listing_status_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.amazon_listing_status
+    ADD CONSTRAINT amazon_listing_status_pkey PRIMARY KEY (sku);
+
+
+--
+-- Name: amazon_refresh_meta amazon_refresh_meta_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.amazon_refresh_meta
+    ADD CONSTRAINT amazon_refresh_meta_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.amazon_refresh_meta
+    ADD CONSTRAINT amazon_refresh_meta_singleton CHECK (id = 1);
+
+
+
 
 --
 -- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
