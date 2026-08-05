@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { syncAllProductsToAmazon, syncProductToAmazon, sendAmazonSyncFailureEmail, validateProductForAmazon } from '@/lib/amazon/sync'
+import { syncAllProductsToAmazon, syncProductToAmazon, sendAmazonSyncFailureEmail, validateProductForAmazon, dryRunAmazonSync } from '@/lib/amazon/sync'
 
 // Full push pages one PUT per SKU (~3000 variants) with backoff — allow up to 5 min.
 export const maxDuration = 300
@@ -45,6 +45,13 @@ export async function POST(request: NextRequest) {
       if (!productId) return NextResponse.json({ error: 'productId required for validate mode' }, { status: 400 })
       const results = await validateProductForAmazon(productId)
       return NextResponse.json({ success: true, mode: 'validate', results })
+    }
+
+    // Dry run: report ASIN-match + listability across a sample of products. Writes nothing.
+    if (mode === 'dryrun') {
+      const limit = Math.min(500, Math.max(1, Number(body.limit) || 100))
+      const report = await dryRunAmazonSync(limit)
+      return NextResponse.json({ success: true, mode: 'dryrun', report })
     }
 
     if (productId) {
