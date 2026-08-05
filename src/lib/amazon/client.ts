@@ -201,32 +201,44 @@ const TYPE_WORDS = [
   'lug', 'terminal', 'durlok', 'shcs', 'taper',
 ]
 
-function extractSpecTokens(text: string): { sizes: Set<string>; dims: Set<string>; types: Set<string> } {
+function extractSpecTokens(text: string): { sizes: Set<string>; dims: Set<string>; types: Set<string>; models: Set<string>; packs: Set<string> } {
   const t = ` ${(text || '').toLowerCase()} `
   const sizes = new Set<string>()
   const dims = new Set<string>()
   const types = new Set<string>()
+  const models = new Set<string>()
+  const packs = new Set<string>()
   for (const m of t.matchAll(/\bm\s?(\d{1,3})\b/g)) sizes.add(`m${m[1]}`)
   for (const m of t.matchAll(/\b(\d{1,4})\s?mm\b/g)) dims.add(`${m[1]}mm`)
   for (const m of t.matchAll(/\b(\d+\/\d+)\s?"?/g)) dims.add(m[1])
   for (const w of TYPE_WORDS) if (t.includes(` ${w}`)) types.add(w)
-  return { sizes, dims, types }
+  // Model codes: alnum tokens with both letters+digits (KM9V, BS31, DIN980M, 1013) — strong
+  // discriminators between otherwise-similar sets. Also bare 3-4 digit model numbers.
+  for (const m of t.matchAll(/\b([a-z]{2,4}\s?\d{1,4}[a-z]?)\b/g)) models.add(m[1].replace(/\s/g, ''))
+  // Pack/set counts: "13pc", "200 pcs", "set of 9", "9 pc".
+  for (const m of t.matchAll(/\b(\d{1,4})\s?(?:pc|pcs|piece|pieces)\b/g)) packs.add(`${m[1]}pc`)
+  for (const m of t.matchAll(/\bset of\s?(\d{1,4})\b/g)) packs.add(`${m[1]}pc`)
+  return { sizes, dims, types, models, packs }
 }
 
-// Score a candidate. HARD-REJECT (-1) unless BOTH (a) the metric size agrees when we have one,
-// and (b) at least one product-type word agrees. This is what stops different fasteners of the
-// same size, or different types, collapsing onto one ASIN. Returns a positive confidence score
-// only for genuinely comparable items.
+// Score a candidate. HARD-REJECT (-1) unless the strong discriminators agree: metric size,
+// product type, AND — when present — model code and pack count. This stops different fasteners
+// of the same size, or a 13-piece set matching a 9-piece set, from collapsing onto one ASIN.
 function scoreCandidate(ourName: string, candidateTitle: string): number {
   const a = extractSpecTokens(ourName)
   const b = extractSpecTokens(candidateTitle)
 
   if (a.sizes.size && ![...a.sizes].some(s => b.sizes.has(s))) return -1
-  // Require product-type agreement when we can identify our type.
   if (a.types.size && ![...a.types].some(x => b.types.has(x))) return -1
+  // If our name carries a model code, the candidate MUST share one (KM13V != KM9V).
+  if (a.models.size && b.models.size && ![...a.models].some(x => b.models.has(x))) return -1
+  // If both carry a pack count, they must agree (13pc != 9pc).
+  if (a.packs.size && b.packs.size && ![...a.packs].some(x => b.packs.has(x))) return -1
 
   let score = 0
   for (const s of a.sizes) if (b.sizes.has(s)) score += 3
+  for (const x of a.models) if (b.models.has(x)) score += 4
+  for (const x of a.packs) if (b.packs.has(x)) score += 3
   for (const d of a.dims) if (b.dims.has(d)) score += 2
   for (const x of a.types) if (b.types.has(x)) score += 1
   return score

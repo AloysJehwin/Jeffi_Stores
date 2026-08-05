@@ -26,13 +26,16 @@ export interface AmazonSummary {
 }
 
 // Derive a single overall status from a Listings Items summary + issues.
-// summaries[].status is BUYABLE/DISCOVERABLE; issues[].severity is ERROR/WARNING/INFO.
+// summaries[].status is an ARRAY (e.g. ["BUYABLE"] / ["DISCOVERABLE"]); issues[].severity is
+// ERROR/WARNING/INFO.
 function deriveStatus(item: any): string {
   const issues: any[] = item.issues || []
-  if (issues.some(i => (i.severity || '').toUpperCase() === 'ERROR')) return 'disapproved'
+  if (issues.some(i => String(i.severity || '').toUpperCase() === 'ERROR')) return 'disapproved'
   const summaries: any[] = item.summaries || []
-  const buyable = summaries.some(s => (s.status || '').toUpperCase() === 'BUYABLE')
-  if (issues.some(i => (i.severity || '').toUpperCase() === 'WARNING')) return 'pending'
+  const statuses = summaries.flatMap(s => Array.isArray(s.status) ? s.status : (s.status ? [s.status] : []))
+    .map((v: any) => String(v).toUpperCase())
+  const buyable = statuses.includes('BUYABLE')
+  if (issues.some(i => String(i.severity || '').toUpperCase() === 'WARNING')) return 'pending'
   if (buyable) return 'approved'
   if (summaries.length) return 'pending'
   return 'unknown'
