@@ -16,6 +16,8 @@ export const AMAZON_PUSH_DISABLED = process.env.AMAZON_PUSH_DISABLED === 'true'
 // LWA token endpoint is global (not region-specific).
 const LWA_TOKEN_URL = 'https://api.amazon.com/auth/o2/token'
 const LISTINGS_BASE = '/listings/2021-08-01/items'
+const CATALOG_BASE = '/catalog/2022-04-01/items'
+const RESTRICTIONS_BASE = '/listings/2021-08-01/restrictions'
 
 interface LwaCreds {
   clientId: string
@@ -152,6 +154,80 @@ export async function searchListingsItems(pageToken?: string): Promise<{ items?:
       includedData: 'summaries,issues',
       pageSize: '20',
       pageToken,
+    },
+  })
+}
+
+// --- Catalog Items API 2022-04-01 (find EXISTING ASINs to attach offers to) ---
+
+export interface CatalogMatch {
+  asin: string
+  title?: string
+  brand?: string
+}
+
+export async function searchCatalogItems(params: {
+  keywords?: string
+  identifiers?: string
+  identifiersType?: 'ASIN' | 'EAN' | 'GTIN' | 'UPC' | 'ISBN' | 'JAN' | 'MINSAN'
+  brandNames?: string
+  pageSize?: number
+}): Promise<{ items?: any[]; numberOfResults?: number }> {
+  return spApiRequest('GET', CATALOG_BASE, {
+    query: {
+      marketplaceIds: MARKETPLACE_ID,
+      includedData: 'identifiers,summaries',
+      keywords: params.keywords,
+      identifiers: params.identifiers,
+      identifiersType: params.identifiers ? params.identifiersType : undefined,
+      brandNames: params.brandNames,
+      pageSize: String(params.pageSize ?? 10),
+    },
+  })
+}
+
+function toCatalogMatch(item: any): CatalogMatch {
+  const s = (item?.summaries || []).find((x: any) => x.marketplaceId === MARKETPLACE_ID) || item?.summaries?.[0]
+  return { asin: item?.asin, title: s?.itemName, brand: s?.brand || s?.brandName }
+}
+
+// Best-effort ASIN match for one of our products/variants:
+//  1) exact GTIN lookup (highest confidence)
+//  2) brand + keyword fallback, gated by brand-name equality to avoid wrong-page attach.
+// Returns null when no confident match (caller falls back to full-create).
+export async function matchAsin(input: {
+  gtin?: string
+  brand?: string
+  mpn?: string
+  name: string
+}): Promise<CatalogMatch | null> {
+  const rawGtin = String(input.gtin || '').replace(/\D/g, '')
+  if (rawGtin.length >= 12) {
+    const type = rawGtin.length === 12 ? 'UPC' : 'EAN'
+    const res = await searchCatalogItems({ identifiers: rawGtin, identifiersType: type })
+    const hit = res.items?.[0]
+    if (hit?.asin) return toCatalogMatch(hit)
+  }
+
+  const kw = [input.mpn, input.name].filter(Boolean).join(' ').slice(0, 200)
+  if (!kw) return null
+  const res = await searchCatalogItems({ keywords: kw, brandNames: input.brand || undefined, pageSize: 10 })
+  const brandLc = (input.brand || '').toLowerCase().trim()
+  const candidate = (res.items || [])
+    .map(toCatalogMatch)
+    .find((m: CatalogMatch) => m.asin && (!brandLc || (m.brand || '').toLowerCase().trim() === brandLc))
+  return candidate || null
+}
+
+// Brand-gate check: whether we're allowed to create an offer on an ASIN. Empty restrictions
+// array => listable now; entries => approval required (with a reasonCode / approval link).
+export async function getListingsRestrictions(asin: string, conditionType = 'new_new'): Promise<{ restrictions?: any[] }> {
+  return spApiRequest('GET', RESTRICTIONS_BASE, {
+    query: {
+      asin,
+      conditionType,
+      sellerId: SELLER_ID,
+      marketplaceIds: MARKETPLACE_ID,
     },
   })
 }

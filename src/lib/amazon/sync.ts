@@ -1,7 +1,7 @@
 import { queryOne, query } from '@/lib/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
-import { productToAmazonListings } from './mapper'
-import { putListingsItem, validateListingsItem, deleteListingsItem, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
+import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
+import { putListingsItem, validateListingsItem, deleteListingsItem, matchAsin, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
 // Unlike GMC (which has a /products/batch), SP-API Listings Items is one PUT per SKU, so we
@@ -106,6 +106,47 @@ export async function syncAllProductsToAmazon(): Promise<SyncResult> {
   }
 }
 
+// Match an ASIN, swallowing catalog API errors (rate limits, transient) so a failed lookup
+// degrades to full-create rather than crashing the whole product.
+async function safeMatchAsin(input: Parameters<typeof matchAsin>[0]) {
+  try {
+    return await matchAsin(input)
+  } catch {
+    return null
+  }
+}
+
+// Decide the listing strategy for ONE product:
+//   ASIN match  -> offer-only listing(s) (bypasses the brand-creation gate; authorized reseller)
+//   no match    -> full-create listing(s) (only succeeds for non-brand-gated brands)
+// Emits one offer-only listing per matched priced variant; if no variant matches, falls back to
+// full-create for the whole product.
+async function resolveListingsForProduct(product: any): Promise<AmazonListing[]> {
+  const brand = product.brands?.name || ''
+  const hasVariants = product.has_variants && product.product_variants?.length > 0
+
+  if (hasVariants) {
+    const out: AmazonListing[] = []
+    for (const v of product.product_variants) {
+      if (v.price == null) continue
+      const match = await safeMatchAsin({
+        gtin: v.gtin || product.gtin, brand, mpn: v.mpn || product.mpn,
+        name: `${brand} ${product.name} ${v.variant_name || ''}`.trim(),
+      })
+      if (match?.asin) out.push(productToAmazonOfferListing(product, match.asin, v))
+    }
+    if (out.length) return out
+    return productToAmazonListings(product)
+  }
+
+  const match = await safeMatchAsin({
+    gtin: product.gtin, brand, mpn: product.mpn,
+    name: `${brand} ${product.name}`.trim(),
+  })
+  if (match?.asin) return [productToAmazonOfferListing(product, match.asin)]
+  return productToAmazonListings(product)
+}
+
 async function runFullSync(): Promise<SyncResult> {
   const startedAt = new Date().toISOString()
   const errors: Array<{ sku: string; error: string }> = []
@@ -117,7 +158,7 @@ async function runFullSync(): Promise<SyncResult> {
 
   for (const product of products) {
     try {
-      for (const l of productToAmazonListings(product)) {
+      for (const l of await resolveListingsForProduct(product)) {
         listings.push({ sku: l.sku, listing: l })
       }
     } catch (err: any) {
@@ -145,7 +186,7 @@ export async function syncProductToAmazon(productId: string): Promise<void> {
   const product = await fetchProduct(productId)
   if (!product) return
 
-  const listings = productToAmazonListings(product)
+  const listings = await resolveListingsForProduct(product)
   for (const l of listings) {
     await putWithBackoff(l.sku, l)
   }
@@ -161,18 +202,18 @@ export async function deleteProductFromAmazon(sku: string): Promise<void> {
 // NOT write anything, so it works even with AMAZON_PUSH_DISABLED=true.
 export async function validateProductForAmazon(
   productId: string
-): Promise<Array<{ sku: string; productType: string; status?: string; issues: any[]; error?: string }>> {
+): Promise<Array<{ sku: string; productType: string; requirements?: string; status?: string; issues: any[]; error?: string }>> {
   if (!SELLER_ID) return [{ sku: '__config__', productType: '', issues: [], error: 'AMAZON_SELLER_ID is not set' }]
   const product = await fetchProduct(productId)
   if (!product) return [{ sku: '__notfound__', productType: '', issues: [], error: 'Product not found' }]
 
-  const out: Array<{ sku: string; productType: string; status?: string; issues: any[]; error?: string }> = []
-  for (const l of productToAmazonListings(product)) {
+  const out: Array<{ sku: string; productType: string; requirements: string; status?: string; issues: any[]; error?: string }> = []
+  for (const l of await resolveListingsForProduct(product)) {
     try {
       const res = await validateListingsItem(l.sku, l)
-      out.push({ sku: l.sku, productType: l.productType, status: res?.status, issues: res?.issues || [] })
+      out.push({ sku: l.sku, productType: l.productType, requirements: l.requirements, status: res?.status, issues: res?.issues || [] })
     } catch (err: any) {
-      out.push({ sku: l.sku, productType: l.productType, issues: [], error: err.message })
+      out.push({ sku: l.sku, productType: l.productType, requirements: l.requirements, issues: [], error: err.message })
     }
   }
   return out
