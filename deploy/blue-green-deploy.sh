@@ -16,7 +16,10 @@ docker compose -f docker-compose.infra.yml -f docker-compose.${IDLE}.yml up -d -
 # 3. Health-check idle slot directly (30 attempts x 10s = 5 min max)
 echo "Health-checking jeffi-app-${IDLE}..."
 for i in $(seq 1 30); do
-  HC=$(docker exec jeffi-app-${IDLE} wget -qO- http://localhost:3000/api/health 2>/dev/null && echo ok || echo fail)
+  # wget's body output is discarded — we only care about its exit code, so HC
+  # ends up as exactly "ok" or "fail" (previously the body leaked in, e.g.
+  # '{"status":"ok"}ok', which never matched "ok" and failed every healthy deploy).
+  HC=$(docker exec jeffi-app-${IDLE} wget -qO- http://localhost:3000/api/health >/dev/null 2>&1 && echo ok || echo fail)
   echo "  Attempt $i: $HC"
   if [[ "$HC" == "ok" ]]; then
     echo "Idle slot healthy."
