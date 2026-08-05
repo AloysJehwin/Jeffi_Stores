@@ -1,5 +1,4 @@
-import GoogleMerchantPanel from '@/components/admin/merchant/GoogleMerchantPanel'
-import AmazonMerchantPanel from '@/components/admin/merchant/AmazonMerchantPanel'
+import MerchantSyncClient from '@/components/admin/merchant/MerchantSyncClient'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -14,8 +13,7 @@ export default function MerchantSyncPage() {
         </p>
       </div>
 
-      <GoogleMerchantPanel />
-      <AmazonMerchantPanel />
+      <MerchantSyncClient />
     </div>
   )
 }
