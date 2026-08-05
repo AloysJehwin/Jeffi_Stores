@@ -1,7 +1,7 @@
 import { queryOne, query } from '@/lib/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
 import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
-import { putListingsItem, validateListingsItem, deleteListingsItem, matchAsin, getListingsRestrictions, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
+import { putListingsItem, validateListingsItem, deleteListingsItem, matchAsin, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
 // Unlike GMC (which has a /products/batch), SP-API Listings Items is one PUT per SKU, so we
@@ -227,51 +227,61 @@ export interface AmazonDryRunRow {
   strategy: 'offer-only' | 'create'
   asin: string | null
   listable: boolean | null
-  restrictionReason?: string
+  postable: boolean | null       // VALIDATION_PREVIEW passed (would actually post)
+  blockReason?: string           // top issue code/message if not postable
 }
 
 export interface AmazonDryRunReport {
   scanned: number
   offerOnly: number
   create: number
-  listableOffers: number
-  gatedOffers: number
+  postable: number
+  blocked: number
   rows: AmazonDryRunRow[]
   truncated: boolean
 }
 
 // DRY RUN: for up to `limit` active products, report whether each matches an existing ASIN
-// (=> offer-only, bypassing brand gate) or would be a full-create, and whether the matched ASIN
-// is actually listable (getListingsRestrictions empty). Writes NOTHING to Amazon.
+// (=> offer-only) or would be full-create, whether the matched ASIN is listable, and whether an
+// offer VALIDATION_PREVIEW actually passes (postable). Writes NOTHING to Amazon.
 export async function dryRunAmazonSync(limit = 100): Promise<AmazonDryRunReport> {
   const products = await fetchAllActiveProducts()
   const slice = products.slice(0, limit)
   const rows: AmazonDryRunRow[] = []
 
   for (const product of slice) {
-    const brand = product.brands?.name || ''
-    const v = product.has_variants ? (product.product_variants || [])[0] : null
-    const match = await safeMatchAsin({
-      gtin: v?.gtin || product.gtin, brand, mpn: v?.mpn || product.mpn,
-      name: `${brand} ${product.name} ${v?.variant_name || ''}`.trim(),
-    })
+    try {
+      const listings = await resolveListingsForProduct(product)
+      const l = listings[0]
+      const isOffer = l?.requirements === 'LISTING_OFFER_ONLY'
+      const asin = isOffer ? (l.attributes as any)?.merchant_suggested_asin?.[0]?.value ?? null : null
 
-    let listable: boolean | null = null
-    let restrictionReason: string | undefined
-    if (match?.asin) {
-      try {
-        const r = await getListingsRestrictions(match.asin)
-        const list = r.restrictions || []
-        listable = list.length === 0
-        if (!listable) restrictionReason = list[0]?.reasons?.[0]?.reasonCode || 'restricted'
-      } catch { listable = null }
+      let postable: boolean | null = null
+      let blockReason: string | undefined
+      if (l) {
+        try {
+          const res = await validateListingsItem(l.sku, l)
+          postable = res?.status === 'VALID'
+          if (!postable) {
+            const iss = (res?.issues || [])[0]
+            blockReason = iss ? `${iss.code || ''}: ${String(iss.message || '').slice(0, 80)}` : 'invalid'
+          }
+        } catch (err: any) { postable = null; blockReason = err.message?.slice(0, 80) }
+      }
+
+      rows.push({
+        productId: product.id, sku: product.sku, name: product.name,
+        brand: product.brands?.name || '',
+        strategy: isOffer ? 'offer-only' : 'create',
+        asin, listable: isOffer ? true : null, postable, blockReason,
+      })
+    } catch (err: any) {
+      rows.push({
+        productId: product.id, sku: product.sku, name: product.name,
+        brand: product.brands?.name || '', strategy: 'create', asin: null,
+        listable: null, postable: null, blockReason: err.message?.slice(0, 80),
+      })
     }
-
-    rows.push({
-      productId: product.id, sku: product.sku, name: product.name, brand,
-      strategy: match?.asin ? 'offer-only' : 'create',
-      asin: match?.asin || null, listable, restrictionReason,
-    })
   }
 
   const offerOnly = rows.filter(r => r.strategy === 'offer-only').length
@@ -279,8 +289,8 @@ export async function dryRunAmazonSync(limit = 100): Promise<AmazonDryRunReport>
     scanned: rows.length,
     offerOnly,
     create: rows.length - offerOnly,
-    listableOffers: rows.filter(r => r.strategy === 'offer-only' && r.listable === true).length,
-    gatedOffers: rows.filter(r => r.strategy === 'offer-only' && r.listable === false).length,
+    postable: rows.filter(r => r.postable === true).length,
+    blocked: rows.filter(r => r.postable === false).length,
     rows,
     truncated: products.length > slice.length,
   }
