@@ -1,6 +1,6 @@
 import { queryMany, queryOne, query } from '@/lib/db'
 import { productToGmcItems } from './mapper'
-import { upsertProduct, deleteProductByOfferId, listProducts, customBatchUpsert, MERCHANT_ID } from './client'
+import { upsertProduct, deleteProductByOfferId, listProducts, customBatchUpsert, MERCHANT_ID, GMC_PUSH_DISABLED } from './client'
 
 const ADMIN_EMAIL = 'jeffistoress@jeffistores.in'
 const BATCH_SIZE = 100
@@ -104,6 +104,14 @@ async function saveSyncStatus(result: Partial<SyncResult> & { status: 'running' 
 }
 
 export async function syncAllProductsToMerchant(): Promise<SyncResult> {
+  if (GMC_PUSH_DISABLED) {
+    const now = new Date().toISOString()
+    return {
+      synced: 0, deleted: 0,
+      errors: [{ sku: '__disabled__', error: 'GMC push is disabled in this environment' }],
+      startedAt: now, finishedAt: now,
+    }
+  }
   const lockRes = await queryOne<{ acquired: boolean }>(
     `SELECT pg_try_advisory_lock($1) AS acquired`,
     [SYNC_LOCK_KEY]
@@ -194,6 +202,7 @@ async function runFullSync(): Promise<SyncResult> {
 }
 
 export async function syncProductToMerchant(productId: string): Promise<void> {
+  if (GMC_PUSH_DISABLED) return
   const product = await fetchProduct(productId)
 
   if (!product) return
