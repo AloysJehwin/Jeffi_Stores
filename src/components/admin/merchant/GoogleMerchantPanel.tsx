@@ -135,11 +135,12 @@ export default function GoogleMerchantPanel() {
     <section className="rounded-lg border border-border-default bg-surface-elevated">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border-default px-4 py-3">
         <div className="flex items-center gap-2">
-          <h2 className="text-lg font-semibold text-foreground">Google Merchant</h2>
-          {summary?.last_refreshed_at && (
+          {summary?.last_refreshed_at ? (
             <span className="text-xs text-foreground-muted">
-              synced {new Date(summary.last_refreshed_at).toLocaleString()}
+              Synced {new Date(summary.last_refreshed_at).toLocaleString()}
             </span>
+          ) : (
+            <span className="text-xs text-foreground-muted">Not refreshed yet</span>
           )}
         </div>
         <div className="flex items-center gap-2">
