@@ -5,7 +5,9 @@ import {
   buildProductDetails,
 } from './google-merchant-helpers'
 
-const SPREADSHEET_ID = '1UYRNtdtvyEl2PF5yAXwtmsKqAKQ-Onqmu9PkR2T2PyU'
+// Spreadsheet ID is environment-driven: local dev points GOOGLE_SHEET_ID at a test
+// sheet, production falls back to the real Merchant feed sheet.
+const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID || '1UYRNtdtvyEl2PF5yAXwtmsKqAKQ-Onqmu9PkR2T2PyU'
 const SHEET_NAME = 'Sheet1'
 const SCOPES = 'https://www.googleapis.com/auth/spreadsheets'
 
