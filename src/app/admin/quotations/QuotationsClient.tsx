@@ -134,8 +134,9 @@ export default function QuotationsClient() {
   }
 
   function handleSort(col: string, dir: SortDir) {
-    setSortCol(col)
-    setSortDir(dir)
+    setSortCol(col || undefined)
+    setSortDir(col ? dir : undefined)
+    // Server-side sort — a useEffect keyed on sortCol/sortDir refetches page 1.
   }
 
   const [editId, setEditId] = useState<string | null>(null)
@@ -213,16 +214,8 @@ export default function QuotationsClient() {
     status: 'status',
   }
 
-  const sortedQuotations = sortCol && QUOTE_SORT_KEYS[sortCol]
-    ? [...quotations].sort((a, b) => {
-        const key = QUOTE_SORT_KEYS[sortCol]
-        const av = a[key] ?? ''
-        const bv = b[key] ?? ''
-        const cmp = String(av).localeCompare(String(bv), 'en', { numeric: true })
-        return sortDir === 'asc' ? cmp : -cmp
-      })
-    : quotations
-
+  // Ordered server-side across all quotations via sort/dir params.
+  const sortedQuotations = quotations
 
   async function loadList(p = 1) {
     setLoading(true)
@@ -232,6 +225,7 @@ export default function QuotationsClient() {
       if (searchQ) params.set('q', searchQ)
       if (fromDate) params.set('from', fromDate)
       if (toDate) params.set('to', toDate)
+      if (sortCol && QUOTE_SORT_KEYS[sortCol]) { params.set('sort', QUOTE_SORT_KEYS[sortCol]); params.set('dir', sortDir || 'desc') }
       params.set('page', String(p))
       params.set('pageSize', String(PAGE_SIZE))
       const res = await fetch(`/api/admin/quotations?${params}`)
@@ -246,7 +240,7 @@ export default function QuotationsClient() {
     }
   }
 
-  useEffect(() => { if (view === 'list') loadList(1) }, [view, statusFilter, searchQ, fromDate, toDate])
+  useEffect(() => { if (view === 'list') loadList(1) }, [view, statusFilter, searchQ, fromDate, toDate, sortCol, sortDir])
 
   function newQuotation() {
     setEditId(null)

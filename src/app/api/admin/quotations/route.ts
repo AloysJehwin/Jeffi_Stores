@@ -102,6 +102,17 @@ export async function GET(request: NextRequest) {
     const params: any[] = []
     let i = 1
 
+    // Whitelisted server-side sort (columns/aliases available in the SELECT below).
+    const SORT_COLS: Record<string, string> = {
+      quote_number: 'quote_number', quote_date: 'quote_date', consignee_name: 'consignee_name',
+      total_amount: 'total_amount', status: 'status',
+    }
+    const sortCol = SORT_COLS[searchParams.get('sort') || ''] || null
+    const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
+    const orderBy = sortCol
+      ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, created_at DESC`
+      : `ORDER BY created_at DESC`
+
     if (status) { conditions.push(`status = $${i++}`); params.push(status) }
     if (q) {
       const sc = buildVectorSearchClause(q, 'search_vector', ['consignee_name'], ['quote_number'], i, 'simple')
@@ -135,7 +146,7 @@ export async function GET(request: NextRequest) {
               cgst_amount, sgst_amount, converted_order_id,
               view_token, created_at,
               EXISTS(SELECT 1 FROM business_rfqs WHERE converted_quotation_id = quotations.id) AS from_rfq
-       FROM quotations ${where} ORDER BY created_at DESC LIMIT $${i} OFFSET $${i + 1}`,
+       FROM quotations ${where} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`,
       dataParams
     )
     return NextResponse.json({ quotations: rows || [], total, page, pageSize })
