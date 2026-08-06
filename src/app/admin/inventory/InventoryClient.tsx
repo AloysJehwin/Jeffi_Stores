@@ -1134,7 +1134,7 @@ function StockTab() {
   }
 
   function handleLedgerSort(col: string, dir: SortDir) { setLedgerSortCol(col); setLedgerSortDir(dir) }
-  function handleValSort(col: string, dir: SortDir) { setValSortCol(col); setValSortDir(dir) }
+  function handleValSort(col: string, dir: SortDir) { setValSortCol(col || undefined); setValSortDir(col ? dir : undefined); setValPage(1) }
 
   const loadLedger = useCallback(async (pg = txPage) => {
     setLoading(true)
@@ -1160,11 +1160,12 @@ function StockTab() {
     if (valCategory) params.set('category', valCategory)
     if (valBrand) params.set('brand', valBrand)
     if (valStockStatus) params.set('stock_status', valStockStatus)
+    if (valSortCol) { params.set('sort', valSortCol); params.set('dir', valSortDir || 'desc') }
     const res = await fetch(`/api/admin/inventory/stock?${params}`)
     const json = await res.json()
     setValuation(json)
     setLoading(false)
-  }, [valSearch, valCategory, valBrand, valStockStatus, valPage])
+  }, [valSearch, valCategory, valBrand, valStockStatus, valPage, valSortCol, valSortDir])
 
   useEffect(() => {
     if (view === 'ledger') loadLedger(txPage)
@@ -1177,17 +1178,8 @@ function StockTab() {
   const valCategories = (valuation?.allCategories || [...new Set(allValRows.map((p: any) => p.category_name).filter(Boolean))]).sort() as string[]
   const valBrands = (valuation?.allBrands || [...new Set(allValRows.map((p: any) => p.brand_name).filter(Boolean))]).sort() as string[]
 
-  const VAL_SORT_KEYS: Record<string, string> = {
-    product: 'name', variant: 'variant_name', sku: 'sku',
-    stock: 'inventory_quantity', price: 'cost_price', value: 'stock_value',
-  }
-  const sortedValRows = valSortCol && VAL_SORT_KEYS[valSortCol]
-    ? [...allValRows].sort((a, b) => {
-        const k = VAL_SORT_KEYS[valSortCol]
-        const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
-        return valSortDir === 'asc' ? cmp : -cmp
-      })
-    : allValRows
+  // Rows are sorted server-side (across all SKUs) via the sort/dir params, so render as-is.
+  const sortedValRows = allValRows
 
   function startEdit(p: any) {
     const rowId = p.sub_variant_id || p.variant_id || p.id
