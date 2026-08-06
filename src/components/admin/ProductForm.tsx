@@ -8,6 +8,7 @@ import { ap } from '@/lib/admin-path'
 import { Star, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
 import AdminSelect from './AdminSelect'
+import ProductSupplierList, { SupplierRow } from './ProductSupplierList'
 import Toggle from '@/components/ui/Toggle'
 import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
@@ -27,6 +28,7 @@ interface Brand {
 
 interface VariantRow {
   id?: string
+  sku?: string
   variant_name: string
   price: string
   mrp: string
@@ -52,7 +54,21 @@ interface VariantRow {
   sub_variant_type_on: boolean
   variant_type: string
   use_own_images: boolean
+  product_suppliers?: SupplierRow[]
   _isDeleted?: boolean
+}
+
+// Convert a raw product_suppliers row (from getProduct / DB) into a form SupplierRow.
+function toSupplierRow(s: any): SupplierRow {
+  return {
+    supplier_id: s.supplier_id || '',
+    unit_cost: s.unit_cost != null ? String(s.unit_cost) : '',
+    is_preferred: !!s.is_preferred,
+    moq: s.moq != null ? String(s.moq) : '',
+    lead_time_days: s.lead_time_days != null ? String(s.lead_time_days) : '',
+    notes: s.notes || '',
+    currency: s.currency || 'INR',
+  }
 }
 
 interface VariantGroup {
@@ -164,6 +180,7 @@ function emptyVariant(pricing_type: 'unit', unit: string): VariantRow {
     sub_variant_type: '', sub_variant_type_on: false,
     variant_type: '',
     use_own_images: false,
+    product_suppliers: [],
   }
 }
 
@@ -248,10 +265,19 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [variantGalleryLoading, setVariantGalleryLoading] = useState(false)
   const [subVariantsMap, setSubVariantsMap] = useState<Record<string, any[]>>(() => {
     const init: Record<string, any[]> = {}
+    // Sub-variant-leaf supplier rows (sub_variant_id set) come flat on
+    // product.product_suppliers — distribute to each sub-variant object here.
+    const allSuppliers: any[] = Array.isArray(product?.product_suppliers) ? product.product_suppliers : []
     if (product?.product_variants) {
       for (const v of product.product_variants) {
         if (v.id && Array.isArray(v.sub_variants) && v.sub_variants.length > 0) {
-          init[v.id] = v.sub_variants
+          init[v.id] = v.sub_variants.map((sv: any) => ({
+            ...sv,
+            // Match published rows by sub_variant_id, or draft rows by sub_variant_sku.
+            product_suppliers: allSuppliers
+              .filter((s: any) => s.sub_variant_id === sv.id || (s.sub_variant_sku && s.sub_variant_sku === sv.sku))
+              .map(toSupplierRow),
+          }))
         }
       }
     }
@@ -273,8 +299,22 @@ export default function ProductForm({ categories, brands, action, product, produ
     return ''
   })
   const [costPrice, setCostPrice] = useState(product?.cost_price != null ? String(product.cost_price) : '')
-  const [supplierId, setSupplierId] = useState<string>(product?.supplier_id || '')
   const [suppliers, setSuppliers] = useState<{ id: string; name: string }[]>([])
+  const [productSuppliers, setProductSuppliers] = useState<SupplierRow[]>(
+    Array.isArray(product?.product_suppliers)
+      ? product.product_suppliers
+          .filter((s: any) => !s.variant_id && !s.sub_variant_id && !s.variant_sku && !s.sub_variant_sku)
+          .map((s: any) => ({
+          supplier_id: s.supplier_id || '',
+          unit_cost: s.unit_cost != null ? String(s.unit_cost) : '',
+          is_preferred: !!s.is_preferred,
+          moq: s.moq != null ? String(s.moq) : '',
+          lead_time_days: s.lead_time_days != null ? String(s.lead_time_days) : '',
+          notes: s.notes || '',
+          currency: s.currency || 'INR',
+        }))
+      : []
+  )
   useEffect(() => {
     fetch('/api/admin/suppliers/list', { credentials: 'include' })
       .then(r => r.ok ? r.json() : [])
@@ -404,6 +444,10 @@ export default function ProductForm({ categories, brands, action, product, produ
       const rate = product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18
       const deriveExGst = (priceVal: any) => priceVal != null ? String(Math.round(Number(priceVal) / (1 + rate / 100) * 100) / 100) : ''
       const deriveIncl = (exVal: any) => exVal != null ? String(Math.round(Number(exVal) * (1 + rate / 100) * 100) / 100) : ''
+      // All leaf supplier rows come flat on product.product_suppliers, tagged by
+      // variant_id / sub_variant_id. Distribute the VARIANT-leaf rows (variant_id
+      // set, sub_variant_id null) to each variant here.
+      const allSuppliers: any[] = Array.isArray(product?.product_suppliers) ? product.product_suppliers : []
       return product.product_variants.map((v: any) => {
         const discPct = product.discount_pct != null ? parseFloat(product.discount_pct) : 0
         const mrpEx = v.mrp_ex_gst != null ? parseFloat(v.mrp_ex_gst) : (v.mrp != null ? Math.round(parseFloat(v.mrp) / (1 + rate / 100) * 100) / 100 : null)
@@ -452,6 +496,9 @@ export default function ProductForm({ categories, brands, action, product, produ
         use_own_images: v.use_own_images != null
           ? !!v.use_own_images
           : !!(v.variant_images && v.variant_images.length > 0),
+        product_suppliers: allSuppliers
+          .filter((s: any) => (s.variant_id === v.id || (s.variant_sku && s.variant_sku === v.sku)) && !s.sub_variant_id && !s.sub_variant_sku)
+          .map(toSupplierRow),
       })
       })
     }
@@ -522,7 +569,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       const snapshot = {
         uncontrolled,
         hasVariants, variants, groups,
-        basePrice, mrp, mrpExGst, salePrice, costPrice, supplierId,
+        basePrice, mrp, mrpExGst, salePrice, costPrice, productSuppliers,
         discountPct,
         topPriceLockSide, topMrpLockSide,
         gstRate, isActive,
@@ -564,7 +611,13 @@ export default function ProductForm({ categories, brands, action, product, produ
     fields.stock_status = hasVariants ? 'In Stock' : (fields.stock_status as string || 'In Stock')
     fields.slug = productName ? productName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') : null
     fields.cost_price = costPrice
-    fields.supplier_id = supplierId || null
+    {
+      // Leaf-level multi-supplier: flatten every leaf, tagged by variant_sku /
+      // sub_variant_sku (or neither = product leaf).
+      const { suppliers: flatSuppliers, preferredProductSupplierId } = buildFlatSuppliers()
+      fields.product_suppliers = flatSuppliers
+      fields.supplier_id = preferredProductSupplierId || null
+    }
     fields.discount_pct = discountPct
     fields.is_active = isActive
     fields.is_featured = isFeatured
@@ -815,6 +868,70 @@ export default function ProductForm({ categories, brands, action, product, produ
     setVariants(updated)
   }
 
+  // Per-variant supplier rows (variant leaf: variant_id set, sub_variant_id null).
+  function updateVariantSuppliers(index: number, rows: SupplierRow[]) {
+    const updated = [...variants]
+    updated[index] = { ...updated[index], product_suppliers: rows }
+    setVariants(updated)
+  }
+
+  // Per-sub-variant supplier rows (sub-variant leaf: sub_variant_id set).
+  function updateSubVariantSuppliers(variantId: string, subVariantId: string, rows: SupplierRow[]) {
+    setSubVariantsMap(m => ({
+      ...m,
+      [variantId]: (m[variantId] || []).map((sv: any) =>
+        sv.id === subVariantId ? { ...sv, product_suppliers: rows } : sv
+      ),
+    }))
+  }
+
+  // Flatten every leaf's supplier rows into ONE product_suppliers array.
+  // Each row is tagged with variant_sku (variant leaf) or sub_variant_sku
+  // (sub-variant leaf), or neither (product leaf, simple products only).
+  // product-draft.ts resolves these SKUs to ids at publish. The legacy
+  // products.supplier_id is the PRODUCT-leaf preferred (simple products only).
+  function buildFlatSuppliers(): { suppliers: any[]; preferredProductSupplierId: string } {
+    const clean = (s: SupplierRow) => ({
+      supplier_id: s.supplier_id,
+      unit_cost: s.unit_cost,
+      is_preferred: !!s.is_preferred,
+      moq: s.moq || null,
+      lead_time_days: s.lead_time_days || null,
+      notes: s.notes || null,
+      currency: s.currency || 'INR',
+    })
+    const valid = (s: SupplierRow) => s.supplier_id && s.unit_cost !== ''
+    const out: any[] = []
+    let preferredProductSupplierId = ''
+
+    if (!hasVariants) {
+      // Product leaf — untagged.
+      const rows = productSuppliers.filter(valid)
+      for (const s of rows) out.push(clean(s))
+      preferredProductSupplierId = rows.find(s => s.is_preferred)?.supplier_id || ''
+    } else {
+      for (const v of variants) {
+        if (v._isDeleted) continue
+        if (v.sub_variant_type_on) {
+          // Sub-variant leaves — tag by sub_variant_sku.
+          const svs = subVariantsMap[v.id || ''] || []
+          for (const sv of svs) {
+            if (!sv.sku) continue // unresolvable at publish without a SKU
+            for (const s of (sv.product_suppliers || []).filter(valid)) {
+              out.push({ ...clean(s), sub_variant_sku: sv.sku })
+            }
+          }
+        } else if (v.sku) {
+          // Variant leaf — tag by variant_sku.
+          for (const s of (v.product_suppliers || []).filter(valid)) {
+            out.push({ ...clean(s), variant_sku: v.sku })
+          }
+        }
+      }
+    }
+    return { suppliers: out, preferredProductSupplierId }
+  }
+
   async function openVariantPopup(variantId: string) {
     setVariantPopupId(variantId)
     setVariantImageError(null)
@@ -837,7 +954,20 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (res.ok) {
       const data = await res.json()
       const loaded = data.sub_variants || []
-      setSubVariantsMap(m => ({ ...m, [variantId]: loaded }))
+      // Preserve per-sub-variant supplier rows across the refetch: prefer any
+      // in-memory edits already on the map, else the seed from product.product_suppliers.
+      const allSuppliers: any[] = Array.isArray(product?.product_suppliers) ? product.product_suppliers : []
+      setSubVariantsMap(m => {
+        const prev = m[variantId] || []
+        const merged = loaded.map((sv: any) => {
+          const existing = prev.find((p: any) => p.id === sv.id)
+          const rows: SupplierRow[] = existing?.product_suppliers
+            ? existing.product_suppliers
+            : allSuppliers.filter((s: any) => s.sub_variant_id === sv.id).map(toSupplierRow)
+          return { ...sv, product_suppliers: rows }
+        })
+        return { ...m, [variantId]: merged }
+      })
     } else {
       setSubVariantsMap(m => ({ ...m, [variantId]: [] }))
     }
@@ -1084,7 +1214,14 @@ export default function ProductForm({ categories, brands, action, product, produ
         formData.set('discount_pct', discountPct || '0')
       }
       formData.set('cost_price', costPrice || '0')
-      formData.set('supplier_id', supplierId || '')
+      // Multi-supplier at LEAF level: flatten every leaf's rows into one array,
+      // each tagged with variant_sku / sub_variant_sku (or neither = product leaf).
+      // supplier_id = the product-leaf preferred (legacy field, simple products only).
+      {
+        const { suppliers: flatSuppliers, preferredProductSupplierId } = buildFlatSuppliers()
+        formData.set('product_suppliers_json', JSON.stringify(flatSuppliers))
+        formData.set('supplier_id', preferredProductSupplierId)
+      }
       formData.set('extra_delivery_days', extraDeliveryDays || '0')
       // Identification & Compliance
       formData.set('barcode', barcode)
@@ -1573,21 +1710,15 @@ export default function ProductForm({ categories, brands, action, product, produ
             <p className="text-xs text-foreground-muted mt-1">Used for P&amp;L gross margin — not shown to customers</p>
           </div>
 
-          <div>
-            <AdminSelect
-              id="supplier_id"
-              name="supplier_id"
-              label="Primary Supplier"
-              value={supplierId}
-              placeholder="None"
-              onChange={setSupplierId}
-              options={[
-                { value: '', label: 'None' },
-                ...suppliers.map(s => ({ value: s.id, label: s.name })),
-              ]}
-            />
-            <p className="text-xs text-foreground-muted mt-1">The supplier this product is typically sourced from</p>
-          </div>
+          {!hasVariants && (
+            <div>
+              <ProductSupplierList
+                suppliers={suppliers}
+                value={productSuppliers}
+                onChange={setProductSuppliers}
+              />
+            </div>
+          )}
 
           <div>
             <AdminSelect
@@ -2861,6 +2992,17 @@ export default function ProductForm({ categories, brands, action, product, produ
                   </div>
                 </div>
 
+                {/* Suppliers — VARIANT leaf (only when this variant has no sub-variants) */}
+                {!popupVariant.sub_variant_type_on && (
+                  <div>
+                    <ProductSupplierList
+                      suppliers={suppliers}
+                      value={popupVariant.product_suppliers || []}
+                      onChange={(rows) => updateVariantSuppliers(popupIndex, rows)}
+                    />
+                  </div>
+                )}
+
                 {/* Shipping */}
                 <div>
                   <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-3">Shipping</p>
@@ -3223,7 +3365,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       })
                                       if (res.ok) {
                                         const updated = await res.json()
-                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? (updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, stock_status: ed.stock || 'In Stock', sku: ed.sku || s.sku }) : s) }))
+                                        setSubVariantsMap(m => ({ ...m, [variantPopupId]: m[variantPopupId].map(s => s.id === sv.id ? { ...(updated.sub_variant || { ...s, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, stock_status: ed.stock || 'In Stock', sku: ed.sku || s.sku }), product_suppliers: s.product_suppliers || [] } : s) }))
                                       }
                                       setSubVariantEditId(null); setSubVariantEditDraft(null)
                                     }} className="text-accent-600 hover:text-accent-700 text-xs font-medium leading-none">Save</button>
@@ -3263,6 +3405,22 @@ export default function ProductForm({ categories, brands, action, product, produ
                           })}
                         </tbody>
                       </table>
+                      </div>
+                    )}
+                    {/* Suppliers per SUB-VARIANT leaf — same popup, separate section */}
+                    {(subVariantsMap[variantPopupId] || []).length > 0 && (
+                      <div className="mb-3 space-y-3 rounded-lg border border-border-secondary bg-surface-secondary/30 p-3">
+                        <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Suppliers per Sub-Variant</p>
+                        {(subVariantsMap[variantPopupId] || []).map((sv: any) => (
+                          <div key={`sup-${sv.id}`} className="rounded-lg border border-border-default bg-surface p-2">
+                            <p className="text-xs font-medium text-foreground mb-1.5">{sv.sub_variant_name}{sv.sku ? <span className="ml-2 font-mono text-[10px] text-foreground-muted">{sv.sku}</span> : null}</p>
+                            <ProductSupplierList
+                              suppliers={suppliers}
+                              value={sv.product_suppliers || []}
+                              onChange={(rows) => updateSubVariantSuppliers(variantPopupId, sv.id, rows)}
+                            />
+                          </div>
+                        ))}
                       </div>
                     )}
                     {(() => {

@@ -244,6 +244,21 @@ export async function getProduct(id: string) {
         '[]'::json
       ) AS product_variants,
       COALESCE(
+        (SELECT json_agg(row_to_json(ps_cur) ORDER BY ps_cur.unit_cost ASC)
+         FROM (
+           SELECT DISTINCT ON (ps.variant_id, ps.sub_variant_id, ps.supplier_id)
+             ps.id, ps.supplier_id, s.name AS supplier_name,
+             ps.variant_id, ps.sub_variant_id,
+             ps.unit_cost, ps.currency, ps.gst_inclusive, ps.moq,
+             ps.lead_time_days, ps.is_preferred, ps.effective_date, ps.notes
+           FROM product_suppliers ps
+           JOIN suppliers s ON s.id = ps.supplier_id
+           WHERE ps.product_id = p.id AND ps.is_active = true
+           ORDER BY ps.variant_id, ps.sub_variant_id, ps.supplier_id, ps.effective_date DESC, ps.created_at DESC
+         ) ps_cur),
+        '[]'::json
+      ) AS product_suppliers,
+      COALESCE(
         (SELECT COUNT(*) FROM product_variants pv
           WHERE pv.product_id = p.id AND pv.is_active = true
           AND (

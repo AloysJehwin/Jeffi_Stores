@@ -14,12 +14,29 @@ export async function GET(
 
     const { id } = await params
 
-    const [primarySupplier, purchaseHistory] = await Promise.all([
+    const [primarySupplier, suppliers, purchaseHistory] = await Promise.all([
       queryOne<any>(
         `SELECT s.id, s.name, s.gstin, s.contact_name, s.phone, s.email
          FROM products p
          JOIN suppliers s ON s.id = p.supplier_id
          WHERE p.id = $1`,
+        [id]
+      ),
+      // Current supplier price list per LEAF (product / variant / sub-variant),
+      // latest dated row per (leaf, supplier). Carries leaf ids + names for grouping.
+      queryMany<any>(
+        `SELECT DISTINCT ON (ps.variant_id, ps.sub_variant_id, ps.supplier_id)
+           ps.id, ps.supplier_id, s.name AS supplier_name, s.gstin,
+           ps.variant_id, ps.sub_variant_id,
+           pv.variant_name, psv.sub_variant_name,
+           ps.unit_cost, ps.currency, ps.gst_inclusive, ps.moq,
+           ps.lead_time_days, ps.is_preferred, ps.effective_date, ps.notes
+         FROM product_suppliers ps
+         JOIN suppliers s ON s.id = ps.supplier_id
+         LEFT JOIN product_variants pv ON pv.id = ps.variant_id
+         LEFT JOIN product_sub_variants psv ON psv.id = ps.sub_variant_id
+         WHERE ps.product_id = $1 AND ps.is_active = true
+         ORDER BY ps.variant_id, ps.sub_variant_id, ps.supplier_id, ps.effective_date DESC, ps.created_at DESC`,
         [id]
       ),
       queryMany<any>(
@@ -45,13 +62,28 @@ export async function GET(
       ),
     ])
 
+    // Sort current suppliers by price ascending, then compute the cheapest per leaf.
+    suppliers.sort((a, b) => Number(a.unit_cost) - Number(b.unit_cost))
+    const NIL = '00000000-0000-0000-0000-000000000000'
+    const bestByLeaf: Record<string, string> = {}
+    for (const r of suppliers) {
+      const k = `${r.variant_id || NIL}:${r.sub_variant_id || NIL}`
+      if (!(k in bestByLeaf)) bestByLeaf[k] = r.supplier_id
+    }
+
     const lastPurchase = purchaseHistory[0] ?? null
+    const lowestHistPrice = purchaseHistory.length
+      ? Math.min(...purchaseHistory.map((h: any) => Number(h.unit_cost)))
+      : null
 
     return NextResponse.json({
       primarySupplier: primarySupplier ?? null,
+      suppliers,
+      bestByLeaf,
       purchaseHistory,
       lastPurchasePrice: lastPurchase ? Number(lastPurchase.unit_cost) : null,
       lastPurchaseDate: lastPurchase ? lastPurchase.order_date : null,
+      lowestHistoricalPrice: lowestHistPrice,
     })
   } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

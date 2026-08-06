@@ -110,6 +110,13 @@ async function updateProduct(productId: string, formData: FormData) {
   const salePrice = formData.get('price_ex_gst') ? round2(parseFloat(formData.get('price_ex_gst') as string)) : null
   const costPrice = formData.get('cost_price') ? round2(parseFloat(formData.get('cost_price') as string)) : 0
   const supplierId = (formData.get('supplier_id') as string || '').trim() || null
+  // Multi-supplier: product-level supplier price list. The preferred row's supplier
+  // is denormalized onto products.supplier_id (legacy field) on publish.
+  const productSuppliersRaw = formData.get('product_suppliers_json') as string | null
+  let productSuppliers: any[] = []
+  try { productSuppliers = productSuppliersRaw ? JSON.parse(productSuppliersRaw) : [] } catch { productSuppliers = [] }
+  const preferredSupplierId =
+    productSuppliers.find((s: any) => s.is_preferred)?.supplier_id || supplierId || null
   const discountPct = formData.get('discount_pct') ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2)) : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
@@ -210,7 +217,8 @@ async function updateProduct(productId: string, formData: FormData) {
         is_featured: isFeatured, has_variants: hasVariants, variant_type: variantType,
         sub_variant_type: subVariantType, weight_grams: weightGrams, package_type: packageType,
         length_cm: lengthCm, breadth_cm: breadthCm, height_cm: heightCm,
-        cost_price: costPrice, discount_pct: discountPct, supplier_id: supplierId,
+        cost_price: costPrice, discount_pct: discountPct, supplier_id: preferredSupplierId,
+        product_suppliers: productSuppliers,
         sku: skuFromForm,
         mpn: hasVariants ? null : mpn, gtin: hasVariants ? null : gtin,
         extra_delivery_days: extraDeliveryDays,
@@ -300,7 +308,7 @@ async function updateProduct(productId: string, formData: FormData) {
       new Date().toISOString(),
     ]
     setClauses.push(`supplier_id = $${params.length + 1}`)
-    params.push(supplierId)
+    params.push(preferredSupplierId)
     if (skuFromForm) {
       setClauses.push(`sku = $${params.length + 1}`)
       params.push(skuFromForm)
