@@ -1,6 +1,7 @@
 import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
+import { getStockValuation } from './inventory'
 
 export const VARIANT_STOCK_TOTAL_SQL = `
   COALESCE((SELECT COUNT(*) FROM product_variants pv
@@ -1669,17 +1670,9 @@ export async function getProductBreakdowns(): Promise<ProductStats> {
         (SELECT COUNT(*)::int FROM categories WHERE is_active) AS categories
       FROM products
     `),
-    // True inventory stock value = Σ price×qty. Quantities live on variants for variant
-    // products; on the product itself for simple products.
-    queryOne<{ inv_value: number }>(`
-      SELECT (
-        COALESCE((SELECT SUM(pv.price * COALESCE(pv.inventory_quantity, 0))
-                    FROM product_variants pv JOIN products p ON p.id = pv.product_id
-                   WHERE p.is_active AND pv.is_active AND p.has_variants), 0)
-      + COALESCE((SELECT SUM(p.base_price * COALESCE(p.inventory_quantity, 0))
-                    FROM products p WHERE p.is_active AND NOT p.has_variants), 0)
-      )::float AS inv_value
-    `),
+    // True inventory stock value — reuse the canonical valuation (ex-GST, covers products +
+    // variants + sub-variants) so this matches the Stock Ledger → Valuation page exactly.
+    getStockValuation().then(v => ({ inv_value: v.totalValue })).catch(() => ({ inv_value: 0 })),
     queryMany<{ label: string | null; count: number }>(`
       SELECT COALESCE(top.name, 'Uncategorized') AS label, COUNT(*)::int AS count
         FROM products p
