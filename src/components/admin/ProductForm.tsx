@@ -2827,6 +2827,10 @@ export default function ProductForm({ categories, brands, action, product, produ
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
                       <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
                     </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">Amazon ASIN</label>
+                      <input type="text" value={popupVariant.asin} onChange={(e) => updateVariant(popupIndex, 'asin', e.target.value)} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. B0XXXXXXXX" />
+                    </div>
                   </div>
                   )}
                   {/* Sub-variants toggle */}
