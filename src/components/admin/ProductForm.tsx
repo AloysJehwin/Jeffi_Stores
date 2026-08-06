@@ -1812,11 +1812,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                       <input type="text" value={brandPartNumber} onChange={e => setBrandPartNumber(e.target.value)} className={inputCls} placeholder="Manufacturer's part no." />
                     </div>
                   )}
-                  {hasVariants && (
-                    <div className="sm:col-span-2 text-xs text-foreground-muted bg-surface-secondary/50 rounded-lg px-3 py-2">
-                      Barcode, ASIN, ISBN &amp; Brand Part Number are set per-variant — edit them in each variant below.
-                    </div>
-                  )}
                   <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-2">Country of Origin</label>
                     <input type="text" maxLength={2} value={countryOfOrigin} onChange={e => setCountryOfOrigin(e.target.value.toUpperCase())} className={inputCls} placeholder="IN" />
