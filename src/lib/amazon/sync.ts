@@ -64,6 +64,21 @@ async function putWithBackoff(sku: string, listing: any): Promise<void> {
       ])
     } catch { /* offer patch failure is surfaced by the later status refresh */ }
   }
+
+  // Store-on-push: persist the ASIN this SKU is now listed against (highest confidence).
+  const asin = (listing?.attributes?.merchant_suggested_asin as any)?.[0]?.value
+  if (asin) await persistListedAsin(sku, String(asin)).catch(() => {})
+}
+
+// Write the confirmed ASIN back onto the variant (or simple product) matched by SKU.
+async function persistListedAsin(sku: string, asin: string): Promise<void> {
+  const upd = await query(
+    `UPDATE product_variants SET asin = $1, asin_match = 'listed' WHERE sku = $2`, [asin, sku]
+  )
+  // If no variant matched this SKU, try the product-level (simple product) SKU.
+  if (!(upd as any)?.rowCount) {
+    await query(`UPDATE products SET asin = $1, asin_match = 'listed' WHERE sku = $2`, [asin, sku])
+  }
 }
 
 // Run tasks through a fixed-size worker pool (SP-API Listings PUT ~5 rps).
@@ -132,6 +147,12 @@ async function safeMatchAsin(input: Parameters<typeof matchAsin>[0]) {
 //   no match    -> full-create listing(s) (only succeeds for non-brand-gated brands)
 // Emits one offer-only listing per matched priced variant; if no variant matches, falls back to
 // full-create for the whole product.
+// A stored ASIN is trusted (skip the catalog search) when it came from a GTIN match or a real
+// listing — not a fuzzy keyword guess.
+function trustedAsin(row: any): string | null {
+  return row?.asin && (row.asin_match === 'gtin' || row.asin_match === 'listed') ? row.asin : null
+}
+
 async function resolveListingsForProduct(product: any): Promise<AmazonListing[]> {
   const brand = product.brands?.name || ''
   const hasVariants = product.has_variants && product.product_variants?.length > 0
@@ -140,21 +161,23 @@ async function resolveListingsForProduct(product: any): Promise<AmazonListing[]>
     const out: AmazonListing[] = []
     for (const v of product.product_variants) {
       if (v.price == null) continue
-      const match = await safeMatchAsin({
+      const stored = trustedAsin(v)
+      const asin = stored || (await safeMatchAsin({
         gtin: v.gtin || product.gtin, brand, mpn: v.mpn || product.mpn,
         name: `${brand} ${product.name} ${v.variant_name || ''}`.trim(),
-      })
-      if (match?.asin) out.push(productToAmazonOfferListing(product, match.asin, v))
+      }))?.asin
+      if (asin) out.push(productToAmazonOfferListing(product, asin, v))
     }
     if (out.length) return out
     return productToAmazonListings(product)
   }
 
-  const match = await safeMatchAsin({
+  const stored = trustedAsin(product)
+  const asin = stored || (await safeMatchAsin({
     gtin: product.gtin, brand, mpn: product.mpn,
     name: `${brand} ${product.name}`.trim(),
-  })
-  if (match?.asin) return [productToAmazonOfferListing(product, match.asin)]
+  }))?.asin
+  if (asin) return [productToAmazonOfferListing(product, asin)]
   return productToAmazonListings(product)
 }
 

@@ -178,6 +178,7 @@ export interface CatalogMatch {
   asin: string
   title?: string
   brand?: string
+  matchType?: 'gtin' | 'keyword'
 }
 
 export async function searchCatalogItems(params: {
@@ -274,7 +275,7 @@ export async function matchAsin(input: {
     const type = rawGtin.length === 12 ? 'UPC' : 'EAN'
     const res = await searchCatalogItems({ identifiers: rawGtin, identifiersType: type })
     const hit = res.items?.[0]
-    if (hit?.asin) return toCatalogMatch(hit)
+    if (hit?.asin) return { ...toCatalogMatch(hit), matchType: 'gtin' }
   }
 
   const kw = [input.mpn, input.name].filter(Boolean).join(' ').slice(0, 200)
@@ -291,7 +292,7 @@ export async function matchAsin(input: {
     const score = scoreCandidate(input.name, m.title || '')
     if (score > bestScore) { bestScore = score; best = m }
   }
-  return best
+  return best ? { ...best, matchType: 'keyword' } : null
 }
 
 // Brand-gate check: whether we're allowed to create an offer on an ASIN. Empty restrictions
