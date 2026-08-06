@@ -266,6 +266,13 @@ export async function publishProductDraft(productId: string): Promise<void> {
         }
         const svsForVariant = stagedSubVariants.filter((sv: any) => sv.variant_id === vid)
         for (const sv of svsForVariant) {
+          // Coerce empty-string / non-numeric form values to null (numeric columns
+          // reject ""). Draft sub-variants often arrive with price/mrp = "".
+          const num = (x: any): number | null => {
+            if (x == null || x === '') return null
+            const n = Number(x)
+            return Number.isFinite(n) ? n : null
+          }
           await client.query(
             `INSERT INTO product_sub_variants (variant_id, product_id, sku, sub_variant_name, price, mrp,
                price_ex_gst, mrp_ex_gst, attributes, is_active, inventory_quantity, discount_pct, stock_status,
@@ -273,14 +280,14 @@ export async function publishProductDraft(productId: string): Promise<void> {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
             [
               vid, productId, sv.sku || null, sv.sub_variant_name,
-              sv.price != null ? sv.price : null,
-              sv.mrp != null ? sv.mrp : null,
-              sv.price_ex_gst != null ? sv.price_ex_gst : null,
-              sv.mrp_ex_gst != null ? sv.mrp_ex_gst : null,
+              num(sv.price),
+              num(sv.mrp),
+              num(sv.price_ex_gst),
+              num(sv.mrp_ex_gst),
               sv.attributes || null,
               sv.is_active != null ? sv.is_active : true,
-              sv.inventory_quantity != null ? sv.inventory_quantity : 0,
-              sv.discount_pct != null ? sv.discount_pct : 0,
+              num(sv.inventory_quantity) ?? 0,
+              num(sv.discount_pct) ?? 0,
               sv.stock_status || 'In Stock',
             ]
           )
