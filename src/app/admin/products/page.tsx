@@ -252,9 +252,9 @@ async function ProductsStats() {
         {/* Left: Catalog Value + the 4 product stats as tiles */}
         <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
           <div>
-            <p className="text-white/80 text-sm">Catalog Value</p>
+            <p className="text-white/80 text-sm">Inventory Stock Value</p>
             <p className="text-3xl sm:text-4xl font-bold mt-1">
-              Rs. {stats.catalogValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              Rs. {stats.inventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
             </p>
           </div>
           <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-4">

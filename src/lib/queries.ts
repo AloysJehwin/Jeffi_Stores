@@ -1636,7 +1636,7 @@ export interface ProductStats {
   activeProducts: number
   featured: number
   categories: number
-  catalogValue: number
+  inventoryValue: number       // Σ (price × inventory_quantity): variants for has_variants, base for simple
   byCategory: BreakdownSlice[]
   byBrand: BreakdownSlice[]
   byStock: BreakdownSlice[]
@@ -1660,15 +1660,25 @@ function toSlices(rows: Array<{ label: string | null; count: number }>, topN = 8
 
 // All the header metrics + three categorical breakdowns for the Products page, in one call.
 export async function getProductBreakdowns(): Promise<ProductStats> {
-  const [summary, catRows, brandRows, stockRows, invValueRows] = await Promise.all([
-    queryOne<{ total: number; active: number; featured: number; categories: number; catalog_value: number }>(`
+  const [summary, invValue, catRows, brandRows, stockRows, invValueRows] = await Promise.all([
+    queryOne<{ total: number; active: number; featured: number; categories: number }>(`
       SELECT
         COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE is_active)::int AS active,
         COUNT(*) FILTER (WHERE is_featured)::int AS featured,
-        (SELECT COUNT(*)::int FROM categories WHERE is_active) AS categories,
-        COALESCE(SUM(base_price) FILTER (WHERE is_active), 0)::float AS catalog_value
+        (SELECT COUNT(*)::int FROM categories WHERE is_active) AS categories
       FROM products
+    `),
+    // True inventory stock value = Σ price×qty. Quantities live on variants for variant
+    // products; on the product itself for simple products.
+    queryOne<{ inv_value: number }>(`
+      SELECT (
+        COALESCE((SELECT SUM(pv.price * COALESCE(pv.inventory_quantity, 0))
+                    FROM product_variants pv JOIN products p ON p.id = pv.product_id
+                   WHERE p.is_active AND pv.is_active AND p.has_variants), 0)
+      + COALESCE((SELECT SUM(p.base_price * COALESCE(p.inventory_quantity, 0))
+                    FROM products p WHERE p.is_active AND NOT p.has_variants), 0)
+      )::float AS inv_value
     `),
     queryMany<{ label: string | null; count: number }>(`
       SELECT COALESCE(top.name, 'Uncategorized') AS label, COUNT(*)::int AS count
@@ -1703,7 +1713,7 @@ export async function getProductBreakdowns(): Promise<ProductStats> {
     activeProducts: Number(summary?.active) || 0,
     featured: Number(summary?.featured) || 0,
     categories: Number(summary?.categories) || 0,
-    catalogValue: Number(summary?.catalog_value) || 0,
+    inventoryValue: Number(invValue?.inv_value) || 0,
     byCategory: toSlices(catRows),
     byBrand: toSlices(brandRows),
     byStock: toSlices(stockRows, 5),
