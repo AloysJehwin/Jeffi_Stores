@@ -38,6 +38,7 @@ interface VariantRow {
   stock_status: string
   mpn: string
   gtin: string
+  asin: string
   pricing_type: 'unit'
   unit: string
   numeric_value: string
@@ -156,7 +157,7 @@ function emptyVariant(pricing_type: 'unit', unit: string): VariantRow {
   return {
     id: `temp-${Math.random().toString(36).slice(2, 11)}`,
     variant_name: '', price: '', mrp: '', mrp_ex_gst: '', price_ex_gst: '', discount_pct: '',
-    stock_status: 'In Stock', mpn: '', gtin: '',
+    stock_status: 'In Stock', mpn: '', gtin: '', asin: '',
     pricing_type, unit, numeric_value: '',
     weight_grams: '', package_type: '', length_cm: '', breadth_cm: '', height_cm: '',
     sub_variant_type: '', sub_variant_type_on: false,
@@ -432,6 +433,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         stock_status: v.stock_status || 'In Stock',
         mpn: v.mpn || '',
         gtin: v.gtin || '',
+        asin: v.asin || '',
         pricing_type: v.pricing_type || 'unit',
         unit: v.unit || 'pcs',
         numeric_value: v.numeric_value != null ? String(v.numeric_value) : '',
@@ -1784,22 +1786,33 @@ export default function ProductForm({ categories, brands, action, product, produ
             {identificationExpanded && (
               <div className="p-4 space-y-4 border-t border-border-default">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Barcode (EAN/UPC)</label>
-                    <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} className={inputCls} placeholder="e.g. 8901234567890" />
-                  </div>
+                  {!hasVariants && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground-secondary mb-2">Barcode (EAN/UPC)</label>
+                      <input type="text" value={barcode} onChange={e => setBarcode(e.target.value)} className={inputCls} placeholder="e.g. 8901234567890" />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-2">ISBN</label>
                     <input type="text" value={isbn} onChange={e => setIsbn(e.target.value)} className={inputCls} placeholder="For books" />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">ASIN</label>
-                    <input type="text" value={asin} onChange={e => setAsin(e.target.value)} className={inputCls} placeholder="Amazon reference" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-foreground-secondary mb-2">Brand Part Number</label>
-                    <input type="text" value={brandPartNumber} onChange={e => setBrandPartNumber(e.target.value)} className={inputCls} placeholder="Manufacturer's part no." />
-                  </div>
+                  {!hasVariants && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground-secondary mb-2">ASIN</label>
+                      <input type="text" value={asin} onChange={e => setAsin(e.target.value)} className={inputCls} placeholder="Amazon reference" />
+                    </div>
+                  )}
+                  {!hasVariants && (
+                    <div>
+                      <label className="block text-sm font-medium text-foreground-secondary mb-2">Brand Part Number</label>
+                      <input type="text" value={brandPartNumber} onChange={e => setBrandPartNumber(e.target.value)} className={inputCls} placeholder="Manufacturer's part no." />
+                    </div>
+                  )}
+                  {hasVariants && (
+                    <div className="sm:col-span-2 text-xs text-foreground-muted bg-surface-secondary/50 rounded-lg px-3 py-2">
+                      Barcode, ASIN &amp; Brand Part Number are set per-variant — edit them in each variant below.
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-foreground-secondary mb-2">Country of Origin</label>
                     <input type="text" maxLength={2} value={countryOfOrigin} onChange={e => setCountryOfOrigin(e.target.value.toUpperCase())} className={inputCls} placeholder="IN" />
@@ -2387,6 +2400,10 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <input type="text" value={variant.gtin} onChange={(e) => updateVariant(index, 'gtin', e.target.value)} className={inputCls} placeholder="Barcode" />
                               </div>
                               <div>
+                                <label className="block text-xs font-medium text-foreground-secondary mb-1">Amazon ASIN</label>
+                                <input type="text" value={variant.asin} onChange={(e) => updateVariant(index, 'asin', e.target.value)} className={inputCls} placeholder="e.g. B0XXXXXXXX" />
+                              </div>
+                              <div>
                                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Shipping Weight (g)</label>
                                 <input type="number" step="1" min="0" value={variant.weight_grams} onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)} className={inputCls} placeholder="e.g. 500" />
                               </div>
@@ -2751,6 +2768,10 @@ export default function ProductForm({ categories, brands, action, product, produ
                         <div>
                           <label className="block text-xs font-medium text-foreground-secondary mb-1">GTIN / Barcode</label>
                           <input type="text" value={popupVariant.gtin} onChange={(e) => updateVariant(popupIndex, 'gtin', e.target.value)} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Barcode" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">Amazon ASIN</label>
+                          <input type="text" value={popupVariant.asin} onChange={(e) => updateVariant(popupIndex, 'asin', e.target.value)} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="e.g. B0XXXXXXXX" />
                         </div>
                       </div>
                     </div>

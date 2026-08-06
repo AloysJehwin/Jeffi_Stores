@@ -796,6 +796,13 @@ CREATE INDEX idx_amazon_listing_status_status ON public.amazon_listing_status US
 CREATE INDEX idx_amazon_listing_status_title ON public.amazon_listing_status USING gin (to_tsvector('simple'::regconfig, COALESCE(title, ''::text)));
 
 
+--
+-- Name: idx_product_variants_asin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_product_variants_asin ON public.product_variants USING btree (asin) WHERE (asin IS NOT NULL);
+
+
 
 --
 -- Name: idx_notifications_created_at; Type: INDEX; Schema: public; Owner: -

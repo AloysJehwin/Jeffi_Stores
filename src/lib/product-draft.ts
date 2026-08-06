@@ -155,7 +155,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
     await client.query(
       `INSERT INTO product_variants (
          product_id, sku, variant_name, price, attributes, is_active, mrp,
-         price_ex_gst, mpn, gtin, pricing_type, unit, numeric_value,
+         price_ex_gst, mpn, gtin, asin, asin_match, pricing_type, unit, numeric_value,
          weight_grams, length_cm, breadth_cm, height_cm,
          package_type, cost_price, inventory_quantity, mrp_ex_gst,
          variant_type, sub_variant_type, sub_variant_type_on, use_own_images,
@@ -164,7 +164,9 @@ export async function publishProductDraft(productId: string): Promise<void> {
        )
        SELECT $1, v->>'sku', v->>'variant_name', (v->>'price')::numeric, v->'attributes',
          COALESCE((v->>'is_active')::boolean, true), NULLIF(v->>'mrp','')::numeric,
-         NULLIF(v->>'price_ex_gst','')::numeric, v->>'mpn', v->>'gtin', COALESCE(NULLIF(v->>'pricing_type',''), 'unit'),
+         NULLIF(v->>'price_ex_gst','')::numeric, v->>'mpn', v->>'gtin',
+         NULLIF(v->>'asin',''), CASE WHEN NULLIF(v->>'asin','') IS NOT NULL THEN 'manual' ELSE NULL END,
+         COALESCE(NULLIF(v->>'pricing_type',''), 'unit'),
          v->>'unit', NULLIF(v->>'numeric_value','')::numeric,
          NULLIF(v->>'weight_grams','')::integer, NULLIF(v->>'length_cm','')::numeric,
          NULLIF(v->>'breadth_cm','')::numeric, NULLIF(v->>'height_cm','')::numeric,
@@ -179,7 +181,10 @@ export async function publishProductDraft(productId: string): Promise<void> {
          variant_name = EXCLUDED.variant_name, price = EXCLUDED.price,
          attributes = EXCLUDED.attributes, is_active = EXCLUDED.is_active,
          mrp = EXCLUDED.mrp, price_ex_gst = EXCLUDED.price_ex_gst,
-         mpn = EXCLUDED.mpn, gtin = EXCLUDED.gtin, pricing_type = EXCLUDED.pricing_type,
+         mpn = EXCLUDED.mpn, gtin = EXCLUDED.gtin,
+         asin = COALESCE(EXCLUDED.asin, product_variants.asin),
+         asin_match = COALESCE(EXCLUDED.asin_match, product_variants.asin_match),
+         pricing_type = EXCLUDED.pricing_type,
          unit = EXCLUDED.unit, numeric_value = EXCLUDED.numeric_value,
          weight_grams = EXCLUDED.weight_grams, length_cm = EXCLUDED.length_cm,
          breadth_cm = EXCLUDED.breadth_cm, height_cm = EXCLUDED.height_cm,
