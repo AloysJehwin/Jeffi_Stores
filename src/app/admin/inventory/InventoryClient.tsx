@@ -1039,7 +1039,7 @@ function StockTab() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
-  const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number; allCategories?: string[]; allBrands?: string[] } | null>(null)
+  const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number; totalValueInclGst?: number; inStockCount?: number; allCategories?: string[]; allBrands?: string[] } | null>(null)
   const [valPage, setValPage] = useState(1)
   const [valSearch, setValSearch] = useState(searchParams.get('val_search') || '')
   const [valCategory, setValCategory] = useState(searchParams.get('val_category') || '')
@@ -1712,10 +1712,10 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(allValRows.reduce((s, p) => { const qty = parseFloat(p.inventory_quantity || '0'); return s + qty * parseFloat(p.cost_price || '0') }, 0))} accent sub={`${valTotal} SKUs`} />
-                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => { const qty = parseFloat(p.inventory_quantity || '0'); return s + qty * parseFloat(p.selling_price || '0') }, 0))} accent sub="this page" />
+                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(valuation.totalValue || 0)} accent sub={`${valTotal} SKUs`} />
+                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(valuation.totalValueInclGst || 0)} accent sub="all products" />
                 <SummaryCard label="Total SKUs" value={String(valTotal)} sub="across all products" />
-                <SummaryCard label="In Stock" value={String(allValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="on this page" />
+                <SummaryCard label="In Stock" value={String(valuation.inStockCount ?? allValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="across all products" />
               </div>
               <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
                 <div className="overflow-x-auto">
