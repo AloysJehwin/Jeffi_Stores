@@ -4,28 +4,39 @@ import { useState } from 'react'
 import type { RevenueTrend } from '@/lib/queries'
 
 // Hand-rolled inline-SVG multi-line chart (no charting library — matches the house style in
-// TrafficClient.tsx). One line per order source over the last 12 months, with a legend and a
-// hover tooltip showing per-source revenue for the hovered month.
+// TrafficClient.tsx). One line per order source, with a period selector, legend, and a hover
+// tooltip showing per-source revenue for the hovered month.
 
 const VIEW_W = 560
 const VIEW_H = 140
-const PAD = { top: 10, right: 12, bottom: 20, left: 40 }
+// Tight padding so the lines use as much width as possible (left just clears the Y labels).
+const PAD = { top: 10, right: 8, bottom: 20, left: 34 }
+
+const PERIODS: { value: string; label: string }[] = [
+  { value: '3m', label: '3 Months' },
+  { value: '6m', label: '6 Months' },
+  { value: '12m', label: '12 Months' },
+  { value: 'ytd', label: 'This Year' },
+  { value: 'all', label: 'All Time' },
+]
 
 function formatINR(n: number): string {
   return `₹${Math.round(n).toLocaleString('en-IN')}`
 }
 
 function shortMonth(m: string): string {
-  // "2026-07" -> "Jul"
   const [y, mm] = m.split('-')
   const d = new Date(Number(y), Number(mm) - 1, 1)
   return d.toLocaleDateString('en-IN', { month: 'short' })
 }
 
-export default function RevenueTrendChart({ data }: { data: RevenueTrend }) {
+export default function RevenueTrendChart({ data: initial }: { data: RevenueTrend }) {
+  const [data, setData] = useState<RevenueTrend>(initial)
+  const [period, setPeriod] = useState('12m')
+  const [loading, setLoading] = useState(false)
   const [hover, setHover] = useState<number | null>(null)
-  const { months, series } = data
 
+  const { months, series } = data
   const activeSeries = series.filter(s => s.points.some(p => p > 0))
   const hasData = months.length > 0 && activeSeries.length > 0
 
@@ -35,53 +46,73 @@ export default function RevenueTrendChart({ data }: { data: RevenueTrend }) {
 
   const x = (i: number) => PAD.left + (months.length <= 1 ? plotW / 2 : (i / (months.length - 1)) * plotW)
   const y = (v: number) => PAD.top + plotH - (v / maxY) * plotH
-
-  // Y gridlines at 0, 50%, 100%
   const yTicks = [0, maxY / 2, maxY]
+  // Label every month when few, else thin them out to avoid crowding.
+  const xStep = months.length <= 8 ? 1 : Math.ceil(months.length / 7)
+
+  async function changePeriod(p: string) {
+    setPeriod(p)
+    setLoading(true)
+    setHover(null)
+    try {
+      const res = await fetch(`/api/admin/orders/revenue-trend?period=${p}`)
+      if (res.ok) {
+        const json = await res.json()
+        if (json.trend) setData(json.trend)
+      }
+    } catch { /* keep previous data on failure */ }
+    finally { setLoading(false) }
+  }
 
   return (
     <div className="bg-surface-elevated border border-border-default rounded-lg shadow-sm p-4 h-full flex flex-col overflow-hidden">
-      <div className="flex items-center justify-between mb-2 flex-shrink-0">
+      <div className="flex items-center justify-between mb-2 flex-shrink-0 gap-2">
         <p className="text-sm font-semibold text-foreground">Revenue Trend</p>
-        <p className="text-xs text-foreground-muted">by source · last 12 months</p>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-foreground-muted hidden sm:inline">by source ·</span>
+          <select
+            value={period}
+            onChange={e => changePeriod(e.target.value)}
+            disabled={loading}
+            className="text-xs bg-surface border border-border-default rounded-md px-2 py-1 text-foreground-secondary hover:border-accent-400 focus:outline-none focus:ring-1 focus:ring-accent-400 disabled:opacity-50 cursor-pointer"
+          >
+            {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+          </select>
+        </div>
       </div>
 
       {!hasData ? (
         <div className="flex-1 flex items-center justify-center text-sm text-foreground-muted">
-          No revenue data yet
+          {loading ? 'Loading…' : 'No revenue data yet'}
         </div>
       ) : (
         <>
-          <div className="relative flex-1 min-h-0">
-            <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-full" preserveAspectRatio="xMidYMid meet">
-              {/* Y gridlines + labels */}
+          <div className={`relative flex-1 min-h-0 transition-opacity ${loading ? 'opacity-50' : ''}`}>
+            <svg viewBox={`0 0 ${VIEW_W} ${VIEW_H}`} className="w-full h-full" preserveAspectRatio="none">
               {yTicks.map((t, i) => (
                 <g key={i}>
                   <line
                     x1={PAD.left} x2={VIEW_W - PAD.right} y1={y(t)} y2={y(t)}
                     className="stroke-border-default" strokeWidth={1} strokeDasharray={i === 0 ? undefined : '3 3'}
                   />
-                  <text x={PAD.left - 6} y={y(t) + 3} textAnchor="end" className="fill-foreground-muted" fontSize={9}>
+                  <text x={PAD.left - 4} y={y(t) + 3} textAnchor="end" className="fill-foreground-muted" fontSize={9}>
                     {t >= 1000 ? `${Math.round(t / 1000)}k` : Math.round(t)}
                   </text>
                 </g>
               ))}
 
-              {/* X labels */}
               {months.map((m, i) => (
-                (months.length <= 8 || i % 2 === 0) && (
+                (i % xStep === 0 || i === months.length - 1) && (
                   <text key={m} x={x(i)} y={VIEW_H - 6} textAnchor="middle" className="fill-foreground-muted" fontSize={9}>
                     {shortMonth(m)}
                   </text>
                 )
               ))}
 
-              {/* Hover guide line */}
               {hover !== null && (
                 <line x1={x(hover)} x2={x(hover)} y1={PAD.top} y2={PAD.top + plotH} className="stroke-border-default" strokeWidth={1} />
               )}
 
-              {/* Lines + points */}
               {activeSeries.map(s => (
                 <g key={s.source}>
                   <polyline
@@ -94,7 +125,6 @@ export default function RevenueTrendChart({ data }: { data: RevenueTrend }) {
                 </g>
               ))}
 
-              {/* Hover hit-areas (one vertical band per month) */}
               {months.map((m, i) => (
                 <rect
                   key={m}
@@ -107,7 +137,6 @@ export default function RevenueTrendChart({ data }: { data: RevenueTrend }) {
               ))}
             </svg>
 
-            {/* Tooltip */}
             {hover !== null && (
               <div
                 className="absolute z-10 text-[11px] rounded px-2.5 py-2 shadow-lg pointer-events-none"
@@ -128,7 +157,6 @@ export default function RevenueTrendChart({ data }: { data: RevenueTrend }) {
             )}
           </div>
 
-          {/* Legend */}
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-2 flex-shrink-0">
             {activeSeries.map(s => (
               <div key={s.source} className="flex items-center gap-1.5 text-xs text-foreground-secondary">

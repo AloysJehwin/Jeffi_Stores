@@ -1565,24 +1565,55 @@ const REVENUE_SOURCES: Array<{ source: string; label: string; color: string }> =
   { source: 'cash_sale', label: 'Cash Sale', color: '#f59e0b' },// amber
 ]
 
-export async function getRevenueTrendBySource(): Promise<RevenueTrend> {
+export type RevenuePeriod = '3m' | '6m' | '12m' | 'ytd' | 'all'
+
+// Monthly paid-revenue trend split by order source, for the requested period. Pivoted
+// server-side into one continuous (zero-filled) points array per source, aligned to a shared
+// months axis.
+export async function getRevenueTrendBySource(period: RevenuePeriod = '12m'): Promise<RevenueTrend> {
+  // Resolve the window's start month (inclusive) as a Date at day 1.
+  const now = new Date()
+  const startOfMonth = (y: number, m: number) => new Date(y, m, 1)
+  let start: Date
+  if (period === '3m') start = startOfMonth(now.getFullYear(), now.getMonth() - 2)
+  else if (period === '6m') start = startOfMonth(now.getFullYear(), now.getMonth() - 5)
+  else if (period === 'ytd') start = startOfMonth(now.getFullYear(), 0)
+  else if (period === 'all') start = new Date(0) // resolved to first-order month below
+  else start = startOfMonth(now.getFullYear(), now.getMonth() - 11) // 12m default
+
+  // For 'all', anchor the axis to the earliest paid order.
+  if (period === 'all') {
+    const first = await queryOne<{ m: string }>(
+      `SELECT to_char(date_trunc('month', min(created_at)), 'YYYY-MM') AS m
+         FROM orders WHERE payment_status = 'paid'`
+    ).catch(() => null)
+    if (first?.m) {
+      const [y, mm] = first.m.split('-').map(Number)
+      start = startOfMonth(y, mm - 1)
+    } else {
+      start = startOfMonth(now.getFullYear(), now.getMonth() - 11)
+    }
+  }
+
+  const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`
   const rows = await queryMany<{ month: string; source: string; revenue: number }>(`
     SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
            source,
            SUM(total_amount)::float AS revenue
       FROM orders
      WHERE payment_status = 'paid'
-       AND created_at >= (date_trunc('month', now()) - INTERVAL '11 months')
+       AND created_at >= $1::date
      GROUP BY 1, 2
      ORDER BY 1
-  `).catch(() => [])
+  `, [startStr]).catch(() => [])
 
-  // Build a continuous 12-month axis ending with the current month.
+  // Continuous month axis from `start` through the current month.
   const months: string[] = []
-  const now = new Date()
-  for (let k = 11; k >= 0; k--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - k, 1)
-    months.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`)
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1)
+  const end = new Date(now.getFullYear(), now.getMonth(), 1)
+  while (cursor <= end) {
+    months.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`)
+    cursor.setMonth(cursor.getMonth() + 1)
   }
   const monthIndex = new Map(months.map((m, idx) => [m, idx]))
 

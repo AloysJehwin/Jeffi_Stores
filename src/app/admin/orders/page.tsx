@@ -40,32 +40,35 @@ async function OrdersStats() {
 
   return (
     <div className="animate-fade-in">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total Orders</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalOrders}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-56">
+        {/* Left: Total Revenue + the 4 order stats as tiles */}
+        <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
+          <div>
+            <p className="text-white/80 text-sm">Total Revenue</p>
+            <p className="text-3xl sm:text-4xl font-bold mt-1">
+              Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-4">
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{totalOrders}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Total</p>
+            </div>
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{pendingOrders}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Pending</p>
+            </div>
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{processingOrders}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Processing</p>
+            </div>
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{completedOrders}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Completed</p>
+            </div>
+          </div>
         </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Pending</p>
-          <p className="text-2xl sm:text-3xl font-bold text-orange-500 mt-2">{pendingOrders}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Processing</p>
-          <p className="text-2xl sm:text-3xl font-bold text-blue-500 mt-2">{processingOrders}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Completed</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-500 mt-2">{completedOrders}</p>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-48">
-        <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-center">
-          <p className="text-white text-sm">Total Revenue</p>
-          <p className="text-3xl sm:text-4xl font-bold text-white mt-2">
-            Rs. {totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-          </p>
-        </div>
+        {/* Right: revenue trend chart */}
         <RevenueTrendChart data={revenueTrend} />
       </div>
     </div>
