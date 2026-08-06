@@ -25,8 +25,8 @@ const STATUS_COLORS: Record<string, string> = {
   cancelled: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
 }
 
-type Tab = 'pos' | 'expenses'
-const VALID_TABS: Tab[] = ['pos', 'expenses']
+type Tab = 'pos' | 'expenses' | 'products'
+const VALID_TABS: Tab[] = ['pos', 'expenses', 'products']
 
 export default function SupplierDetailClient({ id }: { id: string }) {
   const router = useRouter()
@@ -118,6 +118,8 @@ export default function SupplierDetailClient({ id }: { id: string }) {
   const s = data.supplier
   const pos: any[] = data.pos || []
   const expenses: any[] = data.expenses || []
+  const linkedProducts: any[] = data.linkedProducts || []
+  const purchasedProducts: any[] = data.purchasedProducts || []
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -254,7 +256,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
       {/* Tabs */}
       <div>
         <div className="flex border-b border-border-default mb-4">
-          {(['pos', 'expenses'] as Tab[]).map(t => (
+          {(['pos', 'expenses', 'products'] as Tab[]).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -264,7 +266,11 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                   : 'border-transparent text-foreground-secondary hover:text-foreground'
               }`}
             >
-              {t === 'pos' ? `Purchase Orders (${pos.length})` : `Bills / Expenses (${expenses.length})`}
+              {t === 'pos'
+                ? `Purchase Orders (${pos.length})`
+                : t === 'expenses'
+                ? `Bills / Expenses (${expenses.length})`
+                : `Products (${linkedProducts.length})`}
             </button>
           ))}
         </div>
@@ -354,6 +360,88 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                 </table>
               </div>
             )}
+          </div>
+        )}
+
+        {tab === 'products' && (
+          <div className="space-y-6">
+            {/* Linked — current buy-price list from product_suppliers */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">Linked (buy-price list)</p>
+              <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+                {linkedProducts.length === 0 ? (
+                  <p className="text-foreground-secondary text-sm text-center py-8">No products linked to this supplier</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-surface-secondary">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Product</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Variant / Sub-variant</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Buy Price</th>
+                          <th className="px-4 py-2.5 text-center text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Preferred</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">MOQ</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Lead (days)</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-default">
+                        {linkedProducts.map((p: any, i: number) => (
+                          <tr key={`${p.product_id}-${p.variant_id || ''}-${p.sub_variant_id || ''}-${i}`} className="hover:bg-surface-secondary/40 transition-colors">
+                            <td className="px-4 py-3">
+                              <Link href={ap(`/admin/products/${p.product_id}`)} className="font-medium text-accent-500 hover:underline">{p.product_name}</Link>
+                            </td>
+                            <td className="px-4 py-3 text-foreground-secondary">{p.sub_variant_name || p.variant_name || '—'}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.unit_cost || '0'))}</td>
+                            <td className="px-4 py-3 text-center">{p.is_preferred ? '★' : '—'}</td>
+                            <td className="px-4 py-3 text-right text-foreground-secondary">{p.moq ?? '—'}</td>
+                            <td className="px-4 py-3 text-right text-foreground-secondary">{p.lead_time_days ?? '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Purchased — actuals from purchase order items */}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">Purchased (from POs)</p>
+              <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+                {purchasedProducts.length === 0 ? (
+                  <p className="text-foreground-secondary text-sm text-center py-8">No purchases recorded from this supplier</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead className="bg-surface-secondary">
+                        <tr>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Product</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Variant</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Total Qty</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Last Unit Cost</th>
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Last Ordered</th>
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">POs</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border-default">
+                        {purchasedProducts.map((p: any, i: number) => (
+                          <tr key={`${p.product_id}-${p.variant_id || ''}-${i}`} className="hover:bg-surface-secondary/40 transition-colors">
+                            <td className="px-4 py-3">
+                              <Link href={ap(`/admin/products/${p.product_id}`)} className="font-medium text-accent-500 hover:underline">{p.product_name}</Link>
+                            </td>
+                            <td className="px-4 py-3 text-foreground-secondary">{p.variant_name || '—'}</td>
+                            <td className="px-4 py-3 text-right text-foreground">{Number(p.total_qty || 0)}</td>
+                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.last_unit_cost || '0'))}</td>
+                            <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(p.last_order_date)}</td>
+                            <td className="px-4 py-3 text-right text-foreground-secondary">{p.po_count ?? 0}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         )}
       </div>
