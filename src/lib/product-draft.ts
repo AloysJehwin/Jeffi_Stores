@@ -45,7 +45,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          slug                     = COALESCE(NULLIF(($2::jsonb)->>'slug', ''), slug),
          description              = ($2::jsonb)->>'description',
          short_description        = ($2::jsonb)->>'short_description',
-         base_price               = (($2::jsonb)->>'base_price')::numeric,
+         base_price               = COALESCE(NULLIF(($2::jsonb)->>'base_price', '')::numeric, 0),
          price_ex_gst             = NULLIF(($2::jsonb)->>'price_ex_gst', '')::numeric,
          currency                 = ($2::jsonb)->>'currency',
          weight                   = NULLIF(($2::jsonb)->>'weight', '')::numeric,
@@ -167,7 +167,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          discount_pct, stock_decimal_precision, sell_unit_id, stock_status,
          created_at, updated_at
        )
-       SELECT $1, v->>'sku', v->>'variant_name', (v->>'price')::numeric, v->'attributes',
+       SELECT $1, v->>'sku', v->>'variant_name', NULLIF(v->>'price','')::numeric, v->'attributes',
          COALESCE((v->>'is_active')::boolean, true), NULLIF(v->>'mrp','')::numeric,
          NULLIF(v->>'price_ex_gst','')::numeric, v->>'mpn', v->>'gtin',
          NULLIF(v->>'asin',''), CASE WHEN NULLIF(v->>'asin','') IS NOT NULL THEN 'manual' ELSE NULL END,
