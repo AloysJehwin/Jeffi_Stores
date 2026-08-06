@@ -1689,12 +1689,12 @@ export async function getProductBreakdowns(): Promise<ProductStats> {
         FROM products WHERE is_active
        GROUP BY 1 ORDER BY 2 DESC
     `),
-    // Catalog value (Σ base_price) split by stock status — the "Inventory Value" breakdown.
+    // Top products by catalog value (base_price) — the "Inventory Value" breakdown.
     queryMany<{ label: string | null; count: number }>(`
-      SELECT COALESCE(stock_status, 'Unknown') AS label,
-             COALESCE(SUM(base_price), 0)::float AS count
-        FROM products WHERE is_active
-       GROUP BY 1 ORDER BY 2 DESC
+      SELECT name AS label, COALESCE(base_price, 0)::float AS count
+        FROM products WHERE is_active AND base_price > 0
+       ORDER BY base_price DESC
+       LIMIT 10
     `),
   ])
 
@@ -1707,6 +1707,10 @@ export async function getProductBreakdowns(): Promise<ProductStats> {
     byCategory: toSlices(catRows),
     byBrand: toSlices(brandRows),
     byStock: toSlices(stockRows, 5),
-    byInventoryValue: toSlices(invValueRows, 5),
+    byInventoryValue: invValueRows.map((r, i) => ({
+      label: r.label || 'Unnamed',
+      value: Number(r.count) || 0,
+      color: BREAKDOWN_PALETTE[i % BREAKDOWN_PALETTE.length],
+    })),
   }
 }
