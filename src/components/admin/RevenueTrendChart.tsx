@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import type { RevenueTrend } from '@/lib/queries'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 // Hand-rolled inline-SVG multi-line chart (no charting library — matches the house style in
 // TrafficClient.tsx). One line per order source, with a period selector, legend, and a hover
@@ -70,14 +71,14 @@ export default function RevenueTrendChart({ data: initial }: { data: RevenueTren
         <p className="text-sm font-semibold text-foreground">Revenue Trend</p>
         <div className="flex items-center gap-1.5">
           <span className="text-xs text-foreground-muted hidden sm:inline">by source ·</span>
-          <select
+          <AdminSelect
+            xs
             value={period}
-            onChange={e => changePeriod(e.target.value)}
+            options={PERIODS}
+            onChange={changePeriod}
             disabled={loading}
-            className="text-xs bg-surface border border-border-default rounded-md px-2 py-1 text-foreground-secondary hover:border-accent-400 focus:outline-none focus:ring-1 focus:ring-accent-400 disabled:opacity-50 cursor-pointer"
-          >
-            {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
+            className="w-28"
+          />
         </div>
       </div>
 
