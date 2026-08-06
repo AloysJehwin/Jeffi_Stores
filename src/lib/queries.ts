@@ -1628,3 +1628,85 @@ export async function getRevenueTrendBySource(period: RevenuePeriod = '12m'): Pr
   const series = REVENUE_SOURCES.map(s => ({ ...s, points: bySource.get(s.source)! }))
   return { months, series }
 }
+
+export interface BreakdownSlice { label: string; value: number; color: string }
+
+export interface ProductStats {
+  totalProducts: number
+  activeProducts: number
+  featured: number
+  categories: number
+  catalogValue: number
+  byCategory: BreakdownSlice[]
+  byBrand: BreakdownSlice[]
+  byStock: BreakdownSlice[]
+  byInventoryValue: BreakdownSlice[]   // Σ base_price split by stock status (₹)
+}
+
+// Categorical palette for the product breakdown bars (brand-neutral, light/dark safe).
+const BREAKDOWN_PALETTE = [
+  '#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ef4444',
+  '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#f97316',
+]
+
+// Cap a grouped result to top-N slices + an aggregated "Other" bucket, and colorize.
+function toSlices(rows: Array<{ label: string | null; count: number }>, topN = 8): BreakdownSlice[] {
+  const cleaned = rows.map(r => ({ label: r.label || 'Uncategorized', value: Number(r.count) || 0 }))
+  const top = cleaned.slice(0, topN)
+  const rest = cleaned.slice(topN)
+  if (rest.length) top.push({ label: 'Other', value: rest.reduce((s, r) => s + r.value, 0) })
+  return top.map((s, i) => ({ ...s, color: BREAKDOWN_PALETTE[i % BREAKDOWN_PALETTE.length] }))
+}
+
+// All the header metrics + three categorical breakdowns for the Products page, in one call.
+export async function getProductBreakdowns(): Promise<ProductStats> {
+  const [summary, catRows, brandRows, stockRows, invValueRows] = await Promise.all([
+    queryOne<{ total: number; active: number; featured: number; categories: number; catalog_value: number }>(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE is_active)::int AS active,
+        COUNT(*) FILTER (WHERE is_featured)::int AS featured,
+        (SELECT COUNT(*)::int FROM categories WHERE is_active) AS categories,
+        COALESCE(SUM(base_price) FILTER (WHERE is_active), 0)::float AS catalog_value
+      FROM products
+    `),
+    queryMany<{ label: string | null; count: number }>(`
+      SELECT COALESCE(top.name, 'Uncategorized') AS label, COUNT(*)::int AS count
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN categories top ON top.id = COALESCE(c.parent_category_id, c.id)
+       WHERE p.is_active
+       GROUP BY 1 ORDER BY 2 DESC
+    `),
+    queryMany<{ label: string | null; count: number }>(`
+      SELECT COALESCE(b.name, 'No Brand') AS label, COUNT(*)::int AS count
+        FROM products p LEFT JOIN brands b ON p.brand_id = b.id
+       WHERE p.is_active
+       GROUP BY 1 ORDER BY 2 DESC
+    `),
+    queryMany<{ label: string | null; count: number }>(`
+      SELECT COALESCE(stock_status, 'Unknown') AS label, COUNT(*)::int AS count
+        FROM products WHERE is_active
+       GROUP BY 1 ORDER BY 2 DESC
+    `),
+    // Catalog value (Σ base_price) split by stock status — the "Inventory Value" breakdown.
+    queryMany<{ label: string | null; count: number }>(`
+      SELECT COALESCE(stock_status, 'Unknown') AS label,
+             COALESCE(SUM(base_price), 0)::float AS count
+        FROM products WHERE is_active
+       GROUP BY 1 ORDER BY 2 DESC
+    `),
+  ])
+
+  return {
+    totalProducts: Number(summary?.total) || 0,
+    activeProducts: Number(summary?.active) || 0,
+    featured: Number(summary?.featured) || 0,
+    categories: Number(summary?.categories) || 0,
+    catalogValue: Number(summary?.catalog_value) || 0,
+    byCategory: toSlices(catRows),
+    byBrand: toSlices(brandRows),
+    byStock: toSlices(stockRows, 5),
+    byInventoryValue: toSlices(invValueRows, 5),
+  }
+}
