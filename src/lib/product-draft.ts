@@ -314,14 +314,17 @@ export async function publishProductDraft(productId: string): Promise<void> {
         skuVariantCache.set(sku, id)
         return id
       }
-      async function resolveSubVariantId(sku: string): Promise<string | null> {
-        if (skuSubVariantCache.has(sku)) return skuSubVariantCache.get(sku) ?? null
+      async function resolveSubVariantId(variantId: string, subName: string): Promise<string | null> {
+        const cacheKey = `${variantId}:${subName}`
+        if (skuSubVariantCache.has(cacheKey)) return skuSubVariantCache.get(cacheKey) ?? null
         const r = await client.query(
-          `SELECT id FROM product_sub_variants WHERE product_id = $1 AND sku = $2 LIMIT 1`,
-          [productId, sku]
+          `SELECT id FROM product_sub_variants
+           WHERE product_id = $1 AND variant_id = $2 AND sub_variant_name = $3 AND is_active = true
+           ORDER BY created_at DESC LIMIT 1`,
+          [productId, variantId, subName]
         )
         const id = r.rows[0]?.id ?? null
-        skuSubVariantCache.set(sku, id)
+        skuSubVariantCache.set(cacheKey, id)
         return id
       }
 
@@ -333,11 +336,15 @@ export async function publishProductDraft(productId: string): Promise<void> {
         if (!supplierId) continue
         let variantId: string | null = null
         let subVariantId: string | null = null
-        const subSku = s.sub_variant_sku ? String(s.sub_variant_sku) : ''
+        const subName = s.sub_variant_name ? String(s.sub_variant_name) : ''
         const varSku = s.variant_sku ? String(s.variant_sku) : ''
-        if (subSku) {
-          subVariantId = await resolveSubVariantId(subSku)
-          if (!subVariantId) continue // SKU didn't resolve → skip row
+        if (subName && varSku) {
+          // Sub-variant leaf: resolve parent variant by SKU, then sub-variant by name.
+          variantId = await resolveVariantId(varSku)
+          if (!variantId) continue
+          subVariantId = await resolveSubVariantId(variantId, subName)
+          if (!subVariantId) continue
+          variantId = null // leaf is the sub-variant, not the variant
         } else if (varSku) {
           variantId = await resolveVariantId(varSku)
           if (!variantId) continue // SKU didn't resolve → skip row
