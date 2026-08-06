@@ -738,6 +738,8 @@ export default function ProductForm({ categories, brands, action, product, produ
     imageOrder, existingImagesToKeep, galleryImageIds,
     // variants
     variants, groups,
+    // sub-variant leaf edits (incl. per-sub-variant supplier rows) live here
+    subVariantsMap,
   ])
 
   const wasPerishableOff = !(product?.perishable)
