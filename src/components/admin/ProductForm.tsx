@@ -2709,7 +2709,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         const nextVariant = navIndex < activeVariants.length - 1 ? activeVariants[navIndex + 1] : null
         return (
           <div className="fixed inset-0 z-[300] flex items-center justify-center p-4 bg-black/60" onClick={() => setVariantPopupId(null)}>
-            <div className="bg-surface rounded-xl border border-border-default shadow-2xl w-full max-w-5xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="bg-surface rounded-xl border border-border-default shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
               {/* Header */}
               <div className="flex items-center justify-between px-5 py-4 border-b border-border-default">
                 <div className="flex items-center gap-2 min-w-0">
@@ -2783,7 +2783,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     </div>
                   ) : (
-                  <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 xl:grid-cols-9 gap-3">
                     {/* MRP (Ex. GST) — primary input from price catalog */}
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">MRP (Ex. GST) *</label>
