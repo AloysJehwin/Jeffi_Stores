@@ -26,6 +26,7 @@ function formatINR(n: number): string {
 }
 
 function shortMonth(m: string): string {
+  if (!m) return ''
   const [y, mm] = m.split('-')
   const d = new Date(Number(y), Number(mm) - 1, 1)
   return d.toLocaleDateString('en-IN', { month: 'short' })
@@ -138,7 +139,7 @@ export default function RevenueTrendChart({ data: initial }: { data: RevenueTren
               ))}
             </svg>
 
-            {hover !== null && (
+            {hover !== null && months[hover] && (
               <div
                 className="absolute z-10 text-[11px] rounded px-2.5 py-2 shadow-lg pointer-events-none"
                 style={{
