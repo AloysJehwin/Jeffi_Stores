@@ -315,6 +315,85 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                 )}
               </div>
 
+              {/* Suppliers by price — grouped per leaf (product / variant / sub-variant) */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-2">Suppliers (by price)</p>
+                {data.suppliers?.length > 0 ? (
+                  <div className="space-y-4">
+                    {(() => {
+                      const NIL = '00000000-0000-0000-0000-000000000000'
+                      const bestByLeaf: Record<string, string> = data.bestByLeaf || {}
+                      // Group suppliers by leaf, preserving the price-ascending order the API returns.
+                      const groups = new Map<string, { label: string; rows: any[] }>()
+                      for (const row of data.suppliers as any[]) {
+                        const key = `${row.variant_id || NIL}:${row.sub_variant_id || NIL}`
+                        let g = groups.get(key)
+                        if (!g) {
+                          const label = row.sub_variant_id
+                            ? `Sub-variant: ${row.sub_variant_name || row.sub_variant_id}`
+                            : row.variant_id
+                            ? `Variant: ${row.variant_name || row.variant_id}`
+                            : 'Product'
+                          g = { label, rows: [] }
+                          groups.set(key, g)
+                        }
+                        g.rows.push(row)
+                      }
+                      return Array.from(groups.entries()).map(([leafKey, g]) => (
+                        <div key={leafKey}>
+                          <p className="text-[11px] font-medium text-foreground-secondary mb-1">{g.label}</p>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-border-default text-foreground-muted">
+                                  <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
+                                  <th className="text-right pb-1.5 pr-3 font-medium">Buy Price</th>
+                                  <th className="text-center pb-1.5 pr-3 font-medium">Preferred</th>
+                                  <th className="text-right pb-1.5 pr-3 font-medium">MOQ</th>
+                                  <th className="text-right pb-1.5 font-medium">Lead (days)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border-default">
+                                {g.rows.map((row: any) => {
+                                  const isBest = row.supplier_id === bestByLeaf[leafKey]
+                                  return (
+                                    <tr key={row.id} className={isBest ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface-secondary transition-colors'}>
+                                      <td className="py-1.5 pr-3">
+                                        <Link href={`/admin/suppliers/${row.supplier_id}`} className="text-accent-600 hover:underline">{row.supplier_name}</Link>
+                                        {isBest && <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300">Best</span>}
+                                      </td>
+                                      <td className="py-1.5 pr-3 text-right font-semibold text-foreground">
+                                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}
+                                      </td>
+                                      <td className="py-1.5 pr-3 text-center">{row.is_preferred ? '★' : '—'}</td>
+                                      <td className="py-1.5 pr-3 text-right text-foreground-muted">{row.moq ?? '—'}</td>
+                                      <td className="py-1.5 text-right text-foreground-muted">{row.lead_time_days ?? '—'}</td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      ))
+                    })()}
+                    {/* Lowest ever paid across all POs (actual purchases) */}
+                    {data.lowestHistoricalPrice != null && (
+                      <div className="flex flex-wrap gap-3">
+                        <div className="flex-1 min-w-[140px] bg-surface border border-border-default rounded-lg px-3 py-2">
+                          <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Lowest ever paid (PO)</p>
+                          <p className="text-base font-bold text-foreground">
+                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(data.lowestHistoricalPrice)}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-xs text-foreground-muted italic">No suppliers linked — edit product to add suppliers &amp; prices.</p>
+                )}
+              </div>
+
               {/* Last Purchase Price */}
               {data.lastPurchasePrice != null && (
                 <div className="flex items-center gap-3 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg px-3 py-2">

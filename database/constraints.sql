@@ -2722,6 +2722,63 @@ ALTER TABLE product_batches ADD CONSTRAINT product_batches_location_id_fkey FORE
 
 
 --
+-- Name: product_suppliers product_suppliers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: product_suppliers product_suppliers_unit_cost_nonneg; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.product_suppliers
+    ADD CONSTRAINT product_suppliers_unit_cost_nonneg CHECK (unit_cost >= 0);
+
+
+--
+-- Name: product_suppliers product_suppliers_one_leaf; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+-- Supplier attaches at exactly one leaf: at most one of variant_id / sub_variant_id set.
+
+ALTER TABLE public.product_suppliers
+    ADD CONSTRAINT product_suppliers_one_leaf CHECK (NOT (variant_id IS NOT NULL AND sub_variant_id IS NOT NULL));
+
+
+--
+-- Name: product_suppliers product_suppliers_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_suppliers product_suppliers_variant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_suppliers product_suppliers_sub_variant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_sub_variant_id_fkey FOREIGN KEY (sub_variant_id) REFERENCES public.product_sub_variants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_suppliers product_suppliers_supplier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id) ON DELETE RESTRICT;
+
+
+--
 -- PostgreSQL database dump complete
 --
 

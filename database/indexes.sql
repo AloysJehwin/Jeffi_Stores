@@ -1767,3 +1767,24 @@ CREATE UNIQUE INDEX uniq_product_units_sub_variant_unit ON public.product_units 
 
 CREATE UNIQUE INDEX uniq_product_units_variant_unit ON public.product_units USING btree (variant_id, unit) WHERE (variant_id IS NOT NULL);
 
+
+--
+-- Name: product_suppliers indexes; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_product_suppliers_product ON public.product_suppliers USING btree (product_id);
+
+CREATE INDEX idx_product_suppliers_supplier ON public.product_suppliers USING btree (supplier_id);
+
+CREATE INDEX idx_product_suppliers_variant ON public.product_suppliers USING btree (variant_id) WHERE (variant_id IS NOT NULL);
+
+CREATE INDEX idx_product_suppliers_sub_variant ON public.product_suppliers USING btree (sub_variant_id) WHERE (sub_variant_id IS NOT NULL);
+
+CREATE INDEX idx_product_suppliers_leaf_eff ON public.product_suppliers USING btree (product_id, variant_id, sub_variant_id, supplier_id, effective_date DESC);
+
+-- At most one preferred supplier per LEAF (product/variant/sub-variant). NULLs coalesced so
+-- the nil-uuid stands in for "no variant/sub-variant" and participates in the unique key.
+CREATE UNIQUE INDEX uq_product_suppliers_one_preferred
+    ON public.product_suppliers (product_id, COALESCE(variant_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(sub_variant_id, '00000000-0000-0000-0000-000000000000'::uuid))
+    WHERE (is_preferred = true);
+
