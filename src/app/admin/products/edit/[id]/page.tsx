@@ -557,8 +557,14 @@ async function updateProduct(productId: string, formData: FormData) {
           } else if (isPersisted && !variant._isDeleted) {
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, stock_status = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_grams = $13, package_type = $14, length_cm = $15, breadth_cm = $16, height_cm = $17, sub_variant_type = $18, variant_type = $19, discount_pct = $20
-               WHERE id = $21 AND product_id = $22`,
+              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, stock_status = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_grams = $13, package_type = $14, length_cm = $15, breadth_cm = $16, height_cm = $17, sub_variant_type = $18, variant_type = $19, discount_pct = $20,
+                 asin = $21,
+                 asin_match = CASE
+                   WHEN $21::text IS NULL THEN NULL
+                   WHEN asin_match IN ('gtin','listed') AND asin IS NOT DISTINCT FROM $21::text THEN asin_match
+                   ELSE 'manual' END,
+                 isbn = $22
+               WHERE id = $23 AND product_id = $24`,
               [
                 variantSku, variant.variant_name,
                 variant.price ? round2(parseFloat(variant.price)) : null,
@@ -580,6 +586,8 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.sub_variant_type || null,
                 variant.variant_type || null,
                 variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
+                variant.asin || null,
+                variant.isbn || null,
                 variant.id, productId,
               ]
             )
@@ -599,8 +607,8 @@ async function updateProduct(productId: string, formData: FormData) {
             if (!variant.variant_name) continue
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, is_active)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, true)`,
+              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, asin_match, isbn, is_active)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, CASE WHEN $22::text IS NOT NULL THEN 'manual' ELSE NULL END, $23, true)`,
               [
                 productId, variantSku, variant.variant_name,
                 variant.price ? round2(parseFloat(variant.price)) : null,
@@ -622,6 +630,8 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.sub_variant_type || null,
                 variant.variant_type || null,
                 variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
+                variant.asin || null,
+                variant.isbn || null,
               ]
             )
           }
