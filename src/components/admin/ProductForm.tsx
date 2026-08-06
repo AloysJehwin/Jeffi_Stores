@@ -273,9 +273,13 @@ export default function ProductForm({ categories, brands, action, product, produ
         if (v.id && Array.isArray(v.sub_variants) && v.sub_variants.length > 0) {
           init[v.id] = v.sub_variants.map((sv: any) => ({
             ...sv,
-            // Match published rows by sub_variant_id, or draft rows by sub_variant_sku.
+            // Published rows match by sub_variant_id; draft rows (no id/sku on
+            // sub-variants) match by variant_sku + sub_variant_name.
             product_suppliers: allSuppliers
-              .filter((s: any) => s.sub_variant_id === sv.id || (s.sub_variant_sku && s.sub_variant_sku === sv.sku))
+              .filter((s: any) =>
+                s.sub_variant_id === sv.id ||
+                (s.sub_variant_name && s.sub_variant_name === sv.sub_variant_name &&
+                  (!s.variant_sku || s.variant_sku === v.sku)))
               .map(toSupplierRow),
           }))
         }
@@ -914,13 +918,17 @@ export default function ProductForm({ categories, brands, action, product, produ
     } else {
       for (const v of variants) {
         if (v._isDeleted) continue
-        if (v.sub_variant_type_on) {
-          // Sub-variant leaves — tag by sub_variant_sku.
-          const svs = subVariantsMap[v.id || ''] || []
+        const svs = subVariantsMap[v.id || ''] || []
+        if (v.sub_variant_type_on || svs.length > 0) {
+          // Sub-variant leaves. Draft sub-variants have no SKU/stable id (they're
+          // DELETE+INSERT on publish), so tag by variant_sku + sub_variant_name —
+          // the only keys that survive. Requires the parent variant to have a SKU.
+          if (!v.sku) continue
           for (const sv of svs) {
-            if (!sv.sku) continue // unresolvable at publish without a SKU
+            const svName = sv.sub_variant_name
+            if (!svName) continue
             for (const s of (sv.product_suppliers || []).filter(valid)) {
-              out.push({ ...clean(s), sub_variant_sku: sv.sku })
+              out.push({ ...clean(s), variant_sku: v.sku, sub_variant_name: svName })
             }
           }
         } else if (v.sku) {
@@ -959,13 +967,19 @@ export default function ProductForm({ categories, brands, action, product, produ
       // Preserve per-sub-variant supplier rows across the refetch: prefer any
       // in-memory edits already on the map, else the seed from product.product_suppliers.
       const allSuppliers: any[] = Array.isArray(product?.product_suppliers) ? product.product_suppliers : []
+      const parentSku = variants.find(v => v.id === variantId)?.sku
       setSubVariantsMap(m => {
         const prev = m[variantId] || []
         const merged = loaded.map((sv: any) => {
           const existing = prev.find((p: any) => p.id === sv.id)
           const rows: SupplierRow[] = existing?.product_suppliers
             ? existing.product_suppliers
-            : allSuppliers.filter((s: any) => s.sub_variant_id === sv.id).map(toSupplierRow)
+            : allSuppliers
+                .filter((s: any) =>
+                  s.sub_variant_id === sv.id ||
+                  (s.sub_variant_name && s.sub_variant_name === sv.sub_variant_name &&
+                    (!s.variant_sku || s.variant_sku === parentSku)))
+                .map(toSupplierRow)
           return { ...sv, product_suppliers: rows }
         })
         return { ...m, [variantId]: merged }
