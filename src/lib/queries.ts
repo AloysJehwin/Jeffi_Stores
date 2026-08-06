@@ -209,7 +209,7 @@ export async function getProduct(id: string) {
             'id', pv.id, 'sku', pv.sku, 'variant_name', pv.variant_name,
             'price', pv.price, 'mrp', pv.mrp, 'mrp_ex_gst', pv.mrp_ex_gst, 'price_ex_gst', pv.price_ex_gst,
             'stock_status', pv.stock_status, 'inventory_quantity', pv.inventory_quantity,
-            'mpn', pv.mpn, 'gtin', pv.gtin, 'pricing_type', pv.pricing_type,
+            'mpn', pv.mpn, 'gtin', pv.gtin, 'asin', pv.asin, 'asin_match', pv.asin_match, 'isbn', pv.isbn, 'pricing_type', pv.pricing_type,
             'unit', pv.unit, 'numeric_value', pv.numeric_value,
             'weight_grams', pv.weight_grams, 'package_type', pv.package_type,
             'length_cm', pv.length_cm, 'breadth_cm', pv.breadth_cm, 'height_cm', pv.height_cm,
