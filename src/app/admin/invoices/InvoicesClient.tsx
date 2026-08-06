@@ -150,8 +150,10 @@ export default function InvoicesClient() {
   }
 
   function handleSort(col: string, dir: SortDir) {
-    setSortCol(col)
-    setSortDir(dir)
+    setSortCol(col || undefined)
+    setSortDir(col ? dir : undefined)
+    // Refetch from the server so sort applies across ALL rows, not just the current page.
+    // (a useEffect keyed on sortCol/sortDir triggers the page-1 refetch.)
   }
 
   const [customerName, setCustomerName] = useState('')
@@ -224,15 +226,8 @@ export default function InvoicesClient() {
     source: 'source',
   }
 
-  const sortedInvoices = sortCol && INVOICE_SORT_KEYS[sortCol]
-    ? [...invoices].sort((a, b) => {
-        const key = INVOICE_SORT_KEYS[sortCol]
-        const av = a[key] ?? ''
-        const bv = b[key] ?? ''
-        const cmp = String(av).localeCompare(String(bv), 'en', { numeric: true })
-        return sortDir === 'asc' ? cmp : -cmp
-      })
-    : invoices
+  // Rows are ordered server-side (across all invoices) via sort/dir params.
+  const sortedInvoices = invoices
 
   const fetchInvoices = useCallback(async (p = 1) => {
     setLoading(true)
@@ -243,6 +238,7 @@ export default function InvoicesClient() {
       if (fromDate) params.set('from', fromDate)
       if (toDate) params.set('to', toDate)
       if (searchQ) params.set('search', searchQ)
+      if (sortCol && INVOICE_SORT_KEYS[sortCol]) { params.set('sort', INVOICE_SORT_KEYS[sortCol]); params.set('dir', sortDir || 'desc') }
       params.set('page', String(p))
       const res = await fetch(`/api/admin/invoices?${params}`, { credentials: 'include' })
       if (!res.ok) throw new Error('Failed')
@@ -255,9 +251,9 @@ export default function InvoicesClient() {
     } finally {
       setLoading(false)
     }
-  }, [sourceFilter, paymentFilter, fromDate, toDate, searchQ, showToast])
+  }, [sourceFilter, paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir, showToast])
 
-  useEffect(() => { fetchInvoices(1) }, [sourceFilter, paymentFilter, fromDate, toDate, searchQ])
+  useEffect(() => { fetchInvoices(1) }, [sourceFilter, paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir])
 
   const fetchDrafts = useCallback(async () => {
     setDraftsLoading(true)

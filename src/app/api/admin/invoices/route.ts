@@ -98,7 +98,14 @@ export async function GET(request: NextRequest) {
     ` : null
 
     const unionQuery = [orderQuery, csQuery].filter(Boolean).join('\nUNION ALL\n')
-    const fullQuery = `SELECT * FROM (${unionQuery}) combined ORDER BY invoice_number DESC NULLS LAST`
+    // Whitelisted server-side sort over the full combined set (before LIMIT/OFFSET).
+    const SORT_COLS: Record<string, string> = {
+      invoice_number: 'invoice_number', invoice_date: 'invoice_date', customer_name: 'customer_name',
+      total_amount: 'total_amount', payment_status: 'payment_status', source: 'source',
+    }
+    const sortCol = SORT_COLS[searchParams.get('sort') || ''] || 'invoice_number'
+    const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
+    const fullQuery = `SELECT * FROM (${unionQuery}) combined ORDER BY ${sortCol} ${sortDir} NULLS LAST, invoice_number DESC NULLS LAST`
 
     const [rows, countRow] = await Promise.all([
       queryMany(`${fullQuery} LIMIT $${i} OFFSET $${i + 1}`, [...params, limit, offset]),

@@ -440,7 +440,9 @@ export async function getFilteredOrders(filters: {
 const PRODUCT_SORT_COLS: Record<string, string> = {
   name: 'p.name',
   sku: 'p.sku',
-  price: 'p.price',
+  // products has no `price` column — use the effective display price (min active variant
+  // price, else base_price). Sorting by 'p.price' errored the whole page.
+  price: '(COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price))',
   stock: 'p.stock_status',
   created_at: 'p.created_at',
   category: 'c.name',
