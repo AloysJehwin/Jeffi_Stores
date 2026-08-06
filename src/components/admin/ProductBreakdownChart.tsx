@@ -12,7 +12,7 @@ const VIEWS: { value: string; label: string }[] = [
   { value: 'category', label: 'By Category' },
   { value: 'brand', label: 'By Brand' },
   { value: 'stock', label: 'By Stock' },
-  { value: 'inventory', label: 'Inventory Value' },
+  { value: 'inventory', label: 'Top Value' },
 ]
 
 export default function ProductBreakdownChart({
@@ -58,7 +58,7 @@ export default function ProductBreakdownChart({
                   <span className="text-foreground-secondary truncate mr-2">{row.label}</span>
                   <span className="text-foreground-muted flex-shrink-0">
                     {fmt(row.value)}
-                    <span className="ml-1 text-[10px]">({share}%)</span>
+                    {!isMoney && <span className="ml-1 text-[10px]">({share}%)</span>}
                   </span>
                 </div>
                 <div className="h-2.5 rounded-full bg-surface-secondary overflow-hidden">
