@@ -165,8 +165,8 @@ async function createProduct(formData: FormData) {
           if (!variant.variant_name) continue
           const variantSku = generateVariantSku(sku, variant.variant_name)
           await query(
-            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, is_active)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, true)`,
+            `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, isbn, is_active)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, true)`,
             [
               data.id,
               variantSku,
@@ -191,6 +191,7 @@ async function createProduct(formData: FormData) {
               variant.variant_type || null,
               variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
               variant.asin || null,
+              variant.isbn || null,
             ]
           )
         }

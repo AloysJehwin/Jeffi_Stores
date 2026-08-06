@@ -211,6 +211,7 @@ CREATE TABLE public.product_variants (
     gtin character varying(50),
     asin character varying(20),
     asin_match character varying(16),
+    isbn character varying(20),
     pricing_type character varying(20) DEFAULT 'unit'::character varying NOT NULL,
     unit character varying(20),
     numeric_value numeric(10,3),
