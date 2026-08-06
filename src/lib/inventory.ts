@@ -231,8 +231,10 @@ export async function getStockValuation(filters: {
   categoryName?: string
   brandName?: string
   stockStatus?: string
+  sort?: string
+  dir?: string
 } = {}) {
-  const { limit = 50, offset = 0, search, categoryName, brandName, stockStatus } = filters
+  const { limit = 50, offset = 0, search, categoryName, brandName, stockStatus, sort, dir } = filters
 
   // Build WHERE conditions applied to each UNION leg via a wrapping CTE
   const havingClauses: string[] = []
@@ -438,10 +440,21 @@ export async function getStockValuation(filters: {
     params
   ).then(r => r?.n || 0).catch(() => 0)
 
+  // Server-side sort (across ALL matching SKUs, not just the page). Whitelist columns.
+  const VAL_SORT_COLS: Record<string, string> = {
+    product: 'rows.name', variant: 'rows.variant_name', sku: 'rows.row_sku',
+    stock: 'rows.inventory_quantity', price: 'rows.cost_price', value: 'rows.stock_value',
+  }
+  const sortCol = (sort && VAL_SORT_COLS[sort]) || null
+  const sortDir = dir === 'asc' ? 'ASC' : 'DESC'
+  const orderBy = sortCol
+    ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, rows.name, rows.variant_name, rows.sub_variant_name`
+    : `ORDER BY rows.name, rows.variant_name, rows.sub_variant_name`
+
   // Paginated rows
   const pageParams = [...params, limit, offset]
   const products = await queryMany<any>(
-    `${baseQuery} SELECT rows.* FROM rows ${whereClause} ORDER BY rows.name, rows.variant_name, rows.sub_variant_name LIMIT $${i} OFFSET $${i + 1}`,
+    `${baseQuery} SELECT rows.* FROM rows ${whereClause} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`,
     pageParams
   )
 
