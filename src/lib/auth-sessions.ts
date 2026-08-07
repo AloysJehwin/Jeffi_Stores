@@ -1,12 +1,17 @@
 import { query, queryOne, queryMany } from './db'
 
-// Server-side revocable sessions backing the JWT `sid` claim. Node-only (uses pg).
-// Enforced in the Node layer (jwt.ts authenticate*), not in Edge middleware.
+// Server-side sessions. The session id (auth_sessions.id) IS the opaque cookie value —
+// no JWT. resolveSession() is the single source of truth used by BOTH the Node-runtime
+// middleware and the Node authenticate* functions. Node-only (uses pg).
 
 export type PrincipalType = 'admin' | 'customer' | 'business'
 
 export const IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000 // 24h of inactivity ends a session
 const TOUCH_WINDOW_MS = 5 * 60 * 1000               // only bump last_seen_at every 5 min
+
+// Matches a v4-style uuid; used to reject legacy signed-JWT cookies ("eyJ...") cheaply
+// before any DB hit.
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export interface AuthSessionRow {
   id: string
@@ -20,47 +25,111 @@ export interface AuthSessionRow {
   ip_address: string | null
 }
 
-// Create a session row at login/signup. Returns the sid to embed in the JWT.
+// The resolved principal for a live session — everything the middleware + authenticate*
+// functions need. Security fields (role/scopes/certCN/approvalStatus) are snapshotted on
+// the session row at login; email/displayName are joined fresh from admins/users.
+export interface ResolvedSession {
+  sid: string
+  principalType: PrincipalType
+  principalId: string
+  role: string | null
+  scopes: string[]
+  certCN: string | null
+  approvalStatus: string | null
+  email: string | null
+  displayName: string | null
+}
+
+// Create a session row at login/signup. Returns the opaque sid = the cookie value.
 export async function createSession(args: {
   principalType: PrincipalType
   principalId: string
   ttlSeconds: number
   userAgent?: string | null
   ip?: string | null
+  role?: string | null
+  scopes?: string[] | null
+  certCN?: string | null
+  approvalStatus?: string | null
 }): Promise<{ sid: string; expiresAt: string }> {
   const expiresAt = new Date(Date.now() + args.ttlSeconds * 1000).toISOString()
   const row = await queryOne<{ id: string }>(
-    `INSERT INTO auth_sessions (principal_type, principal_id, expires_at, user_agent, ip_address)
-     VALUES ($1, $2, $3, $4, $5)
+    `INSERT INTO auth_sessions
+       (principal_type, principal_id, expires_at, user_agent, ip_address, role, scopes, cert_cn, approval_status)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
      RETURNING id`,
-    [args.principalType, args.principalId, expiresAt, args.userAgent || null, args.ip || null]
+    [
+      args.principalType, args.principalId, expiresAt,
+      args.userAgent || null, args.ip || null,
+      args.role || null, JSON.stringify(args.scopes || []),
+      args.certCN || null, args.approvalStatus || null,
+    ]
   )
   if (!row) throw new Error('Failed to create session')
   return { sid: row.id, expiresAt }
 }
 
-// Hot path: validate a session by sid. Rejects if missing / wrong principal type /
-// revoked / past absolute expiry / idle-expired. On success, throttled fire-and-forget
-// touch of last_seen_at (never awaited on the request critical path).
-export async function validateSession(sid: string, principalType: PrincipalType): Promise<boolean> {
-  if (!sid) return false
-  const row = await queryOne<{ revoked_at: string | null; expires_at: string; last_seen_at: string }>(
-    `SELECT revoked_at, expires_at, last_seen_at
-     FROM auth_sessions
-     WHERE id = $1 AND principal_type = $2`,
-    [sid, principalType]
+// Hot path: resolve an opaque session id to its live principal, or null if the sid isn't
+// a uuid / no row / revoked / past absolute expiry / idle-expired. On success, throttled
+// fire-and-forget last_seen_at touch (never awaited). email/displayName joined fresh:
+// admins.user_id → users for admin; principal_id → users for customer/business.
+export async function resolveSession(sid: string): Promise<ResolvedSession | null> {
+  if (!sid || !UUID_RE.test(sid)) return null
+  const row = await queryOne<{
+    principal_type: PrincipalType; principal_id: string
+    revoked_at: string | null; expires_at: string; last_seen_at: string
+    role: string | null; scopes: any; cert_cn: string | null; approval_status: string | null
+    email: string | null; first_name: string | null; last_name: string | null
+  }>(
+    `SELECT s.principal_type, s.principal_id, s.revoked_at, s.expires_at, s.last_seen_at,
+            s.role, s.scopes, s.cert_cn, s.approval_status,
+            u.email, u.first_name, u.last_name
+     FROM auth_sessions s
+     LEFT JOIN admins a ON a.id = s.principal_id AND s.principal_type = 'admin'
+     LEFT JOIN users u ON u.id = COALESCE(a.user_id, s.principal_id)
+     WHERE s.id = $1`,
+    [sid]
   )
-  if (!row) return false
-  if (row.revoked_at) return false
+  if (!row) return null
+  if (row.revoked_at) return null
   const now = Date.now()
-  if (new Date(row.expires_at).getTime() <= now) return false
-  if (now - new Date(row.last_seen_at).getTime() > IDLE_TIMEOUT_MS) return false
+  if (new Date(row.expires_at).getTime() <= now) return null
+  if (now - new Date(row.last_seen_at).getTime() > IDLE_TIMEOUT_MS) return null
 
-  // Throttled liveness touch — fire-and-forget, never blocks the request.
   if (now - new Date(row.last_seen_at).getTime() > TOUCH_WINDOW_MS) {
     query(`UPDATE auth_sessions SET last_seen_at = now() WHERE id = $1`, [sid]).catch(() => {})
   }
-  return true
+
+  const displayName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || row.email || null
+  return {
+    sid,
+    principalType: row.principal_type,
+    principalId: row.principal_id,
+    role: row.role,
+    scopes: Array.isArray(row.scopes) ? row.scopes : [],
+    certCN: row.cert_cn,
+    approvalStatus: row.approval_status,
+    email: row.email,
+    displayName,
+  }
+}
+
+// Thin wrapper over resolveSession — one liveness implementation, no drift.
+export async function validateSession(sid: string, principalType: PrincipalType): Promise<boolean> {
+  const s = await resolveSession(sid)
+  return !!s && s.principalType === principalType
+}
+
+// Slide the absolute expiry forward (session "refresh"). Keeps the same sid — the cookie
+// value never changes. Only touches live sessions.
+export async function extendSession(sid: string, ttlSeconds: number): Promise<void> {
+  if (!sid) return
+  const expiresAt = new Date(Date.now() + ttlSeconds * 1000).toISOString()
+  await query(
+    `UPDATE auth_sessions SET expires_at = $2, last_seen_at = now()
+     WHERE id = $1 AND revoked_at IS NULL`,
+    [sid, expiresAt]
+  )
 }
 
 export async function revokeSession(sid: string): Promise<void> {

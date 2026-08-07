@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { query, queryOne } from '@/lib/db'
 import { NextRequest } from 'next/server'
 import { ALL_SCOPE_KEYS } from '@/lib/scopes'
+import { revokeAllForPrincipal } from '@/lib/auth-sessions'
 
 export async function PATCH(
   request: NextRequest,
@@ -70,6 +71,13 @@ export async function PATCH(
 
     if (!updated) {
       return NextResponse.json({ error: 'Admin not found' }, { status: 404 })
+    }
+
+    // Role/scopes are snapshotted onto auth_sessions at login; if they changed here the
+    // live sessions are stale. Revoke them so the admin re-logs-in with a fresh snapshot.
+    // Best-effort: never let a revoke failure break the update response.
+    if (role !== undefined || scopes !== undefined) {
+      await revokeAllForPrincipal('admin', id).catch(() => {})
     }
 
     if (is_active === false) {

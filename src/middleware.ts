@@ -1,26 +1,15 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifyToken } from './lib/jwt'
+import { verifyToken, verifyBusinessToken } from './lib/jwt'
 import { getScopeForPath, hasScope } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
-import { jwtVerify } from 'jose'
 
-if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
-const BUSINESS_JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
-
-async function verifyBusinessToken(token: string): Promise<{ userId: string; email: string; approvalStatus: string } | null> {
-  try {
-    const { payload } = await jwtVerify(token, BUSINESS_JWT_SECRET)
-    if (payload.type !== 'business' || !payload.isBusiness) return null
-    return {
-      userId: payload.userId as string,
-      email: payload.email as string,
-      approvalStatus: (payload.approvalStatus as string) || 'pending',
-    }
-  } catch {
-    return null
-  }
-}
+// Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
+// it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
+// middleware is stable in Next 15.5. pg is kept external via serverExternalPackages.
+// Session lookups only run when an auth cookie is present, so anonymous storefront
+// traffic does zero auth DB queries.
+export const runtime = 'nodejs'
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',

@@ -53,7 +53,7 @@ export async function POST(request: NextRequest) {
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
     logActivity({ userId: user.id, kind: 'login', summary: 'Business login via OTP', metadata: { provider: 'otp' } }).catch(() => {})
 
-    const { token } = await issueUserToken({
+    const { sid } = await issueUserToken({
       userId: user.id,
       email: user.email,
       type: 'business',
@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
       path: '/',
       ...cookieDomainOption(),
     }
-    cookieStore.set('business_auth_token', token, cookieOpts)
+    cookieStore.set('business_auth_token', sid, cookieOpts)
     cookieStore.set('session_id', user.id, cookieOpts)
 
     await deleteOTP(email)

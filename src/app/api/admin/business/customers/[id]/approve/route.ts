@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { queryOne, query } from '@/lib/db'
+import { revokeAllForPrincipal } from '@/lib/auth-sessions'
 import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } from '@/lib/email-business'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -46,6 +47,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       sendBusinessAccountRejectedEmail(userInfo.email, name, userInfo.company_name || '', rejectionNote || null).catch(() => {})
     }
   }
+
+  // approval_status is snapshotted onto business auth_sessions at login; flipping it here
+  // makes the live session stale. Revoke so the user re-logs-in with a fresh snapshot
+  // (pending → approved gate, or the rejection gate). principal_id for business = users.id
+  // = the [id] param. Best-effort: don't let a revoke failure break the response.
+  await revokeAllForPrincipal('business', id).catch(() => {})
 
   return NextResponse.json({ success: true, action })
 }

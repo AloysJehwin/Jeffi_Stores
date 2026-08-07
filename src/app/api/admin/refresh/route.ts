@@ -1,23 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { authenticateAdmin, generateToken, JWT_MAX_AGE_S } from '@/lib/jwt'
+import { authenticateAdmin, JWT_MAX_AGE_S } from '@/lib/jwt'
+import { extendSession } from '@/lib/auth-sessions'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
-  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!admin || !admin.sid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const token = await generateToken({
-    adminId: admin.adminId,
-    first_name: admin.first_name,
-    last_name: admin.last_name,
-    email: admin.email,
-    role: admin.role,
-    scopes: admin.scopes,
-    sid: admin.sid, // reuse the existing session — never mint a second row on refresh
-  })
+  // Opaque sessions: "refresh" slides the same session's expiry forward and re-sets the
+  // cookie (same sid value). No new session row, no new token.
+  await extendSession(admin.sid, JWT_MAX_AGE_S)
 
   const response = NextResponse.json({ success: true })
-  response.cookies.set('admin_token', token, {
+  response.cookies.set('admin_token', admin.sid, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

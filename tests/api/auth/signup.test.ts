@@ -20,6 +20,13 @@ vi.mock('@/lib/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
+// Opaque sessions: signup issues a server-side session and sets cookie = sid.
+// Mocking issueUserToken avoids exercising createSession's DB INSERT.
+vi.mock('@/lib/issue-session', () => ({
+  issueUserToken: vi.fn().mockResolvedValue({ sid: 'user-sid' }),
+  USER_SESSION_TTL_S: 7 * 24 * 60 * 60,
+}))
+
 vi.mock('@/lib/email', () => ({
   sendWelcomeEmail: vi.fn().mockResolvedValue(undefined),
 }))
@@ -166,7 +173,7 @@ describe('POST /api/auth/signup', () => {
       await POST(makeRequest(VALID_BODY) as any)
       expect(mockCookieStore.set).toHaveBeenCalledWith(
         'auth_token',
-        expect.any(String),
+        'user-sid',
         expect.objectContaining({ httpOnly: true })
       )
     })

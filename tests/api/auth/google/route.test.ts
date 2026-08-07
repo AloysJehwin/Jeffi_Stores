@@ -19,6 +19,7 @@ const mockQueryOne = vi.hoisted(() => vi.fn())
 const mockQuery = vi.hoisted(() => vi.fn().mockResolvedValue({ rows: [] }))
 const mockLogActivity = vi.hoisted(() => vi.fn().mockResolvedValue(undefined))
 const mockUploadAvatarImage = vi.hoisted(() => vi.fn())
+const mockIssueUserToken = vi.hoisted(() => vi.fn().mockResolvedValue({ sid: 'user-sid' }))
 
 vi.mock('next/headers', () => ({
   cookies: vi.fn().mockResolvedValue(mockCookieStore),
@@ -29,6 +30,13 @@ vi.mock('@/lib/db', () => ({
   queryOne: mockQueryOne,
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
+}))
+
+// Opaque sessions: the route issues a server-side session and sets cookie = sid.
+// Mocking issueUserToken avoids exercising createSession's DB INSERT.
+vi.mock('@/lib/issue-session', () => ({
+  issueUserToken: mockIssueUserToken,
+  USER_SESSION_TTL_S: 7 * 24 * 60 * 60,
 }))
 
 vi.mock('@/lib/activity', () => ({
@@ -97,6 +105,7 @@ describe('POST /api/auth/google', () => {
     mockCookieStore.get.mockReturnValue(undefined)
     mockQuery.mockResolvedValue({ rows: [] })
     mockLogActivity.mockResolvedValue(undefined)
+    mockIssueUserToken.mockResolvedValue({ sid: 'user-sid' })
   })
 
   it('returns 400 when neither idToken nor accessToken is provided', async () => {
@@ -140,7 +149,7 @@ describe('POST /api/auth/google', () => {
     const body = await res.json()
     expect(body.message).toMatch(/login successful/i)
     expect(body.user.email).toBe('user@example.com')
-    expect(mockCookieStore.set).toHaveBeenCalledWith('auth_token', expect.any(String), expect.any(Object))
+    expect(mockCookieStore.set).toHaveBeenCalledWith('auth_token', 'user-sid', expect.any(Object))
   })
 
   it('returns 500 when user insert returns null', async () => {

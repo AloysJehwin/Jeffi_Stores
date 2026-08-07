@@ -3,17 +3,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ---------------------------------------------------------------------------
 // Mocks — vi.hoisted() ensures variables are defined before vi.mock() factories
 // ---------------------------------------------------------------------------
-const { mockDelete, mockCookies, mockGetHost, mockRedirect, mockAp } =
-  vi.hoisted(() => {
-    const mockDelete = vi.fn()
-    return {
-      mockDelete,
-      mockCookies: vi.fn().mockReturnValue({ delete: mockDelete }),
-      mockGetHost: vi.fn().mockResolvedValue(''),
-      mockRedirect: vi.fn(),
-      mockAp: vi.fn(),
-    }
-  })
+const {
+  mockDelete,
+  mockGet,
+  mockCookies,
+  mockGetHost,
+  mockRedirect,
+  mockAp,
+  mockVerifyToken,
+  mockRevokeSession,
+} = vi.hoisted(() => {
+  const mockDelete = vi.fn()
+  const mockGet = vi.fn().mockReturnValue(undefined)
+  return {
+    mockDelete,
+    mockGet,
+    mockCookies: vi.fn().mockReturnValue({ delete: mockDelete, get: mockGet }),
+    mockGetHost: vi.fn().mockResolvedValue(''),
+    mockRedirect: vi.fn(),
+    mockAp: vi.fn(),
+    mockVerifyToken: vi.fn().mockResolvedValue(null),
+    mockRevokeSession: vi.fn().mockResolvedValue(undefined),
+  }
+})
 
 vi.mock('next/headers', () => ({
   cookies: mockCookies,
@@ -31,6 +43,16 @@ vi.mock('@/lib/admin-path', () => ({
   ap: mockAp,
 }))
 
+// Opaque sessions: logout resolves the admin_token cookie via verifyToken and
+// revokes the server-side session before clearing the cookie.
+vi.mock('@/lib/jwt', () => ({
+  verifyToken: mockVerifyToken,
+}))
+
+vi.mock('@/lib/auth-sessions', () => ({
+  revokeSession: mockRevokeSession,
+}))
+
 import { logoutAction } from '@/app/admin/logout-action'
 
 describe('logoutAction', () => {
@@ -38,6 +60,9 @@ describe('logoutAction', () => {
     vi.clearAllMocks()
     mockGetHost.mockResolvedValue('')
     mockAp.mockReturnValue('/admin/login')
+    mockGet.mockReturnValue(undefined)
+    mockVerifyToken.mockResolvedValue(null)
+    mockRevokeSession.mockResolvedValue(undefined)
   })
 
   it('deletes admin_token cookie', async () => {
@@ -73,5 +98,28 @@ describe('logoutAction', () => {
     mockGetHost.mockResolvedValue('')
     await logoutAction()
     expect(mockAp).toHaveBeenCalledWith('/admin/login', '')
+  })
+
+  it('revokes the server-side session for the admin_token cookie sid', async () => {
+    mockGet.mockReturnValue({ value: 'the-cookie-sid' })
+    mockVerifyToken.mockResolvedValue({
+      adminId: 'admin-1',
+      sid: 'admin-sid',
+      role: 'admin',
+      scopes: [],
+    })
+    await logoutAction()
+    expect(mockVerifyToken).toHaveBeenCalledWith('the-cookie-sid')
+    expect(mockRevokeSession).toHaveBeenCalledWith('admin-sid')
+    expect(mockDelete).toHaveBeenCalledWith('admin_token')
+    expect(mockRedirect).toHaveBeenCalled()
+  })
+
+  it('does not revoke a session when there is no admin_token cookie', async () => {
+    mockGet.mockReturnValue(undefined)
+    await logoutAction()
+    expect(mockVerifyToken).not.toHaveBeenCalled()
+    expect(mockRevokeSession).not.toHaveBeenCalled()
+    expect(mockDelete).toHaveBeenCalledWith('admin_token')
   })
 })

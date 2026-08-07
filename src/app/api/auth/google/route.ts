@@ -132,7 +132,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { token } = await issueUserToken({
+    const { sid } = await issueUserToken({
       userId: user.id,
       email: user.email,
       type: 'customer',
@@ -140,7 +140,7 @@ export async function POST(request: NextRequest) {
       ip: request.headers.get('x-forwarded-for'),
     })
 
-    cookieStore.set('auth_token', token, {
+    cookieStore.set('auth_token', sid, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
