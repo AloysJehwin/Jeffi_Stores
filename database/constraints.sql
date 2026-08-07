@@ -2379,6 +2379,14 @@ ALTER TABLE ONLY public.purchase_order_items
     ADD CONSTRAINT purchase_order_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id) ON DELETE RESTRICT;
 
 
+--
+-- Name: purchase_order_items purchase_order_items_sub_variant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_order_items
+    ADD CONSTRAINT purchase_order_items_sub_variant_id_fkey FOREIGN KEY (sub_variant_id) REFERENCES public.product_sub_variants(id) ON DELETE RESTRICT;
+
+
 
 --
 -- Name: purchase_orders purchase_orders_supplier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -

@@ -41,7 +41,7 @@ type Supplier = { id: string; name: string }
 type POSearchMode = 'name' | 'sku' | 'category'
 
 type POLineItem = {
-  id: string; product_id: string; variant_id: string; product_name: string
+  id: string; product_id: string; variant_id: string; sub_variant_id: string; product_name: string
   sku: string; quantity: string; tax_rate: string; hsn_code: string; mrp: number
   sell_unit_label: string; sell_unit_dimension: string
   purchase_unit: string
@@ -59,7 +59,7 @@ type PickerProduct = {
 function newPOLineItem(): POLineItem {
   return {
     id: Math.random().toString(36).slice(2),
-    product_id: '', variant_id: '', product_name: '', sku: '',
+    product_id: '', variant_id: '', sub_variant_id: '', product_name: '', sku: '',
     quantity: '1', tax_rate: '0', hsn_code: '', mrp: 0,
     sell_unit_label: '', sell_unit_dimension: '',
     purchase_unit: '', purchase_unit_factor: '1',
@@ -68,14 +68,17 @@ function newPOLineItem(): POLineItem {
 }
 
 function decodePOLineItemId(encoded: string) {
-  const [product_id, variant_id_raw, , gst_raw, hsn_raw, , sell_unit_label_raw, sell_unit_dimension_raw] = encoded.split('|')
+  // po_line_items suggest encoding (src/app/api/admin/suggest/route.ts):
+  // [0]product_id [1]variant_id [2]base_price [3]gst [4]hsn [5]mrp [6]inventory [7]sub_variant_id [8]discount
+  const parts = encoded.split('|')
   return {
-    product_id,
-    variant_id: variant_id_raw || '',
-    tax_rate: gst_raw ? String(Math.round(parseFloat(gst_raw))) : '0',
-    hsn_code: hsn_raw || '',
-    sell_unit_label: sell_unit_label_raw || '',
-    sell_unit_dimension: sell_unit_dimension_raw || '',
+    product_id: parts[0],
+    variant_id: parts[1] || '',
+    sub_variant_id: parts[7] || '',
+    tax_rate: parts[3] ? String(Math.round(parseFloat(parts[3]))) : '0',
+    hsn_code: parts[4] || '',
+    sell_unit_label: '',
+    sell_unit_dimension: '',
   }
 }
 
@@ -203,6 +206,7 @@ export default function NewPOPage() {
       .filter(it => it.product_id && parseFloat(it.quantity) > 0)
       .map(it => ({
         product_id: it.product_id, variant_id: it.variant_id || null,
+        sub_variant_id: it.sub_variant_id || null,
         product_name: it.product_name, sku: it.sku,
         quantity: parseFloat(it.quantity),
         tax_rate: parseFloat(it.tax_rate) || 0,
@@ -350,7 +354,7 @@ export default function NewPOPage() {
                           onSelect={s => {
                             const d = decodePOLineItemId(s.id)
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
-                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label, sell_unit_dimension: d.sell_unit_dimension }
+                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, sub_variant_id: d.sub_variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label, sell_unit_dimension: d.sell_unit_dimension }
                             setLineItems(mergeOrReplaceLineItem(it.id, populated))
                           }}
                           inputClassName={inputCls} placeholder="Search by product name..." />
@@ -361,7 +365,7 @@ export default function NewPOPage() {
                           onSelect={s => {
                             const d = decodePOLineItemId(s.id)
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
-                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label, sell_unit_dimension: d.sell_unit_dimension }
+                            const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, sub_variant_id: d.sub_variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label, sell_unit_dimension: d.sell_unit_dimension }
                             setLineItems(mergeOrReplaceLineItem(it.id, populated))
                           }}
                           inputClassName={inputCls + ' font-mono'} placeholder="e.g. JFS-1234" />

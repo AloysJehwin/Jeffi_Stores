@@ -441,7 +441,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                               {new Date(row.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </td>
                             <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
-                            <td className="py-1.5 pr-3 text-foreground-muted">{row.variant_name ?? '—'}</td>
+                            <td className="py-1.5 pr-3 text-foreground-muted">{row.sub_variant_name || row.variant_name || '—'}</td>
                             <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
                             <td className="py-1.5 pr-3 text-right text-foreground">
                               {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}

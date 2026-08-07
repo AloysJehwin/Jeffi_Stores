@@ -1788,3 +1788,10 @@ CREATE UNIQUE INDEX uq_product_suppliers_one_preferred
     ON public.product_suppliers (product_id, COALESCE(variant_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(sub_variant_id, '00000000-0000-0000-0000-000000000000'::uuid))
     WHERE (is_preferred = true);
 
+
+--
+-- Name: purchase_order_items sub_variant index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_poi_sub_variant ON public.purchase_order_items USING btree (sub_variant_id) WHERE (sub_variant_id IS NOT NULL);
+

@@ -77,6 +77,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       queryMany<any>(
         `SELECT poi.product_id, p.name AS product_name,
                 poi.variant_id, pv.variant_name,
+                poi.sub_variant_id, psv.sub_variant_name,
                 SUM(poi.quantity) AS total_qty,
                 COUNT(DISTINCT po.id)::int AS po_count,
                 MAX(po.order_date) AS last_order_date,
@@ -85,7 +86,8 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
          JOIN purchase_orders po ON po.id = poi.po_id AND po.supplier_id = $1
          JOIN products p ON p.id = poi.product_id
          LEFT JOIN product_variants pv ON pv.id = poi.variant_id
-         GROUP BY poi.product_id, p.name, poi.variant_id, pv.variant_name
+         LEFT JOIN product_sub_variants psv ON psv.id = poi.sub_variant_id
+         GROUP BY poi.product_id, p.name, poi.variant_id, pv.variant_name, poi.sub_variant_id, psv.sub_variant_name
          ORDER BY MAX(po.order_date) DESC
          LIMIT 100`,
         [id]
