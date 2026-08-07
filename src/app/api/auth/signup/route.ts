@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isOTPVerified, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { sendWelcomeEmail } from '@/lib/email'
 import { queryOne } from '@/lib/db'
-import { SignJWT } from 'jose'
+import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
@@ -11,7 +11,6 @@ import { POLICY_VERSION } from '@/app/legal/policies'
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
 }
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 export async function POST(request: NextRequest) {
   try {
@@ -78,21 +77,20 @@ export async function POST(request: NextRequest) {
       metadata: { email, source: 'email_otp' },
     }).catch(() => {})
 
-    const token = await new SignJWT({
+    const { token } = await issueUserToken({
       userId: newUser.id,
       email: newUser.email,
       type: 'customer',
+      userAgent: request.headers.get('user-agent'),
+      ip: request.headers.get('x-forwarded-for'),
     })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setExpirationTime('30d')
-      .sign(JWT_SECRET)
 
     const cookieStore = await cookies()
     cookieStore.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60,
+      maxAge: USER_SESSION_TTL_S,
       path: '/',
       ...cookieDomainOption(),
     })
@@ -101,7 +99,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60,
+      maxAge: USER_SESSION_TTL_S,
       path: '/',
       ...cookieDomainOption(),
     })

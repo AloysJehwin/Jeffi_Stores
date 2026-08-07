@@ -2,25 +2,14 @@ export const dynamic = 'force-dynamic'
 
 import { cookies, headers } from 'next/headers'
 import { logoutAction } from './logout-action'
-import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { getAdminSession } from '@/lib/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
 
 export const metadata = {
   title: 'Admin Panel - Jeffi Stores',
   description: 'Secure admin panel for Jeffi Stores',
   robots: 'noindex, nofollow',
-}
-
-async function getAdminSession() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
-  if (!token) return null
-  try {
-    return await verifyToken(token.value)
-  } catch {
-    return null
-  }
 }
 
 export default async function AdminLayout({
