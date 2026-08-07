@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
       metadata: { email, source: 'email_otp' },
     }).catch(() => {})
 
-    const { token } = await issueUserToken({
+    const { sid } = await issueUserToken({
       userId: newUser.id,
       email: newUser.email,
       type: 'customer',
@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     })
 
     const cookieStore = await cookies()
-    cookieStore.set('auth_token', token, {
+    cookieStore.set('auth_token', sid, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { generateToken, JWT_MAX_AGE_S } from '@/lib/jwt'
+import { JWT_MAX_AGE_S } from '@/lib/jwt'
 import { createSession } from '@/lib/auth-sessions'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 
@@ -19,28 +19,22 @@ export async function issueAdminSession(
 ) {
   const displayName =
     `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || admin.email || ''
-  // Create a revocable server-side session; embed its id as the JWT `sid`.
+  // Opaque server-side session: the cookie value is the session id (a uuid), NOT a JWT.
+  // role/scopes/cert_cn are snapshotted onto the row for the Node middleware's gate.
   const { sid } = await createSession({
     principalType: 'admin',
     principalId: admin.id,
     ttlSeconds: JWT_MAX_AGE_S,
-  })
-  const token = await generateToken({
-    adminId: admin.id,
-    first_name: admin.first_name || undefined,
-    last_name: admin.last_name || undefined,
-    email: admin.email || undefined,
     role: admin.role,
     scopes: admin.scopes || [],
-    authCertCN: certCN || undefined,
-    sid,
+    certCN: certCN || null,
   })
   const response = NextResponse.json({
     success: true,
     admin: { name: displayName, email: admin.email || undefined, role: admin.role },
     ...(extraBody || {}),
   })
-  response.cookies.set('admin_token', token, {
+  response.cookies.set('admin_token', sid, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',

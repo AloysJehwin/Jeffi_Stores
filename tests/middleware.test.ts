@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
-import { SignJWT } from 'jose'
 
 // ---------------------------------------------------------------------------
 // Mocks — vi.hoisted() ensures these are defined before vi.mock() factories run
 // ---------------------------------------------------------------------------
 
-const { mockVerifyToken, mockApplyRateLimit, mockGetScopeForPath, mockHasScope } =
+const { mockVerifyToken, mockVerifyBusinessToken, mockApplyRateLimit, mockGetScopeForPath, mockHasScope } =
   vi.hoisted(() => ({
     mockVerifyToken: vi.fn(),
+    mockVerifyBusinessToken: vi.fn(),
     mockApplyRateLimit: vi.fn().mockResolvedValue(null),
     mockGetScopeForPath: vi.fn().mockReturnValue(null),
     mockHasScope: vi.fn().mockReturnValue(true),
@@ -16,6 +16,7 @@ const { mockVerifyToken, mockApplyRateLimit, mockGetScopeForPath, mockHasScope }
 
 vi.mock('@/lib/jwt', () => ({
   verifyToken: mockVerifyToken,
+  verifyBusinessToken: mockVerifyBusinessToken,
   authenticateAdmin: vi.fn(),
 }))
 
@@ -59,25 +60,21 @@ function makeNextRequest(
   return req
 }
 
-/** Mint a real Jose JWT for the business portal.
- *  verifyBusinessToken in middleware.ts calls jwtVerify directly (not the
- *  mocked verifyToken), so tests that exercise the business token path must
- *  supply a properly-signed JWT instead of relying on the mock. */
+/** Opaque-session model: the cookie value is a bare session id and middleware calls the
+ *  (mocked) verifyBusinessToken to resolve it. This sets the mock's return for the given
+ *  claims and hands back a dummy opaque cookie value to put in the request. */
 async function mintBusinessJwt(
   claims: Record<string, unknown> = {}
 ): Promise<string> {
-  const secret = new TextEncoder().encode(process.env.JWT_SECRET!)
-  return new SignJWT({
-    type: 'business',
-    isBusiness: true,
+  mockVerifyBusinessToken.mockResolvedValue({
     userId: 'biz-001',
     email: 'biz@example.com',
+    isBusiness: true,
     approvalStatus: 'approved',
+    scopes: [],
     ...claims,
   })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('1h')
-    .sign(secret)
+  return 'biz-session-id'
 }
 
 const ADMIN_PAYLOAD = {
@@ -317,7 +314,7 @@ describe('middleware', () => {
     })
 
     it('redirects to /business/signin when token is invalid on /business/products', async () => {
-      mockVerifyToken.mockResolvedValue(null)
+      mockVerifyBusinessToken.mockResolvedValue(null)
       const req = makeNextRequest('http://localhost/business/products', {
         headers: { 'x-forwarded-host': 'localhost' },
         cookies: { business_auth_token: 'bad-token' },

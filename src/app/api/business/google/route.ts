@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ approvalStatus, message: approvalStatus === 'rejected' ? 'Your application was not approved.' : 'Your account is awaiting approval.' })
     }
 
-    const { token } = await issueUserToken({
+    const { sid } = await issueUserToken({
       userId: user.id,
       email: user.email,
       type: 'business',
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       path: '/',
       ...cookieDomainOption(),
     }
-    cookieStore.set('business_auth_token', token, cookieOpts)
+    cookieStore.set('business_auth_token', sid, cookieOpts)
     cookieStore.set('session_id', user.id, cookieOpts)
 
     return NextResponse.json({

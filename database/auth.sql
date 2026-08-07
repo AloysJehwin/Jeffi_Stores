@@ -17,5 +17,9 @@ CREATE TABLE public.auth_sessions (
     expires_at timestamp with time zone NOT NULL,
     revoked_at timestamp with time zone,
     user_agent character varying(500),
-    ip_address character varying(64)
+    ip_address character varying(64),
+    role character varying(50),
+    scopes jsonb DEFAULT '[]'::jsonb,
+    cert_cn character varying(255),
+    approval_status character varying(20)
 );

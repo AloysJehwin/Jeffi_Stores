@@ -60,7 +60,7 @@ export async function POST(request: NextRequest) {
       metadata: { email, source: 'business_otp', companyName },
     }).catch(() => {})
 
-    const { token } = await issueUserToken({
+    const { sid } = await issueUserToken({
       userId: newUser.id,
       email: newUser.email,
       type: 'business',
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       path: '/',
       ...cookieDomainOption(),
     }
-    cookieStore.set('business_auth_token', token, cookieOpts)
+    cookieStore.set('business_auth_token', sid, cookieOpts)
     cookieStore.set('session_id', newUser.id, cookieOpts)
 
     await deleteOTP(email)
