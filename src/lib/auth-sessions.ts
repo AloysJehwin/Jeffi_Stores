@@ -38,6 +38,7 @@ export interface ResolvedSession {
   approvalStatus: string | null
   email: string | null
   displayName: string | null
+  expiresAt: string
 }
 
 // Create a session row at login/signup. Returns the opaque sid = the cookie value.
@@ -111,6 +112,7 @@ export async function resolveSession(sid: string): Promise<ResolvedSession | nul
     approvalStatus: row.approval_status,
     email: row.email,
     displayName,
+    expiresAt: new Date(row.expires_at).toISOString(),
   }
 }
 
