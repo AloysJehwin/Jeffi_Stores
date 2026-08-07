@@ -51,6 +51,7 @@ CREATE TABLE public.purchase_order_items (
     po_id uuid,
     product_id uuid,
     variant_id uuid,
+    sub_variant_id uuid,
     product_name character varying(255) NOT NULL,
     sku character varying(100),
     quantity numeric(14,3) NOT NULL,

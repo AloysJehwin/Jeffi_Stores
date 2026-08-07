@@ -50,11 +50,13 @@ export async function GET(
            poi.unit_cost,
            poi.quantity,
            poi.line_total_incl_gst,
-           pv.variant_name
+           pv.variant_name,
+           psv.sub_variant_name
          FROM purchase_order_items poi
          JOIN purchase_orders po ON po.id = poi.po_id
          JOIN suppliers s ON s.id = po.supplier_id
          LEFT JOIN product_variants pv ON pv.id = poi.variant_id
+         LEFT JOIN product_sub_variants psv ON psv.id = poi.sub_variant_id
          WHERE poi.product_id = $1
          ORDER BY po.order_date DESC
          LIMIT 20`,

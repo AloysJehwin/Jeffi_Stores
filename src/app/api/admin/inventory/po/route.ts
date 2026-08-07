@@ -93,30 +93,32 @@ export async function GET(request: NextRequest) {
 }
 
 // Sync a supplier's quoted buy-price (product_suppliers) from a PO line's cost.
-// Leaf is resolved by the line SKU: a matching product_variants.sku → variant leaf,
-// else the product leaf. PO items have no sub_variant_id, so sub-variant leaves are
-// never targeted. Records price history by inserting a new dated row on change, and
-// creates the supplier link if none exists. Never flips is_preferred.
-// Runs inside the PO-create transaction (client).
+// Leaf: sub-variant if the line has a sub_variant_id, else the variant resolved by SKU
+// (or the line variant_id), else the product. Records price history by inserting a new
+// dated row on change, creates the link if none exists. Never flips is_preferred.
+// Also denormalizes the price's leaf supplier_id cache. Runs in the PO-create transaction.
 async function syncSupplierPriceFromPO(
   client: import('pg').PoolClient,
-  args: { productId: string; sku: string | null; variantIdFromLine: string | null; supplierId: string; unitCost: number; poNumber: string }
+  args: { productId: string; sku: string | null; variantIdFromLine: string | null; subVariantIdFromLine: string | null; supplierId: string; unitCost: number; poNumber: string }
 ) {
-  const { productId, sku, variantIdFromLine, supplierId, unitCost, poNumber } = args
+  const { productId, sku, variantIdFromLine, subVariantIdFromLine, supplierId, unitCost, poNumber } = args
   if (!productId || !supplierId) return
   if (!Number.isFinite(unitCost) || unitCost < 0) return
 
-  // Resolve the leaf. Prefer the SKU (identifies the exact variant); fall back to the
-  // line's variant_id; else product leaf.
+  // Resolve the leaf. Sub-variant wins (one-leaf rule: sub_variant_id set, variant_id NULL).
+  // Else the variant by SKU (or the line's variant_id). Else the product leaf.
   let variantId: string | null = null
-  if (sku) {
-    const vr = await client.query<{ id: string }>(
-      `SELECT id FROM product_variants WHERE sku = $1 AND product_id = $2 LIMIT 1`,
-      [sku, productId]
-    )
-    variantId = vr.rows[0]?.id ?? variantIdFromLine ?? null
-  } else {
-    variantId = variantIdFromLine ?? null
+  let subVariantId: string | null = subVariantIdFromLine || null
+  if (!subVariantId) {
+    if (sku) {
+      const vr = await client.query<{ id: string }>(
+        `SELECT id FROM product_variants WHERE sku = $1 AND product_id = $2 LIMIT 1`,
+        [sku, productId]
+      )
+      variantId = vr.rows[0]?.id ?? variantIdFromLine ?? null
+    } else {
+      variantId = variantIdFromLine ?? null
+    }
   }
 
   const cost = Math.round(unitCost * 100) / 100 // product_suppliers.unit_cost is numeric(12,2)
@@ -125,10 +127,10 @@ async function syncSupplierPriceFromPO(
     `SELECT id, unit_cost FROM product_suppliers
      WHERE product_id = $1
        AND variant_id IS NOT DISTINCT FROM $2::uuid
-       AND sub_variant_id IS NULL
-       AND supplier_id = $3 AND is_active = true
+       AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+       AND supplier_id = $4 AND is_active = true
      ORDER BY effective_date DESC, created_at DESC LIMIT 1`,
-    [productId, variantId, supplierId]
+    [productId, variantId, subVariantId, supplierId]
   )
   const existing = cur.rows[0]
   const note = `Auto-synced from PO ${poNumber}`
@@ -137,8 +139,8 @@ async function syncSupplierPriceFromPO(
     await client.query(
       `INSERT INTO product_suppliers
          (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, is_preferred, notes)
-       VALUES ($1, $2, NULL, $3, $4, 'INR', false, false, $5)`,
-      [productId, variantId, supplierId, cost, note]
+       VALUES ($1, $2, $3, $4, $5, 'INR', false, false, $6)`,
+      [productId, variantId, subVariantId, supplierId, cost, note]
     )
   } else if (Number(existing.unit_cost) !== cost) {
     // Price changed → deactivate old, insert a new dated row (preserve history).
@@ -149,8 +151,8 @@ async function syncSupplierPriceFromPO(
     await client.query(
       `INSERT INTO product_suppliers
          (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, is_preferred, notes)
-       VALUES ($1, $2, NULL, $3, $4, 'INR', false, false, $5)`,
-      [productId, variantId, supplierId, cost, note]
+       VALUES ($1, $2, $3, $4, $5, 'INR', false, false, $6)`,
+      [productId, variantId, subVariantId, supplierId, cost, note]
     )
   }
   // else unchanged → no-op
@@ -238,12 +240,24 @@ export async function POST(request: NextRequest) {
           if (!vchk.rows[0]) safeVariantId = null
         }
 
+        // Validate sub_variant_id against product_sub_variants (same product). If valid,
+        // also pin its parent variant so variant_id + sub_variant_id are consistent.
+        let safeSubVariantId: string | null = (item as any).sub_variant_id || null
+        if (safeSubVariantId) {
+          const svchk = await client.query<{ id: string; variant_id: string }>(
+            `SELECT id, variant_id FROM product_sub_variants WHERE id = $1 AND product_id = $2 LIMIT 1`,
+            [safeSubVariantId, item.product_id]
+          )
+          if (!svchk.rows[0]) safeSubVariantId = null
+          else safeVariantId = svchk.rows[0].variant_id
+        }
+
         await client.query(
           `INSERT INTO purchase_order_items
-             (po_id, product_id, variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost,
+             (po_id, product_id, variant_id, sub_variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost,
               purchase_unit, purchase_unit_factor, line_total_incl_gst, gst_inclusive)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-          [poId, item.product_id, safeVariantId,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          [poId, item.product_id, safeVariantId, safeSubVariantId,
            item.product_name, item.sku || null,
            baseQty,
            Math.round(resolvedUnitCost * 1000000) / 1000000,
@@ -259,6 +273,7 @@ export async function POST(request: NextRequest) {
           productId: item.product_id,
           sku: item.sku || null,
           variantIdFromLine: safeVariantId,
+          subVariantIdFromLine: safeSubVariantId,
           supplierId: supplier_id,
           unitCost: resolvedUnitCost,
           poNumber,

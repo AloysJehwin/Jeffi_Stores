@@ -429,7 +429,7 @@ export default function SupplierDetailClient({ id }: { id: string }) {
                             <td className="px-4 py-3">
                               <Link href={ap(`/admin/products/${p.product_id}`)} className="font-medium text-accent-500 hover:underline">{p.product_name}</Link>
                             </td>
-                            <td className="px-4 py-3 text-foreground-secondary">{p.variant_name || '—'}</td>
+                            <td className="px-4 py-3 text-foreground-secondary">{p.sub_variant_name || p.variant_name || '—'}</td>
                             <td className="px-4 py-3 text-right text-foreground">{Number(p.total_qty || 0)}</td>
                             <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.last_unit_cost || '0'))}</td>
                             <td className="px-4 py-3 text-foreground-secondary whitespace-nowrap">{formatDate(p.last_order_date)}</td>
