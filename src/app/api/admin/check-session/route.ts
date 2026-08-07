@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
+import { getAdminSession } from '@/lib/admin-auth'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +19,9 @@ export async function GET(request: NextRequest) {
       return res
     }
 
-    const payload = await verifyToken(token.value)
+    // Session-aware: verifies signature AND the server-side session (revoked/idle/expiry),
+    // so a revoked admin is reported as not authenticated.
+    const payload = await getAdminSession()
 
     if (!payload) {
       const res = NextResponse.json({ authenticated: false, expiresAt: null })
