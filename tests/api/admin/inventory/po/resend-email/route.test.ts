@@ -44,7 +44,7 @@ const adminPayload = {
 function makeRequest(id = 'po-1') {
   return new NextRequest(`http://localhost/api/admin/inventory/po/${id}/resend-email`, {
     method: 'POST',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

@@ -38,7 +38,7 @@ function makeRequest(sku?: string) {
   if (sku !== undefined) url.searchParams.set('q', sku)
   return new NextRequest(url.toString(), {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

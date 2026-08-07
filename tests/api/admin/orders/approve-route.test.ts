@@ -28,7 +28,7 @@ const adminPayload = { adminId: 'admin-1', username: 'a', role: 'super_admin', s
 function makeRequest(body: Record<string, unknown>) {
   return new NextRequest('http://localhost/api/admin/business/customers/user-1/approve', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', cookie: 'admin_token=valid' },
+    headers: { 'content-type': 'application/json', cookie: 'admin_sid=valid' },
     body: JSON.stringify(body),
   })
 }

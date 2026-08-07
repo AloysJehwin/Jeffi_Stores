@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // issueAdminSession no longer signs a JWT. It creates an opaque server-side session via
-// createSession() and sets the admin_token cookie to the returned session id (sid).
+// createSession() and sets the admin_sid cookie to the returned session id (sid).
 vi.mock('@/lib/auth-sessions', () => ({
   createSession: vi.fn(),
 }))
@@ -59,12 +59,12 @@ describe('issueAdminSession', () => {
     )
   })
 
-  it('sets admin_token cookie to the returned session id', async () => {
+  it('sets admin_sid cookie to the returned session id', async () => {
     const admin = { id: 'admin-2', email: 'bob@example.com', role: 'admin', scopes: null }
     const response = await issueAdminSession(admin)
     const mockSet = (response as any)._mockCookieSet ?? (response.cookies as any).set
     expect(mockSet).toHaveBeenCalledWith(
-      'admin_token',
+      'admin_sid',
       'fake-uuid',
       expect.objectContaining({ httpOnly: true, path: '/', sameSite: 'strict', maxAge: 28800 })
     )

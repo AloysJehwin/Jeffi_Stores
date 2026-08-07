@@ -6,7 +6,7 @@ import { resolveSession } from '@/lib/auth-sessions'
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const token = cookieStore.get('admin_token')
+    const token = cookieStore.get('admin_sid')
 
     const hostname = request.nextUrl.hostname || request.headers.get('host') || ''
     const isAdminSubdomain = hostname.startsWith('admin.')
@@ -20,8 +20,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Opaque session: resolve the cookie's sid → live admin session (revoked/idle/expiry).
-    // expiresAt comes from the session row (there is no JWT exp anymore).
-    const s = await resolveSession(token.value)
+    // Pass the request UA so a cookie replayed from a different browser is revoked here too
+    // (the 15s poll doubles as a device-binding tripwire). expiresAt comes from the row.
+    const s = await resolveSession(token.value, request.headers.get('user-agent'))
 
     if (!s || s.principalType !== 'admin') {
       const res = NextResponse.json({ authenticated: false, expiresAt: null })

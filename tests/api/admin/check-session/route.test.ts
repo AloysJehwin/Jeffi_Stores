@@ -2,10 +2,12 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 // ── Mocks (must precede imports) ───────────────────────────────────────────
+// Opaque sessions: the route resolves the admin_sid cookie via resolveSession()
+// (NOT verifyToken/JWT) and returns expiresAt from the session row. It also passes
+// the request User-Agent so a cookie replayed from a different browser is rejected.
 
-vi.mock('@/lib/jwt', () => ({
-  authenticateAdmin: vi.fn(),
-  verifyToken: vi.fn(),
+vi.mock('@/lib/auth-sessions', () => ({
+  resolveSession: vi.fn(),
 }))
 vi.mock('next/headers', () => ({
   cookies: vi.fn(),
@@ -14,25 +16,25 @@ vi.mock('next/headers', () => ({
 // ── Imports ────────────────────────────────────────────────────────────────
 
 import { GET } from '@/app/api/admin/check-session/route'
-import { verifyToken } from '@/lib/jwt'
+import { resolveSession } from '@/lib/auth-sessions'
 import { cookies } from 'next/headers'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function makeReq(host = 'admin.example.com') {
+function makeReq(host = 'admin.example.com', ua = 'Chrome') {
   const url = `http://${host}/api/admin/check-session`
   return new NextRequest(url, {
     method: 'GET',
-    headers: new Headers({ host }),
+    headers: new Headers({ host, 'user-agent': ua }),
   })
 }
 
-const mockVerifyToken = vi.mocked(verifyToken)
+const mockResolveSession = vi.mocked(resolveSession)
 const mockCookies = vi.mocked(cookies)
 
 function setCookieToken(value: string | null) {
   mockCookies.mockReturnValue({
-    get: (name: string) => (name === 'admin_token' && value ? { value } : undefined),
+    get: (name: string) => (name === 'admin_sid' && value ? { value } : undefined),
   } as any)
 }
 
@@ -72,11 +74,11 @@ describe('GET /api/admin/check-session', () => {
     expect(res.headers.get('x-cert-status')).toBe('missing')
   })
 
-  // ── Invalid token ────────────────────────────────────────────────────────
+  // ── Invalid / non-resolving session ────────────────────────────────────────
 
-  it('returns authenticated:false when token verification fails', async () => {
-    setCookieToken('bad-token')
-    mockVerifyToken.mockResolvedValue(null)
+  it('returns authenticated:false when the session does not resolve', async () => {
+    setCookieToken('bad-sid')
+    mockResolveSession.mockResolvedValue(null)
     const res = await GET(makeReq())
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -84,27 +86,44 @@ describe('GET /api/admin/check-session', () => {
     expect(body.expiresAt).toBeNull()
   })
 
-  // ── Valid token ───────────────────────────────────────────────────────────
+  it('returns authenticated:false when the resolved principal is not an admin', async () => {
+    setCookieToken('customer-sid')
+    mockResolveSession.mockResolvedValue({
+      sid: 'customer-sid', principalType: 'customer', principalId: 'u1',
+      role: null, scopes: [], certCN: null, approvalStatus: null,
+      email: 'u@x.com', displayName: 'U', expiresAt: new Date(Date.now() + 3600_000).toISOString(),
+    } as any)
+    const res = await GET(makeReq())
+    const body = await res.json()
+    expect(body.authenticated).toBe(false)
+  })
 
-  it('returns authenticated:true with expiresAt when token is valid', async () => {
-    setCookieToken('valid-token')
-    const expSeconds = Math.floor(Date.now() / 1000) + 3600
-    mockVerifyToken.mockResolvedValue({ exp: expSeconds, adminId: 'admin-1', role: 'super_admin' } as any)
+  // ── Valid admin session ─────────────────────────────────────────────────────
+
+  it('returns authenticated:true with expiresAt (epoch ms) from the session row', async () => {
+    setCookieToken('valid-sid')
+    const expIso = new Date(Date.now() + 3600_000).toISOString()
+    mockResolveSession.mockResolvedValue({
+      sid: 'valid-sid', principalType: 'admin', principalId: 'admin-1',
+      role: 'super_admin', scopes: ['*'], certCN: null, approvalStatus: null,
+      email: 'a@x.com', displayName: 'A', expiresAt: expIso,
+    } as any)
     const res = await GET(makeReq())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.authenticated).toBe(true)
-    expect(body.expiresAt).toBe(expSeconds * 1000)
+    expect(body.expiresAt).toBe(new Date(expIso).getTime())
     expect(body.user).toBeDefined()
+    expect(body.user.adminId).toBe('admin-1')
   })
 
-  it('returns expiresAt:null when payload has no exp', async () => {
-    setCookieToken('valid-token')
-    mockVerifyToken.mockResolvedValue({ adminId: 'admin-1', role: 'super_admin' } as any)
-    const res = await GET(makeReq())
-    const body = await res.json()
-    expect(body.authenticated).toBe(true)
-    expect(body.expiresAt).toBeNull()
+  // ── Device binding: mismatch → session rejected ─────────────────────────────
+
+  it('passes the request user-agent into resolveSession (device binding)', async () => {
+    setCookieToken('valid-sid')
+    mockResolveSession.mockResolvedValue(null) // resolveSession revokes+returns null on UA mismatch
+    await GET(makeReq('admin.example.com', 'Safari/iOS'))
+    expect(mockResolveSession).toHaveBeenCalledWith('valid-sid', 'Safari/iOS')
   })
 
   // ── Error handling ───────────────────────────────────────────────────────

@@ -9,7 +9,7 @@ export async function POST() {
     const cookieStore = await cookies()
 
     // Revoke the server-side session before clearing the cookie.
-    const existing = cookieStore.get('admin_token')?.value
+    const existing = cookieStore.get('admin_sid')?.value
     if (existing) {
       try {
         const payload = await verifyToken(existing)
@@ -25,14 +25,14 @@ export async function POST() {
       maxAge: 0,
       path: '/',
     }
-    cookieStore.set('admin_token', '', baseOpts)
-    cookieStore.set('admin_token', '', { ...baseOpts, ...cookieDomainOption() })
+    cookieStore.set('admin_sid', '', baseOpts)
+    cookieStore.set('admin_sid', '', { ...baseOpts, ...cookieDomainOption() })
 
     const res = NextResponse.json({ message: 'Logged out' })
     const flags = `Path=/; Max-Age=0; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
-    res.headers.append('Set-Cookie', `admin_token=; ${flags}`)
+    res.headers.append('Set-Cookie', `admin_sid=; ${flags}`)
     if (process.env.NODE_ENV === 'production') {
-      res.headers.append('Set-Cookie', `admin_token=; Domain=.jeffistores.in; ${flags}`)
+      res.headers.append('Set-Cookie', `admin_sid=; Domain=.jeffistores.in; ${flags}`)
     }
     return res
   } catch (err) {

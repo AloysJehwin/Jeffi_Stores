@@ -60,9 +60,9 @@ describe('POST /api/business/logout', () => {
     const body = await res.json()
     expect(body.message).toMatch(/logged out/i)
     expect(mockLogActivity).toHaveBeenCalled()
-    // Should clear both business_auth_token and session_id cookies
+    // Should clear both business_sid and session_id cookies
     const setCalls = mockCookieStore.set.mock.calls.map((c: any) => c[0])
-    expect(setCalls).toContain('business_auth_token')
+    expect(setCalls).toContain('business_sid')
     expect(setCalls).toContain('session_id')
   })
 
@@ -80,7 +80,7 @@ describe('POST /api/business/logout', () => {
     mockAuthenticateBusiness.mockResolvedValue(null)
     const res = await POST(makePost() as any)
     const setCookieHeaders = res.headers.getSetCookie?.() ?? res.headers.get('set-cookie')
-    // At least one Set-Cookie header for business_auth_token should be appended
+    // At least one Set-Cookie header for business_sid should be appended
     expect(setCookieHeaders).toBeTruthy()
   })
 

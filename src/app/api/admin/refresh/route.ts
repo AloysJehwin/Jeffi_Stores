@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   await extendSession(admin.sid, JWT_MAX_AGE_S)
 
   const response = NextResponse.json({ success: true })
-  response.cookies.set('admin_token', admin.sid, {
+  response.cookies.set('admin_sid', admin.sid, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',

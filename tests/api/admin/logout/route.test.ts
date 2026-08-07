@@ -12,7 +12,7 @@ vi.mock('next/headers', () => ({
 vi.mock('@/lib/cookie-domain', () => ({
   cookieDomainOption: vi.fn().mockReturnValue({ domain: '.jeffistores.in' }),
 }))
-// Opaque sessions: the route resolves the admin_token cookie via verifyToken and
+// Opaque sessions: the route resolves the admin_sid cookie via verifyToken and
 // revokes the server-side session before clearing the cookie.
 vi.mock('@/lib/jwt', () => ({
   verifyToken: mockVerifyToken,
@@ -37,7 +37,7 @@ describe('POST /api/admin/logout', () => {
     mockRevokeSession.mockResolvedValue(undefined)
   })
 
-  it('clears admin_token cookie and returns logged out message', async () => {
+  it('clears admin_sid cookie and returns logged out message', async () => {
     const setCookie = makeSetFn()
     mockCookies.mockResolvedValue({ set: setCookie, get: vi.fn().mockReturnValue(undefined) } as any)
 
@@ -54,7 +54,7 @@ describe('POST /api/admin/logout', () => {
 
     await POST()
     const firstCall = setCookie.mock.calls[0]
-    expect(firstCall[0]).toBe('admin_token')
+    expect(firstCall[0]).toBe('admin_sid')
     expect(firstCall[1]).toBe('')
     expect(firstCall[2]).toMatchObject({ maxAge: 0, httpOnly: true })
   })
@@ -65,11 +65,11 @@ describe('POST /api/admin/logout', () => {
 
     const res = await POST()
     const setCookieHeader = res.headers.get('Set-Cookie')
-    expect(setCookieHeader).toContain('admin_token=')
+    expect(setCookieHeader).toContain('admin_sid=')
     expect(setCookieHeader).toContain('Max-Age=0')
   })
 
-  it('revokes the server-side session for the admin_token cookie sid', async () => {
+  it('revokes the server-side session for the admin_sid cookie sid', async () => {
     const setCookie = makeSetFn()
     const get = vi.fn().mockReturnValue({ value: 'cookie-sid' })
     mockCookies.mockResolvedValue({ set: setCookie, get } as any)

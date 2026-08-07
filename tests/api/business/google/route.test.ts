@@ -181,7 +181,7 @@ describe('POST /api/business/google', () => {
     expect(body.message).toMatch(/login successful/i)
     expect(body.approvalStatus).toBe('approved')
     expect(body.user.email).toBe('biz@example.com')
-    expect(mockCookieStore.set).toHaveBeenCalledWith('business_auth_token', expect.any(String), expect.any(Object))
+    expect(mockCookieStore.set).toHaveBeenCalledWith('business_sid', expect.any(String), expect.any(Object))
   })
 
   it('links google_id for existing user that lacks it', async () => {

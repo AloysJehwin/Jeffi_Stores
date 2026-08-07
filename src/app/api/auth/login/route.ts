@@ -89,7 +89,7 @@ export async function POST(request: NextRequest) {
       ip: request.headers.get('x-forwarded-for'),
     })
 
-    cookieStore.set('auth_token', sid, {
+    cookieStore.set('user_sid', sid, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

@@ -48,7 +48,7 @@ const SALE_ID = 'sale-uuid-1'
 function makeRequest(id: string) {
   return new NextRequest(`http://localhost/api/admin/cash-sale/${id}/receipt`, {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid-token' },
+    headers: { cookie: 'admin_sid=valid-token' },
   })
 }
 

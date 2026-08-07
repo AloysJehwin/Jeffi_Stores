@@ -42,7 +42,7 @@ function makeRequestWithFile(file: File | null, extraFields: Record<string, stri
 
   return new NextRequest('http://localhost/api/admin/agent/upload', {
     method: 'POST',
-    headers: { cookie: 'admin_token=valid-token' },
+    headers: { cookie: 'admin_sid=valid-token' },
     body: form,
   })
 }
@@ -53,7 +53,7 @@ function makeJsonRequest() {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      cookie: 'admin_token=valid-token',
+      cookie: 'admin_sid=valid-token',
     },
     body: JSON.stringify({ file: 'not-a-file' }),
   })
@@ -93,7 +93,7 @@ describe('POST /api/admin/agent/upload', () => {
     form.append('other', 'value')
     const req = new NextRequest('http://localhost/api/admin/agent/upload', {
       method: 'POST',
-      headers: { cookie: 'admin_token=valid-token' },
+      headers: { cookie: 'admin_sid=valid-token' },
       body: form,
     })
     const res = await POST(req)

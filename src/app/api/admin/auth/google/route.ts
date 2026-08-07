@@ -44,7 +44,7 @@ async function verifyGoogleAccessToken(accessToken: string): Promise<GoogleToken
 
 // Layer 2 (identity) — Google sign-in for admins. Verifies the Google token, maps
 // it to an ACTIVE admin (no auto-provisioning), enforces the cert gate, and issues
-// the 5-min MFA ticket. Never mints admin_token — TOTP is still required.
+// the 5-min MFA ticket. Never mints admin_sid — TOTP is still required.
 export async function POST(request: NextRequest) {
   try {
     const { idToken, accessToken } = await request.json().catch(() => ({}))

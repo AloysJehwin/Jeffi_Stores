@@ -41,9 +41,9 @@ export interface UserJWTPayload {
 }
 
 export async function authenticateBusiness(request: NextRequest): Promise<UserJWTPayload | null> {
-  const sid = getTokenFromRequest(request, 'business_auth_token')
+  const sid = getTokenFromRequest(request, 'business_sid')
   if (!sid) return null
-  const s = await resolveSession(sid)
+  const s = await resolveSession(sid, request.headers.get('user-agent'))
   if (!s || s.principalType !== 'business') return null
   return {
     userId: s.principalId,
@@ -66,10 +66,12 @@ export interface AdminJWTPayload {
   [key: string]: any
 }
 
-export async function verifyToken(token: string): Promise<JWTPayload | null> {
+export async function verifyToken(token: string, currentUA?: string | null): Promise<JWTPayload | null> {
   // Opaque admin-session resolve (token = the sid). Used by middleware + admin server
-  // components. authCertCN comes from the snapshot on the session row.
-  const s = await resolveSession(token)
+  // components. authCertCN comes from the snapshot on the session row. When the caller has
+  // the request UA (middleware), pass it so a cookie replayed from a different browser is
+  // rejected + the session revoked (device binding).
+  const s = await resolveSession(token, currentUA)
   if (!s || s.principalType !== 'admin') return null
   return {
     adminId: s.principalId,
@@ -90,17 +92,17 @@ function getTokenFromRequest(request: NextRequest, cookieName: string): string |
 }
 
 export async function authenticateUser(request: NextRequest): Promise<UserJWTPayload | null> {
-  const sid = getTokenFromRequest(request, 'auth_token')
+  const sid = getTokenFromRequest(request, 'user_sid')
   if (!sid) return null
-  const s = await resolveSession(sid)
+  const s = await resolveSession(sid, request.headers.get('user-agent'))
   if (!s || s.principalType !== 'customer') return null
   return { userId: s.principalId, email: s.email || '', scopes: s.scopes, sid }
 }
 
 // Authenticates regular users OR business users.
 // Checks X-Auth-Portal header to determine which cookie to use:
-//   X-Auth-Portal: business → ONLY tries business_auth_token (no customer fallback)
-//   (default)               → tries auth_token first, then business_auth_token
+//   X-Auth-Portal: business → ONLY tries business_sid (no customer fallback)
+//   (default)               → tries user_sid first, then business_sid
 // No cross-portal fallback when portal is explicit — prevents a user logged into both
 // portals from having writes land on the wrong account if one token expires.
 export async function authenticateAnyUser(request: NextRequest): Promise<UserJWTPayload | null> {
@@ -124,9 +126,9 @@ export async function requireAdminScope(
 }
 
 export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTPayload | null> {
-  const sid = getTokenFromRequest(request, 'admin_token')
+  const sid = getTokenFromRequest(request, 'admin_sid')
   if (!sid) return null
-  const s = await resolveSession(sid)
+  const s = await resolveSession(sid, request.headers.get('user-agent'))
   if (!s || s.principalType !== 'admin') return null
   const result: AdminJWTPayload = {
     adminId: s.principalId,
@@ -193,14 +195,14 @@ export async function generateReviewToken(payload: ReviewTokenPayload): Promise<
     .sign(JWT_SECRET)
 }
 
-export async function verifyUserToken(token: string): Promise<UserJWTPayload | null> {
-  const s = await resolveSession(token)
+export async function verifyUserToken(token: string, currentUA?: string | null): Promise<UserJWTPayload | null> {
+  const s = await resolveSession(token, currentUA)
   if (!s || s.principalType !== 'customer') return null
   return { userId: s.principalId, email: s.email || '', scopes: s.scopes, sid: s.sid }
 }
 
-export async function verifyBusinessToken(token: string): Promise<UserJWTPayload | null> {
-  const s = await resolveSession(token)
+export async function verifyBusinessToken(token: string, currentUA?: string | null): Promise<UserJWTPayload | null> {
+  const s = await resolveSession(token, currentUA)
   if (!s || s.principalType !== 'business') return null
   // Default unknown → 'pending' (fail-closed): the middleware gates pending/rejected, so
   // a session without a snapshotted status must NOT be treated as approved.

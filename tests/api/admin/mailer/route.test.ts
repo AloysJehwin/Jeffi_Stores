@@ -44,14 +44,14 @@ function makeGetRequest(searchParams: Record<string, string> = {}) {
   for (const [k, v] of Object.entries(searchParams)) url.searchParams.set(k, v)
   return new NextRequest(url.toString(), {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid-token' },
+    headers: { cookie: 'admin_sid=valid-token' },
   })
 }
 
 function makePostRequest(body: unknown) {
   return new NextRequest('http://localhost/api/admin/mailer', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', cookie: 'admin_token=valid-token' },
+    headers: { 'content-type': 'application/json', cookie: 'admin_sid=valid-token' },
     body: JSON.stringify(body),
   })
 }

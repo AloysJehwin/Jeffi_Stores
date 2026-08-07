@@ -36,7 +36,7 @@ const adminPayload = {
 function makeRequest() {
   return new NextRequest('http://localhost/api/admin/cron/status', {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

@@ -149,7 +149,7 @@ describe('POST /api/auth/google', () => {
     const body = await res.json()
     expect(body.message).toMatch(/login successful/i)
     expect(body.user.email).toBe('user@example.com')
-    expect(mockCookieStore.set).toHaveBeenCalledWith('auth_token', 'user-sid', expect.any(Object))
+    expect(mockCookieStore.set).toHaveBeenCalledWith('user_sid', 'user-sid', expect.any(Object))
   })
 
   it('returns 500 when user insert returns null', async () => {

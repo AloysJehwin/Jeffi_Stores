@@ -38,14 +38,14 @@ const adminPayload = {
 function makeGetRequest(id = 'user-1') {
   return new NextRequest(`http://localhost/api/admin/customers/${id}/health`, {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 
 function makePostRequest(id = 'user-1') {
   return new NextRequest(`http://localhost/api/admin/customers/${id}/health`, {
     method: 'POST',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

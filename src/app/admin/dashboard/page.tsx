@@ -96,7 +96,7 @@ export default async function AdminDashboard() {
   const headersList = await headers()
   // Prefer the admin's full name (first + last) over the username for the greeting.
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')?.value
+  const token = cookieStore.get('admin_sid')?.value
   let displayName = headersList.get('x-username') || 'Admin'
   // Role + scopes gate which quick actions are shown (same as the sidebar nav).
   // Prefer the middleware-injected, verified headers; fall back to the JWT.

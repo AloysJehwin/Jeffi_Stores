@@ -145,7 +145,7 @@ describe('middleware', () => {
 
       const req = makeNextRequest('https://admin.jeffistores.in/dashboard', {
         host: 'admin.jeffistores.in',
-        cookies: { admin_token: 'valid.token.here' },
+        cookies: { admin_sid: 'valid.token.here' },
       })
       const res = await middleware(req)
       // Rewrite response is not a redirect
@@ -182,7 +182,7 @@ describe('middleware', () => {
       mockVerifyToken.mockResolvedValue(null)
       const req = makeNextRequest('http://localhost/api/admin/orders', {
         host: 'localhost',
-        cookies: { admin_token: 'bad.token' },
+        cookies: { admin_sid: 'bad.token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(401)
@@ -200,7 +200,7 @@ describe('middleware', () => {
 
       const req = makeNextRequest('http://localhost/api/admin/orders', {
         host: 'localhost',
-        cookies: { admin_token: 'scoped.token' },
+        cookies: { admin_sid: 'scoped.token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(403)
@@ -251,7 +251,7 @@ describe('middleware', () => {
 
       const req = makeNextRequest('https://business.jeffistores.in/products', {
         host: 'business.jeffistores.in',
-        cookies: { business_auth_token: token },
+        cookies: { business_sid: token },
       })
       const res = await middleware(req)
       expect(res.status).not.toBe(307)
@@ -263,7 +263,7 @@ describe('middleware', () => {
 
       const req = makeNextRequest('https://business.jeffistores.in/products', {
         host: 'business.jeffistores.in',
-        cookies: { business_auth_token: token },
+        cookies: { business_sid: token },
       })
       const res = await middleware(req)
       expect(res.status).toBe(307)
@@ -317,7 +317,7 @@ describe('middleware', () => {
       mockVerifyBusinessToken.mockResolvedValue(null)
       const req = makeNextRequest('http://localhost/business/products', {
         headers: { 'x-forwarded-host': 'localhost' },
-        cookies: { business_auth_token: 'bad-token' },
+        cookies: { business_sid: 'bad-token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(307)
@@ -328,7 +328,7 @@ describe('middleware', () => {
       const token = await mintBusinessJwt({ approvalStatus: 'pending' })
       const req = makeNextRequest('http://localhost/business/products', {
         headers: { 'x-forwarded-host': 'localhost' },
-        cookies: { business_auth_token: token },
+        cookies: { business_sid: token },
       })
       const res = await middleware(req)
       expect(res.status).toBe(307)
@@ -408,7 +408,7 @@ describe('middleware', () => {
       mockVerifyToken.mockResolvedValue(ADMIN_PAYLOAD)
       const req = makeNextRequest('http://localhost/admin/orders', {
         headers: { 'x-forwarded-host': 'localhost' },
-        cookies: { admin_token: 'valid-token' },
+        cookies: { admin_sid: 'valid-token' },
       })
       const res = await middleware(req)
       expect(res.status).not.toBe(307)
@@ -419,7 +419,7 @@ describe('middleware', () => {
     it('returns 403 on /admin/* from a non-admin, non-localhost host', async () => {
       const req = makeNextRequest('https://jeffistores.in/admin/dashboard', {
         headers: { 'x-forwarded-host': 'jeffistores.in' },
-        cookies: { admin_token: 'some-token' },
+        cookies: { admin_sid: 'some-token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(403)
@@ -440,7 +440,7 @@ describe('middleware', () => {
           'x-forwarded-host': 'localhost',
           'x-client-cert-cn': 'bob',
         },
-        cookies: { admin_token: 'valid-token' },
+        cookies: { admin_sid: 'valid-token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(403)
@@ -458,7 +458,7 @@ describe('middleware', () => {
           'x-forwarded-host': 'localhost',
           'x-client-cert-cn': 'alice',
         },
-        cookies: { admin_token: 'valid-token' },
+        cookies: { admin_sid: 'valid-token' },
       })
       const res = await middleware(req)
       expect(res.status).not.toBe(403)
@@ -471,7 +471,7 @@ describe('middleware', () => {
           'x-forwarded-host': 'localhost',
           'x-client-cert-cn': 'Jeffi Stores CA',
         },
-        cookies: { admin_token: 'valid-token' },
+        cookies: { admin_sid: 'valid-token' },
       })
       const res = await middleware(req)
       // CN with spaces is treated as non-client cert — no mismatch rejection

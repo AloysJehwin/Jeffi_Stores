@@ -268,7 +268,7 @@ export default async function BusinessCustomersPage({
   // redirected before any content (stats or list) is rendered/streamed.
   const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
+  const token = cookieStore.get('admin_sid')
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)

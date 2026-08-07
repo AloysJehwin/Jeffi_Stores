@@ -96,7 +96,7 @@ async function importDb(opts: {
   vi.doMock('next/headers', () => ({
     cookies: vi.fn().mockResolvedValue({
       get: (key: string) =>
-        key === 'admin_token' && adminToken ? { value: adminToken } : undefined,
+        key === 'admin_sid' && adminToken ? { value: adminToken } : undefined,
       set: vi.fn(),
       delete: vi.fn(),
     }),
@@ -109,7 +109,7 @@ async function importDb(opts: {
 
   // Opaque sessions: getRequestAdminId now dynamically imports resolveSession from
   // @/lib/auth-sessions (the cookie value is the opaque session id, not a JWT).
-  // Resolve to an admin principal only when an admin_token cookie is present.
+  // Resolve to an admin principal only when an admin_sid cookie is present.
   vi.doMock('@/lib/auth-sessions', () => ({
     resolveSession: vi.fn().mockImplementation(async (sid: string) => {
       if (!sid || !adminToken) return null
@@ -293,7 +293,7 @@ describe('query() – mutation wrapping', () => {
     }))
     vi.doMock('next/headers', () => ({
       cookies: vi.fn().mockResolvedValue({
-        get: (k: string) => k === 'admin_token' ? { value: 'tok' } : undefined,
+        get: (k: string) => k === 'admin_sid' ? { value: 'tok' } : undefined,
       }),
     }))
     vi.doMock('jose', () => ({
@@ -485,7 +485,7 @@ describe('getRequestAdminId – error handling', () => {
     }))
     vi.doMock('next/headers', () => ({
       cookies: vi.fn().mockResolvedValue({
-        get: (k: string) => k === 'admin_token' ? { value: 'bad-token' } : undefined,
+        get: (k: string) => k === 'admin_sid' ? { value: 'bad-token' } : undefined,
       }),
     }))
     // resolveSession throws — exercises the catch block in getRequestAdminId
@@ -518,7 +518,7 @@ describe('getRequestAdminId – error handling', () => {
     }))
     vi.doMock('next/headers', () => ({
       cookies: vi.fn().mockResolvedValue({
-        get: (k: string) => k === 'admin_token' ? { value: 'some-token' } : undefined,
+        get: (k: string) => k === 'admin_sid' ? { value: 'some-token' } : undefined,
       }),
     }))
     // Session not found / expired (e.g. a legacy JWT cookie) -> null

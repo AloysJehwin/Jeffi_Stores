@@ -80,7 +80,7 @@ const mockCreatedAdmin = { id: 'new-admin-uuid', email: 'newadmin@example.com' }
 function makeRequest(body: unknown) {
   return new NextRequest('http://localhost/api/admin/users', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', cookie: 'admin_token=valid-token' },
+    headers: { 'content-type': 'application/json', cookie: 'admin_sid=valid-token' },
     body: JSON.stringify(body),
   })
 }

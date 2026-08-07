@@ -45,7 +45,7 @@ const adminPayload = {
 function makeRequest(body: unknown) {
   return new NextRequest('http://localhost/api/admin/products/draft', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', cookie: 'admin_token=valid-token' },
+    headers: { 'content-type': 'application/json', cookie: 'admin_sid=valid-token' },
     body: JSON.stringify(body),
   })
 }

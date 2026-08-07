@@ -13,6 +13,48 @@ const TOUCH_WINDOW_MS = 5 * 60 * 1000               // only bump last_seen_at ev
 // before any DB hit.
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
+// Coarse user-agent "family" fingerprint = browser family + OS family, version numbers
+// DROPPED on purpose so a routine Chrome/Safari auto-update never forces a re-login. Used
+// only to detect a session cookie being replayed from a clearly different browser/device
+// (e.g. Chrome/macOS → Safari/iOS, or desktop → mobile). Returns null when the UA can't be
+// classified — callers then fail OPEN (never re-auth on an unknown/absent UA).
+export function uaFingerprint(ua: string | null | undefined): string | null {
+  if (!ua) return null
+  const s = ua.toLowerCase()
+
+  // Browser family — order matters (Edge/Chrome both contain "chrome"; iOS browsers all
+  // wrap WebKit but identify via CriOS/FxiOS/EdgiOS).
+  let browser: string | null = null
+  if (s.includes('edg/') || s.includes('edga/') || s.includes('edgios/')) browser = 'edge'
+  else if (s.includes('opr/') || s.includes('opera')) browser = 'opera'
+  else if (s.includes('samsungbrowser')) browser = 'samsung'
+  else if (s.includes('crios/')) browser = 'chrome'
+  else if (s.includes('fxios/') || s.includes('firefox')) browser = 'firefox'
+  else if (s.includes('chrome') || s.includes('chromium')) browser = 'chrome'
+  else if (s.includes('safari')) browser = 'safari'
+
+  // OS / platform family.
+  let os: string | null = null
+  if (s.includes('iphone') || s.includes('ipad') || s.includes('ipod')) os = 'ios'
+  else if (s.includes('android')) os = 'android'
+  else if (s.includes('windows')) os = 'windows'
+  else if (s.includes('mac os') || s.includes('macintosh')) os = 'macos'
+  else if (s.includes('cros')) os = 'chromeos'
+  else if (s.includes('linux')) os = 'linux'
+
+  if (!browser && !os) return null
+  return `${browser || '?'}|${os || '?'}`
+}
+
+// Two UAs "clearly differ" only when BOTH classify to a known family AND those families are
+// not equal. If either side is null/unknown we return false (fail open — no forced re-auth).
+export function uaClearlyDiffers(storedUA: string | null | undefined, currentUA: string | null | undefined): boolean {
+  const a = uaFingerprint(storedUA)
+  const b = uaFingerprint(currentUA)
+  if (!a || !b) return false
+  return a !== b
+}
+
 export interface AuthSessionRow {
   id: string
   principal_type: PrincipalType
@@ -71,19 +113,23 @@ export async function createSession(args: {
 }
 
 // Hot path: resolve an opaque session id to its live principal, or null if the sid isn't
-// a uuid / no row / revoked / past absolute expiry / idle-expired. On success, throttled
+// a uuid / no row / revoked / past absolute expiry / idle-expired. When `currentUA` is
+// supplied and the session's stored user_agent belongs to a clearly different browser/OS
+// family, the session is REVOKED and null is returned (treat a cookie replayed from another
+// browser as a theft signal → forced re-login everywhere). On success, throttled
 // fire-and-forget last_seen_at touch (never awaited). email/displayName joined fresh:
 // admins.user_id → users for admin; principal_id → users for customer/business.
-export async function resolveSession(sid: string): Promise<ResolvedSession | null> {
+export async function resolveSession(sid: string, currentUA?: string | null): Promise<ResolvedSession | null> {
   if (!sid || !UUID_RE.test(sid)) return null
   const row = await queryOne<{
     principal_type: PrincipalType; principal_id: string
     revoked_at: string | null; expires_at: string; last_seen_at: string
     role: string | null; scopes: any; cert_cn: string | null; approval_status: string | null
+    user_agent: string | null
     email: string | null; first_name: string | null; last_name: string | null
   }>(
     `SELECT s.principal_type, s.principal_id, s.revoked_at, s.expires_at, s.last_seen_at,
-            s.role, s.scopes, s.cert_cn, s.approval_status,
+            s.role, s.scopes, s.cert_cn, s.approval_status, s.user_agent,
             u.email, u.first_name, u.last_name
      FROM auth_sessions s
      LEFT JOIN admins a ON a.id = s.principal_id AND s.principal_type = 'admin'
@@ -96,6 +142,14 @@ export async function resolveSession(sid: string): Promise<ResolvedSession | nul
   const now = Date.now()
   if (new Date(row.expires_at).getTime() <= now) return null
   if (now - new Date(row.last_seen_at).getTime() > IDLE_TIMEOUT_MS) return null
+
+  // Device binding: a live cookie presented from a clearly different browser family is
+  // treated as a replayed/stolen credential → revoke the whole session (fire-and-forget)
+  // and reject. Fails open when either UA is absent/unclassifiable (see uaClearlyDiffers).
+  if (currentUA !== undefined && uaClearlyDiffers(row.user_agent, currentUA)) {
+    query(`UPDATE auth_sessions SET revoked_at = now() WHERE id = $1 AND revoked_at IS NULL`, [sid]).catch(() => {})
+    return null
+  }
 
   if (now - new Date(row.last_seen_at).getTime() > TOUCH_WINDOW_MS) {
     query(`UPDATE auth_sessions SET last_seen_at = now() WHERE id = $1`, [sid]).catch(() => {})
@@ -117,8 +171,8 @@ export async function resolveSession(sid: string): Promise<ResolvedSession | nul
 }
 
 // Thin wrapper over resolveSession — one liveness implementation, no drift.
-export async function validateSession(sid: string, principalType: PrincipalType): Promise<boolean> {
-  const s = await resolveSession(sid)
+export async function validateSession(sid: string, principalType: PrincipalType, currentUA?: string | null): Promise<boolean> {
+  const s = await resolveSession(sid, currentUA)
   return !!s && s.principalType === principalType
 }
 

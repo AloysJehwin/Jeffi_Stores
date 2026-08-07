@@ -46,7 +46,7 @@ const adminPayload = {
 function makeRequest() {
   return new NextRequest('http://localhost/api/admin/campaigns/scenarios', {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid-token' },
+    headers: { cookie: 'admin_sid=valid-token' },
   })
 }
 

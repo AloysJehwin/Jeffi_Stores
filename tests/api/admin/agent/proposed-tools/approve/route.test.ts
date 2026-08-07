@@ -45,7 +45,7 @@ const regularAdminPayload = {
 function makeRequest(id = 'tool-1') {
   return new NextRequest(`http://localhost/api/admin/agent/proposed-tools/${id}/approve`, {
     method: 'POST',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

@@ -61,6 +61,7 @@ export async function POST(request: Request) {
       admin,
       t.certCN as string | undefined,
       { recovery_codes: codes.map(c => c.plain) },
+      request.headers.get('user-agent'),
     )
   } catch (err) {
     return NextResponse.json(

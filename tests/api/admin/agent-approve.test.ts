@@ -41,7 +41,7 @@ const ACTION_ID = 'action-uuid-1'
 function makeReq(id = ACTION_ID) {
   return new NextRequest(`http://localhost/api/admin/agent/actions/${id}/approve`, {
     method: 'POST',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

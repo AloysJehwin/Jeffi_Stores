@@ -165,7 +165,7 @@ describe('POST /api/admin/replication/log', () => {
 describe('GET /api/admin/replication/log', () => {
   beforeEach(() => vi.clearAllMocks())
 
-  it('returns 403 when no admin_token cookie', async () => {
+  it('returns 403 when no admin_sid cookie', async () => {
     mockAuthenticateAdmin.mockResolvedValue(null as any)
     mockHasScope.mockReturnValue(false)
 
