@@ -9,9 +9,16 @@ export default function ExtensionTokenCard() {
   async function handleCopy() {
     setError('')
     try {
-      const res = await fetch('/api/admin/token')
-      if (!res.ok) throw new Error('Failed to retrieve token')
+      // Issue a SEPARATE, short-lived, scope-limited token for the extension — never
+      // the admin session JWT (that stays in the HttpOnly cookie and is never exposed).
+      const res = await fetch('/api/admin/token/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scopes: ['products:write'], ttl: 86400 }),
+      })
+      if (!res.ok) throw new Error('Failed to generate token')
       const { token } = await res.json()
+      if (!token) throw new Error('No token returned')
       await navigator.clipboard.writeText(token)
       setCopied(true)
       setTimeout(() => setCopied(false), 2500)
@@ -24,7 +31,7 @@ export default function ExtensionTokenCard() {
     <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
       <div className="px-6 py-4 border-b border-border-default">
         <h2 className="text-lg font-semibold text-foreground">Chrome Extension Token</h2>
-        <p className="text-sm text-foreground-muted mt-1">Copy your session token to configure the Jeffi Gallery Uploader extension.</p>
+        <p className="text-sm text-foreground-muted mt-1">Generate a scoped upload token for the Jeffi Gallery Uploader extension.</p>
       </div>
       <div className="p-4 sm:p-6 space-y-3">
         <div className="flex items-center gap-3 p-3 bg-surface-secondary rounded-lg border border-border-default font-mono text-sm text-foreground-secondary">
@@ -37,7 +44,7 @@ export default function ExtensionTokenCard() {
         >
           {copied ? 'Copied!' : 'Copy Token'}
         </button>
-        <p className="text-xs text-foreground-muted">Token expires with your session. Copy a fresh token each time you log in.</p>
+        <p className="text-xs text-foreground-muted">Scoped to product image uploads only, valid 24 hours. Generate a fresh token when it expires. Your login session is never shared.</p>
       </div>
     </div>
   )
