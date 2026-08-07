@@ -225,12 +225,25 @@ export async function POST(request: NextRequest) {
         const { resolvedUnitCost, baseQty, factor } = item
         const tax = item.tax_rate ?? 0
         const total = round2(baseQty * resolvedUnitCost * (1 + tax / 100))
+
+        // Validate variant_id against product_variants (guards against stale/mismatched
+        // ids from the line picker, which would otherwise violate the FK). If it doesn't
+        // resolve to a real variant of this product, treat the line as product-level.
+        let safeVariantId: string | null = item.variant_id || null
+        if (safeVariantId) {
+          const vchk = await client.query<{ id: string }>(
+            `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2 LIMIT 1`,
+            [safeVariantId, item.product_id]
+          )
+          if (!vchk.rows[0]) safeVariantId = null
+        }
+
         await client.query(
           `INSERT INTO purchase_order_items
              (po_id, product_id, variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost,
               purchase_unit, purchase_unit_factor, line_total_incl_gst, gst_inclusive)
            VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-          [poId, item.product_id, item.variant_id || null,
+          [poId, item.product_id, safeVariantId,
            item.product_name, item.sku || null,
            baseQty,
            Math.round(resolvedUnitCost * 1000000) / 1000000,
@@ -245,7 +258,7 @@ export async function POST(request: NextRequest) {
         await syncSupplierPriceFromPO(client, {
           productId: item.product_id,
           sku: item.sku || null,
-          variantIdFromLine: item.variant_id || null,
+          variantIdFromLine: safeVariantId,
           supplierId: supplier_id,
           unitCost: resolvedUnitCost,
           poNumber,
