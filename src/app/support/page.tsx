@@ -10,7 +10,7 @@ export const metadata = {
 async function getAuthUser() {
   try {
     const cookieStore = await cookies()
-    const token = cookieStore.get('auth_token')?.value
+    const token = cookieStore.get('user_sid')?.value
     if (!token) return null
     return await verifyUserToken(token)
   } catch {

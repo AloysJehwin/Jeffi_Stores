@@ -60,7 +60,7 @@ function makeRequest(method: string, id: string, body?: Record<string, unknown>)
   return new NextRequest(`http://localhost/api/admin/orders/${id}`, {
     method,
     headers: {
-      cookie: 'admin_token=valid-token',
+      cookie: 'admin_sid=valid-token',
       ...(body ? { 'content-type': 'application/json' } : {}),
     },
     body: body ? JSON.stringify(body) : undefined,

@@ -63,7 +63,7 @@ export async function POST(request: Request) {
 
     if (!ok) return NextResponse.json({ error: 'Invalid code' }, { status: 401 })
 
-    return await issueAdminSession(admin, t.certCN as string | undefined)
+    return await issueAdminSession(admin, t.certCN as string | undefined, undefined, request.headers.get('user-agent'))
   } catch (err) {
     return NextResponse.json(
       { error: 'Internal server error' },

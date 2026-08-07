@@ -77,7 +77,7 @@ function makeGetRequest(params?: Record<string, string>, headers?: Record<string
   return new NextRequest(url.toString(), {
     method: 'GET',
     headers: {
-      cookie: 'admin_token=valid-token',
+      cookie: 'admin_sid=valid-token',
       ...headers,
     },
   })
@@ -88,7 +88,7 @@ function makePostRequest(body: unknown, headers?: Record<string, string>) {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      cookie: 'admin_token=valid-token',
+      cookie: 'admin_sid=valid-token',
       ...headers,
     },
     body: JSON.stringify(body),

@@ -53,7 +53,7 @@ function makeRequest(searchParams: Record<string, string> = {}) {
   }
   return new NextRequest(url.toString(), {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid-token' },
+    headers: { cookie: 'admin_sid=valid-token' },
   })
 }
 

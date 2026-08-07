@@ -54,7 +54,7 @@ const ORDER_ID = 'order-uuid-1'
 function makeReq(params: Record<string, string> = {}) {
   const url = new URL(`http://localhost/api/admin/orders/${ORDER_ID}/shipping-label`)
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v)
-  return new NextRequest(url.toString(), { headers: { cookie: 'admin_token=valid' } })
+  return new NextRequest(url.toString(), { headers: { cookie: 'admin_sid=valid' } })
 }
 
 const mockAuth = vi.mocked(authenticateAdmin)

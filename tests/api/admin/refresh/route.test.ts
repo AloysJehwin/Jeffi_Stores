@@ -55,6 +55,6 @@ describe('POST /api/admin/refresh', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(mockExtend).toHaveBeenCalledWith('session-uuid', JWT_MAX_AGE_S)
-    expect(res.cookies.get('admin_token')?.value).toBe('session-uuid')
+    expect(res.cookies.get('admin_sid')?.value).toBe('session-uuid')
   })
 })

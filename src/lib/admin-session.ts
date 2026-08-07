@@ -16,11 +16,13 @@ export async function issueAdminSession(
   admin: AdminSessionAdmin,
   certCN?: string,
   extraBody?: Record<string, unknown>,
+  userAgent?: string | null,
 ) {
   const displayName =
     `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || admin.email || ''
   // Opaque server-side session: the cookie value is the session id (a uuid), NOT a JWT.
   // role/scopes/cert_cn are snapshotted onto the row for the Node middleware's gate.
+  // user_agent is snapshotted for device-binding (resolveSession rejects a mismatch).
   const { sid } = await createSession({
     principalType: 'admin',
     principalId: admin.id,
@@ -28,13 +30,14 @@ export async function issueAdminSession(
     role: admin.role,
     scopes: admin.scopes || [],
     certCN: certCN || null,
+    userAgent: userAgent || null,
   })
   const response = NextResponse.json({
     success: true,
     admin: { name: displayName, email: admin.email || undefined, role: admin.role },
     ...(extraBody || {}),
   })
-  response.cookies.set('admin_token', sid, {
+  response.cookies.set('admin_sid', sid, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',

@@ -180,16 +180,16 @@ describe('authenticateAdmin', () => {
     expect(result).toMatchObject({ adminId: 'admin-123', role: 'admin' })
   })
 
-  it('returns admin payload from admin_token cookie', async () => {
+  it('returns admin payload from admin_sid cookie', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'admin-123', role: 'admin' }))
-    const req = makeRequest({ cookies: { admin_token: 'cookietoken' } })
+    const req = makeRequest({ cookies: { admin_sid: 'cookietoken' } })
     const result = await authenticateAdmin(req)
     expect(result?.adminId).toBe('admin-123')
   })
 
   it('exposes the session id (sid) on the payload', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'admin-123', sid: 'sid-xyz' }))
-    const req = makeRequest({ cookies: { admin_token: 'sid-xyz' } })
+    const req = makeRequest({ cookies: { admin_sid: 'sid-xyz' } })
     const result = await authenticateAdmin(req)
     expect(result?.sid).toBe('sid-xyz')
   })
@@ -232,11 +232,11 @@ describe('authenticateAdmin', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('authenticateUser – customer portal isolation', () => {
-  it('returns user payload for valid customer session in auth_token cookie', async () => {
+  it('returns user payload for valid customer session in user_sid cookie', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({
       principalType: 'customer', principalId: 'user-456', email: 'customer@example.com', scopes: ['read'],
     }))
-    const req = makeRequest({ cookies: { auth_token: 'ctoken' } })
+    const req = makeRequest({ cookies: { user_sid: 'ctoken' } })
     const result = await authenticateUser(req)
     expect(result?.userId).toBe('user-456')
     expect(result?.email).toBe('customer@example.com')
@@ -244,21 +244,21 @@ describe('authenticateUser – customer portal isolation', () => {
 
   it('returns null when principal is business (portal isolation)', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'u1' }))
-    const req = makeRequest({ cookies: { auth_token: 'btoken' } })
+    const req = makeRequest({ cookies: { user_sid: 'btoken' } })
     const result = await authenticateUser(req)
     expect(result).toBeNull()
   })
 
   it('returns null when principal is admin (portal isolation)', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'u1' }))
-    const req = makeRequest({ cookies: { auth_token: 'atoken' } })
+    const req = makeRequest({ cookies: { user_sid: 'atoken' } })
     const result = await authenticateUser(req)
     expect(result).toBeNull()
   })
 
   it('returns null when the session does not resolve', async () => {
     mockResolveSession.mockResolvedValueOnce(null)
-    const req = makeRequest({ cookies: { auth_token: 'token' } })
+    const req = makeRequest({ cookies: { user_sid: 'token' } })
     const result = await authenticateUser(req)
     expect(result).toBeNull()
   })
@@ -271,7 +271,7 @@ describe('authenticateUser – customer portal isolation', () => {
 
   it('carries scopes from the resolved session', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', scopes: [] }))
-    const req = makeRequest({ cookies: { auth_token: 'token' } })
+    const req = makeRequest({ cookies: { user_sid: 'token' } })
     const result = await authenticateUser(req)
     expect(result?.scopes).toEqual([])
   })
@@ -280,11 +280,11 @@ describe('authenticateUser – customer portal isolation', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('authenticateBusiness – business portal isolation', () => {
-  it('returns business payload from business_auth_token cookie', async () => {
+  it('returns business payload from business_sid cookie', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({
       principalType: 'business', principalId: 'biz-789', email: 'biz@company.com', approvalStatus: 'approved', scopes: [],
     }))
-    const req = makeRequest({ cookies: { business_auth_token: 'btoken' } })
+    const req = makeRequest({ cookies: { business_sid: 'btoken' } })
     const result = await authenticateBusiness(req)
     expect(result?.userId).toBe('biz-789')
     expect(result?.isBusiness).toBe(true)
@@ -293,7 +293,7 @@ describe('authenticateBusiness – business portal isolation', () => {
 
   it('returns null when principal is not business', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1' }))
-    const req = makeRequest({ cookies: { business_auth_token: 'token' } })
+    const req = makeRequest({ cookies: { business_sid: 'token' } })
     const result = await authenticateBusiness(req)
     expect(result).toBeNull()
   })
@@ -306,7 +306,7 @@ describe('authenticateBusiness – business portal isolation', () => {
 
   it('returns null when the session does not resolve', async () => {
     mockResolveSession.mockResolvedValueOnce(null)
-    const req = makeRequest({ cookies: { business_auth_token: 'expired' } })
+    const req = makeRequest({ cookies: { business_sid: 'expired' } })
     const result = await authenticateBusiness(req)
     expect(result).toBeNull()
   })
@@ -315,31 +315,31 @@ describe('authenticateBusiness – business portal isolation', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('authenticateAnyUser – portal routing', () => {
-  it('with x-auth-portal: business, only tries business_auth_token', async () => {
+  it('with x-auth-portal: business, only tries business_sid', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'b1', scopes: [] }))
     const req = makeRequest({
       headers: { 'x-auth-portal': 'business' },
-      cookies: { business_auth_token: 'btoken' },
+      cookies: { business_sid: 'btoken' },
     })
     const result = await authenticateAnyUser(req)
     expect(result?.userId).toBe('b1')
     expect(mockResolveSession).toHaveBeenCalledTimes(1)
   })
 
-  it('without portal header, tries auth_token first and returns customer', async () => {
+  it('without portal header, tries user_sid first and returns customer', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'c1', scopes: [] }))
-    const req = makeRequest({ cookies: { auth_token: 'ctoken' } })
+    const req = makeRequest({ cookies: { user_sid: 'ctoken' } })
     const result = await authenticateAnyUser(req)
     expect(result?.userId).toBe('c1')
   })
 
-  it('without portal header, falls back to business_auth_token if auth_token is not a customer', async () => {
-    // First resolve (authenticateUser via auth_token) → wrong type → null
+  it('without portal header, falls back to business_sid if user_sid is not a customer', async () => {
+    // First resolve (authenticateUser via user_sid) → wrong type → null
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'x' }))
-    // Second resolve (authenticateBusiness via business_auth_token) → business
+    // Second resolve (authenticateBusiness via business_sid) → business
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'b1', scopes: [] }))
     const req = makeRequest({
-      cookies: { auth_token: 'bad', business_auth_token: 'btoken' },
+      cookies: { user_sid: 'bad', business_sid: 'btoken' },
     })
     const result = await authenticateAnyUser(req)
     expect(result?.userId).toBe('b1')
@@ -395,7 +395,7 @@ describe('requireAdminScope', () => {
 describe('requireUserScope', () => {
   it('returns user payload when scope is present', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', scopes: ['read'] }))
-    const req = makeRequest({ cookies: { auth_token: 'token' } })
+    const req = makeRequest({ cookies: { user_sid: 'token' } })
     const result = await requireUserScope(req, 'read')
     expect((result as any).userId).toBe('u1')
   })
@@ -408,7 +408,7 @@ describe('requireUserScope', () => {
 
   it('returns 403 when user lacks required scope', async () => {
     mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', scopes: ['read'] }))
-    const req = makeRequest({ cookies: { auth_token: 'token' } })
+    const req = makeRequest({ cookies: { user_sid: 'token' } })
     const result = await requireUserScope(req, 'write') as any
     expect(result.status).toBe(403)
   })

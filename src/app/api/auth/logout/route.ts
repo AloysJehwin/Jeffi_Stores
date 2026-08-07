@@ -21,8 +21,8 @@ export async function POST(request: NextRequest) {
       maxAge: 0,
       path: '/',
     }
-    store.set('auth_token', '', baseOpts)
-    store.set('auth_token', '', { ...baseOpts, ...cookieDomainOption() })
+    store.set('user_sid', '', baseOpts)
+    store.set('user_sid', '', { ...baseOpts, ...cookieDomainOption() })
     store.set('session_id', '', baseOpts)
     store.set('session_id', '', { ...baseOpts, ...cookieDomainOption() })
 
@@ -35,9 +35,9 @@ export async function POST(request: NextRequest) {
 
     const res = NextResponse.json({ message: 'Logged out successfully' })
     const flags = `Path=/; Max-Age=0; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
-    res.headers.append('Set-Cookie', `auth_token=; ${flags}`)
+    res.headers.append('Set-Cookie', `user_sid=; ${flags}`)
     if (process.env.NODE_ENV === 'production') {
-      res.headers.append('Set-Cookie', `auth_token=; Domain=.jeffistores.in; ${flags}`)
+      res.headers.append('Set-Cookie', `user_sid=; Domain=.jeffistores.in; ${flags}`)
     }
     return res
   } catch (err) {

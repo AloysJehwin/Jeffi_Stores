@@ -45,7 +45,7 @@ function makeRequest(searchParams: Record<string, string> = {}) {
   for (const [k, v] of Object.entries(searchParams)) url.searchParams.set(k, v)
   return new NextRequest(url.toString(), {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid-token' },
+    headers: { cookie: 'admin_sid=valid-token' },
   })
 }
 

@@ -20,7 +20,7 @@ export const dynamic = 'force-dynamic'
 export default async function CrmDashboardPage() {
   const host = await getHost()
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')?.value
+  const token = cookieStore.get('admin_sid')?.value
   let adminId = ''
   if (token) {
     try { adminId = (await verifyToken(token))?.adminId || '' } catch {}

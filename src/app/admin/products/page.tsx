@@ -315,7 +315,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   // Read admin role for super_admin-only features (e.g. delete product)
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
+  const token = cookieStore.get('admin_sid')
   let isSuperAdmin = false
   if (token) {
     try {

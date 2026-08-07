@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
       path: '/',
       ...cookieDomainOption(),
     }
-    cookieStore.set('business_auth_token', sid, cookieOpts)
+    cookieStore.set('business_sid', sid, cookieOpts)
     cookieStore.set('session_id', user.id, cookieOpts)
 
     return NextResponse.json({

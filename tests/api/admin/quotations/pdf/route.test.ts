@@ -45,7 +45,7 @@ const adminPayload = {
 function makeRequest(id = 'qt-1') {
   return new NextRequest(`http://localhost/api/admin/quotations/${id}/pdf`, {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid-token' },
+    headers: { cookie: 'admin_sid=valid-token' },
   })
 }
 

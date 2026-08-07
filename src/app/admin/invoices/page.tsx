@@ -10,7 +10,7 @@ export const metadata = { title: 'Invoices — Jeffi Admin' }
 
 export default async function InvoicesPage() {
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
+  const token = cookieStore.get('admin_sid')
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
 

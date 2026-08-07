@@ -61,7 +61,7 @@ export default function BusinessRFQsPage({
 async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }) {
   const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
+  const token = cookieStore.get('admin_sid')
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)

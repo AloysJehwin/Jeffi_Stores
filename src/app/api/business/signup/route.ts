@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
       path: '/',
       ...cookieDomainOption(),
     }
-    cookieStore.set('business_auth_token', sid, cookieOpts)
+    cookieStore.set('business_sid', sid, cookieOpts)
     cookieStore.set('session_id', newUser.id, cookieOpts)
 
     await deleteOTP(email)

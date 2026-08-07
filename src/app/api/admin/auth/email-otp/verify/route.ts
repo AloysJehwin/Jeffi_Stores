@@ -7,7 +7,7 @@ import { logActivity } from '@/lib/activity'
 export const dynamic = 'force-dynamic'
 
 // Layer 2 (identity) — verify the email OTP and, on success, issue the 5-min MFA
-// ticket that the (unchanged) TOTP step consumes. Never mints admin_token here.
+// ticket that the (unchanged) TOTP step consumes. Never mints admin_sid here.
 export async function POST(request: NextRequest) {
   try {
     const { email, code } = await request.json().catch(() => ({}))

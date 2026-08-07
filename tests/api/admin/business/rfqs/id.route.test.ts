@@ -34,14 +34,14 @@ const adminPayload = {
 function makeGetRequest(id = 'rfq-1') {
   return new NextRequest(`http://localhost/api/admin/business/rfqs/${id}`, {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 
 function makePatchRequest(id = 'rfq-1', body: Record<string, unknown> = {}) {
   return new NextRequest(`http://localhost/api/admin/business/rfqs/${id}`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json', cookie: 'admin_token=valid' },
+    headers: { 'content-type': 'application/json', cookie: 'admin_sid=valid' },
     body: JSON.stringify(body),
   })
 }

@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
     })
 
     const cookieStore = await cookies()
-    cookieStore.set('auth_token', sid, {
+    cookieStore.set('user_sid', sid, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',

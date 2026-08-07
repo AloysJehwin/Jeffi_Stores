@@ -27,7 +27,7 @@ const admin = { adminId: 'admin-1', role: 'super_admin', scopes: ['invoices:writ
 function makeRequest() {
   return new NextRequest('http://localhost/api/admin/invoices/drafts/draft-1/publish', {
     method: 'POST',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

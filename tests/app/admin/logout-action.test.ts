@@ -43,7 +43,7 @@ vi.mock('@/lib/admin-path', () => ({
   ap: mockAp,
 }))
 
-// Opaque sessions: logout resolves the admin_token cookie via verifyToken and
+// Opaque sessions: logout resolves the admin_sid cookie via verifyToken and
 // revokes the server-side session before clearing the cookie.
 vi.mock('@/lib/jwt', () => ({
   verifyToken: mockVerifyToken,
@@ -65,9 +65,9 @@ describe('logoutAction', () => {
     mockRevokeSession.mockResolvedValue(undefined)
   })
 
-  it('deletes admin_token cookie', async () => {
+  it('deletes admin_sid cookie', async () => {
     await logoutAction()
-    expect(mockDelete).toHaveBeenCalledWith('admin_token')
+    expect(mockDelete).toHaveBeenCalledWith('admin_sid')
   })
 
   it('deletes admin_session cookie', async () => {
@@ -100,7 +100,7 @@ describe('logoutAction', () => {
     expect(mockAp).toHaveBeenCalledWith('/admin/login', '')
   })
 
-  it('revokes the server-side session for the admin_token cookie sid', async () => {
+  it('revokes the server-side session for the admin_sid cookie sid', async () => {
     mockGet.mockReturnValue({ value: 'the-cookie-sid' })
     mockVerifyToken.mockResolvedValue({
       adminId: 'admin-1',
@@ -111,15 +111,15 @@ describe('logoutAction', () => {
     await logoutAction()
     expect(mockVerifyToken).toHaveBeenCalledWith('the-cookie-sid')
     expect(mockRevokeSession).toHaveBeenCalledWith('admin-sid')
-    expect(mockDelete).toHaveBeenCalledWith('admin_token')
+    expect(mockDelete).toHaveBeenCalledWith('admin_sid')
     expect(mockRedirect).toHaveBeenCalled()
   })
 
-  it('does not revoke a session when there is no admin_token cookie', async () => {
+  it('does not revoke a session when there is no admin_sid cookie', async () => {
     mockGet.mockReturnValue(undefined)
     await logoutAction()
     expect(mockVerifyToken).not.toHaveBeenCalled()
     expect(mockRevokeSession).not.toHaveBeenCalled()
-    expect(mockDelete).toHaveBeenCalledWith('admin_token')
+    expect(mockDelete).toHaveBeenCalledWith('admin_sid')
   })
 })

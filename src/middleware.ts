@@ -45,6 +45,9 @@ function buildRedirectUrl(request: NextRequest, path: string): URL {
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.hostname || ''
   const pathname = request.nextUrl.pathname
+  // Request UA for session device-binding: resolveSession revokes + rejects a cookie
+  // replayed from a clearly different browser family (see uaClearlyDiffers).
+  const reqUA = request.headers.get('user-agent')
 
   if (hostname.startsWith('www.jeffistores.in')) {
     const target = new URL(pathname + request.nextUrl.search, 'https://jeffistores.in')
@@ -106,14 +109,14 @@ export async function middleware(request: NextRequest) {
     const PUBLIC_BUSINESS_SUBDOMAIN = ['/signin', '/signup', '/pending']
     const isPublicSubdomain = pathname === '/' || PUBLIC_BUSINESS_SUBDOMAIN.some(p => pathname.startsWith(p))
     if (!isPublicSubdomain) {
-      const token = request.cookies.get('business_auth_token')?.value
+      const token = request.cookies.get('business_sid')?.value
       if (!token) {
         return NextResponse.redirect(buildRedirectUrl(request, '/signin'))
       }
-      const payload = await verifyBusinessToken(token)
+      const payload = await verifyBusinessToken(token, reqUA)
       if (!payload) {
         const res = NextResponse.redirect(buildRedirectUrl(request, '/signin'))
-        res.cookies.delete('business_auth_token')
+        res.cookies.delete('business_sid')
         return res
       }
       if (payload.approvalStatus === 'pending') {
@@ -133,18 +136,18 @@ export async function middleware(request: NextRequest) {
     const PUBLIC_BUSINESS = ['/business/signin', '/business/signup', '/business/pending']
     const isPublic = PUBLIC_BUSINESS.some(p => pathname.startsWith(p))
     if (!isPublic) {
-      const token = request.cookies.get('business_auth_token')?.value
+      const token = request.cookies.get('business_sid')?.value
       if (!token) {
         const signinUrl = buildRedirectUrl(request, '/business/signin')
         signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
         return NextResponse.redirect(signinUrl)
       }
-      const payload = await verifyBusinessToken(token)
+      const payload = await verifyBusinessToken(token, reqUA)
       if (!payload) {
         const signinUrl = buildRedirectUrl(request, '/business/signin')
         signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
         const res = NextResponse.redirect(signinUrl)
-        res.cookies.delete('business_auth_token')
+        res.cookies.delete('business_sid')
         return res
       }
       if (payload.approvalStatus === 'pending') {
@@ -198,14 +201,14 @@ export async function middleware(request: NextRequest) {
       // Auth check before rewrite so server components receive x-user-id etc.
       const isAdminLogin = pathname === '/login'
       if (!isAdminLogin) {
-        const token = request.cookies.get('admin_token')?.value
+        const token = request.cookies.get('admin_sid')?.value
         if (!token) {
           return NextResponse.redirect(buildRedirectUrl(request, '/login'))
         }
-        const payload = await verifyToken(token)
+        const payload = await verifyToken(token, reqUA)
         if (!payload) {
           const res = NextResponse.redirect(buildRedirectUrl(request, '/login'))
-          res.cookies.delete('admin_token')
+          res.cookies.delete('admin_sid')
           return res
         }
         const rewriteUrl = new URL(`/admin${slug}${search}`, request.url)
@@ -237,12 +240,12 @@ export async function middleware(request: NextRequest) {
       return addSecurityHeaders(NextResponse.next())
     }
 
-    const token = request.cookies.get('admin_token')?.value
+    const token = request.cookies.get('admin_sid')?.value
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const payload = await verifyToken(token)
+    const payload = await verifyToken(token, reqUA)
     if (!payload) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
@@ -284,7 +287,7 @@ export async function middleware(request: NextRequest) {
       })
     }
 
-    const token = request.cookies.get('admin_token')?.value
+    const token = request.cookies.get('admin_sid')?.value
 
     if (!token) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
@@ -292,13 +295,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
-    const payload = await verifyToken(token)
+    const payload = await verifyToken(token, reqUA)
 
     if (!payload) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
       const response = NextResponse.redirect(loginUrl)
-      response.cookies.delete('admin_token')
+      response.cookies.delete('admin_sid')
       return response
     }
 
@@ -308,7 +311,7 @@ export async function middleware(request: NextRequest) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
       const response = NextResponse.redirect(loginUrl)
-      response.cookies.delete('admin_token')
+      response.cookies.delete('admin_sid')
       return response
     }
 
