@@ -13,6 +13,7 @@ export async function POST(request: NextRequest) {
     email: admin.email,
     role: admin.role,
     scopes: admin.scopes,
+    sid: admin.sid, // reuse the existing session — never mint a second row on refresh
   })
 
   const response = NextResponse.json({ success: true })

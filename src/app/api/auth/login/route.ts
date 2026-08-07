@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { queryOne, query } from '@/lib/db'
-import { SignJWT } from 'jose'
+import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
@@ -10,7 +10,6 @@ import { POLICY_VERSION } from '@/app/legal/policies'
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
 }
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 async function recordFailedLogin(req: NextRequest, email: string, reason: string, userId: string | null) {
   try {
@@ -82,20 +81,19 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const token = await new SignJWT({
+    const { token } = await issueUserToken({
       userId: user.id,
       email: user.email,
       type: 'customer',
+      userAgent: request.headers.get('user-agent'),
+      ip: request.headers.get('x-forwarded-for'),
     })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setExpirationTime('30d')
-      .sign(JWT_SECRET)
 
     cookieStore.set('auth_token', token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60,
+      maxAge: USER_SESSION_TTL_S,
       path: '/',
       ...cookieDomainOption(),
     })
@@ -104,7 +102,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60,
+      maxAge: USER_SESSION_TTL_S,
       path: '/',
       ...cookieDomainOption(),
     })

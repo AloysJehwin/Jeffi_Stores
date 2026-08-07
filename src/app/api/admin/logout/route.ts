@@ -1,10 +1,23 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
+import { verifyToken } from '@/lib/jwt'
+import { revokeSession } from '@/lib/auth-sessions'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 
 export async function POST() {
   try {
     const cookieStore = await cookies()
+
+    // Revoke the server-side session before clearing the cookie.
+    const existing = cookieStore.get('admin_token')?.value
+    if (existing) {
+      try {
+        const payload = await verifyToken(existing)
+        const sid = (payload as any)?.sid
+        if (typeof sid === 'string' && sid) await revokeSession(sid)
+      } catch { /* best-effort revoke */ }
+    }
+
     const baseOpts = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

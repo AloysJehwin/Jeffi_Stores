@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { authenticateBusiness } from '@/lib/jwt'
+import { revokeSession } from '@/lib/auth-sessions'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 
@@ -10,6 +11,7 @@ export async function POST(request: NextRequest) {
     if (auth?.userId) {
       logActivity({ userId: auth.userId, kind: 'logout', summary: 'Business user logged out' }).catch(() => {})
     }
+    if (auth?.sid) await revokeSession(auth.sid)
 
     const cookieStore = await cookies()
     const baseOpts = {

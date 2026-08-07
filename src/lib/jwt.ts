@@ -1,6 +1,21 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { NextRequest, NextResponse } from 'next/server'
 import { hasScope, getScopeForPath } from './scopes'
+import type { PrincipalType } from './auth-sessions'
+
+// Session-aware verification. A valid signature is necessary but not sufficient — the
+// token's server-side session must also be live (not revoked / idle / expired).
+// STRICT: a token WITHOUT a `sid` (issued before revocable sessions shipped) is rejected,
+// forcing a one-time re-login on rollout. No ungoverned tokens survive.
+//
+// auth-sessions is imported DYNAMICALLY (not at module top) so its pg dependency never
+// enters the Edge middleware bundle — middleware imports verifyToken from this file but
+// runs on Edge where pg is unavailable. This mirrors the existing audit-context lazy import.
+async function sessionOk(sid: unknown, principalType: PrincipalType): Promise<boolean> {
+  if (typeof sid !== 'string' || !sid) return false // strict: no sid → reject (forced re-login)
+  const { validateSession } = await import('./auth-sessions')
+  return await validateSession(sid, principalType)
+}
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -31,6 +46,7 @@ export interface UserJWTPayload {
   isBusiness?: boolean
   approvalStatus?: string
   scopes?: string[]
+  sid?: string
   [key: string]: any
 }
 
@@ -43,12 +59,14 @@ export async function authenticateBusiness(request: NextRequest): Promise<UserJW
     // Reject tokens that don't explicitly belong to business
     if (payload.type !== 'business') return null
     if (!payload.isBusiness) return null
+    if (!(await sessionOk(payload.sid, 'business'))) return null
     return {
       userId: payload.userId as string,
       email: payload.email as string,
       isBusiness: true,
       approvalStatus: payload.approvalStatus as string | undefined,
       scopes: (payload.scopes as string[] | undefined) ?? [],
+      sid: payload.sid as string | undefined,
     }
   } catch {
     return null
@@ -62,6 +80,7 @@ export interface AdminJWTPayload {
   email?: string
   role: string
   scopes: string[]
+  sid?: string
   [key: string]: any
 }
 
@@ -102,7 +121,8 @@ export async function authenticateUser(request: NextRequest): Promise<UserJWTPay
     if (!payload.userId || typeof payload.userId !== 'string') return null
     // Reject tokens that belong to business or admin
     if (payload.type !== 'customer') return null
-    return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
+    if (!(await sessionOk(payload.sid, 'customer'))) return null
+    return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [], sid: payload.sid as string | undefined }
   } catch {
     return null
   }
@@ -142,6 +162,7 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
     const { payload } = await jwtVerify(token, JWT_SECRET)
     if (!payload.adminId || typeof payload.adminId !== 'string') return null
     if (payload.type !== 'admin_session') return null
+    if (!(await sessionOk(payload.sid, 'admin'))) return null
     const result = {
       adminId: payload.adminId as string,
       first_name: payload.first_name as string | undefined,
@@ -149,6 +170,7 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
       email: payload.email as string | undefined,
       role: payload.role as string,
       scopes: (payload.scopes as string[]) || [],
+      sid: payload.sid as string | undefined,
     }
     if (typeof process !== 'undefined' && process.versions?.node) {
       try {
@@ -216,7 +238,8 @@ export async function verifyUserToken(token: string): Promise<UserJWTPayload | n
     const { payload } = await jwtVerify(token, JWT_SECRET)
     if (!payload.userId || typeof payload.userId !== 'string') return null
     if (payload.type !== 'customer') return null
-    return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
+    if (!(await sessionOk(payload.sid, 'customer'))) return null
+    return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [], sid: payload.sid as string | undefined }
   } catch {
     return null
   }
@@ -228,7 +251,8 @@ export async function verifyBusinessToken(token: string): Promise<UserJWTPayload
     if (!payload.userId || typeof payload.userId !== 'string') return null
     if (payload.type !== 'business') return null
     if (!payload.isBusiness) return null
-    return { userId: payload.userId as string, email: payload.email as string, isBusiness: true, approvalStatus: payload.approvalStatus as string | undefined, scopes: (payload.scopes as string[] | undefined) ?? [] }
+    if (!(await sessionOk(payload.sid, 'business'))) return null
+    return { userId: payload.userId as string, email: payload.email as string, isBusiness: true, approvalStatus: payload.approvalStatus as string | undefined, scopes: (payload.scopes as string[] | undefined) ?? [], sid: payload.sid as string | undefined }
   } catch {
     return null
   }

@@ -1795,3 +1795,12 @@ CREATE UNIQUE INDEX uq_product_suppliers_one_preferred
 
 CREATE INDEX idx_poi_sub_variant ON public.purchase_order_items USING btree (sub_variant_id) WHERE (sub_variant_id IS NOT NULL);
 
+
+--
+-- Name: auth_sessions indexes; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_auth_sessions_principal ON public.auth_sessions USING btree (principal_type, principal_id) WHERE (revoked_at IS NULL);
+
+CREATE INDEX idx_auth_sessions_expiry ON public.auth_sessions USING btree (expires_at);
+

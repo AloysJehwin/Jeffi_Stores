@@ -2787,6 +2787,22 @@ ALTER TABLE ONLY public.product_suppliers
 
 
 --
+-- Name: auth_sessions auth_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.auth_sessions
+    ADD CONSTRAINT auth_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: auth_sessions auth_sessions_principal_type_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.auth_sessions
+    ADD CONSTRAINT auth_sessions_principal_type_check CHECK (((principal_type)::text = ANY ((ARRAY['admin'::character varying, 'customer'::character varying, 'business'::character varying])::text[])));
+
+
+--
 -- PostgreSQL database dump complete
 --
 

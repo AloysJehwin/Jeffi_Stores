@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { generateToken, JWT_MAX_AGE_S } from '@/lib/jwt'
+import { createSession } from '@/lib/auth-sessions'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 
 export interface AdminSessionAdmin {
@@ -18,6 +19,12 @@ export async function issueAdminSession(
 ) {
   const displayName =
     `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || admin.email || ''
+  // Create a revocable server-side session; embed its id as the JWT `sid`.
+  const { sid } = await createSession({
+    principalType: 'admin',
+    principalId: admin.id,
+    ttlSeconds: JWT_MAX_AGE_S,
+  })
   const token = await generateToken({
     adminId: admin.id,
     first_name: admin.first_name || undefined,
@@ -26,6 +33,7 @@ export async function issueAdminSession(
     role: admin.role,
     scopes: admin.scopes || [],
     authCertCN: certCN || undefined,
+    sid,
   })
   const response = NextResponse.json({
     success: true,
