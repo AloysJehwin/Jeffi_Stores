@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
-import { getAdminSession } from '@/lib/admin-auth'
+import { resolveSession } from '@/lib/auth-sessions'
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,19 +19,22 @@ export async function GET(request: NextRequest) {
       return res
     }
 
-    // Session-aware: verifies signature AND the server-side session (revoked/idle/expiry),
-    // so a revoked admin is reported as not authenticated.
-    const payload = await getAdminSession()
+    // Opaque session: resolve the cookie's sid → live admin session (revoked/idle/expiry).
+    // expiresAt comes from the session row (there is no JWT exp anymore).
+    const s = await resolveSession(token.value)
 
-    if (!payload) {
+    if (!s || s.principalType !== 'admin') {
       const res = NextResponse.json({ authenticated: false, expiresAt: null })
       res.headers.set('x-cert-status', certStatus)
       return res
     }
 
-    // exp is seconds since epoch (JWT standard)
-    const expiresAt = typeof payload.exp === 'number' ? payload.exp * 1000 : null
-    const res = NextResponse.json({ authenticated: true, expiresAt, user: payload })
+    const expiresAt = new Date(s.expiresAt).getTime()
+    const res = NextResponse.json({
+      authenticated: true,
+      expiresAt,
+      user: { adminId: s.principalId, email: s.email, role: s.role, scopes: s.scopes },
+    })
     res.headers.set('x-cert-status', certStatus)
     return res
   } catch (error) {
