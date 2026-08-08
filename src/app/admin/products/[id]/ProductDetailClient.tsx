@@ -283,13 +283,13 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
       <button
         type="button"
         onClick={toggle}
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-surface-secondary transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors"
       >
-        <p className="text-sm font-semibold uppercase tracking-wide text-foreground-secondary">Supplier Details</p>
-        <ChevronDown className={`w-5 h-5 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+        <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Supplier Details</p>
+        <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="px-5 pb-5 pt-1">
+        <div className="px-4 pb-4 pt-1">
           {loading && <p className="text-xs text-foreground-muted py-2">Loading…</p>}
           {!loading && data && (
             <div className="space-y-4">
@@ -751,14 +751,6 @@ export default function ProductDetailClient({ id }: { id: string }) {
               </CollapsibleCard>
             )}
 
-            {/* — Supplier Details — */}
-            <SupplierDetailsCard productId={id} />
-
-            {/* — Selling Units — */}
-            <CollapsibleCard title="Selling Units">
-              <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
-            </CollapsibleCard>
-
             {/* — Physical & Compliance — */}
             <CollapsibleCard title="Physical & Compliance">
               {!p.material && !p.finish && !p.size && !p.color && !p.shelf_life_days &&
@@ -814,6 +806,14 @@ export default function ProductDetailClient({ id }: { id: string }) {
               <Field label="Age Range" value={(p.age_min != null || p.age_max != null) ? `${p.age_min ?? '—'} – ${p.age_max ?? '—'}` : null} />
             </CollapsibleCard>
           </div>
+
+          {/* — Supplier Details — */}
+          <SupplierDetailsCard productId={id} />
+
+          {/* — Selling Units — */}
+          <CollapsibleCard title="Selling Units">
+            <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
+          </CollapsibleCard>
 
           {/* — Specifications — */}
           {p.specifications && Object.keys(p.specifications).length > 0 && (
