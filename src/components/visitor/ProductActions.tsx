@@ -219,7 +219,6 @@ export default function ProductActions({
 
   const hasVariants = variants.length > 0
   const selectedVariant = variants.find(v => v.id === selectedVariantId)
-  const displaySku = hasVariants && selectedVariant ? selectedVariant.sku : sku
 
   const modeInitDone = useRef(false)
   useEffect(() => {
@@ -264,6 +263,9 @@ export default function ProductActions({
   }, [selectedVariantId])
 
   const selectedSubVariant = selectedVariant?.sub_variants?.find(sv => sv.id === selectedSubVariantId) ?? null
+  const displaySku = hasVariants && selectedVariant
+    ? (selectedSubVariant?.sku || selectedVariant.sku)
+    : sku
 
   const gstMultiplier = 1 + (gstPercentage ?? 0) / 100
   const toInclGst = (exGst: number) => round2(exGst * gstMultiplier)

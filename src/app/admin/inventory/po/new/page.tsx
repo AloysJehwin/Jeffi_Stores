@@ -51,7 +51,7 @@ type POLineItem = {
 }
 
 type PickerProduct = {
-  product_id: string; variant_id: string | null; name: string; variant_name: string | null
+  product_id: string; variant_id: string | null; sub_variant_id: string | null; name: string; variant_name: string | null
   sku: string; base_price: number | null; gst_percentage: number | null; hsn_code: string | null; mrp: number | null
   sell_unit_label: string | null; sell_unit_dimension: string | null
 }
@@ -177,6 +177,7 @@ export default function NewPOPage() {
       product_name: displayName,
       sku: p.sku || '',
       variant_id: p.variant_id || '',
+      sub_variant_id: p.sub_variant_id || '',
       tax_rate: p.gst_percentage != null ? String(Math.round(Number(p.gst_percentage))) : '0',
       hsn_code: p.hsn_code || '',
       mrp: Number(p.mrp) || 0,

@@ -1049,6 +1049,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
                         <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 transition-colors">
                           <td className="px-4 py-2 pl-10 text-sm text-foreground-secondary">↳ {sv.sub_variant_name}</td>
                           <td className="px-4 py-2 font-mono text-xs text-foreground-muted hidden sm:table-cell">{sv.sku || '—'}</td>
+                          <td className="px-4 py-2 hidden lg:table-cell" />
+                          <td className="px-4 py-2 hidden xl:table-cell" />
                           <td className="px-4 py-2 text-right text-sm text-foreground">{sv.price ? formatINR(Number(sv.price)) : '—'}</td>
                           <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.price_ex_gst ? formatINR(Number(sv.price_ex_gst)) : '—'}</td>
                           <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.mrp ? formatINR(Number(sv.mrp)) : '—'}</td>
