@@ -744,6 +744,14 @@ export default function ProductDetailClient({ id }: { id: string }) {
               </>}
             </CollapsibleCard>
 
+            {/* — Description — */}
+            {p.description && (
+              <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+                <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Description</p>
+                <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{p.description}</p>
+              </div>
+            )}
+
             {/* — Supplier Details — */}
             <SupplierDetailsCard productId={id} />
 
@@ -827,13 +835,6 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <CollapsibleCard title="Short Description">
               <p className="text-sm text-foreground leading-relaxed">{p.short_description}</p>
             </CollapsibleCard>
-          )}
-
-          {p.description && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Description</p>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-line min-h-[80px]">{p.description}</p>
-            </div>
           )}
 
           {(p.ai_description || p.ai_product_type || p.ai_use_cases?.length || p.ai_keywords?.length || p.ai_features?.length || p.ai_search_tags?.length || p.ai_who_uses_it || p.ai_application) && (
