@@ -3442,13 +3442,23 @@ export default function ProductForm({ categories, brands, action, product, produ
                     {(() => {
                       const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'' }
                       const setD = (field: string, val: string) => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, [field]: val } }))
+                      const parentSku = popupVariant?.sku || ''
+                      const autoSku = (name: string) => parentSku ? `${parentSku}-${name.toUpperCase().replace(/[^A-Z0-9]/g, '')}` : ''
+                      const skuIsAuto = !d.sku || d.sku === autoSku(d.name)
                       const inputCls = "field-normal border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent"
                       const lockedCls = `${inputCls} bg-surface-secondary text-foreground-muted cursor-not-allowed`
                       return (
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">Name *</label>
-                            <input type="text" placeholder="e.g. Red" value={d.name} onChange={(e) => setD('name', e.target.value)} className={`${inputCls} w-full`} />
+                            <input type="text" placeholder="e.g. Red" value={d.name} onChange={(e) => {
+                              const name = e.target.value
+                              setSubVariantDrafts(m => {
+                                const cur = m[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'' }
+                                const wasAuto = !cur.sku || cur.sku === autoSku(cur.name)
+                                return { ...m, [variantPopupId]: { ...cur, name, sku: wasAuto ? autoSku(name) : cur.sku } }
+                              })
+                            }} className={`${inputCls} w-full`} />
                           </div>
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">MRP (Ex. GST) *{popupUnitKey && <span className="text-[10px] text-foreground-muted ml-1">/ {popupUnitKey}</span>}</label>
@@ -3496,7 +3506,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                             />
                           </div>
                           <div>
-                            <label className="block text-xs text-foreground-muted mb-0.5">SKU (auto)</label>
+                            <label className="block text-xs text-foreground-muted mb-0.5">SKU {skuIsAuto ? '(auto)' : '(manual)'}</label>
                             <input type="text" placeholder="auto" value={d.sku} onChange={(e) => setD('sku', e.target.value)} className={`${inputCls} w-full`} />
                           </div>
                           <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
