@@ -283,13 +283,13 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
       <button
         type="button"
         onClick={toggle}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors"
+        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-surface-secondary transition-colors"
       >
-        <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Supplier Details</p>
-        <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+        <p className="text-sm font-semibold uppercase tracking-wide text-foreground-secondary">Supplier Details</p>
+        <ChevronDown className={`w-5 h-5 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
-        <div className="px-4 pb-4 pt-1">
+        <div className="px-5 pb-5 pt-1">
           {loading && <p className="text-xs text-foreground-muted py-2">Loading…</p>}
           {!loading && data && (
             <div className="space-y-4">
