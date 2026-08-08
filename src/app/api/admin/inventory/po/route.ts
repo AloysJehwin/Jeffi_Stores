@@ -106,16 +106,33 @@ async function syncSupplierPriceFromPO(
   if (!Number.isFinite(unitCost) || unitCost < 0) return
 
   // Resolve the leaf. Sub-variant wins (one-leaf rule: sub_variant_id set, variant_id NULL).
-  // Else the variant by SKU (or the line's variant_id). Else the product leaf.
+  // Else try to resolve the SKU: first against product_variants, then against
+  // product_sub_variants (a sub-variant SKU like TAP-HTJ15-RED never matches a variant row).
+  // Else fall back to the line's explicit variant_id. Else product leaf.
   let variantId: string | null = null
   let subVariantId: string | null = subVariantIdFromLine || null
   if (!subVariantId) {
     if (sku) {
+      // Try variant first.
       const vr = await client.query<{ id: string }>(
         `SELECT id FROM product_variants WHERE sku = $1 AND product_id = $2 LIMIT 1`,
         [sku, productId]
       )
-      variantId = vr.rows[0]?.id ?? variantIdFromLine ?? null
+      if (vr.rows[0]) {
+        variantId = vr.rows[0].id
+      } else {
+        // Try sub-variant — SKU may belong to a sub-variant (variant_id stays NULL per one-leaf rule).
+        const svr = await client.query<{ id: string }>(
+          `SELECT id FROM product_sub_variants WHERE sku = $1 AND product_id = $2 LIMIT 1`,
+          [sku, productId]
+        )
+        if (svr.rows[0]) {
+          subVariantId = svr.rows[0].id
+          variantId = null
+        } else {
+          variantId = variantIdFromLine ?? null
+        }
+      }
     } else {
       variantId = variantIdFromLine ?? null
     }

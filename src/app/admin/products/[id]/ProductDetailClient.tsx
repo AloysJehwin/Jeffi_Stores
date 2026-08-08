@@ -339,8 +339,12 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                         }
                         g.rows.push(row)
                       }
-                      return Array.from(groups.entries()).map(([leafKey, g]) => (
-                        <div key={leafKey}>
+                      return Array.from(groups.entries()).map(([leafKey, g]) => {
+                        const fmt = (v: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(v)
+                        const leafLowest = data.lowestHistByLeaf?.[leafKey]
+                        const leafLast = data.lastPurchaseByLeaf?.[leafKey]
+                        return (
+                        <div key={leafKey} className="space-y-2">
                           <p className="text-[11px] font-medium text-foreground-secondary mb-1">{g.label}</p>
                           <div className="overflow-x-auto">
                             <table className="w-full text-xs">
@@ -374,42 +378,32 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                               </tbody>
                             </table>
                           </div>
+                          {(leafLowest != null || leafLast) && (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {leafLowest != null && (
+                                <div className="flex-1 min-w-[130px] bg-surface border border-border-default rounded-lg px-3 py-2">
+                                  <p className="text-[10px] text-foreground-muted font-medium uppercase tracking-wide">Lowest ever paid (PO)</p>
+                                  <p className="text-sm font-bold text-foreground">{fmt(leafLowest)}</p>
+                                </div>
+                              )}
+                              {leafLast && (
+                                <div className="flex-1 min-w-[130px] bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg px-3 py-2">
+                                  <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide">Last Purchase Price</p>
+                                  <p className="text-sm font-bold text-accent-700 dark:text-accent-300">{fmt(leafLast.price)}</p>
+                                  <p className="text-[10px] text-foreground-muted">{new Date(leafLast.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      ))
+                        )
+                      })
                     })()}
-                    {/* Lowest ever paid across all POs (actual purchases) */}
-                    {data.lowestHistoricalPrice != null && (
-                      <div className="flex flex-wrap gap-3">
-                        <div className="flex-1 min-w-[140px] bg-surface border border-border-default rounded-lg px-3 py-2">
-                          <p className="text-[11px] text-foreground-muted font-medium uppercase tracking-wide">Lowest ever paid (PO)</p>
-                          <p className="text-base font-bold text-foreground">
-                            {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(data.lowestHistoricalPrice)}
-                          </p>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ) : (
                   <p className="text-xs text-foreground-muted italic">No suppliers linked — edit product to add suppliers &amp; prices.</p>
                 )}
               </div>
-
-              {/* Last Purchase Price */}
-              {data.lastPurchasePrice != null && (
-                <div className="flex items-center gap-3 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg px-3 py-2">
-                  <div>
-                    <p className="text-[11px] text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide">Last Purchase Price</p>
-                    <p className="text-lg font-bold text-accent-700 dark:text-accent-300">
-                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(data.lastPurchasePrice)}
-                    </p>
-                  </div>
-                  {data.lastPurchaseDate && (
-                    <p className="text-xs text-foreground-muted ml-auto">
-                      {new Date(data.lastPurchaseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </p>
-                  )}
-                </div>
-              )}
 
               {/* Purchase History */}
               <div>
@@ -425,7 +419,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                           <th className="text-left pb-1.5 pr-3 font-medium">PO #</th>
                           <th className="text-left pb-1.5 pr-3 font-medium">Date</th>
                           <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
-                          <th className="text-left pb-1.5 pr-3 font-medium">Variant</th>
+                          <th className="text-left pb-1.5 pr-3 font-medium">Leaf</th>
                           <th className="text-right pb-1.5 pr-3 font-medium">Qty</th>
                           <th className="text-right pb-1.5 pr-3 font-medium">Unit Cost</th>
                           <th className="text-right pb-1.5 font-medium">Total</th>
@@ -441,7 +435,11 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                               {new Date(row.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
                             </td>
                             <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
-                            <td className="py-1.5 pr-3 text-foreground-muted">{row.sub_variant_name || row.variant_name || '—'}</td>
+                            <td className="py-1.5 pr-3 text-foreground-muted">
+                              {row.sub_variant_name
+                                ? <span>{row.variant_name ? `${row.variant_name} — ` : ''}<span className="text-foreground">{row.sub_variant_name}</span></span>
+                                : row.variant_name || '—'}
+                            </td>
                             <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
                             <td className="py-1.5 pr-3 text-right text-foreground">
                               {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}

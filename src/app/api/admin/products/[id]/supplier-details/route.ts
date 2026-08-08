@@ -73,6 +73,22 @@ export async function GET(
       if (!(k in bestByLeaf)) bestByLeaf[k] = r.supplier_id
     }
 
+    // Compute last purchase + lowest-ever price PER LEAF so the UI can show
+    // stats scoped to the specific variant/sub-variant rather than the whole product.
+    const lastPurchaseByLeaf: Record<string, { price: number; date: string; supplierName: string }> = {}
+    const lowestHistByLeaf: Record<string, number> = {}
+    for (const h of purchaseHistory) {
+      const k = `${h.variant_id || NIL}:${h.sub_variant_id || NIL}`
+      const cost = Number(h.unit_cost)
+      if (!(k in lastPurchaseByLeaf)) {
+        // purchaseHistory is ORDER BY order_date DESC so first seen = most recent
+        lastPurchaseByLeaf[k] = { price: cost, date: h.order_date, supplierName: h.supplier_name }
+      }
+      if (!(k in lowestHistByLeaf) || cost < lowestHistByLeaf[k]) {
+        lowestHistByLeaf[k] = cost
+      }
+    }
+
     const lastPurchase = purchaseHistory[0] ?? null
     const lowestHistPrice = purchaseHistory.length
       ? Math.min(...purchaseHistory.map((h: any) => Number(h.unit_cost)))
@@ -83,6 +99,8 @@ export async function GET(
       suppliers,
       bestByLeaf,
       purchaseHistory,
+      lastPurchaseByLeaf,
+      lowestHistByLeaf,
       lastPurchasePrice: lastPurchase ? Number(lastPurchase.unit_cost) : null,
       lastPurchaseDate: lastPurchase ? lastPurchase.order_date : null,
       lowestHistoricalPrice: lowestHistPrice,
