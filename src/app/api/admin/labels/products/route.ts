@@ -106,6 +106,7 @@ export async function GET(request: NextRequest) {
            COALESCE(pv.inventory_quantity, 0)::numeric AS inventory_quantity,
            COALESCE(pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
            COALESCE(vsu.display_label, vsu.unit, psu.display_label, psu.unit) AS sell_unit_label,
+           NULL::uuid AS sub_variant_id,
            p.serialized,
            p.fragile, p.hazardous, p.flammable
          FROM product_variants pv
@@ -136,6 +137,7 @@ export async function GET(request: NextRequest) {
            COALESCE(ps.inventory_quantity, 0)::numeric AS inventory_quantity,
            COALESCE(ps.discount_pct, pv.discount_pct, p.discount_pct, 0)::numeric AS discount_pct,
            COALESCE(vsu.display_label, vsu.unit, psu.display_label, psu.unit) AS sell_unit_label,
+           ps.id AS sub_variant_id,
            p.serialized,
            p.fragile, p.hazardous, p.flammable
          FROM product_sub_variants ps
