@@ -1804,3 +1804,8 @@ CREATE INDEX idx_auth_sessions_principal ON public.auth_sessions USING btree (pr
 
 CREATE INDEX idx_auth_sessions_expiry ON public.auth_sessions USING btree (expires_at);
 
+-- Cookie-resolution key: the cookie carries a random opaque token; the DB stores only
+-- SHA-256(token) here and resolveSession() looks it up by hash. Unique so a hash maps to at
+-- most one session; NULL on legacy (pre-token) rows, which Postgres allows multiple of.
+CREATE UNIQUE INDEX idx_auth_sessions_token_hash ON public.auth_sessions USING btree (token_hash);
+

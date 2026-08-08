@@ -25,7 +25,8 @@ const admin = {
   adminId: 'a1',
   role: 'super_admin',
   scopes: ['products'],
-  sid: 'session-uuid',
+  // Opaque session token (64-hex), NOT the row uuid — this is the cookie value now.
+  sid: 'b'.repeat(64),
 }
 
 function makeReq() {
@@ -47,14 +48,14 @@ describe('POST /api/admin/refresh', () => {
     expect(res.status).toBe(401)
   })
 
-  it('slides the session expiry and re-sets the cookie to the same sid on happy path', async () => {
+  it('slides the session expiry and re-sets the cookie to the same token on happy path', async () => {
     mockAuth.mockResolvedValue(admin as any)
     mockExtend.mockResolvedValue(undefined)
     const res = await POST(makeReq())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
-    expect(mockExtend).toHaveBeenCalledWith('session-uuid', JWT_MAX_AGE_S)
-    expect(res.cookies.get('admin_sid')?.value).toBe('session-uuid')
+    expect(mockExtend).toHaveBeenCalledWith('b'.repeat(64), JWT_MAX_AGE_S)
+    expect(res.cookies.get('admin_sid')?.value).toBe('b'.repeat(64))
   })
 })

@@ -1,7 +1,8 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { NextRequest, NextResponse } from 'next/server'
 import { hasScope, getScopeForPath } from './scopes'
-import { resolveSession } from './auth-sessions'
+import { resolveSession, type SessionSignals } from './auth-sessions'
+import { extractSessionSignals } from './session-signals-request'
 
 // OPAQUE SESSIONS: the auth cookie value is the session id (a uuid), NOT a JWT.
 // authenticate*/verify* read the cookie and resolveSession() it (Postgres) — the single
@@ -43,7 +44,7 @@ export interface UserJWTPayload {
 export async function authenticateBusiness(request: NextRequest): Promise<UserJWTPayload | null> {
   const sid = getTokenFromRequest(request, 'business_sid')
   if (!sid) return null
-  const s = await resolveSession(sid, request.headers.get('user-agent'))
+  const s = await resolveSession(sid, extractSessionSignals(request))
   if (!s || s.principalType !== 'business') return null
   return {
     userId: s.principalId,
@@ -66,12 +67,13 @@ export interface AdminJWTPayload {
   [key: string]: any
 }
 
-export async function verifyToken(token: string, currentUA?: string | null): Promise<JWTPayload | null> {
+export async function verifyToken(token: string, current?: string | null | SessionSignals): Promise<JWTPayload | null> {
   // Opaque admin-session resolve (token = the sid). Used by middleware + admin server
-  // components. authCertCN comes from the snapshot on the session row. When the caller has
-  // the request UA (middleware), pass it so a cookie replayed from a different browser is
-  // rejected + the session revoked (device binding).
-  const s = await resolveSession(token, currentUA)
+  // components. authCertCN comes from the snapshot on the session row. `current` carries the
+  // request's device-binding signals (UA family, accept-language, sec-ch-ua-platform, ip, fp);
+  // a bare string is accepted for back-compat and treated as the UA. On a clear multi-signal
+  // mismatch resolveSession revokes the session (device binding).
+  const s = await resolveSession(token, current)
   if (!s || s.principalType !== 'admin') return null
   return {
     adminId: s.principalId,
@@ -94,7 +96,7 @@ function getTokenFromRequest(request: NextRequest, cookieName: string): string |
 export async function authenticateUser(request: NextRequest): Promise<UserJWTPayload | null> {
   const sid = getTokenFromRequest(request, 'user_sid')
   if (!sid) return null
-  const s = await resolveSession(sid, request.headers.get('user-agent'))
+  const s = await resolveSession(sid, extractSessionSignals(request))
   if (!s || s.principalType !== 'customer') return null
   return { userId: s.principalId, email: s.email || '', scopes: s.scopes, sid }
 }
@@ -128,7 +130,7 @@ export async function requireAdminScope(
 export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTPayload | null> {
   const sid = getTokenFromRequest(request, 'admin_sid')
   if (!sid) return null
-  const s = await resolveSession(sid, request.headers.get('user-agent'))
+  const s = await resolveSession(sid, extractSessionSignals(request))
   if (!s || s.principalType !== 'admin') return null
   const result: AdminJWTPayload = {
     adminId: s.principalId,
@@ -195,14 +197,14 @@ export async function generateReviewToken(payload: ReviewTokenPayload): Promise<
     .sign(JWT_SECRET)
 }
 
-export async function verifyUserToken(token: string, currentUA?: string | null): Promise<UserJWTPayload | null> {
-  const s = await resolveSession(token, currentUA)
+export async function verifyUserToken(token: string, current?: string | null | SessionSignals): Promise<UserJWTPayload | null> {
+  const s = await resolveSession(token, current)
   if (!s || s.principalType !== 'customer') return null
   return { userId: s.principalId, email: s.email || '', scopes: s.scopes, sid: s.sid }
 }
 
-export async function verifyBusinessToken(token: string, currentUA?: string | null): Promise<UserJWTPayload | null> {
-  const s = await resolveSession(token, currentUA)
+export async function verifyBusinessToken(token: string, current?: string | null | SessionSignals): Promise<UserJWTPayload | null> {
+  const s = await resolveSession(token, current)
   if (!s || s.principalType !== 'business') return null
   // Default unknown → 'pending' (fail-closed): the middleware gates pending/rejected, so
   // a session without a snapshotted status must NOT be treated as approved.

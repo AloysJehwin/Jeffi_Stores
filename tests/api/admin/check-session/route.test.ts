@@ -119,11 +119,14 @@ describe('GET /api/admin/check-session', () => {
 
   // ── Device binding: mismatch → session rejected ─────────────────────────────
 
-  it('passes the request user-agent into resolveSession (device binding)', async () => {
+  it('passes the request device-binding signals into resolveSession (device binding)', async () => {
     setCookieToken('valid-sid')
-    mockResolveSession.mockResolvedValue(null) // resolveSession revokes+returns null on UA mismatch
+    mockResolveSession.mockResolvedValue(null) // resolveSession revokes+returns null on a clear mismatch
     await GET(makeReq('admin.example.com', 'Safari/iOS'))
-    expect(mockResolveSession).toHaveBeenCalledWith('valid-sid', 'Safari/iOS')
+    expect(mockResolveSession).toHaveBeenCalledWith(
+      'valid-sid',
+      expect.objectContaining({ userAgent: 'Safari/iOS' })
+    )
   })
 
   // ── Error handling ───────────────────────────────────────────────────────

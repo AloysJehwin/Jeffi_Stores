@@ -3,6 +3,7 @@ import type { NextRequest } from 'next/server'
 import { verifyToken, verifyBusinessToken } from './lib/jwt'
 import { getScopeForPath, hasScope } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
+import { extractSessionSignals } from './lib/session-signals-request'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -18,6 +19,9 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  // Opt in to the Sec-CH-UA-Platform client hint so browsers send it on subsequent requests —
+  // it's a STABLE signal in the session device-binding scorer (auth-sessions.ts).
+  'Accept-CH': 'Sec-CH-UA-Platform',
 }
 
 function addSecurityHeaders(response: NextResponse): NextResponse {
@@ -45,9 +49,9 @@ function buildRedirectUrl(request: NextRequest, path: string): URL {
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.hostname || ''
   const pathname = request.nextUrl.pathname
-  // Request UA for session device-binding: resolveSession revokes + rejects a cookie
-  // replayed from a clearly different browser family (see uaClearlyDiffers).
-  const reqUA = request.headers.get('user-agent')
+  // Per-request device-binding signals: resolveSession revokes + rejects a cookie replayed
+  // from a clearly different environment (>= 2 STABLE signals differ — see evaluateBinding).
+  const reqSignals = extractSessionSignals(request)
 
   if (hostname.startsWith('www.jeffistores.in')) {
     const target = new URL(pathname + request.nextUrl.search, 'https://jeffistores.in')
@@ -113,7 +117,7 @@ export async function middleware(request: NextRequest) {
       if (!token) {
         return NextResponse.redirect(buildRedirectUrl(request, '/signin'))
       }
-      const payload = await verifyBusinessToken(token, reqUA)
+      const payload = await verifyBusinessToken(token, reqSignals)
       if (!payload) {
         const res = NextResponse.redirect(buildRedirectUrl(request, '/signin'))
         res.cookies.delete('business_sid')
@@ -142,7 +146,7 @@ export async function middleware(request: NextRequest) {
         signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
         return NextResponse.redirect(signinUrl)
       }
-      const payload = await verifyBusinessToken(token, reqUA)
+      const payload = await verifyBusinessToken(token, reqSignals)
       if (!payload) {
         const signinUrl = buildRedirectUrl(request, '/business/signin')
         signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
@@ -205,7 +209,7 @@ export async function middleware(request: NextRequest) {
         if (!token) {
           return NextResponse.redirect(buildRedirectUrl(request, '/login'))
         }
-        const payload = await verifyToken(token, reqUA)
+        const payload = await verifyToken(token, reqSignals)
         if (!payload) {
           const res = NextResponse.redirect(buildRedirectUrl(request, '/login'))
           res.cookies.delete('admin_sid')
@@ -245,7 +249,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const payload = await verifyToken(token, reqUA)
+    const payload = await verifyToken(token, reqSignals)
     if (!payload) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
@@ -295,7 +299,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
-    const payload = await verifyToken(token, reqUA)
+    const payload = await verifyToken(token, reqSignals)
 
     if (!payload) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')

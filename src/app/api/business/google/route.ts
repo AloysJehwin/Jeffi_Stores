@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
+import { extractSessionSignals } from '@/lib/session-signals-request'
 import { queryOne, query } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
@@ -110,13 +111,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ approvalStatus, message: approvalStatus === 'rejected' ? 'Your application was not approved.' : 'Your account is awaiting approval.' })
     }
 
+    const signals = extractSessionSignals(request)
     const { sid } = await issueUserToken({
       userId: user.id,
       email: user.email,
       type: 'business',
       extraClaims: { isBusiness: true, approvalStatus: 'approved' },
-      userAgent: request.headers.get('user-agent'),
-      ip: request.headers.get('x-forwarded-for'),
+      userAgent: signals.userAgent,
+      ip: signals.ip,
+      acceptLanguage: signals.acceptLanguage,
+      uaPlatform: signals.uaPlatform,
+      fpHash: signals.fpHash,
     })
 
     const cookieStore = await cookies()

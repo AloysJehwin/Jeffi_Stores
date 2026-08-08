@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { JWT_MAX_AGE_S } from '@/lib/jwt'
-import { createSession } from '@/lib/auth-sessions'
+import { createSession, type SessionSignals } from '@/lib/auth-sessions'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 
 export interface AdminSessionAdmin {
@@ -16,13 +16,14 @@ export async function issueAdminSession(
   admin: AdminSessionAdmin,
   certCN?: string,
   extraBody?: Record<string, unknown>,
-  userAgent?: string | null,
+  signals?: SessionSignals,
 ) {
   const displayName =
     `${admin.first_name || ''} ${admin.last_name || ''}`.trim() || admin.email || ''
   // Opaque server-side session: the cookie value is the session id (a uuid), NOT a JWT.
   // role/scopes/cert_cn are snapshotted onto the row for the Node middleware's gate.
-  // user_agent is snapshotted for device-binding (resolveSession rejects a mismatch).
+  // Device-binding signals (UA family, accept-language, sec-ch-ua-platform, ip network, fp
+  // hash) are snapshotted too — resolveSession revokes on a clear multi-signal mismatch.
   const { sid } = await createSession({
     principalType: 'admin',
     principalId: admin.id,
@@ -30,7 +31,11 @@ export async function issueAdminSession(
     role: admin.role,
     scopes: admin.scopes || [],
     certCN: certCN || null,
-    userAgent: userAgent || null,
+    userAgent: signals?.userAgent || null,
+    ip: signals?.ip || null,
+    acceptLanguage: signals?.acceptLanguage || null,
+    uaPlatform: signals?.uaPlatform || null,
+    fpHash: signals?.fpHash || null,
   })
   const response = NextResponse.json({
     success: true,

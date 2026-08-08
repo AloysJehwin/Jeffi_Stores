@@ -35,7 +35,7 @@ const mockCreateSession = vi.mocked(createSession)
 describe('issueAdminSession', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockCreateSession.mockResolvedValue({ sid: 'fake-uuid', expiresAt: '2099-01-01T00:00:00.000Z' })
+    mockCreateSession.mockResolvedValue({ sid: 'fake-uuid', id: 'row-id', expiresAt: '2099-01-01T00:00:00.000Z' })
   })
 
   it('creates an opaque admin session with the admin fields', async () => {
@@ -100,6 +100,26 @@ describe('issueAdminSession', () => {
     await issueAdminSession(admin)
     expect(mockCreateSession).toHaveBeenCalledWith(
       expect.objectContaining({ scopes: [] })
+    )
+  })
+
+  it('forwards device-binding signals (ua, ip, accept-language, platform, fp) into the session', async () => {
+    const admin = { id: 'a1', email: 'test@example.com', role: 'admin', scopes: [] }
+    await issueAdminSession(admin, undefined, undefined, {
+      userAgent: 'Chrome/120',
+      ip: '203.0.113.5',
+      acceptLanguage: 'en-US,en;q=0.9',
+      uaPlatform: '"macOS"',
+      fpHash: 'deadbeef',
+    })
+    expect(mockCreateSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userAgent: 'Chrome/120',
+        ip: '203.0.113.5',
+        acceptLanguage: 'en-US,en;q=0.9',
+        uaPlatform: '"macOS"',
+        fpHash: 'deadbeef',
+      })
     )
   })
 })

@@ -3,6 +3,7 @@ import { isOTPVerified, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { sendWelcomeEmail } from '@/lib/email'
 import { queryOne } from '@/lib/db'
 import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
+import { extractSessionSignals } from '@/lib/session-signals-request'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
@@ -77,12 +78,16 @@ export async function POST(request: NextRequest) {
       metadata: { email, source: 'email_otp' },
     }).catch(() => {})
 
+    const signals = extractSessionSignals(request)
     const { sid } = await issueUserToken({
       userId: newUser.id,
       email: newUser.email,
       type: 'customer',
-      userAgent: request.headers.get('user-agent'),
-      ip: request.headers.get('x-forwarded-for'),
+      userAgent: signals.userAgent,
+      ip: signals.ip,
+      acceptLanguage: signals.acceptLanguage,
+      uaPlatform: signals.uaPlatform,
+      fpHash: signals.fpHash,
     })
 
     const cookieStore = await cookies()

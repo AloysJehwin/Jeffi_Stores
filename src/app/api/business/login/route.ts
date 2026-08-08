@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { queryOne, query } from '@/lib/db'
 import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
+import { extractSessionSignals } from '@/lib/session-signals-request'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
@@ -53,13 +54,17 @@ export async function POST(request: NextRequest) {
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
     logActivity({ userId: user.id, kind: 'login', summary: 'Business login via OTP', metadata: { provider: 'otp' } }).catch(() => {})
 
+    const signals = extractSessionSignals(request)
     const { sid } = await issueUserToken({
       userId: user.id,
       email: user.email,
       type: 'business',
       extraClaims: { isBusiness: true, approvalStatus: 'approved' },
-      userAgent: request.headers.get('user-agent'),
-      ip: request.headers.get('x-forwarded-for'),
+      userAgent: signals.userAgent,
+      ip: signals.ip,
+      acceptLanguage: signals.acceptLanguage,
+      uaPlatform: signals.uaPlatform,
+      fpHash: signals.fpHash,
     })
 
     const cookieStore = await cookies()
