@@ -746,10 +746,9 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
             {/* — Description — */}
             {p.description && (
-              <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-                <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Description</p>
+              <CollapsibleCard title="Description">
                 <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{p.description}</p>
-              </div>
+              </CollapsibleCard>
             )}
 
             {/* — Supplier Details — */}
