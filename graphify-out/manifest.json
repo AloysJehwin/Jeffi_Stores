@@ -1260,8 +1260,8 @@
     "semantic_hash": ""
   },
   "src/app/api/admin/check-session/route.ts": {
-    "mtime": 1786120722.333564,
-    "ast_hash": "0103db8aa522a64ede400fc43d2f6cc3",
+    "mtime": 1786160631.16994,
+    "ast_hash": "764ee6bec80e67e346e0f20b21fb20c6",
     "semantic_hash": ""
   },
   "src/app/api/admin/coupons/[id]/route.ts": {
@@ -1570,8 +1570,8 @@
     "semantic_hash": ""
   },
   "src/app/api/admin/mfa/enroll-confirm/route.ts": {
-    "mtime": 1786120642.595758,
-    "ast_hash": "4207ef081bf08c0cf3b9927d44241463",
+    "mtime": 1786160513.3357158,
+    "ast_hash": "1f258e0676921720888c54b67b234de6",
     "semantic_hash": ""
   },
   "src/app/api/admin/mfa/enroll-start/route.ts": {
@@ -1585,8 +1585,8 @@
     "semantic_hash": "fb37c77b7b510a651afe140c8f2f8b9e"
   },
   "src/app/api/admin/mfa/verify/route.ts": {
-    "mtime": 1786120633.1854854,
-    "ast_hash": "112534ee99d9a408c1810a3b0abc6435",
+    "mtime": 1786160498.3596177,
+    "ast_hash": "e58feb7504c82228cbc218c9a82a830a",
     "semantic_hash": ""
   },
   "src/app/api/admin/orders/[id]/cancel-shipment/route.ts": {
@@ -1935,13 +1935,13 @@
     "semantic_hash": "011906aea22e0377e526af6c50fc90e7"
   },
   "src/app/api/auth/google/route.ts": {
-    "mtime": 1786120182.3466594,
-    "ast_hash": "f4c383f81e3a5cf1516780d9320896ee",
+    "mtime": 1786160413.2127051,
+    "ast_hash": "2e493a86f62b5cd388811cbac5c16d4e",
     "semantic_hash": ""
   },
   "src/app/api/auth/login/route.ts": {
-    "mtime": 1786120182.366829,
-    "ast_hash": "cf2380273658e3cf54e19fdc2b71cd2a",
+    "mtime": 1786160382.2330418,
+    "ast_hash": "ceae3b89068ff9f6abfe7947c4e51bd0",
     "semantic_hash": ""
   },
   "src/app/api/auth/logout/route.ts": {
@@ -1960,8 +1960,8 @@
     "semantic_hash": "a8fd5c5cdecba9b235f231fff5984d14"
   },
   "src/app/api/auth/signup/route.ts": {
-    "mtime": 1786120182.3519402,
-    "ast_hash": "e0c67c763ffca25e4fe23f0533c8ed57",
+    "mtime": 1786160438.3975282,
+    "ast_hash": "fd817e01283e22efa083d9da94e70437",
     "semantic_hash": ""
   },
   "src/app/api/auth/verify-otp/route.ts": {
@@ -1980,13 +1980,13 @@
     "semantic_hash": "1464bf1e797118ea4b3790547795dc81"
   },
   "src/app/api/business/google/route.ts": {
-    "mtime": 1786120182.306426,
-    "ast_hash": "250263c2c8831d5bbe8e6f52b5c24e0b",
+    "mtime": 1786160467.9020076,
+    "ast_hash": "5eb29beda4dee246667f49efe858f31c",
     "semantic_hash": ""
   },
   "src/app/api/business/login/route.ts": {
-    "mtime": 1786120182.330108,
-    "ast_hash": "ced9ce2c090795a576c69a808c35f7c2",
+    "mtime": 1786160451.3399491,
+    "ast_hash": "3896032754573d62f9a3c29432f0e2b8",
     "semantic_hash": ""
   },
   "src/app/api/business/logout/route.ts": {
@@ -2025,8 +2025,8 @@
     "semantic_hash": "c019c8473e9620a7ef27e9557d2dc2ab"
   },
   "src/app/api/business/signup/route.ts": {
-    "mtime": 1786120182.300843,
-    "ast_hash": "6006b75fde87a1d11d1532afeb80f0f5",
+    "mtime": 1786160487.5058706,
+    "ast_hash": "2927d142259ffe2ed9386a21bd0cc8f8",
     "semantic_hash": ""
   },
   "src/app/api/cart/route.ts": {
@@ -3595,9 +3595,9 @@
     "semantic_hash": "ddf76df1d0a02ee41d4165d901a2d486"
   },
   "src/contexts/AuthContext.tsx": {
-    "mtime": 1781527731.6344442,
-    "ast_hash": "3a6b883e9a37c2e26b491a6dc714e204",
-    "semantic_hash": "3a6b883e9a37c2e26b491a6dc714e204"
+    "mtime": 1786160698.7651198,
+    "ast_hash": "b4a30f2fd8562344f166e92a3d36d7ee",
+    "semantic_hash": ""
   },
   "src/contexts/CartContext.tsx": {
     "mtime": 1783888933.6805878,
@@ -3700,8 +3700,8 @@
     "semantic_hash": ""
   },
   "src/lib/admin-session.ts": {
-    "mtime": 1786120615.1445818,
-    "ast_hash": "6345ba6df14845ff698b6d423a203fb5",
+    "mtime": 1786160353.7706833,
+    "ast_hash": "8db3d78b10437582be686a2ee5f43e9b",
     "semantic_hash": ""
   },
   "src/lib/ai-client.ts": {
@@ -3950,8 +3950,8 @@
     "semantic_hash": ""
   },
   "src/lib/jwt.ts": {
-    "mtime": 1786120576.4541314,
-    "ast_hash": "41bcec8f71a1d27c1fc4e9d87b385ad4",
+    "mtime": 1786160567.1977668,
+    "ast_hash": "9ca213554ed9c1bcff976721ed0e2ab4",
     "semantic_hash": ""
   },
   "src/lib/label-pdf.ts": {
@@ -4130,8 +4130,8 @@
     "semantic_hash": "4e1ee0e30f6677cbf5f66e6e1dc53bd9"
   },
   "src/middleware.ts": {
-    "mtime": 1786120601.5132964,
-    "ast_hash": "142bb84108882d3f999ef0035db8d7c5",
+    "mtime": 1786160610.6392307,
+    "ast_hash": "1c6f91449c4832a3b3b7a3b3ec4b5a3f",
     "semantic_hash": ""
   },
   "src/types/google.d.ts": {
@@ -4495,8 +4495,8 @@
     "semantic_hash": ""
   },
   "database/indexes.sql": {
-    "mtime": 1786103587.4260726,
-    "ast_hash": "a1f8c4ad7a68c4c87ed42c41fe912137",
+    "mtime": 1786161690.786484,
+    "ast_hash": "b394085e688d810d9a7c8afaa9602a64",
     "semantic_hash": ""
   },
   "database/inventory.sql": {
@@ -5240,8 +5240,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/check-session/route.test.ts": {
-    "mtime": 1786120799.6866477,
-    "ast_hash": "2c16aea66cc840bafcfdd2640b5b8df4",
+    "mtime": 1786160829.4361207,
+    "ast_hash": "c841c788c5ec6dadc338db5e3b2eb956",
     "semantic_hash": ""
   },
   "tests/api/admin/controls/rollback/route.test.ts": {
@@ -5845,8 +5845,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/refresh/route.test.ts": {
-    "mtime": 1786120393.8417556,
-    "ast_hash": "1623772ba6af307de02343c06d66026a",
+    "mtime": 1786161908.440187,
+    "ast_hash": "d541d59285770a505b3cfe5237fb8e6e",
     "semantic_hash": ""
   },
   "tests/api/admin/replication/log.test.ts": {
@@ -6635,8 +6635,8 @@
     "semantic_hash": ""
   },
   "tests/lib/admin-session.test.ts": {
-    "mtime": 1786120393.7127726,
-    "ast_hash": "dc4aacd7d7f05c211cbf4b8eb96c5461",
+    "mtime": 1786161932.0767841,
+    "ast_hash": "8ad3a7a87c618c90580fb0d3e16d7742",
     "semantic_hash": ""
   },
   "tests/lib/ai-client.test.ts": {
@@ -8170,8 +8170,8 @@
     "semantic_hash": ""
   },
   "database/auth.sql": {
-    "mtime": 1786115414.7092495,
-    "ast_hash": "3c9e77083adcce57131be2c521fa5d0a",
+    "mtime": 1786161677.4684372,
+    "ast_hash": "f6ed05e09604410bad43973a2f44e5ef",
     "semantic_hash": ""
   },
   "src/app/api/admin/sessions/[id]/revoke/route.ts": {
@@ -8230,18 +8230,28 @@
     "semantic_hash": ""
   },
   "src/lib/auth-sessions.ts": {
-    "mtime": 1786120504.8560464,
-    "ast_hash": "49977fdc210f1b29cc6c24262efdaf52",
+    "mtime": 1786161833.7992373,
+    "ast_hash": "4a185a5d52b5a5a425073b88d1bd110e",
     "semantic_hash": ""
   },
   "src/lib/issue-session.ts": {
-    "mtime": 1786115414.7839994,
-    "ast_hash": "79fb03325e56c925081018bcaca3c2cb",
+    "mtime": 1786160339.7409928,
+    "ast_hash": "e97bd1d4c59a25f28b1c491d0bf623a0",
     "semantic_hash": ""
   },
   "tests/lib/auth-sessions.test.ts": {
-    "mtime": 1786120827.6070666,
-    "ast_hash": "69a2cf447be674f434c7d784c983a1fe",
+    "mtime": 1786161886.0837,
+    "ast_hash": "302172e2d06b1777b85b5a0a62046829",
+    "semantic_hash": ""
+  },
+  "src/lib/fp-beacon.ts": {
+    "mtime": 1786160686.0165415,
+    "ast_hash": "b4f43a6c540852c0d2a4c4029a22f691",
+    "semantic_hash": ""
+  },
+  "src/lib/session-signals-request.ts": {
+    "mtime": 1786160992.7666318,
+    "ast_hash": "d8ae3fd2c33c34af5063968d9b8a41a6",
     "semantic_hash": ""
   }
 }
