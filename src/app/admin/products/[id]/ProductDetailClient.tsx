@@ -747,6 +747,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
             {/* — Supplier Details — */}
             <SupplierDetailsCard productId={id} />
 
+            {/* — Selling Units — */}
+            <CollapsibleCard title="Selling Units">
+              <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
+            </CollapsibleCard>
+
             {/* — Physical & Compliance — */}
             <CollapsibleCard title="Physical & Compliance">
               {!p.material && !p.finish && !p.size && !p.color && !p.shelf_life_days &&
@@ -825,9 +830,9 @@ export default function ProductDetailClient({ id }: { id: string }) {
           )}
 
           {p.description && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">Description</p>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{p.description}</p>
+            <div className="bg-surface-elevated rounded-xl border border-border-default p-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-3">Description</p>
+              <p className="text-sm text-foreground leading-relaxed whitespace-pre-line min-h-[80px]">{p.description}</p>
             </div>
           )}
 
@@ -903,17 +908,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           )}
 
-          {/* — Selling Units & Shelf Locations — */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-            <CollapsibleCard title="Selling Units">
-              <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
+          {shelfStock.length > 0 && (
+            <CollapsibleCard title="Shelf Locations">
+              <ShelfBadges rows={shelfStock} />
             </CollapsibleCard>
-            {shelfStock.length > 0 && (
-              <CollapsibleCard title="Shelf Locations">
-                <ShelfBadges rows={shelfStock} />
-              </CollapsibleCard>
-            )}
-          </div>
+          )}
 
           <div className="flex gap-4 text-xs text-foreground-muted">
             <span>Created {formatDate(p.created_at)}</span>
