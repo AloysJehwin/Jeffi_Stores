@@ -7,6 +7,7 @@ import {
   verifyTotp,
 } from '@/lib/mfa'
 import { issueAdminSession } from '@/lib/admin-session'
+import { extractSessionSignals } from '@/lib/session-signals-request'
 
 export async function POST(request: Request) {
   try {
@@ -61,7 +62,7 @@ export async function POST(request: Request) {
       admin,
       t.certCN as string | undefined,
       { recovery_codes: codes.map(c => c.plain) },
-      request.headers.get('user-agent'),
+      extractSessionSignals(request),
     )
   } catch (err) {
     return NextResponse.json(

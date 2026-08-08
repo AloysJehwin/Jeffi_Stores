@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { ensureFingerprintCookie } from '@/lib/fp-beacon'
 
 interface User {
   id: string
@@ -70,6 +71,11 @@ export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { childr
 
   useEffect(() => {
     fetchUser()
+  }, [])
+
+  // Set the fp_hash device-binding cookie once on mount (SOFT/advisory session signal).
+  useEffect(() => {
+    ensureFingerprintCookie()
   }, [])
 
   const login = async (email: string, otp: string, policiesAccepted?: boolean) => {

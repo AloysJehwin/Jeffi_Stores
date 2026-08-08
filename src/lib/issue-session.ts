@@ -14,6 +14,9 @@ export async function issueUserToken(args: {
   extraClaims?: Record<string, unknown>
   userAgent?: string | null
   ip?: string | null
+  acceptLanguage?: string | null
+  uaPlatform?: string | null
+  fpHash?: string | null
 }): Promise<{ sid: string }> {
   const principalType = args.type === 'business' ? 'business' : 'customer'
   const approvalStatus = args.extraClaims?.approvalStatus
@@ -24,6 +27,9 @@ export async function issueUserToken(args: {
     userAgent: args.userAgent,
     ip: args.ip,
     approvalStatus: typeof approvalStatus === 'string' ? approvalStatus : null,
+    acceptLanguage: args.acceptLanguage,
+    uaPlatform: args.uaPlatform,
+    fpHash: args.fpHash,
   })
   return { sid }
 }

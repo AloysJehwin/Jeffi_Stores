@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
 import { resolveSession } from '@/lib/auth-sessions'
+import { extractSessionSignals } from '@/lib/session-signals-request'
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     // Opaque session: resolve the cookie's sid → live admin session (revoked/idle/expiry).
     // Pass the request UA so a cookie replayed from a different browser is revoked here too
     // (the 15s poll doubles as a device-binding tripwire). expiresAt comes from the row.
-    const s = await resolveSession(token.value, request.headers.get('user-agent'))
+    const s = await resolveSession(token.value, extractSessionSignals(request))
 
     if (!s || s.principalType !== 'admin') {
       const res = NextResponse.json({ authenticated: false, expiresAt: null })
