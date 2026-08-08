@@ -470,6 +470,34 @@ export async function publishProductDraft(productId: string): Promise<void> {
           )
         }
       }
+
+      // Deactivate suppliers for leaves that are entirely absent from the draft
+      // (all suppliers removed). The per-leaf loop only visits leaves that still
+      // have >= 1 row; leaves with zero rows are skipped and their DB rows stay
+      // active without this cleanup.
+      const coveredLeafKeys = new Set(Array.from(leaves.keys()))
+      const dbLeaves = await client.query(
+        `SELECT DISTINCT
+           COALESCE(variant_id::text, '${NIL}') AS vid,
+           COALESCE(sub_variant_id::text, '${NIL}') AS svid,
+           variant_id, sub_variant_id
+         FROM product_suppliers
+         WHERE product_id = $1 AND is_active = true`,
+        [productId]
+      )
+      for (const row of dbLeaves.rows) {
+        const key = `${row.vid}:${row.svid}`
+        if (!coveredLeafKeys.has(key)) {
+          await client.query(
+            `UPDATE product_suppliers SET is_active = false, is_preferred = false, updated_at = NOW()
+             WHERE product_id = $1
+               AND variant_id IS NOT DISTINCT FROM $2::uuid
+               AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+               AND is_active = true`,
+            [productId, row.variant_id, row.sub_variant_id]
+          )
+        }
+      }
     }
 
     // Units: UPSERT all scopes — product-level, variant-level, sub-variant-level
