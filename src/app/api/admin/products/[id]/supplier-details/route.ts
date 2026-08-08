@@ -50,6 +50,7 @@ export async function GET(
            poi.unit_cost,
            poi.quantity,
            poi.line_total_incl_gst,
+           poi.sku,
            pv.variant_name,
            psv.sub_variant_name
          FROM purchase_order_items poi
