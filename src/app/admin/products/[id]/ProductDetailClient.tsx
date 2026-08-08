@@ -285,7 +285,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
       <button
         type="button"
         onClick={toggle}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors focus:outline-none"
       >
         <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Supplier Details</p>
         <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -422,7 +422,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                             <th className="text-left pb-1.5 pr-3 font-medium">PO #</th>
                             <th className="text-left pb-1.5 pr-3 font-medium">Date</th>
                             <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
-                            <th className="text-left pb-1.5 pr-3 font-medium">Leaf</th>
+                            <th className="text-left pb-1.5 pr-3 font-medium">SKU</th>
                             <th className="text-right pb-1.5 pr-3 font-medium">Qty</th>
                             <th className="text-right pb-1.5 pr-3 font-medium">Unit Cost</th>
                             <th className="text-right pb-1.5 font-medium">Total</th>
@@ -439,9 +439,11 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                               </td>
                               <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
                               <td className="py-1.5 pr-3 text-foreground-muted">
-                                {row.sub_variant_name
-                                  ? <span>{row.variant_name ? `${row.variant_name} — ` : ''}<span className="text-foreground">{row.sub_variant_name}</span></span>
-                                  : row.variant_name || '—'}
+                                {row.sku
+                                  ? <span className="font-mono text-xs text-foreground">{row.sku}</span>
+                                  : row.sub_variant_name
+                                    ? <span>{row.variant_name ? `${row.variant_name} — ` : ''}{row.sub_variant_name}</span>
+                                    : row.variant_name || '—'}
                               </td>
                               <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
                               <td className="py-1.5 pr-3 text-right text-foreground">
