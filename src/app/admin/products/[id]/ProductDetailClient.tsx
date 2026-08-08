@@ -1021,7 +1021,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
                         ) : '—'}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-foreground-muted hidden xl:table-cell">{v.isbn || '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground">{vMinPrice > 0 ? (hasSubs ? `From ${formatINR(vMinPrice)}` : formatINR(vMinPrice)) : '—'}</td>
+                      <td className="px-4 py-3 text-right text-foreground">{!hasSubs && vMinPrice > 0 ? formatINR(vMinPrice) : '—'}</td>
                       <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : '—'}</td>
                       <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.mrp ? formatINR(Number(v.mrp)) : '—'}</td>
                       <td className={`px-4 py-3 text-right font-semibold ${vStockColor}`}>{vInventory}</td>
