@@ -21,6 +21,7 @@ const PostSchema = z.object({
 const PutSchema = z.object({
   id: zUuid,
   sub_variant_name: z.string().nullish(),
+  sku: z.string().nullish(),
   price: z.optional(zCurrency),
   mrp: z.optional(zCurrency),
   price_ex_gst: z.optional(zCurrency),
@@ -93,10 +94,12 @@ export async function PUT(request: NextRequest, { params }: Params) {
   if (!rawPut) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   const parsedPut = parseBody(PutSchema, rawPut)
   if (!parsedPut.ok) return parsedPut.response
-  const { id, sub_variant_name, price, mrp, price_ex_gst, mrp_ex_gst, discount_pct, stock_status, attributes, is_active } = parsedPut.data
+  const { id, sub_variant_name, sku: skuOverride, price, mrp, price_ex_gst, mrp_ex_gst, discount_pct, stock_status, attributes, is_active } = parsedPut.data
 
   let newSku: string | null = null
-  if (sub_variant_name) {
+  if (skuOverride) {
+    newSku = skuOverride.toUpperCase()
+  } else if (sub_variant_name) {
     const variant = await queryOne<{ sku: string }>(
       `SELECT sku FROM product_variants WHERE id = $1`,
       [variantId]
