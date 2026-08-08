@@ -263,6 +263,8 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [poPage, setPoPage] = useState(0)
+  const PO_PAGE_SIZE = 5
 
   function toggle() {
     setOpen(o => {
@@ -412,47 +414,62 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                   <Link href={`/admin/inventory?tab=pos`} className="text-xs text-accent-600 hover:underline">View all POs →</Link>
                 </div>
                 {data.purchaseHistory?.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-border-default text-foreground-muted">
-                          <th className="text-left pb-1.5 pr-3 font-medium">PO #</th>
-                          <th className="text-left pb-1.5 pr-3 font-medium">Date</th>
-                          <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
-                          <th className="text-left pb-1.5 pr-3 font-medium">Leaf</th>
-                          <th className="text-right pb-1.5 pr-3 font-medium">Qty</th>
-                          <th className="text-right pb-1.5 pr-3 font-medium">Unit Cost</th>
-                          <th className="text-right pb-1.5 font-medium">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border-default">
-                        {data.purchaseHistory.map((row: any, idx: number) => (
-                          <tr key={`${row.po_id}-${idx}`} className="hover:bg-surface-secondary transition-colors">
-                            <td className="py-1.5 pr-3 font-mono text-accent-600">
-                              <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">{row.po_number}</Link>
-                            </td>
-                            <td className="py-1.5 pr-3 text-foreground-secondary">
-                              {new Date(row.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </td>
-                            <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
-                            <td className="py-1.5 pr-3 text-foreground-muted">
-                              {row.sub_variant_name
-                                ? <span>{row.variant_name ? `${row.variant_name} — ` : ''}<span className="text-foreground">{row.sub_variant_name}</span></span>
-                                : row.variant_name || '—'}
-                            </td>
-                            <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
-                            <td className="py-1.5 pr-3 text-right text-foreground">
-                              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}
-                            </td>
-                            <td className="py-1.5 text-right text-foreground">
-                              {row.line_total_incl_gst != null
-                                ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.line_total_incl_gst))
-                                : '—'}
-                            </td>
+                  <div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-border-default text-foreground-muted">
+                            <th className="text-left pb-1.5 pr-3 font-medium">PO #</th>
+                            <th className="text-left pb-1.5 pr-3 font-medium">Date</th>
+                            <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
+                            <th className="text-left pb-1.5 pr-3 font-medium">Leaf</th>
+                            <th className="text-right pb-1.5 pr-3 font-medium">Qty</th>
+                            <th className="text-right pb-1.5 pr-3 font-medium">Unit Cost</th>
+                            <th className="text-right pb-1.5 font-medium">Total</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-border-default">
+                          {data.purchaseHistory.slice(poPage * PO_PAGE_SIZE, (poPage + 1) * PO_PAGE_SIZE).map((row: any, idx: number) => (
+                            <tr key={`${row.po_id}-${poPage}-${idx}`} className="hover:bg-surface-secondary transition-colors">
+                              <td className="py-1.5 pr-3 font-mono text-accent-600">
+                                <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">{row.po_number}</Link>
+                              </td>
+                              <td className="py-1.5 pr-3 text-foreground-secondary">
+                                {new Date(row.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
+                              <td className="py-1.5 pr-3 text-foreground-muted">
+                                {row.sub_variant_name
+                                  ? <span>{row.variant_name ? `${row.variant_name} — ` : ''}<span className="text-foreground">{row.sub_variant_name}</span></span>
+                                  : row.variant_name || '—'}
+                              </td>
+                              <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
+                              <td className="py-1.5 pr-3 text-right text-foreground">
+                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}
+                              </td>
+                              <td className="py-1.5 text-right text-foreground">
+                                {row.line_total_incl_gst != null
+                                  ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.line_total_incl_gst))
+                                  : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {data.purchaseHistory.length > PO_PAGE_SIZE && (
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border-default">
+                        <span className="text-[11px] text-foreground-muted">
+                          {poPage * PO_PAGE_SIZE + 1}–{Math.min((poPage + 1) * PO_PAGE_SIZE, data.purchaseHistory.length)} of {data.purchaseHistory.length}
+                        </span>
+                        <div className="flex gap-1">
+                          <button onClick={() => setPoPage(p => p - 1)} disabled={poPage === 0}
+                            className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors">‹ Prev</button>
+                          <button onClick={() => setPoPage(p => p + 1)} disabled={(poPage + 1) * PO_PAGE_SIZE >= data.purchaseHistory.length}
+                            className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors">Next ›</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-xs text-foreground-muted italic">No purchase history found for this product.</p>
