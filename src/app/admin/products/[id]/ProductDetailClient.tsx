@@ -751,6 +751,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
               </CollapsibleCard>
             )}
 
+            {/* — Selling Units — */}
+            <CollapsibleCard title="Selling Units">
+              <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
+            </CollapsibleCard>
+
             {/* — Physical & Compliance — */}
             <CollapsibleCard title="Physical & Compliance">
               {!p.material && !p.finish && !p.size && !p.color && !p.shelf_life_days &&
@@ -809,11 +814,6 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
           {/* — Supplier Details — */}
           <SupplierDetailsCard productId={id} />
-
-          {/* — Selling Units — */}
-          <CollapsibleCard title="Selling Units">
-            <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
-          </CollapsibleCard>
 
           {/* — Specifications — */}
           {p.specifications && Object.keys(p.specifications).length > 0 && (
