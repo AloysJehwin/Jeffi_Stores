@@ -426,8 +426,8 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border-default">
-                        {data.purchaseHistory.map((row: any) => (
-                          <tr key={`${row.po_id}-${row.variant_name}`} className="hover:bg-surface-secondary transition-colors">
+                        {data.purchaseHistory.map((row: any, idx: number) => (
+                          <tr key={`${row.po_id}-${idx}`} className="hover:bg-surface-secondary transition-colors">
                             <td className="py-1.5 pr-3 font-mono text-accent-600">
                               <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">{row.po_number}</Link>
                             </td>
