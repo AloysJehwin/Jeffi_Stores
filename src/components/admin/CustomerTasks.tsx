@@ -37,6 +37,7 @@ interface AdminOption {
 
 interface CustomerTasksProps {
   customerId: string
+  canWrite?: boolean
 }
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -46,7 +47,7 @@ const PRIORITY_BADGE: Record<string, string> = {
   low:    'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
 }
 
-export default function CustomerTasks({ customerId }: CustomerTasksProps) {
+export default function CustomerTasks({ customerId, canWrite = false }: CustomerTasksProps) {
   const router = useRouter()
   const confirm = useConfirm()
   const [tasks, setTasks] = useState<Task[]>([])
@@ -176,7 +177,7 @@ export default function CustomerTasks({ customerId }: CustomerTasksProps) {
           >
             {showCompleted ? 'Show Open' : 'Show Completed'}
           </button>
-          {!adding && (
+          {!adding && canWrite && (
             <button
               type="button"
               onClick={() => setAdding(true)}
@@ -268,6 +269,7 @@ export default function CustomerTasks({ customerId }: CustomerTasksProps) {
                 className={`border border-border-default rounded-lg p-2.5 group transition-colors ${completed ? 'bg-surface-secondary/40' : 'bg-surface'}`}
               >
                 <div className="flex items-start gap-2">
+                  {canWrite && (
                   <button
                     type="button"
                     onClick={() => toggle(t)}
@@ -285,11 +287,13 @@ export default function CustomerTasks({ customerId }: CustomerTasksProps) {
                       </svg>
                     )}
                   </button>
+                  )}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-2">
                       <p className={`text-sm font-medium ${completed ? 'line-through text-foreground-muted' : 'text-foreground'}`}>
                         {t.title}
                       </p>
+                      {canWrite && (
                       <button
                         type="button"
                         onClick={() => remove(t.id)}
@@ -300,6 +304,7 @@ export default function CustomerTasks({ customerId }: CustomerTasksProps) {
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22" />
                         </svg>
                       </button>
+                      )}
                     </div>
                     {t.description && (
                       <p className={`text-xs mt-1 whitespace-pre-wrap break-words ${completed ? 'text-foreground-muted' : 'text-foreground-secondary'}`}>

@@ -1,9 +1,10 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { verifyToken } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { getFilteredProducts, getAllCategories, getAllBrands, getProductBreakdowns } from '@/lib/queries'
 import { queryOne, queryMany } from '@/lib/db'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
@@ -29,7 +30,7 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { resolvedSearchParams: SP; isSuperAdmin: boolean }) {
+async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrite }: { resolvedSearchParams: SP; isSuperAdmin: boolean; canWrite: boolean }) {
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
@@ -183,10 +184,10 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { res
                 <div className="flex items-center justify-between text-xs text-foreground-muted">
                   <span>{product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}</span>
                   <div className="flex items-center gap-3">
-                    <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
+                    {canWrite && <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />}
                     <Link href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">Edit</Link>
                     <DownloadAdButton productId={product.id} productName={product.name} />
-                    <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
+                    {canWrite && <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />}
                   </div>
                 </div>
               </div>
@@ -215,7 +216,7 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { res
                 <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Actions</th>
               </tr>
             </thead>
-            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} isSuperAdmin={isSuperAdmin} />
+            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
           </table>
         </div>
       </div>
@@ -229,6 +230,10 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { res
 // Runs ONLY the aggregate stats query (all products) and renders the stat cards.
 async function ProductsStats() {
   const host = await getHost()
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'products:write')
   const [stats, pendingDrafts] = await Promise.all([
     getProductBreakdowns(),
     queryMany<{ product_id: string; name: string; sku: string; updated_at: string }>(
@@ -290,17 +295,24 @@ async function ProductsStats() {
             </div>
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
               {pendingDrafts.map((d) => (
-                <DraftRowActions
-                  key={d.product_id}
-                  entityId={d.product_id}
-                  name={d.name}
-                  subtitle={d.sku}
-                  updatedAt={d.updated_at}
-                  editHref={ap(`/admin/products/edit/${d.product_id}`, host)}
-                  publishPath={`/api/admin/products/${d.product_id}/publish`}
-                  discardPath={`/api/admin/products/${d.product_id}/draft`}
-                  entityLabel="product"
-                />
+                canWrite ? (
+                  <DraftRowActions
+                    key={d.product_id}
+                    entityId={d.product_id}
+                    name={d.name}
+                    subtitle={d.sku}
+                    updatedAt={d.updated_at}
+                    editHref={ap(`/admin/products/edit/${d.product_id}`, host)}
+                    publishPath={`/api/admin/products/${d.product_id}/publish`}
+                    discardPath={`/api/admin/products/${d.product_id}/draft`}
+                    entityLabel="product"
+                  />
+                ) : (
+                  <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono">{d.sku}</p>
+                  </div>
+                )
               ))}
             </div>
           </div>
@@ -324,6 +336,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
     } catch {}
   }
 
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'products:write')
+
   const [categories, brands] = await Promise.all([
     getAllCategories(),
     getAllBrands(),
@@ -346,12 +363,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Products</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
         </div>
+        {canWrite && (
         <Link
           href={ap('/admin/products/add', host)}
           className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
         >
           Add New Product
         </Link>
+        )}
       </div>
 
       <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
@@ -390,7 +409,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         ]} mode="content" forceExpanded />}
       />
 
-      <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} />
+      <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
     </div>
   )
 }
@@ -398,12 +417,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 // Resolves searchParams (no DB — near-instant) then keys the table Suspense
 // on the query string so filter/pagination changes re-trigger the shimmer
 // while the stats + filters above stay mounted.
-async function ProductsListSection({ searchParams, isSuperAdmin }: { searchParams: Promise<SP>; isSuperAdmin: boolean }) {
+async function ProductsListSection({ searchParams, isSuperAdmin, canWrite }: { searchParams: Promise<SP>; isSuperAdmin: boolean; canWrite: boolean }) {
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
-      <ProductsListContent resolvedSearchParams={resolvedSearchParams} isSuperAdmin={isSuperAdmin} />
+      <ProductsListContent resolvedSearchParams={resolvedSearchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
     </Suspense>
   )
 }

@@ -1,4 +1,4 @@
-import { cookies} from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
@@ -21,9 +21,14 @@ export default async function InvoicesPage() {
     redirect(ap('/admin/dashboard', host))
   }
 
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'invoices:write')
+
   return (
     <div className="p-4 sm:p-6">
-      <InvoicesClient />
+      <InvoicesClient canWrite={canWrite} />
     </div>
   )
 }

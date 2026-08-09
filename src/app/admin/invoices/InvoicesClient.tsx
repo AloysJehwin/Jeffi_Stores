@@ -80,7 +80,7 @@ const SOURCE_COLORS: Record<string, string> = {
   business: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
 }
 
-export default function InvoicesClient() {
+export default function InvoicesClient({ canWrite = false }: { canWrite?: boolean }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const searchParams = useSearchParams()
@@ -1099,17 +1099,19 @@ export default function InvoicesClient() {
 
 
           <div className="flex flex-wrap items-center gap-3 pb-6">
+            {canWrite && (
             <button type="submit" disabled={submitting}
               className="px-6 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
               {submitting ? (isEdit ? 'Saving…' : 'Creating…') : (isEdit ? 'Save Changes' : 'Create Invoice')}
             </button>
-            {!isEdit && (
+            )}
+            {!isEdit && canWrite && (
               <button type="button" disabled={submitting} onClick={handleSaveDraft}
                 className="px-6 py-2 border border-border-default hover:bg-surface-secondary text-foreground rounded-lg text-sm font-semibold disabled:opacity-50 transition-colors">
                 {submitting ? 'Saving…' : 'Save as Draft'}
               </button>
             )}
-            {isEdit && editIsDraft && (
+            {isEdit && editIsDraft && canWrite && (
               <button
                 type="button"
                 disabled={submitting}
@@ -1178,6 +1180,7 @@ export default function InvoicesClient() {
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Invoices</h1>
           <p className="text-foreground-secondary mt-1 text-sm">All online and offline invoices</p>
         </div>
+        {canWrite && (
         <button onClick={() => navigateView('create')}
           className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1185,6 +1188,7 @@ export default function InvoicesClient() {
           </svg>
           New Offline Invoice
         </button>
+        )}
       </div>
 
       <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
@@ -1284,7 +1288,7 @@ export default function InvoicesClient() {
                         <td className="px-4 py-3 text-xs text-foreground-secondary whitespace-nowrap">{fmtDate(draft.created_at)}</td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            {draft.source === 'offline' && !draft.order_number?.startsWith('AMD-') && (
+                            {draft.source === 'offline' && !draft.order_number?.startsWith('AMD-') && canWrite && (
                             <button
                               onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
                               className="text-xs text-foreground-secondary hover:text-foreground font-medium transition-colors"
@@ -1308,6 +1312,7 @@ export default function InvoicesClient() {
                                 >
                                   View
                                 </a>
+                                {canWrite && (
                                 <button
                                   onClick={() => publishAmendmentDraft(draft.id)}
                                   disabled={publishingId === draft.id}
@@ -1315,8 +1320,9 @@ export default function InvoicesClient() {
                                 >
                                   {publishingId === draft.id ? 'Publishing…' : 'Publish Amendment'}
                                 </button>
+                                )}
                               </>
-                            ) : (
+                            ) : canWrite ? (
                               <button
                                 onClick={() => finalizeDraft(draft.id)}
                                 disabled={finalizingId === draft.id}
@@ -1324,7 +1330,7 @@ export default function InvoicesClient() {
                               >
                                 {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
                               </button>
-                            )}
+                            ) : null}
                           </div>
                         </td>
                       </tr>
@@ -1360,7 +1366,7 @@ export default function InvoicesClient() {
                       <DraftStockPill draft={draft} />
                     </div>
                     <div className="flex gap-4 pt-1">
-                      {draft.source === 'offline' && !draft.order_number?.startsWith('AMD-') && (
+                      {draft.source === 'offline' && !draft.order_number?.startsWith('AMD-') && canWrite && (
                       <button
                         onClick={() => openEdit({ id: draft.id, source: 'offline', invoice_number: '', status: 'draft' } as Invoice)}
                         className="text-xs text-foreground-secondary hover:text-foreground font-medium"
@@ -1377,6 +1383,7 @@ export default function InvoicesClient() {
                       </a>
                       )}
                       {draft.order_number?.startsWith('AMD-') ? (
+                        canWrite && (
                         <button
                           onClick={() => publishAmendmentDraft(draft.id)}
                           disabled={publishingId === draft.id}
@@ -1384,7 +1391,8 @@ export default function InvoicesClient() {
                         >
                           {publishingId === draft.id ? 'Publishing…' : 'Publish Amendment'}
                         </button>
-                      ) : (
+                        )
+                      ) : canWrite ? (
                         <button
                           onClick={() => finalizeDraft(draft.id)}
                           disabled={finalizingId === draft.id}
@@ -1392,7 +1400,7 @@ export default function InvoicesClient() {
                         >
                           {finalizingId === draft.id ? 'Finalizing…' : 'Finalize'}
                         </button>
-                      )}
+                      ) : null}
                     </div>
                   </div>
                 ))}
@@ -1591,7 +1599,7 @@ export default function InvoicesClient() {
                               )}
                             </button>
                           )}
-                          {inv.source === 'offline' && inv.status !== 'cancelled' && (
+                          {inv.source === 'offline' && inv.status !== 'cancelled' && canWrite && (
                             <button
                               onClick={() => openEdit(inv)}
                               title="Edit Invoice"
@@ -1602,7 +1610,7 @@ export default function InvoicesClient() {
                               </svg>
                             </button>
                           )}
-                          {inv.source === 'offline' && inv.status !== 'cancelled' && (
+                          {inv.source === 'offline' && inv.status !== 'cancelled' && canWrite && (
                             <button
                               onClick={() => cancelInvoice(inv)}
                               disabled={cancellingId === inv.id}
@@ -1720,7 +1728,7 @@ export default function InvoicesClient() {
                         {sendingEmailId === inv.id ? 'Sending…' : 'Send Email'}
                       </button>
                     )}
-                    {inv.source === 'offline' && inv.status !== 'cancelled' && (
+                    {inv.source === 'offline' && inv.status !== 'cancelled' && canWrite && (
                       <button
                         onClick={() => openEdit(inv)}
                         className="text-xs text-foreground-secondary hover:text-foreground font-medium"
@@ -1728,7 +1736,7 @@ export default function InvoicesClient() {
                         Edit
                       </button>
                     )}
-                    {inv.source === 'offline' && inv.status !== 'cancelled' && (
+                    {inv.source === 'offline' && inv.status !== 'cancelled' && canWrite && (
                       <button
                         onClick={() => cancelInvoice(inv)}
                         disabled={cancellingId === inv.id}
