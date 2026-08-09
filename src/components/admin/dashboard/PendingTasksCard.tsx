@@ -15,7 +15,7 @@ interface Task {
 }
 
 export default function PendingTasksCard({ tasks, viewAllHref }: { tasks: Task[]; viewAllHref: string }) {
-  const [open, setOpen] = useState(true)
+  const [open, setOpen] = useState(false)
   const [page, setPage] = useState(0)
 
   const totalPages = Math.ceil(tasks.length / PAGE_SIZE)
