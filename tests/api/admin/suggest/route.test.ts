@@ -454,4 +454,210 @@ describe('GET /api/admin/suggest', () => {
     const data = await res.json()
     expect(data.items).toEqual([])
   })
+
+  // ── line_items null-field branches (lines 84–99) ──────────────────────────
+
+  it('line_items: encodes empty strings for null base_price, mrp, hsn_code, sub_variant_id', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      {
+        product_id: 'p1', variant_id: null, sub_variant_id: null,
+        name: 'Bolt', variant_name: null, sku: 'B-1',
+        base_price: null, mrp: null, gst_percentage: 18, hsn_code: null,
+        inventory_quantity: null, discount_pct: null,
+      },
+    ])
+
+    const res = await GET(makeGet({ q: 'bolt', type: 'line_items' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items).toHaveLength(1)
+    const item = data.items[0]
+    // label has no price suffix when base_price is null
+    expect(item.sublabel).toBe('B-1')
+    // encoded id: product_id|variant_id(empty)|base_price(empty)|gst|hsn(empty)|mrp(empty)|inv(empty)|sub_variant_id(empty)|discount_pct(0)
+    const parts = item.id.split('|')
+    expect(parts[0]).toBe('p1')
+    expect(parts[1]).toBe('')   // variant_id null -> ''
+    expect(parts[2]).toBe('')   // base_price null -> ''
+    expect(parts[4]).toBe('')   // hsn_code null -> ''
+    expect(parts[5]).toBe('')   // mrp null -> ''
+    expect(parts[6]).toBe('')   // inventory_quantity null -> ''
+    expect(parts[7]).toBe('')   // sub_variant_id null -> ''
+    expect(parts[8]).toBe('0')  // discount_pct null -> '0'
+  })
+
+  it('line_items: encodes sub_variant_id when present', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      {
+        product_id: 'p1', variant_id: 'v1', sub_variant_id: 'sv1',
+        name: 'Bolt', variant_name: 'M8', sku: 'B-M8',
+        base_price: 75, mrp: 90, gst_percentage: 18, hsn_code: '7318',
+        inventory_quantity: 10, discount_pct: 5,
+      },
+    ])
+
+    const res = await GET(makeGet({ q: 'bolt', type: 'line_items' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    const parts = data.items[0].id.split('|')
+    expect(parts[1]).toBe('v1')
+    expect(parts[7]).toBe('sv1')
+    expect(parts[8]).toBe('5')
+  })
+
+  it('line_items: handles null queryMany result (rows || [])', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+
+    const res = await GET(makeGet({ q: 'bolt', type: 'line_items' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items).toEqual([])
+  })
+
+  // ── po_line_items null-field branches (lines 173–185) ─────────────────────
+
+  it('po_line_items: encodes empty strings for null base_price, mrp, hsn_code, sell_unit fields', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      {
+        product_id: 'p2', variant_id: null,
+        name: 'Wrench', variant_name: null, sku: 'WR-1',
+        base_price: null, mrp: null, gst_percentage: 12, hsn_code: null,
+        sell_unit_label: null, sell_unit_dimension: null,
+      },
+    ])
+
+    const res = await GET(makeGet({ q: 'wrench', type: 'po_line_items' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    const item = data.items[0]
+    expect(item.label).toBe('Wrench')
+    expect(item.sublabel).toBe('WR-1')
+    const parts = item.id.split('|')
+    expect(parts[0]).toBe('p2')
+    expect(parts[1]).toBe('')  // variant_id null -> ''
+    expect(parts[2]).toBe('')  // base_price null -> ''
+    expect(parts[4]).toBe('')  // hsn_code null -> ''
+    expect(parts[5]).toBe('')  // mrp null -> ''
+    expect(parts[6]).toBe('')  // sell_unit_label null -> ''
+    expect(parts[7]).toBe('')  // sell_unit_dimension null -> ''
+  })
+
+  it('po_line_items: encodes variant name in label when present', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      {
+        product_id: 'p2', variant_id: 'v2',
+        name: 'Wrench', variant_name: '1/2 inch', sku: 'WR-H',
+        base_price: 150, mrp: 180, gst_percentage: 12, hsn_code: '8204',
+        sell_unit_label: 'Piece', sell_unit_dimension: 'unit',
+      },
+    ])
+
+    const res = await GET(makeGet({ q: 'wrench', type: 'po_line_items' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items[0].label).toBe('Wrench — 1/2 inch')
+    const parts = data.items[0].id.split('|')
+    expect(parts[6]).toBe('Piece')
+    expect(parts[7]).toBe('unit')
+  })
+
+  it('po_line_items: handles null queryMany result (rows || [])', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+
+    const res = await GET(makeGet({ q: 'wrench', type: 'po_line_items' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items).toEqual([])
+  })
+
+  // ── null queryMany fallback in simple-map handlers (rows || []) ────────────
+
+  it('products: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'bolt', type: 'products' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  it('orders: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'ORD', type: 'orders' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  it('customers: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'jane', type: 'customers' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  it('invoices: falls back to order_number when invoice_number is null', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      { id: 'o2', invoice_number: null, order_number: 'ORD-999', customer_name: 'Dan' },
+    ])
+    const res = await GET(makeGet({ q: 'ORD', type: 'invoices' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items[0].label).toBe('ORD-999')
+  })
+
+  it('invoices: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'inv', type: 'invoices' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  it('quotations: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'QUO', type: 'quotations' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  it('categories: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'fast', type: 'categories' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  it('coupons: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'SAVE', type: 'coupons' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  it('brands: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'unbr', type: 'brands' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  it('suppliers: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'acme', type: 'suppliers' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
 })

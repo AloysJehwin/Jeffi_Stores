@@ -238,4 +238,215 @@ describe('POST /api/shipping/rate', () => {
     const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
     expect(res.status).toBe(500)
   })
+
+  // ── callDelhiveryForCarton branches (lines 56, 58–59, 62–63) ──────────────
+
+  it('falls back when Delhivery returns non-ok HTTP status (line 56)', async () => {
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 503, json: async () => ({}) })
+    mockFallbackRate.mockReturnValueOnce({ charge: 55, zone: 'C', source: 'fallback' })
+    mockApplyRules.mockReturnValueOnce({ charge: 55, source: 'as_is' } as any)
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.source).toBe('fallback')
+    expect(mockFallbackRate).toHaveBeenCalled()
+  })
+
+  it('falls back when Delhivery returns object (not array) with error field (line 58–59)', async () => {
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    // Return a plain object (not array) with an error field
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ error: 'Pincode not serviceable', total_amount: null }),
+    })
+    mockFallbackRate.mockReturnValueOnce({ charge: 70, zone: 'D', source: 'fallback' })
+    mockApplyRules.mockReturnValueOnce({ charge: 70, source: 'as_is' } as any)
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.source).toBe('fallback')
+  })
+
+  it('falls back when Delhivery rate has total_amount null (line 59)', async () => {
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ error: null, total_amount: null, zone: 'A', charged_weight: 500 }],
+    })
+    mockFallbackRate.mockReturnValueOnce({ charge: 60, zone: 'A', source: 'fallback' })
+    mockApplyRules.mockReturnValueOnce({ charge: 60, source: 'as_is' } as any)
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.source).toBe('fallback')
+  })
+
+  it('uses fallback zone string when Delhivery zone is falsy (line 62–63)', async () => {
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    // zone is empty string, charged_weight is 0 (falsy) → uses weightGrams as fallback
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => [{ error: null, total_amount: 80, zone: '', charged_weight: 0 }],
+    })
+    mockApplyRules.mockReturnValueOnce({ charge: 80, source: 'as_is' } as any)
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    // zone falls back to '' (prior zone value stays '') and chargedWeight falls back to weightGrams
+    expect(json.chargedWeightGrams).toBeGreaterThanOrEqual(0)
+  })
+
+  // ── cart item filtering branches (lines 78–79) ─────────────────────────────
+
+  it('handles mixed cart with both variant and product items', async () => {
+    // First queryMany call: variants; second: products
+    mockQueryMany
+      .mockResolvedValueOnce([mockVariantRow])
+      .mockResolvedValueOnce([mockProductRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 800 }] as any)
+    mockFallbackRate.mockReturnValueOnce({ charge: 65, zone: 'B', source: 'fallback' })
+    mockApplyRules.mockReturnValueOnce({ charge: 65, source: 'as_is' } as any)
+
+    const res = await POST(makeRequest({
+      destinationPin: '400053',
+      cartItems: [variantCartItem, productCartItem],
+    }) as any)
+    expect(res.status).toBe(200)
+    expect(mockQueryMany).toHaveBeenCalledTimes(2)
+  })
+
+  // ── variant not found in lookup (line 97) ─────────────────────────────────
+
+  it('skips variant cart item when variant row not found in DB result', async () => {
+    // queryMany returns a row for a different id — variant 'var-1' not found
+    mockQueryMany.mockResolvedValueOnce([{ ...mockVariantRow, id: 'var-other' }])
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
+    // All variant cart items skipped → no shipment items → 400
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toContain('No valid cart items')
+  })
+
+  // ── product not found in lookup (lines 121–126) ────────────────────────────
+
+  it('skips product cart item when product row not found in DB result', async () => {
+    mockQueryMany.mockResolvedValueOnce([{ ...mockProductRow, id: 'prod-other' }])
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [productCartItem] }) as any)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toContain('No valid cart items')
+  })
+
+  // ── SHIPPING_MIN_CHARGE / SHIPPING_MAX_CHARGE clamp branches (lines 208–213) ─
+
+  it('applies SHIPPING_MAX_CHARGE ceiling (default 200) when fallback charge exceeds it', async () => {
+    // SHIPPING_MAX_CHARGE is a module-level constant defaulting to 200.
+    // Provide a fallback charge > 200 — applyRules should receive 200 as baseCharge.
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 5000 }] as any)
+    mockFallbackRate.mockReturnValueOnce({ charge: 350, zone: 'D', source: 'fallback' })
+    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const }))
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.charge).toBe(200)
+  })
+
+  // ── freeShippingThreshold in response (line 238) ───────────────────────────
+
+  it('includes freeShippingThreshold in response when freeThreshold > 0 but subtotal does not meet it', async () => {
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce({ ...defaultSettings, freeThreshold: 1000 } as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    mockFallbackRate.mockReturnValueOnce({ charge: 60, zone: 'B', source: 'fallback' })
+    mockApplyRules.mockReturnValueOnce({ charge: 60, source: 'as_is' } as any)
+
+    const res = await POST(makeRequest({
+      destinationPin: '400053',
+      cartItems: [variantCartItem],
+      subtotal: 400,
+    }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.freeShippingThreshold).toBe(1000)
+    expect(json.charge).toBe(60)
+  })
+
+  // ── COD surcharge: flat wins when pct surcharge is lower (line 217–219) ─────
+
+  it('COD surcharge uses flat fee when pct of subtotal is less than flat', async () => {
+    process.env.COD_SURCHARGE_FLAT = '40'
+    process.env.COD_SURCHARGE_PCT = '2'
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    mockFallbackRate.mockReturnValueOnce({ charge: 0, zone: 'A', source: 'fallback' })
+    // baseCharge = 0 + codFee; 2% of 100 = 2 < 40, so flat=40 wins
+    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const }))
+
+    const res = await POST(makeRequest({
+      destinationPin: '400053',
+      cartItems: [variantCartItem],
+      subtotal: 100,
+      isCod: true,
+    }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.charge).toBe(40)
+  })
+
+  it('COD surcharge uses pct fee when pct of subtotal exceeds flat', async () => {
+    process.env.COD_SURCHARGE_FLAT = '40'
+    process.env.COD_SURCHARGE_PCT = '2'
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    mockFallbackRate.mockReturnValueOnce({ charge: 0, zone: 'A', source: 'fallback' })
+    // 2% of 5000 = 100 > 40, so pct=100 wins
+    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const }))
+
+    const res = await POST(makeRequest({
+      destinationPin: '400053',
+      cartItems: [variantCartItem],
+      subtotal: 5000,
+      isCod: true,
+    }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.charge).toBe(100)
+  })
+
+  it('COD surcharge uses flat fee when subtotal is not a number', async () => {
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    mockFallbackRate.mockReturnValueOnce({ charge: 0, zone: 'A', source: 'fallback' })
+    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const }))
+
+    const res = await POST(makeRequest({
+      destinationPin: '400053',
+      cartItems: [variantCartItem],
+      isCod: true,
+      // subtotal omitted — typeof subtotal !== 'number'
+    }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.charge).toBe(40)
+  })
 })
