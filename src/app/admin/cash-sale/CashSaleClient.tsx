@@ -143,15 +143,8 @@ export default function CashSaleClient() {
     payment: 'payment_status',
   }
 
-  const sortedSales = sortCol && SORT_KEYS[sortCol]
-    ? [...sales].sort((a, b) => {
-        const key = SORT_KEYS[sortCol]
-        const av = a[key] ?? ''
-        const bv = b[key] ?? ''
-        const cmp = String(av).localeCompare(String(bv), 'en', { numeric: true })
-        return sortDir === 'asc' ? cmp : -cmp
-      })
-    : sales
+  // Ordered server-side across all sales via sort/dir params.
+  const sortedSales = sales
 
   const fetchSales = useCallback(async (p = 1) => {
     setLoading(true)
@@ -161,6 +154,7 @@ export default function CashSaleClient() {
       if (fromDate) params.set('from', fromDate)
       if (toDate) params.set('to', toDate)
       if (searchQ) params.set('search', searchQ)
+      if (sortCol && SORT_KEYS[sortCol]) { params.set('sort', SORT_KEYS[sortCol]); params.set('dir', sortDir || 'desc') }
       params.set('page', String(p))
       const res = await fetch(`/api/admin/cash-sale?${params}`, { credentials: 'include' })
       if (!res.ok) throw new Error('Failed')
@@ -173,9 +167,9 @@ export default function CashSaleClient() {
     } finally {
       setLoading(false)
     }
-  }, [paymentFilter, fromDate, toDate, searchQ, showToast])
+  }, [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir, showToast])
 
-  useEffect(() => { fetchSales(1) }, [paymentFilter, fromDate, toDate, searchQ])
+  useEffect(() => { fetchSales(1) }, [paymentFilter, fromDate, toDate, searchQ, sortCol, sortDir])
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setSelectedSale(null) }

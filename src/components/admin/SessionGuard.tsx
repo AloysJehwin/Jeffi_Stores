@@ -4,10 +4,12 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { usePathname } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 
-// How often to poll the server for the real expiry time (ms)
-const POLL_INTERVAL_MS = 15_000
-// Show modal this many seconds before expiry
+// Only poll when tab becomes visible again — avoids hammering the server
+// every N seconds and prevents false logouts from stale interval fires.
+// Show warning modal this many seconds before expiry.
 const WARN_BEFORE_S = 20
+// Fallback poll interval when tab stays visible (catch silent expiry)
+const FALLBACK_POLL_MS = 5 * 60 * 1000 // 5 minutes
 
 export default function SessionGuard() {
   const pathname = usePathname()
@@ -19,7 +21,6 @@ export default function SessionGuard() {
   const expiresAtRef = useRef<number | null>(null)
   const loggedOutRef = useRef(false)
 
-  // Don't run on the login page
   const isLoginPage = pathname === ap('/admin/login')
 
   const clearTimers = () => {
@@ -33,7 +34,6 @@ export default function SessionGuard() {
     clearTimers()
     setShowModal(false)
     try { await fetch('/api/admin/logout', { method: 'POST' }) } catch {}
-    // Hard reload — forces server layout to re-evaluate with cleared cookie
     window.location.href = ap('/admin/login')
   }, [])
 
@@ -56,6 +56,8 @@ export default function SessionGuard() {
 
   const pollSession = useCallback(async () => {
     if (loggedOutRef.current) return
+    // Skip poll while tab is hidden — avoids stale UA / network issues
+    if (typeof document !== 'undefined' && document.hidden) return
     try {
       const res = await fetch('/api/admin/check-session', { cache: 'no-store' })
       const data = await res.json()
@@ -71,24 +73,19 @@ export default function SessionGuard() {
       expiresAtRef.current = data.expiresAt
       const sLeft = Math.floor((data.expiresAt - Date.now()) / 1000)
 
-      if (sLeft <= 0) {
-        logout()
-        return
-      }
+      if (sLeft <= 0) { logout(); return }
 
       if (sLeft <= WARN_BEFORE_S) {
         setSecondsLeft(sLeft)
         setShowModal(true)
         startTicker()
       } else {
-        // Not near expiry — hide modal if it was showing (e.g. after refresh)
         setShowModal(false)
         if (tickRef.current) { clearInterval(tickRef.current); tickRef.current = null }
       }
     } catch {}
   }, [logout, startTicker])
 
-  // Reset everything when page changes (fixes modal showing on login page)
   useEffect(() => {
     loggedOutRef.current = false
     setShowModal(false)
@@ -97,25 +94,28 @@ export default function SessionGuard() {
 
     if (isLoginPage) return
 
-    // Initial poll immediately, then on interval
+    // Poll once on mount, then only when tab becomes visible again.
+    // This avoids hammering the server every 15s and prevents false
+    // logouts caused by stale UA/cookie state during background tabs.
     pollSession()
-    pollRef.current = setInterval(pollSession, POLL_INTERVAL_MS)
 
-    return clearTimers
+    // Fallback: catch sessions that expire while the tab stays open
+    pollRef.current = setInterval(pollSession, FALLBACK_POLL_MS)
+
+    const onVisible = () => { if (!document.hidden) pollSession() }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      clearTimers()
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [pathname, isLoginPage, pollSession])
 
   const handleContinue = async () => {
     try {
       const res = await fetch('/api/admin/refresh', { method: 'POST' })
-      if (res.ok) {
-        // Poll immediately to get new expiresAt
-        await pollSession()
-      } else {
-        logout()
-      }
-    } catch {
-      logout()
-    }
+      if (res.ok) { await pollSession() } else { logout() }
+    } catch { logout() }
   }
 
   if (!showModal || secondsLeft === null) return null
@@ -137,16 +137,10 @@ export default function SessionGuard() {
         </div>
         <div className="text-3xl font-mono font-bold text-red-500 tabular-nums">{mm}:{ss}</div>
         <div className="flex gap-3 w-full">
-          <button
-            onClick={logout}
-            className="flex-1 px-4 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors"
-          >
+          <button onClick={logout} className="flex-1 px-4 py-2 border border-border-default rounded-lg text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Log out
           </button>
-          <button
-            onClick={handleContinue}
-            className="flex-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-bold transition-colors"
-          >
+          <button onClick={handleContinue} className="flex-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-bold transition-colors">
             Continue working
           </button>
         </div>
@@ -154,4 +148,3 @@ export default function SessionGuard() {
     </div>
   )
 }
-

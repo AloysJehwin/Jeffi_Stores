@@ -11,7 +11,7 @@ export const metadata = { title: 'Cash Sale — Jeffi Admin' }
 export default async function CashSalePage() {
   const host = await getHost()
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
+  const token = cookieStore.get('admin_sid')
   if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null

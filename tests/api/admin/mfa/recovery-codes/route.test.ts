@@ -38,14 +38,14 @@ const adminPayload = {
 function makeGetRequest() {
   return new NextRequest('http://localhost/api/admin/mfa/recovery-codes', {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 
 function makePostRequest() {
   return new NextRequest('http://localhost/api/admin/mfa/recovery-codes', {
     method: 'POST',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

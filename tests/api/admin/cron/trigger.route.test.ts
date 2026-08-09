@@ -32,7 +32,7 @@ const adminPayload = {
 function makeRequest(body: Record<string, unknown> = {}) {
   return new NextRequest('http://localhost/api/admin/cron/trigger', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', cookie: 'admin_token=valid' },
+    headers: { 'content-type': 'application/json', cookie: 'admin_sid=valid' },
     body: JSON.stringify(body),
   })
 }

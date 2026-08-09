@@ -1,8 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
+import { headers } from 'next/headers'
 import { getCustomerById } from '@/lib/queries'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { hasScope } from '@/lib/scopes'
 import CustomerActionButton from '@/components/admin/CustomerActionButton'
 import CustomerMailerPanel from '@/components/admin/CustomerMailerPanel'
 import AdminSupportChat from '@/components/admin/AdminSupportChat'
@@ -92,6 +94,11 @@ export default async function CustomerDetailPage({
   } catch {
     notFound()
   }
+
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'customers:write')
 
   const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown'
   const initials = [customer.first_name?.[0], customer.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
@@ -249,27 +256,31 @@ export default async function CustomerDetailPage({
           {/* Account Actions */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-4">Account Actions</h2>
-            <CustomerActionButton
-              customerId={customer.id}
-              customerName={fullName}
-              isActive={customer.is_active}
-              isFlagged={customer.is_flagged}
-            />
+            {canWrite ? (
+              <CustomerActionButton
+                customerId={customer.id}
+                customerName={fullName}
+                isActive={customer.is_active}
+                isFlagged={customer.is_flagged}
+              />
+            ) : (
+              <p className="text-xs text-foreground-muted">Read-only access — cannot modify account.</p>
+            )}
           </div>
 
           {/* Tags */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <CustomerTags customerId={customer.id} initialTags={customer.tags || []} />
+            <CustomerTags customerId={customer.id} initialTags={customer.tags || []} canWrite={canWrite} />
           </div>
 
           {/* Internal Notes */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <CustomerNotes customerId={customer.id} initialNotes={customer.notes || []} />
+            <CustomerNotes customerId={customer.id} initialNotes={customer.notes || []} canWrite={canWrite} />
           </div>
 
           {/* Tasks */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
-            <CustomerTasks customerId={customer.id} />
+            <CustomerTasks customerId={customer.id} canWrite={canWrite} />
           </div>
 
           {/* Business details (customer_profiles) */}

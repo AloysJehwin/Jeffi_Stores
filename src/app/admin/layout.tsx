@@ -2,25 +2,16 @@ export const dynamic = 'force-dynamic'
 
 import { cookies, headers } from 'next/headers'
 import { logoutAction } from './logout-action'
-import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { getAdminSession } from '@/lib/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
+import { AdminMobileProvider } from '@/contexts/AdminMobileProvider'
+import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
 
 export const metadata = {
   title: 'Admin Panel - Jeffi Stores',
   description: 'Secure admin panel for Jeffi Stores',
   robots: 'noindex, nofollow',
-}
-
-async function getAdminSession() {
-  const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
-  if (!token) return null
-  try {
-    return await verifyToken(token.value)
-  } catch {
-    return null
-  }
 }
 
 export default async function AdminLayout({
@@ -31,6 +22,8 @@ export default async function AdminLayout({
   const headersList = await headers()
   const pathname = headersList.get('x-pathname') || ''
   const cookieStore = await cookies()
+  const ua = headersList.get('user-agent') || ''
+  const isMobile = /android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini/i.test(ua)
 
   const session = await getAdminSession()
 
@@ -38,7 +31,6 @@ export default async function AdminLayout({
   if (pathname === '/admin/login' || !session) {
     return <>{children}</>
   }
-
   const role = session?.role || ''
   const scopes: string[] = session?.scopes || []
 
@@ -48,6 +40,7 @@ export default async function AdminLayout({
     { href: '/admin/categories', label: 'Categories', scope: 'categories:read', group: 'Catalogue' },
     { href: '/admin/brands', label: 'Brands', scope: 'brands:read', group: 'Catalogue' },
     { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'catalog_enrichment:read', group: 'Catalogue' },
+    { href: '/admin/merchant-sync', label: 'Merchant Sync', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations:read', group: 'Sales' },
     { href: '/admin/invoices', label: 'Invoices', scope: 'invoices:read', group: 'Sales' },
@@ -88,10 +81,10 @@ export default async function AdminLayout({
   })
   const desktopNavLinks = filteredNavLinks.filter(link => !('mobileOnly' in link && link.mobileOnly))
 
-  const displayName = session?.first_name && session?.last_name
-    ? `${session.first_name} ${session.last_name}`
-    : session?.email || 'Admin'
-  const usernameInitial = (session?.first_name || session?.email || 'A')[0].toUpperCase()
+  const displayName = session?.displayName
+    || (session?.first_name && session?.last_name ? `${session.first_name} ${session.last_name}` : null)
+    || 'Admin'
+  const usernameInitial = (displayName !== 'Admin' ? displayName : (session?.email || 'A'))[0].toUpperCase()
 
   const logoutForm = (
     <form action={logoutAction}>
@@ -107,17 +100,20 @@ export default async function AdminLayout({
   const sidebarCollapsed = cookieStore.get('sidebar_collapsed')?.value === 'true'
 
   return (
-    <AdminShell
-      desktopNavLinks={desktopNavLinks}
-      allNavLinks={filteredNavLinks}
-      displayName={displayName}
-      usernameInitial={usernameInitial}
-      role={role}
-      canUseAgent={hasScope(role, scopes, 'agent:read')}
-      logoutForm={logoutForm}
-      initialCollapsed={sidebarCollapsed}
-    >
-      {children}
-    </AdminShell>
+    <AdminMobileProvider isMobile={isMobile}>
+      <AdminShell
+        desktopNavLinks={desktopNavLinks}
+        allNavLinks={filteredNavLinks}
+        displayName={displayName}
+        usernameInitial={usernameInitial}
+        role={role}
+        canUseAgent={hasScope(role, scopes, 'agent:read')}
+        logoutForm={logoutForm}
+        initialCollapsed={sidebarCollapsed}
+      >
+        <DesktopRequiredBanner />
+        {children}
+      </AdminShell>
+    </AdminMobileProvider>
   )
 }

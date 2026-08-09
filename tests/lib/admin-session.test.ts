@@ -1,8 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
+// issueAdminSession no longer signs a JWT. It creates an opaque server-side session via
+// createSession() and sets the admin_sid cookie to the returned session id (sid).
+vi.mock('@/lib/auth-sessions', () => ({
+  createSession: vi.fn(),
+}))
+
 vi.mock('@/lib/jwt', () => ({
-  generateToken: vi.fn().mockResolvedValue('mock-jwt-token'),
-  JWT_MAX_AGE_S: 3600,
+  JWT_MAX_AGE_S: 28800,
 }))
 
 vi.mock('@/lib/cookie-domain', () => ({
@@ -22,18 +27,18 @@ vi.mock('next/server', () => {
 })
 
 import { issueAdminSession } from '@/lib/admin-session'
-import { generateToken } from '@/lib/jwt'
+import { createSession } from '@/lib/auth-sessions'
 import { NextResponse } from 'next/server'
 
-const mockGenerateToken = vi.mocked(generateToken)
+const mockCreateSession = vi.mocked(createSession)
 
 describe('issueAdminSession', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mockGenerateToken.mockResolvedValue('mock-jwt-token')
+    mockCreateSession.mockResolvedValue({ sid: 'fake-uuid', id: 'row-id', expiresAt: '2099-01-01T00:00:00.000Z' })
   })
 
-  it('calls generateToken with admin fields', async () => {
+  it('creates an opaque admin session with the admin fields', async () => {
     const admin = {
       id: 'admin-1',
       email: 'alice@example.com',
@@ -43,25 +48,25 @@ describe('issueAdminSession', () => {
       scopes: ['read', 'write'],
     }
     await issueAdminSession(admin)
-    expect(mockGenerateToken).toHaveBeenCalledWith(
+    expect(mockCreateSession).toHaveBeenCalledWith(
       expect.objectContaining({
-        adminId: 'admin-1',
-        email: 'alice@example.com',
-        first_name: 'Alice',
-        last_name: 'Smith',
+        principalType: 'admin',
+        principalId: 'admin-1',
         role: 'superadmin',
+        scopes: ['read', 'write'],
+        ttlSeconds: 28800,
       })
     )
   })
 
-  it('sets admin_token cookie on the response', async () => {
+  it('sets admin_sid cookie to the returned session id', async () => {
     const admin = { id: 'admin-2', email: 'bob@example.com', role: 'admin', scopes: null }
     const response = await issueAdminSession(admin)
     const mockSet = (response as any)._mockCookieSet ?? (response.cookies as any).set
     expect(mockSet).toHaveBeenCalledWith(
-      'admin_token',
-      'mock-jwt-token',
-      expect.objectContaining({ httpOnly: true, path: '/' })
+      'admin_sid',
+      'fake-uuid',
+      expect.objectContaining({ httpOnly: true, path: '/', sameSite: 'strict', maxAge: 28800 })
     )
   })
 
@@ -74,11 +79,11 @@ describe('issueAdminSession', () => {
     expect(response).toBeDefined()
   })
 
-  it('includes certCN in token when provided', async () => {
+  it('snapshots certCN onto the session when provided', async () => {
     const admin = { id: 'a1', email: 'test@example.com', role: 'admin', scopes: [] }
     await issueAdminSession(admin, 'client-cert-cn')
-    expect(mockGenerateToken).toHaveBeenCalledWith(
-      expect.objectContaining({ authCertCN: 'client-cert-cn' })
+    expect(mockCreateSession).toHaveBeenCalledWith(
+      expect.objectContaining({ certCN: 'client-cert-cn' })
     )
   })
 
@@ -93,8 +98,28 @@ describe('issueAdminSession', () => {
   it('handles null scopes by defaulting to empty array', async () => {
     const admin = { id: 'a1', email: 'test@example.com', role: 'admin', scopes: null }
     await issueAdminSession(admin)
-    expect(mockGenerateToken).toHaveBeenCalledWith(
+    expect(mockCreateSession).toHaveBeenCalledWith(
       expect.objectContaining({ scopes: [] })
+    )
+  })
+
+  it('forwards device-binding signals (ua, ip, accept-language, platform, fp) into the session', async () => {
+    const admin = { id: 'a1', email: 'test@example.com', role: 'admin', scopes: [] }
+    await issueAdminSession(admin, undefined, undefined, {
+      userAgent: 'Chrome/120',
+      ip: '203.0.113.5',
+      acceptLanguage: 'en-US,en;q=0.9',
+      uaPlatform: '"macOS"',
+      fpHash: 'deadbeef',
+    })
+    expect(mockCreateSession).toHaveBeenCalledWith(
+      expect.objectContaining({
+        userAgent: 'Chrome/120',
+        ip: '203.0.113.5',
+        acceptLanguage: 'en-US,en;q=0.9',
+        uaPlatform: '"macOS"',
+        fpHash: 'deadbeef',
+      })
     )
   })
 })

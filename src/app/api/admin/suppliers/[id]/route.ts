@@ -24,7 +24,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
     if (!supplier) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const [stats, pos, expenses] = await Promise.all([
+    const [stats, pos, expenses, linkedProducts, purchasedProducts] = await Promise.all([
       queryOne<any>(
         `SELECT
           COUNT(DISTINCT po.id)::int AS po_count,
@@ -55,12 +55,51 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
          LIMIT 50`,
         [id]
       ),
+      // Linked products: current (latest-dated, active) product_suppliers rows for this
+      // supplier, one per leaf, with product/variant/sub-variant names.
+      queryMany<any>(
+        `SELECT DISTINCT ON (ps.product_id, ps.variant_id, ps.sub_variant_id)
+                ps.product_id, p.name AS product_name,
+                ps.variant_id, pv.variant_name,
+                ps.sub_variant_id, psv.sub_variant_name,
+                ps.unit_cost, ps.currency, ps.is_preferred, ps.moq,
+                ps.lead_time_days, ps.effective_date
+         FROM product_suppliers ps
+         JOIN products p ON p.id = ps.product_id
+         LEFT JOIN product_variants pv ON pv.id = ps.variant_id
+         LEFT JOIN product_sub_variants psv ON psv.id = ps.sub_variant_id
+         WHERE ps.supplier_id = $1 AND ps.is_active = true
+         ORDER BY ps.product_id, ps.variant_id, ps.sub_variant_id, ps.effective_date DESC, ps.created_at DESC`,
+        [id]
+      ),
+      // Purchased products: aggregate of what has actually been bought from this
+      // supplier via POs, grouped by product + variant.
+      queryMany<any>(
+        `SELECT poi.product_id, p.name AS product_name,
+                poi.variant_id, pv.variant_name,
+                poi.sub_variant_id, psv.sub_variant_name,
+                SUM(poi.quantity) AS total_qty,
+                COUNT(DISTINCT po.id)::int AS po_count,
+                MAX(po.order_date) AS last_order_date,
+                (ARRAY_AGG(poi.unit_cost ORDER BY po.order_date DESC))[1] AS last_unit_cost
+         FROM purchase_order_items poi
+         JOIN purchase_orders po ON po.id = poi.po_id AND po.supplier_id = $1
+         JOIN products p ON p.id = poi.product_id
+         LEFT JOIN product_variants pv ON pv.id = poi.variant_id
+         LEFT JOIN product_sub_variants psv ON psv.id = poi.sub_variant_id
+         GROUP BY poi.product_id, p.name, poi.variant_id, pv.variant_name, poi.sub_variant_id, psv.sub_variant_name
+         ORDER BY MAX(po.order_date) DESC
+         LIMIT 100`,
+        [id]
+      ),
     ])
 
     return NextResponse.json({
       supplier: { ...supplier, ...stats },
       pos: pos || [],
       expenses: expenses || [],
+      linkedProducts: linkedProducts || [],
+      purchasedProducts: purchasedProducts || [],
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Internal server error' }, { status: 500 })

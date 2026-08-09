@@ -15,14 +15,19 @@ import {
   updateWarehouse,
   deleteWarehouse,
   listLocations,
+  getOrCreateOpenShelf,
   getLocation,
   createLocation,
   updateLocation,
   deleteLocation,
   getStockAtLocation,
+  getBatchesAtLocation,
   getStockForProduct,
   adjustStock,
   moveStock,
+  syncPerishableStock,
+  decrementNonPerishableShelfStock,
+  upsertShelfStock,
 } from '@/lib/shelf'
 import { query, queryOne, queryMany, getClient } from '@/lib/db'
 
@@ -648,5 +653,303 @@ describe('moveStock', () => {
 
     await expect(moveStock('from', 'to', 'prod', null, null, 3)).rejects.toThrow('move fail')
     expect(client.release).toHaveBeenCalled()
+  })
+
+  it('handles perishable product: throws when insufficient batch stock', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })                                         // BEGIN
+        .mockResolvedValueOnce({ rows: [{ perishable: true }] })                     // perishable check
+        .mockResolvedValueOnce({ rows: [{ id: 'b1', quantity_remaining: '2' }] }),   // batches — only 2 avail
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+
+    await expect(moveStock('from', 'to', 'prod', null, null, 10)).rejects.toThrow('Insufficient stock at source location')
+    expect(client.release).toHaveBeenCalled()
+  })
+
+  it('handles perishable product: moves entire batch when take === avail', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })                                          // BEGIN
+        .mockResolvedValueOnce({ rows: [{ perishable: true }] })                      // perishable check
+        .mockResolvedValueOnce({ rows: [{ id: 'b1', quantity_remaining: '5' }] })    // batches (avail=5=take)
+        .mockResolvedValueOnce({ rows: [] })                                          // UPDATE batch location
+        .mockResolvedValueOnce({ rows: [] })                                          // INSERT move_out transaction
+        // syncPerishableStock receives the outer client directly (ownClient=false, no BEGIN/COMMIT):
+        .mockResolvedValueOnce({ rows: [{ location_id: 'from', total: '0' }] })      // batchTotals SELECT
+        .mockResolvedValueOnce({ rows: [{ id: 'ss1', location_id: 'from' }] })       // existing shelf_stock SELECT
+        .mockResolvedValueOnce({ rows: [] })                                          // DELETE shelf_stock (qty=0)
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })                           // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] })                                          // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }),                                         // COMMIT
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+
+    await expect(moveStock('from', 'to', 'prod', null, null, 5)).resolves.toBeUndefined()
+    expect(client.release).toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getBatchesAtLocation
+// ---------------------------------------------------------------------------
+
+describe('getBatchesAtLocation', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('calls queryMany with locationId', async () => {
+    mockQueryMany.mockResolvedValue([])
+    await getBatchesAtLocation('loc-1')
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.stringContaining('product_batches'), ['loc-1'])
+  })
+
+  it('returns batches array', async () => {
+    const batches = [{ id: 'pb1', lot_number: 'LOT-A', quantity_remaining: 10, serials: [] }]
+    mockQueryMany.mockResolvedValue(batches as any)
+    const result = await getBatchesAtLocation('loc-1')
+    expect(result).toEqual(batches)
+  })
+
+  it('returns empty array when no batches', async () => {
+    mockQueryMany.mockResolvedValue([])
+    expect(await getBatchesAtLocation('loc-2')).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getOrCreateOpenShelf
+// ---------------------------------------------------------------------------
+
+describe('getOrCreateOpenShelf', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns existing open shelf id when found', async () => {
+    mockQueryOne.mockResolvedValueOnce({ id: 'open-shelf-1' })
+    const result = await getOrCreateOpenShelf('wh-1', 'WH')
+    expect(result).toBe('open-shelf-1')
+    expect(mockQueryOne).toHaveBeenCalledTimes(1)
+  })
+
+  it('creates and returns new open shelf when not found', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'new-open-shelf' })
+    const result = await getOrCreateOpenShelf('wh-1', 'WH')
+    expect(result).toBe('new-open-shelf')
+    expect(mockQueryOne).toHaveBeenCalledTimes(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// syncPerishableStock
+// ---------------------------------------------------------------------------
+
+describe('syncPerishableStock', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('opens its own connection when no client provided, commits on success', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })                        // BEGIN
+        .mockResolvedValueOnce({ rows: [] })                        // batchTotals — empty
+        .mockResolvedValueOnce({ rows: [] })                        // existing shelf_stock — empty
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })         // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] })                        // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }),                       // COMMIT
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+
+    await expect(syncPerishableStock(null, 'prod-1', null, null)).resolves.toBeUndefined()
+    expect(client.release).toHaveBeenCalled()
+  })
+
+  it('rolls back and rethrows when a query fails', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })
+        .mockRejectedValueOnce(new Error('sync fail')),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+
+    await expect(syncPerishableStock(null, 'prod-1', null, null)).rejects.toThrow('sync fail')
+    expect(client.release).toHaveBeenCalled()
+  })
+
+  it('inserts new shelf_stock row when location not in existing map', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })                                              // BEGIN
+        .mockResolvedValueOnce({ rows: [{ location_id: 'loc-new', total: '5' }] })       // batchTotals
+        .mockResolvedValueOnce({ rows: [] })                                              // existing shelf_stock — empty
+        .mockResolvedValueOnce({ rows: [] })                                              // INSERT shelf_stock
+        .mockResolvedValueOnce({ rows: [{ total: '5' }] })                               // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] })                                              // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }),                                             // COMMIT
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+
+    await expect(syncPerishableStock(null, 'prod-1', null, null)).resolves.toBeUndefined()
+    expect(client.release).toHaveBeenCalled()
+  })
+
+  it('deletes shelf_stock row when qty drops to 0 for existing location', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })                                              // BEGIN
+        .mockResolvedValueOnce({ rows: [{ location_id: 'loc-1', total: '0' }] })         // batchTotals (qty=0)
+        .mockResolvedValueOnce({ rows: [{ id: 'ss1', location_id: 'loc-1' }] })          // existing shelf_stock
+        .mockResolvedValueOnce({ rows: [] })                                              // DELETE shelf_stock
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })                               // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] })                                              // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }),                                             // COMMIT
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+
+    await expect(syncPerishableStock(null, 'prod-1', null, null)).resolves.toBeUndefined()
+  })
+
+  it('removes orphaned shelf_stock rows not in batchTotals', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })                                              // BEGIN
+        .mockResolvedValueOnce({ rows: [] })                                              // batchTotals — empty
+        .mockResolvedValueOnce({ rows: [{ id: 'orphan-ss', location_id: 'old-loc' }] })  // existing shelf_stock (orphan)
+        .mockResolvedValueOnce({ rows: [] })                                              // DELETE orphan
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })                               // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] })                                              // UPDATE products
+        .mockResolvedValueOnce({ rows: [] }),                                             // COMMIT
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+
+    await expect(syncPerishableStock(null, 'prod-1', null, null)).resolves.toBeUndefined()
+  })
+
+  it('uses provided client and does NOT open its own connection', async () => {
+    const externalClient = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })                       // batchTotals — empty
+        .mockResolvedValueOnce({ rows: [] })                       // existing shelf_stock — empty
+        .mockResolvedValueOnce({ rows: [{ total: '0' }] })        // syncCentralInventory SUM
+        .mockResolvedValueOnce({ rows: [] }),                      // UPDATE products
+      release: vi.fn(),
+    }
+
+    await expect(syncPerishableStock(externalClient, 'prod-1', null, null)).resolves.toBeUndefined()
+    expect(mockGetClient).not.toHaveBeenCalled()
+    expect(externalClient.release).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// decrementNonPerishableShelfStock
+// ---------------------------------------------------------------------------
+
+describe('decrementNonPerishableShelfStock', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('does nothing when qty <= 0', async () => {
+    await decrementNonPerishableShelfStock(null, 'prod-1', null, null, 0)
+    expect(mockGetClient).not.toHaveBeenCalled()
+  })
+
+  it('runs UPDATE via provided txClient', async () => {
+    const txClient = { query: vi.fn().mockResolvedValue({ rows: [] }) }
+    await decrementNonPerishableShelfStock(txClient, 'prod-1', null, null, 3)
+    expect(txClient.query).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE shelf_stock'),
+      expect.arrayContaining([3, 'prod-1'])
+    )
+  })
+
+  it('opens its own client when txClient is null', async () => {
+    const client = { query: vi.fn().mockResolvedValue({ rows: [] }), release: vi.fn() }
+    mockGetClient.mockResolvedValue(client as any)
+
+    await decrementNonPerishableShelfStock(null, 'prod-2', 'var-1', null, 5)
+    expect(mockGetClient).toHaveBeenCalled()
+    expect(client.release).toHaveBeenCalled()
+  })
+
+  it('releases client even when query throws', async () => {
+    const client = {
+      query: vi.fn().mockRejectedValue(new Error('decrement fail')),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+
+    await expect(decrementNonPerishableShelfStock(null, 'prod-3', null, null, 2)).rejects.toThrow('decrement fail')
+    expect(client.release).toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// upsertShelfStock
+// ---------------------------------------------------------------------------
+
+describe('upsertShelfStock', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('inserts new row when none exists and quantity > 0', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [] })   // SELECT — no existing
+        .mockResolvedValueOnce({ rows: [] }),  // INSERT
+    }
+    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 5, mode: 'add' })
+    expect(client.query.mock.calls[1][0]).toContain('INSERT INTO shelf_stock')
+  })
+
+  it('does nothing when quantity=0 and no existing row', async () => {
+    const client = { query: vi.fn().mockResolvedValueOnce({ rows: [] }) }
+    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 0, mode: 'set' })
+    expect(client.query).toHaveBeenCalledTimes(1) // only SELECT
+  })
+
+  it('adds to existing quantity in add mode', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'ss1', quantity: '10' }] }) // existing=10
+        .mockResolvedValueOnce({ rows: [] }),                              // UPDATE
+    }
+    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 3, mode: 'add' })
+    expect(client.query.mock.calls[1][1][0]).toBe(13) // 10 + 3
+  })
+
+  it('sets quantity directly in set mode', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'ss1', quantity: '10' }] })
+        .mockResolvedValueOnce({ rows: [] }),
+    }
+    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 7, mode: 'set' })
+    expect(client.query.mock.calls[1][1][0]).toBe(7)
+  })
+
+  it('deletes existing row when result quantity is <= 0 in add mode', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'ss1', quantity: '5' }] }) // existing=5
+        .mockResolvedValueOnce({ rows: [] }),                             // DELETE
+    }
+    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: -10, mode: 'add' })
+    expect(client.query.mock.calls[1][0]).toContain('DELETE FROM shelf_stock')
+  })
+
+  it('deletes row when set mode results in 0', async () => {
+    const client = {
+      query: vi.fn()
+        .mockResolvedValueOnce({ rows: [{ id: 'ss1', quantity: '5' }] })
+        .mockResolvedValueOnce({ rows: [] }),
+    }
+    await upsertShelfStock(client, { locationId: 'loc-1', productId: 'prod-1', variantId: null, subVariantId: null, quantity: 0, mode: 'set' })
+    expect(client.query.mock.calls[1][0]).toContain('DELETE FROM shelf_stock')
   })
 })

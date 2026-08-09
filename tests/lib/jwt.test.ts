@@ -5,9 +5,13 @@ process.env.JWT_SECRET = 'test-secret-for-jwt-unit-tests-minimum-length'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 // ── Hoist mock functions so vi.mock factory can reference them ────────────────
-const { mockSign, mockJwtVerify } = vi.hoisted(() => ({
+// mockSign/mockJwtVerify back the jose mock used by the still-stateless REVIEW tokens.
+// mockResolveSession backs @/lib/auth-sessions — the opaque server-side session store
+// that every authenticate*/verify* function now delegates to.
+const { mockSign, mockJwtVerify, mockResolveSession } = vi.hoisted(() => ({
   mockSign: vi.fn(),
   mockJwtVerify: vi.fn(),
+  mockResolveSession: vi.fn(),
 }))
 
 vi.mock('jose', () => {
@@ -23,6 +27,27 @@ vi.mock('jose', () => {
   }
   return { SignJWT, jwtVerify: mockJwtVerify }
 })
+
+// ── Mock the opaque session store (single source of truth for auth) ───────────
+vi.mock('@/lib/auth-sessions', () => ({
+  resolveSession: mockResolveSession,
+}))
+
+// A helper that builds a ResolvedSession row for a given principal.
+function resolved(overrides: Record<string, unknown>) {
+  return {
+    sid: 'sid-uuid',
+    principalType: 'admin',
+    principalId: 'p1',
+    role: null,
+    scopes: [],
+    certCN: null,
+    approvalStatus: null,
+    email: null,
+    displayName: null,
+    ...overrides,
+  }
+}
 
 // ── Mock next/server ─────────────────────────────────────────────────────────
 vi.mock('next/server', () => ({
@@ -73,7 +98,6 @@ import * as dbMod from '@/lib/db'
 const mockDbQueryOne = vi.mocked(dbMod.queryOne)
 
 import {
-  generateToken,
   verifyToken,
   authenticateAdmin,
   authenticateUser,
@@ -90,6 +114,10 @@ import {
   JWT_MAX_AGE_S,
 } from '@/lib/jwt'
 
+beforeEach(() => {
+  vi.clearAllMocks()
+})
+
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('jwt.ts – constants', () => {
@@ -103,50 +131,39 @@ describe('jwt.ts – constants', () => {
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// verifyToken now resolves an opaque admin session id via resolveSession (no JWT).
 
-describe('generateToken', () => {
-  beforeEach(() => {
-    mockSign.mockResolvedValue('signed.jwt.token')
+describe('verifyToken – opaque admin session resolve', () => {
+  it('maps a resolved admin session onto the admin payload', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({
+      principalType: 'admin',
+      principalId: 'admin-123',
+      role: 'admin',
+      scopes: ['products'],
+      certCN: 'CN=bob',
+      email: 'bob@example.com',
+      sid: 'sid-abc',
+    }))
+    const result = await verifyToken('sid-abc')
+    expect(result).toEqual({
+      adminId: 'admin-123',
+      email: 'bob@example.com',
+      role: 'admin',
+      scopes: ['products'],
+      authCertCN: 'CN=bob',
+      sid: 'sid-abc',
+    })
   })
 
-  it('returns the signed token string', async () => {
-    const payload = { adminId: 'a1', username: 'alice', role: 'admin', scopes: [] }
-    const token = await generateToken(payload)
-    expect(token).toBe('signed.jwt.token')
-  })
-
-  it('calls sign with the provided payload', async () => {
-    const payload = { adminId: 'a1', username: 'alice', role: 'super_admin', scopes: ['products'] }
-    await generateToken(payload)
-    expect(mockSign).toHaveBeenCalledWith({ ...payload, type: 'admin_session' })
-  })
-})
-
-// ─────────────────────────────────────────────────────────────────────────────
-
-describe('verifyToken', () => {
-  it('returns parsed payload on valid token', async () => {
-    const fakePayload = { adminId: 'a1', username: 'alice', role: 'admin', scopes: [], type: 'admin_session' }
-    mockJwtVerify.mockResolvedValueOnce({ payload: fakePayload })
-    const result = await verifyToken('valid.token')
-    expect(result).toEqual(fakePayload)
-  })
-
-  it('returns null on expired token', async () => {
-    mockJwtVerify.mockRejectedValueOnce(new Error('JWTExpired'))
-    const result = await verifyToken('expired.token')
+  it('returns null when the session does not resolve (invalid/expired/revoked)', async () => {
+    mockResolveSession.mockResolvedValueOnce(null)
+    const result = await verifyToken('not-a-live-session')
     expect(result).toBeNull()
   })
 
-  it('returns null on tampered token', async () => {
-    mockJwtVerify.mockRejectedValueOnce(new Error('JWSInvalid'))
-    const result = await verifyToken('tampered.token')
-    expect(result).toBeNull()
-  })
-
-  it('returns null on completely invalid token', async () => {
-    mockJwtVerify.mockRejectedValueOnce(new Error('invalid'))
-    const result = await verifyToken('not-a-jwt')
+  it('returns null when the resolved principal is not an admin', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer' }))
+    const result = await verifyToken('customer-sid')
     expect(result).toBeNull()
   })
 })
@@ -154,28 +171,27 @@ describe('verifyToken', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('authenticateAdmin', () => {
-  const validAdminPayload = {
-    adminId: 'admin-123',
-    username: 'bob',
-    first_name: 'Bob',
-    last_name: 'Smith',
-    role: 'admin',
-    scopes: ['products', 'orders'],
-    type: 'admin_session',
-  }
-
   it('returns admin payload from Bearer header', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: validAdminPayload })
+    mockResolveSession.mockResolvedValueOnce(resolved({
+      principalType: 'admin', principalId: 'admin-123', role: 'admin', scopes: ['products', 'orders'],
+    }))
     const req = makeRequest({ authHeader: 'Bearer sometoken' })
     const result = await authenticateAdmin(req)
     expect(result).toMatchObject({ adminId: 'admin-123', role: 'admin' })
   })
 
-  it('returns admin payload from admin_token cookie', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: validAdminPayload })
-    const req = makeRequest({ cookies: { admin_token: 'cookietoken' } })
+  it('returns admin payload from admin_sid cookie', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'admin-123', role: 'admin' }))
+    const req = makeRequest({ cookies: { admin_sid: 'cookietoken' } })
     const result = await authenticateAdmin(req)
     expect(result?.adminId).toBe('admin-123')
+  })
+
+  it('exposes the session id (sid) on the payload', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'admin-123', sid: 'sid-xyz' }))
+    const req = makeRequest({ cookies: { admin_sid: 'sid-xyz' } })
+    const result = await authenticateAdmin(req)
+    expect(result?.sid).toBe('sid-xyz')
   })
 
   it('returns null when no token is present', async () => {
@@ -184,29 +200,29 @@ describe('authenticateAdmin', () => {
     expect(result).toBeNull()
   })
 
-  it('returns null when payload lacks adminId', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { username: 'bob', role: 'admin', scopes: [], type: 'admin_session' } })
+  it('returns null when the session does not resolve', async () => {
+    mockResolveSession.mockResolvedValueOnce(null)
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await authenticateAdmin(req)
     expect(result).toBeNull()
   })
 
-  it('returns null on verification error', async () => {
-    mockJwtVerify.mockRejectedValueOnce(new Error('JWTExpired'))
-    const req = makeRequest({ authHeader: 'Bearer expired' })
+  it('returns null when the resolved principal is not an admin', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business' }))
+    const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await authenticateAdmin(req)
     expect(result).toBeNull()
   })
 
-  it('includes scopes as empty array when not present in payload', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { adminId: 'a1', username: 'u', role: 'admin', type: 'admin_session' } })
+  it('includes scopes from the resolved session', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'a1', scopes: [] }))
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await authenticateAdmin(req)
     expect(result?.scopes).toEqual([])
   })
 
   it('Bearer header is case-insensitive', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: validAdminPayload })
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'admin-123', role: 'admin' }))
     const req = makeRequest({ authHeader: 'BEARER sometoken' })
     const result = await authenticateAdmin(req)
     expect(result?.adminId).toBe('admin-123')
@@ -216,38 +232,33 @@ describe('authenticateAdmin', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('authenticateUser – customer portal isolation', () => {
-  const validCustomerPayload = {
-    userId: 'user-456',
-    email: 'customer@example.com',
-    type: 'customer',
-    scopes: ['read'],
-  }
-
-  it('returns user payload for valid customer token in auth_token cookie', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: validCustomerPayload })
-    const req = makeRequest({ cookies: { auth_token: 'ctoken' } })
+  it('returns user payload for valid customer session in user_sid cookie', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({
+      principalType: 'customer', principalId: 'user-456', email: 'customer@example.com', scopes: ['read'],
+    }))
+    const req = makeRequest({ cookies: { user_sid: 'ctoken' } })
     const result = await authenticateUser(req)
     expect(result?.userId).toBe('user-456')
     expect(result?.email).toBe('customer@example.com')
   })
 
-  it('returns null when type is business (portal isolation)', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'b@b.com', type: 'business' } })
-    const req = makeRequest({ cookies: { auth_token: 'btoken' } })
+  it('returns null when principal is business (portal isolation)', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'u1' }))
+    const req = makeRequest({ cookies: { user_sid: 'btoken' } })
     const result = await authenticateUser(req)
     expect(result).toBeNull()
   })
 
-  it('returns null when type is admin (portal isolation)', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'a@a.com', type: 'admin' } })
-    const req = makeRequest({ cookies: { auth_token: 'atoken' } })
+  it('returns null when principal is admin (portal isolation)', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'u1' }))
+    const req = makeRequest({ cookies: { user_sid: 'atoken' } })
     const result = await authenticateUser(req)
     expect(result).toBeNull()
   })
 
-  it('returns null when payload has no userId', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { email: 'x@x.com', type: 'customer' } })
-    const req = makeRequest({ cookies: { auth_token: 'token' } })
+  it('returns null when the session does not resolve', async () => {
+    mockResolveSession.mockResolvedValueOnce(null)
+    const req = makeRequest({ cookies: { user_sid: 'token' } })
     const result = await authenticateUser(req)
     expect(result).toBeNull()
   })
@@ -258,9 +269,9 @@ describe('authenticateUser – customer portal isolation', () => {
     expect(result).toBeNull()
   })
 
-  it('defaults scopes to empty array when absent', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'x@x.com', type: 'customer' } })
-    const req = makeRequest({ cookies: { auth_token: 'token' } })
+  it('carries scopes from the resolved session', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', scopes: [] }))
+    const req = makeRequest({ cookies: { user_sid: 'token' } })
     const result = await authenticateUser(req)
     expect(result?.scopes).toEqual([])
   })
@@ -269,34 +280,20 @@ describe('authenticateUser – customer portal isolation', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('authenticateBusiness – business portal isolation', () => {
-  const validBusinessPayload = {
-    userId: 'biz-789',
-    email: 'biz@company.com',
-    type: 'business',
-    isBusiness: true,
-    approvalStatus: 'approved',
-    scopes: [],
-  }
-
-  it('returns business payload from business_auth_token cookie', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: validBusinessPayload })
-    const req = makeRequest({ cookies: { business_auth_token: 'btoken' } })
+  it('returns business payload from business_sid cookie', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({
+      principalType: 'business', principalId: 'biz-789', email: 'biz@company.com', approvalStatus: 'approved', scopes: [],
+    }))
+    const req = makeRequest({ cookies: { business_sid: 'btoken' } })
     const result = await authenticateBusiness(req)
     expect(result?.userId).toBe('biz-789')
     expect(result?.isBusiness).toBe(true)
     expect(result?.approvalStatus).toBe('approved')
   })
 
-  it('returns null when type is not business', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'x@x.com', type: 'customer', isBusiness: true } })
-    const req = makeRequest({ cookies: { business_auth_token: 'token' } })
-    const result = await authenticateBusiness(req)
-    expect(result).toBeNull()
-  })
-
-  it('returns null when isBusiness flag is missing/false', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'x@x.com', type: 'business', isBusiness: false } })
-    const req = makeRequest({ cookies: { business_auth_token: 'token' } })
+  it('returns null when principal is not business', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1' }))
+    const req = makeRequest({ cookies: { business_sid: 'token' } })
     const result = await authenticateBusiness(req)
     expect(result).toBeNull()
   })
@@ -307,9 +304,9 @@ describe('authenticateBusiness – business portal isolation', () => {
     expect(result).toBeNull()
   })
 
-  it('returns null on verification error', async () => {
-    mockJwtVerify.mockRejectedValueOnce(new Error('expired'))
-    const req = makeRequest({ cookies: { business_auth_token: 'expired' } })
+  it('returns null when the session does not resolve', async () => {
+    mockResolveSession.mockResolvedValueOnce(null)
+    const req = makeRequest({ cookies: { business_sid: 'expired' } })
     const result = await authenticateBusiness(req)
     expect(result).toBeNull()
   })
@@ -318,34 +315,31 @@ describe('authenticateBusiness – business portal isolation', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('authenticateAnyUser – portal routing', () => {
-  const customerPayload = { userId: 'c1', email: 'c@c.com', type: 'customer', scopes: [] }
-  const bizPayload = { userId: 'b1', email: 'b@b.com', type: 'business', isBusiness: true, scopes: [] }
-
-  it('with x-auth-portal: business, only tries business_auth_token', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: bizPayload })
+  it('with x-auth-portal: business, only tries business_sid', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'b1', scopes: [] }))
     const req = makeRequest({
       headers: { 'x-auth-portal': 'business' },
-      cookies: { business_auth_token: 'btoken' },
+      cookies: { business_sid: 'btoken' },
     })
     const result = await authenticateAnyUser(req)
     expect(result?.userId).toBe('b1')
-    expect(mockJwtVerify).toHaveBeenCalledTimes(1)
+    expect(mockResolveSession).toHaveBeenCalledTimes(1)
   })
 
-  it('without portal header, tries auth_token first and returns customer', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: customerPayload })
-    const req = makeRequest({ cookies: { auth_token: 'ctoken' } })
+  it('without portal header, tries user_sid first and returns customer', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'c1', scopes: [] }))
+    const req = makeRequest({ cookies: { user_sid: 'ctoken' } })
     const result = await authenticateAnyUser(req)
     expect(result?.userId).toBe('c1')
   })
 
-  it('without portal header, falls back to business_auth_token if auth_token fails', async () => {
-    // First call (authenticateUser) succeeds but wrong type → returns null
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'x', email: 'x@x.com', type: 'business' } })
-    // Second call (authenticateBusiness)
-    mockJwtVerify.mockResolvedValueOnce({ payload: bizPayload })
+  it('without portal header, falls back to business_sid if user_sid is not a customer', async () => {
+    // First resolve (authenticateUser via user_sid) → wrong type → null
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'x' }))
+    // Second resolve (authenticateBusiness via business_sid) → business
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'b1', scopes: [] }))
     const req = makeRequest({
-      cookies: { auth_token: 'bad', business_auth_token: 'btoken' },
+      cookies: { user_sid: 'bad', business_sid: 'btoken' },
     })
     const result = await authenticateAnyUser(req)
     expect(result?.userId).toBe('b1')
@@ -361,10 +355,8 @@ describe('authenticateAnyUser – portal routing', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('requireAdminScope', () => {
-  const adminPayload = { adminId: 'a1', username: 'alice', role: 'admin', scopes: ['products'], type: 'admin_session' }
-
   it('returns admin payload when scope is satisfied', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: adminPayload })
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'a1', role: 'admin', scopes: ['products'] }))
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await requireAdminScope(req, 'products')
     expect((result as any).adminId).toBe('a1')
@@ -377,22 +369,21 @@ describe('requireAdminScope', () => {
   })
 
   it('returns 403 when admin lacks required scope', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: adminPayload })
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'a1', role: 'admin', scopes: ['products'] }))
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await requireAdminScope(req, 'settings') as any
     expect(result.status).toBe(403)
   })
 
   it('super_admin bypasses scope check', async () => {
-    const superPayload = { ...adminPayload, role: 'super_admin' }
-    mockJwtVerify.mockResolvedValueOnce({ payload: superPayload })
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'a1', role: 'super_admin', scopes: ['products'] }))
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await requireAdminScope(req, 'settings')
     expect((result as any).role).toBe('super_admin')
   })
 
   it('returns admin when scope param is null (no scope check)', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: adminPayload })
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'admin', principalId: 'a1', role: 'admin', scopes: ['products'] }))
     const req = makeRequest({ authHeader: 'Bearer token' })
     const result = await requireAdminScope(req, null)
     expect((result as any).adminId).toBe('a1')
@@ -402,11 +393,9 @@ describe('requireAdminScope', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('requireUserScope', () => {
-  const userPayload = { userId: 'u1', email: 'u@u.com', type: 'customer', scopes: ['read'] }
-
   it('returns user payload when scope is present', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: userPayload })
-    const req = makeRequest({ cookies: { auth_token: 'token' } })
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', scopes: ['read'] }))
+    const req = makeRequest({ cookies: { user_sid: 'token' } })
     const result = await requireUserScope(req, 'read')
     expect((result as any).userId).toBe('u1')
   })
@@ -418,14 +407,15 @@ describe('requireUserScope', () => {
   })
 
   it('returns 403 when user lacks required scope', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: userPayload })
-    const req = makeRequest({ cookies: { auth_token: 'token' } })
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', scopes: ['read'] }))
+    const req = makeRequest({ cookies: { user_sid: 'token' } })
     const result = await requireUserScope(req, 'write') as any
     expect(result.status).toBe(403)
   })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Review tokens are still stateless JWTs (jose) — unchanged by the opaque migration.
 
 describe('generateReviewToken', () => {
   it('signs a review_token and returns the token string', async () => {
@@ -478,77 +468,53 @@ describe('verifyReviewToken', () => {
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('verifyUserToken', () => {
-  it('returns user payload for valid customer token', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'customer', scopes: ['read'] } })
-    const result = await verifyUserToken('valid.token')
+describe('verifyUserToken – opaque customer session resolve', () => {
+  it('returns user payload for a valid customer session', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1', email: 'u@u.com', scopes: ['read'], sid: 'sid-1' }))
+    const result = await verifyUserToken('sid-1')
     expect(result?.userId).toBe('u1')
     expect(result?.scopes).toEqual(['read'])
   })
 
-  it('returns null when type is not customer', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'business' } })
-    const result = await verifyUserToken('biz.token')
+  it('returns null when principal is not customer', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'u1' }))
+    const result = await verifyUserToken('biz.sid')
     expect(result).toBeNull()
   })
 
-  it('returns null when userId is missing', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { email: 'u@u.com', type: 'customer' } })
-    const result = await verifyUserToken('no-uid.token')
-    expect(result).toBeNull()
-  })
-
-  it('defaults scopes to empty array when absent', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'customer' } })
-    const result = await verifyUserToken('token')
-    expect(result?.scopes).toEqual([])
-  })
-
-  it('returns null on verification error', async () => {
-    mockJwtVerify.mockRejectedValueOnce(new Error('expired'))
-    const result = await verifyUserToken('expired.token')
+  it('returns null when the session does not resolve', async () => {
+    mockResolveSession.mockResolvedValueOnce(null)
+    const result = await verifyUserToken('no-session')
     expect(result).toBeNull()
   })
 })
 
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('verifyBusinessToken', () => {
-  it('returns business payload for valid token', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'b1', email: 'b@b.com', type: 'business', isBusiness: true, approvalStatus: 'approved', scopes: [] } })
-    const result = await verifyBusinessToken('biz.token')
+describe('verifyBusinessToken – opaque business session resolve', () => {
+  it('returns business payload for a valid session', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'b1', email: 'b@b.com', approvalStatus: 'approved', scopes: [], sid: 'sid-b' }))
+    const result = await verifyBusinessToken('sid-b')
     expect(result?.userId).toBe('b1')
     expect(result?.isBusiness).toBe(true)
     expect(result?.approvalStatus).toBe('approved')
   })
 
-  it('returns null when type is not business', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'customer', isBusiness: true } })
-    const result = await verifyBusinessToken('customer.token')
+  it('returns null when principal is not business', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'customer', principalId: 'u1' }))
+    const result = await verifyBusinessToken('customer.sid')
     expect(result).toBeNull()
   })
 
-  it('returns null when isBusiness is false', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'u1', email: 'u@u.com', type: 'business', isBusiness: false } })
-    const result = await verifyBusinessToken('token')
-    expect(result).toBeNull()
+  it('defaults approvalStatus to pending (fail-closed) when the snapshot is absent', async () => {
+    mockResolveSession.mockResolvedValueOnce(resolved({ principalType: 'business', principalId: 'b1', approvalStatus: null }))
+    const result = await verifyBusinessToken('sid')
+    expect(result?.approvalStatus).toBe('pending')
   })
 
-  it('returns null when userId is missing', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { email: 'b@b.com', type: 'business', isBusiness: true } })
-    const result = await verifyBusinessToken('token')
-    expect(result).toBeNull()
-  })
-
-  it('defaults scopes to empty array when absent', async () => {
-    mockJwtVerify.mockResolvedValueOnce({ payload: { userId: 'b1', email: 'b@b.com', type: 'business', isBusiness: true } })
-    const result = await verifyBusinessToken('token')
-    expect(result?.scopes).toEqual([])
-  })
-
-  it('returns null on verification error', async () => {
-    mockJwtVerify.mockRejectedValueOnce(new Error('expired'))
-    const result = await verifyBusinessToken('expired.token')
+  it('returns null when the session does not resolve', async () => {
+    mockResolveSession.mockResolvedValueOnce(null)
+    const result = await verifyBusinessToken('expired.sid')
     expect(result).toBeNull()
   })
 })

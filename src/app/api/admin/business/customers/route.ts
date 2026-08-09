@@ -3,7 +3,7 @@ import { requireAdminScope } from '@/lib/jwt'
 import { queryMany, queryCount } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
-  const admin = await requireAdminScope(request, 'business_customers')
+  const admin = await requireAdminScope(request, 'business_customers:read')
   if (admin instanceof NextResponse) return admin
 
   const { searchParams } = new URL(request.url)

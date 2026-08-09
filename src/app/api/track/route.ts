@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
     let userId: string | null = null
     try {
       const cookieStore = await cookies()
-      const token = cookieStore.get('auth_token')?.value
+      const token = cookieStore.get('user_sid')?.value
       if (token) {
         const payload = await verifyToken(token) as any
         userId = payload?.userId || null

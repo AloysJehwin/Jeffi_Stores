@@ -38,7 +38,7 @@ const adminPayload = {
 function makeRequest(id = 'order-1', body: Record<string, unknown> = {}) {
   return new NextRequest(`http://localhost/api/admin/orders/${id}/payment-status`, {
     method: 'PATCH',
-    headers: { 'content-type': 'application/json', cookie: 'admin_token=valid' },
+    headers: { 'content-type': 'application/json', cookie: 'admin_sid=valid' },
     body: JSON.stringify(body),
   })
 }

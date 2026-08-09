@@ -1,6 +1,14 @@
 import { SignJWT, jwtVerify } from 'jose'
 import { NextRequest, NextResponse } from 'next/server'
 import { hasScope, getScopeForPath } from './scopes'
+import { resolveSession, type SessionSignals } from './auth-sessions'
+import { extractSessionSignals } from './session-signals-request'
+
+// OPAQUE SESSIONS: the auth cookie value is the session id (a uuid), NOT a JWT.
+// authenticate*/verify* read the cookie and resolveSession() it (Postgres) — the single
+// source of truth shared with the Node-runtime middleware. Legacy signed-JWT cookies
+// (eyJ...) fail resolveSession's uuid guard → null → forced re-login. jose/JWT_SECRET
+// remain only for the still-stateless review tokens.
 
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
@@ -8,9 +16,7 @@ if (!process.env.JWT_SECRET) {
 
 const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
-// Single source of truth for session lifetime.
-// JWT_EXPIRES_IN: jose format string used when signing the token.
-// JWT_MAX_AGE_S:  cookie maxAge in seconds — must match JWT_EXPIRES_IN exactly.
+// Single source of truth for admin session lifetime (cookie maxAge + session TTL).
 export const JWT_EXPIRES_IN = '8h'
 export const JWT_MAX_AGE_S = 8 * 60 * 60
 
@@ -19,6 +25,7 @@ export interface JWTPayload {
   first_name?: string
   last_name?: string
   email?: string
+  displayName?: string
   role: string
   scopes: string[]
   authCertCN?: string
@@ -31,27 +38,22 @@ export interface UserJWTPayload {
   isBusiness?: boolean
   approvalStatus?: string
   scopes?: string[]
+  sid?: string
   [key: string]: any
 }
 
 export async function authenticateBusiness(request: NextRequest): Promise<UserJWTPayload | null> {
-  const token = getTokenFromRequest(request, 'business_auth_token')
-  if (!token) return null
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-    if (!payload.userId || typeof payload.userId !== 'string') return null
-    // Reject tokens that don't explicitly belong to business
-    if (payload.type !== 'business') return null
-    if (!payload.isBusiness) return null
-    return {
-      userId: payload.userId as string,
-      email: payload.email as string,
-      isBusiness: true,
-      approvalStatus: payload.approvalStatus as string | undefined,
-      scopes: (payload.scopes as string[] | undefined) ?? [],
-    }
-  } catch {
-    return null
+  const sid = getTokenFromRequest(request, 'business_sid')
+  if (!sid) return null
+  const s = await resolveSession(sid, extractSessionSignals(request))
+  if (!s || s.principalType !== 'business') return null
+  return {
+    userId: s.principalId,
+    email: s.email || '',
+    isBusiness: true,
+    approvalStatus: s.approvalStatus || undefined,
+    scopes: s.scopes,
+    sid,
   }
 }
 
@@ -62,26 +64,26 @@ export interface AdminJWTPayload {
   email?: string
   role: string
   scopes: string[]
+  sid?: string
   [key: string]: any
 }
 
-export async function generateToken(payload: JWTPayload): Promise<string> {
-  const token = await new SignJWT({ ...payload, type: 'admin_session' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setExpirationTime(JWT_EXPIRES_IN)
-    .sign(JWT_SECRET)
-
-  return token
-}
-
-export async function verifyToken(token: string): Promise<JWTPayload | null> {
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-    if (payload.type !== 'admin_session') return null
-    return payload as JWTPayload
-  } catch {
-    return null
+export async function verifyToken(token: string, current?: string | null | SessionSignals): Promise<JWTPayload | null> {
+  // Opaque admin-session resolve (token = the sid). Used by middleware + admin server
+  // components. authCertCN comes from the snapshot on the session row. `current` carries the
+  // request's device-binding signals (UA family, accept-language, sec-ch-ua-platform, ip, fp);
+  // a bare string is accepted for back-compat and treated as the UA. On a clear multi-signal
+  // mismatch resolveSession revokes the session (device binding).
+  const s = await resolveSession(token, current)
+  if (!s || s.principalType !== 'admin') return null
+  return {
+    adminId: s.principalId,
+    email: s.email || undefined,
+    role: s.role || '',
+    scopes: s.scopes,
+    authCertCN: s.certCN || undefined,
+    sid: s.sid,
+    displayName: s.displayName || undefined,
   }
 }
 
@@ -94,24 +96,17 @@ function getTokenFromRequest(request: NextRequest, cookieName: string): string |
 }
 
 export async function authenticateUser(request: NextRequest): Promise<UserJWTPayload | null> {
-  const token = getTokenFromRequest(request, 'auth_token')
-  if (!token) return null
-
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-    if (!payload.userId || typeof payload.userId !== 'string') return null
-    // Reject tokens that belong to business or admin
-    if (payload.type !== 'customer') return null
-    return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
-  } catch {
-    return null
-  }
+  const sid = getTokenFromRequest(request, 'user_sid')
+  if (!sid) return null
+  const s = await resolveSession(sid, extractSessionSignals(request))
+  if (!s || s.principalType !== 'customer') return null
+  return { userId: s.principalId, email: s.email || '', scopes: s.scopes, sid }
 }
 
 // Authenticates regular users OR business users.
 // Checks X-Auth-Portal header to determine which cookie to use:
-//   X-Auth-Portal: business → ONLY tries business_auth_token (no customer fallback)
-//   (default)               → tries auth_token first, then business_auth_token
+//   X-Auth-Portal: business → ONLY tries business_sid (no customer fallback)
+//   (default)               → tries user_sid first, then business_sid
 // No cross-portal fallback when portal is explicit — prevents a user logged into both
 // portals from having writes land on the wrong account if one token expires.
 export async function authenticateAnyUser(request: NextRequest): Promise<UserJWTPayload | null> {
@@ -135,31 +130,24 @@ export async function requireAdminScope(
 }
 
 export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTPayload | null> {
-  const token = getTokenFromRequest(request, 'admin_token')
-  if (!token) return null
-
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-    if (!payload.adminId || typeof payload.adminId !== 'string') return null
-    if (payload.type !== 'admin_session') return null
-    const result = {
-      adminId: payload.adminId as string,
-      first_name: payload.first_name as string | undefined,
-      last_name: payload.last_name as string | undefined,
-      email: payload.email as string | undefined,
-      role: payload.role as string,
-      scopes: (payload.scopes as string[]) || [],
-    }
-    if (typeof process !== 'undefined' && process.versions?.node) {
-      try {
-        const mod = await import('./audit-context')
-        mod.setAuditAdminId(result.adminId)
-      } catch {}
-    }
-    return result
-  } catch {
-    return null
+  const sid = getTokenFromRequest(request, 'admin_sid')
+  if (!sid) return null
+  const s = await resolveSession(sid, extractSessionSignals(request))
+  if (!s || s.principalType !== 'admin') return null
+  const result: AdminJWTPayload = {
+    adminId: s.principalId,
+    email: s.email || undefined,
+    role: s.role || '',
+    scopes: s.scopes,
+    sid,
   }
+  if (typeof process !== 'undefined' && process.versions?.node) {
+    try {
+      const mod = await import('./audit-context')
+      mod.setAuditAdminId(result.adminId)
+    } catch {}
+  }
+  return result
 }
 
 export interface ServiceAccountPayload {
@@ -211,27 +199,18 @@ export async function generateReviewToken(payload: ReviewTokenPayload): Promise<
     .sign(JWT_SECRET)
 }
 
-export async function verifyUserToken(token: string): Promise<UserJWTPayload | null> {
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-    if (!payload.userId || typeof payload.userId !== 'string') return null
-    if (payload.type !== 'customer') return null
-    return { userId: payload.userId as string, email: payload.email as string, scopes: (payload.scopes as string[] | undefined) ?? [] }
-  } catch {
-    return null
-  }
+export async function verifyUserToken(token: string, current?: string | null | SessionSignals): Promise<UserJWTPayload | null> {
+  const s = await resolveSession(token, current)
+  if (!s || s.principalType !== 'customer') return null
+  return { userId: s.principalId, email: s.email || '', scopes: s.scopes, sid: s.sid }
 }
 
-export async function verifyBusinessToken(token: string): Promise<UserJWTPayload | null> {
-  try {
-    const { payload } = await jwtVerify(token, JWT_SECRET)
-    if (!payload.userId || typeof payload.userId !== 'string') return null
-    if (payload.type !== 'business') return null
-    if (!payload.isBusiness) return null
-    return { userId: payload.userId as string, email: payload.email as string, isBusiness: true, approvalStatus: payload.approvalStatus as string | undefined, scopes: (payload.scopes as string[] | undefined) ?? [] }
-  } catch {
-    return null
-  }
+export async function verifyBusinessToken(token: string, current?: string | null | SessionSignals): Promise<UserJWTPayload | null> {
+  const s = await resolveSession(token, current)
+  if (!s || s.principalType !== 'business') return null
+  // Default unknown → 'pending' (fail-closed): the middleware gates pending/rejected, so
+  // a session without a snapshotted status must NOT be treated as approved.
+  return { userId: s.principalId, email: s.email || '', isBusiness: true, approvalStatus: s.approvalStatus || 'pending', scopes: s.scopes, sid: s.sid }
 }
 
 export async function verifyReviewToken(token: string): Promise<ReviewTokenPayload | null> {

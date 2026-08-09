@@ -110,6 +110,13 @@ async function updateProduct(productId: string, formData: FormData) {
   const salePrice = formData.get('price_ex_gst') ? round2(parseFloat(formData.get('price_ex_gst') as string)) : null
   const costPrice = formData.get('cost_price') ? round2(parseFloat(formData.get('cost_price') as string)) : 0
   const supplierId = (formData.get('supplier_id') as string || '').trim() || null
+  // Multi-supplier: product-level supplier price list. The preferred row's supplier
+  // is denormalized onto products.supplier_id (legacy field) on publish.
+  const productSuppliersRaw = formData.get('product_suppliers_json') as string | null
+  let productSuppliers: any[] = []
+  try { productSuppliers = productSuppliersRaw ? JSON.parse(productSuppliersRaw) : [] } catch { productSuppliers = [] }
+  const preferredSupplierId =
+    productSuppliers.find((s: any) => s.is_preferred)?.supplier_id || supplierId || null
   const discountPct = formData.get('discount_pct') ? parseFloat(parseFloat(formData.get('discount_pct') as string).toFixed(2)) : 0
   const gstPercentage = parseFloat(formData.get('gst_percentage') as string || '18')
   const hsnCode = formData.get('hsn_code') as string || null
@@ -210,7 +217,8 @@ async function updateProduct(productId: string, formData: FormData) {
         is_featured: isFeatured, has_variants: hasVariants, variant_type: variantType,
         sub_variant_type: subVariantType, weight_grams: weightGrams, package_type: packageType,
         length_cm: lengthCm, breadth_cm: breadthCm, height_cm: heightCm,
-        cost_price: costPrice, discount_pct: discountPct, supplier_id: supplierId,
+        cost_price: costPrice, discount_pct: discountPct, supplier_id: preferredSupplierId,
+        product_suppliers: productSuppliers,
         sku: skuFromForm,
         mpn: hasVariants ? null : mpn, gtin: hasVariants ? null : gtin,
         extra_delivery_days: extraDeliveryDays,
@@ -300,7 +308,7 @@ async function updateProduct(productId: string, formData: FormData) {
       new Date().toISOString(),
     ]
     setClauses.push(`supplier_id = $${params.length + 1}`)
-    params.push(supplierId)
+    params.push(preferredSupplierId)
     if (skuFromForm) {
       setClauses.push(`sku = $${params.length + 1}`)
       params.push(skuFromForm)
@@ -557,8 +565,14 @@ async function updateProduct(productId: string, formData: FormData) {
           } else if (isPersisted && !variant._isDeleted) {
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, stock_status = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_grams = $13, package_type = $14, length_cm = $15, breadth_cm = $16, height_cm = $17, sub_variant_type = $18, variant_type = $19, discount_pct = $20
-               WHERE id = $21 AND product_id = $22`,
+              `UPDATE product_variants SET sku = $1, variant_name = $2, price = $3, mrp = $4, mrp_ex_gst = $5, price_ex_gst = $6, stock_status = $7, mpn = $8, gtin = $9, pricing_type = $10, unit = $11, numeric_value = $12, weight_grams = $13, package_type = $14, length_cm = $15, breadth_cm = $16, height_cm = $17, sub_variant_type = $18, variant_type = $19, discount_pct = $20,
+                 asin = $21,
+                 asin_match = CASE
+                   WHEN $21::text IS NULL THEN NULL
+                   WHEN asin_match IN ('gtin','listed') AND asin IS NOT DISTINCT FROM $21::text THEN asin_match
+                   ELSE 'manual' END,
+                 isbn = $22
+               WHERE id = $23 AND product_id = $24`,
               [
                 variantSku, variant.variant_name,
                 variant.price ? round2(parseFloat(variant.price)) : null,
@@ -580,6 +594,8 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.sub_variant_type || null,
                 variant.variant_type || null,
                 variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
+                variant.asin || null,
+                variant.isbn || null,
                 variant.id, productId,
               ]
             )
@@ -599,8 +615,8 @@ async function updateProduct(productId: string, formData: FormData) {
             if (!variant.variant_name) continue
             const variantSku = generateVariantSku(productSku, variant.variant_name)
             await query(
-              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, is_active)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, true)`,
+              `INSERT INTO product_variants (product_id, sku, variant_name, price, mrp, mrp_ex_gst, price_ex_gst, stock_status, mpn, gtin, pricing_type, unit, numeric_value, weight_grams, package_type, length_cm, breadth_cm, height_cm, sub_variant_type, variant_type, discount_pct, asin, asin_match, isbn, is_active)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, CASE WHEN $22::text IS NOT NULL THEN 'manual' ELSE NULL END, $23, true)`,
               [
                 productId, variantSku, variant.variant_name,
                 variant.price ? round2(parseFloat(variant.price)) : null,
@@ -622,6 +638,8 @@ async function updateProduct(productId: string, formData: FormData) {
                 variant.sub_variant_type || null,
                 variant.variant_type || null,
                 variant.discount_pct ? parseFloat(parseFloat(variant.discount_pct).toFixed(2)) : 0,
+                variant.asin || null,
+                variant.isbn || null,
               ]
             )
           }
@@ -635,6 +653,8 @@ async function updateProduct(productId: string, formData: FormData) {
     syncProductToSheet(productId).catch(() => {})
     const { syncProductToMerchant } = await import('@/lib/merchant/sync')
     syncProductToMerchant(productId).catch(() => {})
+    const { syncProductToAmazon } = await import('@/lib/amazon/sync')
+    syncProductToAmazon(productId).catch(() => {})
     triggerEnrichment(productId)
 
     revalidatePath('/admin/products')

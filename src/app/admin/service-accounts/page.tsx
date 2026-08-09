@@ -85,15 +85,17 @@ export default async function ServiceAccountsPage() {
           </p>
         </div>
         {canWrite && (
-          <Link
-            href={ap('/admin/service-accounts/add')}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
-            Create
-          </Link>
+          <div className="hidden md:block">
+            <Link
+              href={ap('/admin/service-accounts/add')}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-secondary-500 hover:bg-secondary-600 text-white text-sm font-medium transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+              </svg>
+              Create
+            </Link>
+          </div>
         )}
       </div>
 
@@ -172,7 +174,7 @@ export default async function ServiceAccountsPage() {
                       <span>Created {new Date(sa.created_at).toLocaleDateString('en-IN')}</span>
                       <span>{sa.last_used_at ? `Used ${relativeTime(sa.last_used_at)}` : 'Never used'}</span>
                     </div>
-                    {canWrite && !sa.is_revoked && <ServiceAccountRevokeButton id={sa.id} name={sa.name} />}
+                    {canWrite && !sa.is_revoked && <div className="hidden md:block"><ServiceAccountRevokeButton id={sa.id} name={sa.name} /></div>}
                   </div>
                 )
               })}

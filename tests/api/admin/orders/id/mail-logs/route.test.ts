@@ -88,3 +88,9 @@ describe('GET /api/admin/orders/[id]/mail-logs/[logId]/body', () => {
     expect(res.status).toBe(500)
   })
 })
+
+  it('returns 500 on queryMany error', async () => {
+    vi.mocked(queryMany).mockRejectedValue(new Error('db error'))
+    const res = await getLogs(new NextRequest('http://localhost'), { params })
+    expect(res.status).toBe(500)
+  })

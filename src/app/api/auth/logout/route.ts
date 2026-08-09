@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { authenticateUser } from '@/lib/jwt'
+import { revokeSession } from '@/lib/auth-sessions'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 
@@ -10,6 +11,7 @@ export async function POST(request: NextRequest) {
     if (auth?.userId) {
       logActivity({ userId: auth.userId, kind: 'logout', summary: 'Logged out' }).catch(() => {})
     }
+    if (auth?.sid) await revokeSession(auth.sid)
 
     const store = await cookies()
     const baseOpts = {
@@ -19,8 +21,8 @@ export async function POST(request: NextRequest) {
       maxAge: 0,
       path: '/',
     }
-    store.set('auth_token', '', baseOpts)
-    store.set('auth_token', '', { ...baseOpts, ...cookieDomainOption() })
+    store.set('user_sid', '', baseOpts)
+    store.set('user_sid', '', { ...baseOpts, ...cookieDomainOption() })
     store.set('session_id', '', baseOpts)
     store.set('session_id', '', { ...baseOpts, ...cookieDomainOption() })
 
@@ -33,9 +35,9 @@ export async function POST(request: NextRequest) {
 
     const res = NextResponse.json({ message: 'Logged out successfully' })
     const flags = `Path=/; Max-Age=0; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
-    res.headers.append('Set-Cookie', `auth_token=; ${flags}`)
+    res.headers.append('Set-Cookie', `user_sid=; ${flags}`)
     if (process.env.NODE_ENV === 'production') {
-      res.headers.append('Set-Cookie', `auth_token=; Domain=.jeffistores.in; ${flags}`)
+      res.headers.append('Set-Cookie', `user_sid=; Domain=.jeffistores.in; ${flags}`)
     }
     return res
   } catch (err) {

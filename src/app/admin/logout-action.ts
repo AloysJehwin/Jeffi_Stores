@@ -4,10 +4,21 @@ import { cookies} from 'next/headers'
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { verifyToken } from '@/lib/jwt'
+import { revokeSession } from '@/lib/auth-sessions'
 
 export async function logoutAction() {
   const cookieStore = await cookies()
-  cookieStore.delete('admin_token')
+  // Revoke the server-side session before clearing the cookie.
+  const existing = cookieStore.get('admin_sid')?.value
+  if (existing) {
+    try {
+      const payload = await verifyToken(existing)
+      const sid = (payload as any)?.sid
+      if (typeof sid === 'string' && sid) await revokeSession(sid)
+    } catch { /* best-effort revoke */ }
+  }
+  cookieStore.delete('admin_sid')
   cookieStore.delete('admin_session') // Clear old session cookie too
   const host = await getHost()
   redirect(ap('/admin/login', host))

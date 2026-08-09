@@ -106,6 +106,41 @@ ALTER TABLE ONLY public.merchant_sync_log ALTER COLUMN id SET DEFAULT nextval('p
 
 
 --
+-- Name: merchant_gmc_status; Type: TABLE; Schema: public; Owner: -
+-- Cached snapshot of Google Merchant Center product statuses (Content API), so the
+-- Merchant Sync admin page can paginate/search ~14k items without paging GMC live.
+-- Refreshed on demand via POST /api/admin/merchant/gmc-status/refresh.
+--
+
+CREATE TABLE public.merchant_gmc_status (
+    offer_id text NOT NULL,
+    title text,
+    status text,
+    item_group_id text,
+    link text,
+    price text,
+    destination_statuses jsonb DEFAULT '[]'::jsonb NOT NULL,
+    item_issues jsonb DEFAULT '[]'::jsonb NOT NULL,
+    synced_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: merchant_gmc_refresh_meta; Type: TABLE; Schema: public; Owner: -
+-- Single-row meta tracking the last full GMC status refresh and aggregate counts.
+--
+
+CREATE TABLE public.merchant_gmc_refresh_meta (
+    id integer DEFAULT 1 NOT NULL,
+    last_refreshed_at timestamp with time zone,
+    total integer DEFAULT 0 NOT NULL,
+    approved integer DEFAULT 0 NOT NULL,
+    pending integer DEFAULT 0 NOT NULL,
+    disapproved integer DEFAULT 0 NOT NULL
+);
+
+
+--
 -- Name: page_events; Type: TABLE; Schema: public; Owner: -
 --
 

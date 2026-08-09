@@ -1,6 +1,7 @@
 import { queryOne, queryMany, queryCount } from './db'
 import { DashboardStats } from '@/types'
 import { buildSearchClause, buildProductSearchClause, buildProductSearchRank, buildVectorSearchClause } from './search'
+import { getStockValuation } from './inventory'
 
 export const VARIANT_STOCK_TOTAL_SQL = `
   COALESCE((SELECT COUNT(*) FROM product_variants pv
@@ -208,7 +209,7 @@ export async function getProduct(id: string) {
             'id', pv.id, 'sku', pv.sku, 'variant_name', pv.variant_name,
             'price', pv.price, 'mrp', pv.mrp, 'mrp_ex_gst', pv.mrp_ex_gst, 'price_ex_gst', pv.price_ex_gst,
             'stock_status', pv.stock_status, 'inventory_quantity', pv.inventory_quantity,
-            'mpn', pv.mpn, 'gtin', pv.gtin, 'pricing_type', pv.pricing_type,
+            'mpn', pv.mpn, 'gtin', pv.gtin, 'asin', pv.asin, 'asin_match', pv.asin_match, 'isbn', pv.isbn, 'pricing_type', pv.pricing_type,
             'unit', pv.unit, 'numeric_value', pv.numeric_value,
             'weight_grams', pv.weight_grams, 'package_type', pv.package_type,
             'length_cm', pv.length_cm, 'breadth_cm', pv.breadth_cm, 'height_cm', pv.height_cm,
@@ -242,6 +243,21 @@ export async function getProduct(id: string) {
          FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
         '[]'::json
       ) AS product_variants,
+      COALESCE(
+        (SELECT json_agg(row_to_json(ps_cur) ORDER BY ps_cur.unit_cost ASC)
+         FROM (
+           SELECT DISTINCT ON (ps.variant_id, ps.sub_variant_id, ps.supplier_id)
+             ps.id, ps.supplier_id, s.name AS supplier_name,
+             ps.variant_id, ps.sub_variant_id,
+             ps.unit_cost, ps.currency, ps.gst_inclusive, ps.moq,
+             ps.lead_time_days, ps.is_preferred, ps.effective_date, ps.notes
+           FROM product_suppliers ps
+           JOIN suppliers s ON s.id = ps.supplier_id
+           WHERE ps.product_id = p.id AND ps.is_active = true
+           ORDER BY ps.variant_id, ps.sub_variant_id, ps.supplier_id, ps.effective_date DESC, ps.created_at DESC
+         ) ps_cur),
+        '[]'::json
+      ) AS product_suppliers,
       COALESCE(
         (SELECT COUNT(*) FROM product_variants pv
           WHERE pv.product_id = p.id AND pv.is_active = true
@@ -439,7 +455,9 @@ export async function getFilteredOrders(filters: {
 const PRODUCT_SORT_COLS: Record<string, string> = {
   name: 'p.name',
   sku: 'p.sku',
-  price: 'p.price',
+  // products has no `price` column — use the effective display price (min active variant
+  // price, else base_price). Sorting by 'p.price' errored the whole page.
+  price: '(COALESCE((SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), p.base_price))',
   stock: 'p.stock_status',
   created_at: 'p.created_at',
   category: 'c.name',
@@ -1479,13 +1497,40 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         COALESCE(SUM(total_amount) FILTER (WHERE (buyer_gstin IS NULL OR buyer_gstin = '') AND business_discount_amount = 0), 0) AS consumer_rev
       FROM orders WHERE created_at >= ${startExpr} AND payment_status = 'paid'
     `),
-    // Inventory health (active products) + stock value at cost
+    // Inventory health (active products) + real stock value from variants/sub-variants
     queryOne<Record<string, string>>(`
       SELECT
         COUNT(*) FILTER (WHERE stock_status = 'In Stock') AS in_stock,
         COUNT(*) FILTER (WHERE stock_status = 'Low Stock') AS low_stock,
         COUNT(*) FILTER (WHERE stock_status = 'Out of Stock') AS out_of_stock,
-        COALESCE(SUM(inventory_quantity * COALESCE(NULLIF(cost_price,0), base_price)), 0) AS stock_value
+        COALESCE((
+          SELECT SUM(
+            COALESCE(pv.inventory_quantity, 0) *
+            COALESCE(NULLIF(pv.cost_price,0), NULLIF(pv.price,0), NULLIF(p2.cost_price,0), NULLIF(p2.base_price,0), 0)
+          )
+          FROM product_variants pv
+          JOIN products p2 ON p2.id = pv.product_id
+          WHERE p2.is_active = true AND pv.is_active = true
+            AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+        ), 0) +
+        COALESCE((
+          SELECT SUM(
+            COALESCE(sv.inventory_quantity, 0) *
+            COALESCE(NULLIF(sv.price,0), NULLIF(p3.cost_price,0), NULLIF(p3.base_price,0), 0)
+          )
+          FROM product_sub_variants sv
+          JOIN product_variants pv2 ON pv2.id = sv.variant_id
+          JOIN products p3 ON p3.id = pv2.product_id
+          WHERE p3.is_active = true AND sv.is_active = true
+        ), 0) +
+        COALESCE((
+          SELECT SUM(
+            COALESCE(inventory_quantity, 0) *
+            COALESCE(NULLIF(cost_price,0), NULLIF(base_price,0), 0)
+          )
+          FROM products
+          WHERE is_active = true AND has_variants = false
+        ), 0) AS stock_value
       FROM products WHERE is_active = true
     `),
     // Returns / RTO
@@ -1548,5 +1593,171 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
     returns: {
       total: int(retRow?.total_returns), rtoInTransit: int(retRow?.rto_in_transit), rtoDelivered: int(retRow?.rto_delivered),
     },
+  }
+}
+
+// Monthly paid-revenue trend split by order source (last 12 months). Pivoted server-side into
+// one continuous (zero-filled) points array per source, aligned to a shared months axis.
+export interface RevenueTrend {
+  months: string[]
+  series: Array<{ source: string; label: string; color: string; points: number[] }>
+}
+
+const REVENUE_SOURCES: Array<{ source: string; label: string; color: string }> = [
+  { source: 'online', label: 'Online', color: '#3b82f6' },      // blue
+  { source: 'business', label: 'Business', color: '#22c55e' },  // green
+  { source: 'offline', label: 'Offline', color: '#a855f7' },    // purple
+  { source: 'cash_sale', label: 'Cash Sale', color: '#f59e0b' },// amber
+]
+
+export type RevenuePeriod = '3m' | '6m' | '12m' | 'ytd' | 'all'
+
+// Monthly paid-revenue trend split by order source, for the requested period. Pivoted
+// server-side into one continuous (zero-filled) points array per source, aligned to a shared
+// months axis.
+export async function getRevenueTrendBySource(period: RevenuePeriod = '12m'): Promise<RevenueTrend> {
+  // Resolve the window's start month (inclusive) as a Date at day 1.
+  const now = new Date()
+  const startOfMonth = (y: number, m: number) => new Date(y, m, 1)
+  let start: Date
+  if (period === '3m') start = startOfMonth(now.getFullYear(), now.getMonth() - 2)
+  else if (period === '6m') start = startOfMonth(now.getFullYear(), now.getMonth() - 5)
+  else if (period === 'ytd') start = startOfMonth(now.getFullYear(), 0)
+  else if (period === 'all') start = new Date(0) // resolved to first-order month below
+  else start = startOfMonth(now.getFullYear(), now.getMonth() - 11) // 12m default
+
+  // For 'all', anchor the axis to the earliest paid order.
+  if (period === 'all') {
+    const first = await queryOne<{ m: string }>(
+      `SELECT to_char(date_trunc('month', min(created_at)), 'YYYY-MM') AS m
+         FROM orders WHERE payment_status = 'paid'`
+    ).catch(() => null)
+    if (first?.m) {
+      const [y, mm] = first.m.split('-').map(Number)
+      start = startOfMonth(y, mm - 1)
+    } else {
+      start = startOfMonth(now.getFullYear(), now.getMonth() - 11)
+    }
+  }
+
+  const startStr = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, '0')}-01`
+  const rows = await queryMany<{ month: string; source: string; revenue: number }>(`
+    SELECT to_char(date_trunc('month', created_at), 'YYYY-MM') AS month,
+           source,
+           SUM(total_amount)::float AS revenue
+      FROM orders
+     WHERE payment_status = 'paid'
+       AND created_at >= $1::date
+     GROUP BY 1, 2
+     ORDER BY 1
+  `, [startStr]).catch(() => [])
+
+  // Continuous month axis from `start` through the current month.
+  const months: string[] = []
+  const cursor = new Date(start.getFullYear(), start.getMonth(), 1)
+  const end = new Date(now.getFullYear(), now.getMonth(), 1)
+  while (cursor <= end) {
+    months.push(`${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}`)
+    cursor.setMonth(cursor.getMonth() + 1)
+  }
+  const monthIndex = new Map(months.map((m, idx) => [m, idx]))
+
+  const bySource = new Map<string, number[]>()
+  for (const s of REVENUE_SOURCES) bySource.set(s.source, new Array(months.length).fill(0))
+  for (const r of rows) {
+    const arr = bySource.get(r.source)
+    const idx = monthIndex.get(r.month)
+    if (arr && idx !== undefined) arr[idx] = Number(r.revenue) || 0
+  }
+
+  const series = REVENUE_SOURCES.map(s => ({ ...s, points: bySource.get(s.source)! }))
+  return { months, series }
+}
+
+export interface BreakdownSlice { label: string; value: number; color: string }
+
+export interface ProductStats {
+  totalProducts: number
+  activeProducts: number
+  featured: number
+  categories: number
+  inventoryValue: number       // Σ (price × inventory_quantity): variants for has_variants, base for simple
+  byCategory: BreakdownSlice[]
+  byBrand: BreakdownSlice[]
+  byStock: BreakdownSlice[]
+  byInventoryValue: BreakdownSlice[]   // Σ base_price split by stock status (₹)
+}
+
+// Categorical palette for the product breakdown bars (brand-neutral, light/dark safe).
+const BREAKDOWN_PALETTE = [
+  '#3b82f6', '#22c55e', '#a855f7', '#f59e0b', '#ef4444',
+  '#06b6d4', '#ec4899', '#84cc16', '#6366f1', '#f97316',
+]
+
+// Cap a grouped result to top-N slices + an aggregated "Other" bucket, and colorize.
+function toSlices(rows: Array<{ label: string | null; count: number }>, topN = 8): BreakdownSlice[] {
+  const cleaned = rows.map(r => ({ label: r.label || 'Uncategorized', value: Number(r.count) || 0 }))
+  const top = cleaned.slice(0, topN)
+  const rest = cleaned.slice(topN)
+  if (rest.length) top.push({ label: 'Other', value: rest.reduce((s, r) => s + r.value, 0) })
+  return top.map((s, i) => ({ ...s, color: BREAKDOWN_PALETTE[i % BREAKDOWN_PALETTE.length] }))
+}
+
+// All the header metrics + three categorical breakdowns for the Products page, in one call.
+export async function getProductBreakdowns(): Promise<ProductStats> {
+  const [summary, invValue, catRows, brandRows, stockRows, invValueRows] = await Promise.all([
+    queryOne<{ total: number; active: number; featured: number; categories: number }>(`
+      SELECT
+        COUNT(*)::int AS total,
+        COUNT(*) FILTER (WHERE is_active)::int AS active,
+        COUNT(*) FILTER (WHERE is_featured)::int AS featured,
+        (SELECT COUNT(*)::int FROM categories WHERE is_active) AS categories
+      FROM products
+    `),
+    // True inventory stock value — reuse the canonical valuation (ex-GST, covers products +
+    // variants + sub-variants) so this matches the Stock Ledger → Valuation page exactly.
+    getStockValuation().then(v => ({ inv_value: v.totalValue })).catch(() => ({ inv_value: 0 })),
+    queryMany<{ label: string | null; count: number }>(`
+      SELECT COALESCE(top.name, 'Uncategorized') AS label, COUNT(*)::int AS count
+        FROM products p
+        LEFT JOIN categories c ON p.category_id = c.id
+        LEFT JOIN categories top ON top.id = COALESCE(c.parent_category_id, c.id)
+       WHERE p.is_active
+       GROUP BY 1 ORDER BY 2 DESC
+    `),
+    queryMany<{ label: string | null; count: number }>(`
+      SELECT COALESCE(b.name, 'No Brand') AS label, COUNT(*)::int AS count
+        FROM products p LEFT JOIN brands b ON p.brand_id = b.id
+       WHERE p.is_active
+       GROUP BY 1 ORDER BY 2 DESC
+    `),
+    queryMany<{ label: string | null; count: number }>(`
+      SELECT COALESCE(stock_status, 'Unknown') AS label, COUNT(*)::int AS count
+        FROM products WHERE is_active
+       GROUP BY 1 ORDER BY 2 DESC
+    `),
+    // Top products by catalog value (base_price) — the "Inventory Value" breakdown.
+    queryMany<{ label: string | null; count: number }>(`
+      SELECT name AS label, COALESCE(base_price, 0)::float AS count
+        FROM products WHERE is_active AND base_price > 0
+       ORDER BY base_price DESC
+       LIMIT 10
+    `),
+  ])
+
+  return {
+    totalProducts: Number(summary?.total) || 0,
+    activeProducts: Number(summary?.active) || 0,
+    featured: Number(summary?.featured) || 0,
+    categories: Number(summary?.categories) || 0,
+    inventoryValue: Number(invValue?.inv_value) || 0,
+    byCategory: toSlices(catRows),
+    byBrand: toSlices(brandRows),
+    byStock: toSlices(stockRows, 5),
+    byInventoryValue: invValueRows.map((r, i) => ({
+      label: r.label || 'Unnamed',
+      value: Number(r.count) || 0,
+      color: BREAKDOWN_PALETTE[i % BREAKDOWN_PALETTE.length],
+    })),
   }
 }

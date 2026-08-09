@@ -314,16 +314,26 @@ describe('publishProductDraft', () => {
     expect(variantUnitUpsert.length).toBeGreaterThan(0)
   })
 
-  it('handles variant unit with minimal fields (all ?? defaults applied)', async () => {
+  it('handles sub_variant_id as additional column in variant-level unit', async () => {
     const draft = {
       product_id: 'prod-1',
-      fields: { name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false, has_variants: true, fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true, is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false, is_searchable: true, inclusive_tax: false, serialized: false, stock_status: 'In Stock', inventory_quantity: '0' },
+      fields: {
+        name: 'P', sku: 'S', slug: 's', base_price: '0', is_featured: false, has_variants: false,
+        fragile: false, hazardous: false, flammable: false, perishable: false, is_cod_allowed: true,
+        is_oversized: false, is_digital: false, is_subscription: false, is_bundle: false,
+        is_searchable: true, inclusive_tax: false, serialized: false,
+        stock_status: 'In Stock', inventory_quantity: '0',
+      },
       variants: [],
       images: [],
       sub_variants: [],
+      // variant_id present + sub_variant_id — stored as a column in the ON CONFLICT (variant_id, unit) path
       units: [
-        // Minimal unit — all optional fields undefined, forces all ?? branches
-        { id: 'u-v1', unit: 'pc', variant_id: 'v-1' },
+        {
+          id: 'u-sv1', unit: 'box', factor: 12, is_base: false, is_purchase_default: true,
+          dimension: 'count', variant_id: 'v-1', sub_variant_id: 'sv-1',
+          min_qty: 1, max_qty: 100, qty_step: 1,
+        },
       ],
     }
 
@@ -335,14 +345,12 @@ describe('publishProductDraft', () => {
     mockClientQuery.mockImplementation(smartClientMock)
 
     await publishProductDraft('prod-1')
-    // The ?? defaults (factor??1, is_base??false, etc.) should be applied
+    // Uses the variant_id ON CONFLICT path; sub_variant_id is stored as param index 11 (0-based)
     const upsert = mockClientQuery.mock.calls.find(
       ([sql]: [string]) => typeof sql === 'string' && sql.includes('ON CONFLICT (variant_id, unit)')
     )
     expect(upsert).toBeDefined()
-    // factor defaults to 1
-    expect(upsert![1][3]).toBe(1)
-    // is_base defaults to false
-    expect(upsert![1][4]).toBe(false)
+    // sub_variant_id is the 12th param (index 11)
+    expect(upsert![1][11]).toBe('sv-1')
   })
 })

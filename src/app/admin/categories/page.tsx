@@ -1,7 +1,9 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { hasScope } from '@/lib/scopes'
 import { getFilteredCategories } from '@/lib/queries'
 import { queryMany } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
@@ -35,6 +37,11 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
        LIMIT 20`
     ),
   ])
+
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'categories:write')
 
   const allCategories = categories || []
   const mainCategoriesCount = allCategories.filter(c => !c.parent_category_id).length
@@ -70,16 +77,22 @@ async function CategoriesStats({ resolvedSearchParams }: { resolvedSearchParams:
             </div>
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
               {pendingDrafts.map((d) => (
-                <DraftRowActions
-                  key={d.category_id}
-                  entityId={d.category_id}
-                  name={d.name}
-                  updatedAt={d.updated_at}
-                  editHref={ap(`/admin/categories/edit/${d.category_id}`, host)}
-                  publishPath={`/api/admin/categories/${d.category_id}/publish`}
-                  discardPath={`/api/admin/categories/${d.category_id}/draft`}
-                  entityLabel="category"
-                />
+                canWrite ? (
+                  <DraftRowActions
+                    key={d.category_id}
+                    entityId={d.category_id}
+                    name={d.name}
+                    updatedAt={d.updated_at}
+                    editHref={ap(`/admin/categories/edit/${d.category_id}`, host)}
+                    publishPath={`/api/admin/categories/${d.category_id}/publish`}
+                    discardPath={`/api/admin/categories/${d.category_id}/draft`}
+                    entityLabel="category"
+                  />
+                ) : (
+                  <div key={d.category_id} className="px-4 py-2.5 flex items-center gap-2">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
+                  </div>
+                )
               ))}
             </div>
           </div>
@@ -170,6 +183,10 @@ export default function CategoriesPage({ searchParams }: { searchParams: Promise
 
 async function CategoriesHeader() {
   const host = await getHost()
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'categories:write')
   return (
     <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6">
       <div>
@@ -178,12 +195,14 @@ async function CategoriesHeader() {
       </div>
       <div className="flex flex-col sm:flex-row gap-2">
         <BrochureButton mode="category" />
-        <Link
-          href={ap('/admin/categories/add', host)}
-          className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-        >
-          Add New Category
-        </Link>
+        {canWrite && (
+          <Link
+            href={ap('/admin/categories/add', host)}
+            className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+          >
+            Add New Category
+          </Link>
+        )}
       </div>
     </div>
   )

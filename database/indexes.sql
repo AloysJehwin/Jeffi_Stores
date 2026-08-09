@@ -761,6 +761,48 @@ CREATE INDEX idx_invoices_status ON public.invoices USING btree (status) WHERE (
 CREATE INDEX idx_merchant_sync_log_started_at ON public.merchant_sync_log USING btree (started_at DESC);
 
 
+--
+-- Name: idx_merchant_gmc_status_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_merchant_gmc_status_status ON public.merchant_gmc_status USING btree (status);
+
+
+--
+-- Name: idx_merchant_gmc_status_title; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_merchant_gmc_status_title ON public.merchant_gmc_status USING gin (to_tsvector('simple'::regconfig, COALESCE(title, ''::text)));
+
+
+--
+-- Name: idx_amazon_sync_log_started_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_amazon_sync_log_started_at ON public.amazon_sync_log USING btree (started_at DESC);
+
+
+--
+-- Name: idx_amazon_listing_status_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_amazon_listing_status_status ON public.amazon_listing_status USING btree (status);
+
+
+--
+-- Name: idx_amazon_listing_status_title; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_amazon_listing_status_title ON public.amazon_listing_status USING gin (to_tsvector('simple'::regconfig, COALESCE(title, ''::text)));
+
+
+--
+-- Name: idx_product_variants_asin; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_product_variants_asin ON public.product_variants USING btree (asin) WHERE (asin IS NOT NULL);
+
+
 
 --
 -- Name: idx_notifications_created_at; Type: INDEX; Schema: public; Owner: -
@@ -1724,4 +1766,46 @@ CREATE UNIQUE INDEX uniq_product_units_sub_variant_unit ON public.product_units 
 --
 
 CREATE UNIQUE INDEX uniq_product_units_variant_unit ON public.product_units USING btree (variant_id, unit) WHERE (variant_id IS NOT NULL);
+
+
+--
+-- Name: product_suppliers indexes; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_product_suppliers_product ON public.product_suppliers USING btree (product_id);
+
+CREATE INDEX idx_product_suppliers_supplier ON public.product_suppliers USING btree (supplier_id);
+
+CREATE INDEX idx_product_suppliers_variant ON public.product_suppliers USING btree (variant_id) WHERE (variant_id IS NOT NULL);
+
+CREATE INDEX idx_product_suppliers_sub_variant ON public.product_suppliers USING btree (sub_variant_id) WHERE (sub_variant_id IS NOT NULL);
+
+CREATE INDEX idx_product_suppliers_leaf_eff ON public.product_suppliers USING btree (product_id, variant_id, sub_variant_id, supplier_id, effective_date DESC);
+
+-- At most one preferred supplier per LEAF (product/variant/sub-variant). NULLs coalesced so
+-- the nil-uuid stands in for "no variant/sub-variant" and participates in the unique key.
+CREATE UNIQUE INDEX uq_product_suppliers_one_preferred
+    ON public.product_suppliers (product_id, COALESCE(variant_id, '00000000-0000-0000-0000-000000000000'::uuid), COALESCE(sub_variant_id, '00000000-0000-0000-0000-000000000000'::uuid))
+    WHERE (is_preferred = true);
+
+
+--
+-- Name: purchase_order_items sub_variant index; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_poi_sub_variant ON public.purchase_order_items USING btree (sub_variant_id) WHERE (sub_variant_id IS NOT NULL);
+
+
+--
+-- Name: auth_sessions indexes; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_auth_sessions_principal ON public.auth_sessions USING btree (principal_type, principal_id) WHERE (revoked_at IS NULL);
+
+CREATE INDEX idx_auth_sessions_expiry ON public.auth_sessions USING btree (expires_at);
+
+-- Cookie-resolution key: the cookie carries a random opaque token; the DB stores only
+-- SHA-256(token) here and resolveSession() looks it up by hash. Unique so a hash maps to at
+-- most one session; NULL on legacy (pre-token) rows, which Postgres allows multiple of.
+CREATE UNIQUE INDEX idx_auth_sessions_token_hash ON public.auth_sessions USING btree (token_hash);
 

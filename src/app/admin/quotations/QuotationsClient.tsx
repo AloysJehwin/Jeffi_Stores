@@ -74,7 +74,7 @@ function todayISO() {
   return new Date().toISOString().slice(0, 10)
 }
 
-export default function QuotationsClient() {
+export default function QuotationsClient({ canWrite = false }: { canWrite?: boolean }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
   const searchParams = useSearchParams()
@@ -134,8 +134,9 @@ export default function QuotationsClient() {
   }
 
   function handleSort(col: string, dir: SortDir) {
-    setSortCol(col)
-    setSortDir(dir)
+    setSortCol(col || undefined)
+    setSortDir(col ? dir : undefined)
+    // Server-side sort — a useEffect keyed on sortCol/sortDir refetches page 1.
   }
 
   const [editId, setEditId] = useState<string | null>(null)
@@ -213,16 +214,8 @@ export default function QuotationsClient() {
     status: 'status',
   }
 
-  const sortedQuotations = sortCol && QUOTE_SORT_KEYS[sortCol]
-    ? [...quotations].sort((a, b) => {
-        const key = QUOTE_SORT_KEYS[sortCol]
-        const av = a[key] ?? ''
-        const bv = b[key] ?? ''
-        const cmp = String(av).localeCompare(String(bv), 'en', { numeric: true })
-        return sortDir === 'asc' ? cmp : -cmp
-      })
-    : quotations
-
+  // Ordered server-side across all quotations via sort/dir params.
+  const sortedQuotations = quotations
 
   async function loadList(p = 1) {
     setLoading(true)
@@ -232,6 +225,7 @@ export default function QuotationsClient() {
       if (searchQ) params.set('q', searchQ)
       if (fromDate) params.set('from', fromDate)
       if (toDate) params.set('to', toDate)
+      if (sortCol && QUOTE_SORT_KEYS[sortCol]) { params.set('sort', QUOTE_SORT_KEYS[sortCol]); params.set('dir', sortDir || 'desc') }
       params.set('page', String(p))
       params.set('pageSize', String(PAGE_SIZE))
       const res = await fetch(`/api/admin/quotations?${params}`)
@@ -246,7 +240,7 @@ export default function QuotationsClient() {
     }
   }
 
-  useEffect(() => { if (view === 'list') loadList(1) }, [view, statusFilter, searchQ, fromDate, toDate])
+  useEffect(() => { if (view === 'list') loadList(1) }, [view, statusFilter, searchQ, fromDate, toDate, sortCol, sortDir])
 
   function newQuotation() {
     setEditId(null)
@@ -619,12 +613,14 @@ export default function QuotationsClient() {
             <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Quotations</h1>
             <p className="text-foreground-secondary mt-1 text-sm">Create and manage B2B quotations</p>
           </div>
+          {canWrite && (
           <button
             onClick={newQuotation}
             className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white font-semibold rounded-lg text-sm transition-colors"
           >
             + New Quotation
           </button>
+          )}
         </div>
 
         {error && (
@@ -747,7 +743,7 @@ export default function QuotationsClient() {
                     </td>
                     <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
-                        {q.status === 'draft' && !q.from_rfq && (
+                        {q.status === 'draft' && !q.from_rfq && canWrite && (
                           <button onClick={() => openEdit(q.id)} title="Edit"
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500 transition-colors">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -784,7 +780,7 @@ export default function QuotationsClient() {
                             )}
                           </button>
                         )}
-                        {q.status === 'final' && !q.converted_order_id && (
+                        {q.status === 'final' && !q.converted_order_id && canWrite && (
                           <button
                             onClick={async () => {
                               setConvertPendingQuoteId(q.id)
@@ -829,7 +825,7 @@ export default function QuotationsClient() {
                             Invoiced ↗
                           </a>
                         )}
-                        {q.status === 'draft' && (
+                        {q.status === 'draft' && canWrite && (
                           <button onClick={() => deleteQuote(q.id)} title="Delete"
                             className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary hover:text-red-500 transition-colors">
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1394,7 +1390,7 @@ export default function QuotationsClient() {
         {autoSaveStatus === 'saved' && (
           <span className="text-xs text-green-600 dark:text-green-400 inline-flex items-center gap-1"><Check className="w-3 h-3" /> Saved</span>
         )}
-        {!isFinal && (
+        {!isFinal && canWrite && (
           <button onClick={() => save('final')} disabled={saving}
             className="px-5 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50">
             {saving ? 'Saving…' : 'Finalise & Save'}

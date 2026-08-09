@@ -48,7 +48,7 @@ import * as db from '@/lib/db'
 
 function meRequest(cookieValue?: string) {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-  if (cookieValue) headers['Cookie'] = `auth_token=${cookieValue}`
+  if (cookieValue) headers['Cookie'] = `user_sid=${cookieValue}`
   return new Request('http://localhost/api/auth/me', { method: 'GET', headers })
 }
 
@@ -160,16 +160,16 @@ describe('POST /api/auth/logout', () => {
     expect(body.message).toMatch(/logged out/i)
   })
 
-  it('clears auth_token cookie via Set-Cookie header', async () => {
+  it('clears user_sid cookie via Set-Cookie header', async () => {
     vi.mocked(jwtLib.authenticateUser).mockResolvedValue(null)
 
     const res = await logoutPOST(logoutRequest() as any)
     const setCookieHeader = res.headers.get('set-cookie')
-    expect(setCookieHeader).toMatch(/auth_token=/)
+    expect(setCookieHeader).toMatch(/user_sid=/)
     expect(setCookieHeader).toMatch(/Max-Age=0/)
   })
 
-  it('clears auth_token when user is authenticated', async () => {
+  it('clears user_sid when user is authenticated', async () => {
     vi.mocked(jwtLib.authenticateUser).mockResolvedValue(USER_PAYLOAD)
 
     const res = await logoutPOST(logoutRequest() as any)

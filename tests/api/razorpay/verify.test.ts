@@ -567,4 +567,193 @@ describe('POST /api/razorpay/verify', () => {
 
     expect(res.status).toBe(500)
   })
+
+  it('commitDraft idempotency: returns existing order when payment already committed', async () => {
+    const { verifyDraftToken } = await import('@/lib/order-draft')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'cart', cartHash: null,
+      couponId: null, shippingAmount: 0, addressId: null, notes: null,
+    } as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: ORDER_UUID, order_number: 'ORD-001' })
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_idem',
+    }) as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(body.order.orderNumber).toBe('ORD-001')
+    expect(orderCommit.commitOrder).not.toHaveBeenCalled()
+  })
+
+  it('commitDraft: applies coupon discount when couponId is present', async () => {
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-coup',
+      couponId: 'coup-uuid-1', shippingAmount: 0, addressId: null,
+      notes: null, businessDiscountAmount: 0,
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValue(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
+    vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
+    vi.mocked(hashCartItems).mockReturnValue('hash-coup')
+    vi.mocked(orderCommit.cartSubtotal).mockReturnValue(500)
+    vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(76)
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({ ok: true, appliedDiscount: 50 } as any)
+    vi.mocked(orderCommit.commitOrder).mockResolvedValue({
+      id: 'order-coup', order_number: 'ORD-C', total_amount: '450',
+    } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_coupon',
+    }) as any)
+
+    expect(res.status).toBe(200)
+    expect(orderCommit.validateCouponForUser).toHaveBeenCalledWith(
+      expect.objectContaining({ couponId: 'coup-uuid-1' })
+    )
+  })
+
+  it('commitDraft buyNow: returns 404 when product not found', async () => {
+    const { verifyDraftToken } = await import('@/lib/order-draft')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'buyNow',
+      buyNowItem: { productId: 'missing-prod', variantId: null, subVariantId: null, price: 100, qty: 1 },
+      cartHash: null, couponId: null, shippingAmount: 0, addressId: null, notes: null,
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null) // product not found
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_noprod',
+    }) as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(404)
+    expect(body.error).toMatch(/product not found/i)
+  })
+
+  it('commitDraft buyNow: looks up variant and sub-variant when IDs present', async () => {
+    const { verifyDraftToken } = await import('@/lib/order-draft')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'buyNow',
+      buyNowItem: { productId: 'prod-1', variantId: 'var-1', subVariantId: 'sv-1', price: 500, qty: 2 },
+      cartHash: null, couponId: null, shippingAmount: 0, addressId: null,
+      notes: null, businessDiscountAmount: 0,
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce({ id: 'prod-1', name: 'Bolt', sku: 'B001', gst_percentage: '18', hsn_code: '7318' })
+      .mockResolvedValueOnce({ id: 'var-1', variant_name: 'M8', sku: 'B001-M8', mrp: '600' })
+      .mockResolvedValueOnce({ id: 'sv-1', sub_variant_name: 'Box/10', sku: 'B001-M8-10', mrp: '550' })
+      .mockResolvedValue(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    vi.mocked(orderCommit.commitOrder).mockResolvedValue({
+      id: 'order-bn', order_number: 'ORD-BN', total_amount: '1000',
+    } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_bn_variant',
+    }) as any)
+
+    expect(res.status).toBe(200)
+    expect(orderCommit.commitOrder).toHaveBeenCalledWith(expect.objectContaining({ mode: 'buyNow' }))
+  })
+
+  it('commitDraft: returns 400 when draft mode is neither cart nor buyNow', async () => {
+    const { verifyDraftToken } = await import('@/lib/order-draft')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'unknown_mode',
+      cartHash: null, couponId: null, shippingAmount: 0, addressId: null, notes: null,
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(MOCK_USER)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_bad_mode',
+    }) as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(400)
+    expect(body.error).toMatch(/invalid draft/i)
+  })
+
+  it('markLegacyOrderPaid: inserts payment when UPDATE rowCount=0', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_ORDER)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = {
+        query: vi.fn()
+          .mockResolvedValueOnce({ rows: [], rowCount: 1 })  // UPDATE orders
+          .mockResolvedValueOnce({ rows: [], rowCount: 0 })  // UPDATE payments → no match
+          .mockResolvedValueOnce({ rows: [], rowCount: 1 })  // INSERT payment
+          .mockResolvedValue({ rows: [], rowCount: 1 }),     // DELETE cart
+      }
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
+    }) as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.success).toBe(true)
+  })
+
+  it('triggers high-value order auto-task when total >= 50000 in commitDraft', async () => {
+    const { createAutoTask } = await import('@/lib/auto-tasks')
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-hv',
+      couponId: null, shippingAmount: 0, addressId: null, notes: null,
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValue(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
+    vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
+    vi.mocked(hashCartItems).mockReturnValue('hash-hv')
+    vi.mocked(orderCommit.cartSubtotal).mockReturnValue(50000)
+    vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(7627)
+    vi.mocked(orderCommit.commitOrder).mockResolvedValue({
+      id: 'order-hv', order_number: 'ORD-HV', total_amount: '50000',
+    } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_hv',
+    }) as any)
+
+    expect(res.status).toBe(200)
+    expect(vi.mocked(createAutoTask)).toHaveBeenCalled()
+  })
 })

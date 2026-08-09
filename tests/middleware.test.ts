@@ -1,14 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest, NextResponse } from 'next/server'
-import { SignJWT } from 'jose'
 
 // ---------------------------------------------------------------------------
 // Mocks — vi.hoisted() ensures these are defined before vi.mock() factories run
 // ---------------------------------------------------------------------------
 
-const { mockVerifyToken, mockApplyRateLimit, mockGetScopeForPath, mockHasScope } =
+const { mockVerifyToken, mockVerifyBusinessToken, mockApplyRateLimit, mockGetScopeForPath, mockHasScope } =
   vi.hoisted(() => ({
     mockVerifyToken: vi.fn(),
+    mockVerifyBusinessToken: vi.fn(),
     mockApplyRateLimit: vi.fn().mockResolvedValue(null),
     mockGetScopeForPath: vi.fn().mockReturnValue(null),
     mockHasScope: vi.fn().mockReturnValue(true),
@@ -16,6 +16,7 @@ const { mockVerifyToken, mockApplyRateLimit, mockGetScopeForPath, mockHasScope }
 
 vi.mock('@/lib/jwt', () => ({
   verifyToken: mockVerifyToken,
+  verifyBusinessToken: mockVerifyBusinessToken,
   authenticateAdmin: vi.fn(),
 }))
 
@@ -59,25 +60,21 @@ function makeNextRequest(
   return req
 }
 
-/** Mint a real Jose JWT for the business portal.
- *  verifyBusinessToken in middleware.ts calls jwtVerify directly (not the
- *  mocked verifyToken), so tests that exercise the business token path must
- *  supply a properly-signed JWT instead of relying on the mock. */
+/** Opaque-session model: the cookie value is a bare session id and middleware calls the
+ *  (mocked) verifyBusinessToken to resolve it. This sets the mock's return for the given
+ *  claims and hands back a dummy opaque cookie value to put in the request. */
 async function mintBusinessJwt(
   claims: Record<string, unknown> = {}
 ): Promise<string> {
-  const secret = new TextEncoder().encode(process.env.JWT_SECRET!)
-  return new SignJWT({
-    type: 'business',
-    isBusiness: true,
+  mockVerifyBusinessToken.mockResolvedValue({
     userId: 'biz-001',
     email: 'biz@example.com',
+    isBusiness: true,
     approvalStatus: 'approved',
+    scopes: [],
     ...claims,
   })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setExpirationTime('1h')
-    .sign(secret)
+  return 'biz-session-id'
 }
 
 const ADMIN_PAYLOAD = {
@@ -148,7 +145,7 @@ describe('middleware', () => {
 
       const req = makeNextRequest('https://admin.jeffistores.in/dashboard', {
         host: 'admin.jeffistores.in',
-        cookies: { admin_token: 'valid.token.here' },
+        cookies: { admin_sid: 'valid.token.here' },
       })
       const res = await middleware(req)
       // Rewrite response is not a redirect
@@ -185,7 +182,7 @@ describe('middleware', () => {
       mockVerifyToken.mockResolvedValue(null)
       const req = makeNextRequest('http://localhost/api/admin/orders', {
         host: 'localhost',
-        cookies: { admin_token: 'bad.token' },
+        cookies: { admin_sid: 'bad.token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(401)
@@ -203,7 +200,7 @@ describe('middleware', () => {
 
       const req = makeNextRequest('http://localhost/api/admin/orders', {
         host: 'localhost',
-        cookies: { admin_token: 'scoped.token' },
+        cookies: { admin_sid: 'scoped.token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(403)
@@ -254,7 +251,7 @@ describe('middleware', () => {
 
       const req = makeNextRequest('https://business.jeffistores.in/products', {
         host: 'business.jeffistores.in',
-        cookies: { business_auth_token: token },
+        cookies: { business_sid: token },
       })
       const res = await middleware(req)
       expect(res.status).not.toBe(307)
@@ -266,7 +263,7 @@ describe('middleware', () => {
 
       const req = makeNextRequest('https://business.jeffistores.in/products', {
         host: 'business.jeffistores.in',
-        cookies: { business_auth_token: token },
+        cookies: { business_sid: token },
       })
       const res = await middleware(req)
       expect(res.status).toBe(307)
@@ -317,10 +314,10 @@ describe('middleware', () => {
     })
 
     it('redirects to /business/signin when token is invalid on /business/products', async () => {
-      mockVerifyToken.mockResolvedValue(null)
+      mockVerifyBusinessToken.mockResolvedValue(null)
       const req = makeNextRequest('http://localhost/business/products', {
         headers: { 'x-forwarded-host': 'localhost' },
-        cookies: { business_auth_token: 'bad-token' },
+        cookies: { business_sid: 'bad-token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(307)
@@ -331,7 +328,7 @@ describe('middleware', () => {
       const token = await mintBusinessJwt({ approvalStatus: 'pending' })
       const req = makeNextRequest('http://localhost/business/products', {
         headers: { 'x-forwarded-host': 'localhost' },
-        cookies: { business_auth_token: token },
+        cookies: { business_sid: token },
       })
       const res = await middleware(req)
       expect(res.status).toBe(307)
@@ -411,7 +408,7 @@ describe('middleware', () => {
       mockVerifyToken.mockResolvedValue(ADMIN_PAYLOAD)
       const req = makeNextRequest('http://localhost/admin/orders', {
         headers: { 'x-forwarded-host': 'localhost' },
-        cookies: { admin_token: 'valid-token' },
+        cookies: { admin_sid: 'valid-token' },
       })
       const res = await middleware(req)
       expect(res.status).not.toBe(307)
@@ -422,7 +419,7 @@ describe('middleware', () => {
     it('returns 403 on /admin/* from a non-admin, non-localhost host', async () => {
       const req = makeNextRequest('https://jeffistores.in/admin/dashboard', {
         headers: { 'x-forwarded-host': 'jeffistores.in' },
-        cookies: { admin_token: 'some-token' },
+        cookies: { admin_sid: 'some-token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(403)
@@ -443,7 +440,7 @@ describe('middleware', () => {
           'x-forwarded-host': 'localhost',
           'x-client-cert-cn': 'bob',
         },
-        cookies: { admin_token: 'valid-token' },
+        cookies: { admin_sid: 'valid-token' },
       })
       const res = await middleware(req)
       expect(res.status).toBe(403)
@@ -461,7 +458,7 @@ describe('middleware', () => {
           'x-forwarded-host': 'localhost',
           'x-client-cert-cn': 'alice',
         },
-        cookies: { admin_token: 'valid-token' },
+        cookies: { admin_sid: 'valid-token' },
       })
       const res = await middleware(req)
       expect(res.status).not.toBe(403)
@@ -474,7 +471,7 @@ describe('middleware', () => {
           'x-forwarded-host': 'localhost',
           'x-client-cert-cn': 'Jeffi Stores CA',
         },
-        cookies: { admin_token: 'valid-token' },
+        cookies: { admin_sid: 'valid-token' },
       })
       const res = await middleware(req)
       // CN with spaces is treated as non-client cert — no mismatch rejection
@@ -534,6 +531,288 @@ describe('middleware', () => {
       const res = await middleware(req)
       expect(res.status).not.toBe(307)
       expect(res.status).not.toBe(301)
+    })
+
+    it('rewrites purchaseorder root / to /purchaseorder (empty slug)', async () => {
+      const req = makeNextRequest('https://purchaseorder.jeffistores.in/', {
+        headers: { 'x-forwarded-host': 'purchaseorder.jeffistores.in' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(307)
+      expect(res.status).not.toBe(301)
+    })
+
+    it('passes API paths through on purchaseorder subdomain', async () => {
+      const req = makeNextRequest('https://purchaseorder.jeffistores.in/api/some-endpoint', {
+        headers: { 'x-forwarded-host': 'purchaseorder.jeffistores.in' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(307)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // forms subdomain — root path and API pass-through
+  // -------------------------------------------------------------------------
+  describe('forms subdomain — additional branches', () => {
+    it('rewrites forms root / to /forms (empty slug)', async () => {
+      const req = makeNextRequest('https://forms.jeffistores.in/', {
+        headers: { 'x-forwarded-host': 'forms.jeffistores.in' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(307)
+      expect(res.status).not.toBe(301)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // quotation subdomain — API pass-through and root path
+  // -------------------------------------------------------------------------
+  describe('quotation subdomain — additional branches', () => {
+    it('passes API paths through on quotation subdomain', async () => {
+      const req = makeNextRequest('https://quotation.jeffistores.in/api/some-endpoint', {
+        headers: { 'x-forwarded-host': 'quotation.jeffistores.in' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(307)
+    })
+
+    it('rewrites quotation root / to /quotation (empty slug)', async () => {
+      const req = makeNextRequest('https://quotation.jeffistores.in/', {
+        headers: { 'x-forwarded-host': 'quotation.jeffistores.in' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(307)
+      expect(res.status).not.toBe(301)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // invoice subdomain — API pass-through and root path
+  // -------------------------------------------------------------------------
+  describe('invoice subdomain — additional branches', () => {
+    it('passes API paths through on invoice subdomain', async () => {
+      const req = makeNextRequest('https://invoice.jeffistores.in/api/some-endpoint', {
+        headers: { 'x-forwarded-host': 'invoice.jeffistores.in' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(307)
+    })
+
+    it('rewrites invoice root / to /invoice (empty slug)', async () => {
+      const req = makeNextRequest('https://invoice.jeffistores.in/', {
+        headers: { 'x-forwarded-host': 'invoice.jeffistores.in' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(307)
+      expect(res.status).not.toBe(301)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // business subdomain — invalid token and rejected status
+  // -------------------------------------------------------------------------
+  describe('business subdomain — additional branches', () => {
+    it('redirects and clears cookie when token is invalid on business subdomain', async () => {
+      mockVerifyBusinessToken.mockResolvedValue(null)
+
+      const req = makeNextRequest('https://business.jeffistores.in/products', {
+        headers: { 'x-forwarded-host': 'business.jeffistores.in' },
+        cookies: { business_sid: 'bad-token' },
+      })
+      const res = await middleware(req)
+      expect(res.status).toBe(307)
+      expect(res.headers.get('location')).toContain('/signin')
+    })
+
+    it('redirects to /signin?rejected=1 when approvalStatus is rejected on business subdomain', async () => {
+      await mintBusinessJwt({ approvalStatus: 'rejected' })
+
+      const req = makeNextRequest('https://business.jeffistores.in/products', {
+        headers: { 'x-forwarded-host': 'business.jeffistores.in' },
+        cookies: { business_sid: 'biz-session-id' },
+      })
+      const res = await middleware(req)
+      expect(res.status).toBe(307)
+      expect(res.headers.get('location')).toContain('rejected=1')
+    })
+
+    it('rewrites business subdomain root / to /business (empty slug)', async () => {
+      const token = await mintBusinessJwt({ approvalStatus: 'approved' })
+
+      const req = makeNextRequest('https://business.jeffistores.in/', {
+        headers: { 'x-forwarded-host': 'business.jeffistores.in' },
+        cookies: { business_sid: token },
+      })
+      const res = await middleware(req)
+      // root is public, no redirect
+      expect(res.status).not.toBe(307)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // /business/* paths on main domain — rejected status
+  // -------------------------------------------------------------------------
+  describe('/business/* paths on main domain — rejected status', () => {
+    it('redirects to /business/signin?rejected=1 when approvalStatus is rejected', async () => {
+      const token = await mintBusinessJwt({ approvalStatus: 'rejected' })
+      const req = makeNextRequest('http://localhost/business/products', {
+        headers: { 'x-forwarded-host': 'localhost' },
+        cookies: { business_sid: token },
+      })
+      const res = await middleware(req)
+      expect(res.status).toBe(307)
+      expect(res.headers.get('location')).toContain('rejected=1')
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // admin subdomain — non-admin-API, non-admin-path branches
+  // -------------------------------------------------------------------------
+  describe('admin subdomain — non-admin-path branches', () => {
+    it('passes non-admin API paths through on admin subdomain without auth', async () => {
+      const req = makeNextRequest('https://admin.jeffistores.in/api/products', {
+        headers: { 'x-forwarded-host': 'admin.jeffistores.in' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(401)
+      expect(res.status).not.toBe(307)
+    })
+
+    it('redirects business/* paths on admin subdomain to business subdomain', async () => {
+      const req = makeNextRequest('https://admin.jeffistores.in/business/signin', {
+        headers: { 'x-forwarded-host': 'admin.jeffistores.in' },
+      })
+      const res = await middleware(req)
+      expect(res.status).toBe(307)
+      const loc = res.headers.get('location') ?? ''
+      expect(loc).toContain('business.')
+    })
+
+    it('rewrites admin subdomain path to /admin/* when token is valid (x-pathname set)', async () => {
+      mockVerifyToken.mockResolvedValue(ADMIN_PAYLOAD)
+
+      const req = makeNextRequest('https://admin.jeffistores.in/products', {
+        headers: { 'x-forwarded-host': 'admin.jeffistores.in' },
+        cookies: { admin_sid: 'valid-token' },
+      })
+      const res = await middleware(req)
+      expect(res.headers.get('x-user-id')).toBe('admin-001')
+    })
+
+    it('redirects to /login and clears cookie when admin token is invalid on subdomain', async () => {
+      mockVerifyToken.mockResolvedValue(null)
+
+      const req = makeNextRequest('https://admin.jeffistores.in/products', {
+        headers: { 'x-forwarded-host': 'admin.jeffistores.in' },
+        cookies: { admin_sid: 'invalid-token' },
+      })
+      const res = await middleware(req)
+      expect(res.status).toBe(307)
+      expect(res.headers.get('location')).toContain('/login')
+    })
+
+    it('blocks mobile UA from admin write paths on subdomain and redirects to parent', async () => {
+      mockVerifyToken.mockResolvedValue(ADMIN_PAYLOAD)
+
+      const req = makeNextRequest('https://admin.jeffistores.in/products/edit/abc', {
+        headers: {
+          'x-forwarded-host': 'admin.jeffistores.in',
+          'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0 like Mac OS X) Mobile/15E148',
+        },
+        cookies: { admin_sid: 'valid-token' },
+      })
+      const res = await middleware(req)
+      expect(res.status).toBe(307)
+      const loc = res.headers.get('location') ?? ''
+      expect(loc).toContain('desktop_required=1')
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // Mobile UA — admin write path block on /admin/* direct paths
+  // -------------------------------------------------------------------------
+  describe('mobile UA write path block on /admin/* (localhost)', () => {
+    it('blocks mobile UA from /admin/products/edit/* and redirects with desktop_required', async () => {
+      mockVerifyToken.mockResolvedValue(ADMIN_PAYLOAD)
+
+      const req = makeNextRequest('http://localhost/admin/products/edit/abc', {
+        headers: {
+          'x-forwarded-host': 'localhost',
+          'user-agent': 'Mozilla/5.0 (Android 12; Mobile) AppleWebKit/537.36',
+        },
+        cookies: { admin_sid: 'valid-token' },
+      })
+      const res = await middleware(req)
+      expect(res.status).toBe(307)
+      const loc = res.headers.get('location') ?? ''
+      expect(loc).toContain('desktop_required=1')
+      expect(loc).toContain('/admin/products')
+    })
+
+    it('does NOT block desktop UA from /admin/products/edit/*', async () => {
+      mockVerifyToken.mockResolvedValue(ADMIN_PAYLOAD)
+
+      const req = makeNextRequest('http://localhost/admin/products/edit/abc', {
+        headers: {
+          'x-forwarded-host': 'localhost',
+          'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+        cookies: { admin_sid: 'valid-token' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(307)
+    })
+
+    it('does NOT block mobile UA from /admin/orders/* (orders are exempt)', async () => {
+      mockVerifyToken.mockResolvedValue(ADMIN_PAYLOAD)
+
+      const req = makeNextRequest('http://localhost/admin/orders/edit/123', {
+        headers: {
+          'x-forwarded-host': 'localhost',
+          'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 16_0) Mobile/15E148',
+        },
+        cookies: { admin_sid: 'valid-token' },
+      })
+      const res = await middleware(req)
+      // orders are not in isAdminWritePath pattern, so it passes through
+      expect(res.status).not.toBe(307)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // isMobileUA — null UA
+  // -------------------------------------------------------------------------
+  describe('isMobileUA null user-agent', () => {
+    it('does not redirect when user-agent header is absent on an admin write path', async () => {
+      mockVerifyToken.mockResolvedValue(ADMIN_PAYLOAD)
+
+      // No user-agent header → isMobileUA returns false → no mobile redirect
+      const req = makeNextRequest('http://localhost/admin/products/edit/abc', {
+        headers: { 'x-forwarded-host': 'localhost' },
+        cookies: { admin_sid: 'valid-token' },
+      })
+      const res = await middleware(req)
+      expect(res.status).not.toBe(307)
+    })
+  })
+
+  // -------------------------------------------------------------------------
+  // buildRedirectUrl — x-forwarded-proto / x-forwarded-host usage
+  // -------------------------------------------------------------------------
+  describe('buildRedirectUrl — forwarded headers', () => {
+    it('uses x-forwarded-host and x-forwarded-proto when building redirect URL', async () => {
+      // No token — triggers redirect to /admin/login. The redirect URL should use the forwarded host/proto.
+      const req = makeNextRequest('http://localhost/admin/dashboard', {
+        headers: {
+          'x-forwarded-host': 'admin.jeffistores.in',
+          'x-forwarded-proto': 'https',
+        },
+      })
+      const res = await middleware(req)
+      expect(res.status).toBe(307)
+      const loc = res.headers.get('location') ?? ''
+      expect(loc).toContain('admin.jeffistores.in')
     })
   })
 })

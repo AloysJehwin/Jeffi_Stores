@@ -263,6 +263,8 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [loaded, setLoaded] = useState(false)
+  const [poPage, setPoPage] = useState(0)
+  const PO_PAGE_SIZE = 5
 
   function toggle() {
     setOpen(o => {
@@ -283,7 +285,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
       <button
         type="button"
         onClick={toggle}
-        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 text-left hover:bg-surface-secondary transition-colors focus:outline-none"
       >
         <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Supplier Details</p>
         <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${open ? 'rotate-180' : ''}`} />
@@ -315,22 +317,95 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                 )}
               </div>
 
-              {/* Last Purchase Price */}
-              {data.lastPurchasePrice != null && (
-                <div className="flex items-center gap-3 bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg px-3 py-2">
-                  <div>
-                    <p className="text-[11px] text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide">Last Purchase Price</p>
-                    <p className="text-lg font-bold text-accent-700 dark:text-accent-300">
-                      {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(data.lastPurchasePrice)}
-                    </p>
+              {/* Suppliers by price — grouped per leaf (product / variant / sub-variant) */}
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-foreground-muted mb-2">Suppliers (by price)</p>
+                {data.suppliers?.length > 0 ? (
+                  <div className="space-y-4">
+                    {(() => {
+                      const NIL = '00000000-0000-0000-0000-000000000000'
+                      const bestByLeaf: Record<string, string> = data.bestByLeaf || {}
+                      // Group suppliers by leaf, preserving the price-ascending order the API returns.
+                      const groups = new Map<string, { label: string; rows: any[] }>()
+                      for (const row of data.suppliers as any[]) {
+                        const key = `${row.variant_id || NIL}:${row.sub_variant_id || NIL}`
+                        let g = groups.get(key)
+                        if (!g) {
+                          const label = row.sub_variant_id
+                            ? `Sub-variant: ${row.sub_variant_name || row.sub_variant_id}`
+                            : row.variant_id
+                            ? `Variant: ${row.variant_name || row.variant_id}`
+                            : 'Product'
+                          g = { label, rows: [] }
+                          groups.set(key, g)
+                        }
+                        g.rows.push(row)
+                      }
+                      return Array.from(groups.entries()).map(([leafKey, g]) => {
+                        const fmt = (v: number) => new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(v)
+                        const leafLowest = data.lowestHistByLeaf?.[leafKey]
+                        const leafLast = data.lastPurchaseByLeaf?.[leafKey]
+                        return (
+                        <div key={leafKey} className="space-y-2">
+                          <p className="text-[11px] font-medium text-foreground-secondary mb-1">{g.label}</p>
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-xs">
+                              <thead>
+                                <tr className="border-b border-border-default text-foreground-muted">
+                                  <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
+                                  <th className="text-right pb-1.5 pr-3 font-medium">Buy Price</th>
+                                  <th className="text-center pb-1.5 pr-3 font-medium">Preferred</th>
+                                  <th className="text-right pb-1.5 pr-3 font-medium">MOQ</th>
+                                  <th className="text-right pb-1.5 font-medium">Lead (days)</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-border-default">
+                                {g.rows.map((row: any) => {
+                                  const isBest = row.supplier_id === bestByLeaf[leafKey]
+                                  return (
+                                    <tr key={row.id} className={isBest ? 'bg-accent-50 dark:bg-accent-900/20' : 'hover:bg-surface-secondary transition-colors'}>
+                                      <td className="py-1.5 pr-3">
+                                        <Link href={`/admin/suppliers/${row.supplier_id}`} className="text-accent-600 hover:underline">{row.supplier_name}</Link>
+                                        {isBest && <span className="ml-2 text-[10px] font-semibold uppercase tracking-wide text-accent-700 dark:text-accent-300">Best</span>}
+                                      </td>
+                                      <td className="py-1.5 pr-3 text-right font-semibold text-foreground">
+                                        {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}
+                                      </td>
+                                      <td className="py-1.5 pr-3 text-center">{row.is_preferred ? '★' : '—'}</td>
+                                      <td className="py-1.5 pr-3 text-right text-foreground-muted">{row.moq ?? '—'}</td>
+                                      <td className="py-1.5 text-right text-foreground-muted">{row.lead_time_days ?? '—'}</td>
+                                    </tr>
+                                  )
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                          {(leafLowest != null || leafLast) && (
+                            <div className="flex flex-wrap gap-2 pt-1">
+                              {leafLowest != null && (
+                                <div className="flex-1 min-w-[130px] bg-surface border border-border-default rounded-lg px-3 py-2">
+                                  <p className="text-[10px] text-foreground-muted font-medium uppercase tracking-wide">Lowest ever paid (PO)</p>
+                                  <p className="text-sm font-bold text-foreground">{fmt(leafLowest)}</p>
+                                </div>
+                              )}
+                              {leafLast && (
+                                <div className="flex-1 min-w-[130px] bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-700 rounded-lg px-3 py-2">
+                                  <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium uppercase tracking-wide">Last Purchase Price</p>
+                                  <p className="text-sm font-bold text-accent-700 dark:text-accent-300">{fmt(leafLast.price)}</p>
+                                  <p className="text-[10px] text-foreground-muted">{new Date(leafLast.date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}</p>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        )
+                      })
+                    })()}
                   </div>
-                  {data.lastPurchaseDate && (
-                    <p className="text-xs text-foreground-muted ml-auto">
-                      {new Date(data.lastPurchaseDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                    </p>
-                  )}
-                </div>
-              )}
+                ) : (
+                  <p className="text-xs text-foreground-muted italic">No suppliers linked — edit product to add suppliers &amp; prices.</p>
+                )}
+              </div>
 
               {/* Purchase History */}
               <div>
@@ -339,43 +414,64 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                   <Link href={`/admin/inventory?tab=pos`} className="text-xs text-accent-600 hover:underline">View all POs →</Link>
                 </div>
                 {data.purchaseHistory?.length > 0 ? (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs">
-                      <thead>
-                        <tr className="border-b border-border-default text-foreground-muted">
-                          <th className="text-left pb-1.5 pr-3 font-medium">PO #</th>
-                          <th className="text-left pb-1.5 pr-3 font-medium">Date</th>
-                          <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
-                          <th className="text-left pb-1.5 pr-3 font-medium">Variant</th>
-                          <th className="text-right pb-1.5 pr-3 font-medium">Qty</th>
-                          <th className="text-right pb-1.5 pr-3 font-medium">Unit Cost</th>
-                          <th className="text-right pb-1.5 font-medium">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border-default">
-                        {data.purchaseHistory.map((row: any) => (
-                          <tr key={`${row.po_id}-${row.variant_name}`} className="hover:bg-surface-secondary transition-colors">
-                            <td className="py-1.5 pr-3 font-mono text-accent-600">
-                              <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">{row.po_number}</Link>
-                            </td>
-                            <td className="py-1.5 pr-3 text-foreground-secondary">
-                              {new Date(row.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
-                            </td>
-                            <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
-                            <td className="py-1.5 pr-3 text-foreground-muted">{row.variant_name ?? '—'}</td>
-                            <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
-                            <td className="py-1.5 pr-3 text-right text-foreground">
-                              {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}
-                            </td>
-                            <td className="py-1.5 text-right text-foreground">
-                              {row.line_total_incl_gst != null
-                                ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.line_total_incl_gst))
-                                : '—'}
-                            </td>
+                  <div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-border-default text-foreground-muted">
+                            <th className="text-left pb-1.5 pr-3 font-medium">PO #</th>
+                            <th className="text-left pb-1.5 pr-3 font-medium">Date</th>
+                            <th className="text-left pb-1.5 pr-3 font-medium">Supplier</th>
+                            <th className="text-left pb-1.5 pr-3 font-medium">SKU</th>
+                            <th className="text-right pb-1.5 pr-3 font-medium">Qty</th>
+                            <th className="text-right pb-1.5 pr-3 font-medium">Unit Cost</th>
+                            <th className="text-right pb-1.5 font-medium">Total</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                        </thead>
+                        <tbody className="divide-y divide-border-default">
+                          {data.purchaseHistory.slice(poPage * PO_PAGE_SIZE, (poPage + 1) * PO_PAGE_SIZE).map((row: any, idx: number) => (
+                            <tr key={`${row.po_id}-${poPage}-${idx}`} className="hover:bg-surface-secondary transition-colors">
+                              <td className="py-1.5 pr-3 font-mono text-accent-600">
+                                <Link href={`/admin/inventory?tab=pos&po=${row.po_id}`} className="hover:underline">{row.po_number}</Link>
+                              </td>
+                              <td className="py-1.5 pr-3 text-foreground-secondary">
+                                {new Date(row.order_date).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
+                              <td className="py-1.5 pr-3 text-foreground-muted">
+                                {row.sku
+                                  ? <span className="font-mono text-xs text-foreground">{row.sku}</span>
+                                  : row.sub_variant_name
+                                    ? <span>{row.variant_name ? `${row.variant_name} — ` : ''}{row.sub_variant_name}</span>
+                                    : row.variant_name || '—'}
+                              </td>
+                              <td className="py-1.5 pr-3 text-right text-foreground">{row.quantity}</td>
+                              <td className="py-1.5 pr-3 text-right text-foreground">
+                                {new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.unit_cost))}
+                              </td>
+                              <td className="py-1.5 text-right text-foreground">
+                                {row.line_total_incl_gst != null
+                                  ? new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(Number(row.line_total_incl_gst))
+                                  : '—'}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    {data.purchaseHistory.length > PO_PAGE_SIZE && (
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-border-default">
+                        <span className="text-[11px] text-foreground-muted">
+                          {poPage * PO_PAGE_SIZE + 1}–{Math.min((poPage + 1) * PO_PAGE_SIZE, data.purchaseHistory.length)} of {data.purchaseHistory.length}
+                        </span>
+                        <div className="flex gap-1">
+                          <button onClick={() => setPoPage(p => p - 1)} disabled={poPage === 0}
+                            className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors">‹ Prev</button>
+                          <button onClick={() => setPoPage(p => p + 1)} disabled={(poPage + 1) * PO_PAGE_SIZE >= data.purchaseHistory.length}
+                            className="px-2 py-0.5 text-xs rounded border border-border-default disabled:opacity-30 hover:bg-surface-secondary transition-colors">Next ›</button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <p className="text-xs text-foreground-muted italic">No purchase history found for this product.</p>
@@ -665,8 +761,17 @@ export default function ProductDetailClient({ id }: { id: string }) {
               </>}
             </CollapsibleCard>
 
-            {/* — Supplier Details — */}
-            <SupplierDetailsCard productId={id} />
+            {/* — Description — */}
+            {p.description && (
+              <CollapsibleCard title="Description">
+                <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{p.description}</p>
+              </CollapsibleCard>
+            )}
+
+            {/* — Selling Units — */}
+            <CollapsibleCard title="Selling Units">
+              <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
+            </CollapsibleCard>
 
             {/* — Physical & Compliance — */}
             <CollapsibleCard title="Physical & Compliance">
@@ -724,6 +829,9 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </CollapsibleCard>
           </div>
 
+          {/* — Supplier Details — */}
+          <SupplierDetailsCard productId={id} />
+
           {/* — Specifications — */}
           {p.specifications && Object.keys(p.specifications).length > 0 && (
             <CollapsibleCard title="Specifications">
@@ -743,13 +851,6 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <CollapsibleCard title="Short Description">
               <p className="text-sm text-foreground leading-relaxed">{p.short_description}</p>
             </CollapsibleCard>
-          )}
-
-          {p.description && (
-            <div className="bg-surface-elevated rounded-xl border border-border-default p-4">
-              <p className="text-xs font-semibold uppercase tracking-wide text-foreground-secondary mb-2">Description</p>
-              <p className="text-sm text-foreground leading-relaxed whitespace-pre-line">{p.description}</p>
-            </div>
           )}
 
           {(p.ai_description || p.ai_product_type || p.ai_use_cases?.length || p.ai_keywords?.length || p.ai_features?.length || p.ai_search_tags?.length || p.ai_who_uses_it || p.ai_application) && (
@@ -824,17 +925,11 @@ export default function ProductDetailClient({ id }: { id: string }) {
             </div>
           )}
 
-          {/* — Selling Units & Shelf Locations — */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
-            <CollapsibleCard title="Selling Units">
-              <UnitsManager productId={p.id} basePrice={p.base_price} readOnly />
+          {shelfStock.length > 0 && (
+            <CollapsibleCard title="Shelf Locations">
+              <ShelfBadges rows={shelfStock} />
             </CollapsibleCard>
-            {shelfStock.length > 0 && (
-              <CollapsibleCard title="Shelf Locations">
-                <ShelfBadges rows={shelfStock} />
-              </CollapsibleCard>
-            )}
-          </div>
+          )}
 
           <div className="flex gap-4 text-xs text-foreground-muted">
             <span>Created {formatDate(p.created_at)}</span>
@@ -854,6 +949,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
                 <tr>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Variant</th>
                   <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden sm:table-cell">SKU</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden lg:table-cell">Amazon ASIN</th>
+                  <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden xl:table-cell">ISBN</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary">Price (incl. GST)</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">Ex-GST</th>
                   <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-foreground-secondary hidden md:table-cell">MRP</th>
@@ -934,7 +1031,13 @@ export default function ProductDetailClient({ id }: { id: string }) {
                         )}
                       </td>
                       <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">{v.sku || '—'}</td>
-                      <td className="px-4 py-3 text-right text-foreground">{vMinPrice > 0 ? (hasSubs ? `From ${formatINR(vMinPrice)}` : formatINR(vMinPrice)) : '—'}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-foreground-muted hidden lg:table-cell">
+                        {v.asin ? (
+                          <span title={v.asin_match ? `matched via ${v.asin_match}` : undefined}>{v.asin}</span>
+                        ) : '—'}
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-foreground-muted hidden xl:table-cell">{v.isbn || '—'}</td>
+                      <td className="px-4 py-3 text-right text-foreground">{!hasSubs && vMinPrice > 0 ? formatINR(vMinPrice) : '—'}</td>
                       <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.price_ex_gst ? formatINR(Number(v.price_ex_gst)) : '—'}</td>
                       <td className="px-4 py-3 text-right text-foreground-secondary hidden md:table-cell">{!hasSubs && v.mrp ? formatINR(Number(v.mrp)) : '—'}</td>
                       <td className={`px-4 py-3 text-right font-semibold ${vStockColor}`}>{vInventory}</td>
@@ -962,6 +1065,8 @@ export default function ProductDetailClient({ id }: { id: string }) {
                         <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 transition-colors">
                           <td className="px-4 py-2 pl-10 text-sm text-foreground-secondary">↳ {sv.sub_variant_name}</td>
                           <td className="px-4 py-2 font-mono text-xs text-foreground-muted hidden sm:table-cell">{sv.sku || '—'}</td>
+                          <td className="px-4 py-2 hidden lg:table-cell" />
+                          <td className="px-4 py-2 hidden xl:table-cell" />
                           <td className="px-4 py-2 text-right text-sm text-foreground">{sv.price ? formatINR(Number(sv.price)) : '—'}</td>
                           <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.price_ex_gst ? formatINR(Number(sv.price_ex_gst)) : '—'}</td>
                           <td className="px-4 py-2 text-right text-sm text-foreground-secondary hidden md:table-cell">{sv.mrp ? formatINR(Number(sv.mrp)) : '—'}</td>

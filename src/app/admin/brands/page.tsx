@@ -48,12 +48,14 @@ async function getFilteredBrands(filters: { is_active?: string; search?: string;
 async function AddBrandButton() {
   const host = await getHost()
   return (
-    <Link
-      href={ap('/admin/brands/add', host)}
-      className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-    >
-      Add New Brand
-    </Link>
+    <div className="hidden md:block">
+      <Link
+        href={ap('/admin/brands/add', host)}
+        className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+      >
+        Add New Brand
+      </Link>
+    </div>
   )
 }
 
@@ -187,7 +189,7 @@ async function BrandsListContent({ resolvedSearchParams }: { resolvedSearchParam
                   </a>
                 </div>
               )}
-              <div className="flex items-center justify-end gap-3 text-sm">
+              <div className="hidden md:flex items-center justify-end gap-3 text-sm">
                 <Link href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">
                   Edit
                 </Link>

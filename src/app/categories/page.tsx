@@ -45,15 +45,19 @@ export default async function CategoriesPage() {
 
       <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {mainCategories.map((category) => {
+          {mainCategories.map((category, index) => {
             const subcategories = getSubcategories(category.id)
             const totalProducts = (productCounts[category.id] || 0) +
               subcategories.reduce((sum, sub) => sum + (productCounts[sub.id] || 0), 0)
+            // When the final row (lg 3-col) holds a single orphan card, place it in the middle
+            // column so it's centered instead of hanging left.
+            const isCenteredOrphan =
+              index === mainCategories.length - 1 && mainCategories.length % 3 === 1
 
             return (
               <div
                 key={category.id}
-                className="bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow"
+                className={`bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden hover:shadow-lg transition-shadow${isCenteredOrphan ? ' lg:col-start-2' : ''}`}
               >
                 <Link href={`/categories/${category.slug}`} className="block p-4 sm:p-6 group">
                   <div className="flex items-start justify-between mb-4">

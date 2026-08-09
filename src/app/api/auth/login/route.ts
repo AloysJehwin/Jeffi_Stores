@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { queryOne, query } from '@/lib/db'
-import { SignJWT } from 'jose'
+import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
+import { extractSessionSignals } from '@/lib/session-signals-request'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
@@ -10,7 +11,6 @@ import { POLICY_VERSION } from '@/app/legal/policies'
 if (!process.env.JWT_SECRET) {
   throw new Error('JWT_SECRET environment variable is not set')
 }
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 async function recordFailedLogin(req: NextRequest, email: string, reason: string, userId: string | null) {
   try {
@@ -82,20 +82,23 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const token = await new SignJWT({
+    const signals = extractSessionSignals(request)
+    const { sid } = await issueUserToken({
       userId: user.id,
       email: user.email,
       type: 'customer',
+      userAgent: signals.userAgent,
+      ip: signals.ip,
+      acceptLanguage: signals.acceptLanguage,
+      uaPlatform: signals.uaPlatform,
+      fpHash: signals.fpHash,
     })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setExpirationTime('30d')
-      .sign(JWT_SECRET)
 
-    cookieStore.set('auth_token', token, {
+    cookieStore.set('user_sid', sid, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60,
+      maxAge: USER_SESSION_TTL_S,
       path: '/',
       ...cookieDomainOption(),
     })
@@ -104,7 +107,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict',
-      maxAge: 30 * 24 * 60 * 60,
+      maxAge: USER_SESSION_TTL_S,
       path: '/',
       ...cookieDomainOption(),
     })

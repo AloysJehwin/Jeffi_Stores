@@ -1,6 +1,7 @@
-import { queryMany, queryOne, query } from '@/lib/db'
+import { queryOne, query } from '@/lib/db'
 import { productToGmcItems } from './mapper'
-import { upsertProduct, deleteProductByOfferId, listProducts, customBatchUpsert, MERCHANT_ID } from './client'
+import { fetchAllActiveProducts, fetchProduct } from './product-fetch'
+import { upsertProduct, deleteProductByOfferId, listProducts, customBatchUpsert, MERCHANT_ID, GMC_PUSH_DISABLED } from './client'
 
 const ADMIN_EMAIL = 'jeffistoress@jeffistores.in'
 const BATCH_SIZE = 100
@@ -12,63 +13,6 @@ interface SyncResult {
   errors: Array<{ sku: string; error: string }>
   startedAt: string
   finishedAt: string
-}
-
-async function fetchAllActiveProducts() {
-  return queryMany(`
-    SELECT p.*,
-      json_build_object(
-        'id', c.id, 'name', c.name, 'slug', c.slug,
-        'google_product_category', c.google_product_category,
-        'parent_name', pc.name,
-        'parent_google_product_category', pc.google_product_category
-      ) AS categories,
-      json_build_object('id', b.id, 'name', b.name) AS brands,
-      COALESCE(
-        (SELECT json_agg(pi ORDER BY pi.display_order)
-         FROM product_images pi WHERE pi.product_id = p.id),
-        '[]'::json
-      ) AS product_images,
-      COALESCE(
-        (SELECT json_agg(pv ORDER BY pv.variant_name)
-         FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
-        '[]'::json
-      ) AS product_variants
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN categories pc ON c.parent_category_id = pc.id
-    LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.is_active = true
-    ORDER BY p.created_at DESC
-  `)
-}
-
-async function fetchProduct(productId: string) {
-  return queryOne(`
-    SELECT p.*,
-      json_build_object(
-        'id', c.id, 'name', c.name, 'slug', c.slug,
-        'google_product_category', c.google_product_category,
-        'parent_name', pc.name,
-        'parent_google_product_category', pc.google_product_category
-      ) AS categories,
-      json_build_object('id', b.id, 'name', b.name) AS brands,
-      COALESCE(
-        (SELECT json_agg(pi ORDER BY pi.display_order)
-         FROM product_images pi WHERE pi.product_id = p.id),
-        '[]'::json
-      ) AS product_images,
-      COALESCE(
-        (SELECT json_agg(pv ORDER BY pv.variant_name)
-         FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true),
-        '[]'::json
-      ) AS product_variants
-    FROM products p
-    LEFT JOIN categories c ON p.category_id = c.id
-    LEFT JOIN categories pc ON c.parent_category_id = pc.id
-    LEFT JOIN brands b ON p.brand_id = b.id
-    WHERE p.id = $1
-  `, [productId])
 }
 
 async function getExistingGmcOfferIds(): Promise<Set<string>> {
@@ -105,6 +49,14 @@ async function saveSyncStatus(result: Partial<SyncResult> & { status: 'running' 
 }
 
 export async function syncAllProductsToMerchant(): Promise<SyncResult> {
+  if (GMC_PUSH_DISABLED) {
+    const now = new Date().toISOString()
+    return {
+      synced: 0, deleted: 0,
+      errors: [{ sku: '__disabled__', error: 'GMC push is disabled in this environment' }],
+      startedAt: now, finishedAt: now,
+    }
+  }
   const lockRes = await queryOne<{ acquired: boolean }>(
     `SELECT pg_try_advisory_lock($1) AS acquired`,
     [SYNC_LOCK_KEY]
@@ -195,26 +147,13 @@ async function runFullSync(): Promise<SyncResult> {
 }
 
 export async function syncProductToMerchant(productId: string): Promise<void> {
+  if (GMC_PUSH_DISABLED) return
   const product = await fetchProduct(productId)
 
   if (!product) return
 
-  if (!product.is_active) {
-    const skusToDelete: string[] = []
-    if (product.sku) skusToDelete.push(product.sku)
-    if (Array.isArray(product.product_variants)) {
-      for (const v of product.product_variants) {
-        if (v?.sku) skusToDelete.push(v.sku)
-      }
-    }
-    for (const sku of skusToDelete) {
-      try {
-        await deleteProductByOfferId(sku.replace(/[^a-zA-Z0-9_:.-]/g, '_'))
-      } catch (err) { console.error("[route]", err) }
-    }
-    return
-  }
-
+  // Inactive products stay in the feed as out_of_stock (handled by productToGmcItems),
+  // so we upsert them rather than delete.
   const items = productToGmcItems(product)
   for (const item of items) {
     await upsertProduct(item)

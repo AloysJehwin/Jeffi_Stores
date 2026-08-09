@@ -840,7 +840,7 @@ export default function CategoriesClient({
                   <span>{sub.slug}</span>
                   <span>Order: {sub.display_order}</span>
                 </div>
-                <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
+                <div className="hidden md:flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
                   <DraftEditButton entity="categories" id={sub.id} name={sub.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
                   <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                 </div>
@@ -888,7 +888,7 @@ export default function CategoriesClient({
                     <span>{cat.slug}</span>
                     <span>Order: {cat.display_order}</span>
                   </div>
-                  <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
+                  <div className="hidden md:flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
                     <DraftEditButton entity="categories" id={cat.id} name={cat.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
                     <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} onDeleted={() => handleCategoryDeleted(cat.id)} />
                   </div>
@@ -918,7 +918,7 @@ export default function CategoriesClient({
                       <span>{sub.slug}</span>
                       <span>Order: {sub.display_order}</span>
                     </div>
-                    <div className="flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
+                    <div className="hidden md:flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
                       <DraftEditButton entity="categories" id={sub.id} name={sub.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
                       <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                     </div>

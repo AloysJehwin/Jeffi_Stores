@@ -45,7 +45,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          slug                     = COALESCE(NULLIF(($2::jsonb)->>'slug', ''), slug),
          description              = ($2::jsonb)->>'description',
          short_description        = ($2::jsonb)->>'short_description',
-         base_price               = (($2::jsonb)->>'base_price')::numeric,
+         base_price               = COALESCE(NULLIF(($2::jsonb)->>'base_price', '')::numeric, 0),
          price_ex_gst             = NULLIF(($2::jsonb)->>'price_ex_gst', '')::numeric,
          currency                 = ($2::jsonb)->>'currency',
          weight                   = NULLIF(($2::jsonb)->>'weight', '')::numeric,
@@ -67,6 +67,7 @@ export async function publishProductDraft(productId: string): Promise<void> {
          height_cm                = NULLIF(($2::jsonb)->>'height_cm', '')::numeric,
          package_type             = ($2::jsonb)->>'package_type',
          cost_price               = NULLIF(($2::jsonb)->>'cost_price', '')::numeric,
+         supplier_id              = NULLIF(($2::jsonb)->>'supplier_id', '')::uuid,
          extra_delivery_days      = NULLIF(($2::jsonb)->>'extra_delivery_days', '')::integer,
          inventory_quantity       = COALESCE(NULLIF(($2::jsonb)->>'inventory_quantity', '')::numeric, 0),
          mrp_ex_gst               = NULLIF(($2::jsonb)->>'mrp_ex_gst', '')::numeric,
@@ -140,6 +141,10 @@ export async function publishProductDraft(productId: string): Promise<void> {
       [productId, JSON.stringify(draft.fields)]
     )
 
+    // NOTE: Leaf-level supplier reconcile runs AFTER the variant + sub-variant
+    // upserts below, so each row's variant_sku / sub_variant_sku resolves to a
+    // freshly-persisted id. See "Reconcile suppliers per leaf" further down.
+
     // UPSERT variants — never hard-delete to preserve FK references from POs/orders
     // Only process variants that have valid SKUs
     const validVariants = (variants as any[]).filter((v: any) => v.sku)
@@ -155,16 +160,19 @@ export async function publishProductDraft(productId: string): Promise<void> {
     await client.query(
       `INSERT INTO product_variants (
          product_id, sku, variant_name, price, attributes, is_active, mrp,
-         price_ex_gst, mpn, gtin, pricing_type, unit, numeric_value,
+         price_ex_gst, mpn, gtin, asin, asin_match, isbn, pricing_type, unit, numeric_value,
          weight_grams, length_cm, breadth_cm, height_cm,
          package_type, cost_price, inventory_quantity, mrp_ex_gst,
          variant_type, sub_variant_type, sub_variant_type_on, use_own_images,
          discount_pct, stock_decimal_precision, sell_unit_id, stock_status,
          created_at, updated_at
        )
-       SELECT $1, v->>'sku', v->>'variant_name', (v->>'price')::numeric, v->'attributes',
+       SELECT $1, v->>'sku', v->>'variant_name', NULLIF(v->>'price','')::numeric, v->'attributes',
          COALESCE((v->>'is_active')::boolean, true), NULLIF(v->>'mrp','')::numeric,
-         NULLIF(v->>'price_ex_gst','')::numeric, v->>'mpn', v->>'gtin', COALESCE(NULLIF(v->>'pricing_type',''), 'unit'),
+         NULLIF(v->>'price_ex_gst','')::numeric, v->>'mpn', v->>'gtin',
+         NULLIF(v->>'asin',''), CASE WHEN NULLIF(v->>'asin','') IS NOT NULL THEN 'manual' ELSE NULL END,
+         NULLIF(v->>'isbn',''),
+         COALESCE(NULLIF(v->>'pricing_type',''), 'unit'),
          v->>'unit', NULLIF(v->>'numeric_value','')::numeric,
          NULLIF(v->>'weight_grams','')::integer, NULLIF(v->>'length_cm','')::numeric,
          NULLIF(v->>'breadth_cm','')::numeric, NULLIF(v->>'height_cm','')::numeric,
@@ -179,7 +187,11 @@ export async function publishProductDraft(productId: string): Promise<void> {
          variant_name = EXCLUDED.variant_name, price = EXCLUDED.price,
          attributes = EXCLUDED.attributes, is_active = EXCLUDED.is_active,
          mrp = EXCLUDED.mrp, price_ex_gst = EXCLUDED.price_ex_gst,
-         mpn = EXCLUDED.mpn, gtin = EXCLUDED.gtin, pricing_type = EXCLUDED.pricing_type,
+         mpn = EXCLUDED.mpn, gtin = EXCLUDED.gtin,
+         asin = COALESCE(EXCLUDED.asin, product_variants.asin),
+         asin_match = COALESCE(EXCLUDED.asin_match, product_variants.asin_match),
+         isbn = EXCLUDED.isbn,
+         pricing_type = EXCLUDED.pricing_type,
          unit = EXCLUDED.unit, numeric_value = EXCLUDED.numeric_value,
          weight_grams = EXCLUDED.weight_grams, length_cm = EXCLUDED.length_cm,
          breadth_cm = EXCLUDED.breadth_cm, height_cm = EXCLUDED.height_cm,
@@ -254,6 +266,13 @@ export async function publishProductDraft(productId: string): Promise<void> {
         }
         const svsForVariant = stagedSubVariants.filter((sv: any) => sv.variant_id === vid)
         for (const sv of svsForVariant) {
+          // Coerce empty-string / non-numeric form values to null (numeric columns
+          // reject ""). Draft sub-variants often arrive with price/mrp = "".
+          const num = (x: any): number | null => {
+            if (x == null || x === '') return null
+            const n = Number(x)
+            return Number.isFinite(n) ? n : null
+          }
           await client.query(
             `INSERT INTO product_sub_variants (variant_id, product_id, sku, sub_variant_name, price, mrp,
                price_ex_gst, mrp_ex_gst, attributes, is_active, inventory_quantity, discount_pct, stock_status,
@@ -261,16 +280,221 @@ export async function publishProductDraft(productId: string): Promise<void> {
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
             [
               vid, productId, sv.sku || null, sv.sub_variant_name,
-              sv.price != null ? sv.price : null,
-              sv.mrp != null ? sv.mrp : null,
-              sv.price_ex_gst != null ? sv.price_ex_gst : null,
-              sv.mrp_ex_gst != null ? sv.mrp_ex_gst : null,
+              num(sv.price),
+              num(sv.mrp),
+              num(sv.price_ex_gst),
+              num(sv.mrp_ex_gst),
               sv.attributes || null,
               sv.is_active != null ? sv.is_active : true,
-              sv.inventory_quantity != null ? sv.inventory_quantity : 0,
-              sv.discount_pct != null ? sv.discount_pct : 0,
+              num(sv.inventory_quantity) ?? 0,
+              num(sv.discount_pct) ?? 0,
               sv.stock_status || 'In Stock',
             ]
+          )
+        }
+      }
+    }
+
+    // ── Reconcile suppliers per LEAF ─────────────────────────────────────────
+    // Runs AFTER the variant + sub-variant upserts above so variant_sku /
+    // sub_variant_sku carried on each draft row resolves to a persisted id.
+    // Carrier: one flat fields.product_suppliers array. Each row optionally
+    // carries variant_sku (variant leaf) or sub_variant_sku (sub-variant leaf),
+    // or neither (product leaf). We resolve the SKU to an id, group rows per
+    // leaf, and reconcile each leaf scoped by (product_id, variant_id,
+    // sub_variant_id) using IS NOT DISTINCT FROM for the nullable leaf columns.
+    const draftSuppliers = Array.isArray((draft.fields as any)?.product_suppliers)
+      ? ((draft.fields as any).product_suppliers as any[])
+      : null
+    if (draftSuppliers) {
+      // Resolve each row to a leaf { variantId, subVariantId } — skip rows whose
+      // tagged SKU does not resolve to a persisted variant/sub-variant.
+      const skuVariantCache = new Map<string, string | null>()
+      const skuSubVariantCache = new Map<string, string | null>()
+      async function resolveVariantId(sku: string): Promise<string | null> {
+        if (skuVariantCache.has(sku)) return skuVariantCache.get(sku) ?? null
+        const r = await client.query(
+          `SELECT id FROM product_variants WHERE product_id = $1 AND sku = $2 LIMIT 1`,
+          [productId, sku]
+        )
+        const id = r.rows[0]?.id ?? null
+        skuVariantCache.set(sku, id)
+        return id
+      }
+      async function resolveSubVariantId(variantId: string, subName: string): Promise<string | null> {
+        const cacheKey = `${variantId}:${subName}`
+        if (skuSubVariantCache.has(cacheKey)) return skuSubVariantCache.get(cacheKey) ?? null
+        const r = await client.query(
+          `SELECT id FROM product_sub_variants
+           WHERE product_id = $1 AND variant_id = $2 AND sub_variant_name = $3 AND is_active = true
+           ORDER BY created_at DESC LIMIT 1`,
+          [productId, variantId, subName]
+        )
+        const id = r.rows[0]?.id ?? null
+        skuSubVariantCache.set(cacheKey, id)
+        return id
+      }
+
+      // leafKey `${variantId||NIL}:${subVariantId||NIL}` -> { variantId, subVariantId, rows }
+      const NIL = '00000000-0000-0000-0000-000000000000'
+      const leaves = new Map<string, { variantId: string | null; subVariantId: string | null; rows: any[] }>()
+      for (const s of draftSuppliers) {
+        const supplierId = String(s.supplier_id || '').trim()
+        if (!supplierId) continue
+        let variantId: string | null = null
+        let subVariantId: string | null = null
+        const subName = s.sub_variant_name ? String(s.sub_variant_name) : ''
+        const varSku = s.variant_sku ? String(s.variant_sku) : ''
+        if (subName && varSku) {
+          // Sub-variant leaf: resolve parent variant by SKU, then sub-variant by name.
+          variantId = await resolveVariantId(varSku)
+          if (!variantId) continue
+          subVariantId = await resolveSubVariantId(variantId, subName)
+          if (!subVariantId) continue
+          variantId = null // leaf is the sub-variant, not the variant
+        } else if (varSku) {
+          variantId = await resolveVariantId(varSku)
+          if (!variantId) continue // SKU didn't resolve → skip row
+        }
+        const key = `${variantId || NIL}:${subVariantId || NIL}`
+        let leaf = leaves.get(key)
+        if (!leaf) { leaf = { variantId, subVariantId, rows: [] }; leaves.set(key, leaf) }
+        leaf.rows.push(s)
+      }
+
+      for (const { variantId, subVariantId, rows } of leaves.values()) {
+        const keepSupplierIds = rows
+          .map((s: any) => String(s.supplier_id || '').trim())
+          .filter(Boolean)
+        // Deactivate rows for this leaf whose supplier is no longer in the draft set.
+        await client.query(
+          `UPDATE product_suppliers SET is_active = false, is_preferred = false, updated_at = NOW()
+           WHERE product_id = $1
+             AND variant_id IS NOT DISTINCT FROM $2::uuid
+             AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+             AND is_active = true
+             AND supplier_id <> ALL($4::uuid[])`,
+          [productId, variantId, subVariantId, keepSupplierIds]
+        )
+
+        for (const s of rows) {
+          const supplierId = String(s.supplier_id || '').trim()
+          if (!supplierId) continue
+          const unitCost = Number(s.unit_cost)
+          if (!Number.isFinite(unitCost) || unitCost < 0) continue
+          const currency = s.currency ? String(s.currency).slice(0, 3) : 'INR'
+          const gstInclusive = !!s.gst_inclusive
+          const moq = s.moq != null && Number.isFinite(Number(s.moq)) ? Number(s.moq) : null
+          const leadTime = s.lead_time_days != null && Number.isInteger(Number(s.lead_time_days)) ? Number(s.lead_time_days) : null
+          const notes = s.notes ? String(s.notes).slice(0, 500) : null
+
+          // Current active row for this leaf + supplier (latest), if any.
+          const cur = await client.query(
+            `SELECT id, unit_cost FROM product_suppliers
+             WHERE product_id = $1
+               AND variant_id IS NOT DISTINCT FROM $2::uuid
+               AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+               AND supplier_id = $4 AND is_active = true
+             ORDER BY effective_date DESC, created_at DESC LIMIT 1`,
+            [productId, variantId, subVariantId, supplierId]
+          )
+          const existing = cur.rows[0]
+          if (!existing) {
+            await client.query(
+              `INSERT INTO product_suppliers
+                 (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, moq, lead_time_days, is_preferred, notes)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10)`,
+              [productId, variantId, subVariantId, supplierId, unitCost, currency, gstInclusive, moq, leadTime, notes]
+            )
+          } else if (Number(existing.unit_cost) !== unitCost) {
+            // Price changed → new dated row, deactivate old (preserve history).
+            await client.query(
+              `UPDATE product_suppliers SET is_active = false, is_preferred = false, updated_at = NOW() WHERE id = $1`,
+              [existing.id]
+            )
+            await client.query(
+              `INSERT INTO product_suppliers
+                 (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, moq, lead_time_days, is_preferred, notes)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false, $10)`,
+              [productId, variantId, subVariantId, supplierId, unitCost, currency, gstInclusive, moq, leadTime, notes]
+            )
+          } else {
+            await client.query(
+              `UPDATE product_suppliers
+                 SET currency = $1, gst_inclusive = $2, moq = $3, lead_time_days = $4, notes = $5,
+                     is_preferred = false, updated_at = NOW()
+               WHERE id = $6`,
+              [currency, gstInclusive, moq, leadTime, notes, existing.id]
+            )
+          }
+        }
+
+        // Set the single preferred flag LAST per leaf, matching the draft row.
+        await client.query(
+          `UPDATE product_suppliers SET is_preferred = false, updated_at = NOW()
+           WHERE product_id = $1
+             AND variant_id IS NOT DISTINCT FROM $2::uuid
+             AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+             AND is_preferred = true`,
+          [productId, variantId, subVariantId]
+        )
+        const preferredSupplierId = rows.find((s: any) => s.is_preferred)?.supplier_id
+        if (preferredSupplierId) {
+          await client.query(
+            `UPDATE product_suppliers SET is_preferred = true, updated_at = NOW()
+             WHERE id = (
+               SELECT id FROM product_suppliers
+               WHERE product_id = $1
+                 AND variant_id IS NOT DISTINCT FROM $2::uuid
+                 AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+                 AND supplier_id = $4 AND is_active = true
+               ORDER BY effective_date DESC, created_at DESC LIMIT 1
+             )`,
+            [productId, variantId, subVariantId, String(preferredSupplierId)]
+          )
+        }
+
+        // Denormalize the leaf's preferred supplier to its cache column.
+        // products.supplier_id (product leaf) is already handled by the main
+        // UPDATE above; here we cache the variant/sub-variant leaves.
+        const cachedSupplierId = preferredSupplierId ? String(preferredSupplierId) : null
+        if (subVariantId) {
+          await client.query(
+            `UPDATE product_sub_variants SET supplier_id = $2::uuid, updated_at = NOW() WHERE id = $1`,
+            [subVariantId, cachedSupplierId]
+          )
+        } else if (variantId) {
+          await client.query(
+            `UPDATE product_variants SET supplier_id = $2::uuid, updated_at = NOW() WHERE id = $1`,
+            [variantId, cachedSupplierId]
+          )
+        }
+      }
+
+      // Deactivate suppliers for leaves that are entirely absent from the draft
+      // (all suppliers removed). The per-leaf loop only visits leaves that still
+      // have >= 1 row; leaves with zero rows are skipped and their DB rows stay
+      // active without this cleanup.
+      const coveredLeafKeys = new Set(Array.from(leaves.keys()))
+      const dbLeaves = await client.query(
+        `SELECT DISTINCT
+           COALESCE(variant_id::text, '${NIL}') AS vid,
+           COALESCE(sub_variant_id::text, '${NIL}') AS svid,
+           variant_id, sub_variant_id
+         FROM product_suppliers
+         WHERE product_id = $1 AND is_active = true`,
+        [productId]
+      )
+      for (const row of dbLeaves.rows) {
+        const key = `${row.vid}:${row.svid}`
+        if (!coveredLeafKeys.has(key)) {
+          await client.query(
+            `UPDATE product_suppliers SET is_active = false, is_preferred = false, updated_at = NOW()
+             WHERE product_id = $1
+               AND variant_id IS NOT DISTINCT FROM $2::uuid
+               AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+               AND is_active = true`,
+            [productId, row.variant_id, row.sub_variant_id]
           )
         }
       }
