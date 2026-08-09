@@ -5,7 +5,7 @@ import { logoutAction } from './logout-action'
 import { hasScope } from '@/lib/scopes'
 import { getAdminSession } from '@/lib/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
-import { AdminMobileContext } from '@/contexts/AdminMobileContext'
+import { AdminMobileProvider } from '@/contexts/AdminMobileProvider'
 import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
 
 export const metadata = {
@@ -100,7 +100,7 @@ export default async function AdminLayout({
   const sidebarCollapsed = cookieStore.get('sidebar_collapsed')?.value === 'true'
 
   return (
-    <AdminMobileContext.Provider value={isMobile}>
+    <AdminMobileProvider isMobile={isMobile}>
       <AdminShell
         desktopNavLinks={desktopNavLinks}
         allNavLinks={filteredNavLinks}
@@ -114,6 +114,6 @@ export default async function AdminLayout({
         <DesktopRequiredBanner />
         {children}
       </AdminShell>
-    </AdminMobileContext.Provider>
+    </AdminMobileProvider>
   )
 }
