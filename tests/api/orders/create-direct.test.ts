@@ -464,3 +464,411 @@ describe('POST /api/orders/create-direct', () => {
     expect((await res.json()).message).toBe('Order created successfully')
   })
 })
+
+// ── targeted fallback branch coverage ────────────────────────────────────────
+describe('POST /api/orders/create-direct — targeted fallback branches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = {
+        query: vi.fn().mockResolvedValue({
+          rows: [{ id: 'order-ok', order_number: 'ORD-T', total_amount: '500', status: 'pending' }],
+        }),
+      }
+      return fn(client)
+    })
+  })
+
+  // Line 78: intentData.buyMode is non-null (covers ?? undefined right-hand side)
+  it('passes buyMode from intent when it is non-null', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(checkoutIntent.verifyIntent).mockResolvedValue({
+      mode: 'buy_now',
+      productId: 'prod-1',
+      variantId: null,
+      subVariantId: null,
+      qty: 1,
+      buyMode: 'box',   // non-null — covers the ?? undefined right side
+      buyUnit: 'dozen',
+    } as any)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+
+    const res = await POST(makeRequest({ paymentMethod: 'manual', intent: 'tok' }) as any)
+    expect(res.status).toBe(200)
+    expect(vi.mocked(orderCommit.resolveBuyNowItem)).toHaveBeenCalledWith(
+      expect.objectContaining({ buyMode: 'box', buyUnit: 'dozen' })
+    )
+  })
+
+  // Line 147: coupon present but validateCouponForUser returns ok=false — appliedDiscount stays 0
+  it('skips discount when coupon validation returns ok=false', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({ ok: false } as any)
+
+    const res = await POST(makeRequest({ ...VALID_BODY, couponId: 'bad-coupon' }) as any)
+    expect(res.status).toBe(200)
+  })
+
+  // Lines 153-154: category_id present but pct=0 — businessDiscountAmount stays 0
+  it('skips business discount when category pct is 0', async () => {
+    const { getBusinessDiscountMap } = await import('@/lib/business-discount')
+    vi.mocked(getBusinessDiscountMap).mockResolvedValue({ 'cat-1': 0 } as any)
+
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...MOCK_PRODUCT, category_id: 'cat-1' })
+      .mockResolvedValueOnce(null)
+
+    const res = await POST(makeRequest() as any)
+    expect(res.status).toBe(200)
+  })
+
+  // Line 174: shippingAddress has postal_code (snake_case) not postalCode
+  it('reads destinationPin from postal_code fallback on shippingAddress', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(40)
+
+    const res = await POST(makeRequest({
+      ...VALID_BODY,
+      // postal_code snake_case — not postalCode camelCase
+      shippingAddress: { postal_code: '600001', state: 'TN' },
+    }) as any)
+    expect(res.status).toBe(200)
+    expect(vi.mocked(orderCommit.quoteShipping)).toHaveBeenCalledWith(
+      expect.objectContaining({ destinationPin: '600001' })
+    )
+  })
+
+  // Lines 183-185: isGSTEnabled=true, isIGST=true path (inter-state order)
+  it('calculates IGST for inter-state order when GST enabled', async () => {
+    const { isInterState, calculateGST } = await import('@/lib/gst')
+    vi.mocked(isInterState).mockReturnValue(true)
+    vi.mocked(calculateGST).mockReturnValue({
+      totalTax: 90, taxableAmount: 500, cgst: 0, sgst: 0, igst: 90,
+    } as any)
+
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+
+    const res = await POST(makeRequest({
+      ...VALID_BODY,
+      shippingAddress: { postalCode: '110001', state: 'Delhi' },
+    }) as any)
+    expect(res.status).toBe(200)
+  })
+
+  // Lines 213-214: shippingAddress present with addressLine2 and landmark
+  it('stores landmark and addressLine2 when provided', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+
+    let capturedParams: any[] = []
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = {
+        query: vi.fn(async (sql: string, params?: any[]) => {
+          if (/SELECT \* FROM addresses/i.test(sql)) return { rows: [], rowCount: 0 }
+          if (/INSERT INTO addresses/i.test(sql)) {
+            capturedParams = params || []
+            return { rows: [{ id: 'addr-lm' }], rowCount: 1 }
+          }
+          return { rows: [{ id: 'order-lm', order_number: 'ORD-LM', total_amount: '500', status: 'pending' }], rowCount: 1 }
+        }),
+      }
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({
+      ...VALID_BODY,
+      shippingAddress: {
+        fullName: 'Test',
+        addressLine1: '1 Main',
+        addressLine2: 'Apt 2',
+        landmark: 'Near Park',
+        city: 'Pune',
+        state: 'Maharashtra',
+        postalCode: '411001',
+        country: 'India',
+      },
+    }) as any)
+    expect(res.status).toBe(200)
+    // addressLine2 and landmark should be passed to INSERT
+    expect(capturedParams).toContain('Apt 2')
+    expect(capturedParams).toContain('Near Park')
+  })
+
+  // Lines 263-266: isGSTEnabled branches inside withTransaction for order INSERT
+  it('sets non-razorpay order status to confirmed and sends emails', async () => {
+    const { sendOrderConfirmationEmail, sendNewOrderNotification } = await import('@/lib/email')
+
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+
+    const res = await POST(makeRequest({ ...VALID_BODY, paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(200)
+    expect(vi.mocked(db.query)).toHaveBeenCalledWith(
+      expect.stringMatching(/UPDATE orders SET status = 'confirmed'/),
+      expect.any(Array)
+    )
+    expect(vi.mocked(sendOrderConfirmationEmail)).toHaveBeenCalled()
+    expect(vi.mocked(sendNewOrderNotification)).toHaveBeenCalled()
+  })
+})
+describe('POST /api/orders/create-direct — additional branch coverage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = {
+        query: vi.fn().mockResolvedValue({
+          rows: [{ id: 'order-created', order_number: 'ORD-001', total_amount: '1000', status: 'pending' }],
+        }),
+      }
+      return fn(client)
+    })
+  })
+
+  it('returns 400 when body fails schema validation', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER)
+    // paymentMethod is invalid enum value
+    const res = await POST(makeRequest({ paymentMethod: 'bitcoin', item: VALID_ITEM }) as any)
+    expect(res.status).toBe(400)
+  })
+
+  it('uses client-supplied shippingAmount when live quote is 0 and client amount present', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null) // no existing unpaid
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null) // min_order_amount
+    // quoteShipping returns 0, clientShipping is 50
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(0)
+
+    const res = await POST(makeRequest({
+      ...VALID_BODY,
+      shippingAmount: 50,
+      shippingAddress: { postalCode: '400001', state: 'MH' },
+    }) as any)
+    expect(res.status).toBe(200)
+  })
+
+  it('uses live quote when quoteShipping returns non-zero', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(80)
+
+    const res = await POST(makeRequest({
+      ...VALID_BODY,
+      shippingAmount: 50,
+      shippingAddress: { postalCode: '400001', state: 'MH' },
+    }) as any)
+    expect(res.status).toBe(200)
+  })
+
+  it('handles address insert returning no rows gracefully', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = {
+        query: vi.fn()
+          .mockResolvedValueOnce({ rows: [], rowCount: 0 })   // address not found
+          .mockResolvedValueOnce({ rows: [], rowCount: 0 })   // INSERT address returns no rows
+          .mockResolvedValue({ rows: [{ id: 'order-xyz', order_number: 'ORD-999', total_amount: '500', status: 'pending' }], rowCount: 1 }),
+      }
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({
+      ...VALID_BODY,
+      shippingAddress: {
+        fullName: 'Test',
+        addressLine1: '123 St',
+        city: 'Chennai',
+        state: 'Tamil Nadu',
+        postalCode: '600001',
+      },
+    }) as any)
+    expect(res.status).toBe(200)
+  })
+
+  it('builds full name from user first+last when shippingAddress.fullName missing', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+
+    let capturedPhone: string | undefined
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = {
+        query: vi.fn(async (sql: string, params?: any[]) => {
+          if (/SELECT \* FROM addresses/i.test(sql)) return { rows: [], rowCount: 0 }
+          if (/INSERT INTO addresses/i.test(sql)) {
+            capturedPhone = params?.[3]
+            return { rows: [{ id: 'addr-new' }], rowCount: 1 }
+          }
+          return { rows: [{ id: 'order-new', order_number: 'ORD-X', total_amount: '500', status: 'pending' }], rowCount: 1 }
+        }),
+      }
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({
+      ...VALID_BODY,
+      shippingAddress: {
+        // no fullName — should fall back to user's first+last name
+        addressLine1: '1 Test St',
+        city: 'Hyderabad',
+        state: 'Telangana',
+        postalCode: '500001',
+      },
+    }) as any)
+    expect(res.status).toBe(200)
+    // phone falls back to user.phone
+    expect(capturedPhone).toBe(MOCK_USER.phone)
+  })
+
+  it('applies product discount_pct when non-zero', async () => {
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 2, price: 450 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...MOCK_PRODUCT, discount_pct: 10, mrp: '500' })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = {
+        query: vi.fn().mockResolvedValue({
+          rows: [{ id: 'order-created', order_number: 'ORD-001', total_amount: '900', status: 'pending' }],
+        }),
+      }
+      return fn(client)
+    })
+    const res = await POST(makeRequest() as any)
+    expect(res.status).toBe(200)
+  })
+
+  it('uses variant mrp when variant exists and has mrp', async () => {
+    const VARIANT_ID = '550e8400-e29b-41d4-a716-446655440099'
+    const MOCK_VARIANT = { id: VARIANT_ID, variant_name: 'Large', sku: 'SKU-L', mrp: '650' }
+
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: VARIANT_ID, subVariantId: null, qty: 1, price: 600 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(MOCK_VARIANT)
+    const res = await POST(makeRequest({
+      paymentMethod: 'manual',
+      item: { productId: '550e8400-e29b-41d4-a716-446655440001', variantId: VARIANT_ID, qty: 1 },
+    }) as any)
+    expect(res.status).toBe(200)
+  })
+})
