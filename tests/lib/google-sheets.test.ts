@@ -202,7 +202,7 @@ describe('syncAllProductsToSheet', () => {
 
     await syncAllProductsToSheet()
     const calls = mockFetch.mock.calls.map(c => String(c[0]))
-    expect(calls.some(url => url.includes('AM1'))).toBe(true)
+    expect(calls.some(url => url.includes('AN1'))).toBe(true)
   })
 
   it('handles variant products — inserts one row per variant', async () => {
