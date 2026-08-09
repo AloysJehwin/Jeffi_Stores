@@ -211,3 +211,15 @@ describe('POST /api/admin/customers/[id]/tasks', () => {
     )
   })
 })
+
+  it('uses admin.adminId as assigned_to when not provided', async () => {
+    mockAuth.mockResolvedValue(adminPayload)
+    mockHasScope.mockReturnValue(true)
+    mockQuery.mockResolvedValue({ rows: [{ id: 'task-x' }], rowCount: 1 } as any)
+    await POST(
+      makePostRequest(CUSTOMER_ID, { title: 'No assignee task' }),
+      { params: Promise.resolve({ id: CUSTOMER_ID }) }
+    )
+    const callArgs = mockQuery.mock.calls[0]!
+    expect(callArgs[1]![2]).toBe(adminPayload.adminId)
+  })
