@@ -25,6 +25,7 @@ export interface JWTPayload {
   first_name?: string
   last_name?: string
   email?: string
+  displayName?: string
   role: string
   scopes: string[]
   authCertCN?: string
@@ -82,6 +83,7 @@ export async function verifyToken(token: string, current?: string | null | Sessi
     scopes: s.scopes,
     authCertCN: s.certCN || undefined,
     sid: s.sid,
+    displayName: s.displayName || undefined,
   }
 }
 

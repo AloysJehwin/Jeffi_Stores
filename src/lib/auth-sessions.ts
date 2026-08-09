@@ -341,7 +341,7 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     query(`UPDATE auth_sessions SET last_seen_at = now() WHERE id = $1`, [row.id]).catch(() => {})
   }
 
-  const displayName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || row.email || null
+  const displayName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || null
   return {
     sid,
     principalType: row.principal_type,

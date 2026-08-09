@@ -109,7 +109,7 @@ export default async function AdminDashboard() {
       const payload = await verifyToken(token) as { adminId?: string; first_name?: string; last_name?: string; email?: string; role?: string; scopes?: string[] } | null
       const full = [payload?.first_name, payload?.last_name].filter(Boolean).join(' ').trim()
       if (full) displayName = full
-      else if (payload?.email) displayName = payload.email
+      else displayName = displayName || 'Admin'
       if (!role && payload?.role) role = payload.role
       if (!adminId && payload?.adminId) adminId = payload.adminId
       if (scopes.length === 0 && Array.isArray(payload?.scopes)) scopes = payload!.scopes as string[]
