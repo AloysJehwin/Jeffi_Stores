@@ -139,20 +139,120 @@ describe('GET /api/admin/quotations', () => {
 
     await quotationsGET(makeReq('http://localhost/api/admin/quotations?status=draft'))
 
-    // Verify queryOne (count query) was called — with status param in conditions
     expect(queryOne).toHaveBeenCalled()
+    const countCall = vi.mocked(queryOne).mock.calls[0]
+    expect(countCall[1]).toContain('draft')
+  })
+
+  it('applies date range filters (from + to)', async () => {
+    vi.mocked(queryMany).mockResolvedValue([] as any)
+    vi.mocked(queryOne).mockResolvedValue({ total: '0' } as any)
+
+    const res = await quotationsGET(makeReq(
+      'http://localhost/api/admin/quotations?from=2024-01-01&to=2024-03-31'
+    ))
+    expect(res.status).toBe(200)
+    const countCall = vi.mocked(queryOne).mock.calls[0]
+    expect(countCall[1]).toEqual(expect.arrayContaining(['2024-01-01', '2024-03-31']))
+  })
+
+  it('applies text search via buildVectorSearchClause', async () => {
+    vi.mocked(queryMany).mockResolvedValue([] as any)
+    vi.mocked(queryOne).mockResolvedValue({ total: '0' } as any)
+    vi.mocked(buildVectorSearchClause).mockReturnValue({
+      clause: 'search_vector @@ to_tsquery($1)',
+      params: ['bolt'],
+      nextIdx: 2,
+    })
+
+    const res = await quotationsGET(makeReq('http://localhost/api/admin/quotations?q=bolt'))
+    expect(res.status).toBe(200)
+    expect(buildVectorSearchClause).toHaveBeenCalledWith(
+      'bolt', 'search_vector', expect.any(Array), expect.any(Array), expect.any(Number), 'simple'
+    )
+  })
+
+  it('applies all filters combined (status + q + from + to)', async () => {
+    vi.mocked(queryMany).mockResolvedValue([] as any)
+    vi.mocked(queryOne).mockResolvedValue({ total: '0' } as any)
+    vi.mocked(buildVectorSearchClause).mockReturnValue({ clause: 'TRUE', params: [], nextIdx: 3 })
+
+    const res = await quotationsGET(makeReq(
+      'http://localhost/api/admin/quotations?status=final&q=acme&from=2024-01-01&to=2024-12-31'
+    ))
+    expect(res.status).toBe(200)
+    expect(queryOne).toHaveBeenCalled()
+  })
+
+  it('applies whitelisted sort column (total_amount asc)', async () => {
+    vi.mocked(queryMany).mockResolvedValue([] as any)
+    vi.mocked(queryOne).mockResolvedValue({ total: '0' } as any)
+
+    const res = await quotationsGET(makeReq(
+      'http://localhost/api/admin/quotations?sort=total_amount&dir=asc'
+    ))
+    expect(res.status).toBe(200)
+    const dataCall = vi.mocked(queryMany).mock.calls[0]
+    expect(dataCall[0]).toContain('total_amount ASC')
+  })
+
+  it('ignores unknown sort column and falls back to created_at DESC', async () => {
+    vi.mocked(queryMany).mockResolvedValue([] as any)
+    vi.mocked(queryOne).mockResolvedValue({ total: '0' } as any)
+
+    const res = await quotationsGET(makeReq(
+      'http://localhost/api/admin/quotations?sort=injected_col&dir=desc'
+    ))
+    expect(res.status).toBe(200)
+    const dataCall = vi.mocked(queryMany).mock.calls[0]
+    expect(dataCall[0]).toContain('ORDER BY created_at DESC')
+    expect(dataCall[0]).not.toContain('injected_col')
+  })
+
+  it('caps pageSize at 200', async () => {
+    vi.mocked(queryMany).mockResolvedValue([] as any)
+    vi.mocked(queryOne).mockResolvedValue({ total: '0' } as any)
+
+    const res = await quotationsGET(makeReq('http://localhost/api/admin/quotations?pageSize=9999'))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.pageSize).toBe(200)
+  })
+
+  it('treats page < 1 as page 1', async () => {
+    vi.mocked(queryMany).mockResolvedValue([] as any)
+    vi.mocked(queryOne).mockResolvedValue({ total: '0' } as any)
+
+    const res = await quotationsGET(makeReq('http://localhost/api/admin/quotations?page=0'))
+    const json = await res.json()
+    expect(json.page).toBe(1)
+  })
+
+  it('handles null total from count query gracefully', async () => {
+    vi.mocked(queryOne).mockResolvedValue(null as any)
+    vi.mocked(queryMany).mockResolvedValue([] as any)
+
+    const res = await quotationsGET(makeReq('http://localhost/api/admin/quotations'))
+    const json = await res.json()
+    expect(res.status).toBe(200)
+    expect(json.total).toBe(0)
+  })
+
+  it('returns 500 on db error', async () => {
+    vi.mocked(queryOne).mockRejectedValue(new Error('PG timeout'))
+    const res = await quotationsGET(makeReq('http://localhost/api/admin/quotations'))
+    expect(res.status).toBe(500)
+    expect((await res.json()).error).toBe('PG timeout')
   })
 
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-
     const res = await quotationsGET(makeReq('http://localhost/api/admin/quotations'))
     expect(res.status).toBe(401)
   })
 
   it('returns 403 when quotations scope missing', async () => {
     vi.mocked(hasScope).mockReturnValue(false)
-
     const res = await quotationsGET(makeReq('http://localhost/api/admin/quotations'))
     expect(res.status).toBe(403)
   })
@@ -175,8 +275,8 @@ describe('POST /api/admin/quotations', () => {
 
   it('creates quotation with line items and returns 201', async () => {
     vi.mocked(queryOne)
-      .mockResolvedValueOnce({ max_seq: null } as any) // sequence lookup
-      .mockResolvedValueOnce(newQuote as any)          // INSERT returning *
+      .mockResolvedValueOnce({ max_seq: null } as any)
+      .mockResolvedValueOnce(newQuote as any)
     vi.mocked(query).mockResolvedValue(undefined as any)
     vi.mocked(queryMany).mockResolvedValue([SAMPLE_ITEM] as any)
 
@@ -209,12 +309,118 @@ describe('POST /api/admin/quotations', () => {
 
   it('returns 401 when unauthenticated', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(null as any)
-
     const res = await quotationsPOST(jsonReq('http://localhost/api/admin/quotations', {
       consignee_name: 'Acme Corp',
       items: [SAMPLE_ITEM],
     }))
     expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when scope missing', async () => {
+    vi.mocked(hasScope).mockReturnValue(false)
+    const res = await quotationsPOST(jsonReq('http://localhost/api/admin/quotations', {
+      consignee_name: 'Acme Corp',
+      items: [SAMPLE_ITEM],
+    }))
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 500 on db error', async () => {
+    vi.mocked(queryOne).mockRejectedValue(new Error('DB connection lost'))
+    const res = await quotationsPOST(jsonReq('http://localhost/api/admin/quotations', {
+      consignee_name: 'Acme Corp',
+      items: [SAMPLE_ITEM],
+    }))
+    expect(res.status).toBe(500)
+  })
+
+  it('increments sequence when prior quotes exist in month (max_seq > 0)', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ max_seq: '5' } as any)
+      .mockResolvedValueOnce({ id: 'new-qt', quote_number: 'QT/24-25/JAN/6', status: 'draft' } as any)
+    vi.mocked(query).mockResolvedValue(undefined as any)
+    vi.mocked(queryMany).mockResolvedValue([SAMPLE_ITEM] as any)
+
+    const res = await quotationsPOST(jsonReq('http://localhost/api/admin/quotations', {
+      consignee_name: 'Acme Corp',
+      items: [SAMPLE_ITEM],
+    }))
+    expect(res.status).toBe(201)
+    const json = await res.json()
+    expect(json.quotation.quote_number).toContain('/6')
+  })
+
+  it('stores buyer_same=false and buyer address fields', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ max_seq: null } as any)
+      .mockResolvedValueOnce({ id: 'qt-2', quote_number: 'QT/24-25/JAN/1', status: 'draft' } as any)
+    vi.mocked(query).mockResolvedValue(undefined as any)
+    vi.mocked(queryMany).mockResolvedValue([SAMPLE_ITEM] as any)
+
+    const res = await quotationsPOST(jsonReq('http://localhost/api/admin/quotations', {
+      consignee_name: 'Consignee Ltd',
+      buyer_same: false,
+      buyer_name: 'Buyer Corp',
+      buyer_addr1: '12 Park St',
+      buyer_city: 'Delhi',
+      buyer_state: 'Delhi',
+      buyer_gstin: '07AABCU9603R1ZP',
+      items: [SAMPLE_ITEM],
+    }))
+    expect(res.status).toBe(201)
+    const insertCall = vi.mocked(queryOne).mock.calls.find(([sql]) =>
+      (sql as string).includes('INSERT INTO quotations')
+    )
+    expect(insertCall).toBeDefined()
+  })
+
+  it('uses lineItemExGst to compute amount when item.amount is 0', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ max_seq: null } as any)
+      .mockResolvedValueOnce({ id: 'qt-3', quote_number: 'QT/24-25/JAN/1', status: 'draft' } as any)
+    vi.mocked(query).mockResolvedValue(undefined as any)
+    vi.mocked(queryMany).mockResolvedValue([{ ...SAMPLE_ITEM, amount: 0 }] as any)
+
+    const res = await quotationsPOST(jsonReq('http://localhost/api/admin/quotations', {
+      consignee_name: 'Acme Corp',
+      items: [{ ...SAMPLE_ITEM, amount: 0 }],
+    }))
+    expect(res.status).toBe(201)
+  })
+
+  it('uses provided amount when item.amount > 0', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ max_seq: null } as any)
+      .mockResolvedValueOnce({ id: 'qt-4', quote_number: 'QT/24-25/JAN/1', status: 'draft' } as any)
+    vi.mocked(query).mockResolvedValue(undefined as any)
+    vi.mocked(queryMany).mockResolvedValue([{ ...SAMPLE_ITEM, amount: 450 }] as any)
+
+    const res = await quotationsPOST(jsonReq('http://localhost/api/admin/quotations', {
+      consignee_name: 'Acme Corp',
+      items: [{ ...SAMPLE_ITEM, amount: 450 }],
+    }))
+    expect(res.status).toBe(201)
+  })
+
+  it('sets sell_unit_factor and base_quantity when sell_unit_factor > 1', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ max_seq: null } as any)
+      .mockResolvedValueOnce({ id: 'qt-5', quote_number: 'QT/24-25/JAN/1', status: 'draft' } as any)
+    vi.mocked(query).mockResolvedValue(undefined as any)
+    vi.mocked(queryMany).mockResolvedValue([SAMPLE_ITEM] as any)
+
+    const res = await quotationsPOST(jsonReq('http://localhost/api/admin/quotations', {
+      consignee_name: 'Acme Corp',
+      items: [{ ...SAMPLE_ITEM, sell_unit_factor: 10, buy_unit: 'BOX' }],
+    }))
+    expect(res.status).toBe(201)
+    const insertItemCalls = vi.mocked(query).mock.calls.filter(([sql]) =>
+      (sql as string).includes('INSERT INTO quotation_items')
+    )
+    expect(insertItemCalls).toHaveLength(1)
+    // sold_unit_factor param should be 10
+    const params = insertItemCalls[0][1] as any[]
+    expect(params).toContain(10)
   })
 })
 
@@ -226,7 +432,6 @@ describe('GET /api/admin/quotations/[id]', () => {
   beforeEach(() => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(hasScope).mockReturnValue(true)
-    // reset to null so each test sets its own return value
     vi.mocked(queryOne).mockReset()
     vi.mocked(queryMany).mockReset()
   })
@@ -275,8 +480,8 @@ describe('PATCH /api/admin/quotations/[id]', () => {
 
   it('updates quotation status', async () => {
     vi.mocked(queryOne)
-      .mockResolvedValueOnce(existing as any)  // existence check
-      .mockResolvedValueOnce(updated as any)   // UPDATE returning *
+      .mockResolvedValueOnce(existing as any)
+      .mockResolvedValueOnce(updated as any)
     vi.mocked(query).mockResolvedValue(undefined as any)
     vi.mocked(queryMany).mockResolvedValue([SAMPLE_ITEM] as any)
 
