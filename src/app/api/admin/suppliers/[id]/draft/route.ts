@@ -22,6 +22,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   const body = await req.json()
   await query(
     `INSERT INTO supplier_drafts (supplier_id, fields, updated_at)
@@ -37,6 +38,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   const draft = await queryOne<{ supplier_id: string; fields: Record<string, unknown> }>(
     `SELECT supplier_id, fields FROM supplier_drafts WHERE supplier_id = $1`, [id]
   )
@@ -61,6 +63,7 @@ export async function DELETE(req: NextRequest, { params }: Params) {
   const { id } = await params
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'inventory:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   await query(`DELETE FROM supplier_drafts WHERE supplier_id = $1`, [id])
   return NextResponse.json({ success: true })
 }

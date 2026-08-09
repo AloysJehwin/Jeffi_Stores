@@ -29,7 +29,7 @@ function parseAddress(raw: string | null): { addr1: string; addr2: string | null
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const admin = await requireAdminScope(request, 'business_rfqs')
+  const admin = await requireAdminScope(request, 'business_rfqs:write')
   if (admin instanceof NextResponse) return admin
 
   const rfq = await queryOne<any>(

@@ -4,7 +4,7 @@ import { queryOne, queryMany, query } from '@/lib/db'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const admin = await requireAdminScope(request, 'business_rfqs')
+  const admin = await requireAdminScope(request, 'business_rfqs:read')
   if (admin instanceof NextResponse) return admin
 
   const rfq = await queryOne<any>(`SELECT id FROM business_rfqs WHERE id = $1`, [id])
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const admin = await requireAdminScope(request, 'business_rfqs')
+  const admin = await requireAdminScope(request, 'business_rfqs:write')
   if (admin instanceof NextResponse) return admin
 
   try {

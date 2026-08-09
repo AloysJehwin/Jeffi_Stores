@@ -6,7 +6,7 @@ import { sendBusinessAccountApprovedEmail, sendBusinessAccountRejectedEmail } fr
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const admin = await requireAdminScope(request, 'business_customers')
+  const admin = await requireAdminScope(request, 'business_customers:write')
   if (admin instanceof NextResponse) return admin
 
   const { action, rejectionNote } = await request.json()
