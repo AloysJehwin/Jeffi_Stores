@@ -289,8 +289,399 @@ describe('GET /api/orders/[id]/invoice — extra branch coverage', () => {
   })
 })
 
+describe('GET /api/orders/[id]/invoice — auth branches', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(db.queryMany).mockResolvedValue([])
+  })
+
+  it('returns 401 when both user and admin auth are null', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(null)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when authenticated user does not own the order', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue({ userId: 'other-user' } as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ ...BASE, user_id: 'user-1' })
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 404 when order has no invoice number', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ ...BASE, invoice_number: null })
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(404)
+  })
+
+  it('returns 404 when order not found', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(404)
+  })
+
+  it('redirects when non-voided pdf_url is cached', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(BASE)
+      .mockResolvedValueOnce({ pdf_url: 'https://cached.s3.example.com/inv.pdf' })
+    const res = await GET(makeReq() as any, PARAMS)
+    // NextResponse.redirect produces a 307/308
+    expect([307, 308]).toContain(res.status)
+  })
+
+  it('handles invoice_date fallback to created_at', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...BASE, invoice_date: null })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    expect((args[0] as any).invoice_date).toBe(BASE.created_at)
+  })
+
+  it('builds destination from city+state when both present', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...BASE, city: 'Delhi', state: 'DL' })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    expect((args[0] as any).destination).toBe('Delhi, DL')
+  })
+
+  it('builds destination with only city when state is null', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...BASE, city: 'Mumbai', state: null })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    expect((args[0] as any).destination).toBe('Mumbai')
+  })
+
+  it('maps item with null mrp and null sold_unit_factor correctly', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(BASE)
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany)
+      .mockResolvedValueOnce([{
+        product_name: 'Bolt',
+        hsn_code: null,
+        gst_rate: null,
+        quantity: 1,
+        unit_price: '100',
+        total_price: '100',
+        discount_amount: null,
+        mrp: null,
+        sold_unit_factor: null,
+        taxable_amount: null,
+        cgst_amount: null,
+        sgst_amount: null,
+        igst_amount: null,
+        buy_mode: null,
+        buy_unit: null,
+      }])
+      .mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    const items = args[1] as any[]
+    expect(items[0].mrp).toBeNull()
+    expect(items[0].sold_unit_factor).toBeNull()
+    expect(items[0].buy_mode).toBe('unit')
+    expect(items[0].hsn_code).toBeNull()
+  })
+
+  it('uses customer_name fallback when full_name is null for buyerAddress', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...BASE, full_name: null })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    expect((args[3] as any).full_name).toBe(BASE.customer_name)
+  })
+
+  it('sets address_line2 to null when field is undefined', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    // address_line2 is omitted entirely (undefined) rather than null
+    const orderNoLine2 = { ...BASE }
+    delete (orderNoLine2 as any).address_line2
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(orderNoLine2)
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    expect((args[3] as any).address_line2).toBeNull()
+  })
+
+  it('builds empty destination when both city and state are null', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...BASE, city: null, state: null })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    expect((args[0] as any).destination).toBe('')
+  })
+
+  it('admin auth allows access to any order', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(null)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...BASE, user_id: 'someone-else' })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+  })
+
+  it('returns CANCELLED suffix for cancelled voided order', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...BASE, status: 'cancelled' })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('Content-Disposition') || '').toMatch(/-CANCELLED/i)
+  })
+})
+
+describe('GET /api/orders/[id]/invoice — fallback branch coverage', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.mocked(db.queryMany).mockResolvedValue([])
+  })
+
+  // Covers lines 99-104: || '0' fallback when order amount fields are null/undefined
+  it('falls back to 0 for null order amount fields', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({
+        ...BASE,
+        discount_amount: null,
+        shipping_amount: null,
+        taxable_amount: null,
+        cgst_amount: null,
+        sgst_amount: null,
+        igst_amount: null,
+        is_igst: null,
+        buyer_gstin: null,
+        tracking_number: null,
+        shipped_at: null,
+        shipping_method: null,
+      })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    const order = args[0] as any
+    expect(order.discount_amount).toBe(0)
+    expect(order.shipping_amount).toBe(0)
+    expect(order.taxable_amount).toBe(0)
+    expect(order.cgst_amount).toBe(0)
+    expect(order.sgst_amount).toBe(0)
+    expect(order.igst_amount).toBe(0)
+    expect(order.is_igst).toBe(false)
+  })
+
+  // Covers lines 134-140: || '' fallbacks when buyer address fields are null
+  it('falls back to empty strings for null buyer address fields', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({
+        ...BASE,
+        full_name: null,
+        customer_name: null,
+        address_line1: null,
+        address_line2: null,
+        city: null,
+        state: null,
+        postal_code: null,
+        address_phone: null,
+        customer_phone: null,
+      })
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    const buyer = args[3] as any
+    expect(buyer.full_name).toBe('')
+    expect(buyer.address_line1).toBe('')
+    expect(buyer.address_line2).toBeNull()
+    expect(buyer.city).toBe('')
+    expect(buyer.state).toBe('')
+    expect(buyer.postal_code).toBe('')
+    expect(buyer.phone).toBe('')
+  })
+
+  // Covers lines 72-73: settingsRows with a null value (row.value || '')
+  it('handles settings row with null value by falling back to empty string', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(BASE)
+      .mockResolvedValueOnce(null)
+    // Return settings rows where some values are null
+    vi.mocked(db.queryMany)
+      .mockResolvedValueOnce([])  // order items
+      .mockResolvedValueOnce([
+        { key: 'business_gstin', value: null },
+        { key: 'business_legal_name', value: 'Jeffi' },
+      ])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    const biz = args[2] as any
+    expect(biz.gstin).toBe('')
+    expect(biz.legalName).toBe('Jeffi')
+  })
+
+  // Covers lines 161-167: billing address fallback fields when all are null
+  it('falls back to empty strings for null billing address fields', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...BASE, billing_address_id: 'addr-2' })
+      .mockResolvedValueOnce(null)  // no cached pdf
+      .mockResolvedValueOnce({      // billing address with null fields
+        full_name: null,
+        address_line1: null,
+        address_line2: null,
+        city: null,
+        state: null,
+        postal_code: null,
+        phone: null,
+      })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([]).mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    const billing = args[4] as any
+    expect(billing).toBeDefined()
+    expect(billing.full_name).toBe('')
+    expect(billing.address_line1).toBe('')
+    expect(billing.city).toBe('')
+    expect(billing.phone).toBe('')
+  })
+
+  // Covers items line 115: orderItems || [] when queryMany returns null
+  it('handles null orderItems gracefully', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(BASE)
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany)
+      .mockResolvedValueOnce(null as any)   // null orderItems
+      .mockResolvedValueOnce([])
+    vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
+
+    const res = await GET(makeReq() as any, PARAMS)
+    expect(res.status).toBe(200)
+    const args = vi.mocked(invoicePdf.generateInvoicePDF).mock.calls[0]
+    expect(args[1]).toEqual([])
+  })
+})
+
 describe('POST /api/orders/[id]/invoice — extra coverage', () => {
   beforeEach(() => vi.clearAllMocks())
+
+  it('returns 401 when admin not authenticated', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(null)
+    const res = await POST(makeReq('POST') as any, PARAMS)
+    expect(res.status).toBe(401)
+  })
+
+  it('returns 404 when order not found in POST', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null)
+    const res = await POST(makeReq('POST') as any, PARAMS)
+    expect(res.status).toBe(404)
+  })
+
+  it('returns existing invoice when already exists', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-1', invoice_number: 'INV-EXISTING', payment_status: 'paid', status: 'confirmed',
+    })
+    const res = await POST(makeReq('POST') as any, PARAMS)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.invoiceNumber).toBe('INV-EXISTING')
+  })
+
+  it('returns 400 when payment not completed', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-1', invoice_number: null, payment_status: 'unpaid', status: 'confirmed',
+    })
+    const res = await POST(makeReq('POST') as any, PARAMS)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/payment/i)
+  })
+
+  it('returns 400 when status is pending', async () => {
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      id: 'order-1', invoice_number: null, payment_status: 'paid', status: 'pending',
+    })
+    const res = await POST(makeReq('POST') as any, PARAMS)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/pending/i)
+  })
 
   it('returns 400 when status is cancelled', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
@@ -301,5 +692,30 @@ describe('POST /api/orders/[id]/invoice — extra coverage', () => {
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/cancelled/i)
+  })
+
+  it('returns 400 when generateOrderInvoice returns null', async () => {
+    const invoiceMod = await import('@/lib/invoice')
+    vi.mocked(invoiceMod.generateOrderInvoice).mockResolvedValueOnce(null)
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ id: 'order-1', invoice_number: null, payment_status: 'paid', status: 'confirmed' })
+    const res = await POST(makeReq('POST') as any, PARAMS)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/generation failed/i)
+  })
+
+  it('returns success with invoice number after generation', async () => {
+    const invoiceMod = await import('@/lib/invoice')
+    vi.mocked(invoiceMod.generateOrderInvoice).mockResolvedValueOnce(Buffer.from('pdf'))
+    vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ id: 'order-1', invoice_number: null, payment_status: 'paid', status: 'confirmed' })
+      .mockResolvedValueOnce({ invoice_number: 'NEW-INV-001' })
+    const res = await POST(makeReq('POST') as any, PARAMS)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.success).toBe(true)
+    expect(body.invoiceNumber).toBe('NEW-INV-001')
   })
 })
