@@ -81,10 +81,10 @@ export default async function AdminLayout({
   })
   const desktopNavLinks = filteredNavLinks.filter(link => !('mobileOnly' in link && link.mobileOnly))
 
-  const displayName = session?.first_name && session?.last_name
-    ? `${session.first_name} ${session.last_name}`
-    : session?.email || 'Admin'
-  const usernameInitial = (session?.first_name || session?.email || 'A')[0].toUpperCase()
+  const displayName = session?.displayName
+    || (session?.first_name && session?.last_name ? `${session.first_name} ${session.last_name}` : null)
+    || 'Admin'
+  const usernameInitial = (displayName !== 'Admin' ? displayName : (session?.email || 'A'))[0].toUpperCase()
 
   const logoutForm = (
     <form action={logoutAction}>

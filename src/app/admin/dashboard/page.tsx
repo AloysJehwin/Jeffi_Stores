@@ -106,10 +106,8 @@ export default async function AdminDashboard() {
   try { scopes = JSON.parse(headersList.get('x-user-scopes') || '[]') } catch { scopes = [] }
   if (token) {
     try {
-      const payload = await verifyToken(token) as { adminId?: string; first_name?: string; last_name?: string; email?: string; role?: string; scopes?: string[] } | null
-      const full = [payload?.first_name, payload?.last_name].filter(Boolean).join(' ').trim()
-      if (full) displayName = full
-      else displayName = displayName || 'Admin'
+      const payload = await verifyToken(token) as { adminId?: string; displayName?: string; role?: string; scopes?: string[] } | null
+      if (payload?.displayName) displayName = payload.displayName
       if (!role && payload?.role) role = payload.role
       if (!adminId && payload?.adminId) adminId = payload.adminId
       if (scopes.length === 0 && Array.isArray(payload?.scopes)) scopes = payload!.scopes as string[]
