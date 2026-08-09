@@ -1497,13 +1497,40 @@ export async function getDashboardAnalytics(range: AnalyticsRange = '30d'): Prom
         COALESCE(SUM(total_amount) FILTER (WHERE (buyer_gstin IS NULL OR buyer_gstin = '') AND business_discount_amount = 0), 0) AS consumer_rev
       FROM orders WHERE created_at >= ${startExpr} AND payment_status = 'paid'
     `),
-    // Inventory health (active products) + stock value at cost
+    // Inventory health (active products) + real stock value from variants/sub-variants
     queryOne<Record<string, string>>(`
       SELECT
         COUNT(*) FILTER (WHERE stock_status = 'In Stock') AS in_stock,
         COUNT(*) FILTER (WHERE stock_status = 'Low Stock') AS low_stock,
         COUNT(*) FILTER (WHERE stock_status = 'Out of Stock') AS out_of_stock,
-        COALESCE(SUM(inventory_quantity * COALESCE(NULLIF(cost_price,0), base_price)), 0) AS stock_value
+        COALESCE((
+          SELECT SUM(
+            COALESCE(pv.inventory_quantity, 0) *
+            COALESCE(NULLIF(pv.cost_price,0), NULLIF(pv.price,0), NULLIF(p2.cost_price,0), NULLIF(p2.base_price,0), 0)
+          )
+          FROM product_variants pv
+          JOIN products p2 ON p2.id = pv.product_id
+          WHERE p2.is_active = true AND pv.is_active = true
+            AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+        ), 0) +
+        COALESCE((
+          SELECT SUM(
+            COALESCE(sv.inventory_quantity, 0) *
+            COALESCE(NULLIF(sv.price,0), NULLIF(p3.cost_price,0), NULLIF(p3.base_price,0), 0)
+          )
+          FROM product_sub_variants sv
+          JOIN product_variants pv2 ON pv2.id = sv.variant_id
+          JOIN products p3 ON p3.id = pv2.product_id
+          WHERE p3.is_active = true AND sv.is_active = true
+        ), 0) +
+        COALESCE((
+          SELECT SUM(
+            COALESCE(inventory_quantity, 0) *
+            COALESCE(NULLIF(cost_price,0), NULLIF(base_price,0), 0)
+          )
+          FROM products
+          WHERE is_active = true AND has_variants = false
+        ), 0) AS stock_value
       FROM products WHERE is_active = true
     `),
     // Returns / RTO

@@ -7,6 +7,7 @@ import Link from 'next/link'
 import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
 import AnalyticsDashboardClient from '@/components/admin/dashboard/AnalyticsDashboardClient'
 import QuickActionBar from '@/components/admin/dashboard/QuickActionBar'
+import PendingTasksCard from '@/components/admin/dashboard/PendingTasksCard'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 
@@ -145,43 +146,9 @@ export default async function AdminDashboard() {
       {/* C. Command Bar */}
       <QuickActionBar primary={visibleQuick} more={visibleMore} host={host} />
 
-      {/* C2. My Pending Tasks — assigned to this admin (only when they can access tasks) */}
+      {/* C2. My Pending Tasks — collapsible + paginated client component */}
       {canSeeTasks && (
-        <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs uppercase tracking-wide text-foreground-muted font-medium">My Pending Tasks</p>
-            <Link href={ap('/admin/tasks', host)} className="text-xs font-medium text-accent-600 hover:text-accent-500 transition-colors">View all</Link>
-          </div>
-          {myTasks.length > 0 ? (
-            <ul className="divide-y divide-border-default/70">
-              {myTasks.map(t => (
-                <li key={t.id}>
-                  <Link href={ap('/admin/tasks', host)} className="flex items-center gap-3 py-2.5 group">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.priority === 'urgent' ? 'bg-red-500' : t.priority === 'high' ? 'bg-amber-500' : 'bg-foreground-muted/50'}`} />
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm text-foreground group-hover:text-accent-600 transition-colors truncate">{t.title}</span>
-                      {t.customer_name && <span className="block text-xs text-foreground-muted truncate">{t.customer_name}</span>}
-                    </span>
-                    {t.due_date && (
-                      <span className={`text-xs font-medium shrink-0 ${t.overdue ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted'}`}>
-                        {t.overdue ? 'Overdue' : new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="flex items-center gap-2.5 py-1 text-foreground-muted">
-              <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-500/10 text-green-600 dark:text-green-400 shrink-0">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              <span className="text-sm">No pending tasks assigned to you.</span>
-            </div>
-          )}
-        </div>
+        <PendingTasksCard tasks={myTasks} viewAllHref={ap('/admin/tasks', host)} />
       )}
 
       {/* D. Needs-Attention card — always shown; empty/cleared state when nothing pending */}
