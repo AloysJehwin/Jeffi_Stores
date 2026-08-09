@@ -15,6 +15,10 @@ vi.mock('@/lib/search', () => ({
   buildVectorSearchClause: vi.fn().mockReturnValue({ clause: '1=1', params: [], nextIdx: 2 }),
 }))
 
+vi.mock('@/lib/inventory', () => ({
+  getStockValuation: vi.fn().mockResolvedValue({ totalValue: 0 }),
+}))
+
 import {
   getDashboardStats,
   getAllProducts,
@@ -34,6 +38,11 @@ import {
   getDashboardAnalytics,
   getOrder,
   getReturnRequest,
+  getRevenueTrendBySource,
+  getProductBreakdowns,
+  getBrochureProductsByCategories,
+  getBrochureProductsByBrands,
+  getBrochureProductsByIds,
   VARIANT_STOCK_TOTAL_SQL,
   VARIANT_INVENTORY_TOTAL_SQL,
   VARIANT_MIN_PRICE_SQL,
@@ -1219,5 +1228,351 @@ describe('getReturnRequest', () => {
     mockQueryOne.mockResolvedValue(null)
     const result = await getReturnRequest('ord-1')
     expect(result).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getDashboardAnalytics — additional range variants + KPI branches
+// ---------------------------------------------------------------------------
+
+describe('getDashboardAnalytics — additional ranges', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('accepts month range', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany.mockResolvedValue([])
+    const result = await getDashboardAnalytics('month')
+    expect(result.range).toBe('month')
+    expect(result.rangeLabel).toBe('This month')
+  })
+
+  it('accepts year range', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany.mockResolvedValue([])
+    const result = await getDashboardAnalytics('year')
+    expect(result.range).toBe('year')
+    expect(result.rangeLabel).toBe('Last 12 months')
+  })
+
+  it('computes aov as 0 when no orders', async () => {
+    mockQueryOne.mockResolvedValue({ rev: '0', rev_prev: '0', ord: '0', ord_prev: '0', cust: '0', cust_prev: '0' })
+    mockQueryMany.mockResolvedValue([])
+    const result = await getDashboardAnalytics('30d')
+    expect(result.kpis.aov).toBe(0)
+    expect(result.kpis.aovPrev).toBe(0)
+  })
+
+  it('computes aov and pctChange when orders exist', async () => {
+    mockQueryOne.mockResolvedValue({ rev: '10000', rev_prev: '8000', ord: '4', ord_prev: '4', cust: '2', cust_prev: '2' })
+    mockQueryMany.mockResolvedValue([])
+    const result = await getDashboardAnalytics('30d')
+    expect(result.kpis.aov).toBe(2500)
+    expect(result.kpis.revenuePct).toBe(25)
+  })
+
+  it('trend rows have aov=0 when paidOrders=0', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany
+      .mockResolvedValueOnce([{ bucket: '2026-07-01', revenue: '500', orders: '3', paid_orders: '0', customers: '2', units: '5' }])
+      .mockResolvedValue([])
+    const result = await getDashboardAnalytics('7d')
+    expect(result.trend[0].aov).toBe(0)
+  })
+
+  it('trend rows compute aov when paidOrders>0', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany
+      .mockResolvedValueOnce([{ bucket: '2026-07-01', revenue: '600', orders: '3', paid_orders: '2', customers: '2', units: '5' }])
+      .mockResolvedValue([])
+    const result = await getDashboardAnalytics('7d')
+    expect(result.trend[0].aov).toBe(300)
+  })
+
+  it('topCategories uses Uncategorized for null name', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany
+      .mockResolvedValueOnce([]) // trendRows
+      .mockResolvedValueOnce([{ name: null, units: '5', revenue: '100' }]) // topCats
+      .mockResolvedValue([])
+    const result = await getDashboardAnalytics('7d')
+    expect(result.topCategories[0].name).toBe('Uncategorized')
+  })
+
+  it('topBrands uses No brand for null name', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ name: null, units: '3', revenue: '200' }])
+      .mockResolvedValue([])
+    const result = await getDashboardAnalytics('7d')
+    expect(result.topBrands[0].name).toBe('No brand')
+  })
+
+  it('returns populated inventory, returns, payment, buyerSplit sections', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce({ rev: '0', rev_prev: '0', ord: '0', ord_prev: '0', cust: '0', cust_prev: '0' })
+      .mockResolvedValueOnce({ online: '1000', cod: '500', other: '0', cod_outstanding: '200', cod_outstanding_count: '3' })
+      .mockResolvedValueOnce({ new_cust: '5', returning_cust: '2' })
+      .mockResolvedValueOnce({ business: '2', consumer: '8', business_rev: '4000', consumer_rev: '6000' })
+      .mockResolvedValueOnce({ in_stock: '10', low_stock: '3', out_of_stock: '2', stock_value: '50000' })
+      .mockResolvedValueOnce({ total_returns: '4', rto_in_transit: '1', rto_delivered: '2' })
+    mockQueryMany.mockResolvedValue([])
+    const result = await getDashboardAnalytics('30d')
+    expect(result.inventory.inStock).toBe(10)
+    expect(result.inventory.stockValue).toBe(50000)
+    expect(result.returns.total).toBe(4)
+    expect(result.returns.rtoInTransit).toBe(1)
+    expect(result.payment.codOutstanding).toBe(200)
+    expect(result.payment.codOutstandingCount).toBe(3)
+    expect(result.buyerSplit.business).toBe(2)
+    expect(result.customerSplit.newCustomers).toBe(5)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getRevenueTrendBySource
+// ---------------------------------------------------------------------------
+
+describe('getRevenueTrendBySource', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns months and 4-series structure for default 12m', async () => {
+    mockQueryMany.mockResolvedValue([])
+    const result = await getRevenueTrendBySource()
+    expect(Array.isArray(result.months)).toBe(true)
+    expect(result.months.length).toBeGreaterThanOrEqual(1)
+    expect(result.series.length).toBe(4)
+  })
+
+  it('returns correct series sources', async () => {
+    mockQueryMany.mockResolvedValue([])
+    const result = await getRevenueTrendBySource('3m')
+    const sources = result.series.map((s) => s.source)
+    expect(sources).toContain('online')
+    expect(sources).toContain('business')
+    expect(sources).toContain('offline')
+    expect(sources).toContain('cash_sale')
+  })
+
+  it('handles 6m period', async () => {
+    mockQueryMany.mockResolvedValue([])
+    const result = await getRevenueTrendBySource('6m')
+    expect(result.months.length).toBeGreaterThanOrEqual(6)
+  })
+
+  it('handles ytd period — months start from January', async () => {
+    mockQueryMany.mockResolvedValue([])
+    const result = await getRevenueTrendBySource('ytd')
+    expect(result.months[0]).toMatch(/^\d{4}-01$/)
+  })
+
+  it('handles all period with earliest paid order from DB', async () => {
+    mockQueryOne.mockResolvedValue({ m: '2025-06' })
+    mockQueryMany.mockResolvedValue([])
+    const result = await getRevenueTrendBySource('all')
+    expect(result.months[0]).toBe('2025-06')
+  })
+
+  it('handles all period when no paid orders in DB', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany.mockResolvedValue([])
+    const result = await getRevenueTrendBySource('all')
+    expect(result.months.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('fills zero for months with no revenue rows', async () => {
+    mockQueryMany.mockResolvedValue([])
+    const result = await getRevenueTrendBySource('3m')
+    for (const s of result.series) {
+      for (const pt of s.points) expect(pt).toBe(0)
+    }
+  })
+
+  it('maps DB rows into correct source bucket', async () => {
+    const now = new Date()
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    mockQueryMany.mockResolvedValue([
+      { month: thisMonth, source: 'online', revenue: 1500 },
+      { month: thisMonth, source: 'business', revenue: 2000 },
+    ])
+    const result = await getRevenueTrendBySource('3m')
+    const onlineSeries = result.series.find((s) => s.source === 'online')!
+    const bizSeries = result.series.find((s) => s.source === 'business')!
+    const lastIdx = result.months.length - 1
+    expect(onlineSeries.points[lastIdx]).toBe(1500)
+    expect(bizSeries.points[lastIdx]).toBe(2000)
+  })
+
+  it('ignores rows for unknown sources', async () => {
+    const now = new Date()
+    const thisMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    mockQueryMany.mockResolvedValue([{ month: thisMonth, source: 'unknown_src', revenue: 999 }])
+    const result = await getRevenueTrendBySource('3m')
+    for (const s of result.series) {
+      for (const pt of s.points) expect(pt).toBe(0)
+    }
+  })
+
+  it('catches queryMany errors and returns empty points', async () => {
+    mockQueryMany.mockRejectedValue(new Error('DB failure'))
+    const result = await getRevenueTrendBySource('12m')
+    expect(result.months.length).toBeGreaterThanOrEqual(1)
+    for (const s of result.series) {
+      expect(s.points.every((p) => p === 0)).toBe(true)
+    }
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getProductBreakdowns
+// ---------------------------------------------------------------------------
+
+describe('getProductBreakdowns', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns zeroed stats when all queries return null/empty', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    mockQueryMany.mockResolvedValue([])
+    const result = await getProductBreakdowns()
+    expect(result.totalProducts).toBe(0)
+    expect(result.activeProducts).toBe(0)
+    expect(result.inventoryValue).toBe(0)
+    expect(result.byCategory).toEqual([])
+    expect(result.byBrand).toEqual([])
+    expect(result.byInventoryValue).toEqual([])
+  })
+
+  it('returns correct totals from summary row', async () => {
+    mockQueryOne.mockResolvedValue({ total: 150, active: 120, featured: 10, categories: 8 })
+    mockQueryMany.mockResolvedValue([])
+    const result = await getProductBreakdowns()
+    expect(result.totalProducts).toBe(150)
+    expect(result.activeProducts).toBe(120)
+    expect(result.featured).toBe(10)
+    expect(result.categories).toBe(8)
+  })
+
+  it('builds byCategory slices with colors', async () => {
+    mockQueryOne.mockResolvedValue({ total: 5, active: 5, featured: 1, categories: 2 })
+    mockQueryMany
+      .mockResolvedValueOnce([{ label: 'Tools', count: 30 }, { label: 'Fasteners', count: 20 }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+    const result = await getProductBreakdowns()
+    expect(result.byCategory.length).toBe(2)
+    expect(result.byCategory[0].label).toBe('Tools')
+    expect(result.byCategory[0].value).toBe(30)
+    expect(typeof result.byCategory[0].color).toBe('string')
+  })
+
+  it('caps byCategory to topN=8 + Other bucket', async () => {
+    mockQueryOne.mockResolvedValue({ total: 100, active: 100, featured: 0, categories: 10 })
+    const catRows = Array.from({ length: 10 }, (_, i) => ({ label: `Cat${i}`, count: 10 - i }))
+    mockQueryMany
+      .mockResolvedValueOnce(catRows)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+    const result = await getProductBreakdowns()
+    expect(result.byCategory.length).toBe(9) // top 8 + Other
+    expect(result.byCategory[8].label).toBe('Other')
+  })
+
+  it('maps null label to Uncategorized in slices', async () => {
+    mockQueryOne.mockResolvedValue({ total: 5, active: 5, featured: 0, categories: 1 })
+    mockQueryMany
+      .mockResolvedValueOnce([{ label: null, count: 5 }])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+    const result = await getProductBreakdowns()
+    expect(result.byCategory[0].label).toBe('Uncategorized')
+  })
+
+  it('builds byInventoryValue from invValueRows, null label → Unnamed', async () => {
+    mockQueryOne.mockResolvedValue({ total: 3, active: 3, featured: 0, categories: 1 })
+    mockQueryMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([{ label: 'Widget A', count: 500 }, { label: null, count: 200 }])
+    const result = await getProductBreakdowns()
+    expect(result.byInventoryValue[0].label).toBe('Widget A')
+    expect(result.byInventoryValue[1].label).toBe('Unnamed')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// getBrochureProductsByCategories / getBrochureProductsByBrands / getBrochureProductsByIds
+// ---------------------------------------------------------------------------
+
+describe('getBrochureProductsByCategories', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns empty array and skips DB when categoryIds is empty', async () => {
+    const result = await getBrochureProductsByCategories([])
+    expect(result).toEqual([])
+    expect(mockQueryMany).not.toHaveBeenCalled()
+  })
+
+  it('returns products when categoryIds provided', async () => {
+    const products = [{ id: 'p1', name: 'Bolt', category_name: 'Fasteners' }]
+    mockQueryMany.mockResolvedValue(products as any)
+    const result = await getBrochureProductsByCategories(['cat-1'])
+    expect(result).toEqual(products)
+  })
+
+  it('passes categoryIds as array param', async () => {
+    mockQueryMany.mockResolvedValue([])
+    await getBrochureProductsByCategories(['cat-1', 'cat-2'])
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), [['cat-1', 'cat-2']])
+  })
+})
+
+describe('getBrochureProductsByBrands', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns empty array and skips DB when brandIds is empty', async () => {
+    const result = await getBrochureProductsByBrands([])
+    expect(result).toEqual([])
+    expect(mockQueryMany).not.toHaveBeenCalled()
+  })
+
+  it('returns products when brandIds provided', async () => {
+    const products = [{ id: 'p1', name: 'Bolt', brand_name: 'Unbrako' }]
+    mockQueryMany.mockResolvedValue(products as any)
+    expect(await getBrochureProductsByBrands(['brand-1'])).toEqual(products)
+  })
+
+  it('passes brandIds as array param', async () => {
+    mockQueryMany.mockResolvedValue([])
+    await getBrochureProductsByBrands(['b1', 'b2'])
+    expect(mockQueryMany).toHaveBeenCalledWith(expect.any(String), [['b1', 'b2']])
+  })
+})
+
+describe('getBrochureProductsByIds', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns empty array and skips DB when productIds is empty', async () => {
+    const result = await getBrochureProductsByIds([])
+    expect(result).toEqual([])
+    expect(mockQueryMany).not.toHaveBeenCalled()
+  })
+
+  it('preserves input order of productIds in result', async () => {
+    mockQueryMany.mockResolvedValue([{ id: 'p2', name: 'Nut' }, { id: 'p1', name: 'Bolt' }] as any)
+    const result = await getBrochureProductsByIds(['p1', 'p2'])
+    expect(result[0].id).toBe('p1')
+    expect(result[1].id).toBe('p2')
+  })
+
+  it('filters out ids not returned by DB', async () => {
+    mockQueryMany.mockResolvedValue([{ id: 'p1', name: 'Bolt' }] as any)
+    const result = await getBrochureProductsByIds(['p1', 'p-missing'])
+    expect(result.length).toBe(1)
+    expect(result[0].id).toBe('p1')
   })
 })

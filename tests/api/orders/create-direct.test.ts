@@ -33,11 +33,18 @@ vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
+vi.mock('@/lib/checkout-intent', () => ({
+  verifyIntent: vi.fn(),
+}))
+vi.mock('@/lib/edd', () => ({
+  computeEdd: vi.fn().mockReturnValue(null),
+}))
 
 import { POST } from '@/app/api/orders/create-direct/route'
 import * as jwt from '@/lib/jwt'
 import * as db from '@/lib/db'
 import * as orderCommit from '@/lib/order-commit'
+import * as checkoutIntent from '@/lib/checkout-intent'
 
 const USER = { userId: 'user-1' }
 
@@ -322,5 +329,138 @@ describe('POST /api/orders/create-direct', () => {
       item: { productId: '550e8400-e29b-41d4-a716-446655440001', variantId: VARIANT_ID, qty: 1 },
     }) as any)
     expect(res.status).toBe(200)
+  })
+
+  // ── intent path ──────────────────────────────────────────────────────────
+
+  it('returns 400 when intent token is invalid', async () => {
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)   // user lookup
+      .mockResolvedValueOnce(null)         // no existing unpaid
+    vi.mocked(checkoutIntent.verifyIntent).mockResolvedValue(null)
+
+    const res = await POST(makeRequest({ paymentMethod: 'manual', intent: 'bad-token' }) as any)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/Invalid or expired checkout intent/)
+  })
+
+  it('returns 400 when intent mode is cart', async () => {
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(checkoutIntent.verifyIntent).mockResolvedValue({
+      mode: 'cart', productId: 'prod-1', variantId: null, subVariantId: null,
+      qty: 1, buyMode: null, buyUnit: null,
+    } as any)
+
+    const res = await POST(makeRequest({ paymentMethod: 'manual', intent: 'cart-token' }) as any)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toMatch(/cart order route/)
+  })
+
+  it('resolves item from valid buy_now intent', async () => {
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)        // no existing unpaid
+    vi.mocked(checkoutIntent.verifyIntent).mockResolvedValue({
+      mode: 'buy_now', productId: 'prod-1', variantId: null, subVariantId: null,
+      qty: 2, buyMode: 'unit', buyUnit: null,
+    } as any)
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 2, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_PRODUCT)  // product
+      .mockResolvedValueOnce(null)           // min_order_amount
+
+    const res = await POST(makeRequest({ paymentMethod: 'manual', intent: 'valid-intent' }) as any)
+    expect(res.status).toBe(200)
+    expect(vi.mocked(checkoutIntent.verifyIntent)).toHaveBeenCalledWith('valid-intent')
+  })
+
+  it('returns 400 when no item and no intent provided', async () => {
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+
+    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/required/i)
+  })
+
+  // ── COD path ──────────────────────────────────────────────────────────────
+
+  it('returns 422 when COD not available for product', async () => {
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)  // no existing unpaid
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({
+      ...MOCK_PRODUCT, id: 'prod-1', is_cod_allowed: false,
+    })
+
+    const res = await POST(makeRequest({ ...VALID_BODY, paymentMethod: 'cod' }) as any)
+    expect(res.status).toBe(422)
+    const body = await res.json()
+    expect(body.error).toMatch(/COD is not available/)
+    expect(body.codBlockedProductIds).toContain('prod-1')
+  })
+
+  it('creates COD order successfully', async () => {
+    vi.mocked(db.queryOne).mockReset()
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)  // no existing unpaid
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...MOCK_PRODUCT, is_cod_allowed: true })
+      .mockResolvedValueOnce(null)  // min_order_amount
+
+    const res = await POST(makeRequest({ ...VALID_BODY, paymentMethod: 'cod' }) as any)
+    expect(res.status).toBe(200)
+    expect((await res.json()).requiresPayment).toBe(false)
+  })
+
+  // ── business discount path ────────────────────────────────────────────────
+
+  it('applies business discount when category discount exists', async () => {
+    vi.mocked(db.queryOne).mockReset()
+    const { getBusinessDiscountMap } = await import('@/lib/business-discount')
+    vi.mocked(getBusinessDiscountMap).mockResolvedValue({ 'cat-1': 10 } as any)
+
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)   // no existing unpaid
+    vi.mocked(orderCommit.resolveBuyNowItem).mockResolvedValue({
+      ok: true,
+      item: { productId: 'prod-1', variantId: null, subVariantId: null, qty: 1, price: 500 },
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ ...MOCK_PRODUCT, id: 'prod-1', category_id: 'cat-1' })
+      .mockResolvedValueOnce(null)  // min_order_amount
+
+    const res = await POST(makeRequest({ ...VALID_BODY, paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(200)
+    expect((await res.json()).message).toBe('Order created successfully')
   })
 })
