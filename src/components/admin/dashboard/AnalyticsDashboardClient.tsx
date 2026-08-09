@@ -370,12 +370,12 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
         {/* J. Inventory / Customer split / Returns */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <SectionCard>
-            <SectionHeader title="Inventory Health" actionLabel="Inventory" href={ap('/admin/inventory', host)} />
+            <SectionHeader title="Stock Status" actionLabel="Inventory" href={ap('/admin/inventory', host)} />
             <div className="space-y-0.5">
               <MiniStat label="In stock" value={String(data.inventory.inStock)} tone="text-green-600 dark:text-green-400" href={ap('/admin/inventory', host)} />
               <MiniStat label="Low stock" value={String(data.inventory.lowStock)} tone="text-yellow-600 dark:text-yellow-400" href={ap('/admin/inventory', host)} />
               <MiniStat label="Out of stock" value={String(data.inventory.outOfStock)} tone="text-red-500 dark:text-red-400" href={ap('/admin/inventory', host)} />
-              <MiniStat label="Stock value" value={rs(data.inventory.stockValue)} href={ap('/admin/financial', host)} />
+              <MiniStat label="Inventory value" value={rs(data.inventory.stockValue)} href={ap('/admin/financial', host)} />
             </div>
           </SectionCard>
           <SectionCard href={ap('/admin/customers', host)}>
