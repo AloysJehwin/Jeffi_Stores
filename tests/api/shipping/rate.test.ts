@@ -360,7 +360,7 @@ describe('POST /api/shipping/rate', () => {
     mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 5000 }] as any)
     mockFallbackRate.mockReturnValueOnce({ charge: 350, zone: 'D', source: 'fallback' })
-    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const }))
+    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const, originalCharge: baseCharge, discountApplied: 0 }))
 
     const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
     expect(res.status).toBe(200)
@@ -398,7 +398,7 @@ describe('POST /api/shipping/rate', () => {
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
     mockFallbackRate.mockReturnValueOnce({ charge: 0, zone: 'A', source: 'fallback' })
     // baseCharge = 0 + codFee; 2% of 100 = 2 < 40, so flat=40 wins
-    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const }))
+    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const, originalCharge: baseCharge, discountApplied: 0 }))
 
     const res = await POST(makeRequest({
       destinationPin: '400053',
@@ -419,7 +419,7 @@ describe('POST /api/shipping/rate', () => {
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
     mockFallbackRate.mockReturnValueOnce({ charge: 0, zone: 'A', source: 'fallback' })
     // 2% of 5000 = 100 > 40, so pct=100 wins
-    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const }))
+    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const, originalCharge: baseCharge, discountApplied: 0 }))
 
     const res = await POST(makeRequest({
       destinationPin: '400053',
@@ -437,7 +437,7 @@ describe('POST /api/shipping/rate', () => {
     mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
     mockFallbackRate.mockReturnValueOnce({ charge: 0, zone: 'A', source: 'fallback' })
-    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const }))
+    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const, originalCharge: baseCharge, discountApplied: 0 }))
 
     const res = await POST(makeRequest({
       destinationPin: '400053',

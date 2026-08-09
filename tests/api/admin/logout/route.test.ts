@@ -90,3 +90,23 @@ describe('POST /api/admin/logout', () => {
     expect((await res.json()).error).toMatch(/internal server error/i)
   })
 })
+
+  it('handles verifyToken throwing without crashing (best-effort revoke)', async () => {
+    const setCookie = makeSetFn()
+    const get = vi.fn().mockReturnValue({ value: 'bad-token' })
+    mockCookies.mockResolvedValue({ set: setCookie, get } as any)
+    mockVerifyToken.mockRejectedValue(new Error('bad token'))
+    const res = await POST()
+    expect(res.status).toBe(200)
+    expect(mockRevokeSession).not.toHaveBeenCalled()
+  })
+
+  it('does not revoke when payload has no sid', async () => {
+    const setCookie = makeSetFn()
+    const get = vi.fn().mockReturnValue({ value: 'cookie-val' })
+    mockCookies.mockResolvedValue({ set: setCookie, get } as any)
+    mockVerifyToken.mockResolvedValue({ adminId: 'a1', role: 'admin', scopes: [] } as any)
+    const res = await POST()
+    expect(res.status).toBe(200)
+    expect(mockRevokeSession).not.toHaveBeenCalled()
+  })
