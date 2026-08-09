@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
 
@@ -159,7 +160,7 @@ interface PolicyProps {
 }
 
 const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed, freeShippingThreshold = 500 }: PolicyProps) => {
-  const [activePolicy, setActivePolicy] = useState<null | typeof items[0]>(null)
+  const [activePolicy, setActivePolicy] = useState<null | { label: string; sub: string; detail: string; bullets: string[]; color: string; href: string; hrefLabel: string; icon: React.ReactNode }>(null)
 
   const items = [
     {
@@ -171,7 +172,13 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       ),
       label: 'Free Delivery',
       sub: `On orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}`,
-      detail: `We offer free delivery on all orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}. Orders below this threshold may attract a standard shipping fee. Delivery is typically completed within 3–7 business days depending on your location.`,
+      detail: `Free delivery on all orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}. Standard shipping charges apply below this threshold.`,
+      bullets: [
+        'Delivered within 3–7 business days',
+        'Same-day dispatch on orders placed before 2 PM',
+        'Tracking link sent via SMS & email after dispatch',
+        'Delivery available across India including remote areas',
+      ],
       color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
       href: '/legal/shipping-policy',
       hrefLabel: 'Read Shipping Policy',
@@ -185,8 +192,19 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       label: returnAllowed ? 'Easy Returns' : 'Non-Returnable',
       sub: returnAllowed ? `${returnDays}-day return policy` : 'This product cannot be returned',
       detail: returnAllowed
-        ? `This product is eligible for returns within ${returnDays} days of delivery. The item must be unused, in its original packaging, and in the same condition it was received. Raise a return request from your orders page.`
-        : 'This product is non-returnable due to its nature. Please review the product details carefully before placing your order. In case of a damaged or defective item, please contact our support team.',
+        ? `Hassle-free returns within ${returnDays} days of delivery.`
+        : 'This product is non-returnable due to its nature.',
+      bullets: returnAllowed ? [
+        `Raise a return request within ${returnDays} days of delivery`,
+        'Item must be unused and in original packaging',
+        'Refund processed within 5–7 business days after pickup',
+        'Free pickup arranged from your doorstep',
+      ] : [
+        'Please review the product details carefully before ordering',
+        'Damaged or defective items — contact support within 48 hours',
+        'Wrong item received? We will arrange a replacement',
+        'Our team is available 9 AM – 6 PM Mon–Sat',
+      ],
       color: returnAllowed
         ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
         : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
@@ -202,8 +220,19 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       label: replacementAllowed ? 'Free Replacement' : 'Non-Replaceable',
       sub: replacementAllowed ? `${replacementDays}-day guarantee` : 'This product cannot be replaced',
       detail: replacementAllowed
-        ? `Free replacement is available within ${replacementDays} days if the product is found to be defective or damaged on delivery. Raise a replacement request from your orders page with supporting photos.`
-        : 'This product is not eligible for replacement under our standard policy. If you receive a damaged or incorrect item, please contact our support team within 48 hours of delivery.',
+        ? `Free replacement within ${replacementDays} days for defective or damaged products.`
+        : 'This product is not eligible for replacement under our standard policy.',
+      bullets: replacementAllowed ? [
+        `Request replacement within ${replacementDays} days of delivery`,
+        'Applicable for manufacturing defects & damage on delivery',
+        'Upload photos of the defect when raising the request',
+        'Replacement dispatched within 2–3 business days of approval',
+      ] : [
+        'Damaged on delivery? Contact support within 48 hours with photos',
+        'Incorrect item received will be replaced at no cost',
+        'Manufacturing defects covered under brand warranty',
+        'Contact us at support@jeffistores.in for assistance',
+      ],
       color: replacementAllowed
         ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
         : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
@@ -218,7 +247,13 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       ),
       label: '100% Genuine',
       sub: 'Verified authentic products',
-      detail: 'All products sold on Jeffi Stores are 100% genuine and sourced directly from authorised distributors or manufacturers. We do not sell counterfeit or grey-market goods. Each product goes through a quality verification process before dispatch.',
+      detail: 'Every product on Jeffi Stores is sourced directly from authorised distributors or manufacturers.',
+      bullets: [
+        'Sourced directly from authorised distributors',
+        'Zero tolerance for counterfeit or grey-market goods',
+        'Quality inspection before every dispatch',
+        'Brand warranty honoured on all genuine products',
+      ],
       color: 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400',
       href: '/legal/warranty-policy',
       hrefLabel: 'Read Warranty Policy',
@@ -242,9 +277,9 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
         ))}
       </div>
 
-      {/* Policy popup modal */}
-      {activePolicy && (
-        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setActivePolicy(null)}>
+      {/* Policy popup modal — rendered via portal to avoid z-index/overflow clipping */}
+      {activePolicy && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setActivePolicy(null)}>
           <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
           <div className="relative bg-surface rounded-2xl border border-border-default shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3">
@@ -257,6 +292,16 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
               </div>
             </div>
             <p className="text-sm text-foreground-secondary leading-relaxed">{activePolicy.detail}</p>
+            <ul className="space-y-2">
+              {activePolicy.bullets.map((b: string, i: number) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-foreground-secondary">
+                  <svg className="w-4 h-4 mt-0.5 shrink-0 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  {b}
+                </li>
+              ))}
+            </ul>
             <div className="flex items-center justify-between pt-1">
               <Link href={activePolicy.href} target="_blank" rel="noopener noreferrer"
                 className="text-sm font-medium text-accent-600 hover:underline flex items-center gap-1">
@@ -269,7 +314,8 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <Link href="/legal/faq" target="_blank" rel="noopener noreferrer"
