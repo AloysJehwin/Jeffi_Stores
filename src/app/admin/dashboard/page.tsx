@@ -88,7 +88,7 @@ async function getMyPendingTasks(adminId: string): Promise<PendingTask[]> {
                CASE ct.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
                ct.due_date ASC NULLS LAST,
                ct.created_at DESC
-      LIMIT 5`,
+      LIMIT 50`,
     [adminId]
   )
 }
