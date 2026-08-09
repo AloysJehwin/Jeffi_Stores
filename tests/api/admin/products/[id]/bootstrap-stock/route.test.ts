@@ -1,6 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
+vi.mock('@/lib/jwt', () => ({
+  authenticateAdmin: vi.fn(),
+}))
+vi.mock('@/lib/scopes', () => ({
+  hasScope: vi.fn(),
+}))
+
 vi.mock('@/lib/db', () => ({
   getClient: vi.fn(),
   queryOne: vi.fn(),
@@ -17,6 +24,8 @@ vi.mock('@/lib/inventory', () => ({
 
 import { POST } from '@/app/api/admin/products/[id]/bootstrap-stock/route'
 import { getClient, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { syncPerishableStock } from '@/lib/shelf'
 import { logStockMovement } from '@/lib/inventory'
 
@@ -45,6 +54,8 @@ function makeMockClient(responses: Record<number, any> = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  vi.mocked(authenticateAdmin).mockResolvedValue({ adminId: 'admin-1', role: 'super_admin', scopes: [] } as any)
+  vi.mocked(hasScope).mockReturnValue(true)
   vi.mocked(logStockMovement).mockResolvedValue(undefined)
   vi.mocked(syncPerishableStock).mockResolvedValue(undefined)
   // clearAllMocks wipes implementations; provide safe defaults

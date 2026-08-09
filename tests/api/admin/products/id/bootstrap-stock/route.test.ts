@@ -33,6 +33,8 @@ vi.mock('@/lib/inventory', () => ({
 
 import { POST } from '@/app/api/admin/products/[id]/bootstrap-stock/route'
 import { getClient, queryOne } from '@/lib/db'
+import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { syncPerishableStock, upsertShelfStock } from '@/lib/shelf'
 import { logStockMovement } from '@/lib/inventory'
 
@@ -79,6 +81,8 @@ function makeClient(rows: any[] = []) {
 describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.mocked(authenticateAdmin).mockResolvedValue({ adminId: 'admin-1', role: 'super_admin', scopes: [] } as any)
+    vi.mocked(hasScope).mockReturnValue(true)
   })
 
   // --- Validation ---
