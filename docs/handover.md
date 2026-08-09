@@ -1,135 +1,98 @@
-# Session Handover — 2026-08-04
+# Session Handover — 2026-08-05
+
+## 🔴 CRITICAL: PRODUCTION IS DOWN — read "Recovery" first
+
+**`https://jeffistores.in` returns 000 (down).** The EC2 box (`i-0b2466b2a540d6f23`, public IP `32.196.38.130`, Tailscale `jeffi-ec2` / `100.121.227.128`) is **OOM-locked**: both `jeffi-app-blue` and `jeffi-app-green` auto-restart on a 2 GB t4g.small and exhaust memory, wedging `sshd` (SSH fails with "Connection timed out during banner exchange"). Tailscale ping works (kernel) but no shell path works (SSH, `tailscale ssh`, and SSM all blocked — SSM agent not installed).
+
+### ROOT CAUSE
+The t4g.small has **2 GB RAM and cannot run blue + green simultaneously** (2 × Next.js standalone × `WEB_CONCURRENCY=4` = 8 heavy Node processes + nginx + redis). The blue-green deploy started `app_green` alongside `app_blue` → OOM. Both containers have `restart: unless-stopped`, so every reboot re-creates the deadlock.
+
+### RECOVERY PROCEDURE (do this first, next session)
+There is a **~20–30 s window right after a reboot** where sshd responds before both apps saturate RAM. Catch it and kill green:
+
+```bash
+# 1. Reboot to clear the OOM
+aws ec2 reboot-instances --instance-ids i-0b2466b2a540d6f23 --region us-east-1
+
+# 2. IMMEDIATELY hammer SSH (public IP 32.196.38.130) and kill green the instant you're in.
+#    Start ~30s after reboot, retry every 2-3s. The FIRST successful connect must run:
+ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ec2-user@32.196.38.130 \
+  'docker update --restart=no jeffi-app-green; docker rm -f jeffi-app-green'
+#    (Runbook confirms: caught the window once at "Up 22 seconds" — must be faster next time.)
+
+# 3. Once green is gone, blue serves alone and the box stabilizes. Verify:
+ssh ec2-user@32.196.38.130 'free -m; docker ps; curl -s -o /dev/null -w "%{http_code}\n" -H "Host: jeffistores.in" http://localhost/api/health'
+curl -s -o /dev/null -w "%{http_code}\n" https://jeffistores.in/    # expect 200
+```
+
+**If the window can't be caught:** stop the instance, detach/mount the root volume on a helper instance, edit `/opt/jeffi-stores/docker-compose.green.yml` (or `docker` state) so green can't start — or set both slots to `WEB_CONCURRENCY=2` before restart. Simpler: after reboot, if you get in, also `docker update --restart=no jeffi-app-blue` is NOT needed (blue is the one we want serving).
+
+### THE REAL FIX (so this never recurs)
+Blue-green needs both slots running momentarily → **2 GB is not enough.** Options:
+1. **Upgrade EC2 t4g.small → t4g.medium (4 GB)** before using blue-green, OR
+2. **Lower `WEB_CONCURRENCY` to 2** in `docker-compose.blue.yml`/`green.yml` (halves memory per slot), OR
+3. **Abandon blue-green on this box** and revert to the old rolling `docker-compose.prod.yml` (single app service, 2 replicas) which fit in 2 GB fine.
+
+Recommendation: revert to old rolling deploy until the box is upgraded. Blue-green is not viable on 2 GB.
+
+---
 
 ## What Was Being Worked On
-Infrastructure upgrades for jeffistores.in: created an AWS ALB in front of the EC2 instance, upgraded EC2 from t4g.micro to t4g.small, and implemented Node.js cluster mode (4 workers) to increase concurrent request capacity from ~5 to ~15–20 simultaneous users.
+Merged a large `feature-business` PR (#407) to main — product-delete fix, draft-mode enforcement, admin username/password removal, dashboard redesign — then attempted the **first blue-green + cluster deploy**, which OOM-crashed the 2 GB box. Also mid-session: swapped storefront logo to the JS-circle, cleaned repo cruft, updated the super-admin email on live RDS.
 
-## Branch
-`feature-business` — all code changes go here. **Never push to main directly.**
-
----
-
-## AWS Infrastructure Changed This Session
-
-| Resource | Before | After |
-|---|---|---|
-| EC2 instance type | t4g.micro (1 vCPU, 1 GB RAM) | t4g.small (2 vCPU, 2 GB RAM) |
-| Load balancer | nginx internal only | AWS ALB + nginx internal |
-| CloudFront origin | EC2 Elastic IP (HTTP) | ALB DNS (HTTPS-only) |
-| EC2 port 80 | Open to internet | ALB SG only |
-
-## AWS Resources Created This Session
-
-| Resource | ID / Value |
+## Systems / Infra
+| Resource | Value |
 |---|---|
-| ALB DNS | `jeffi-stores-alb-287793444.us-east-1.elb.amazonaws.com` |
-| ALB ARN | `arn:aws:elasticloadbalancing:us-east-1:708835965056:loadbalancer/app/jeffi-stores-alb/4af5bc82562f377f` |
-| Target group ARN | `arn:aws:elasticloadbalancing:us-east-1:708835965056:targetgroup/jeffi-stores-tg/4f965ea11b637a5d` |
-| ALB SG | `sg-06785e62fbbf4116e` (jeffi-stores-alb) |
-| EC2 SG | `sg-0dc5182e111d71d02` — port 80 now locked to ALB SG only |
-| CloudFront distribution | `E1M6ZFCWXAMF26` — origin updated to ALB, HTTPS-only, read timeout 60s |
-| ACM cert | `arn:aws:acm:us-east-1:708835965056:certificate/4591f2e4-417c-4049-95a0-a30a8e0cfdc5` (`*.jeffistores.in`) |
-
----
-
-## Current Live Capacity (t4g.small, 2 workers, cluster NOT yet deployed)
-
-| Concurrent users | RPS | Failures | Verdict |
-|---|---|---|---|
-| 5 | 6.6 | 0% | Stable |
-| 10 | 7.4 | 8% | Degrading |
-| 15 | 12 | 3% | Errors |
-
-Safe limit: ~5 simultaneous users (~50 active visitors at normal browse pace).
-
-**After cluster deploy (PR #357 merged): expected ~15–20 concurrent, ~3× improvement.**
-
----
-
-## What Was Completed This Session
-
-- AWS ALB created — HTTP→HTTPS redirect listener + HTTPS forward listener (TLS 1.3, ACM wildcard cert)
-- ALB idle timeout set to 150s (matches AI route maxDuration)
-- EC2 port 80 locked to ALB SG only (security hardening)
-- CloudFront origin switched from EC2 Elastic IP → ALB DNS, protocol HTTPS-only
-- EC2 upgraded t4g.micro → t4g.small (2 GB RAM, removes memory bottleneck)
-- nginx `proxy_read_timeout 150s` added to storefront + business subdomains (was missing, caused silent 504s on AI routes)
-- `cluster-server.js` created — Node.js cluster wrapper, forks `WEB_CONCURRENCY` workers, auto-restarts crashed workers
-- `Dockerfile` updated: CMD changed to `node cluster-server.js`, COPY for cluster-server.js added
-- `docker-compose.prod.yml`: `WEB_CONCURRENCY=2` added
-
----
-
-## What Is In Progress / Partially Done
-
-- **Cluster mode not yet deployed** — `cluster-server.js` + Dockerfile + docker-compose changes are on `feature-business`, not merged. Needs PR #357 merge to go live.
-- **CloudFront origin read timeout stuck at 60s** — needs AWS support case for 180s increase (free support tier blocks API-based case creation).
-
----
-
-## What Needs To Be Done Next
-
-1. **Merge PR #357** → pipeline auto-deploys cluster mode → capacity ~3× improvement
-2. **Raise CloudFront timeout support case manually**:
-   - URL: https://console.aws.amazon.com/support/home#/case/create
-   - Type: Service limit increase → CloudFront
-   - Distribution ID: `E1M6ZFCWXAMF26`, Origin ID: `jeffi-stores-ec2`
-   - Request: `OriginReadTimeout = 180 seconds`
-   - Reason: AI/LLM routes take up to 120s; 60s limit causes 504 on customer-facing AI features
-   - Once approved, patch `/tmp/cf-config3-fixed.json` → set `OriginReadTimeout: 180` → `aws cloudfront update-distribution --id E1M6ZFCWXAMF26 --if-match <latest-etag> --distribution-config file:///tmp/cf-config3-fixed.json`
-3. **After cluster deploy, re-run load test**: `ab -n 200 -c 20 https://jeffistores.in/` to confirm improvement
-4. **Optional next scale step**: upgrade RDS `db.t4g.micro` → `db.t4g.small` (+~$13/month) — becomes bottleneck after cluster is live
-
----
-
-## Key Decisions Made
-
-- ALB uses HTTPS-only to origin — CloudFront → ALB on port 443 with ACM cert (HTTP caused redirect loop)
-- CloudFront failover group `jeffi-stores-failover-group` kept intact — EC2/ALB primary, S3 maintenance bucket failover on 502/503/504
-- Default CloudFront cache behavior changed from `jeffi-stores-failover-group` → `jeffi-stores-ec2` directly — failover group was serving S3 during EC2 restart
-- `WEB_CONCURRENCY=2` per container — matches t4g.small's 2 vCPU; 2 replicas × 2 workers = 4 total handlers
-- console.log removed from cluster-server.js — project hook blocks log statements in JS files
-
----
-
-## Important File Paths
-
-| File | Change |
-|---|---|
-| `cluster-server.js` | New — Node.js cluster wrapper for Next.js standalone |
-| `Dockerfile` | CMD → `node cluster-server.js`; COPY cluster-server.js added |
-| `docker-compose.prod.yml` | `WEB_CONCURRENCY=2` added to app environment |
-| `deploy/nginx.conf` | `proxy_connect_timeout 10s`, `proxy_send_timeout 150s`, `proxy_read_timeout 150s` added to storefront (443) and business.jeffistores.in blocks |
-
----
-
-## Known Issues / Gotchas
-
-- **EC2 direct port 80 is now blocked** — external curl to `http://32.196.38.130` will fail. Internal `localhost` (CI pipeline health checks) still works fine.
-- **CloudFront OriginReadTimeout capped at 60s** on standard accounts — AI routes taking >60s will still 504 at CloudFront edge until support case is approved.
-- **Site went down briefly** during EC2 instance type change (stop→modify→start). CloudFront failed over to S3 maintenance. Root cause: CloudFront default behavior was pointing to failover group, not EC2 directly. Fixed.
-- **Dependabot PRs** (#396–#405) are open but unreviewed — not urgent, no security criticals.
-
----
-
-## Previous Session Context (2026-08-03)
-
-Key items still pending from last session:
-
-- **AI email generation** (`src/app/api/admin/ai-generate-email/route.ts`) — was broken in Turbopack dev, may work in prod. Test after deploy.
-- **AdvancedFilterPanel layout** — fix: `mode="trigger"` + `mode="content"` split in products/orders pages (see memory `feedback_filter_panel_layout.md`)
-- **coupon_drafts migration** — `database/migrations/coupon-drafts.sql` needs to be applied to live RDS
-- `feature-business` is 106+ commits ahead of main
+| EC2 instance | `i-0b2466b2a540d6f23`, t4g.small (2 GB), region us-east-1 |
+| Public IP (post-reboot) | `32.196.38.130` |
+| Tailscale | `jeffi-ec2` / `100.121.227.128` (ping OK, sshd wedged) |
+| App dir | `/opt/jeffi-stores` (on `main`) |
+| RDS | `jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com` db `jeffi_stores` user `app_user` (IAM auth) |
+| Local DB | `postgresql://localhost:5432/jeffi_production_ready` |
+| AWS CLI | works locally (used it to reboot) |
+| SSM | NOT available (agent not registered) |
 
 ## Open PRs
+#409 postcss/next, #408 fast-uri, #406 hono, #405 ip-address, #404 js-yaml, #401 hono-node-server, #398 sharp, #396 body-parser — **all Dependabot, none related to this outage.** PR #410 (network fix) was MERGED.
 
-| PR | Description |
-|---|---|
-| #405 | bump ip-address 10.2.0 → 10.4.0 |
-| #404 | bump js-yaml 4.2.0 → 4.3.0 |
-| #403 | bump postcss 8.5.15 → 8.5.18 |
-| #402 | bump hono 4.12.26 → 4.12.32 |
-| #401 | bump @hono/node-server + @modelcontextprotocol/sdk |
-| #400 | bump next 15.5.19 → 15.5.21 |
-| #399 | bump fast-uri 3.1.2 → 3.1.4 |
-| #398 | bump sharp 0.33.5 → 0.35.0 |
-| #396 | bump body-parser 2.2.2 → 2.3.0 |
+## What Was Completed This Session
+- **Product delete** (`api/admin/products/[id]/route.ts`): transactional full cascade incl. GRN/PO history + selling units. Merged.
+- **Draft-mode enforcement** (products, brands, categories): edit pages redirect when no draft; `DraftEditButton` + parameterized `DraftConfirmModal`; brands draft POST added. Merged.
+- **Admin username/password removal**: 28 files + migration `database/migrations/2026-08-05_admins_drop_username_password.sql` + entity SQL (users/constraints/functions). Merged. **NOTE: this migration has NOT run on live RDS** (deploy never reached the migrate step — good, no half-applied auth change).
+- **New-admin cert email** (`src/lib/email.ts`): greeting→full name, Email row, slug filename. Merged.
+- **Logo**: `public/images/logo.png` overwritten with 96px JS circle (from `store-logo.png`). Local only — NOT committed.
+- **Repo cleanup**: removed `old-files/`, `check-images.js`, `logo_4k/enhanced/upscaled/original_backup.png`, all `.DS_Store`. Local only — NOT committed.
+- **Sidebar/top-bar**: "Jeffi Stores" + collapse toggle moved to full-width top bar; folder icon. Local only — NOT committed (AdminShell.tsx, AdminSidebarNav.tsx).
+- **Blue-green network fix** (PR #410, MERGED): all compose files pin `networks.internal.name = jeffi_internal`; removed `depends_on: redis` from blue/green.
+- **LIVE RDS super-admin email changed**: `aloysjehwin@gmail.com` → `admin@jeffistores.in`, and `google_id` cleared (re-links on next Google login). DONE + committed to DB. `admin@jeffistores.in` confirmed a real Google account.
+
+## What Is In Progress / Partially Done
+- **BLUE-GREEN CUTOVER — FAILED, box OOM-locked.** `infra.yml` on main still says `driver: bridge` (should be `external: true`); I patched it server-locally during bootstrap but `git reset --hard` in deploy reverts it. The deploy script runs `infra + green` (external wins) so it starts green → OOM.
+- Uncommitted local changes (logo, cleanup, sidebar) still on `feature-business` working tree — not committed/pushed.
+
+## What Needs To Be Done Next (ordered)
+1. **RECOVER PRODUCTION** — reboot + race-SSH to kill `jeffi-app-green` (see Recovery above). Get site to 200.
+2. **Decide blue-green viability**: upgrade box to 4 GB, OR set `WEB_CONCURRENCY=2` per slot, OR revert to old rolling `docker-compose.prod.yml`. Until then, DO NOT re-run a blue-green deploy — it will OOM again.
+3. Fix `docker-compose.infra.yml` on main: `internal` network → `external: true` (must be created out-of-band first). Add to a new PR.
+4. Commit the uncommitted local work (logo swap, repo cleanup, sidebar top-bar) — separate clean commits.
+5. When ready to deploy the merged `main` app changes safely: the `admins` username/password migration + entity schema-diff WILL run on live RDS on the next successful deploy → **test Google→MFA login immediately after** (super-admin now logs in as `admin@jeffistores.in`).
+
+## Key Decisions Made
+- Live super-admin email is now `admin@jeffistores.in` (Google-login capable, google_id cleared for re-link).
+- Blue-green network pinned to fixed name `jeffi_internal` across all compose files (PR #410).
+- Product-with-history delete = force full delete (removes GRN/PO line items), per user choice.
+- Draft editing enforced for products/brands/categories; coupons/suppliers/review-forms were already safe.
+
+## Important File Paths
+- `deploy/blue-green-deploy.sh` — health-check loop is 30 attempts × 10s sleep = 5 min max.
+- `docker-compose.{infra,blue,green}.yml` — network `jeffi_internal`; blue/green external, infra still `driver: bridge` (BUG).
+- `docs/runbooks/blue-green-setup.md` — one-time bootstrap steps (has the two-paths schema section).
+- `database/migrations/2026-08-05_admins_drop_username_password.sql` — applied LOCAL only; pending on live.
+- `src/lib/admin-identity.ts` — cert-CN now matches `admin_certificates.common_name`, not username.
+
+## Known Issues / Gotchas
+- **2 GB box cannot run blue+green together — this is the outage root cause.** Do not retry blue-green until box is upgraded or WEB_CONCURRENCY lowered.
+- SSH banner-exchange timeout = OOM symptom, not a network issue (Tailscale ping still works).
+- Public IP changed to `32.196.38.130` after reboot (was different before). CloudFront origin is the ALB, not the raw IP, so CF should follow — but verify.
+- Old rolling containers (`jeffi-stores-app-1/2`) were REMOVED during bootstrap — the old setup is not trivially restorable without `docker compose -f docker-compose.prod.yml up -d app`.
+- Uncommitted local changes on `feature-business` will be lost if branch is reset — commit them.
