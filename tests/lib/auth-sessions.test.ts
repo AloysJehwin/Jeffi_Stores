@@ -20,6 +20,11 @@ import {
   resolveSession,
   createSession,
   hashToken,
+  validateSession,
+  extendSession,
+  revokeSession,
+  revokeAllForPrincipal,
+  listActiveSessions,
   type StoredBinding,
 } from '@/lib/auth-sessions'
 
@@ -389,5 +394,159 @@ describe('resolveSession — token vs legacy lookup routing', () => {
     const s = await resolveSession('not-a-valid-anything')
     expect(s).toBeNull()
     expect(mockQueryOne).not.toHaveBeenCalled()
+  })
+})
+
+const liveBase = () => ({
+  id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+  principal_type: 'customer' as const,
+  principal_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+  revoked_at: null,
+  expires_at: new Date(Date.now() + 3600_000).toISOString(),
+  last_seen_at: new Date().toISOString(),
+  role: null, scopes: [], cert_cn: null, approval_status: null,
+  user_agent: null, accept_lang: null, ua_platform: null, ip_net: null, fp_hash: null,
+  email: 'x@y.com', first_name: 'X', last_name: 'Y',
+})
+
+describe('resolveSession — extra edge paths', () => {
+  beforeEach(() => { vi.clearAllMocks(); mockQuery.mockResolvedValue({ rowCount: 1 }) })
+
+  it('returns null for a revoked row', async () => {
+    mockQueryOne.mockResolvedValue({ ...liveBase(), revoked_at: new Date().toISOString() })
+    expect(await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')).toBeNull()
+  })
+
+  it('returns null for an expired row (past expires_at)', async () => {
+    mockQueryOne.mockResolvedValue({ ...liveBase(), expires_at: new Date(Date.now() - 1000).toISOString() })
+    expect(await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')).toBeNull()
+  })
+
+  it('returns null for idle-expired row (last_seen > 24h ago)', async () => {
+    mockQueryOne.mockResolvedValue({ ...liveBase(), last_seen_at: new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString() })
+    expect(await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')).toBeNull()
+  })
+
+  it('fires last_seen_at touch UPDATE when beyond touch window', async () => {
+    mockQueryOne.mockResolvedValue({ ...liveBase(), last_seen_at: new Date(Date.now() - 10 * 60 * 1000).toISOString() })
+    const s = await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')
+    expect(s).not.toBeNull()
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('last_seen_at = now()'), ['eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee'])
+  })
+
+  it('returns resolved session with displayName from first+last name', async () => {
+    mockQueryOne.mockResolvedValue({ ...liveBase(), first_name: 'John', last_name: 'Doe' })
+    const s = await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')
+    expect(s?.displayName).toBe('John Doe')
+  })
+
+  it('returns null displayName when no name fields', async () => {
+    mockQueryOne.mockResolvedValue({ ...liveBase(), first_name: null, last_name: null })
+    const s = await resolveSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee')
+    expect(s?.displayName).toBeNull()
+  })
+})
+
+describe('validateSession', () => {
+  beforeEach(() => { vi.clearAllMocks(); mockQuery.mockResolvedValue({ rowCount: 1 }) })
+
+  it('returns true when session resolves and principalType matches', async () => {
+    mockQueryOne.mockResolvedValue({ ...liveBase(), principal_type: 'customer' })
+    expect(await validateSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'customer')).toBe(true)
+  })
+
+  it('returns false when principalType mismatches', async () => {
+    mockQueryOne.mockResolvedValue({ ...liveBase(), principal_type: 'customer' })
+    expect(await validateSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'admin')).toBe(false)
+  })
+
+  it('returns false when session does not exist', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    expect(await validateSession('eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', 'customer')).toBe(false)
+  })
+})
+
+describe('extendSession', () => {
+  beforeEach(() => { vi.clearAllMocks(); mockQuery.mockResolvedValue({ rowCount: 1 }) })
+
+  it('updates expiry using token_hash for a 64-hex token', async () => {
+    const token = 'e'.repeat(64)
+    await extendSession(token, 3600)
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('token_hash = $1'), expect.arrayContaining([hashToken(token)]))
+  })
+
+  it('updates expiry using id for a legacy uuid', async () => {
+    const uuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    await extendSession(uuid, 3600)
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('id = $1'), expect.arrayContaining([uuid]))
+  })
+
+  it('no-ops for empty sid', async () => {
+    await extendSession('', 3600)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+
+  it('no-ops for malformed sid (neither token nor uuid)', async () => {
+    await extendSession('not-valid', 3600)
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+})
+
+describe('revokeSession', () => {
+  beforeEach(() => { vi.clearAllMocks(); mockQuery.mockResolvedValue({ rowCount: 1 }) })
+
+  it('revokes by token_hash for a 64-hex token', async () => {
+    const token = 'f'.repeat(64)
+    await revokeSession(token)
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('token_hash = $1'), [hashToken(token)])
+  })
+
+  it('revokes by id for a legacy uuid', async () => {
+    const uuid = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc'
+    await revokeSession(uuid)
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('id = $1'), [uuid])
+  })
+
+  it('no-ops for empty sid', async () => {
+    await revokeSession('')
+    expect(mockQuery).not.toHaveBeenCalled()
+  })
+})
+
+describe('revokeAllForPrincipal', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('issues bulk revoke and returns affected rowCount', async () => {
+    mockQuery.mockResolvedValue({ rowCount: 3 })
+    expect(await revokeAllForPrincipal('customer', 'u1')).toBe(3)
+    expect(mockQuery).toHaveBeenCalledWith(expect.stringContaining('principal_type = $1'), ['customer', 'u1'])
+  })
+
+  it('returns 0 when nothing revoked', async () => {
+    mockQuery.mockResolvedValue({ rowCount: 0 })
+    expect(await revokeAllForPrincipal('admin', 'a1')).toBe(0)
+  })
+
+  it('returns 0 when rowCount is null', async () => {
+    mockQuery.mockResolvedValue({ rowCount: null })
+    expect(await revokeAllForPrincipal('business', 'b1')).toBe(0)
+  })
+})
+
+describe('listActiveSessions', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  it('returns session rows from queryMany', async () => {
+    const { queryMany } = await import('@/lib/db')
+    vi.mocked(queryMany).mockResolvedValue([{ id: 'r1' }, { id: 'r2' }] as any)
+    const rows = await listActiveSessions('customer', 'u1')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toMatchObject({ id: 'r1' })
+  })
+
+  it('returns empty array when no active sessions', async () => {
+    const { queryMany } = await import('@/lib/db')
+    vi.mocked(queryMany).mockResolvedValue([])
+    expect(await listActiveSessions('admin', 'a1')).toEqual([])
   })
 })
