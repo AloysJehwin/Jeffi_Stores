@@ -184,10 +184,12 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
                 <div className="flex items-center justify-between text-xs text-foreground-muted">
                   <span>{product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}</span>
                   <div className="flex items-center gap-3">
-                    {canWrite && <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />}
-                    <Link href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">Edit</Link>
+                    <div className="hidden md:inline-flex items-center gap-3">
+                      {canWrite && <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />}
+                      <Link href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">Edit</Link>
+                      {canWrite && <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />}
+                    </div>
                     <DownloadAdButton productId={product.id} productName={product.name} />
-                    {canWrite && <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />}
                   </div>
                 </div>
               </div>
@@ -364,12 +366,14 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
         </div>
         {canWrite && (
-        <Link
-          href={ap('/admin/products/add', host)}
-          className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-        >
-          Add New Product
-        </Link>
+        <div className="hidden md:block">
+          <Link
+            href={ap('/admin/products/add', host)}
+            className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+          >
+            Add New Product
+          </Link>
+        </div>
         )}
       </div>
 

@@ -85,6 +85,7 @@ export default async function TeamPage() {
       </div>
 
       {/* Add member */}
+      <div className="hidden md:block">
       <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
         <div className="px-5 py-4 border-b border-border-default">
           <h2 className="text-sm font-semibold text-foreground">Add Team Member</h2>
@@ -94,6 +95,7 @@ export default async function TeamPage() {
           <CreateAdminForm />
         </div>
       </section>
+      </div>
 
       {/* Members table */}
       <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm overflow-hidden">

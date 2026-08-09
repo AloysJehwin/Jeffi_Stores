@@ -177,9 +177,11 @@ function SuppliersTab() {
         </div>
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>
-          <Link href={ap('/admin/suppliers/new')} className={btnPrimary}>
-            + Add Supplier
-          </Link>
+          <div className="hidden md:block">
+            <Link href={ap('/admin/suppliers/new')} className={btnPrimary}>
+              + Add Supplier
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -228,7 +230,7 @@ function SuppliersTab() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-3">
+                      <div className="hidden md:flex items-center justify-end gap-3">
                         <Link href={ap(`/admin/suppliers/${s.id}/edit`)} className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium">Edit</Link>
                         <button className="text-xs text-foreground-secondary hover:text-foreground hover:underline" onClick={() => toggleActive(s)}>
                           {s.is_active ? 'Deactivate' : 'Activate'}
@@ -914,9 +916,11 @@ function POTab({ initialPO }: { initialPO?: string }) {
         </div>
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>
-          <Link href={ap('/admin/inventory/po/new')} className={btnPrimary}>
-            + Create PO
-          </Link>
+          <div className="hidden md:block">
+            <Link href={ap('/admin/inventory/po/new')} className={btnPrimary}>
+              + Create PO
+            </Link>
+          </div>
         </div>
       </div>
 

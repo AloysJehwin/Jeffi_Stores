@@ -105,9 +105,11 @@ async function AddCouponButton() {
   const canWrite = hasScope(role, scopes, 'coupons:write')
   if (!canWrite) return null
   return (
-    <Link href={ap('/admin/coupons/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
-      Add New Coupon
-    </Link>
+    <div className="hidden md:block">
+      <Link href={ap('/admin/coupons/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+        Add New Coupon
+      </Link>
+    </div>
   )
 }
 
@@ -294,8 +296,10 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
               </div>
               <div className="flex gap-3 pt-1">
                 <Link href={ap(`/admin/coupons/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">View</Link>
-                {canWrite && <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">Edit</Link>}
-                {canWrite && <DeleteCouponButton id={c.id} code={c.code} />}
+                <div className="hidden md:flex gap-3">
+                  {canWrite && <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">Edit</Link>}
+                  {canWrite && <DeleteCouponButton id={c.id} code={c.code} />}
+                </div>
               </div>
             </div>
           ))}
