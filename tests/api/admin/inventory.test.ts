@@ -18,6 +18,17 @@ vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
   query: vi.fn(),
   getClient: vi.fn(),
+  withTransaction: vi.fn().mockImplementation(async (fn: (client: any) => any) => {
+    const mockClient = {
+      query: vi.fn().mockImplementation(async (sql: string) => {
+        if (sql.includes('SELECT COUNT')) return { rows: [{ cnt: '0' }] }
+        if (sql.includes('INSERT INTO purchase_orders')) return { rows: [{ id: 'new-po-id' }] }
+        if (sql.includes('INSERT INTO purchase_order_items')) return { rows: [{}] }
+        return { rows: [] }
+      }),
+    }
+    return fn(mockClient)
+  }),
 }))
 
 vi.mock('@/lib/inventory', () => ({
@@ -63,7 +74,7 @@ import { GET as stockGET, PATCH as stockPATCH } from '@/app/api/admin/inventory/
 import { GET as poGET, POST as poPOST } from '@/app/api/admin/inventory/po/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, query, getClient } from '@/lib/db'
+import { queryMany, queryOne, query, getClient, withTransaction } from '@/lib/db'
 import { getStockLedger, getStockValuation } from '@/lib/inventory'
 import { buildSearchClause } from '@/lib/search'
 

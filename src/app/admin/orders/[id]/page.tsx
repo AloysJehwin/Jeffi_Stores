@@ -1,8 +1,10 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { getOrder, getReturnRequest } from '@/lib/queries'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { hasScope } from '@/lib/scopes'
 import UpdateOrderStatus from '@/components/admin/UpdateOrderStatus'
 import CancelReview from '@/components/admin/CancelReview'
 import ReturnReview from '@/components/admin/ReturnReview'
@@ -41,6 +43,11 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
   if (!order) {
     notFound()
   }
+
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'orders:write')
 
   const returnRequest = await getReturnRequest(id).catch(() => null)
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
@@ -232,7 +239,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                   </svg>
                 </a>
               </div>
-            ) : (order.payment_status === 'paid' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'out_for_delivery' || order.status === 'delivered') && (
+            ) : canWrite && (order.payment_status === 'paid' || order.status === 'confirmed' || order.status === 'processing' || order.status === 'shipped' || order.status === 'out_for_delivery' || order.status === 'delivered') && (
               <GenerateInvoiceButton orderId={order.id} />
             ))}
             {showRetryEmailButton && <RetryPaymentEmailButton orderId={order.id} />}
@@ -416,7 +423,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                 <h2 className="text-lg font-semibold text-orange-900 dark:text-orange-300">Cancellation Request</h2>
               </div>
               <div className="p-4 sm:p-6">
-                <CancelReview orderId={order.id} />
+                {canWrite ? <CancelReview orderId={order.id} /> : <p className="text-sm text-foreground-muted">Read-only access — cannot approve or reject.</p>}
               </div>
             </div>
           )}
@@ -453,11 +460,13 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                 </h2>
               </div>
               <div className="p-4 sm:p-6">
-                <ReturnReview
-                  orderId={order.id}
-                  returnRequest={returnRequest}
-                  replacementOrderNumber={returnRequest.replacement_order_number || null}
-                />
+                {canWrite ? (
+                  <ReturnReview
+                    orderId={order.id}
+                    returnRequest={returnRequest}
+                    replacementOrderNumber={returnRequest.replacement_order_number || null}
+                  />
+                ) : <p className="text-sm text-foreground-muted">Read-only access — cannot approve or reject.</p>}
               </div>
             </div>
           )}
@@ -476,7 +485,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
           </div>
           )}
 
-          {(order.status === 'cancelled' || order.status === 'returned' || order.status === 'cancel_requested') && order.payment_status === 'paid' && returnRequest?.type !== 'replacement' && (
+          {(order.status === 'cancelled' || order.status === 'returned' || order.status === 'cancel_requested') && order.payment_status === 'paid' && returnRequest?.type !== 'replacement' && canWrite && (
             <InitiateRefundButton
               orderId={order.id}
               orderNumber={order.order_number || order.id.slice(0, 8)}
@@ -491,12 +500,16 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
               <h2 className="text-lg font-semibold text-foreground">Update Order Status</h2>
             </div>
             <div className="p-4 sm:p-6">
-              <UpdateOrderStatus orderId={order.id} currentStatus={order.status} currentPaymentStatus={order.payment_status} />
+              {canWrite ? (
+                <UpdateOrderStatus orderId={order.id} currentStatus={order.status} currentPaymentStatus={order.payment_status} />
+              ) : (
+                <p className="text-sm text-foreground-muted">Read-only access — cannot update status.</p>
+              )}
             </div>
           </div>
           )}
 
-          {order.status === 'processing' && !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) && (
+          {order.status === 'processing' && !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) && canWrite && (
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
               <h2 className="text-lg font-semibold text-foreground">Delhivery Shipment</h2>
@@ -609,7 +622,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                     ) : (
                       <p className="text-xs text-foreground-muted">No expected delivery date set</p>
                     )}
-                    {order.status !== 'delivered' && <ExtendEddButton orderId={order.id} currentEdd={rawEdd} />}
+                    {order.status !== 'delivered' && canWrite && <ExtendEddButton orderId={order.id} currentEdd={rawEdd} />}
                   </div>
                 </div>
               ) : (

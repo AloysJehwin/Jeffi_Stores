@@ -65,7 +65,7 @@ describe('POST /api/track', () => {
     )
   })
 
-  it('resolves userId from auth_token cookie when present', async () => {
+  it('resolves userId from user_sid cookie when present', async () => {
     mockCookieStore.get.mockReturnValue({ value: 'valid-token' })
     vi.mocked(jwtLib.verifyToken).mockResolvedValue({ userId: 'user-99' } as any)
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)

@@ -1,26 +1,16 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { verifyToken } from './lib/jwt'
+import { verifyToken, verifyBusinessToken } from './lib/jwt'
 import { getScopeForPath, hasScope } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
-import { jwtVerify } from 'jose'
+import { extractSessionSignals } from './lib/session-signals-request'
 
-if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
-const BUSINESS_JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
-
-async function verifyBusinessToken(token: string): Promise<{ userId: string; email: string; approvalStatus: string } | null> {
-  try {
-    const { payload } = await jwtVerify(token, BUSINESS_JWT_SECRET)
-    if (payload.type !== 'business' || !payload.isBusiness) return null
-    return {
-      userId: payload.userId as string,
-      email: payload.email as string,
-      approvalStatus: (payload.approvalStatus as string) || 'pending',
-    }
-  } catch {
-    return null
-  }
-}
+// Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
+// it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
+// middleware is stable in Next 15.5. pg is kept external via serverExternalPackages.
+// Session lookups only run when an auth cookie is present, so anonymous storefront
+// traffic does zero auth DB queries.
+export const runtime = 'nodejs'
 
 const SECURITY_HEADERS: Record<string, string> = {
   'X-Content-Type-Options': 'nosniff',
@@ -29,6 +19,9 @@ const SECURITY_HEADERS: Record<string, string> = {
   'Referrer-Policy': 'strict-origin-when-cross-origin',
   'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
   'Strict-Transport-Security': 'max-age=63072000; includeSubDomains; preload',
+  // Opt in to the Sec-CH-UA-Platform client hint so browsers send it on subsequent requests —
+  // it's a STABLE signal in the session device-binding scorer (auth-sessions.ts).
+  'Accept-CH': 'Sec-CH-UA-Platform',
 }
 
 function addSecurityHeaders(response: NextResponse): NextResponse {
@@ -53,9 +46,26 @@ function buildRedirectUrl(request: NextRequest, path: string): URL {
   return new URL(path, `${proto}://${host}`)
 }
 
+function isMobileUA(ua: string | null): boolean {
+  if (!ua) return false
+  return /android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini/i.test(ua)
+}
+
+function isAdminWritePath(pathname: string): boolean {
+  return /\/admin\/(products|categories|brands|coupons|review-forms|suppliers|inventory\/po|mailer|campaigns|service-accounts|team)\/(add|new|edit(\/|$))/i.test(pathname)
+}
+
+// Strip /add, /new, or /edit/[...] suffix to derive the parent list URL.
+function adminWritePathParent(pathname: string): string {
+  return pathname.replace(/\/(add|new|edit(\/[^?]*)?)$/i, '')
+}
+
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.hostname || ''
   const pathname = request.nextUrl.pathname
+  // Per-request device-binding signals: resolveSession revokes + rejects a cookie replayed
+  // from a clearly different environment (>= 2 STABLE signals differ — see evaluateBinding).
+  const reqSignals = extractSessionSignals(request)
 
   if (hostname.startsWith('www.jeffistores.in')) {
     const target = new URL(pathname + request.nextUrl.search, 'https://jeffistores.in')
@@ -117,14 +127,14 @@ export async function middleware(request: NextRequest) {
     const PUBLIC_BUSINESS_SUBDOMAIN = ['/signin', '/signup', '/pending']
     const isPublicSubdomain = pathname === '/' || PUBLIC_BUSINESS_SUBDOMAIN.some(p => pathname.startsWith(p))
     if (!isPublicSubdomain) {
-      const token = request.cookies.get('business_auth_token')?.value
+      const token = request.cookies.get('business_sid')?.value
       if (!token) {
         return NextResponse.redirect(buildRedirectUrl(request, '/signin'))
       }
-      const payload = await verifyBusinessToken(token)
+      const payload = await verifyBusinessToken(token, reqSignals)
       if (!payload) {
         const res = NextResponse.redirect(buildRedirectUrl(request, '/signin'))
-        res.cookies.delete('business_auth_token')
+        res.cookies.delete('business_sid')
         return res
       }
       if (payload.approvalStatus === 'pending') {
@@ -144,18 +154,18 @@ export async function middleware(request: NextRequest) {
     const PUBLIC_BUSINESS = ['/business/signin', '/business/signup', '/business/pending']
     const isPublic = PUBLIC_BUSINESS.some(p => pathname.startsWith(p))
     if (!isPublic) {
-      const token = request.cookies.get('business_auth_token')?.value
+      const token = request.cookies.get('business_sid')?.value
       if (!token) {
         const signinUrl = buildRedirectUrl(request, '/business/signin')
         signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
         return NextResponse.redirect(signinUrl)
       }
-      const payload = await verifyBusinessToken(token)
+      const payload = await verifyBusinessToken(token, reqSignals)
       if (!payload) {
         const signinUrl = buildRedirectUrl(request, '/business/signin')
         signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
         const res = NextResponse.redirect(signinUrl)
-        res.cookies.delete('business_auth_token')
+        res.cookies.delete('business_sid')
         return res
       }
       if (payload.approvalStatus === 'pending') {
@@ -209,21 +219,26 @@ export async function middleware(request: NextRequest) {
       // Auth check before rewrite so server components receive x-user-id etc.
       const isAdminLogin = pathname === '/login'
       if (!isAdminLogin) {
-        const token = request.cookies.get('admin_token')?.value
+        const token = request.cookies.get('admin_sid')?.value
         if (!token) {
           return NextResponse.redirect(buildRedirectUrl(request, '/login'))
         }
-        const payload = await verifyToken(token)
+        const payload = await verifyToken(token, reqSignals)
         if (!payload) {
           const res = NextResponse.redirect(buildRedirectUrl(request, '/login'))
-          res.cookies.delete('admin_token')
+          res.cookies.delete('admin_sid')
           return res
         }
         const rewriteUrl = new URL(`/admin${slug}${search}`, request.url)
+        // Block mobile users from write-action pages (orders exempt)
+        if (isMobileUA(request.headers.get('user-agent')) && isAdminWritePath(`/admin${slug}`)) {
+          const parentPath = adminWritePathParent(`/admin${slug}`)
+          return NextResponse.redirect(buildRedirectUrl(request, `${parentPath}?desktop_required=1`))
+        }
         const response = NextResponse.rewrite(rewriteUrl)
         response.headers.set('x-pathname', `/admin${slug}`)
         response.headers.set('x-user-id', payload.adminId)
-        response.headers.set('x-username', `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || payload.email || '')
+        response.headers.set('x-username', payload.displayName || `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || 'Admin')
         response.headers.set('x-user-role', payload.role)
         response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
         return addSecurityHeaders(response)
@@ -248,12 +263,12 @@ export async function middleware(request: NextRequest) {
       return addSecurityHeaders(NextResponse.next())
     }
 
-    const token = request.cookies.get('admin_token')?.value
+    const token = request.cookies.get('admin_sid')?.value
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const payload = await verifyToken(token)
+    const payload = await verifyToken(token, reqSignals)
     if (!payload) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
@@ -295,7 +310,7 @@ export async function middleware(request: NextRequest) {
       })
     }
 
-    const token = request.cookies.get('admin_token')?.value
+    const token = request.cookies.get('admin_sid')?.value
 
     if (!token) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
@@ -303,13 +318,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
-    const payload = await verifyToken(token)
+    const payload = await verifyToken(token, reqSignals)
 
     if (!payload) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
       const response = NextResponse.redirect(loginUrl)
-      response.cookies.delete('admin_token')
+      response.cookies.delete('admin_sid')
       return response
     }
 
@@ -319,7 +334,7 @@ export async function middleware(request: NextRequest) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
       const response = NextResponse.redirect(loginUrl)
-      response.cookies.delete('admin_token')
+      response.cookies.delete('admin_sid')
       return response
     }
 
@@ -329,6 +344,12 @@ export async function middleware(request: NextRequest) {
         status: 403,
         headers: { 'Content-Type': 'text/plain' },
       })
+    }
+
+    // Block mobile users from write-action pages (orders exempt)
+    if (isMobileUA(request.headers.get('user-agent')) && isAdminWritePath(pathname)) {
+      const parentPath = adminWritePathParent(pathname)
+      return NextResponse.redirect(buildRedirectUrl(request, `${parentPath}?desktop_required=1`))
     }
 
     const response = NextResponse.next()

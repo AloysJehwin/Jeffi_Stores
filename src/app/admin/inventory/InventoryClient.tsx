@@ -177,9 +177,11 @@ function SuppliersTab() {
         </div>
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>
-          <Link href={ap('/admin/suppliers/new')} className={btnPrimary}>
-            + Add Supplier
-          </Link>
+          <div className="hidden md:block">
+            <Link href={ap('/admin/suppliers/new')} className={btnPrimary}>
+              + Add Supplier
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -228,7 +230,7 @@ function SuppliersTab() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <div className="flex items-center justify-end gap-3">
+                      <div className="hidden md:flex items-center justify-end gap-3">
                         <Link href={ap(`/admin/suppliers/${s.id}/edit`)} className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium">Edit</Link>
                         <button className="text-xs text-foreground-secondary hover:text-foreground hover:underline" onClick={() => toggleActive(s)}>
                           {s.is_active ? 'Deactivate' : 'Activate'}
@@ -914,9 +916,11 @@ function POTab({ initialPO }: { initialPO?: string }) {
         </div>
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>
-          <Link href={ap('/admin/inventory/po/new')} className={btnPrimary}>
-            + Create PO
-          </Link>
+          <div className="hidden md:block">
+            <Link href={ap('/admin/inventory/po/new')} className={btnPrimary}>
+              + Create PO
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -1039,7 +1043,7 @@ function StockTab() {
   const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
-  const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number; allCategories?: string[]; allBrands?: string[] } | null>(null)
+  const [valuation, setValuation] = useState<{ products: any[]; total: number; totalValue: number; totalValueInclGst?: number; inStockCount?: number; allCategories?: string[]; allBrands?: string[] } | null>(null)
   const [valPage, setValPage] = useState(1)
   const [valSearch, setValSearch] = useState(searchParams.get('val_search') || '')
   const [valCategory, setValCategory] = useState(searchParams.get('val_category') || '')
@@ -1134,7 +1138,7 @@ function StockTab() {
   }
 
   function handleLedgerSort(col: string, dir: SortDir) { setLedgerSortCol(col); setLedgerSortDir(dir) }
-  function handleValSort(col: string, dir: SortDir) { setValSortCol(col); setValSortDir(dir) }
+  function handleValSort(col: string, dir: SortDir) { setValSortCol(col || undefined); setValSortDir(col ? dir : undefined); setValPage(1) }
 
   const loadLedger = useCallback(async (pg = txPage) => {
     setLoading(true)
@@ -1160,11 +1164,12 @@ function StockTab() {
     if (valCategory) params.set('category', valCategory)
     if (valBrand) params.set('brand', valBrand)
     if (valStockStatus) params.set('stock_status', valStockStatus)
+    if (valSortCol) { params.set('sort', valSortCol); params.set('dir', valSortDir || 'desc') }
     const res = await fetch(`/api/admin/inventory/stock?${params}`)
     const json = await res.json()
     setValuation(json)
     setLoading(false)
-  }, [valSearch, valCategory, valBrand, valStockStatus, valPage])
+  }, [valSearch, valCategory, valBrand, valStockStatus, valPage, valSortCol, valSortDir])
 
   useEffect(() => {
     if (view === 'ledger') loadLedger(txPage)
@@ -1177,17 +1182,8 @@ function StockTab() {
   const valCategories = (valuation?.allCategories || [...new Set(allValRows.map((p: any) => p.category_name).filter(Boolean))]).sort() as string[]
   const valBrands = (valuation?.allBrands || [...new Set(allValRows.map((p: any) => p.brand_name).filter(Boolean))]).sort() as string[]
 
-  const VAL_SORT_KEYS: Record<string, string> = {
-    product: 'name', variant: 'variant_name', sku: 'sku',
-    stock: 'inventory_quantity', price: 'cost_price', value: 'stock_value',
-  }
-  const sortedValRows = valSortCol && VAL_SORT_KEYS[valSortCol]
-    ? [...allValRows].sort((a, b) => {
-        const k = VAL_SORT_KEYS[valSortCol]
-        const cmp = String(a[k] ?? '').localeCompare(String(b[k] ?? ''), 'en', { numeric: true })
-        return valSortDir === 'asc' ? cmp : -cmp
-      })
-    : allValRows
+  // Rows are sorted server-side (across all SKUs) via the sort/dir params, so render as-is.
+  const sortedValRows = allValRows
 
   function startEdit(p: any) {
     const rowId = p.sub_variant_id || p.variant_id || p.id
@@ -1712,10 +1708,10 @@ function StockTab() {
           ) : valuation ? (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(allValRows.reduce((s, p) => { const qty = parseFloat(p.inventory_quantity || '0'); return s + qty * parseFloat(p.cost_price || '0') }, 0))} accent sub={`${valTotal} SKUs`} />
-                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(allValRows.reduce((s, p) => { const qty = parseFloat(p.inventory_quantity || '0'); return s + qty * parseFloat(p.selling_price || '0') }, 0))} accent sub="this page" />
+                <SummaryCard label="Stock Value (ex-GST)" value={formatINR(valuation.totalValue || 0)} accent sub={`${valTotal} SKUs`} />
+                <SummaryCard label="Stock Value (incl. GST)" value={formatINR(valuation.totalValueInclGst || 0)} accent sub="all products" />
                 <SummaryCard label="Total SKUs" value={String(valTotal)} sub="across all products" />
-                <SummaryCard label="In Stock" value={String(allValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="on this page" />
+                <SummaryCard label="In Stock" value={String(valuation.inStockCount ?? allValRows.filter(p => parseFloat(p.inventory_quantity || '0') > 0).length)} sub="across all products" />
               </div>
               <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
                 <div className="overflow-x-auto">

@@ -96,7 +96,7 @@ async function importDb(opts: {
   vi.doMock('next/headers', () => ({
     cookies: vi.fn().mockResolvedValue({
       get: (key: string) =>
-        key === 'admin_token' && adminToken ? { value: adminToken } : undefined,
+        key === 'admin_sid' && adminToken ? { value: adminToken } : undefined,
       set: vi.fn(),
       delete: vi.fn(),
     }),
@@ -105,6 +105,22 @@ async function importDb(opts: {
   const jwtPayload = opts.jwtPayload ?? { adminId: 'admin-123' }
   vi.doMock('jose', () => ({
     jwtVerify: vi.fn().mockResolvedValue({ payload: jwtPayload }),
+  }))
+
+  // Opaque sessions: getRequestAdminId now dynamically imports resolveSession from
+  // @/lib/auth-sessions (the cookie value is the opaque session id, not a JWT).
+  // Resolve to an admin principal only when an admin_sid cookie is present.
+  vi.doMock('@/lib/auth-sessions', () => ({
+    resolveSession: vi.fn().mockImplementation(async (sid: string) => {
+      if (!sid || !adminToken) return null
+      return {
+        sid,
+        principalType: 'admin',
+        principalId: jwtPayload.adminId,
+        role: 'admin',
+        scopes: [],
+      }
+    }),
   }))
 
   process.env.DATABASE_URL = opts.dbUrl ?? 'postgres://localhost/testdb'
@@ -277,11 +293,20 @@ describe('query() – mutation wrapping', () => {
     }))
     vi.doMock('next/headers', () => ({
       cookies: vi.fn().mockResolvedValue({
-        get: (k: string) => k === 'admin_token' ? { value: 'tok' } : undefined,
+        get: (k: string) => k === 'admin_sid' ? { value: 'tok' } : undefined,
       }),
     }))
     vi.doMock('jose', () => ({
       jwtVerify: vi.fn().mockResolvedValue({ payload: { adminId: 'admin-err' } }),
+    }))
+    vi.doMock('@/lib/auth-sessions', () => ({
+      resolveSession: vi.fn().mockResolvedValue({
+        sid: 'tok',
+        principalType: 'admin',
+        principalId: 'admin-err',
+        role: 'admin',
+        scopes: [],
+      }),
     }))
     process.env.DATABASE_URL = 'postgres://localhost/testdb'
 
@@ -441,10 +466,10 @@ describe('getPool – RDS IAM Auth', () => {
 })
 
 // ---------------------------------------------------------------------------
-// getRequestAdminId – catch branch (line 90): jwtVerify throws
+// getRequestAdminId – catch branch: resolveSession throws / returns null
 // ---------------------------------------------------------------------------
 describe('getRequestAdminId – error handling', () => {
-  it('returns null and does not throw when jwtVerify rejects (catch branch)', async () => {
+  it('returns null and does not throw when resolveSession rejects (catch branch)', async () => {
     vi.resetModules()
 
     const pg = makePgMock()
@@ -460,24 +485,24 @@ describe('getRequestAdminId – error handling', () => {
     }))
     vi.doMock('next/headers', () => ({
       cookies: vi.fn().mockResolvedValue({
-        get: (k: string) => k === 'admin_token' ? { value: 'bad-token' } : undefined,
+        get: (k: string) => k === 'admin_sid' ? { value: 'bad-token' } : undefined,
       }),
     }))
-    // jwtVerify throws — exercises the catch block at line 90
-    vi.doMock('jose', () => ({
-      jwtVerify: vi.fn().mockRejectedValue(new Error('invalid signature')),
+    // resolveSession throws — exercises the catch block in getRequestAdminId
+    vi.doMock('@/lib/auth-sessions', () => ({
+      resolveSession: vi.fn().mockRejectedValue(new Error('db unreachable')),
     }))
     process.env.DATABASE_URL = 'postgres://localhost/testdb'
     process.env.JWT_SECRET = 'secret'
 
     const { query } = await import('@/lib/db')
     // INSERT would wrap in transaction only if adminId is non-null.
-    // Since jwtVerify throws, adminId should be null -> falls through to pool.query
+    // Since resolveSession throws, adminId should be null -> falls through to pool.query
     await expect(query('INSERT INTO t VALUES ($1)', [1])).resolves.toBeDefined()
     expect(pg.poolConnect).not.toHaveBeenCalled()
   })
 
-  it('returns null when JWT_SECRET env var is missing', async () => {
+  it('returns null when resolveSession finds no session for the cookie', async () => {
     vi.resetModules()
 
     const pg = makePgMock()
@@ -493,17 +518,17 @@ describe('getRequestAdminId – error handling', () => {
     }))
     vi.doMock('next/headers', () => ({
       cookies: vi.fn().mockResolvedValue({
-        get: (k: string) => k === 'admin_token' ? { value: 'some-token' } : undefined,
+        get: (k: string) => k === 'admin_sid' ? { value: 'some-token' } : undefined,
       }),
     }))
-    vi.doMock('jose', () => ({
-      jwtVerify: vi.fn().mockResolvedValue({ payload: { adminId: 'admin-xyz' } }),
+    // Session not found / expired (e.g. a legacy JWT cookie) -> null
+    vi.doMock('@/lib/auth-sessions', () => ({
+      resolveSession: vi.fn().mockResolvedValue(null),
     }))
     process.env.DATABASE_URL = 'postgres://localhost/testdb'
-    delete process.env.JWT_SECRET
 
     const { query } = await import('@/lib/db')
-    // No JWT_SECRET -> adminId null -> no transaction wrapping
+    // No session -> adminId null -> no transaction wrapping
     await expect(query('INSERT INTO t VALUES ($1)', [1])).resolves.toBeDefined()
     expect(pg.poolConnect).not.toHaveBeenCalled()
   })

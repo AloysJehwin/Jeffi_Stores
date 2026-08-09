@@ -82,10 +82,9 @@ describe('merchant/mapper', () => {
     })
 
     it('sets sale price when mrp > base_price', () => {
-      // Mapper: when hasSale=true, price.value = base_price (the discounted price),
-      // salePrice.value = base_price (same field — both hold the actual selling price)
+      // Mapper: price.value = mrp (the listed price), salePrice.value = base_price (discounted)
       const items = productToGmcItems(makeProduct({ base_price: 199, mrp: 249 }))
-      expect(items[0].price.value).toBe('199.00')
+      expect(items[0].price.value).toBe('249.00')
       expect(items[0].salePrice?.value).toBe('199.00')
       expect(items[0].salePrice?.currency).toBe('INR')
       expect(items[0].salePrice).toBeDefined()
@@ -156,9 +155,9 @@ describe('merchant/mapper', () => {
       expect(items[0].shipping[0].price.currency).toBe('INR')
     })
 
-    it('sets shippingWeight when weight present', () => {
+    it('does not set shippingWeight (not in mapper output)', () => {
       const items = productToGmcItems(makeProduct({ weight: 1.5 }))
-      expect(items[0].shippingWeight).toEqual({ value: '1.5', unit: 'kg' })
+      expect(items[0].shippingWeight).toBeUndefined()
     })
 
     it('omits shippingWeight when no weight', () => {
@@ -166,14 +165,14 @@ describe('merchant/mapper', () => {
       expect(items[0].shippingWeight).toBeUndefined()
     })
 
-    it('sets googleProductCategory from helper', () => {
+    it('does not set googleProductCategory (not in mapper output)', () => {
       const items = productToGmcItems(makeProduct())
-      expect(items[0].googleProductCategory).toBe('Hardware > Tools')
+      expect(items[0].googleProductCategory).toBeUndefined()
     })
 
-    it('sets productTypes from helper', () => {
+    it('does not set productTypes (not in mapper output)', () => {
       const items = productToGmcItems(makeProduct())
-      expect(items[0].productTypes).toEqual(['Tools > Hand Tools'])
+      expect(items[0].productTypes).toBeUndefined()
     })
 
     it('sets productHighlights from helper', () => {
@@ -200,10 +199,10 @@ describe('merchant/mapper', () => {
       expect(items[0].productDetails).toBeUndefined()
     })
 
-    it('sets customLabels from helper', () => {
+    it('does not set customLabels (not in mapper output)', () => {
       const items = productToGmcItems(makeProduct())
-      expect(items[0].customLabel0).toBe('label0')
-      expect(items[0].customLabel4).toBe('label4')
+      expect(items[0].customLabel0).toBeUndefined()
+      expect(items[0].customLabel4).toBeUndefined()
     })
 
     it('sets primary image link', () => {
@@ -319,16 +318,11 @@ describe('merchant/mapper', () => {
     })
 
     it('sets sale price when variant mrp > variant price', () => {
-      // Mapper logic: price field = hasSale ? price : (mrp || price)
-      // When hasSale=true: price.value = price (the numeric), salePrice.value = price
-      // The displayed price (MRP) goes in salePrice context but the field structure
-      // is: price = actual price, salePrice = discounted price (same when hasSale)
-      // Let's verify the actual behavior from the source
+      // Mapper: price field = mrp (listed), salePrice = actual price (discounted)
       const items = productToGmcItems(makeVariantProduct([
         { sku: 'VAR-1', variant_name: 'Size M', price: 199, mrp: 249, stock_status: 'In Stock' },
       ]))
-      // When hasSale: price field = price var (199), salePrice = price var (199)
-      expect(items[0].price.value).toBe('199.00')
+      expect(items[0].price.value).toBe('249.00')
       expect(items[0].salePrice?.value).toBe('199.00')
       expect(items[0].salePrice).toBeDefined()
     })
@@ -337,9 +331,9 @@ describe('merchant/mapper', () => {
       const items = productToGmcItems(makeVariantProduct([
         { sku: 'VAR-1', variant_name: 'Size M', price: 199, mrp: null, stock_status: 'In Stock' },
       ]))
-      // product.mrp = 249 > 199 so hasSale should be true
-      // price field = price (199), salePrice = price (199)
-      expect(items[0].price.value).toBe('199.00')
+      // product.mrp = 249 > 199 so hasSale is true; price = mrp (249), salePrice = price (199)
+      expect(items[0].price.value).toBe('249.00')
+      expect(items[0].salePrice?.value).toBe('199.00')
       expect(items[0].salePrice).toBeDefined()
     })
 

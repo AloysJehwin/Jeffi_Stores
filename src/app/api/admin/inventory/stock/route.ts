@@ -94,6 +94,8 @@ export async function GET(request: NextRequest) {
         categoryName: searchParams.get('category') || undefined,
         brandName: searchParams.get('brand') || undefined,
         stockStatus: searchParams.get('stock_status') || undefined,
+        sort: searchParams.get('sort') || undefined,
+        dir: searchParams.get('dir') || undefined,
       })
       return NextResponse.json({ ...data, page: valPage, limit: valLimit })
     }

@@ -20,9 +20,10 @@ interface Props {
   featuredCount: number
   backUrl?: string
   isSuperAdmin?: boolean
+  canWrite?: boolean
 }
 
-export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products', isSuperAdmin = false }: Props) {
+export default function ProductsTableClient({ products, featuredCount, backUrl = '/admin/products', isSuperAdmin = false, canWrite = false }: Props) {
   const confirm = useConfirm()
   const router = useRouter()
   const [selected, setSelected] = useState<any>(null)
@@ -322,8 +323,9 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
                 <div className="flex items-center gap-1.5 flex-nowrap whitespace-nowrap">
                   <button
-                    onClick={() => handleToggleActive(product.id, activeStates[product.id] ?? product.is_active)}
-                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full shrink-0 hover:opacity-75 transition-opacity ${
+                    onClick={() => canWrite && handleToggleActive(product.id, activeStates[product.id] ?? product.is_active)}
+                    disabled={!canWrite}
+                    className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full shrink-0 transition-opacity ${canWrite ? 'hover:opacity-75 cursor-pointer' : 'cursor-default'} ${
                       (activeStates[product.id] ?? product.is_active)
                         ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                         : 'bg-surface-secondary text-foreground'
@@ -331,7 +333,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                   >
                     {(activeStates[product.id] ?? product.is_active) ? 'Active' : 'Inactive'}
                   </button>
-                  <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
+                  {canWrite && <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />}
                 </div>
               </td>
               <td className="px-4 py-3" onClick={e => e.stopPropagation()}>

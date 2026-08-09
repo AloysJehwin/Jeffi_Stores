@@ -3,6 +3,8 @@ import { z } from 'zod'
 import { getClient, queryOne } from '@/lib/db'
 import { syncPerishableStock, upsertShelfStock } from '@/lib/shelf'
 import { logStockMovement } from '@/lib/inventory'
+import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 
 const bodySchema = z.object({
   variant_id: z.string().uuid().nullable().optional(),
@@ -15,6 +17,10 @@ const bodySchema = z.object({
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id: productId } = await params
+
+  const admin = await authenticateAdmin(req)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const raw = await req.json()
   const parsed = bodySchema.safeParse(raw)

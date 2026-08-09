@@ -51,7 +51,7 @@ function SectionHeader({ title, actionLabel, href }: { title: string; actionLabe
  * for tiles that hold their own inner links, avoiding nested <a>).
  */
 function SectionCard({ href, span, children }: { href?: string; span?: boolean; children: ReactNode }) {
-  const base = `bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5 ${span ? 'lg:col-span-2' : ''}`
+  const base = `bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-4 sm:p-5 ${span ? 'lg:col-span-2' : ''}`
   if (href) {
     return (
       <Link href={href} className={`${base} block hover:ring-accent-500/50 hover:shadow-md transition-[box-shadow,ring-color] duration-200`}>
@@ -221,20 +221,20 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
   const topProductsMax = metrics.topProducts.reduce((m, p) => Math.max(m, p.qty), 1)
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* A. Header + range */}
-      <div className="flex items-start justify-between gap-3 flex-wrap">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">Welcome back, {username}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground">Welcome back, {username}</h1>
           <p className="text-sm text-foreground-secondary mt-0.5">Store at a glance · {data.rangeLabel}</p>
         </div>
-        <div className="flex items-center bg-surface-secondary border border-border-default rounded-xl p-1 gap-0.5">
+        <div className="flex items-center bg-surface-secondary border border-border-default rounded-xl p-1 gap-0.5 self-start shrink-0">
           {RANGES.map(r => (
             <button
               key={r.key}
               onClick={() => changeRange(r.key)}
               disabled={loading}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${
+              className={`px-2.5 sm:px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${
                 range === r.key ? 'bg-accent-500 text-white shadow-sm' : 'text-foreground-secondary hover:text-foreground'
               }`}
             >
@@ -248,9 +248,9 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
       {children}
 
       {/* Range-aware analytics dim during refetch; ops block above stays crisp */}
-      <div className={`space-y-6 transition-opacity ${loading ? 'opacity-60' : ''}`}>
-        {/* E. KPIs — each now a drill-down link */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+      <div className={`space-y-4 sm:space-y-6 transition-opacity ${loading ? 'opacity-60' : ''}`}>
+        {/* E. KPIs */}
+        <div className="grid grid-cols-2 sm:grid-cols-2 xl:grid-cols-4 gap-3 sm:gap-4">
           <StatCard label="Revenue" value={rs(k.revenue)} sub={`Prev: ${rs(k.revenuePrev)}`} pct={k.revenuePct} color="bg-accent-500/10 text-accent-600" href={ap('/admin/financial', host)}
             icon={<Icon cls="text-accent-600" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />} />
           <StatCard label="Orders" value={k.orders.toLocaleString('en-IN')} sub={`Prev: ${k.ordersPrev}`} pct={k.ordersPct} color="bg-blue-500/10 text-blue-600 dark:text-blue-400" href={ap('/admin/orders', host)}
@@ -261,11 +261,23 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
             icon={<Icon cls="text-violet-600 dark:text-violet-400" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />} />
         </div>
 
-        {/* F. Trend (2/3) + Payment (1/3) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        {/* F. Trend (2/3) + Payment (1/3) — trend chart hidden on mobile */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
           <SectionCard span>
             <SectionHeader title="Revenue & Orders" actionLabel="Orders" href={ap('/admin/orders', host)} />
-            <TrendChart points={data.trend} />
+            <div className="hidden sm:block">
+              <TrendChart points={data.trend} />
+            </div>
+            <div className="sm:hidden flex gap-4 py-2">
+              <div className="flex-1 text-center">
+                <p className="text-xs text-foreground-muted">Revenue</p>
+                <p className="text-base font-bold text-accent-600">{rs(k.revenue)}</p>
+              </div>
+              <div className="flex-1 text-center">
+                <p className="text-xs text-foreground-muted">Orders</p>
+                <p className="text-base font-bold text-blue-600">{k.orders}</p>
+              </div>
+            </div>
           </SectionCard>
           <SectionCard>
             <SectionHeader title="Payment Split" actionLabel="Ledger" href={ap('/admin/financial', host)} />
@@ -291,7 +303,7 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
           </SectionCard>
         </div>
 
-        {/* G. Order Funnel — full width, each segment a status-filtered link */}
+        {/* G. Order Funnel */}
         <SectionCard>
           <SectionHeader title="Order Funnel" actionLabel="All orders" href={ap('/admin/orders', host)} />
           <FunnelBar
@@ -307,8 +319,8 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
           />
         </SectionCard>
 
-        {/* H. Categories / Brands / Buyer mix — whole-card links */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* H. Categories / Brands / Buyer mix */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <SectionCard href={ap('/admin/categories', host)}>
             <SectionHeader title="Top Categories" />
             <RankedBars items={data.topCategories.map(c => ({ name: c.name, value: c.revenue, sub: rs(c.revenue) }))} />
@@ -331,8 +343,8 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
           </SectionCard>
         </div>
 
-        {/* I. Top products / Recent orders — worklists */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* I. Top products / Recent orders */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-4">
           <SectionCard>
             <SectionHeader title="Top Products" actionLabel="All products" href={ap('/admin/products', host)} />
             <ListRows rows={metrics.topProducts.map((p, i) => ({
@@ -355,15 +367,15 @@ export default function AnalyticsDashboardClient({ initial, metrics, host, usern
           </SectionCard>
         </div>
 
-        {/* J. Inventory / Customer split / Returns — 3-up mini */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* J. Inventory / Customer split / Returns */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <SectionCard>
-            <SectionHeader title="Inventory Health" actionLabel="Inventory" href={ap('/admin/inventory', host)} />
+            <SectionHeader title="Stock Status" actionLabel="Inventory" href={ap('/admin/inventory', host)} />
             <div className="space-y-0.5">
               <MiniStat label="In stock" value={String(data.inventory.inStock)} tone="text-green-600 dark:text-green-400" href={ap('/admin/inventory', host)} />
               <MiniStat label="Low stock" value={String(data.inventory.lowStock)} tone="text-yellow-600 dark:text-yellow-400" href={ap('/admin/inventory', host)} />
               <MiniStat label="Out of stock" value={String(data.inventory.outOfStock)} tone="text-red-500 dark:text-red-400" href={ap('/admin/inventory', host)} />
-              <MiniStat label="Stock value" value={rs(data.inventory.stockValue)} href={ap('/admin/financial', host)} />
+              <MiniStat label="Inventory value" value={rs(data.inventory.stockValue)} href={ap('/admin/financial', host)} />
             </div>
           </SectionCard>
           <SectionCard href={ap('/admin/customers', host)}>

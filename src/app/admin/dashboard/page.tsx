@@ -7,6 +7,7 @@ import Link from 'next/link'
 import SupportRequestsAlert from '@/components/admin/SupportRequestsAlert'
 import AnalyticsDashboardClient from '@/components/admin/dashboard/AnalyticsDashboardClient'
 import QuickActionBar from '@/components/admin/dashboard/QuickActionBar'
+import PendingTasksCard from '@/components/admin/dashboard/PendingTasksCard'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 
@@ -86,8 +87,7 @@ async function getMyPendingTasks(adminId: string): Promise<PendingTask[]> {
       ORDER BY (ct.due_date IS NOT NULL AND ct.due_date < CURRENT_DATE) DESC,
                CASE ct.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END,
                ct.due_date ASC NULLS LAST,
-               ct.created_at DESC
-      LIMIT 5`,
+               ct.created_at DESC`,
     [adminId]
   )
 }
@@ -96,7 +96,7 @@ export default async function AdminDashboard() {
   const headersList = await headers()
   // Prefer the admin's full name (first + last) over the username for the greeting.
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')?.value
+  const token = cookieStore.get('admin_sid')?.value
   let displayName = headersList.get('x-username') || 'Admin'
   // Role + scopes gate which quick actions are shown (same as the sidebar nav).
   // Prefer the middleware-injected, verified headers; fall back to the JWT.
@@ -106,10 +106,8 @@ export default async function AdminDashboard() {
   try { scopes = JSON.parse(headersList.get('x-user-scopes') || '[]') } catch { scopes = [] }
   if (token) {
     try {
-      const payload = await verifyToken(token) as { adminId?: string; first_name?: string; last_name?: string; email?: string; role?: string; scopes?: string[] } | null
-      const full = [payload?.first_name, payload?.last_name].filter(Boolean).join(' ').trim()
-      if (full) displayName = full
-      else if (payload?.email) displayName = payload.email
+      const payload = await verifyToken(token) as { adminId?: string; displayName?: string; role?: string; scopes?: string[] } | null
+      if (payload?.displayName) displayName = payload.displayName
       if (!role && payload?.role) role = payload.role
       if (!adminId && payload?.adminId) adminId = payload.adminId
       if (scopes.length === 0 && Array.isArray(payload?.scopes)) scopes = payload!.scopes as string[]
@@ -147,43 +145,9 @@ export default async function AdminDashboard() {
       {/* C. Command Bar */}
       <QuickActionBar primary={visibleQuick} more={visibleMore} host={host} />
 
-      {/* C2. My Pending Tasks — assigned to this admin (only when they can access tasks) */}
+      {/* C2. My Pending Tasks — collapsible + paginated client component */}
       {canSeeTasks && (
-        <div className="bg-surface-elevated rounded-xl ring-1 ring-border-default/70 dark:ring-white/5 shadow-sm dark:shadow-none p-5">
-          <div className="flex items-center justify-between mb-3">
-            <p className="text-xs uppercase tracking-wide text-foreground-muted font-medium">My Pending Tasks</p>
-            <Link href={ap('/admin/tasks', host)} className="text-xs font-medium text-accent-600 hover:text-accent-500 transition-colors">View all</Link>
-          </div>
-          {myTasks.length > 0 ? (
-            <ul className="divide-y divide-border-default/70">
-              {myTasks.map(t => (
-                <li key={t.id}>
-                  <Link href={ap('/admin/tasks', host)} className="flex items-center gap-3 py-2.5 group">
-                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${t.priority === 'urgent' ? 'bg-red-500' : t.priority === 'high' ? 'bg-amber-500' : 'bg-foreground-muted/50'}`} />
-                    <span className="flex-1 min-w-0">
-                      <span className="block text-sm text-foreground group-hover:text-accent-600 transition-colors truncate">{t.title}</span>
-                      {t.customer_name && <span className="block text-xs text-foreground-muted truncate">{t.customer_name}</span>}
-                    </span>
-                    {t.due_date && (
-                      <span className={`text-xs font-medium shrink-0 ${t.overdue ? 'text-red-600 dark:text-red-400' : 'text-foreground-muted'}`}>
-                        {t.overdue ? 'Overdue' : new Date(t.due_date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
-                      </span>
-                    )}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div className="flex items-center gap-2.5 py-1 text-foreground-muted">
-              <span className="w-8 h-8 rounded-lg flex items-center justify-center bg-green-500/10 text-green-600 dark:text-green-400 shrink-0">
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-              </span>
-              <span className="text-sm">No pending tasks assigned to you.</span>
-            </div>
-          )}
-        </div>
+        <PendingTasksCard tasks={myTasks} viewAllHref={ap('/admin/tasks', host)} />
       )}
 
       {/* D. Needs-Attention card — always shown; empty/cleared state when nothing pending */}

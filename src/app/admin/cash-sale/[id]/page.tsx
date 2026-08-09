@@ -12,7 +12,7 @@ export default async function CashSaleDetailPage({ params }: { params: Promise<{
   const { id } = await params
   const host = await getHost()
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
+  const token = cookieStore.get('admin_sid')
   if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null

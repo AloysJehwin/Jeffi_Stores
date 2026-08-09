@@ -7,6 +7,7 @@ import {
   verifyTotp,
 } from '@/lib/mfa'
 import { issueAdminSession } from '@/lib/admin-session'
+import { extractSessionSignals } from '@/lib/session-signals-request'
 
 export async function POST(request: Request) {
   try {
@@ -63,7 +64,7 @@ export async function POST(request: Request) {
 
     if (!ok) return NextResponse.json({ error: 'Invalid code' }, { status: 401 })
 
-    return await issueAdminSession(admin, t.certCN as string | undefined)
+    return await issueAdminSession(admin, t.certCN as string | undefined, undefined, extractSessionSignals(request))
   } catch (err) {
     return NextResponse.json(
       { error: 'Internal server error' },

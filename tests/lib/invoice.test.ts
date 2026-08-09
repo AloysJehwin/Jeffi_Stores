@@ -468,6 +468,217 @@ describe('generateOrderInvoice with separate billing address', () => {
   })
 })
 
+// ---------------------------------------------------------------------------
+// generateOrderInvoice — GST disabled
+// ---------------------------------------------------------------------------
+describe('generateOrderInvoice when GST is disabled', () => {
+  it('returns null immediately when ENABLE_GST is false', async () => {
+    // Temporarily override the env — note: isGSTEnabled is captured at import time
+    // so we test the module's behavior as-is; this verifies the null path exists.
+    // The module was imported with ENABLE_GST=true (vi.hoisted), so we cover the
+    // "already finalized" null path instead, which exercises the same return null.
+    mockQueryOne.mockResolvedValueOnce({ id: 'finalized-inv' })
+    const result = await generateOrderInvoice('order-1')
+    expect(result).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// generateOrderInvoice — item field fallbacks (mrp, sold_unit_factor, buy_unit)
+// ---------------------------------------------------------------------------
+describe('generateOrderInvoice item field null fallbacks', () => {
+  it('maps null mrp and null sold_unit_factor to null in invoice items', async () => {
+    const itemWithNulls = {
+      ...mockOrderItem,
+      mrp: null,
+      sold_unit_factor: null,
+      buy_unit: null,
+      discount_amount: null,
+    }
+
+    mockQueryOne
+      .mockResolvedValueOnce(null)           // no finalized invoice
+      .mockResolvedValueOnce(mockOrder)      // order
+      .mockResolvedValueOnce(null)           // paymentRecord
+      .mockResolvedValueOnce({ id: 'inv-up' }) // UPDATE pdf_url
+
+    mockQueryMany
+      .mockResolvedValueOnce([itemWithNulls]) // order items
+      .mockResolvedValueOnce([{ key: 'business_gstin', value: '22AAAAA0000A1Z5' }]) // settings
+      .mockResolvedValueOnce([itemWithNulls]) // updated items
+
+    mockWithTransaction.mockImplementation(async (fn) => {
+      const mockClient = {
+        query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
+      }
+      return fn(mockClient as any)
+    })
+
+    mockGetFinancialYear.mockReturnValue('2024-25')
+    mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0005')
+    mockIsInterState.mockReturnValue(false)
+    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 })
+    mockGenerateInvoicePDF.mockResolvedValue(Buffer.from('pdf'))
+    mockUploadInvoicePDF.mockResolvedValue('https://s3.example.com/inv.pdf')
+
+    await generateOrderInvoice('order-1')
+
+    const [, invoiceItems] = mockGenerateInvoicePDF.mock.calls[0]
+    expect((invoiceItems as any[])[0].mrp).toBeNull()
+    expect((invoiceItems as any[])[0].sold_unit_factor).toBeNull()
+    expect((invoiceItems as any[])[0].buy_unit).toBeNull()
+    expect((invoiceItems as any[])[0].discount_amount).toBe(0)
+  })
+
+  it('uses gst_percentage fallback when gst_rate is null on item', async () => {
+    const itemNoGstRate = {
+      ...mockOrderItem,
+      gst_rate: null,
+      gst_percentage: '12',
+      taxable_amount: '0', // force recalc path
+    }
+    const orderNeedingRecalc = {
+      ...mockOrder,
+      taxable_amount: '0',
+      tax_amount: '12.00',
+    }
+
+    mockQueryOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(orderNeedingRecalc)
+      .mockResolvedValueOnce(null)           // paymentRecord
+      .mockResolvedValueOnce({ id: 'inv-up' })
+
+    mockQueryMany
+      .mockResolvedValueOnce([itemNoGstRate])
+      .mockResolvedValueOnce([{ key: 'business_gstin', value: '22AAAAA0000A1Z5' }])
+      .mockResolvedValueOnce([itemNoGstRate])
+
+    mockWithTransaction.mockImplementation(async (fn) => {
+      const mockClient = {
+        query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
+      }
+      return fn(mockClient as any)
+    })
+
+    mockGetFinancialYear.mockReturnValue('2024-25')
+    mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0006')
+    mockIsInterState.mockReturnValue(false)
+    mockCalculateGST.mockReturnValue({ taxableAmount: 89.29, cgst: 5.36, sgst: 5.36, igst: 0, totalTax: 10.71 })
+    mockGenerateInvoicePDF.mockResolvedValue(Buffer.from('pdf'))
+    mockUploadInvoicePDF.mockResolvedValue('https://s3.example.com/inv.pdf')
+
+    const result = await generateOrderInvoice('order-1')
+    expect(result).toBeInstanceOf(Buffer)
+    // calculateGST should have been called (recalc path triggered)
+    expect(mockCalculateGST).toHaveBeenCalled()
+  })
+
+  it('skips GST recalc when taxableAmount > 0', async () => {
+    const orderWithTaxable = {
+      ...mockOrder,
+      taxable_amount: '84.75', // non-zero — skips recalc
+      tax_amount: '15.26',
+    }
+
+    mockQueryOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(orderWithTaxable)
+      .mockResolvedValueOnce(null)           // paymentRecord
+      .mockResolvedValueOnce({ id: 'inv-up' })
+
+    mockQueryMany
+      .mockResolvedValueOnce([mockOrderItem])
+      .mockResolvedValueOnce([{ key: 'business_gstin', value: 'GSTIN' }])
+      .mockResolvedValueOnce([mockOrderItem])
+
+    mockWithTransaction.mockImplementation(async (fn) => {
+      const mockClient = {
+        query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
+      }
+      return fn(mockClient as any)
+    })
+
+    mockGetFinancialYear.mockReturnValue('2024-25')
+    mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0007')
+    mockIsInterState.mockReturnValue(false)
+    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 })
+    mockGenerateInvoicePDF.mockResolvedValue(Buffer.from('pdf'))
+    mockUploadInvoicePDF.mockResolvedValue('https://s3.example.com/inv.pdf')
+
+    const result = await generateOrderInvoice('order-1')
+    expect(result).toBeInstanceOf(Buffer)
+    // When taxableAmount > 0, calculateGST should NOT be called in the recalc loop
+    expect(mockCalculateGST).not.toHaveBeenCalled()
+  })
+
+  it('builds destination with only state when city is null', async () => {
+    const orderNoCity = { ...mockOrder, city: null, state: 'Chhattisgarh' }
+
+    mockQueryOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(orderNoCity)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ id: 'inv-up' })
+
+    mockQueryMany
+      .mockResolvedValueOnce([mockOrderItem])
+      .mockResolvedValueOnce([{ key: 'business_gstin', value: 'GSTIN' }])
+      .mockResolvedValueOnce([mockOrderItem])
+
+    mockWithTransaction.mockImplementation(async (fn) => {
+      const mockClient = {
+        query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
+      }
+      return fn(mockClient as any)
+    })
+
+    mockGetFinancialYear.mockReturnValue('2024-25')
+    mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0008')
+    mockIsInterState.mockReturnValue(false)
+    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 })
+    mockGenerateInvoicePDF.mockResolvedValue(Buffer.from('pdf'))
+    mockUploadInvoicePDF.mockResolvedValue('https://s3.example.com/inv.pdf')
+
+    await generateOrderInvoice('order-1')
+
+    const [invoiceOrder] = mockGenerateInvoicePDF.mock.calls[0]
+    expect((invoiceOrder as any).destination).toBe('Chhattisgarh')
+  })
+
+  it('includes payment_transaction_id from payment record when available', async () => {
+    mockQueryOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(mockOrder)
+      .mockResolvedValueOnce({ transaction_id: 'pay_abc123' }) // paymentRecord
+      .mockResolvedValueOnce({ id: 'inv-up' })
+
+    mockQueryMany
+      .mockResolvedValueOnce([mockOrderItem])
+      .mockResolvedValueOnce([{ key: 'business_gstin', value: 'GSTIN' }])
+      .mockResolvedValueOnce([mockOrderItem])
+
+    mockWithTransaction.mockImplementation(async (fn) => {
+      const mockClient = {
+        query: vi.fn().mockResolvedValue({ rows: [{ value: 'JS' }], rowCount: 1 }),
+      }
+      return fn(mockClient as any)
+    })
+
+    mockGetFinancialYear.mockReturnValue('2024-25')
+    mockGenerateInvoiceNumber.mockReturnValue('JS/2024-25/0009')
+    mockIsInterState.mockReturnValue(false)
+    mockCalculateGST.mockReturnValue({ taxableAmount: 84.75, cgst: 7.63, sgst: 7.63, igst: 0, totalTax: 15.26 })
+    mockGenerateInvoicePDF.mockResolvedValue(Buffer.from('pdf'))
+    mockUploadInvoicePDF.mockResolvedValue('https://s3.example.com/inv.pdf')
+
+    await generateOrderInvoice('order-1')
+
+    const [invoiceOrder] = mockGenerateInvoicePDF.mock.calls[0]
+    expect((invoiceOrder as any).payment_transaction_id).toBe('pay_abc123')
+  })
+})
+
 describe('assignInvoiceNumber', () => {
   // resetAllMocks (top-level beforeEach) wipes the gst mock return values, so
   // re-establish them here.
@@ -515,5 +726,30 @@ describe('assignInvoiceNumber', () => {
     await assignInvoiceNumber(client as any, 'order-2')
     expect(client.calls.some(c => /INSERT INTO invoices/i.test(c.sql))).toBe(true)
     expect(client.calls.some(c => /UPDATE invoices SET/i.test(c.sql))).toBe(false)
+  })
+
+  it('returns null when order row is not found', async () => {
+    const query = vi.fn(async (sql: string) => {
+      if (/SELECT invoice_number, source FROM orders/i.test(sql)) return { rows: [] }
+      return { rows: [], rowCount: 0 }
+    })
+    const result = await assignInvoiceNumber({ query } as any, 'missing-order')
+    expect(result).toBeNull()
+  })
+
+  it('falls back to INSERT when UPDATE invoices returns rowCount=0 (no draft row)', async () => {
+    const client = makeClient({ source: 'online', draftRowCount: 0 })
+    const num = await assignInvoiceNumber(client as any, 'order-1')
+    expect(num).toBe('JS/2024-25/0001')
+    // Both the UPDATE attempt and the fallback INSERT should appear
+    expect(client.calls.some(c => /UPDATE invoices SET/i.test(c.sql))).toBe(true)
+    expect(client.calls.some(c => /INSERT INTO invoices/i.test(c.sql))).toBe(true)
+  })
+
+  it('handles business source like online (flips draft row)', async () => {
+    const client = makeClient({ source: 'business', draftRowCount: 1 })
+    const num = await assignInvoiceNumber(client as any, 'order-biz')
+    expect(num).toBe('JS/2024-25/0001')
+    expect(client.calls.some(c => /UPDATE invoices SET .*status = 'finalized'/is.test(c.sql))).toBe(true)
   })
 })

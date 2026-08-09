@@ -193,14 +193,14 @@ describe('POST /api/business/login', () => {
       expect(body.user.companyName).toBe('Acme Ltd')
     })
 
-    it('sets business_auth_token cookie on successful login', async () => {
+    it('sets business_sid cookie on successful login', async () => {
       vi.mocked(otpLib.verifyOTP).mockResolvedValue({ valid: true, message: 'OK' })
       vi.mocked(db.queryOne).mockResolvedValue(APPROVED_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       await loginPOST(loginRequest({ email: 'biz@example.com', otp: '123456' }) as any)
       expect(mockCookieStore.set).toHaveBeenCalledWith(
-        'business_auth_token',
+        'business_sid',
         expect.any(String),
         expect.objectContaining({ httpOnly: true })
       )
@@ -311,7 +311,7 @@ describe('POST /api/business/signup', () => {
       )
     })
 
-    it('sets business_auth_token cookie after signup', async () => {
+    it('sets business_sid cookie after signup', async () => {
       vi.mocked(otpLib.isOTPVerified).mockResolvedValue(true)
       vi.mocked(db.queryOne)
         .mockResolvedValueOnce(null)
@@ -320,7 +320,7 @@ describe('POST /api/business/signup', () => {
 
       await signupPOST(signupRequest(VALID_SIGNUP_BODY) as any)
       expect(mockCookieStore.set).toHaveBeenCalledWith(
-        'business_auth_token',
+        'business_sid',
         expect.any(String),
         expect.objectContaining({ httpOnly: true })
       )

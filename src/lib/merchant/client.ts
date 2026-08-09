@@ -1,6 +1,10 @@
 import { createSign } from 'crypto'
 
-const MERCHANT_ID = '5762156822'
+// Merchant ID is environment-driven; production falls back to the real GMC account.
+const MERCHANT_ID = process.env.GMC_MERCHANT_ID || '5762156822'
+// When true (set on local dev), pushes to Google Merchant Center are refused so
+// local never writes to the real Merchant Center (there is no test GMC account).
+export const GMC_PUSH_DISABLED = process.env.GMC_PUSH_DISABLED === 'true'
 const SCOPE = 'https://www.googleapis.com/auth/content'
 const BASE_URL = `https://shoppingcontent.googleapis.com/content/v2.1/${MERCHANT_ID}`
 const BATCH_URL = `https://shoppingcontent.googleapis.com/content/v2.1`
@@ -108,6 +112,12 @@ export async function deleteProductByOfferId(offerId: string): Promise<void> {
 export async function listProducts(pageToken?: string): Promise<{ resources?: any[]; nextPageToken?: string }> {
   const qs = pageToken ? `?pageToken=${encodeURIComponent(pageToken)}` : ''
   return gmcRequest('GET', `/products${qs}`)
+}
+
+export async function listProductStatuses(pageToken?: string): Promise<{ resources?: any[]; nextPageToken?: string }> {
+  const params = new URLSearchParams({ maxResults: '250' })
+  if (pageToken) params.set('pageToken', pageToken)
+  return gmcRequest('GET', `/productstatuses?${params.toString()}`)
 }
 
 export async function customBatchUpsert(entries: unknown[]): Promise<any> {

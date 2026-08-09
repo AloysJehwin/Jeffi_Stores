@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import ProductImageGallery from './ProductImageGallery'
 
@@ -159,6 +160,8 @@ interface PolicyProps {
 }
 
 const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replacementDays, isCodAllowed, freeShippingThreshold = 500 }: PolicyProps) => {
+  const [activePolicy, setActivePolicy] = useState<null | { label: string; sub: string; detail: string; bullets: string[]; color: string; href: string; hrefLabel: string; icon: React.ReactNode }>(null)
+
   const items = [
     {
       icon: (
@@ -169,8 +172,16 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       ),
       label: 'Free Delivery',
       sub: `On orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}`,
+      detail: `Free delivery on all orders above ₹${freeShippingThreshold.toLocaleString('en-IN')}. Standard shipping charges apply below this threshold.`,
+      bullets: [
+        'Delivered within 3–7 business days',
+        'Same-day dispatch on orders placed before 2 PM',
+        'Tracking link sent via SMS & email after dispatch',
+        'Delivery available across India including remote areas',
+      ],
       color: 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400',
       href: '/legal/shipping-policy',
+      hrefLabel: 'Read Shipping Policy',
     },
     {
       icon: (
@@ -180,10 +191,25 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       ),
       label: returnAllowed ? 'Easy Returns' : 'Non-Returnable',
       sub: returnAllowed ? `${returnDays}-day return policy` : 'This product cannot be returned',
+      detail: returnAllowed
+        ? `Hassle-free returns within ${returnDays} days of delivery.`
+        : 'This product is non-returnable due to its nature.',
+      bullets: returnAllowed ? [
+        `Raise a return request within ${returnDays} days of delivery`,
+        'Item must be unused and in original packaging',
+        'Refund processed within 5–7 business days after pickup',
+        'Free pickup arranged from your doorstep',
+      ] : [
+        'Please review the product details carefully before ordering',
+        'Damaged or defective items — contact support within 48 hours',
+        'Wrong item received? We will arrange a replacement',
+        'Our team is available 9 AM – 6 PM Mon–Sat',
+      ],
       color: returnAllowed
         ? 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400'
         : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
       href: '/legal/return-refund-policy',
+      hrefLabel: 'Read Return & Refund Policy',
     },
     {
       icon: (
@@ -193,10 +219,25 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       ),
       label: replacementAllowed ? 'Free Replacement' : 'Non-Replaceable',
       sub: replacementAllowed ? `${replacementDays}-day guarantee` : 'This product cannot be replaced',
+      detail: replacementAllowed
+        ? `Free replacement within ${replacementDays} days for defective or damaged products.`
+        : 'This product is not eligible for replacement under our standard policy.',
+      bullets: replacementAllowed ? [
+        `Request replacement within ${replacementDays} days of delivery`,
+        'Applicable for manufacturing defects & damage on delivery',
+        'Upload photos of the defect when raising the request',
+        'Replacement dispatched within 2–3 business days of approval',
+      ] : [
+        'Damaged on delivery? Contact support within 48 hours with photos',
+        'Incorrect item received will be replaced at no cost',
+        'Manufacturing defects covered under brand warranty',
+        'Contact us at support@jeffistores.in for assistance',
+      ],
       color: replacementAllowed
         ? 'bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
         : 'bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400',
       href: '/legal/return-refund-policy',
+      hrefLabel: 'Read Return & Refund Policy',
     },
     {
       icon: (
@@ -206,8 +247,16 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       ),
       label: '100% Genuine',
       sub: 'Verified authentic products',
+      detail: 'Every product on Jeffi Stores is sourced directly from authorised distributors or manufacturers.',
+      bullets: [
+        'Sourced directly from authorised distributors',
+        'Zero tolerance for counterfeit or grey-market goods',
+        'Quality inspection before every dispatch',
+        'Brand warranty honoured on all genuine products',
+      ],
       color: 'bg-purple-50 dark:bg-purple-900/20 text-purple-600 dark:text-purple-400',
       href: '/legal/warranty-policy',
+      hrefLabel: 'Read Warranty Policy',
     },
   ]
 
@@ -215,8 +264,8 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 items-stretch">
         {items.map((item, i) => (
-          <Link key={i} href={item.href} target="_blank" rel="noopener noreferrer"
-            className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full overflow-hidden">
+          <button key={i} type="button" onClick={() => setActivePolicy(item)}
+            className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full overflow-hidden text-left w-full">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${item.color}`}>
               {item.icon}
             </div>
@@ -224,9 +273,50 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
               <p className="text-sm font-semibold text-foreground leading-tight group-hover:text-accent-600 transition-colors">{item.label}</p>
               <p className="text-[11px] text-foreground-muted leading-snug mt-0.5">{item.sub}</p>
             </div>
-          </Link>
+          </button>
         ))}
       </div>
+
+      {/* Policy popup modal — rendered via portal to avoid z-index/overflow clipping */}
+      {activePolicy && typeof document !== 'undefined' && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4" onClick={() => setActivePolicy(null)}>
+          <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" />
+          <div className="relative bg-surface rounded-2xl border border-border-default shadow-2xl w-full max-w-sm p-5 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${activePolicy.color}`}>
+                {activePolicy.icon}
+              </div>
+              <div>
+                <p className="text-base font-semibold text-foreground">{activePolicy.label}</p>
+                <p className="text-xs text-foreground-muted">{activePolicy.sub}</p>
+              </div>
+            </div>
+            <p className="text-sm text-foreground-secondary leading-relaxed">{activePolicy.detail}</p>
+            <ul className="space-y-2">
+              {activePolicy.bullets.map((b: string, i: number) => (
+                <li key={i} className="flex items-start gap-2 text-sm text-foreground-secondary">
+                  <svg className="w-4 h-4 mt-0.5 shrink-0 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+                  </svg>
+                  {b}
+                </li>
+              ))}
+            </ul>
+            <div className="flex items-center justify-between pt-1">
+              <Link href={activePolicy.href} target="_blank" rel="noopener noreferrer"
+                className="text-sm font-medium text-accent-600 hover:underline flex items-center gap-1">
+                {activePolicy.hrefLabel}
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
+              </Link>
+              <button type="button" onClick={() => setActivePolicy(null)}
+                className="text-xs text-foreground-muted hover:text-foreground transition-colors px-3 py-1.5 rounded-lg hover:bg-surface-secondary">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
 
       <Link href="/legal/faq" target="_blank" rel="noopener noreferrer"
         className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group">

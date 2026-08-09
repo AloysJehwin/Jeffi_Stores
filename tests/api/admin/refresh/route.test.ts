@@ -3,8 +3,11 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/jwt', () => ({
   authenticateAdmin: vi.fn(),
-  generateToken: vi.fn(),
   JWT_MAX_AGE_S: 28800,
+}))
+
+vi.mock('@/lib/auth-sessions', () => ({
+  extendSession: vi.fn(),
 }))
 
 vi.mock('@/lib/cookie-domain', () => ({
@@ -12,18 +15,18 @@ vi.mock('@/lib/cookie-domain', () => ({
 }))
 
 import { POST } from '@/app/api/admin/refresh/route'
-import { authenticateAdmin, generateToken } from '@/lib/jwt'
+import { authenticateAdmin, JWT_MAX_AGE_S } from '@/lib/jwt'
+import { extendSession } from '@/lib/auth-sessions'
 
 const mockAuth = vi.mocked(authenticateAdmin)
-const mockGenToken = vi.mocked(generateToken)
+const mockExtend = vi.mocked(extendSession)
 
 const admin = {
   adminId: 'a1',
-  username: 'admin',
-  first_name: 'Test',
-  last_name: 'Admin',
   role: 'super_admin',
   scopes: ['products'],
+  // Opaque session token (64-hex), NOT the row uuid — this is the cookie value now.
+  sid: 'b'.repeat(64),
 }
 
 function makeReq() {
@@ -39,13 +42,20 @@ describe('POST /api/admin/refresh', () => {
     expect(res.status).toBe(401)
   })
 
-  it('generates new token and sets cookie on happy path', async () => {
-    mockAuth.mockResolvedValue(admin)
-    mockGenToken.mockResolvedValue('new-jwt-token')
+  it('returns 401 when the session has no sid', async () => {
+    mockAuth.mockResolvedValue({ adminId: 'a1', role: 'admin', scopes: [] } as any)
+    const res = await POST(makeReq())
+    expect(res.status).toBe(401)
+  })
+
+  it('slides the session expiry and re-sets the cookie to the same token on happy path', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockExtend.mockResolvedValue(undefined)
     const res = await POST(makeReq())
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
-    expect(mockGenToken).toHaveBeenCalledWith(expect.objectContaining({ adminId: 'a1' }))
+    expect(mockExtend).toHaveBeenCalledWith('b'.repeat(64), JWT_MAX_AGE_S)
+    expect(res.cookies.get('admin_sid')?.value).toBe('b'.repeat(64))
   })
 })

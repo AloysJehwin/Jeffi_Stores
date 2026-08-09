@@ -22,6 +22,7 @@ vi.mock('@/lib/merchant/client', () => ({
   listProducts: vi.fn(),
   customBatchUpsert: vi.fn(),
   MERCHANT_ID: 'test-merchant-123',
+  GMC_PUSH_DISABLED: false,
 }))
 
 import {
@@ -181,32 +182,37 @@ describe('merchant/sync', () => {
       expect(mockUpsertProduct).not.toHaveBeenCalled()
     })
 
-    it('deletes product from GMC when is_active is false', async () => {
+    it('upserts inactive product as out_of_stock (not deleted)', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'p1',
-        sku: 'SKU-001',
-        is_active: false,
-        product_variants: [],
+        id: 'p1', sku: 'SKU-001', is_active: false, product_variants: [],
       })
-
+      mockProductToGmcItems.mockReturnValueOnce([{ offerId: 'SKU-001', availability: 'out of stock' }])
       await syncProductToMerchant('p1')
-      expect(mockDeleteProductByOfferId).toHaveBeenCalledWith('SKU-001')
-      expect(mockUpsertProduct).not.toHaveBeenCalled()
+      expect(mockUpsertProduct).toHaveBeenCalledWith({ offerId: 'SKU-001', availability: 'out of stock' })
+      expect(mockDeleteProductByOfferId).not.toHaveBeenCalled()
     })
 
-    it('deletes variant skus when inactive product has variants', async () => {
+    it('upserts all variant items for inactive product with variants as out_of_stock', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'p1',
-        sku: 'SKU-001',
-        is_active: false,
-        product_variants: [
-          { sku: 'SKU-001-S' },
-          { sku: 'SKU-001-L' },
-        ],
+        id: 'p1', sku: 'SKU-001', is_active: false,
+        product_variants: [{ sku: 'SKU-001-S' }, { sku: 'SKU-001-L' }],
       })
-
+      mockProductToGmcItems.mockReturnValueOnce([
+        { offerId: 'SKU-001-S', availability: 'out of stock' },
+        { offerId: 'SKU-001-L', availability: 'out of stock' },
+      ])
       await syncProductToMerchant('p1')
-      expect(mockDeleteProductByOfferId).toHaveBeenCalledTimes(3) // product + 2 variants
+      expect(mockUpsertProduct).toHaveBeenCalledTimes(2)
+      expect(mockDeleteProductByOfferId).not.toHaveBeenCalled()
+    })
+
+    it('upserts inactive product with sanitized sku', async () => {
+      mockQueryOne.mockResolvedValueOnce({
+        id: 'p1', sku: 'SKU 001/test', is_active: false, product_variants: [],
+      })
+      mockProductToGmcItems.mockReturnValueOnce([{ offerId: 'SKU_001_test', availability: 'out of stock' }])
+      await syncProductToMerchant('p1')
+      expect(mockUpsertProduct).toHaveBeenCalledWith({ offerId: 'SKU_001_test', availability: 'out of stock' })
     })
 
     it('upserts each GMC item when product is active', async () => {
@@ -242,16 +248,17 @@ describe('merchant/sync', () => {
       expect(mockUpsertProduct).toHaveBeenCalledTimes(2)
     })
 
-    it('sanitizes sku for inactive product deletion', async () => {
+    it('upserts active product with all variant items', async () => {
       mockQueryOne.mockResolvedValueOnce({
-        id: 'p1',
-        sku: 'SKU 001/test',
-        is_active: false,
-        product_variants: [],
+        id: 'p1', sku: 'SKU-001', is_active: true,
+        product_variants: [{ sku: 'SKU-001-S' }, { sku: 'SKU-001-L' }],
       })
-
+      mockProductToGmcItems.mockReturnValueOnce([
+        { offerId: 'SKU-001-S', title: 'Widget S' },
+        { offerId: 'SKU-001-L', title: 'Widget L' },
+      ])
       await syncProductToMerchant('p1')
-      expect(mockDeleteProductByOfferId).toHaveBeenCalledWith('SKU_001_test')
+      expect(mockUpsertProduct).toHaveBeenCalledTimes(2)
     })
   })
 

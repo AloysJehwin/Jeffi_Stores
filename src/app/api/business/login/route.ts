@@ -1,14 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { queryOne, query } from '@/lib/db'
-import { SignJWT } from 'jose'
+import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
+import { extractSessionSignals } from '@/lib/session-signals-request'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 import { POLICY_VERSION } from '@/app/legal/policies'
 
 if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is not set')
-const JWT_SECRET = new TextEncoder().encode(process.env.JWT_SECRET)
 
 export async function POST(request: NextRequest) {
   try {
@@ -54,21 +54,29 @@ export async function POST(request: NextRequest) {
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
     logActivity({ userId: user.id, kind: 'login', summary: 'Business login via OTP', metadata: { provider: 'otp' } }).catch(() => {})
 
-    const token = await new SignJWT({ userId: user.id, email: user.email, type: 'business', isBusiness: true, approvalStatus: 'approved' })
-      .setProtectedHeader({ alg: 'HS256' })
-      .setExpirationTime('30d')
-      .sign(JWT_SECRET)
+    const signals = extractSessionSignals(request)
+    const { sid } = await issueUserToken({
+      userId: user.id,
+      email: user.email,
+      type: 'business',
+      extraClaims: { isBusiness: true, approvalStatus: 'approved' },
+      userAgent: signals.userAgent,
+      ip: signals.ip,
+      acceptLanguage: signals.acceptLanguage,
+      uaPlatform: signals.uaPlatform,
+      fpHash: signals.fpHash,
+    })
 
     const cookieStore = await cookies()
     const cookieOpts = {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'strict' as const,
-      maxAge: 30 * 24 * 60 * 60,
+      maxAge: USER_SESSION_TTL_S,
       path: '/',
       ...cookieDomainOption(),
     }
-    cookieStore.set('business_auth_token', token, cookieOpts)
+    cookieStore.set('business_sid', sid, cookieOpts)
     cookieStore.set('session_id', user.id, cookieOpts)
 
     await deleteOTP(email)

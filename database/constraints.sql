@@ -659,6 +659,54 @@ ALTER TABLE ONLY public.merchant_sync_log
 
 
 --
+-- Name: merchant_gmc_status merchant_gmc_status_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.merchant_gmc_status
+    ADD CONSTRAINT merchant_gmc_status_pkey PRIMARY KEY (offer_id);
+
+
+--
+-- Name: merchant_gmc_refresh_meta merchant_gmc_refresh_meta_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.merchant_gmc_refresh_meta
+    ADD CONSTRAINT merchant_gmc_refresh_meta_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.merchant_gmc_refresh_meta
+    ADD CONSTRAINT merchant_gmc_refresh_meta_singleton CHECK (id = 1);
+
+
+--
+-- Name: amazon_sync_log amazon_sync_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.amazon_sync_log
+    ADD CONSTRAINT amazon_sync_log_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: amazon_listing_status amazon_listing_status_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.amazon_listing_status
+    ADD CONSTRAINT amazon_listing_status_pkey PRIMARY KEY (sku);
+
+
+--
+-- Name: amazon_refresh_meta amazon_refresh_meta_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.amazon_refresh_meta
+    ADD CONSTRAINT amazon_refresh_meta_pkey PRIMARY KEY (id);
+
+ALTER TABLE ONLY public.amazon_refresh_meta
+    ADD CONSTRAINT amazon_refresh_meta_singleton CHECK (id = 1);
+
+
+
+
+--
 -- Name: notifications notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -2331,6 +2379,14 @@ ALTER TABLE ONLY public.purchase_order_items
     ADD CONSTRAINT purchase_order_items_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id) ON DELETE RESTRICT;
 
 
+--
+-- Name: purchase_order_items purchase_order_items_sub_variant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.purchase_order_items
+    ADD CONSTRAINT purchase_order_items_sub_variant_id_fkey FOREIGN KEY (sub_variant_id) REFERENCES public.product_sub_variants(id) ON DELETE RESTRICT;
+
+
 
 --
 -- Name: purchase_orders purchase_orders_supplier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
@@ -2671,6 +2727,79 @@ ALTER TABLE shelf_stock_transactions DROP CONSTRAINT IF EXISTS shelf_stock_trans
 ALTER TABLE shelf_stock_transactions ADD CONSTRAINT shelf_stock_transactions_location_id_fkey FOREIGN KEY (location_id) REFERENCES shelf_locations(id) ON DELETE SET NULL;
 ALTER TABLE product_batches DROP CONSTRAINT IF EXISTS product_batches_location_id_fkey;
 ALTER TABLE product_batches ADD CONSTRAINT product_batches_location_id_fkey FOREIGN KEY (location_id) REFERENCES shelf_locations(id) ON DELETE SET NULL;
+
+
+--
+-- Name: product_suppliers product_suppliers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: product_suppliers product_suppliers_unit_cost_nonneg; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.product_suppliers
+    ADD CONSTRAINT product_suppliers_unit_cost_nonneg CHECK (unit_cost >= 0);
+
+
+--
+-- Name: product_suppliers product_suppliers_one_leaf; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+-- Supplier attaches at exactly one leaf: at most one of variant_id / sub_variant_id set.
+
+ALTER TABLE public.product_suppliers
+    ADD CONSTRAINT product_suppliers_one_leaf CHECK (NOT (variant_id IS NOT NULL AND sub_variant_id IS NOT NULL));
+
+
+--
+-- Name: product_suppliers product_suppliers_product_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_product_id_fkey FOREIGN KEY (product_id) REFERENCES public.products(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_suppliers product_suppliers_variant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_variant_id_fkey FOREIGN KEY (variant_id) REFERENCES public.product_variants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_suppliers product_suppliers_sub_variant_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_sub_variant_id_fkey FOREIGN KEY (sub_variant_id) REFERENCES public.product_sub_variants(id) ON DELETE CASCADE;
+
+
+--
+-- Name: product_suppliers product_suppliers_supplier_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_suppliers
+    ADD CONSTRAINT product_suppliers_supplier_id_fkey FOREIGN KEY (supplier_id) REFERENCES public.suppliers(id) ON DELETE RESTRICT;
+
+
+--
+-- Name: auth_sessions auth_sessions_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.auth_sessions
+    ADD CONSTRAINT auth_sessions_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: auth_sessions auth_sessions_principal_type_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE public.auth_sessions
+    ADD CONSTRAINT auth_sessions_principal_type_check CHECK (((principal_type)::text = ANY ((ARRAY['admin'::character varying, 'customer'::character varying, 'business'::character varying])::text[])));
 
 
 --

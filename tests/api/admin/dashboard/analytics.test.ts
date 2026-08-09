@@ -65,3 +65,11 @@ describe('GET /api/admin/dashboard/analytics', () => {
     expect(mockGet).toHaveBeenCalledWith('30d')
   })
 })
+
+  it('returns 500 when getDashboardAnalytics throws', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockGet.mockRejectedValue(new Error('db fail'))
+    const res = await GET(makeReq())
+    expect(res.status).toBe(500)
+  })

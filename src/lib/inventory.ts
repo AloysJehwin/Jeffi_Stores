@@ -231,8 +231,10 @@ export async function getStockValuation(filters: {
   categoryName?: string
   brandName?: string
   stockStatus?: string
+  sort?: string
+  dir?: string
 } = {}) {
-  const { limit = 50, offset = 0, search, categoryName, brandName, stockStatus } = filters
+  const { limit = 50, offset = 0, search, categoryName, brandName, stockStatus, sort, dir } = filters
 
   // Build WHERE conditions applied to each UNION leg via a wrapping CTE
   const havingClauses: string[] = []
@@ -422,18 +424,37 @@ export async function getStockValuation(filters: {
   const allCategories = [...new Set(filterMeta.map(r => r.category_name).filter(Boolean))].sort() as string[]
   const allBrands = [...new Set(filterMeta.map(r => r.brand_name).filter(Boolean))].sort() as string[]
 
-  // Count filtered rows
-  const countRow = await queryOne<{ total: number; total_value: string }>(
-    `${baseQuery} SELECT COUNT(*)::int AS total, SUM(rows.stock_value)::text AS total_value FROM rows ${whereClause}`,
+  // Count filtered rows + site-wide totals (across ALL matching SKUs, not just the page).
+  const countRow = await queryOne<{ total: number; total_value: string; total_value_incl: string }>(
+    `${baseQuery} SELECT COUNT(*)::int AS total,
+        SUM(rows.stock_value)::text AS total_value,
+        SUM(rows.inventory_quantity * rows.selling_price)::text AS total_value_incl
+       FROM rows ${whereClause}`,
     params
   )
   const total = countRow?.total || 0
   const totalValue = parseFloat(countRow?.total_value || '0') || 0
+  const totalValueInclGst = parseFloat(countRow?.total_value_incl || '0') || 0
+  const inStockCount = await queryOne<{ n: number }>(
+    `${baseQuery} SELECT COUNT(*)::int AS n FROM rows ${whereClause}${whereClause ? ' AND' : ' WHERE'} rows.inventory_quantity > 0`,
+    params
+  ).then(r => r?.n || 0).catch(() => 0)
+
+  // Server-side sort (across ALL matching SKUs, not just the page). Whitelist columns.
+  const VAL_SORT_COLS: Record<string, string> = {
+    product: 'rows.name', variant: 'rows.variant_name', sku: 'rows.row_sku',
+    stock: 'rows.inventory_quantity', price: 'rows.cost_price', value: 'rows.stock_value',
+  }
+  const sortCol = (sort && VAL_SORT_COLS[sort]) || null
+  const sortDir = dir === 'asc' ? 'ASC' : 'DESC'
+  const orderBy = sortCol
+    ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, rows.name, rows.variant_name, rows.sub_variant_name`
+    : `ORDER BY rows.name, rows.variant_name, rows.sub_variant_name`
 
   // Paginated rows
   const pageParams = [...params, limit, offset]
   const products = await queryMany<any>(
-    `${baseQuery} SELECT rows.* FROM rows ${whereClause} ORDER BY rows.name, rows.variant_name, rows.sub_variant_name LIMIT $${i} OFFSET $${i + 1}`,
+    `${baseQuery} SELECT rows.* FROM rows ${whereClause} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`,
     pageParams
   )
 
@@ -441,6 +462,8 @@ export async function getStockValuation(filters: {
     products: products || [],
     total,
     totalValue: round2(totalValue),
+    totalValueInclGst: round2(totalValueInclGst),
+    inStockCount,
     allCategories,
     allBrands,
   }

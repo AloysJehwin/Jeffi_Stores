@@ -42,7 +42,7 @@ const adminPayload = {
 function makeRequest(id = 'order-1') {
   return new NextRequest(`http://localhost/api/admin/orders/${id}/retry-email`, {
     method: 'POST',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

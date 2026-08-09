@@ -38,7 +38,7 @@ function makeRequest(id = 'user-1', searchParams: Record<string, string> = {}) {
   for (const [k, v] of Object.entries(searchParams)) url.searchParams.set(k, v)
   return new NextRequest(url.toString(), {
     method: 'GET',
-    headers: { cookie: 'admin_token=valid' },
+    headers: { cookie: 'admin_sid=valid' },
   })
 }
 

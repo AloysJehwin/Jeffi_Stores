@@ -135,14 +135,14 @@ describe('POST /api/auth/login', () => {
       expect(body.user.email).toBe('user@example.com')
     })
 
-    it('sets auth_token cookie on successful login', async () => {
+    it('sets user_sid cookie on successful login', async () => {
       vi.mocked(otpLib.verifyOTP).mockResolvedValue({ valid: true, message: 'OK' })
       vi.mocked(db.queryOne).mockResolvedValue(ACTIVE_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
       await POST(makeRequest({ email: 'user@example.com', otp: '123456' }) as any)
       expect(mockCookieStore.set).toHaveBeenCalledWith(
-        'auth_token',
+        'user_sid',
         expect.any(String),
         expect.objectContaining({ httpOnly: true })
       )

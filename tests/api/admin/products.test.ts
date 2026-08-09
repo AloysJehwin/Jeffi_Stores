@@ -57,7 +57,7 @@ const adminPayload = {
 }
 
 function makeGetRequest(id: string, cookies: Record<string, string> = {}) {
-  const cookieHeader = Object.entries({ admin_token: 'valid-token', ...cookies })
+  const cookieHeader = Object.entries({ admin_sid: 'valid-token', ...cookies })
     .map(([k, v]) => `${k}=${v}`).join('; ')
   return new NextRequest(`http://localhost/api/admin/products/${id}`, {
     method: 'GET',
@@ -70,7 +70,7 @@ function makePatchRequest(id: string, body: Record<string, unknown>) {
     method: 'PATCH',
     headers: {
       'content-type': 'application/json',
-      cookie: 'admin_token=valid-token',
+      cookie: 'admin_sid=valid-token',
     },
     body: JSON.stringify(body),
   })

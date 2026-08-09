@@ -50,9 +50,11 @@ export default async function MailerPage({ searchParams }: { searchParams: Promi
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Mailer</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Create and send email campaigns to your customers</p>
         </div>
-        <Link href={ap('/admin/mailer/new', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
-          New Campaign
-        </Link>
+        <div className="hidden md:block">
+          <Link href={ap('/admin/mailer/new', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+            New Campaign
+          </Link>
+        </div>
       </div>
 
       <AdminFilters filters={[]} searchPlaceholder="Search by title or subject..." />
@@ -206,7 +208,7 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
               <div className="flex gap-3 pt-1">
                 {(c.status === 'draft' || c.status === 'scheduled') && <DispatchCampaignButton id={c.id} />}
                 <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-xs text-accent-500 hover:underline">View</Link>
-                {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
+                {c.status !== 'sending' && <div className="hidden md:block"><DeleteCampaignButton id={c.id} title={c.title} /></div>}
               </div>
             </div>
           ))}

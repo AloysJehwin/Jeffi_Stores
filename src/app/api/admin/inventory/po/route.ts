@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryMany, queryOne, query } from '@/lib/db'
+import { queryMany, queryOne, withTransaction } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { buildSearchClause } from '@/lib/search'
 import { z } from 'zod'
@@ -92,6 +92,89 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// Sync a supplier's quoted buy-price (product_suppliers) from a PO line's cost.
+// Leaf: sub-variant if the line has a sub_variant_id, else the variant resolved by SKU
+// (or the line variant_id), else the product. Records price history by inserting a new
+// dated row on change, creates the link if none exists. Never flips is_preferred.
+// Also denormalizes the price's leaf supplier_id cache. Runs in the PO-create transaction.
+async function syncSupplierPriceFromPO(
+  client: import('pg').PoolClient,
+  args: { productId: string; sku: string | null; variantIdFromLine: string | null; subVariantIdFromLine: string | null; supplierId: string; unitCost: number; poNumber: string }
+) {
+  const { productId, sku, variantIdFromLine, subVariantIdFromLine, supplierId, unitCost, poNumber } = args
+  if (!productId || !supplierId) return
+  if (!Number.isFinite(unitCost) || unitCost < 0) return
+
+  // Resolve the leaf. Sub-variant wins (one-leaf rule: sub_variant_id set, variant_id NULL).
+  // Else try to resolve the SKU: first against product_variants, then against
+  // product_sub_variants (a sub-variant SKU like TAP-HTJ15-RED never matches a variant row).
+  // Else fall back to the line's explicit variant_id. Else product leaf.
+  let variantId: string | null = null
+  let subVariantId: string | null = subVariantIdFromLine || null
+  if (!subVariantId) {
+    if (sku) {
+      // Try variant first.
+      const vr = await client.query<{ id: string }>(
+        `SELECT id FROM product_variants WHERE sku = $1 AND product_id = $2 LIMIT 1`,
+        [sku, productId]
+      )
+      if (vr.rows[0]) {
+        variantId = vr.rows[0].id
+      } else {
+        // Try sub-variant — SKU may belong to a sub-variant (variant_id stays NULL per one-leaf rule).
+        const svr = await client.query<{ id: string }>(
+          `SELECT id FROM product_sub_variants WHERE sku = $1 AND product_id = $2 LIMIT 1`,
+          [sku, productId]
+        )
+        if (svr.rows[0]) {
+          subVariantId = svr.rows[0].id
+          variantId = null
+        } else {
+          variantId = variantIdFromLine ?? null
+        }
+      }
+    } else {
+      variantId = variantIdFromLine ?? null
+    }
+  }
+
+  const cost = Math.round(unitCost * 100) / 100 // product_suppliers.unit_cost is numeric(12,2)
+
+  const cur = await client.query<{ id: string; unit_cost: string }>(
+    `SELECT id, unit_cost FROM product_suppliers
+     WHERE product_id = $1
+       AND variant_id IS NOT DISTINCT FROM $2::uuid
+       AND sub_variant_id IS NOT DISTINCT FROM $3::uuid
+       AND supplier_id = $4 AND is_active = true
+     ORDER BY effective_date DESC, created_at DESC LIMIT 1`,
+    [productId, variantId, subVariantId, supplierId]
+  )
+  const existing = cur.rows[0]
+  const note = `Auto-synced from PO ${poNumber}`
+
+  if (!existing) {
+    await client.query(
+      `INSERT INTO product_suppliers
+         (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, is_preferred, notes)
+       VALUES ($1, $2, $3, $4, $5, 'INR', false, false, $6)`,
+      [productId, variantId, subVariantId, supplierId, cost, note]
+    )
+  } else if (Number(existing.unit_cost) !== cost) {
+    // Price changed → deactivate old, insert a new dated row (preserve history).
+    await client.query(
+      `UPDATE product_suppliers SET is_active = false, is_preferred = false, updated_at = NOW() WHERE id = $1`,
+      [existing.id]
+    )
+    await client.query(
+      `INSERT INTO product_suppliers
+         (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, is_preferred, notes)
+       VALUES ($1, $2, $3, $4, $5, 'INR', false, false, $6)`,
+      [productId, variantId, subVariantId, supplierId, cost, note]
+    )
+  }
+  // else unchanged → no-op
+}
+
 export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
@@ -144,37 +227,77 @@ export async function POST(request: NextRequest) {
     })
     const totalAmount = subtotal + taxAmount
 
-    const po = await queryOne<{ id: string }>(
-      `INSERT INTO purchase_orders (po_number, supplier_id, status, order_date, expected_date, notes, subtotal, tax_amount, total_amount)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
-      [poNumber, supplier_id, status,
-       order_date || new Date().toISOString().slice(0, 10),
-       expected_date || null, notes || null,
-       round2(subtotal),
-       round2(taxAmount),
-       round2(totalAmount)]
-    )
-
-    for (const item of resolvedItems) {
-      const { resolvedUnitCost, baseQty, factor } = item
-      const tax = item.tax_rate ?? 0
-      const total = round2(baseQty * resolvedUnitCost * (1 + tax / 100))
-      await query(
-        `INSERT INTO purchase_order_items
-           (po_id, product_id, variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost,
-            purchase_unit, purchase_unit_factor, line_total_incl_gst, gst_inclusive)
-         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
-        [po?.id, item.product_id, item.variant_id || null,
-         item.product_name, item.sku || null,
-         baseQty,
-         Math.round(resolvedUnitCost * 1000000) / 1000000,
-         tax, total,
-         item.purchase_unit || null,
-         factor,
-         item.line_total_incl_gst ?? null,
-         item.gst_inclusive ?? true]
+    const po = await withTransaction(async (client) => {
+      const poRow = await client.query<{ id: string }>(
+        `INSERT INTO purchase_orders (po_number, supplier_id, status, order_date, expected_date, notes, subtotal, tax_amount, total_amount)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9) RETURNING id`,
+        [poNumber, supplier_id, status,
+         order_date || new Date().toISOString().slice(0, 10),
+         expected_date || null, notes || null,
+         round2(subtotal),
+         round2(taxAmount),
+         round2(totalAmount)]
       )
-    }
+      const poId = poRow.rows[0]?.id
+
+      for (const item of resolvedItems) {
+        const { resolvedUnitCost, baseQty, factor } = item
+        const tax = item.tax_rate ?? 0
+        const total = round2(baseQty * resolvedUnitCost * (1 + tax / 100))
+
+        // Validate variant_id against product_variants (guards against stale/mismatched
+        // ids from the line picker, which would otherwise violate the FK). If it doesn't
+        // resolve to a real variant of this product, treat the line as product-level.
+        let safeVariantId: string | null = item.variant_id || null
+        if (safeVariantId) {
+          const vchk = await client.query<{ id: string }>(
+            `SELECT id FROM product_variants WHERE id = $1 AND product_id = $2 LIMIT 1`,
+            [safeVariantId, item.product_id]
+          )
+          if (!vchk.rows[0]) safeVariantId = null
+        }
+
+        // Validate sub_variant_id against product_sub_variants (same product). If valid,
+        // also pin its parent variant so variant_id + sub_variant_id are consistent.
+        let safeSubVariantId: string | null = (item as any).sub_variant_id || null
+        if (safeSubVariantId) {
+          const svchk = await client.query<{ id: string; variant_id: string }>(
+            `SELECT id, variant_id FROM product_sub_variants WHERE id = $1 AND product_id = $2 LIMIT 1`,
+            [safeSubVariantId, item.product_id]
+          )
+          if (!svchk.rows[0]) safeSubVariantId = null
+          else safeVariantId = svchk.rows[0].variant_id
+        }
+
+        await client.query(
+          `INSERT INTO purchase_order_items
+             (po_id, product_id, variant_id, sub_variant_id, product_name, sku, quantity, unit_cost, tax_rate, total_cost,
+              purchase_unit, purchase_unit_factor, line_total_incl_gst, gst_inclusive)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+          [poId, item.product_id, safeVariantId, safeSubVariantId,
+           item.product_name, item.sku || null,
+           baseQty,
+           Math.round(resolvedUnitCost * 1000000) / 1000000,
+           tax, total,
+           item.purchase_unit || null,
+           factor,
+           item.line_total_incl_gst ?? null,
+           item.gst_inclusive ?? true]
+        )
+
+        // Auto-sync the supplier's quoted buy-price for this leaf from the PO line cost.
+        await syncSupplierPriceFromPO(client, {
+          productId: item.product_id,
+          sku: item.sku || null,
+          variantIdFromLine: safeVariantId,
+          subVariantIdFromLine: safeSubVariantId,
+          supplierId: supplier_id,
+          unitCost: resolvedUnitCost,
+          poNumber,
+        })
+      }
+      return { id: poId }
+    })
 
     return NextResponse.json({ success: true, id: po?.id, po_number: poNumber })
   } catch (err: any) {

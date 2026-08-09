@@ -1,10 +1,11 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { cookies } from 'next/headers'
+import { cookies, headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { verifyToken } from '@/lib/jwt'
-import { getFilteredProducts, getAllCategories, getAllBrands } from '@/lib/queries'
+import { hasScope } from '@/lib/scopes'
+import { getFilteredProducts, getAllCategories, getAllBrands, getProductBreakdowns } from '@/lib/queries'
 import { queryOne, queryMany } from '@/lib/db'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
 import FeaturedToggleButton from '@/components/admin/FeaturedToggleButton'
@@ -17,9 +18,10 @@ import ProductsTableClient from '@/components/admin/ProductsTableClient'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
 import DraftRowActions from '@/components/admin/DraftRowActions'
-import MerchantSyncStatus from '@/components/admin/MerchantSyncStatus'
+
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -28,7 +30,7 @@ const PAGE_SIZE = 25
 
 type SP = { [key: string]: string | undefined }
 
-async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { resolvedSearchParams: SP; isSuperAdmin: boolean }) {
+async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrite }: { resolvedSearchParams: SP; isSuperAdmin: boolean; canWrite: boolean }) {
   const host = await getHost()
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
@@ -182,10 +184,12 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { res
                 <div className="flex items-center justify-between text-xs text-foreground-muted">
                   <span>{product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}</span>
                   <div className="flex items-center gap-3">
-                    <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />
-                    <Link href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">Edit</Link>
+                    <div className="hidden md:inline-flex items-center gap-3">
+                      {canWrite && <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />}
+                      <Link href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">Edit</Link>
+                      {canWrite && <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />}
+                    </div>
                     <DownloadAdButton productId={product.id} productName={product.name} />
-                    <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />
                   </div>
                 </div>
               </div>
@@ -201,20 +205,20 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { res
 
       <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[900px] divide-y divide-border-default table-fixed">
+          <table className="min-w-full min-w-[900px] divide-y divide-border-default">
             <thead className="bg-surface-secondary">
               <tr>
-                <SortableHeader label="Product" column="name" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[26%]" />
-                <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[9%]" />
-                <SortableHeader label="Category" column="category" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[9%]" />
-                <SortableHeader label="Brand" column="brand" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[7%]" />
-                <SortableHeader label="Price" column="price" options={sortOptions('number')} currentSort={sort} currentDir={dir} className="w-[10%]" />
-                <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={sort} currentDir={dir} className="w-[10%]" />
-                <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} className="w-[13%]" />
-                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider w-[10%]">Actions</th>
+                <SortableHeader label="Product" column="name" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Category" column="category" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Brand" column="brand" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Price" column="price" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+                <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} isSuperAdmin={isSuperAdmin} />
+            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
           </table>
         </div>
       </div>
@@ -228,9 +232,12 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin }: { res
 // Runs ONLY the aggregate stats query (all products) and renders the stat cards.
 async function ProductsStats() {
   const host = await getHost()
-  const [allProductsForStats, categories, pendingDrafts] = await Promise.all([
-    getFilteredProducts({}),
-    getAllCategories(),
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'products:write')
+  const [stats, pendingDrafts] = await Promise.all([
+    getProductBreakdowns(),
     queryMany<{ product_id: string; name: string; sku: string; updated_at: string }>(
       `SELECT pd.product_id, p.name, p.sku, pd.updated_at
        FROM product_drafts pd
@@ -240,34 +247,44 @@ async function ProductsStats() {
     ),
   ])
 
-  const featuredCount = allProductsForStats.products?.filter((p: any) => p.is_featured).length || 0
-  const activeCount = allProductsForStats.products?.filter((p: any) => p.is_active).length || 0
-  const totalCount = allProductsForStats.total
-  const categoryCount = categories?.length || 0
+  const featuredCount = stats.featured
+  const activeCount = stats.activeProducts
+  const totalCount = stats.totalProducts
+  const categoryCount = stats.categories
   const pendingDraftsCount = pendingDrafts.length
 
   return (
     <div className="animate-fade-in">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{totalCount}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-56">
+        {/* Left: Catalog Value + the 4 product stats as tiles */}
+        <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
+          <div>
+            <p className="text-white/80 text-sm">Inventory Stock Value</p>
+            <p className="text-3xl sm:text-4xl font-bold mt-1">
+              Rs. {stats.inventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+            </p>
+          </div>
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-4">
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{totalCount}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Total</p>
+            </div>
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{activeCount}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Active</p>
+            </div>
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{featuredCount}<span className="text-xs font-normal text-white/70">/6</span></p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Featured</p>
+            </div>
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{categoryCount}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Categories</p>
+            </div>
+          </div>
         </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Featured</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">
-            <span className={featuredCount >= 6 ? 'text-yellow-600 dark:text-yellow-400' : ''}>{featuredCount}</span>
-            <span className="text-base font-normal text-foreground-muted">/6</span>
-          </p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Categories</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{categoryCount}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Active Products</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{activeCount}</p>
-        </div>
+        {/* Right: product breakdown chart */}
+        <ProductBreakdownChart byCategory={stats.byCategory} byBrand={stats.byBrand} byStock={stats.byStock} byInventoryValue={stats.byInventoryValue} />
       </div>
       {pendingDraftsCount > 0 && (
         <div className="mb-6">
@@ -280,17 +297,24 @@ async function ProductsStats() {
             </div>
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
               {pendingDrafts.map((d) => (
-                <DraftRowActions
-                  key={d.product_id}
-                  entityId={d.product_id}
-                  name={d.name}
-                  subtitle={d.sku}
-                  updatedAt={d.updated_at}
-                  editHref={ap(`/admin/products/edit/${d.product_id}`, host)}
-                  publishPath={`/api/admin/products/${d.product_id}/publish`}
-                  discardPath={`/api/admin/products/${d.product_id}/draft`}
-                  entityLabel="product"
-                />
+                canWrite ? (
+                  <DraftRowActions
+                    key={d.product_id}
+                    entityId={d.product_id}
+                    name={d.name}
+                    subtitle={d.sku}
+                    updatedAt={d.updated_at}
+                    editHref={ap(`/admin/products/edit/${d.product_id}`, host)}
+                    publishPath={`/api/admin/products/${d.product_id}/publish`}
+                    discardPath={`/api/admin/products/${d.product_id}/draft`}
+                    entityLabel="product"
+                  />
+                ) : (
+                  <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono">{d.sku}</p>
+                  </div>
+                )
               ))}
             </div>
           </div>
@@ -305,7 +329,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   // Read admin role for super_admin-only features (e.g. delete product)
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_token')
+  const token = cookieStore.get('admin_sid')
   let isSuperAdmin = false
   if (token) {
     try {
@@ -313,6 +337,11 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
       isSuperAdmin = payload?.role === 'super_admin'
     } catch {}
   }
+
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'products:write')
 
   const [categories, brands] = await Promise.all([
     getAllCategories(),
@@ -336,15 +365,17 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Products</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage your product inventory</p>
         </div>
-        <Link
-          href={ap('/admin/products/add', host)}
-          className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
-        >
-          Add New Product
-        </Link>
+        {canWrite && (
+        <div className="hidden md:block">
+          <Link
+            href={ap('/admin/products/add', host)}
+            className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+          >
+            Add New Product
+          </Link>
+        </div>
+        )}
       </div>
-
-      <MerchantSyncStatus />
 
       <Suspense fallback={<AdminStatsSkeleton cards={4} banner={false} />}>
         <ProductsStats />
@@ -382,7 +413,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
         ]} mode="content" forceExpanded />}
       />
 
-      <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} />
+      <ProductsListSection searchParams={searchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
     </div>
   )
 }
@@ -390,12 +421,12 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 // Resolves searchParams (no DB — near-instant) then keys the table Suspense
 // on the query string so filter/pagination changes re-trigger the shimmer
 // while the stats + filters above stay mounted.
-async function ProductsListSection({ searchParams, isSuperAdmin }: { searchParams: Promise<SP>; isSuperAdmin: boolean }) {
+async function ProductsListSection({ searchParams, isSuperAdmin, canWrite }: { searchParams: Promise<SP>; isSuperAdmin: boolean; canWrite: boolean }) {
   const resolvedSearchParams = await searchParams
   const key = JSON.stringify(resolvedSearchParams)
   return (
     <Suspense key={key} fallback={<AdminTableSkeleton rows={8} cols={8} />}>
-      <ProductsListContent resolvedSearchParams={resolvedSearchParams} isSuperAdmin={isSuperAdmin} />
+      <ProductsListContent resolvedSearchParams={resolvedSearchParams} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
     </Suspense>
   )
 }

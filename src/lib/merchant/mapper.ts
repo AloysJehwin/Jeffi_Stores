@@ -1,9 +1,6 @@
 import {
-  getGoogleProductCategory,
-  buildProductType,
   buildProductHighlights,
   buildProductDetails,
-  buildCustomLabels,
 } from '@/lib/google-merchant-helpers'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
@@ -50,11 +47,15 @@ export function productToGmcItems(product: any): any[] {
   const additionalImages = buildAdditionalImages(product, primaryImage?.id)
   const brandName = product.brands?.name || ''
   const description = (product.description || product.name || '').slice(0, 5000)
-  const googleProductCategory = getGoogleProductCategory(product)
-  const productType = buildProductType(product)
   const highlights = buildHighlights(product)
   const details = buildDetails(product)
   const hasVariants = product.has_variants && product.product_variants?.length > 0
+  const productActive = product.is_active !== false
+
+  const cogs = (cost: any) => {
+    const n = Number(cost)
+    return n > 0 ? { value: n.toFixed(2), currency: 'INR' } : undefined
+  }
 
   const common = {
     channel: CHANNEL,
@@ -71,9 +72,6 @@ export function productToGmcItems(product: any): any[] {
     ageGroup: 'adult',
     material: product.material || undefined,
     shipping: buildShipping(0),
-    shippingWeight: product.weight ? { value: String(product.weight), unit: 'kg' } : undefined,
-    googleProductCategory: googleProductCategory || undefined,
-    productTypes: productType ? [productType] : undefined,
     productHighlights: highlights.length ? highlights : undefined,
     productDetails: details.length ? details : undefined,
     isBundle: false,
@@ -87,26 +85,21 @@ export function productToGmcItems(product: any): any[] {
         const price = Number(v.price)
         const mrp = v.mrp ? Number(v.mrp) : (product.mrp ? Number(product.mrp) : null)
         const hasSale = mrp && mrp > price
-        const [cl0, cl1, cl2, cl3, cl4] = buildCustomLabels(product, v.stock_status)
 
         return {
           ...common,
           offerId: buildOfferId(v.sku),
           title: `${product.name} - ${v.variant_name}`,
           link: `${BASE_URL}/products/${product.slug}?sku=${encodeURIComponent(v.sku)}`,
-          price: { value: (hasSale ? price : (mrp || price)).toFixed(2), currency: 'INR' },
+          price: { value: (hasSale ? (mrp || price) : (mrp || price)).toFixed(2), currency: 'INR' },
           salePrice: hasSale ? { value: price.toFixed(2), currency: 'INR' } : undefined,
-          availability: v.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock',
+          availability: !productActive ? 'out of stock' : (v.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock'),
           itemGroupId: buildOfferId(product.sku),
           sizes: v.variant_name ? [v.variant_name] : undefined,
           gtin: v.gtin || product.gtin || undefined,
           mpn: v.mpn || product.mpn || undefined,
           identifierExists: !!(v.mpn || product.mpn || v.gtin || product.gtin || brandName),
-          customLabel0: cl0,
-          customLabel1: cl1,
-          customLabel2: cl2,
-          customLabel3: cl3,
-          customLabel4: cl4,
+          costOfGoodsSold: cogs(v.cost_price ?? product.cost_price),
         }
       })
   }
@@ -114,21 +107,16 @@ export function productToGmcItems(product: any): any[] {
   const price = Number(product.base_price)
   const mrp = product.mrp ? Number(product.mrp) : null
   const hasSale = mrp && mrp > price
-  const [cl0, cl1, cl2, cl3, cl4] = buildCustomLabels(product)
 
   return [{
     ...common,
     offerId: buildOfferId(product.sku),
     title: product.name,
     link: `${BASE_URL}/products/${product.slug}`,
-    price: { value: (hasSale ? price : (mrp || price)).toFixed(2), currency: 'INR' },
+    price: { value: (mrp || price).toFixed(2), currency: 'INR' },
     salePrice: hasSale ? { value: price.toFixed(2), currency: 'INR' } : undefined,
-    availability: product.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock',
+    availability: !productActive ? 'out of stock' : (product.stock_status !== 'Out of Stock' ? 'in stock' : 'out of stock'),
     sizes: product.size ? [product.size] : undefined,
-    customLabel0: cl0,
-    customLabel1: cl1,
-    customLabel2: cl2,
-    customLabel3: cl3,
-    customLabel4: cl4,
+    costOfGoodsSold: cogs(product.cost_price),
   }]
 }

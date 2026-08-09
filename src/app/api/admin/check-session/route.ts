@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { cookies } from 'next/headers'
-import { verifyToken } from '@/lib/jwt'
+import { resolveSession } from '@/lib/auth-sessions'
+import { extractSessionSignals } from '@/lib/session-signals-request'
 
 export async function GET(request: NextRequest) {
   try {
     const cookieStore = await cookies()
-    const token = cookieStore.get('admin_token')
+    const token = cookieStore.get('admin_sid')
 
     const hostname = request.nextUrl.hostname || request.headers.get('host') || ''
     const isAdminSubdomain = hostname.startsWith('admin.')
@@ -19,17 +20,23 @@ export async function GET(request: NextRequest) {
       return res
     }
 
-    const payload = await verifyToken(token.value)
+    // Opaque session: resolve the cookie's sid → live admin session (revoked/idle/expiry).
+    // Pass the request UA so a cookie replayed from a different browser is revoked here too
+    // (the 15s poll doubles as a device-binding tripwire). expiresAt comes from the row.
+    const s = await resolveSession(token.value, extractSessionSignals(request))
 
-    if (!payload) {
+    if (!s || s.principalType !== 'admin') {
       const res = NextResponse.json({ authenticated: false, expiresAt: null })
       res.headers.set('x-cert-status', certStatus)
       return res
     }
 
-    // exp is seconds since epoch (JWT standard)
-    const expiresAt = typeof payload.exp === 'number' ? payload.exp * 1000 : null
-    const res = NextResponse.json({ authenticated: true, expiresAt, user: payload })
+    const expiresAt = new Date(s.expiresAt).getTime()
+    const res = NextResponse.json({
+      authenticated: true,
+      expiresAt,
+      user: { adminId: s.principalId, email: s.email, role: s.role, scopes: s.scopes },
+    })
     res.headers.set('x-cert-status', certStatus)
     return res
   } catch (error) {

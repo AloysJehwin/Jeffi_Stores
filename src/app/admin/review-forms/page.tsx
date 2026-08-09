@@ -53,9 +53,11 @@ export default async function ReviewFormsPage({ searchParams }: { searchParams: 
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Review Forms</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Shareable forms that reward customers for Google reviews</p>
         </div>
-        <Link href={ap('/admin/review-forms/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
-          Create Form
-        </Link>
+        <div className="hidden md:block">
+          <Link href={ap('/admin/review-forms/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
+            Create Form
+          </Link>
+        </div>
       </div>
 
       <AdminFilters
@@ -183,8 +185,10 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
                 <div className="flex gap-3 pt-1">
                   <a href={formUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-foreground-muted hover:underline">Open ↗</a>
                   <Link href={ap(`/admin/review-forms/${f.id}/submissions`, host)} className="text-xs text-accent-500 hover:underline">Submissions</Link>
-                  <Link href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-xs text-accent-500 hover:underline">Edit</Link>
-                  <DeleteReviewFormButton id={f.id} title={f.title} />
+                  <div className="hidden md:flex gap-3">
+                    <Link href={ap(`/admin/review-forms/edit/${f.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-xs text-accent-500 hover:underline">Edit</Link>
+                    <DeleteReviewFormButton id={f.id} title={f.title} />
+                  </div>
                 </div>
               </div>
             )

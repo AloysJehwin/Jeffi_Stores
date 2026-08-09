@@ -16,9 +16,10 @@ interface Note {
 interface CustomerNotesProps {
   customerId: string
   initialNotes: Note[]
+  canWrite?: boolean
 }
 
-export default function CustomerNotes({ customerId, initialNotes }: CustomerNotesProps) {
+export default function CustomerNotes({ customerId, initialNotes, canWrite = false }: CustomerNotesProps) {
   const router = useRouter()
   const confirm = useConfirm()
   const [notes, setNotes] = useState<Note[]>(initialNotes)
@@ -84,6 +85,7 @@ export default function CustomerNotes({ customerId, initialNotes }: CustomerNote
   return (
     <div>
       <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">Internal Notes</h2>
+      {canWrite && (
       <div className="space-y-2 mb-3">
         <textarea
           value={body}
@@ -107,6 +109,7 @@ export default function CustomerNotes({ customerId, initialNotes }: CustomerNote
         </div>
         {error && <p className="text-xs text-red-600">{error}</p>}
       </div>
+      )}
 
       {notes.length === 0 ? (
         <p className="text-xs text-foreground-muted italic">No notes yet</p>
@@ -116,16 +119,18 @@ export default function CustomerNotes({ customerId, initialNotes }: CustomerNote
             <div key={n.id} className="border-l-2 border-accent-500 pl-3 py-1 group">
               <div className="flex items-start justify-between gap-2">
                 <p className="text-sm text-foreground whitespace-pre-wrap break-words">{n.body}</p>
-                <button
-                  type="button"
-                  onClick={() => remove(n.id)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity text-foreground-muted hover:text-red-600 shrink-0"
-                  aria-label="Delete note"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22" />
-                  </svg>
-                </button>
+                {canWrite && (
+                  <button
+                    type="button"
+                    onClick={() => remove(n.id)}
+                    className="opacity-0 group-hover:opacity-100 transition-opacity text-foreground-muted hover:text-red-600 shrink-0"
+                    aria-label="Delete note"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6M1 7h22" />
+                    </svg>
+                  </button>
+                )}
               </div>
               <p className="text-[10px] text-foreground-muted mt-1">
                 {authorName(n)} · {fmt(n.created_at)}

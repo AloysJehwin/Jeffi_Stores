@@ -81,14 +81,13 @@ async function getRequestAdminId(): Promise<string | null> {
   if (local) return local
   try {
     const { cookies } = await import('next/headers')
-    const token = (await cookies()).get('admin_token')?.value
-    if (!token) return null
-    const { jwtVerify } = await import('jose')
-    const jwtSecret = process.env.JWT_SECRET
-    if (!jwtSecret) return null
-    const secret = new TextEncoder().encode(jwtSecret)
-    const { payload } = await jwtVerify(token, secret)
-    return typeof payload.adminId === 'string' ? payload.adminId : null
+    const sid = (await cookies()).get('admin_sid')?.value
+    if (!sid) return null
+    // Cookie value is the opaque session id. Dynamic import avoids a db.ts ↔ auth-sessions
+    // circular import at module load.
+    const { resolveSession } = await import('./auth-sessions')
+    const s = await resolveSession(sid)
+    return s && s.principalType === 'admin' ? s.principalId : null
   } catch {
     return null
   }

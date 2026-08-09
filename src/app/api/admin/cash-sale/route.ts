@@ -37,6 +37,17 @@ export async function GET(request: NextRequest) {
 
     const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : ''
 
+    // Whitelisted server-side sort (real cash_sales columns).
+    const SORT_COLS: Record<string, string> = {
+      invoice_number: 'cs.invoice_number', invoice_date: 'cs.invoice_date',
+      total_amount: 'cs.total_amount', payment_status: 'cs.payment_status',
+    }
+    const sortCol = SORT_COLS[searchParams.get('sort') || ''] || null
+    const sortDir = (searchParams.get('dir') || 'desc').toLowerCase() === 'asc' ? 'ASC' : 'DESC'
+    const orderBy = sortCol
+      ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, cs.created_at DESC`
+      : `ORDER BY cs.created_at DESC`
+
     const [rows, countRow] = await Promise.all([
       queryMany(`
         SELECT
@@ -46,7 +57,7 @@ export async function GET(request: NextRequest) {
           cs.payment_status, cs.payment_mode, cs.notes
         FROM cash_sales cs
         ${where}
-        ORDER BY cs.created_at DESC
+        ${orderBy}
         LIMIT $${i} OFFSET $${i + 1}
       `, [...params, limit, offset]),
       queryOne<{ count: string }>(`SELECT COUNT(*) AS count FROM cash_sales cs ${where}`, params),

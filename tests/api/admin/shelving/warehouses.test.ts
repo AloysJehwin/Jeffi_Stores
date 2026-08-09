@@ -56,7 +56,7 @@ function makeRequest(method: string, body?: unknown) {
     method,
     headers: {
       'content-type': 'application/json',
-      cookie: 'admin_token=valid-token',
+      cookie: 'admin_sid=valid-token',
     },
     body: body ? JSON.stringify(body) : undefined,
   })

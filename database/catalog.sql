@@ -144,6 +144,7 @@ CREATE TABLE public.product_sub_variants (
     inventory_quantity numeric(14,3) DEFAULT 0 NOT NULL,
     discount_pct numeric(5,2) DEFAULT 0 NOT NULL,
     stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
+    supplier_id uuid,
     CONSTRAINT product_sub_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
 
@@ -209,6 +210,9 @@ CREATE TABLE public.product_variants (
     price_ex_gst numeric(12,2),
     mpn character varying(100),
     gtin character varying(50),
+    asin character varying(20),
+    asin_match character varying(16),
+    isbn character varying(20),
     pricing_type character varying(20) DEFAULT 'unit'::character varying NOT NULL,
     unit character varying(20),
     numeric_value numeric(10,3),
@@ -228,6 +232,7 @@ CREATE TABLE public.product_variants (
     discount_pct numeric(5,2) DEFAULT 0 NOT NULL,
     stock_decimal_precision smallint DEFAULT 0 NOT NULL,
     sell_unit_id uuid,
+    supplier_id uuid,
     stock_status character varying(20) DEFAULT 'In Stock'::character varying NOT NULL,
     CONSTRAINT product_variants_stock_status_check CHECK (((stock_status)::text = ANY ((ARRAY['In Stock'::character varying, 'Low Stock'::character varying, 'Out of Stock'::character varying])::text[])))
 );
@@ -294,6 +299,7 @@ CREATE TABLE public.products (
     barcode character varying(50),
     isbn character varying(20),
     asin character varying(20),
+    asin_match character varying(16),
     brand_part_number character varying(100),
     country_of_origin character varying(2),
     shelf_life_days integer,
