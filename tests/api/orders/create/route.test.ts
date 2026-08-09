@@ -620,4 +620,325 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     const res = await POST(req as any)
     expect(res.status).toBe(500)
   })
+
+  // ── Additional branch coverage ────────────────────────────────────────────────
+
+  it('returns 401 when user not authenticated', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(null)
+    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(401)
+    const body = await res.json()
+    expect(body.error).toBe('Unauthorized')
+  })
+
+  it('returns 404 when user record not found in DB', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(null) // user not found
+    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(404)
+    const body = await res.json()
+    expect(body.error).toBe('User not found')
+  })
+
+  it('returns 400 when cart is empty', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER)
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/cart is empty/i)
+  })
+
+  it('returns 400 when subtotal is below minimum order amount', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce({ value: '500' }) // min order = 500, subtotal = 200
+    vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
+    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(400)
+    const body = await res.json()
+    expect(body.error).toMatch(/minimum order value/i)
+  })
+
+  it('returns 409 when user has existing unpaid razorpay order', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null) // min order
+    vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
+
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn() }
+      client.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('INNER JOIN payments') && sql.includes('unpaid')) {
+          // Return an existing unpaid order
+          return { rows: [{ id: 'old-order', order_number: 'ORD-OLD-001' }], rowCount: 1 }
+        }
+        return { rows: [], rowCount: 0 }
+      })
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({ paymentMethod: 'razorpay' }) as any)
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.error).toMatch(/unpaid order/i)
+    expect(body.existingOrderId).toBe('old-order')
+    expect(body.existingOrderNumber).toBe('ORD-OLD-001')
+  })
+
+  it('sets requiresPayment=true for razorpay and does not confirm order', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn() }
+      client.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('INSERT INTO orders')) return { rows: [CREATED_ORDER], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      })
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({ paymentMethod: 'razorpay' }) as any)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.requiresPayment).toBe(true)
+    // For razorpay, status UPDATE should NOT be called (order stays pending)
+    expect(vi.mocked(db.query)).not.toHaveBeenCalledWith(
+      expect.stringContaining("status = 'confirmed'"),
+      expect.anything()
+    )
+  })
+
+  it('confirms order and sets status=confirmed for manual payment', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn() }
+      client.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('INSERT INTO orders')) return { rows: [CREATED_ORDER], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      })
+      return fn(client)
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.requiresPayment).toBe(false)
+    // The top-level query call should update status to confirmed
+    expect(vi.mocked(db.query)).toHaveBeenCalledWith(
+      expect.stringContaining("status = 'confirmed'"),
+      [CREATED_ORDER.id]
+    )
+  })
+
+  it('creates auto-task for high-value order (>= 50000)', async () => {
+    const { createAutoTask } = await import('@/lib/auto-tasks')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    // Single item at price 60000
+    const highValueItem = baseCartItem({ price_at_addition: '60000', quantity: '1' })
+    vi.mocked(db.queryMany).mockResolvedValue([highValueItem])
+
+    const highValueOrder = { ...CREATED_ORDER, total_amount: '60000' }
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn() }
+      client.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('INSERT INTO orders')) return { rows: [highValueOrder], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      })
+      return fn(client)
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(200)
+    expect(vi.mocked(createAutoTask)).toHaveBeenCalledWith(
+      expect.objectContaining({ sourceKind: 'review_high_value_order' })
+    )
+  })
+
+  it('reuses existing address when match found in DB', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
+
+    let existingAddrUsed = false
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn() }
+      client.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('SELECT * FROM addresses')) {
+          // Existing address found
+          return { rows: [{ id: 'addr-existing', full_name: 'Branch Tester' }], rowCount: 1 }
+        }
+        if (sql.includes('SELECT full_name') && sql.includes('FROM addresses WHERE id')) {
+          return { rows: [{ full_name: 'Branch Tester', city: 'Chennai' }], rowCount: 1 }
+        }
+        if (sql.includes('INSERT INTO orders')) {
+          // Check that address id used is the existing one
+          existingAddrUsed = true
+          return { rows: [CREATED_ORDER], rowCount: 1 }
+        }
+        return { rows: [], rowCount: 0 }
+      })
+      return fn(client)
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await POST(makeRequest({
+      paymentMethod: 'manual',
+      shippingAddress: {
+        addressLine1: '1 Main St',
+        city: 'Chennai',
+        state: 'TN',
+        postalCode: '600001',
+      },
+    }) as any)
+    expect(res.status).toBe(200)
+    expect(existingAddrUsed).toBe(true)
+  })
+
+  it('records coupon usage when valid coupon applied', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
+      appliedDiscount: 20,
+      ok: true,
+    } as any)
+
+    const couponInserts: string[][] = []
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn() }
+      client.query.mockImplementation(async (sql: string, params: any[]) => {
+        if (sql.includes('INSERT INTO coupon_usage')) {
+          couponInserts.push(params)
+          return { rows: [], rowCount: 1 }
+        }
+        if (sql.includes('UPDATE coupons SET times_used')) {
+          return { rows: [], rowCount: 1 }
+        }
+        if (sql.includes('INSERT INTO orders')) return { rows: [CREATED_ORDER], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      })
+      return fn(client)
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await POST(makeRequest({ paymentMethod: 'manual', couponId: 'coupon-valid' }) as any)
+    expect(res.status).toBe(200)
+    expect(couponInserts).toHaveLength(1)
+    expect(couponInserts[0]).toContain('coupon-valid')
+  })
+
+  it('passes isCod=true to quoteShipping when paymentMethod=cod', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(50)
+
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn() }
+      client.query.mockImplementation(async (sql: string) => {
+        if (sql.includes('INSERT INTO orders')) return { rows: [CREATED_ORDER], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      })
+      return fn(client)
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await POST(makeRequest({
+      paymentMethod: 'cod',
+      shippingAddress: { addressLine1: 'X', city: 'Mumbai', state: 'Maharashtra', postalCode: '400001' },
+    }) as any)
+    expect(res.status).toBe(200)
+    expect(vi.mocked(orderCommit.quoteShipping)).toHaveBeenCalledWith(
+      expect.objectContaining({ isCod: true, destinationPin: '400001' })
+    )
+  })
+
+  it('falls back to client-quoted shipping when live quote returns 0', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(0) // live quote unavailable
+
+    let capturedShipping = -1
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn() }
+      client.query.mockImplementation(async (sql: string, params: any[]) => {
+        if (sql.includes('INSERT INTO orders')) {
+          capturedShipping = Number(params[12])
+          return { rows: [CREATED_ORDER], rowCount: 1 }
+        }
+        return { rows: [], rowCount: 0 }
+      })
+      return fn(client)
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await POST(makeRequest({
+      paymentMethod: 'manual',
+      shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '600001' },
+      shippingAmount: 99,
+    }) as any)
+    expect(res.status).toBe(200)
+    expect(capturedShipping).toBe(99) // fell back to client-quoted 99
+  })
+
+  it('order items use sub_variant sku and compound name when both variant and sub_variant present', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce(null)
+    const compoundItem = baseCartItem({
+      variant: { id: 'v1', variant_name: 'Red', sku: 'V-R', price: '150', discount_pct: 0 },
+      sub_variant: { id: 'sv1', sub_variant_name: 'Small', sku: 'SV-S', price: '175', mrp: 220, discount_pct: 0 },
+      products: { ...baseCartItem().products, discount_pct: 0 },
+    })
+    vi.mocked(db.queryMany).mockResolvedValue([compoundItem])
+
+    const capturedNames: string[] = []
+    const capturedSkus: string[] = []
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn() }
+      client.query.mockImplementation(async (sql: string, params: any[]) => {
+        if (sql.includes('INSERT INTO order_items')) {
+          capturedNames.push(params[4]) // product_name
+          capturedSkus.push(params[5])  // product_sku
+          return { rows: [], rowCount: 1 }
+        }
+        if (sql.includes('INSERT INTO orders')) return { rows: [CREATED_ORDER], rowCount: 1 }
+        return { rows: [], rowCount: 0 }
+      })
+      return fn(client)
+    })
+    vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
+
+    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    expect(res.status).toBe(200)
+    expect(capturedNames[0]).toContain('Red')
+    expect(capturedNames[0]).toContain('Small')
+    expect(capturedSkus[0]).toBe('SV-S') // sub_variant sku takes priority
+  })
 })

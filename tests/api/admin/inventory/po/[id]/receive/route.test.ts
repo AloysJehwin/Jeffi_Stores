@@ -15,6 +15,11 @@ vi.mock('@/lib/inventory', () => ({
   logStockMovement: vi.fn(),
   updateWeightedAvgCost: vi.fn(),
 }))
+vi.mock('@/lib/shelf', () => ({
+  adjustStock: vi.fn(),
+  syncPerishableStock: vi.fn(),
+  getOrCreateOpenShelf: vi.fn().mockResolvedValue('shelf-open-1'),
+}))
 vi.mock('@/lib/email', () => ({
   sendPOReceiveNotificationEmail: vi.fn(),
 }))
@@ -433,5 +438,218 @@ describe('POST /api/admin/inventory/po/[id]/receive', () => {
       const inserts = client.query.mock.calls.filter((c: any[]) => /INSERT INTO product_serials/.test(c[0]))
       expect(inserts).toHaveLength(8)
     })
+  })
+
+  // ── New branch coverage ────────────────────────────────────────────────────────
+
+  it('rejects duplicate serial numbers already in stock', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    const serialItem = {
+      po_item_id: 'poi-1', product_id: 'prod-1', variant_id: null, sub_variant_id: null,
+      quantity_received: 1, unit_cost: 50, serial_numbers: ['SN-DUPE'],
+    }
+    mockParseBody.mockReturnValue({ ok: true, data: { items: [serialItem] } } as any)
+    mockQueryOne
+      .mockResolvedValueOnce(mockPO as any)
+      .mockResolvedValueOnce({ cnt: 0 } as any)
+    const client = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-d' }] }
+        if (sql.includes('perishable, serialized')) return { rows: [{ perishable: false, serialized: true }] }
+        if (sql.includes('COALESCE(vsu.qty_step')) return { rows: [{ qty_step: '1' }] }
+        if (sql.includes('FROM product_serials WHERE product_id')) return { rows: [{ serial_number: 'SN-DUPE' }] }
+        if (sql.includes('FROM products WHERE id')) return { rows: [{ inventory_quantity: '10' }] }
+        return { rows: [] }
+      }),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+    mockQueryMany.mockResolvedValue([])
+    const res = await POST(makePost(validBody), params as any)
+    expect(res.status).toBe(500)
+    const data = await res.json()
+    expect(data.error).toMatch(/duplicate serial/i)
+  })
+
+  it('throws when perishable product has no expiry_date', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    const perishItem = {
+      po_item_id: 'poi-1', product_id: 'prod-1', variant_id: null, sub_variant_id: null,
+      quantity_received: 5, unit_cost: 20, expiry_date: null,
+    }
+    mockParseBody.mockReturnValue({ ok: true, data: { items: [perishItem] } } as any)
+    mockQueryOne
+      .mockResolvedValueOnce(mockPO as any)
+      .mockResolvedValueOnce({ cnt: 0 } as any)
+    const client = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-p' }] }
+        if (sql.includes('perishable, serialized')) return { rows: [{ perishable: true, serialized: false }] }
+        return { rows: [] }
+      }),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+    mockQueryMany.mockResolvedValue([])
+    const res = await POST(makePost(validBody), params as any)
+    expect(res.status).toBe(500)
+    const data = await res.json()
+    expect(data.error).toMatch(/perishable.*expiry_date/i)
+  })
+
+  it('creates batch for perishable product with expiry_date', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    const perishItem = {
+      po_item_id: 'poi-1', product_id: 'prod-1', variant_id: null, sub_variant_id: null,
+      quantity_received: 5, unit_cost: 20, expiry_date: '2025-12-31',
+      manufacture_date: '2024-06-01', lot_number: 'LOT-A',
+    }
+    mockParseBody.mockReturnValue({ ok: true, data: { items: [perishItem] } } as any)
+    mockQueryOne
+      .mockResolvedValueOnce(mockPO as any)
+      .mockResolvedValueOnce({ cnt: 0 } as any)
+    const client = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-p2' }] }
+        if (sql.includes('perishable, serialized')) return { rows: [{ perishable: true, serialized: false }] }
+        if (sql.includes('SUM(quantity_remaining)')) return { rows: [{ total: '0' }] }
+        if (sql.includes('INSERT INTO product_batches')) return { rows: [{ id: 'batch-p1' }] }
+        if (sql.includes('FROM purchase_order_items WHERE po_id')) {
+          return { rows: [{ quantity: '5', quantity_received: '5' }] }
+        }
+        return { rows: [] }
+      }),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+    mockQueryMany.mockResolvedValue([])
+    const res = await POST(makePost(validBody), params as any)
+    expect(res.status).toBe(200)
+    const batchInsert = client.query.mock.calls.find(
+      (c: any[]) => c[0].includes('INSERT INTO product_batches')
+    )
+    expect(batchInsert).toBeDefined()
+  })
+
+  it('skips items where qtyReceived <= 0', async () => {
+    const zeroItem = {
+      po_item_id: 'poi-z', product_id: 'prod-1', variant_id: null, sub_variant_id: null,
+      quantity_received: 0, unit_cost: 50,
+    }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { items: [zeroItem] } } as any)
+    mockQueryOne
+      .mockResolvedValueOnce(mockPO as any)
+      .mockResolvedValueOnce({ cnt: 0 } as any)
+    const client = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-z' }] }
+        if (sql.includes('FROM purchase_order_items WHERE po_id')) {
+          return { rows: [{ quantity: '0', quantity_received: '0' }] }
+        }
+        return { rows: [] }
+      }),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+    mockQueryMany.mockResolvedValue([])
+    const res = await POST(makePost(validBody), params as any)
+    expect(res.status).toBe(200)
+    const grnItemInserts = client.query.mock.calls.filter(
+      (c: any[]) => c[0].includes('INSERT INTO grn_items')
+    )
+    expect(grnItemInserts).toHaveLength(0)
+  })
+
+  it('sets PO status to received when all items fully received', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { items: validBody.items } } as any)
+    mockQueryOne
+      .mockResolvedValueOnce(mockPO as any)
+      .mockResolvedValueOnce({ cnt: 1 } as any)
+    const client = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-full' }] }
+        if (sql.includes('FROM products WHERE id')) return { rows: [{ inventory_quantity: '0' }] }
+        if (sql.includes('FROM purchase_order_items WHERE po_id')) {
+          return { rows: [{ quantity: '10', quantity_received: '10' }] }
+        }
+        return { rows: [] }
+      }),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+    mockQueryMany.mockResolvedValue([])
+    const res = await POST(makePost(validBody), params as any)
+    expect(res.status).toBe(200)
+    const statusUpdate = client.query.mock.calls.find(
+      (c: any[]) => c[0].includes('UPDATE purchase_orders') && c[1]?.[0] === 'received'
+    )
+    expect(statusUpdate).toBeDefined()
+  })
+
+  it('does not send email when supplier_email is absent', async () => {
+    const poNoEmail = { ...mockPO, supplier_email: null }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: { items: validBody.items } } as any)
+    mockQueryOne
+      .mockResolvedValueOnce(poNoEmail as any)
+      .mockResolvedValueOnce({ cnt: 0 } as any)
+    const client = {
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-noemail' }] }
+        if (sql.includes('FROM products WHERE id')) return { rows: [{ inventory_quantity: '100' }] }
+        if (sql.includes('FROM purchase_order_items WHERE po_id')) {
+          return { rows: [{ quantity: '10', quantity_received: '10' }] }
+        }
+        return { rows: [] }
+      }),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+    mockQueryMany.mockResolvedValue([])
+    const res = await POST(makePost(validBody), params as any)
+    expect(res.status).toBe(200)
+    expect(mockSendEmail).not.toHaveBeenCalled()
+  })
+
+  it('uses purchase_unit_factor to convert received qty to base units', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    const itemWithFactor = [{
+      po_item_id: 'poi-1', product_id: 'prod-1', variant_id: null, sub_variant_id: null,
+      quantity_received: 2, unit_cost: 100, purchase_unit_factor: 6,
+    }]
+    mockParseBody.mockReturnValue({ ok: true, data: { items: itemWithFactor } } as any)
+    mockQueryOne
+      .mockResolvedValueOnce(mockPO as any)
+      .mockResolvedValueOnce({ cnt: 0 } as any)
+    let capturedGrnItemQty: number | null = null
+    const client = {
+      query: vi.fn().mockImplementation((sql: string, p?: any[]) => {
+        if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-factor' }] }
+        if (sql.includes('INSERT INTO grn_items')) {
+          capturedGrnItemQty = p?.[4] ?? null
+          return { rows: [] }
+        }
+        if (sql.includes('FROM products WHERE id')) return { rows: [{ inventory_quantity: '20' }] }
+        if (sql.includes('FROM purchase_order_items WHERE po_id')) {
+          return { rows: [{ quantity: '12', quantity_received: '12' }] }
+        }
+        return { rows: [] }
+      }),
+      release: vi.fn(),
+    }
+    mockGetClient.mockResolvedValue(client as any)
+    mockQueryMany.mockResolvedValue([])
+    const res = await POST(makePost(validBody), params as any)
+    expect(res.status).toBe(200)
+    expect(capturedGrnItemQty).toBe(12)
   })
 })
