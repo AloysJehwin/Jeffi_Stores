@@ -279,5 +279,354 @@ describe('admin-agent/tools/marketing', () => {
         })
       ).rejects.toThrow(/not found/i)
     })
+
+    it('throws when customer has no email', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'u2', email: null, first_name: 'Bob', last_name: null, marketing_opt_out: false })
+      await expect(
+        getTool('propose_generate_personalized_coupon').handler({
+          userId: 'u2',
+          discountType: 'percentage',
+          discountValue: 10,
+        })
+      ).rejects.toThrow(/no email/i)
+    })
+
+    it('shows warn callout when customer is opted out of marketing', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'u3', email: 'optout@test.com', first_name: 'Eve', last_name: null, marketing_opt_out: true })
+      const result = await getTool('propose_generate_personalized_coupon').handler({
+        userId: 'u3',
+        discountType: 'fixed',
+        discountValue: 200,
+        daysValid: 7,
+      }) as any
+      expect(result.proposed).toBe(true)
+      const warnBlock = result.ui_blocks.find((b: any) => b.tone === 'warn')
+      expect(warnBlock).toBeDefined()
+      expect(warnBlock.title).toMatch(/opted out/i)
+    })
+
+    it('falls back to email as customer name when first/last name are absent', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'u4', email: 'noname@test.com', first_name: null, last_name: null, marketing_opt_out: false })
+      const result = await getTool('propose_generate_personalized_coupon').handler({
+        userId: 'u4',
+        discountType: 'percentage',
+        discountValue: 5,
+      }) as any
+      expect(result.payload.customerName).toBe('noname@test.com')
+    })
+
+    it('clamps daysValid to 1 when given 0', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'u5', email: 'e@t.com', first_name: 'A', last_name: 'B', marketing_opt_out: false })
+      const result = await getTool('propose_generate_personalized_coupon').handler({
+        userId: 'u5',
+        discountType: 'percentage',
+        discountValue: 10,
+        daysValid: 0,
+      }) as any
+      expect(result.payload.daysValid).toBe(1)
+    })
+
+    it('formats fixed discount as rupee amount in confirmation', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'u6', email: 'g@t.com', first_name: 'G', last_name: 'H', marketing_opt_out: false })
+      const result = await getTool('propose_generate_personalized_coupon').handler({
+        userId: 'u6',
+        discountType: 'fixed',
+        discountValue: 500,
+      }) as any
+      expect(result.confirmation).toContain('₹500')
+    })
+
+    it('sanitises campaign string replacing special chars with underscores', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'u7', email: 'h@t.com', first_name: 'H', last_name: null, marketing_opt_out: false })
+      const result = await getTool('propose_generate_personalized_coupon').handler({
+        userId: 'u7',
+        discountType: 'percentage',
+        discountValue: 20,
+        campaign: 'winback-90!',
+      }) as any
+      expect(result.payload.campaign).toMatch(/^[a-z0-9_]+$/)
+    })
+  })
+
+  // --- list_campaigns: filter branches ---
+  describe('list_campaigns — filter branches', () => {
+    it('applies enabledOnly filter when set to string "true"', async () => {
+      mockQueryMany.mockResolvedValueOnce([])
+      const result = await getTool('list_campaigns').handler({ enabledOnly: 'true' }) as any
+      expect(result.campaigns).toEqual([])
+    })
+
+    it('applies kind filter when kind is provided', async () => {
+      mockQueryMany.mockResolvedValueOnce([{ kind: 'winback', name: 'Winback' }])
+      const result = await getTool('list_campaigns').handler({ kind: 'winback' }) as any
+      expect(result.count).toBe(1)
+    })
+
+    it('applies both enabledOnly and kind filters together', async () => {
+      mockQueryMany.mockResolvedValueOnce([])
+      const result = await getTool('list_campaigns').handler({ enabledOnly: true, kind: 'cart' }) as any
+      expect(result.campaigns).toEqual([])
+    })
+
+    it('returns empty list when no campaigns match', async () => {
+      mockQueryMany.mockResolvedValueOnce([])
+      const result = await getTool('list_campaigns').handler({ enabledOnly: true }) as any
+      expect(result.count).toBe(0)
+    })
+  })
+
+  // --- get_campaign: validation ---
+  describe('get_campaign — validation', () => {
+    it('throws when kind is empty string', async () => {
+      await expect(getTool('get_campaign').handler({ kind: '' })).rejects.toThrow(/kind is required/i)
+    })
+
+    it('throws when kind is missing', async () => {
+      await expect(getTool('get_campaign').handler({})).rejects.toThrow(/kind is required/i)
+    })
+  })
+
+  // --- list_coupons: filter branches ---
+  describe('list_coupons — filter branches', () => {
+    it('applies activeOnly=false to show all coupons', async () => {
+      mockQueryMany.mockResolvedValueOnce([{ id: 'c1' }, { id: 'c2' }])
+      const result = await getTool('list_coupons').handler({ activeOnly: false }) as any
+      expect(result.count).toBe(2)
+    })
+
+    it('applies autoGeneratedOnly=true', async () => {
+      mockQueryMany.mockResolvedValueOnce([{ id: 'c3', auto_generated: true }])
+      const result = await getTool('list_coupons').handler({ autoGeneratedOnly: true }) as any
+      expect(result.coupons[0].auto_generated).toBe(true)
+    })
+
+    it('sets truncated=true when result length equals limit', async () => {
+      const rows = Array.from({ length: 5 }, (_, i) => ({ id: `c${i}` }))
+      mockQueryMany.mockResolvedValueOnce(rows)
+      const result = await getTool('list_coupons').handler({ limit: 5 }) as any
+      expect(result.truncated).toBe(true)
+    })
+  })
+
+  // --- get_coupon: UUID vs code lookup ---
+  describe('get_coupon — UUID vs code lookup', () => {
+    it('looks up by UUID when codeOrId is a valid UUID', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'c1', code: 'AUTO123' })
+      const result = await getTool('get_coupon').handler({ codeOrId: '550e8400-e29b-41d4-a716-446655440001' }) as any
+      expect(result.code).toBe('AUTO123')
+    })
+
+    it('throws when codeOrId is empty', async () => {
+      await expect(getTool('get_coupon').handler({ codeOrId: '' })).rejects.toThrow(/codeOrId is required/i)
+    })
+  })
+
+  // --- list_mailer_templates: limit clamping ---
+  describe('list_mailer_templates — limit', () => {
+    it('clamps limit to max 50', async () => {
+      mockQueryMany.mockResolvedValueOnce([])
+      const result = await getTool('list_mailer_templates').handler({ limit: 999 }) as any
+      expect(result.count).toBe(0)
+    })
+  })
+
+  // --- propose_create_coupon: additional branches ---
+  describe('propose_create_coupon — additional branches', () => {
+    it('throws when coupon code already exists', async () => {
+      mockQueryOne.mockResolvedValueOnce({ id: 'existing' })
+      await expect(
+        getTool('propose_create_coupon').handler({ code: 'SAVE20', discountType: 'percentage', discountValue: 20 })
+      ).rejects.toThrow(/already exists/i)
+    })
+
+    it('throws on invalid discountType', async () => {
+      await expect(
+        getTool('propose_create_coupon').handler({ code: 'CODE1', discountType: 'bogus', discountValue: 10 })
+      ).rejects.toThrow(/discountType/i)
+    })
+
+    it('throws when validUntil is not a valid date', async () => {
+      mockQueryOne.mockResolvedValueOnce(null)
+      await expect(
+        getTool('propose_create_coupon').handler({ code: 'GOOD1', discountType: 'percentage', discountValue: 10, validUntil: 'not-a-date' })
+      ).rejects.toThrow()
+    })
+
+    it('omits expiry in confirmation when validUntil is not provided', async () => {
+      mockQueryOne.mockResolvedValueOnce(null)
+      const result = await getTool('propose_create_coupon').handler({
+        code: 'NOEXP1', discountType: 'fixed', discountValue: 50,
+      }) as any
+      expect(result.confirmation).not.toContain('expires')
+    })
+
+    it('sets minPurchaseAmount and usageLimit in payload when provided', async () => {
+      mockQueryOne.mockResolvedValueOnce(null)
+      const result = await getTool('propose_create_coupon').handler({
+        code: 'FULL10', discountType: 'percentage', discountValue: 10,
+        minPurchaseAmount: 500, usageLimit: 100, description: 'Test coupon',
+      }) as any
+      expect(result.payload.minPurchaseAmount).toBe(500)
+      expect(result.payload.usageLimit).toBe(100)
+      expect(result.payload.description).toBe('Test coupon')
+    })
+
+    it('rejects coupon code with leading dash', async () => {
+      await expect(
+        getTool('propose_create_coupon').handler({ code: '-INVALID', discountType: 'fixed', discountValue: 10 })
+      ).rejects.toThrow()
+    })
+  })
+
+  // --- propose_update_campaign_template: body-length branches ---
+  describe('propose_update_campaign_template — body change branches', () => {
+    it('throws when kind is empty', async () => {
+      await expect(getTool('propose_update_campaign_template').handler({ kind: '' })).rejects.toThrow(/kind is required/i)
+    })
+
+    it('throws when neither newSubject nor newBody is provided', async () => {
+      mockQueryOne.mockResolvedValueOnce({ kind: 'cart', name: 'Cart', subject_template: 'S', body_template: 'B' })
+      await expect(
+        getTool('propose_update_campaign_template').handler({ kind: 'cart' })
+      ).rejects.toThrow(/newSubject.*newBody/i)
+    })
+
+    it('throws when newSubject is empty string', async () => {
+      mockQueryOne.mockResolvedValueOnce({ kind: 'cart', name: 'Cart', subject_template: 'S', body_template: 'B' })
+      await expect(
+        getTool('propose_update_campaign_template').handler({ kind: 'cart', newSubject: '' })
+      ).rejects.toThrow(/newSubject/i)
+    })
+
+    it('throws when newSubject exceeds 500 chars', async () => {
+      mockQueryOne.mockResolvedValueOnce({ kind: 'cart', name: 'Cart', subject_template: 'S', body_template: 'B' })
+      await expect(
+        getTool('propose_update_campaign_template').handler({ kind: 'cart', newSubject: 'A'.repeat(501) })
+      ).rejects.toThrow(/newSubject/i)
+    })
+
+    it('throws when newBody exceeds 50000 chars', async () => {
+      mockQueryOne.mockResolvedValueOnce({ kind: 'cart', name: 'Cart', subject_template: 'S', body_template: 'B' })
+      await expect(
+        getTool('propose_update_campaign_template').handler({ kind: 'cart', newBody: 'X'.repeat(50001) })
+      ).rejects.toThrow(/newBody/i)
+    })
+
+    it('adds large-body-change warning callout when diff > 50%', async () => {
+      mockQueryOne.mockResolvedValueOnce({ kind: 'cart', name: 'Cart', subject_template: 'S', body_template: 'A'.repeat(10) })
+      const result = await getTool('propose_update_campaign_template').handler({
+        kind: 'cart', newBody: 'B'.repeat(100),
+      }) as any
+      expect(result.proposed).toBe(true)
+      const warnBlock = result.ui_blocks.find((b: any) => b.tone === 'warn')
+      expect(warnBlock).toBeDefined()
+      expect(warnBlock.title).toMatch(/large body rewrite/i)
+    })
+
+    it('adds subject table rows when newSubject is provided', async () => {
+      mockQueryOne.mockResolvedValueOnce({ kind: 'cart', name: 'Cart', subject_template: 'Old', body_template: 'Body' })
+      const result = await getTool('propose_update_campaign_template').handler({
+        kind: 'cart', newSubject: 'New Subject',
+      }) as any
+      expect(result.proposed).toBe(true)
+      const tableBlock = result.ui_blocks.find((b: any) => b.type === 'table')
+      expect(tableBlock).toBeDefined()
+      expect(tableBlock.rows.some((r: any) => r[1] === 'New Subject')).toBe(true)
+    })
+
+    it('handles empty original body_template (oldLen treated as 0)', async () => {
+      mockQueryOne.mockResolvedValueOnce({ kind: 'cart', name: 'Cart', subject_template: 'S', body_template: null })
+      const result = await getTool('propose_update_campaign_template').handler({
+        kind: 'cart', newBody: 'Some new body',
+      }) as any
+      expect(result.proposed).toBe(true)
+    })
+  })
+
+  // --- propose_send_mailer_broadcast: additional branches ---
+  describe('propose_send_mailer_broadcast — additional branches', () => {
+    it('proposes broadcast to recent_buyers audience', async () => {
+      mockQueryOne.mockResolvedValueOnce({ n: 15 })
+      const result = await getTool('propose_send_mailer_broadcast').handler({
+        audience: 'recent_buyers', subject: 'Flash Sale', body: '<p>Sale!</p>',
+      }) as any
+      expect(result.proposed).toBe(true)
+      expect(result.payload.audience).toBe('recent_buyers')
+      expect(result.payload.audienceCount).toBe(15)
+    })
+
+    it('proposes test_only broadcast using testEmail param', async () => {
+      const result = await getTool('propose_send_mailer_broadcast').handler({
+        audience: 'test_only', testEmail: 'admin@example.com', subject: 'Test', body: '<p>Test</p>',
+      }) as any
+      expect(result.proposed).toBe(true)
+      expect(result.payload.testEmail).toBe('admin@example.com')
+      expect(result.payload.audienceCount).toBe(1)
+    })
+
+    it('throws when audience=test_only and testEmail has no @', async () => {
+      await expect(
+        getTool('propose_send_mailer_broadcast').handler({ audience: 'test_only', testEmail: 'notanemail', subject: 'T', body: '<p>T</p>' })
+      ).rejects.toThrow(/testEmail/i)
+    })
+
+    it('throws when audience=test_only: colon form has no valid email', async () => {
+      await expect(
+        getTool('propose_send_mailer_broadcast').handler({ audience: 'test_only:bademail', subject: 'T', body: '<p>T</p>' })
+      ).rejects.toThrow(/test_only audience needs a valid email/i)
+    })
+
+    it('throws when subject is empty', async () => {
+      await expect(
+        getTool('propose_send_mailer_broadcast').handler({ audience: 'all_opted_in', subject: '', body: '<p>body</p>' })
+      ).rejects.toThrow(/subject/i)
+    })
+
+    it('throws when body is empty', async () => {
+      await expect(
+        getTool('propose_send_mailer_broadcast').handler({ audience: 'all_opted_in', subject: 'Hi', body: '' })
+      ).rejects.toThrow(/body/i)
+    })
+
+    it('uses "Jeffi Stores" as default from name', async () => {
+      mockQueryOne.mockResolvedValueOnce({ n: 5 })
+      const result = await getTool('propose_send_mailer_broadcast').handler({
+        audience: 'all_opted_in', subject: 'Sale', body: '<p>Go</p>',
+      }) as any
+      expect(result.payload.fromName).toBe('Jeffi Stores')
+    })
+
+    it('uses custom from name when provided', async () => {
+      mockQueryOne.mockResolvedValueOnce({ n: 5 })
+      const result = await getTool('propose_send_mailer_broadcast').handler({
+        audience: 'all_opted_in', subject: 'Sale', body: '<p>Go</p>', fromName: 'Jeffi Team',
+      }) as any
+      expect(result.payload.fromName).toBe('Jeffi Team')
+    })
+
+    it('truncates body preview in code_block when body > 500 chars', async () => {
+      mockQueryOne.mockResolvedValueOnce({ n: 1 })
+      const result = await getTool('propose_send_mailer_broadcast').handler({
+        audience: 'all_opted_in', subject: 'Hi', body: '<p>' + 'X'.repeat(600) + '</p>',
+      }) as any
+      const codeBlock = result.ui_blocks.find((b: any) => b.type === 'code_block')
+      expect(codeBlock.content).toContain('(truncated)')
+    })
+
+    it('returns audienceCount=0 when all_opted_in query returns null', async () => {
+      mockQueryOne.mockResolvedValueOnce(null)
+      const result = await getTool('propose_send_mailer_broadcast').handler({
+        audience: 'all_opted_in', subject: 'Hi', body: '<p>body</p>',
+      }) as any
+      expect(result.payload.audienceCount).toBe(0)
+    })
+
+    it('uses singular "recipient" in confirmation when count=1', async () => {
+      mockQueryOne.mockResolvedValueOnce({ n: 1 })
+      const result = await getTool('propose_send_mailer_broadcast').handler({
+        audience: 'all_opted_in', subject: 'Hi', body: '<p>body</p>',
+      }) as any
+      expect(result.confirmation).toContain('1 recipient (all_opted_in)')
+    })
   })
 })
