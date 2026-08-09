@@ -46,6 +46,20 @@ function buildRedirectUrl(request: NextRequest, path: string): URL {
   return new URL(path, `${proto}://${host}`)
 }
 
+function isMobileUA(ua: string | null): boolean {
+  if (!ua) return false
+  return /android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini/i.test(ua)
+}
+
+function isAdminWritePath(pathname: string): boolean {
+  return /\/admin\/(products|categories|brands|coupons|review-forms|suppliers|inventory\/po|mailer|campaigns|service-accounts|team)\/(add|new|edit(\/|$))/i.test(pathname)
+}
+
+// Strip /add, /new, or /edit/[...] suffix to derive the parent list URL.
+function adminWritePathParent(pathname: string): string {
+  return pathname.replace(/\/(add|new|edit(\/[^?]*)?)$/i, '')
+}
+
 export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.hostname || ''
   const pathname = request.nextUrl.pathname
@@ -216,6 +230,11 @@ export async function middleware(request: NextRequest) {
           return res
         }
         const rewriteUrl = new URL(`/admin${slug}${search}`, request.url)
+        // Block mobile users from write-action pages (orders exempt)
+        if (isMobileUA(request.headers.get('user-agent')) && isAdminWritePath(`/admin${slug}`)) {
+          const parentPath = adminWritePathParent(`/admin${slug}`)
+          return NextResponse.redirect(buildRedirectUrl(request, `${parentPath}?desktop_required=1`))
+        }
         const response = NextResponse.rewrite(rewriteUrl)
         response.headers.set('x-pathname', `/admin${slug}`)
         response.headers.set('x-user-id', payload.adminId)
@@ -325,6 +344,12 @@ export async function middleware(request: NextRequest) {
         status: 403,
         headers: { 'Content-Type': 'text/plain' },
       })
+    }
+
+    // Block mobile users from write-action pages (orders exempt)
+    if (isMobileUA(request.headers.get('user-agent')) && isAdminWritePath(pathname)) {
+      const parentPath = adminWritePathParent(pathname)
+      return NextResponse.redirect(buildRedirectUrl(request, `${parentPath}?desktop_required=1`))
     }
 
     const response = NextResponse.next()

@@ -5,6 +5,8 @@ import { logoutAction } from './logout-action'
 import { hasScope } from '@/lib/scopes'
 import { getAdminSession } from '@/lib/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
+import { AdminMobileContext } from '@/contexts/AdminMobileContext'
+import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
 
 export const metadata = {
   title: 'Admin Panel - Jeffi Stores',
@@ -20,6 +22,8 @@ export default async function AdminLayout({
   const headersList = await headers()
   const pathname = headersList.get('x-pathname') || ''
   const cookieStore = await cookies()
+  const ua = headersList.get('user-agent') || ''
+  const isMobile = /android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini/i.test(ua)
 
   const session = await getAdminSession()
 
@@ -27,7 +31,6 @@ export default async function AdminLayout({
   if (pathname === '/admin/login' || !session) {
     return <>{children}</>
   }
-
   const role = session?.role || ''
   const scopes: string[] = session?.scopes || []
 
@@ -97,17 +100,20 @@ export default async function AdminLayout({
   const sidebarCollapsed = cookieStore.get('sidebar_collapsed')?.value === 'true'
 
   return (
-    <AdminShell
-      desktopNavLinks={desktopNavLinks}
-      allNavLinks={filteredNavLinks}
-      displayName={displayName}
-      usernameInitial={usernameInitial}
-      role={role}
-      canUseAgent={hasScope(role, scopes, 'agent:read')}
-      logoutForm={logoutForm}
-      initialCollapsed={sidebarCollapsed}
-    >
-      {children}
-    </AdminShell>
+    <AdminMobileContext.Provider value={isMobile}>
+      <AdminShell
+        desktopNavLinks={desktopNavLinks}
+        allNavLinks={filteredNavLinks}
+        displayName={displayName}
+        usernameInitial={usernameInitial}
+        role={role}
+        canUseAgent={hasScope(role, scopes, 'agent:read')}
+        logoutForm={logoutForm}
+        initialCollapsed={sidebarCollapsed}
+      >
+        <DesktopRequiredBanner />
+        {children}
+      </AdminShell>
+    </AdminMobileContext.Provider>
   )
 }
