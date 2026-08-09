@@ -3,7 +3,7 @@ import { requireAdminScope } from '@/lib/jwt'
 import { query, queryMany } from '@/lib/db'
 
 export async function GET(request: NextRequest) {
-  const admin = await requireAdminScope(request, 'business_customers')
+  const admin = await requireAdminScope(request, 'business_customers:read')
   if (admin instanceof NextResponse) return admin
 
   const { searchParams } = new URL(request.url)
@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const admin = await requireAdminScope(request, 'business_customers')
+  const admin = await requireAdminScope(request, 'business_customers:write')
   if (admin instanceof NextResponse) return admin
 
   const { userId, categoryId, discountPct } = await request.json()

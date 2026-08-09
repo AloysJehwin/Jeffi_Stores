@@ -4,7 +4,7 @@ import { queryOne, queryMany } from '@/lib/db'
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
-  const admin = await requireAdminScope(request, 'business_customers')
+  const admin = await requireAdminScope(request, 'business_customers:read')
   if (admin instanceof NextResponse) return admin
 
   const customer = await queryOne<any>(
