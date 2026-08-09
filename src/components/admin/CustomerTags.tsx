@@ -19,6 +19,7 @@ interface TagDefinition {
 interface CustomerTagsProps {
   customerId: string
   initialTags: Tag[]
+  canWrite?: boolean
 }
 
 const COLOR_CLASSES: Record<string, { badge: string; pill: string }> = {
@@ -37,7 +38,7 @@ function tagClasses(color: string) {
   return COLOR_CLASSES[color] ?? COLOR_CLASSES.accent
 }
 
-export default function CustomerTags({ customerId, initialTags }: CustomerTagsProps) {
+export default function CustomerTags({ customerId, initialTags, canWrite = false }: CustomerTagsProps) {
   const router = useRouter()
   const [tags, setTags] = useState<Tag[]>(initialTags)
   const [definitions, setDefinitions] = useState<TagDefinition[]>([])
@@ -116,25 +117,27 @@ export default function CustomerTags({ customerId, initialTags }: CustomerTagsPr
                 className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${cls.badge}`}
               >
                 {t.tag}
-                <button
-                  type="button"
-                  onClick={() => remove(t.tag)}
-                  disabled={busy}
-                  aria-label={`Remove tag ${t.tag}`}
-                  className="ml-0.5 opacity-60 hover:opacity-100 disabled:opacity-30 transition-opacity"
-                >
-                  <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                {canWrite && (
+                  <button
+                    type="button"
+                    onClick={() => remove(t.tag)}
+                    disabled={busy}
+                    aria-label={`Remove tag ${t.tag}`}
+                    className="ml-0.5 opacity-60 hover:opacity-100 disabled:opacity-30 transition-opacity"
+                  >
+                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                )}
               </span>
             )
           })
         )}
       </div>
 
-      {/* Add tag picker — always visible once definitions loaded, hidden only if all tags assigned */}
-      {definitions.length > 0 && (
+      {/* Add tag picker — only visible to write-capable admins */}
+      {canWrite && definitions.length > 0 && (
         <div ref={panelRef} className="relative">
           <button
             type="button"

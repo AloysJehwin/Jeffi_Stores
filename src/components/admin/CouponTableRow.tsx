@@ -23,7 +23,7 @@ interface CouponRow {
   generated_for_campaign: string | null
 }
 
-export default function CouponTableRow({ coupon: c, backUrl = '/admin/coupons' }: { coupon: CouponRow; backUrl?: string }) {
+export default function CouponTableRow({ coupon: c, backUrl = '/admin/coupons', canWrite = false }: { coupon: CouponRow; backUrl?: string; canWrite?: boolean }) {
   const isExpired = c.valid_until && new Date(c.valid_until) < new Date()
   const [open, setOpen] = useState(false)
   const router = useRouter()
@@ -195,8 +195,8 @@ export default function CouponTableRow({ coupon: c, backUrl = '/admin/coupons' }
         </td>
         <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
           <div className="flex items-center gap-3">
-            <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 hover:underline text-sm">Edit</Link>
-            <DeleteCouponButton id={c.id} code={c.code} />
+            {canWrite && <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 hover:underline text-sm">Edit</Link>}
+            {canWrite && <DeleteCouponButton id={c.id} code={c.code} />}
           </div>
         </td>
       </tr>

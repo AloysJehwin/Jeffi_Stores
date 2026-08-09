@@ -1,7 +1,9 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
+import { headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { hasScope } from '@/lib/scopes'
 import { queryMany, queryCount } from '@/lib/db'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
@@ -72,7 +74,9 @@ export default function CouponsPage({ searchParams }: { searchParams: Promise<{ 
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Coupons</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Manage discount coupons</p>
         </div>
-        <AddCouponButton />
+        <Suspense fallback={null}>
+          <AddCouponButton />
+        </Suspense>
       </div>
 
       <Suspense fallback={<AdminStatsSkeleton cards={4} gridClass="grid-cols-2 sm:grid-cols-4" />}>
@@ -95,6 +99,11 @@ export default function CouponsPage({ searchParams }: { searchParams: Promise<{ 
 
 async function AddCouponButton() {
   const host = await getHost()
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'coupons:write')
+  if (!canWrite) return null
   return (
     <Link href={ap('/admin/coupons/add', host)} className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base">
       Add New Coupon
@@ -104,6 +113,10 @@ async function AddCouponButton() {
 
 async function CouponsStats() {
   const host = await getHost()
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'coupons:write')
   const [allStats, pendingDrafts] = await Promise.all([
     getFilteredCoupons({}),
     queryMany<{ coupon_id: string; code: string; updated_at: string }>(
@@ -153,17 +166,23 @@ async function CouponsStats() {
             </div>
             <div className="divide-y divide-amber-100 dark:divide-amber-800/30">
               {pendingDrafts.map((d) => (
-                <DraftRowActions
-                  key={d.coupon_id}
-                  entityId={d.coupon_id}
-                  name={d.code}
-                  subtitle={null}
-                  updatedAt={d.updated_at}
-                  editHref={ap(`/admin/coupons/edit/${d.coupon_id}`, host)}
-                  publishPath={`/api/admin/coupons/${d.coupon_id}/publish`}
-                  discardPath={`/api/admin/coupons/${d.coupon_id}/draft`}
-                  entityLabel="coupon"
-                />
+                canWrite ? (
+                  <DraftRowActions
+                    key={d.coupon_id}
+                    entityId={d.coupon_id}
+                    name={d.code}
+                    subtitle={null}
+                    updatedAt={d.updated_at}
+                    editHref={ap(`/admin/coupons/edit/${d.coupon_id}`, host)}
+                    publishPath={`/api/admin/coupons/${d.coupon_id}/publish`}
+                    discardPath={`/api/admin/coupons/${d.coupon_id}/draft`}
+                    entityLabel="coupon"
+                  />
+                ) : (
+                  <div key={d.coupon_id} className="px-4 py-2.5 flex items-center gap-2">
+                    <p className="text-sm font-medium text-amber-800 dark:text-amber-300 font-mono truncate">{d.code}</p>
+                  </div>
+                )
               ))}
             </div>
           </div>
@@ -188,6 +207,10 @@ async function CouponsListSection({ searchParams }: { searchParams: Promise<{ [k
 
 async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchParams: { [key: string]: string | undefined } }) {
   const host = await getHost()
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
+  const canWrite = hasScope(role, scopes, 'coupons:write')
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const sort = resolvedSearchParams.sort
   const dir = resolvedSearchParams.dir as 'asc' | 'desc' | undefined
@@ -238,7 +261,7 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
             </thead>
             <tbody className="divide-y divide-border-default">
               {(coupons as CouponRow[]).map(c => (
-                <CouponTableRow key={c.id} coupon={c} backUrl={currentListUrl} />
+                <CouponTableRow key={c.id} coupon={c} backUrl={currentListUrl} canWrite={canWrite} />
               ))}
               {coupons.length === 0 && (
                 <tr><td colSpan={8} className="px-4 py-8 text-center text-foreground-muted">No coupons found</td></tr>
@@ -271,8 +294,8 @@ async function CouponsListContent({ resolvedSearchParams }: { resolvedSearchPara
               </div>
               <div className="flex gap-3 pt-1">
                 <Link href={ap(`/admin/coupons/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">View</Link>
-                <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">Edit</Link>
-                <DeleteCouponButton id={c.id} code={c.code} />
+                {canWrite && <Link href={ap(`/admin/coupons/edit/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-sm text-accent-500 hover:underline">Edit</Link>}
+                {canWrite && <DeleteCouponButton id={c.id} code={c.code} />}
               </div>
             </div>
           ))}
