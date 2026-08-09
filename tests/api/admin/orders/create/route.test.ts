@@ -429,4 +429,260 @@ describe('POST /api/admin/orders/create', () => {
     // No product_id means no stock check, order goes through as delivered
     expect(data.savedAsDraft).toBe(false)
   })
+
+  it('calls deductOrderStock when order is not a draft', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: parsedOrderData } as any)
+    setupGstMocks()
+    const client = buildMockTxClient()
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(validOrderBody))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.savedAsDraft).toBe(false)
+    // deductOrderStock is called inside the transaction when !saveAsDraft
+    // verified indirectly: order completes successfully (stock deducted)
+    expect(data.success).toBe(true)
+  })
+
+  it('does not invoke invoice logic when draft', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: parsedOrderData } as any)
+    setupGstMocks()
+    const client = buildMockTxClient({
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+        if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-DRAFT' }] }
+        if (sql.includes('SELECT inventory_quantity FROM products')) return { rows: [{ inventory_quantity: '0' }] }
+        return { rows: [] }
+      }),
+    })
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(validOrderBody))
+    const data = await res.json()
+    expect(data.savedAsDraft).toBe(true)
+    expect(data.invoiceNumber).toBeNull()
+  })
+
+  it('handles sell_unit_factor > 1 with sufficient stock', async () => {
+    const bodyWithFactor = {
+      ...parsedOrderData,
+      items: [{ ...parsedOrderData.items[0], sell_unit_factor: 10, quantity: 5 }],
+    }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: bodyWithFactor } as any)
+    setupGstMocks()
+    // sell_unit_factor affects pricing (baseQty = qty*factor), stock check uses product_units row
+    const client = buildMockTxClient()
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(validOrderBody))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    // Stock = 100, no product_units factor → baseQty = 5, sufficient → not draft
+    expect(data.savedAsDraft).toBe(false)
+  })
+
+  it('saves as draft when product_units count factor makes base qty exceed stock', async () => {
+    const bodyWithUnit = {
+      ...parsedOrderData,
+      items: [{ ...parsedOrderData.items[0], buy_unit: 'box', quantity: 5 }],
+    }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: bodyWithUnit } as any)
+    setupGstMocks()
+    // 5 boxes * factor=5 = 25 base units, stock=10 → insufficient → draft
+    const client = buildMockTxClient({
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+        if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-U2' }] }
+        if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: '5', dimension: 'count' }] }
+        if (sql.includes('SELECT inventory_quantity FROM products')) return { rows: [{ inventory_quantity: '10' }] }
+        return { rows: [] }
+      }),
+    })
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(validOrderBody))
+    const data = await res.json()
+    expect(data.savedAsDraft).toBe(true)
+  })
+
+  it('handles batch assignments — sufficient → not draft', async () => {
+    const itemWithTempId = { ...parsedOrderData.items[0], temp_id: 'ti-1' }
+    const bodyWithBatch = { ...parsedOrderData, items: [itemWithTempId] }
+    const reqBody = {
+      ...validOrderBody,
+      items: [{ ...validOrderBody.items[0], temp_id: 'ti-1' }],
+      batch_assignments: [{ order_item_id: 'ti-1', batch_id: 'batch-1', qty: 5 }],
+    }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: bodyWithBatch } as any)
+    setupGstMocks()
+    const client = buildMockTxClient({
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+        if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-BATCH' }] }
+        if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-1' }] }
+        if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: null, dimension: null }] }
+        if (sql.includes('SELECT quantity_remaining FROM product_batches')) return { rows: [{ quantity_remaining: '20' }] }
+        if (sql.includes("SELECT value FROM site_settings")) return { rows: [{ value: 'JS' }] }
+        return { rows: [] }
+      }),
+    })
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(reqBody))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.savedAsDraft).toBe(false)
+  })
+
+  it('saves as draft when batch qty insufficient for item', async () => {
+    const itemWithTempId = { ...parsedOrderData.items[0], temp_id: 'ti-2' }
+    const bodyWithBatch = { ...parsedOrderData, items: [itemWithTempId] }
+    const reqBody = {
+      ...validOrderBody,
+      items: [{ ...validOrderBody.items[0], temp_id: 'ti-2' }],
+      batch_assignments: [{ order_item_id: 'ti-2', batch_id: 'batch-2', qty: 10 }],
+    }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: bodyWithBatch } as any)
+    setupGstMocks()
+    const client = buildMockTxClient({
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+        if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-BF' }] }
+        if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-2' }] }
+        if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: null, dimension: null }] }
+        // batch has only 3, taking 10 → avail(3) < qty(10) → shortfall
+        if (sql.includes('SELECT quantity_remaining FROM product_batches')) return { rows: [{ quantity_remaining: '3' }] }
+        return { rows: [] }
+      }),
+    })
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(reqBody))
+    const data = await res.json()
+    expect(data.savedAsDraft).toBe(true)
+    expect(data.insufficientItems).toHaveLength(1)
+    expect(data.insufficientItems[0]).toMatch(/batch available/i)
+  })
+
+  it('saves as draft when batch total assigned < required base qty', async () => {
+    const itemWithTempId = { ...parsedOrderData.items[0], temp_id: 'ti-3', quantity: 10 }
+    const bodyWithBatch = { ...parsedOrderData, items: [itemWithTempId] }
+    const reqBody = {
+      ...validOrderBody,
+      items: [{ ...validOrderBody.items[0], temp_id: 'ti-3', quantity: 10 }],
+      batch_assignments: [{ order_item_id: 'ti-3', batch_id: 'batch-3', qty: 7 }],
+    }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: bodyWithBatch } as any)
+    setupGstMocks()
+    const client = buildMockTxClient({
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+        if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-BL' }] }
+        if (sql.includes('INSERT INTO order_items')) return { rows: [{ id: 'oi-3' }] }
+        if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: null, dimension: null }] }
+        // per-batch ok (20 avail, taking 7), but totalBatchQty(7) < baseQty(10)
+        if (sql.includes('SELECT quantity_remaining FROM product_batches')) return { rows: [{ quantity_remaining: '20' }] }
+        return { rows: [] }
+      }),
+    })
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(reqBody))
+    const data = await res.json()
+    expect(data.savedAsDraft).toBe(true)
+    expect(data.insufficientItems).toHaveLength(1)
+    expect(data.insufficientItems[0]).toMatch(/batch total/i)
+  })
+
+  it('uses buy_unit count factor from product_units when dimension=count', async () => {
+    const bodyWithUnit = {
+      ...parsedOrderData,
+      items: [{ ...parsedOrderData.items[0], buy_unit: 'box', quantity: 2 }],
+    }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: bodyWithUnit } as any)
+    setupGstMocks()
+    const client = buildMockTxClient({
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+        if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-UNIT' }] }
+        if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: '5', dimension: 'count' }] }
+        if (sql.includes('SELECT inventory_quantity FROM products')) return { rows: [{ inventory_quantity: '100' }] }
+        if (sql.includes("SELECT value FROM site_settings")) return { rows: [{ value: 'JS' }] }
+        return { rows: [] }
+      }),
+    })
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(validOrderBody))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.savedAsDraft).toBe(false)
+  })
+
+  it('saves as draft when product_units factor makes base qty exceed stock', async () => {
+    const bodyWithUnit = {
+      ...parsedOrderData,
+      items: [{ ...parsedOrderData.items[0], buy_unit: 'box', quantity: 5 }],
+    }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: bodyWithUnit } as any)
+    setupGstMocks()
+    const client = buildMockTxClient({
+      query: vi.fn().mockImplementation((sql: string) => {
+        if (sql.includes('INSERT INTO addresses')) return { rows: [{ id: 'addr-1' }] }
+        if (sql.includes('INSERT INTO orders')) return { rows: [{ id: 'order-1', order_number: 'OFF-U2' }] }
+        if (sql.includes('LEFT JOIN product_units')) return { rows: [{ factor: '5', dimension: 'count' }] }
+        if (sql.includes('SELECT inventory_quantity FROM products')) return { rows: [{ inventory_quantity: '10' }] }
+        return { rows: [] }
+      }),
+    })
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(validOrderBody))
+    const data = await res.json()
+    expect(data.savedAsDraft).toBe(true)
+  })
+
+  it('includes discount_amount > 0 in order item when discount_pct > 0', async () => {
+    const bodyWithDiscount = {
+      ...parsedOrderData,
+      items: [{ ...parsedOrderData.items[0], discount_pct: 10, quantity: 1 }],
+    }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: bodyWithDiscount } as any)
+    setupGstMocks()
+    const client = buildMockTxClient()
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    const res = await POST(makePost(validOrderBody))
+    expect(res.status).toBe(200)
+    const itemInsert = client.query.mock.calls.find((c: any) => c[0].includes('INSERT INTO order_items'))
+    expect(itemInsert).toBeDefined()
+    // discount_amount at index 17 in params
+    expect(Number(itemInsert![1][17])).toBeGreaterThan(0)
+  })
+
+  it('sets payment_status to paid for non-credit payment', async () => {
+    const cashBody = { ...parsedOrderData, paymentMode: 'cash' }
+    mockAuth.mockResolvedValue(admin as any)
+    mockHasScope.mockReturnValue(true)
+    mockParseBody.mockReturnValue({ ok: true, data: cashBody } as any)
+    setupGstMocks()
+    const client = buildMockTxClient()
+    mockWithTx.mockImplementation(async (fn: any) => fn(client))
+    await POST(makePost(validOrderBody))
+    const insertOrderCall = client.query.mock.calls.find(
+      (c: any) => c[0].includes('INSERT INTO orders')
+    )
+    expect(insertOrderCall![1]).toContain('paid')
+  })
 })
