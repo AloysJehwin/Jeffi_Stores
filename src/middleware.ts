@@ -238,7 +238,7 @@ export async function middleware(request: NextRequest) {
         const response = NextResponse.rewrite(rewriteUrl)
         response.headers.set('x-pathname', `/admin${slug}`)
         response.headers.set('x-user-id', payload.adminId)
-        response.headers.set('x-username', `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || payload.email || '')
+        response.headers.set('x-username', payload.displayName || `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || 'Admin')
         response.headers.set('x-user-role', payload.role)
         response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
         return addSecurityHeaders(response)
