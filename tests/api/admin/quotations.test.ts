@@ -514,6 +514,118 @@ describe('PATCH /api/admin/quotations/[id]', () => {
     )
     expect(res.status).toBe(401)
   })
+
+  it('returns 403 when quotations:write scope missing', async () => {
+    vi.mocked(hasScope).mockReturnValue(false)
+
+    const res = await quotationByIdPATCH(
+      patchReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`, { status: 'final' }),
+      { params: Promise.resolve({ id: QUOTE_ID }) }
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it('recomputes totals and replaces items when items array is provided', async () => {
+    const existingWithItems = { ...existing, total_amount: 0 }
+    const updatedQt = { ...updated, total_amount: 590, consignee_email: null }
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce(existingWithItems as any)   // fetch existing
+      .mockResolvedValueOnce(updatedQt as any)           // UPDATE RETURNING
+    vi.mocked(query).mockResolvedValue(undefined as any)
+    vi.mocked(queryMany).mockResolvedValue([SAMPLE_ITEM] as any)
+
+    const res = await quotationByIdPATCH(
+      patchReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`, {
+        status: 'draft',
+        items: [SAMPLE_ITEM],
+      }),
+      { params: Promise.resolve({ id: QUOTE_ID }) }
+    )
+    expect(res.status).toBe(200)
+    // DELETE + INSERT per item should have been called
+    const deleteCalls = vi.mocked(query).mock.calls.filter(([sql]) =>
+      (sql as string).includes('DELETE FROM quotation_items')
+    )
+    expect(deleteCalls.length).toBeGreaterThan(0)
+  })
+
+  it('recomputes totals from existing db items when no items provided and stored total is 0', async () => {
+    const zeroTotal = { ...existing, subtotal: 0, total_amount: 0, cgst_amount: 0, sgst_amount: 0 }
+    const updatedQt = { ...updated, total_amount: 590, consignee_email: null }
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce(zeroTotal as any)    // fetch existing
+      .mockResolvedValueOnce(updatedQt as any)    // UPDATE RETURNING
+    vi.mocked(queryMany)
+      .mockResolvedValueOnce([{ ...SAMPLE_ITEM, amount: 500, gst_rate: 18 }] as any) // existing items for recompute
+      .mockResolvedValueOnce([SAMPLE_ITEM] as any)  // savedItems after update
+    vi.mocked(query).mockResolvedValue(undefined as any)
+
+    const res = await quotationByIdPATCH(
+      patchReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`, { status: 'draft' }),
+      { params: Promise.resolve({ id: QUOTE_ID }) }
+    )
+    expect(res.status).toBe(200)
+    // queryMany was called at least once for the existing-items recompute
+    expect(queryMany).toHaveBeenCalled()
+  })
+
+  it('sends finalized email when status is final and consignee_email is set', async () => {
+    const { sendQuotationFinalizedEmail } = await import('@/lib/email')
+    const existingDraft = { ...existing, total_amount: 590 }
+    const finalQt = {
+      ...updated, status: 'final',
+      consignee_email: 'buyer@acme.com',
+      consignee_name: 'Acme Corp',
+      quote_number: 'QT/24-25/JAN/1',
+      total_amount: 590,
+      view_token: 'tok-abc',
+    }
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce(existingDraft as any)
+      .mockResolvedValueOnce(finalQt as any)
+    vi.mocked(query).mockResolvedValue(undefined as any)
+    vi.mocked(queryMany).mockResolvedValue([SAMPLE_ITEM] as any)
+
+    const res = await quotationByIdPATCH(
+      patchReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`, { status: 'final' }),
+      { params: Promise.resolve({ id: QUOTE_ID }) }
+    )
+    expect(res.status).toBe(200)
+    expect(sendQuotationFinalizedEmail).toHaveBeenCalledWith(
+      'buyer@acme.com',
+      'Acme Corp',
+      'QT/24-25/JAN/1',
+      590,
+      expect.stringContaining('tok-abc')
+    )
+  })
+
+  it('does NOT send email when status is final but consignee_email is absent', async () => {
+    const { sendQuotationFinalizedEmail } = await import('@/lib/email')
+    const existingDraft = { ...existing, total_amount: 590 }
+    const finalQtNoEmail = { ...updated, status: 'final', consignee_email: null }
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce(existingDraft as any)
+      .mockResolvedValueOnce(finalQtNoEmail as any)
+    vi.mocked(query).mockResolvedValue(undefined as any)
+    vi.mocked(queryMany).mockResolvedValue([SAMPLE_ITEM] as any)
+
+    const res = await quotationByIdPATCH(
+      patchReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`, { status: 'final' }),
+      { params: Promise.resolve({ id: QUOTE_ID }) }
+    )
+    expect(res.status).toBe(200)
+    expect(sendQuotationFinalizedEmail).not.toHaveBeenCalled()
+  })
+
+  it('returns 500 on db error', async () => {
+    vi.mocked(queryOne).mockRejectedValue(new Error('DB timeout'))
+    const res = await quotationByIdPATCH(
+      patchReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`, { status: 'draft' }),
+      { params: Promise.resolve({ id: QUOTE_ID }) }
+    )
+    expect(res.status).toBe(500)
+  })
 })
 
 // ---------------------------------------------------------------------------
@@ -570,5 +682,43 @@ describe('DELETE /api/admin/quotations/[id]', () => {
       { params: Promise.resolve({ id: QUOTE_ID }) }
     )
     expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when quotations:write scope missing', async () => {
+    vi.mocked(hasScope).mockReturnValue(false)
+    vi.mocked(queryOne).mockResolvedValue({ id: QUOTE_ID, status: 'draft' } as any)
+
+    const res = await quotationByIdDELETE(
+      deleteReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`),
+      { params: Promise.resolve({ id: QUOTE_ID }) }
+    )
+    expect(res.status).toBe(403)
+  })
+
+  it('returns 409 when a FK violation occurs (RFQ linked quotation)', async () => {
+    vi.mocked(queryOne).mockResolvedValue({ id: QUOTE_ID, status: 'draft' } as any)
+    // First query() is the RFQ detach UPDATE, second is the DELETE — simulate FK error on the DELETE
+    vi.mocked(query)
+      .mockResolvedValueOnce(undefined as any)          // detach RFQ UPDATE succeeds
+      .mockRejectedValueOnce(Object.assign(new Error('FK violation'), { code: '23503' }))
+
+    const res = await quotationByIdDELETE(
+      deleteReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`),
+      { params: Promise.resolve({ id: QUOTE_ID }) }
+    )
+    expect(res.status).toBe(409)
+    const json = await res.json()
+    expect(json.error).toMatch(/RFQ/i)
+  })
+
+  it('returns 500 on unexpected db error during delete', async () => {
+    vi.mocked(queryOne).mockResolvedValue({ id: QUOTE_ID, status: 'draft' } as any)
+    vi.mocked(query).mockRejectedValue(new Error('Connection lost'))
+
+    const res = await quotationByIdDELETE(
+      deleteReq(`http://localhost/api/admin/quotations/${QUOTE_ID}`),
+      { params: Promise.resolve({ id: QUOTE_ID }) }
+    )
+    expect(res.status).toBe(500)
   })
 })
