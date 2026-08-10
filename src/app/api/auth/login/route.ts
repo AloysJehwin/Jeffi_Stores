@@ -46,6 +46,15 @@ export async function POST(request: NextRequest) {
     )
 
     if (!user) {
+      // Check if a business account exists — if so, treat them as an existing user
+      // rather than sending isNewUser=true which would trigger signup and create a duplicate.
+      const bizUser = await queryOne(
+        "SELECT id FROM users WHERE email = $1 AND user_type = 'business'",
+        [email.toLowerCase()]
+      )
+      if (bizUser) {
+        return NextResponse.json({ error: 'This email is registered as a business account. Please use the business portal to sign in.' }, { status: 403 })
+      }
       return NextResponse.json({ isNewUser: true, email }, { status: 200 })
     }
 
