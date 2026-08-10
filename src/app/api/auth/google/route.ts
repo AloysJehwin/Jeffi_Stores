@@ -84,6 +84,25 @@ export async function POST(request: NextRequest) {
       [googleId, email]
     )
 
+    // If no customer account found, check if a business account exists with this email/google_id.
+    // A business user logging in via the customer portal should use their existing account rather
+    // than spawning a duplicate customer row.
+    if (!user) {
+      const bizUser = await queryOne<any>(
+        "SELECT * FROM users WHERE (google_id = $1 OR email = $2) AND user_type = 'business' LIMIT 1",
+        [googleId, email]
+      )
+      if (bizUser) {
+        // Link google_id if not already set and log them in as their business account.
+        if (!bizUser.google_id) {
+          await query('UPDATE users SET google_id = $1, auth_provider = $2 WHERE id = $3', [googleId, 'google', bizUser.id])
+        }
+        await query('UPDATE users SET last_login = NOW() WHERE id = $1', [bizUser.id])
+        logActivity({ userId: bizUser.id, kind: 'login', summary: 'Logged in via Google', metadata: { provider: 'google' } }).catch(() => {})
+        user = { ...bizUser, google_id: bizUser.google_id || googleId }
+      }
+    }
+
     if (!user) {
       user = await queryOne<any>(
         `INSERT INTO users (email, first_name, last_name, is_active, auth_provider, google_id, last_login)
