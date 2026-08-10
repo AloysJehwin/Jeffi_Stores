@@ -3,7 +3,6 @@ import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { queryOne, query } from '@/lib/db'
 import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
-import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 import { POLICY_VERSION } from '@/app/legal/policies'
@@ -12,7 +11,6 @@ if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
     const { email, otp, policiesAccepted } = await request.json()
     if (!email || !otp) return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
 
@@ -76,17 +74,17 @@ export async function POST(request: NextRequest) {
       path: '/',
       ...cookieDomainOption(),
     }
-    cookieStore.set('business_sid', sid, cookieOpts)
-    cookieStore.set('session_id', user.id, cookieOpts)
-
     await deleteOTP(email)
     await resetSendOtpCounter(email)
 
-    return NextResponse.json({
+    const res = NextResponse.json({
       message: 'Login successful',
       approvalStatus: 'approved',
       user: { id: user.id, email: user.email, firstName: user.first_name, lastName: user.last_name, companyName: user.company_name },
     })
+    res.cookies.set('business_sid', sid, cookieOpts)
+    res.cookies.set('session_id', user.id, cookieOpts)
+    return res
   } catch (err) {
     console.error('[route]', err)
     return NextResponse.json({ error: 'Login failed' }, { status: 500 })
