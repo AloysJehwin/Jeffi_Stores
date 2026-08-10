@@ -12,6 +12,7 @@ import { restoreOrderStock } from '@/lib/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { attributeConversion } from '@/lib/marketing'
 import { parseBody } from '@/lib/validate'
+import { sendOrderCancelledSMS, sendPaymentFailedSMS } from '@/lib/sms'
 
 const OrderPatchSchema = z.object({
   status: z.string().nullish(),
@@ -504,6 +505,13 @@ export async function PATCH(
     const notify = async () => {
       let invoicePdfBuffer: Buffer | null = null
       const effectivePaymentStatus = payment_status || currentOrder.payment_status
+
+      const smsCustomer = currentOrder.user_id
+        ? await queryOne<{ phone: string | null; notification_channel: string | null }>(
+            `SELECT phone, notification_channel FROM users WHERE id = $1`,
+            [currentOrder.user_id]
+          )
+        : null
       if (statusChanged && (status === 'confirmed' || status === 'processing') && effectivePaymentStatus === 'paid') {
         try { invoicePdfBuffer = await generateOrderInvoice(orderId) } catch {}
       }
@@ -532,12 +540,18 @@ export async function PATCH(
             userEmail, userName, currentOrder.order_number, orderId, status,
             currentOrder.status, invoicePdfBuffer
           ).catch(() => {})
+          if (status === 'cancelled' && smsCustomer?.notification_channel === 'sms' && smsCustomer.phone) {
+            sendOrderCancelledSMS({ phone: smsCustomer.phone, orderNumber: currentOrder.order_number }).catch(() => {})
+          }
         }
         if (paymentStatusChanged) {
           await sendPaymentStatusUpdate(
             userEmail, userName, currentOrder.order_number, orderId,
             payment_status, parseFloat(currentOrder.total_amount)
           ).catch(() => {})
+          if (payment_status === 'failed' && smsCustomer?.notification_channel === 'sms' && smsCustomer.phone) {
+            sendPaymentFailedSMS({ phone: smsCustomer.phone, orderNumber: currentOrder.order_number }).catch(() => {})
+          }
         }
       }
     }

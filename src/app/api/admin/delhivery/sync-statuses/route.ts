@@ -4,6 +4,7 @@ import { sendOrderStatusUpdate } from '@/lib/email'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { resolveShipmentStatus, isAdvancement, shipmentStatusToSyncType, rankOf } from '@/lib/shipment-status'
 import { restoreOrderStock } from '@/lib/order-stock'
+import { sendOrderDeliveredSMS, sendOutForDeliverySMS } from '@/lib/sms'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,11 +47,13 @@ export async function POST(request: NextRequest) {
     id: string; awb_number: string; status: string; shipment_status: string | null
     order_number: string; customer_name: string; customer_email: string
     user_id: string | null; payment_mode: string | null
+    phone: string | null; notification_channel: string | null
   }>(
     `SELECT o.id, o.awb_number, o.status, o.shipment_status, o.order_number, o.user_id,
             o.payment_mode,
             COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
-            COALESCE(u.email, o.customer_email) AS customer_email
+            COALESCE(u.email, o.customer_email) AS customer_email,
+            u.phone, u.notification_channel
      FROM orders o
      LEFT JOIN users u ON u.id = o.user_id
      WHERE o.awb_number IS NOT NULL
@@ -182,6 +185,14 @@ export async function POST(request: NextRequest) {
             order.order_number, order.id,
             syncRule.orderStatus, order.status
           ).catch(() => {})
+        }
+
+        if (order.notification_channel === 'sms' && order.phone) {
+          if (syncRule.orderStatus === 'delivered') {
+            sendOrderDeliveredSMS({ phone: order.phone, orderNumber: order.order_number }).catch(() => {})
+          } else if (syncRule.orderStatus === 'out_for_delivery') {
+            sendOutForDeliverySMS({ phone: order.phone, orderNumber: order.order_number }).catch(() => {})
+          }
         }
 
         if (syncRule.orderStatus === 'returned') {

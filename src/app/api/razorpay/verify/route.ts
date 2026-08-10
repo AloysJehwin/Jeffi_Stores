@@ -18,6 +18,7 @@ import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
+import { sendOrderConfirmedSMS } from '@/lib/sms'
 
 const VerifySchema = z.object({
   razorpay_order_id: zNonEmpty,
@@ -215,6 +216,9 @@ async function commitDraft(args: {
   sendOrderConfirmationEmail(user.email, fullOrder, orderItems || []).catch(() => {})
   sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
   sendPaymentStatusUpdate(user.email, userName, created.order_number, created.id, 'paid', parseFloat(created.total_amount)).catch(() => {})
+  if (user.notification_channel === 'sms' && user.phone) {
+    sendOrderConfirmedSMS({ phone: user.phone, orderNumber: created.order_number, total: parseFloat(created.total_amount) }).catch(() => {})
+  }
 
   logActivity({
     userId: args.userId,
@@ -343,6 +347,9 @@ async function markLegacyOrderPaid(args: {
     sendOrderConfirmationEmail(user.email, updatedOrder || order, orderItems || []).catch(() => {})
     sendNewOrderNotification(updatedOrder || order, orderItems || [], user).catch(() => {})
     sendPaymentStatusUpdate(user.email, userName, order.order_number, args.orderId, 'paid', parseFloat(order.total_amount)).catch(() => {})
+    if (user.notification_channel === 'sms' && user.phone) {
+      sendOrderConfirmedSMS({ phone: user.phone, orderNumber: order.order_number, total: parseFloat(order.total_amount) }).catch(() => {})
+    }
 
     recordImplicitSignalsForProducts(args.userId, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
   }
