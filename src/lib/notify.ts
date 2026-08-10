@@ -35,8 +35,12 @@ function dispatch(
   whatsapp: () => Promise<boolean>
 ): void {
   if (!phone) return
-  if (channel === 'sms') sms().catch(() => {})
-  else if (channel === 'whatsapp') whatsapp().catch(() => {})
+  if (channel === 'sms') {
+    sms().catch(() => {})
+  } else if (channel === 'whatsapp') {
+    // WhatsApp first; if it fails (e.g. template not yet approved), fall back to SMS.
+    whatsapp().then(ok => { if (!ok) sms().catch(() => {}) }).catch(() => { sms().catch(() => {}) })
+  }
 }
 
 export async function notifyOrderConfirmed(userId: string | null, orderNumber: string, total: number): Promise<void> {
