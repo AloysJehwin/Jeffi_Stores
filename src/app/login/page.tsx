@@ -141,12 +141,15 @@ function LoginPage() {
     try {
       await login(email, otpValue, requiresPolicy ? policyAccepted : undefined)
       await refreshCart()
-      // Save channel preference asynchronously — non-blocking
+      // Save channel preference + phone (for SMS/WhatsApp) asynchronously — non-blocking
       fetch('/api/user/update', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ notificationChannel: channel }),
+        body: JSON.stringify({
+          notificationChannel: channel,
+          ...(channel !== 'email' && loginPhone.length === 10 ? { phone: loginPhone } : {}),
+        }),
       }).catch(() => {})
       router.push(redirect)
     } catch (err: any) {

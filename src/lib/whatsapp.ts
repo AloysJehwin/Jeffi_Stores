@@ -24,6 +24,7 @@ const TEMPLATES = {
   orderDelivered: process.env.TWILIO_WA_ORDER_DELIVERED_SID || 'HX3d1393a9898a8d9e87c0dbc55497a6af',
   orderCancelled: process.env.TWILIO_WA_ORDER_CANCELLED_SID || 'HX05b47f8c139e462a443a428af823f8dc',
   outForDelivery: process.env.TWILIO_WA_OUT_FOR_DELIVERY_SID || 'HXfa11093ed4bc99a14151f8b3bc90b749',
+  paymentFailed: process.env.TWILIO_WA_PAYMENT_FAILED_SID || '',
 }
 
 function getClient() {
@@ -101,4 +102,12 @@ export async function sendOutForDeliveryWhatsApp(params: {
   phone?: string | null; orderNumber: string
 }): Promise<boolean> {
   return sendTemplate(params.phone, TEMPLATES.outForDelivery, { '1': params.orderNumber })
+}
+
+export async function sendPaymentFailedWhatsApp(params: {
+  phone?: string | null; orderNumber: string
+}): Promise<boolean> {
+  // No dedicated payment-failed template yet; skip unless configured.
+  if (!TEMPLATES.paymentFailed) return false
+  return sendTemplate(params.phone, TEMPLATES.paymentFailed, { '1': params.orderNumber })
 }
