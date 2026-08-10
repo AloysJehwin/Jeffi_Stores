@@ -25,8 +25,12 @@ function LoginPage() {
   const { refreshCart } = useCart()
   const { showToast } = useToast()
 
-  const [step, setStep] = useState<'email' | 'otp'>('email')
+  const [step, setStep] = useState<'email' | 'channel' | 'otp'>('email')
   const [email, setEmail] = useState('')
+  const [loginPhone, setLoginPhone] = useState('')
+  const [loginPhoneError, setLoginPhoneError] = useState('')
+  const [channel, setChannel] = useState<'email' | 'sms' | 'whatsapp'>('email')
+  const [channelLoading, setChannelLoading] = useState(false)
   const [otp, setOtp] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -92,13 +96,24 @@ function LoginPage() {
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
-    setIsLoading(true)
+    setLoginPhoneError('')
+    if (loginPhone.length !== 10) {
+      setLoginPhoneError('Enter a valid 10-digit mobile number')
+      return
+    }
+    setStep('channel')
+  }
+
+  const handleSelectChannel = async (selectedChannel: 'email' | 'sms' | 'whatsapp') => {
+    setChannel(selectedChannel)
+    setError('')
+    setChannelLoading(true)
     try {
       const response = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, isSignup: false }),
+        body: JSON.stringify({ email, phone: `+91${loginPhone}`, channel: selectedChannel, isSignup: false }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -120,7 +135,7 @@ function LoginPage() {
     } catch (err: any) {
       setError(err.message)
     } finally {
-      setIsLoading(false)
+      setChannelLoading(false)
     }
   }
 
@@ -133,6 +148,13 @@ function LoginPage() {
     try {
       await login(email, otpValue, requiresPolicy ? policyAccepted : undefined)
       await refreshCart()
+      // Save channel preference asynchronously — non-blocking
+      fetch('/api/user/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ notificationChannel: channel }),
+      }).catch(() => {})
       router.push(redirect)
     } catch (err: any) {
       setError(err.message)
@@ -167,7 +189,7 @@ function LoginPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, isSignup: false }),
+        body: JSON.stringify({ email, phone: `+91${loginPhone}`, channel, isSignup: false }),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -177,7 +199,7 @@ function LoginPage() {
         throw new Error(data.error || 'Failed to resend OTP')
       }
       setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 60)
-      showToast('New OTP sent! Check your email for the latest code.', 'success')
+      showToast('New OTP sent! Check your inbox for the latest code.', 'success')
       setTimeout(() => otpInputRef.current?.focus(), 0)
     } catch (err: any) {
       setError(err.message)
@@ -287,20 +309,104 @@ function LoginPage() {
                   placeholder="your@email.com"
                 />
               </div>
+              <div>
+                <label htmlFor="login-phone" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Mobile Number
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
+                    +91
+                  </span>
+                  <input
+                    id="login-phone"
+                    type="tel"
+                    inputMode="numeric"
+                    maxLength={10}
+                    required
+                    value={loginPhone}
+                    onChange={e => { setLoginPhone(e.target.value.replace(/\D/g, '')); setLoginPhoneError('') }}
+                    className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="00000 00000"
+                  />
+                </div>
+                {loginPhoneError && (
+                  <p className="mt-1 text-xs text-red-500">{loginPhoneError}</p>
+                )}
+                {loginPhone.length > 0 && loginPhone.length !== 10 && !loginPhoneError && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+                )}
+              </div>
               <button type="submit" disabled={isLoading}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending OTP...</>
-                ) : 'Send Verification Code'}
+                ) : 'Continue'}
               </button>
             </form>
+          )}
+
+          {step === 'channel' && (
+            <div className="space-y-4">
+              <p className="text-sm text-foreground-secondary">
+                How would you like to receive your verification code?
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {([
+                  {
+                    id: 'email' as const,
+                    icon: '📧',
+                    label: 'Email',
+                    description: email,
+                  },
+                  {
+                    id: 'sms' as const,
+                    icon: '📱',
+                    label: 'SMS',
+                    description: `+91 ••••• ${loginPhone.slice(-4)}`,
+                  },
+                  {
+                    id: 'whatsapp' as const,
+                    icon: '💬',
+                    label: 'WhatsApp',
+                    description: `+91 ••••• ${loginPhone.slice(-4)}`,
+                  },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => handleSelectChannel(opt.id)}
+                    disabled={channelLoading}
+                    className="flex flex-col items-center gap-2 px-3 py-4 rounded-lg border-2 border-border-secondary bg-surface hover:border-accent-500 hover:bg-accent-50 dark:hover:bg-accent-950/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-center group"
+                  >
+                    <span className="text-2xl">{opt.icon}</span>
+                    <span className="text-sm font-semibold text-foreground group-hover:text-accent-600">{opt.label}</span>
+                    <span className="text-xs text-foreground-muted break-all leading-tight">{opt.description}</span>
+                  </button>
+                ))}
+              </div>
+              {channelLoading && (
+                <div className="flex items-center justify-center gap-2 text-sm text-foreground-secondary py-2">
+                  <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full" />
+                  Sending code…
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setStep('email')}
+                className="text-sm text-foreground-secondary hover:text-foreground"
+              >
+                ← Change email or phone
+              </button>
+            </div>
           )}
 
           {step === 'otp' && (
             <form onSubmit={handleLogin} className="space-y-6">
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
                 <p className="text-sm text-blue-800 dark:text-blue-300">
-                  We&apos;ve sent a 6-digit verification code to <strong>{email}</strong>
+                  {channel === 'email' && <>We&apos;ve sent a 6-digit verification code to <strong>{email}</strong></>}
+                  {channel === 'sms' && <>We&apos;ve sent a 6-digit verification code via SMS to <strong>+91 ••••• {loginPhone.slice(-4)}</strong></>}
+                  {channel === 'whatsapp' && <>We&apos;ve sent a 6-digit verification code via WhatsApp to <strong>+91 ••••• {loginPhone.slice(-4)}</strong></>}
                 </p>
               </div>
               <div>
@@ -325,9 +431,9 @@ function LoginPage() {
                   className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
                   {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
                 </button>
-                <button type="button" onClick={() => { setStep('email'); setOtp(''); submittedOtpRef.current = '' }}
+                <button type="button" onClick={() => { setStep('channel'); setOtp(''); submittedOtpRef.current = '' }}
                   className="text-foreground-secondary hover:text-foreground">
-                  Change Email
+                  Change Channel
                 </button>
               </div>
               {requiresPolicy && (
