@@ -26,11 +26,10 @@ async function recordFailedLogin(req: NextRequest, email: string, reason: string
 
 export async function POST(request: NextRequest) {
   try {
+    // cookies() must be called before any await in Next.js 15
+    const cookieStore = await cookies()
     const body = await request.json()
     const { email, otp, policiesAccepted, channel } = body
-
-    // Resolve cookieStore early — Next.js 15 requires cookies() before any await
-    const cookieStore = await cookies()
 
     if (!email || !otp) {
       return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
