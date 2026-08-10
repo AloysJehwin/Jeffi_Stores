@@ -91,9 +91,10 @@ export async function refreshGmcStatusSnapshot(): Promise<GmcSummary | { locked:
          FROM merchant_gmc_status`
     )
     await query(
-      `UPDATE merchant_gmc_refresh_meta
-          SET last_refreshed_at = now(), total = $1, approved = $2, pending = $3, disapproved = $4
-        WHERE id = 1`,
+      `INSERT INTO merchant_gmc_refresh_meta (key, last_refreshed_at, total, approved, pending, disapproved)
+       VALUES ('default', now(), $1, $2, $3, $4)
+       ON CONFLICT (key) DO UPDATE SET
+         last_refreshed_at = now(), total = $1, approved = $2, pending = $3, disapproved = $4`,
       [counts?.total ?? 0, counts?.approved ?? 0, counts?.pending ?? 0, counts?.disapproved ?? 0]
     )
     return await getGmcSummary()
@@ -105,7 +106,7 @@ export async function refreshGmcStatusSnapshot(): Promise<GmcSummary | { locked:
 export async function getGmcSummary(): Promise<GmcSummary> {
   const m = await queryOne<GmcSummary>(
     `SELECT last_refreshed_at, total, approved, pending, disapproved
-       FROM merchant_gmc_refresh_meta WHERE id = 1`
+       FROM merchant_gmc_refresh_meta WHERE key = 'default' LIMIT 1`
   )
   return m ?? { last_refreshed_at: null, total: 0, approved: 0, pending: 0, disapproved: 0 }
 }
