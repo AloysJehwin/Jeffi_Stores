@@ -17,6 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
     const { email, firstName, lastName, phone, channel } = body
+    const cookieStore = await cookies()
 
     if (!email || !firstName) {
       return NextResponse.json(
@@ -90,7 +91,6 @@ export async function POST(request: NextRequest) {
       fpHash: signals.fpHash,
     })
 
-    const cookieStore = await cookies()
     cookieStore.set('user_sid', sid, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
