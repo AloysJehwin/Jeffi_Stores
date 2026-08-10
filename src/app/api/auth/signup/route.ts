@@ -4,7 +4,6 @@ import { sendWelcomeEmail } from '@/lib/email'
 import { queryOne } from '@/lib/db'
 import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
-import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 import { POLICY_VERSION } from '@/app/legal/policies'
@@ -15,7 +14,6 @@ if (!process.env.JWT_SECRET) {
 
 export async function POST(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
     const body = await request.json()
     const { email, firstName, lastName, phone, channel } = body
 
@@ -91,28 +89,18 @@ export async function POST(request: NextRequest) {
       fpHash: signals.fpHash,
     })
 
-    cookieStore.set('user_sid', sid, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: USER_SESSION_TTL_S,
-      path: '/',
-      ...cookieDomainOption(),
-    })
-
-    cookieStore.set('session_id', newUser.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: USER_SESSION_TTL_S,
-      path: '/',
-      ...cookieDomainOption(),
-    })
-
     await deleteOTP(email)
     await resetSendOtpCounter(email)
 
-    return NextResponse.json({
+    const cookieOpts = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      maxAge: USER_SESSION_TTL_S,
+      path: '/',
+      ...cookieDomainOption(),
+    }
+    const res = NextResponse.json({
       message: 'Account created successfully',
       user: {
         id: newUser.id,
@@ -122,6 +110,9 @@ export async function POST(request: NextRequest) {
         phone: newUser.phone,
       },
     })
+    res.cookies.set('user_sid', sid, cookieOpts)
+    res.cookies.set('session_id', newUser.id, cookieOpts)
+    return res
   } catch {
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
   }
