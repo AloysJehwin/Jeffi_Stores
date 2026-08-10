@@ -272,4 +272,37 @@ describe('POST /api/auth/google', () => {
     const body = await res.json()
     expect(body.error).toMatch(/authentication failed/i)
   })
+
+  it('uses existing business account instead of creating duplicate customer when business-only user signs in', async () => {
+    const bizUser = { ...DB_USER, id: 'biz-user-1', user_type: 'business', google_id: GOOGLE_PAYLOAD.sub }
+    mockIdTokenVerify(GOOGLE_PAYLOAD)
+    mockQueryOne
+      .mockResolvedValueOnce(null)      // no customer account found
+      .mockResolvedValueOnce(bizUser)   // business account found
+      .mockResolvedValueOnce(null)      // guest user lookup
+    const res = await POST(makePost({ idToken: 'valid-token' }) as any)
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.user.email).toBe('user@example.com')
+    // Must NOT have inserted a new user row
+    const insertCalls = (vi.mocked(mockQueryOne).mock.calls as any[]).filter(
+      (c: any[]) => String(c[0]).includes('INSERT INTO users')
+    )
+    expect(insertCalls).toHaveLength(0)
+  })
+
+  it('links google_id to business account when not already set', async () => {
+    const bizUserNoGoogleId = { ...DB_USER, id: 'biz-2', user_type: 'business', google_id: null }
+    mockIdTokenVerify(GOOGLE_PAYLOAD)
+    mockQueryOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(bizUserNoGoogleId)
+      .mockResolvedValueOnce(null)
+    vi.mocked(mockQuery).mockResolvedValue({ rows: [] } as any)
+    await POST(makePost({ idToken: 'valid-token' }) as any)
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining('UPDATE users SET google_id'),
+      expect.arrayContaining([GOOGLE_PAYLOAD.sub])
+    )
+  })
 })

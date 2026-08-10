@@ -97,15 +97,29 @@ describe('POST /api/auth/login', () => {
   })
 
   describe('OTP valid, user not found → new user flow', () => {
-    it('returns 200 with isNewUser:true when user does not exist', async () => {
+    it('returns 200 with isNewUser:true when user does not exist at all', async () => {
       vi.mocked(otpLib.verifyOTP).mockResolvedValue({ valid: true, message: 'OK' })
-      vi.mocked(db.queryOne).mockResolvedValue(null)
+      vi.mocked(db.queryOne)
+        .mockResolvedValueOnce(null)  // no customer
+        .mockResolvedValueOnce(null)  // no business either
 
       const res = await POST(makeRequest({ email: 'new@example.com', otp: '123456' }) as any)
       expect(res.status).toBe(200)
       const body = await res.json()
       expect(body.isNewUser).toBe(true)
       expect(body.email).toBe('new@example.com')
+    })
+
+    it('returns 403 when only a business account exists — prevents duplicate customer creation', async () => {
+      vi.mocked(otpLib.verifyOTP).mockResolvedValue({ valid: true, message: 'OK' })
+      vi.mocked(db.queryOne)
+        .mockResolvedValueOnce(null)                          // no customer account
+        .mockResolvedValueOnce({ id: 'biz-1', email: 'biz@example.com', user_type: 'business' }) // business account exists
+
+      const res = await POST(makeRequest({ email: 'biz@example.com', otp: '123456' }) as any)
+      expect(res.status).toBe(403)
+      const body = await res.json()
+      expect(body.error).toMatch(/business portal/i)
     })
   })
 
