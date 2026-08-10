@@ -49,6 +49,7 @@
     "replicate": "^1.4.0",
     "sharp": "^0.33.1",
     "tailwind-merge": "^2.2.0",
+    "twilio": "^6.0.2",
     "zod": "^4.4.3"
   },
   "devDependencies": {
