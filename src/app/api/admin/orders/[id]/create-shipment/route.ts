@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, query, queryMany } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { computeShipmentDims, ShipmentItem, PackageType } from '@/lib/shipping'
+import { sendOrderShippedSMS } from '@/lib/sms'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 const TOKEN = process.env.DELHIVERY_API_KEY
@@ -205,6 +206,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       `UPDATE orders SET awb_number = $1, status = 'processing', estimated_delivery_date = COALESCE($3::date, estimated_delivery_date), shipment_status = COALESCE(shipment_status, 'created'), updated_at = NOW() WHERE id = $2`,
       [awb, id, estimatedDeliveryDate]
     )
+
+    const smsCustomer = await queryOne<{ phone: string | null; notification_channel: string | null }>(
+      `SELECT u.phone, u.notification_channel FROM orders o JOIN users u ON u.id = o.user_id WHERE o.id = $1`,
+      [id]
+    )
+    if (smsCustomer?.notification_channel === 'sms' && smsCustomer.phone) {
+      sendOrderShippedSMS({ phone: smsCustomer.phone, orderNumber: order.order_number, trackingId: awb, courier: 'Delhivery' }).catch(() => {})
+    }
 
     return NextResponse.json({
       awb,
