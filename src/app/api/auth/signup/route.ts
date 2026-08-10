@@ -15,9 +15,9 @@ if (!process.env.JWT_SECRET) {
 
 export async function POST(request: NextRequest) {
   try {
+    const cookieStore = await cookies()
     const body = await request.json()
     const { email, firstName, lastName, phone, channel } = body
-    const cookieStore = await cookies()
 
     if (!email || !firstName) {
       return NextResponse.json(

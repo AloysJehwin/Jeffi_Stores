@@ -12,8 +12,8 @@ if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET environment variable is
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, otp, policiesAccepted } = await request.json()
     const cookieStore = await cookies()
+    const { email, otp, policiesAccepted } = await request.json()
     if (!email || !otp) return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
 
     const otpVerification = await verifyOTP(email, otp)
