@@ -29,6 +29,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { email, otp, policiesAccepted, channel } = body
 
+    // Resolve cookieStore early — Next.js 15 requires cookies() before any await
+    const cookieStore = await cookies()
+
     if (!email || !otp) {
       return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
     }
@@ -83,7 +86,6 @@ export async function POST(request: NextRequest) {
       metadata: { provider: 'otp' },
     }).catch(() => {})
 
-    const cookieStore = await cookies()
     const guestSessionId = cookieStore.get('session_id')?.value
     if (guestSessionId && guestSessionId.startsWith('guest_')) {
       const guestUser = await queryOne(
