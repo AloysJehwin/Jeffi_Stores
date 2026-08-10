@@ -82,6 +82,7 @@ export function AuthProvider({ children, meEndpoint = '/api/auth/me' }: { childr
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ email, otp, policiesAccepted }),
     })
     if (!response.ok) {
