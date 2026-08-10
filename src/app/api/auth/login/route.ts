@@ -21,13 +21,13 @@ async function recordFailedLogin(req: NextRequest, email: string, reason: string
        VALUES ($1, $2, $3, $4, $5)`,
       [email.toLowerCase(), userId, ip, ua, reason]
     )
-  } catch (err) { console.error("[route]", err) }
+  } catch { /* swallow */ }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, otp, policiesAccepted } = body
+    const { email, otp, policiesAccepted, channel } = body
 
     if (!email || !otp) {
       return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
@@ -71,6 +71,10 @@ export async function POST(request: NextRequest) {
     }
 
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
+
+    if (channel && channel !== user.notification_channel) {
+      await query('UPDATE users SET notification_channel = $1 WHERE id = $2', [channel, user.id])
+    }
 
     logActivity({
       userId: user.id,

@@ -166,5 +166,6 @@ CREATE TABLE public.users (
     avatar_is_custom boolean DEFAULT false NOT NULL,
     user_type character varying(20) DEFAULT 'customer'::character varying NOT NULL,
     policies_accepted_version text,
-    policies_accepted_at timestamp with time zone
+    policies_accepted_at timestamp with time zone,
+    notification_channel character varying(20) DEFAULT 'email'::character varying NOT NULL
 );
