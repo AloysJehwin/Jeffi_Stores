@@ -10,9 +10,10 @@ const UpdateUserSchema = z
     firstName: zNonEmpty.optional(),
     lastName: zNonEmpty.optional(),
     phone: zPhone.optional(),
+    notificationChannel: z.enum(['email', 'sms', 'whatsapp']).optional(),
   })
   .refine(
-    (d) => d.firstName !== undefined || d.lastName !== undefined || d.phone !== undefined,
+    (d) => d.firstName !== undefined || d.lastName !== undefined || d.phone !== undefined || d.notificationChannel !== undefined,
     { message: 'At least one field must be provided' }
   )
 
@@ -27,9 +28,9 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const parsed = parseBody(UpdateUserSchema, body)
     if (!parsed.ok) return parsed.response
-    const { firstName, lastName, phone } = parsed.data
+    const { firstName, lastName, phone, notificationChannel } = parsed.data
 
-    const existing = await queryOne('SELECT first_name, last_name, phone FROM users WHERE id = $1', [userId])
+    const existing = await queryOne('SELECT first_name, last_name, phone, notification_channel FROM users WHERE id = $1', [userId])
     if (!existing) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
@@ -51,11 +52,13 @@ export async function PATCH(request: NextRequest) {
       normalizedPhone = cleaned
     }
 
+    const resolvedChannel = notificationChannel !== undefined ? notificationChannel : existing.notification_channel
+
     const updatedUser = await queryOne(
-      `UPDATE users SET first_name = $1, last_name = $2, phone = $3, updated_at = NOW()
-       WHERE id = $4
+      `UPDATE users SET first_name = $1, last_name = $2, phone = $3, notification_channel = $4, updated_at = NOW()
+       WHERE id = $5
        RETURNING *`,
-      [resolvedFirstName, resolvedLastName || null, normalizedPhone, userId]
+      [resolvedFirstName, resolvedLastName || null, normalizedPhone, resolvedChannel, userId]
     )
 
     if (!updatedUser) {
@@ -66,7 +69,7 @@ export async function PATCH(request: NextRequest) {
       userId,
       kind: 'profile_updated',
       summary: 'Updated profile',
-      metadata: { fields: ['firstName', 'lastName', 'phone'].filter(f => body[f] !== undefined) },
+      metadata: { fields: ['firstName', 'lastName', 'phone', 'notificationChannel'].filter(f => body[f] !== undefined) },
     }).catch(() => {})
 
     const user = {
@@ -75,12 +78,12 @@ export async function PATCH(request: NextRequest) {
       firstName: updatedUser.first_name,
       lastName: updatedUser.last_name,
       phone: updatedUser.phone,
+      notificationChannel: updatedUser.notification_channel,
       createdAt: updatedUser.created_at,
     }
 
     return NextResponse.json({ user })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

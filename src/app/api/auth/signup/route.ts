@@ -16,7 +16,7 @@ if (!process.env.JWT_SECRET) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, firstName, lastName, phone } = body
+    const { email, firstName, lastName, phone, channel } = body
 
     if (!email || !firstName) {
       return NextResponse.json(
@@ -59,10 +59,10 @@ export async function POST(request: NextRequest) {
 
     const newUser = await queryOne(
       `INSERT INTO users (email, first_name, last_name, phone, is_active, last_login,
-                         policies_accepted_version, policies_accepted_at)
-       VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW())
+                         policies_accepted_version, policies_accepted_at, notification_channel)
+       VALUES ($1, $2, $3, $4, $5, NOW(), $6, NOW(), $7)
        RETURNING *`,
-      [email.toLowerCase(), firstName, lastName || null, normalizedPhone, true, POLICY_VERSION]
+      [email.toLowerCase(), firstName, lastName || null, normalizedPhone, true, POLICY_VERSION, channel || 'email']
     )
 
     if (!newUser) {
@@ -122,8 +122,7 @@ export async function POST(request: NextRequest) {
         phone: newUser.phone,
       },
     })
-  } catch (err) {
-    console.error('[route]', err)
+  } catch {
     return NextResponse.json({ error: 'Failed to create account' }, { status: 500 })
   }
 }
