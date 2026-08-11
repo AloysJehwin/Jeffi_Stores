@@ -75,6 +75,29 @@ CREATE TABLE public.email_logs (
 
 
 --
+-- Name: message_logs; Type: TABLE; Schema: public; Owner: -
+-- Outbound SMS + WhatsApp notifications (OTP is intentionally NOT logged here).
+--
+
+CREATE TABLE public.message_logs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    user_id uuid,
+    channel character varying(16) NOT NULL,
+    direction character varying(10) DEFAULT 'outbound'::character varying NOT NULL,
+    to_number character varying(32) NOT NULL,
+    from_number character varying(32),
+    body text,
+    kind character varying(64),
+    entity_type character varying(64),
+    entity_id character varying(128),
+    status character varying(50) DEFAULT 'sent'::character varying,
+    error text,
+    provider_sid character varying(128),
+    sent_at timestamp with time zone DEFAULT now()
+);
+
+
+--
 -- Name: merchant_sync_log; Type: TABLE; Schema: public; Owner: -
 --
 

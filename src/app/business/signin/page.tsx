@@ -34,6 +34,9 @@ function BusinessSignInPage() {
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [email, setEmail] = useState('')
+  const [loginPhone, setLoginPhone] = useState('')
+  const [selectedChannel, setSelectedChannel] = useState<'email' | 'sms' | 'whatsapp'>('email')
+  const [channel, setChannel] = useState<'email' | 'sms' | 'whatsapp'>('email')
   const [otp, setOtp] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
@@ -67,13 +70,18 @@ function BusinessSignInPage() {
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (selectedChannel !== 'email' && loginPhone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number')
+      return
+    }
     setIsLoading(true)
+    setChannel(selectedChannel)
     try {
       const res = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, isSignup: false, userType: 'business' }),
+        body: JSON.stringify({ email, phone: `+91${loginPhone}`, channel: selectedChannel, isSignup: false, userType: 'business' }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -131,6 +139,13 @@ function BusinessSignInPage() {
         submittedOtpRef.current = ''
         return
       }
+      // Save channel preference asynchronously — non-blocking
+      fetch('/api/user/update', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'X-Auth-Portal': 'business' },
+        credentials: 'include',
+        body: JSON.stringify({ notificationChannel: channel }),
+      }).catch(() => {})
       // Redirect to business portal
       window.location.href = callbackUrl || bp('/business/products')
     } catch (err: any) {
@@ -164,7 +179,7 @@ function BusinessSignInPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ email, isSignup: false, userType: 'business' }),
+        body: JSON.stringify({ email, phone: `+91${loginPhone}`, channel, isSignup: false, userType: 'business' }),
       })
       const data = await res.json()
       if (!res.ok) {
@@ -272,6 +287,36 @@ function BusinessSignInPage() {
     }
   }
 
+  const channelOptions = [
+    {
+      id: 'email' as const,
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+        </svg>
+      ),
+      label: 'Email',
+    },
+    {
+      id: 'sms' as const,
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18h3" />
+        </svg>
+      ),
+      label: 'SMS',
+    },
+    {
+      id: 'whatsapp' as const,
+      icon: (
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+        </svg>
+      ),
+      label: 'Business WhatsApp',
+    },
+  ] as const
+
   return (
     <>
     <BusinessPublicHeader />
@@ -346,9 +391,60 @@ function BusinessSignInPage() {
                   placeholder="you@company.com"
                 />
               </div>
+
+              {/* Inline channel selector */}
+              <div>
+                <p className="text-sm font-medium text-foreground-secondary mb-1.5">
+                  Send OTP via
+                </p>
+                <div className="flex gap-2">
+                  {channelOptions.map(opt => (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => setSelectedChannel(opt.id)}
+                      className={`flex-1 flex items-center justify-center gap-1.5 px-2 py-2.5 rounded-lg border-2 text-xs font-medium transition-colors ${
+                        selectedChannel === opt.id
+                          ? 'border-accent-500 bg-accent-50 dark:bg-accent-950/20 text-accent-600 dark:text-accent-400'
+                          : 'border-border-secondary bg-surface text-foreground-secondary hover:border-accent-400 hover:text-foreground'
+                      }`}
+                    >
+                      <span className="shrink-0">{opt.icon}</span>
+                      <span className="leading-tight text-center">{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Conditional phone input */}
+              {(selectedChannel === 'sms' || selectedChannel === 'whatsapp') && (
+                <div>
+                  <label htmlFor="b-login-phone" className="block text-sm font-medium text-foreground-secondary mb-1.5">
+                    Mobile Number
+                  </label>
+                  <div className="flex items-center border border-border-secondary rounded-lg overflow-hidden focus-within:ring-2 focus-within:ring-accent-500 focus-within:border-accent-500">
+                    <span className="px-3 py-3 bg-surface-secondary text-foreground-secondary text-sm border-r border-border-secondary">+91</span>
+                    <input
+                      id="b-login-phone"
+                      type="tel"
+                      inputMode="numeric"
+                      maxLength={10}
+                      value={loginPhone}
+                      onChange={e => setLoginPhone(e.target.value.replace(/\D/g, ''))}
+                      placeholder="10-digit mobile number"
+                      autoFocus
+                      className="flex-1 px-3 py-3 bg-transparent text-foreground placeholder:text-foreground-muted focus:outline-none text-sm"
+                    />
+                  </div>
+                  {loginPhone.length > 0 && loginPhone.length !== 10 && (
+                    <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+                  )}
+                </div>
+              )}
+
               <button type="submit" disabled={isLoading}
                 className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:opacity-60 disabled:cursor-not-allowed flex items-center justify-center">
-                {isLoading ? <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending…</> : 'Send Verification Code'}
+                {isLoading ? <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending…</> : 'Continue'}
               </button>
             </form>
           )}
@@ -357,7 +453,9 @@ function BusinessSignInPage() {
             <form onSubmit={handleLogin} className="space-y-5">
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
                 <p className="text-sm text-blue-800 dark:text-blue-300">
-                  We&apos;ve sent a 6-digit code to <strong>{email}</strong>
+                  {channel === 'email' && <>We&apos;ve sent a 6-digit code to <strong>{email}</strong></>}
+                  {channel === 'sms' && <>We&apos;ve sent a 6-digit code via SMS to <strong>+91 ••••• {loginPhone.slice(-4)}</strong></>}
+                  {channel === 'whatsapp' && <>We&apos;ve sent a 6-digit code via Business WhatsApp to <strong>+91 ••••• {loginPhone.slice(-4)}</strong></>}
                 </p>
               </div>
               <div>
@@ -382,7 +480,7 @@ function BusinessSignInPage() {
                 </button>
                 <button type="button" onClick={() => { setStep('email'); setOtp(''); submittedOtpRef.current = '' }}
                   className="text-foreground-secondary hover:text-foreground">
-                  Change Email
+                  Change Channel
                 </button>
               </div>
               {requiresPolicy && (

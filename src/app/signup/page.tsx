@@ -17,6 +17,38 @@ export default function SignupPageWrapper() {
   )
 }
 
+type Channel = 'email' | 'sms' | 'whatsapp'
+
+const channelOptions: { id: Channel; label: string; icon: React.ReactNode }[] = [
+  {
+    id: 'email',
+    label: 'Email',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+      </svg>
+    ),
+  },
+  {
+    id: 'sms',
+    label: 'SMS',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18h3" />
+      </svg>
+    ),
+  },
+  {
+    id: 'whatsapp',
+    label: 'WhatsApp',
+    icon: (
+      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z" />
+      </svg>
+    ),
+  },
+]
+
 function SignupPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -29,12 +61,13 @@ function SignupPage() {
   const { refreshCart } = useCart()
   const { showToast } = useToast()
 
-  const [step, setStep] = useState<'email' | 'otp' | 'details' | 'phone'>('email')
+  const [step, setStep] = useState<'details' | 'otp' | 'phone'>('details')
   const [email, setEmail] = useState(prefillEmail)
   const [otp, setOtp] = useState('')
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
   const [phone, setPhone] = useState('')
+  const [channel, setChannel] = useState<Channel>('email')
   const [isLoading, setIsLoading] = useState(false)
   const [googleLoading, setGoogleLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
@@ -49,6 +82,13 @@ function SignupPage() {
     const t = setTimeout(() => setResendCooldown(c => c - 1), 1000)
     return () => clearTimeout(t)
   }, [resendCooldown])
+
+  // Auto-switch channel back to email if phone is cleared
+  useEffect(() => {
+    if (phone.length === 0 && (channel === 'sms' || channel === 'whatsapp')) {
+      setChannel('email')
+    }
+  }, [phone, channel])
 
   async function handleGoogleButtonClick() {
     setError('')
@@ -78,22 +118,33 @@ function SignupPage() {
       } else {
         router.push(redirectTo)
       }
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setGoogleLoading(false)
     }
   }
 
+  // Step 1: collect all details then send OTP
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    if (!firstName.trim()) {
+      setError('First name is required')
+      return
+    }
+    if (phone.length > 0 && phone.length !== 10) {
+      setError('Enter a valid 10-digit mobile number')
+      return
+    }
     setIsLoading(true)
     try {
+      const body: Record<string, unknown> = { email, isSignup: true, channel }
+      if (phone.length === 10) body.phone = `+91${phone}`
       const response = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, isSignup: true }),
+        body: JSON.stringify(body),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -106,30 +157,41 @@ function SignupPage() {
       }
       setStep('otp')
       setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 30)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const submitVerifyOTP = async (otpValue: string) => {
+  // Step 2: verify OTP then create account
+  const submitVerifyAndSignup = async (otpValue: string) => {
     if (submittedOtpRef.current === otpValue) return
     if (!policyAccepted) return
     submittedOtpRef.current = otpValue
     setError('')
     setIsLoading(true)
     try {
-      const response = await fetch('/api/auth/verify-otp', {
+      const verifyResponse = await fetch('/api/auth/verify-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp: otpValue }),
       })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Invalid OTP')
-      setStep('details')
-    } catch (err: any) {
-      setError(err.message)
+      const verifyData = await verifyResponse.json()
+      if (!verifyResponse.ok) throw new Error(verifyData.error || 'Invalid OTP')
+
+      // OTP verified — create account
+      await signup({
+        email,
+        otp: otpValue,
+        firstName,
+        lastName: lastName || undefined,
+        phone: phone.length === 10 ? `+91${phone}` : undefined,
+      })
+      await refreshCart()
+      router.push(redirectTo)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
       setOtp('')
       submittedOtpRef.current = ''
       setTimeout(() => otpInputRef.current?.focus(), 0)
@@ -140,7 +202,7 @@ function SignupPage() {
 
   const handleVerifyOTP = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (otp.length === 6) await submitVerifyOTP(otp)
+    if (otp.length === 6) await submitVerifyAndSignup(otp)
   }
 
   useEffect(() => {
@@ -148,27 +210,9 @@ function SignupPage() {
     if (otp.length !== 6) return
     if (isLoading) return
     if (!policyAccepted) return
-    submitVerifyOTP(otp)
+    submitVerifyAndSignup(otp)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otp, step, isLoading, policyAccepted])
-
-  const handleSignup = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setError('')
-    if (!phone || phone.length !== 10) {
-      setError('Enter a valid 10-digit mobile number')
-      return
-    }
-    setIsLoading(true)
-    try {
-      await signup({ email, otp, firstName, lastName, phone })
-      await refreshCart()
-      router.push(redirectTo)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setIsLoading(false)
-    }
-  }
 
   const handleResendOTP = async () => {
     setError('')
@@ -176,10 +220,12 @@ function SignupPage() {
     submittedOtpRef.current = ''
     setIsLoading(true)
     try {
+      const body: Record<string, unknown> = { email, isSignup: true, channel }
+      if (phone.length === 10) body.phone = `+91${phone}`
       const response = await fetch('/api/auth/send-otp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, isSignup: true }),
+        body: JSON.stringify(body),
       })
       const data = await response.json()
       if (!response.ok) {
@@ -191,8 +237,8 @@ function SignupPage() {
       setResendCooldown(typeof data.nextCooldown === 'number' ? data.nextCooldown : 60)
       showToast('OTP sent successfully!', 'success')
       setTimeout(() => otpInputRef.current?.focus(), 0)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setIsLoading(false)
     }
@@ -230,12 +276,17 @@ function SignupPage() {
         }).catch(() => {})
       }
       router.push(redirectTo)
-    } catch (err: any) {
-      setError(err.message)
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'An error occurred')
     } finally {
       setIsLoading(false)
     }
   }
+
+  const otpDestination =
+    channel === 'email'
+      ? email
+      : `+91 ••••• ${phone.slice(-4)}`
 
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
@@ -248,7 +299,7 @@ function SignupPage() {
             </p>
           </div>
 
-          {fromLogin && step === 'email' && (
+          {fromLogin && step === 'details' && (
             <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
               <p className="text-sm text-blue-800 dark:text-blue-300">
                 No account found for <strong>{prefillEmail}</strong>. Create one to continue.
@@ -262,7 +313,8 @@ function SignupPage() {
             </div>
           )}
 
-          {step === 'email' && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+          {/* Google OAuth — shown on details step only */}
+          {step === 'details' && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
             <>
               <button
                 type="button"
@@ -293,11 +345,38 @@ function SignupPage() {
             </>
           )}
 
-          {step === 'email' && (
-            <form onSubmit={handleSendOTP} className="space-y-6">
+          {/* Step 1: collect all details */}
+          {step === 'details' && (
+            <form onSubmit={handleSendOTP} className="space-y-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label htmlFor="firstName" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    First Name *
+                  </label>
+                  <input
+                    id="firstName" type="text" required value={firstName}
+                    onChange={e => setFirstName(e.target.value)}
+                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="John"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label htmlFor="lastName" className="block text-sm font-medium text-foreground-secondary mb-2">
+                    Last Name
+                  </label>
+                  <input
+                    id="lastName" type="text" value={lastName}
+                    onChange={e => setLastName(e.target.value)}
+                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="Doe"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Email Address
+                  Email Address *
                 </label>
                 <input
                   id="email" type="email" required value={email}
@@ -306,8 +385,63 @@ function SignupPage() {
                   placeholder="your@email.com"
                 />
               </div>
-              <button type="submit" disabled={isLoading}
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
+
+              <div>
+                <label htmlFor="phone" className="block text-sm font-medium text-foreground-secondary mb-2">
+                  Mobile Number *
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
+                    +91
+                  </span>
+                  <input
+                    id="phone" type="tel" inputMode="numeric" maxLength={10} value={phone} required
+                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
+                    className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
+                    placeholder="00000 00000"
+                  />
+                </div>
+                {phone.length > 0 && phone.length !== 10 && (
+                  <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
+                )}
+              </div>
+
+              {/* OTP channel selector */}
+              <div>
+                <p className="text-sm font-medium text-foreground-secondary mb-2">
+                  How would you like to receive your OTP?
+                </p>
+                <div className="flex gap-2">
+                  {channelOptions.map(opt => {
+                    const needsPhone = opt.id === 'sms' || opt.id === 'whatsapp'
+                    const disabled = needsPhone && phone.length !== 10
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => !disabled && setChannel(opt.id)}
+                        className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg border-2 text-sm font-medium transition-colors ${
+                          channel === opt.id
+                            ? 'border-accent-500 bg-accent-50 dark:bg-accent-950/20 text-accent-600 dark:text-accent-400'
+                            : disabled
+                              ? 'border-border-secondary bg-surface text-foreground-muted opacity-40 cursor-not-allowed'
+                              : 'border-border-secondary bg-surface text-foreground-secondary hover:border-accent-400 hover:text-foreground'
+                        }`}
+                      >
+                        <span className="shrink-0">{opt.icon}</span>
+                        <span>{opt.label}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isLoading}
+                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
+              >
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Sending OTP...</>
                 ) : 'Send Verification Code'}
@@ -315,11 +449,12 @@ function SignupPage() {
             </form>
           )}
 
+          {/* Step 2: verify OTP + create account */}
           {step === 'otp' && (
             <form onSubmit={handleVerifyOTP} className="space-y-6">
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4">
                 <p className="text-sm text-blue-800 dark:text-blue-300">
-                  We&apos;ve sent a 6-digit verification code to <strong>{email}</strong>
+                  We&apos;ve sent a 6-digit verification code to <strong>{otpDestination}</strong>
                 </p>
               </div>
               <div>
@@ -340,13 +475,20 @@ function SignupPage() {
                 />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <button type="button" onClick={handleResendOTP} disabled={isLoading || resendCooldown > 0}
-                  className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed">
+                <button
+                  type="button"
+                  onClick={handleResendOTP}
+                  disabled={isLoading || resendCooldown > 0}
+                  className="text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   {resendCooldown > 0 ? `Resend in ${resendCooldown}s` : 'Resend Code'}
                 </button>
-                <button type="button" onClick={() => { setStep('email'); setOtp(''); submittedOtpRef.current = '' }}
-                  className="text-foreground-secondary hover:text-foreground">
-                  Change Email
+                <button
+                  type="button"
+                  onClick={() => { setStep('details'); setOtp(''); submittedOtpRef.current = '' }}
+                  className="text-foreground-secondary hover:text-foreground"
+                >
+                  Change details
                 </button>
               </div>
               <label className="flex items-start gap-2 text-sm text-foreground-secondary cursor-pointer">
@@ -362,63 +504,19 @@ function SignupPage() {
                   <a href="/legal/terms-and-conditions" target="_blank" rel="noopener" className="text-accent-500 hover:underline font-medium">Terms &amp; Conditions</a>.
                 </span>
               </label>
-              <button type="submit" disabled={otp.length !== 6 || isLoading || !policyAccepted}
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
-                {isLoading ? (
-                  <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Verifying...</>
-                ) : 'Verify & Continue'}
-              </button>
-            </form>
-          )}
-
-          {step === 'details' && (
-            <form onSubmit={handleSignup} className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium text-foreground-secondary mb-2">
-                    First Name *
-                  </label>
-                  <input id="firstName" type="text" required value={firstName}
-                    onChange={e => setFirstName(e.target.value)}
-                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                    placeholder="John" />
-                </div>
-                <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-foreground-secondary mb-2">
-                    Last Name
-                  </label>
-                  <input id="lastName" type="text" value={lastName}
-                    onChange={e => setLastName(e.target.value)}
-                    className="w-full px-4 py-3 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                    placeholder="Doe" />
-                </div>
-              </div>
-              <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-foreground-secondary mb-2">
-                  Mobile Number *
-                </label>
-                <div className="flex">
-                  <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
-                    +91
-                  </span>
-                  <input id="phone" type="tel" inputMode="numeric" maxLength={10} value={phone} required
-                    onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
-                    className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                    placeholder="00000 00000" />
-                </div>
-                {phone && phone.length > 0 && phone.length !== 10 && (
-                  <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
-                )}
-              </div>
-              <button type="submit" disabled={isLoading}
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
+              <button
+                type="submit"
+                disabled={otp.length !== 6 || isLoading || !policyAccepted}
+                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
+              >
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Creating Account...</>
-                ) : 'Complete Signup'}
+                ) : 'Verify & Create Account'}
               </button>
             </form>
           )}
 
+          {/* Step: phone collection after Google OAuth */}
           {step === 'phone' && (
             <form onSubmit={handleSavePhone} className="space-y-6">
               <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-2">
@@ -434,12 +532,14 @@ function SignupPage() {
                   <span className="inline-flex items-center px-4 py-3 border border-r-0 border-border-secondary rounded-l-lg bg-surface-secondary text-foreground-secondary text-sm font-medium">
                     +91
                   </span>
-                  <input id="phone-google" type="tel" inputMode="numeric" maxLength={10} value={phone} required autoFocus
+                  <input
+                    id="phone-google" type="tel" inputMode="numeric" maxLength={10} value={phone} required autoFocus
                     onChange={e => setPhone(e.target.value.replace(/\D/g, ''))}
                     className="w-full px-4 py-3 border border-border-secondary rounded-r-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-accent-500"
-                    placeholder="00000 00000" />
+                    placeholder="00000 00000"
+                  />
                 </div>
-                {phone && phone.length > 0 && phone.length !== 10 && (
+                {phone.length > 0 && phone.length !== 10 && (
                   <p className="mt-1 text-xs text-red-500">Enter a valid 10-digit mobile number</p>
                 )}
               </div>
@@ -458,8 +558,11 @@ function SignupPage() {
                   </span>
                 </label>
               )}
-              <button type="submit" disabled={isLoading || phone.length !== 10 || (phoneRequiresPolicy && !policyAccepted)}
-                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center">
+              <button
+                type="submit"
+                disabled={isLoading || phone.length !== 10 || (phoneRequiresPolicy && !policyAccepted)}
+                className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
+              >
                 {isLoading ? (
                   <><div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />Saving...</>
                 ) : 'Save & Continue'}

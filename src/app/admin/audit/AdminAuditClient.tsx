@@ -8,6 +8,7 @@ import {
   Warehouse, TrendingUp, Wand2, ClipboardList, Tag,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Clock, CheckCircle2, XCircle, RefreshCw, Play, Mail, ChevronDown, ChevronUp, Users, User, Database,
+  MessageSquare, MessageCircle,
 } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
@@ -90,7 +91,7 @@ interface CronJob {
   log: Array<{ t: string; ok: boolean; err?: string; detail?: unknown }>
 }
 
-type PageTab = 'audit' | 'mail_log' | 'cron' | 'replication'
+type PageTab = 'audit' | 'mail_log' | 'sms_log' | 'whatsapp_log' | 'cron' | 'replication'
 
 export default function AdminAuditClient({ canViewReplication = false }: { canViewReplication?: boolean }) {
   const searchParams = useSearchParams()
@@ -107,6 +108,8 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
     const t = searchParams?.get('tab')
     if (t === 'cron') return t
     if (t === 'mail_log') return t
+    if (t === 'sms_log') return t
+    if (t === 'whatsapp_log') return t
     if (t === 'replication' && canViewReplication) return t
     return 'audit'
   }
@@ -200,6 +203,86 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
     }
     setExpandedMailId(id)
     if (!mailBodies[id]) loadMailBody(id)
+  }
+
+  // ── SMS / WhatsApp Log state (message_logs — every outbound notification) ───
+  interface MessageLogRow {
+    id: string
+    channel: string
+    to_number: string
+    from_number: string | null
+    body: string | null
+    kind: string | null
+    status: string
+    error: string | null
+    provider_sid: string | null
+    sent_at: string
+  }
+
+  const [smsRows, setSmsRows] = useState<MessageLogRow[]>([])
+  const [smsLoading, setSmsLoading] = useState(false)
+  const [smsPage, setSmsPage] = useState(1)
+  const [smsTotal, setSmsTotal] = useState(0)
+  const smsPageSize = 25
+  const [smsKind, setSmsKind] = useState<string>('all')
+  const [smsStatus, setSmsStatus] = useState<string>('all')
+  const [smsQuery, setSmsQuery] = useState<string>('')
+  const [smsQueryDebounced, setSmsQueryDebounced] = useState<string>('')
+  const [expandedSmsId, setExpandedSmsId] = useState<string | null>(null)
+
+  async function loadSmsLog() {
+    setSmsLoading(true)
+    try {
+      const qs = new URLSearchParams({
+        channel: 'sms',
+        page: String(smsPage),
+        pageSize: String(smsPageSize),
+      })
+      if (smsKind !== 'all') qs.set('kind', smsKind)
+      if (smsStatus !== 'all') qs.set('status', smsStatus)
+      if (smsQueryDebounced) qs.set('q', smsQueryDebounced)
+      const res = await fetch(`/api/admin/audit/message-log?${qs.toString()}`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setSmsRows(data.rows || [])
+        setSmsTotal(data.total || 0)
+      }
+    } finally {
+      setSmsLoading(false)
+    }
+  }
+
+  const [waRows, setWaRows] = useState<MessageLogRow[]>([])
+  const [waLoading, setWaLoading] = useState(false)
+  const [waPage, setWaPage] = useState(1)
+  const [waTotal, setWaTotal] = useState(0)
+  const waPageSize = 25
+  const [waKind, setWaKind] = useState<string>('all')
+  const [waStatus, setWaStatus] = useState<string>('all')
+  const [waQuery, setWaQuery] = useState<string>('')
+  const [waQueryDebounced, setWaQueryDebounced] = useState<string>('')
+  const [expandedWaId, setExpandedWaId] = useState<string | null>(null)
+
+  async function loadWaLog() {
+    setWaLoading(true)
+    try {
+      const qs = new URLSearchParams({
+        channel: 'whatsapp',
+        page: String(waPage),
+        pageSize: String(waPageSize),
+      })
+      if (waKind !== 'all') qs.set('kind', waKind)
+      if (waStatus !== 'all') qs.set('status', waStatus)
+      if (waQueryDebounced) qs.set('q', waQueryDebounced)
+      const res = await fetch(`/api/admin/audit/message-log?${qs.toString()}`, { credentials: 'include' })
+      if (res.ok) {
+        const data = await res.json()
+        setWaRows(data.rows || [])
+        setWaTotal(data.total || 0)
+      }
+    } finally {
+      setWaLoading(false)
+    }
   }
 
   interface ReplicationRun {
@@ -304,6 +387,20 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
     return () => clearTimeout(id)
   }, [mailQuery])
   useEffect(() => { setMailPage(1) }, [mailKind, mailStatus, mailQueryDebounced])
+
+  useEffect(() => { if (pageTab === 'sms_log') loadSmsLog() }, [pageTab, smsPage, smsKind, smsStatus, smsQueryDebounced])
+  useEffect(() => {
+    const id = setTimeout(() => setSmsQueryDebounced(smsQuery), 300)
+    return () => clearTimeout(id)
+  }, [smsQuery])
+  useEffect(() => { setSmsPage(1) }, [smsKind, smsStatus, smsQueryDebounced])
+
+  useEffect(() => { if (pageTab === 'whatsapp_log') loadWaLog() }, [pageTab, waPage, waKind, waStatus, waQueryDebounced])
+  useEffect(() => {
+    const id = setTimeout(() => setWaQueryDebounced(waQuery), 300)
+    return () => clearTimeout(id)
+  }, [waQuery])
+  useEffect(() => { setWaPage(1) }, [waKind, waStatus, waQueryDebounced])
 
   const entityOptions = useMemo(() => [
     { value: 'all', label: 'All entities' },
@@ -568,6 +665,8 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
         {([
           { id: 'audit' as const, label: 'Audit Events', icon: ScrollText, show: true },
           { id: 'mail_log' as const, label: 'Mail Log', icon: Mail, show: true },
+          { id: 'sms_log' as const, label: 'SMS Log', icon: MessageSquare, show: true },
+          { id: 'whatsapp_log' as const, label: 'WhatsApp Log', icon: MessageCircle, show: true },
           { id: 'cron' as const, label: 'Cron Jobs', icon: Clock, show: true },
           { id: 'replication' as const, label: 'Replication', icon: Database, show: canViewReplication },
         ]).filter(t => t.show).map(({ id, label, icon: Icon }) => (
@@ -752,6 +851,296 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                 <div className="flex items-center gap-1">
                   <button type="button" onClick={() => setMailPage(p => Math.max(1, p - 1))} disabled={mailPage === 1} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"><ChevronLeft className="w-3.5 h-3.5" /></button>
                   <button type="button" onClick={() => setMailPage(p => Math.min(totalPages, p + 1))} disabled={mailPage >= totalPages} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"><ChevronRight className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {pageTab === 'sms_log' && (
+        <div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <p className="text-sm text-foreground-muted">Every outbound SMS notification (OTP is not logged).</p>
+            <button
+              type="button"
+              onClick={loadSmsLog}
+              disabled={smsLoading}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${smsLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
+            <input
+              type="text"
+              placeholder="Search by number or message..."
+              value={smsQuery}
+              onChange={e => setSmsQuery(e.target.value)}
+              className="text-sm px-3 py-1.5 rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+            />
+            <AdminSelect
+              value={smsKind}
+              onChange={(v) => setSmsKind(v)}
+              options={[
+                { value: 'all', label: 'All kinds' },
+                { value: 'order_confirmed', label: 'Order confirmed' },
+                { value: 'order_shipped', label: 'Order shipped' },
+                { value: 'order_delivered', label: 'Order delivered' },
+                { value: 'order_cancelled', label: 'Order cancelled' },
+                { value: 'out_for_delivery', label: 'Out for delivery' },
+                { value: 'payment_failed', label: 'Payment failed' },
+              ]}
+              sm
+            />
+            <AdminSelect
+              value={smsStatus}
+              onChange={(v) => setSmsStatus(v)}
+              options={[
+                { value: 'all', label: 'All status' },
+                { value: 'sent', label: 'Sent' },
+                { value: 'failed', label: 'Failed' },
+              ]}
+              sm
+            />
+          </div>
+
+          {smsLoading && smsRows.length === 0 ? (
+            <div className="space-y-3">
+              {[1,2,3,4,5].map(i => <div key={i} className="h-14 rounded-lg bg-surface-secondary animate-pulse" />)}
+            </div>
+          ) : smsRows.length === 0 ? (
+            <p className="text-sm text-foreground-muted italic">No SMS messages found.</p>
+          ) : (
+            <div className="space-y-2">
+              {smsRows.map(row => {
+                const isExpanded = expandedSmsId === row.id
+                return (
+                  <div key={row.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedSmsId(isExpanded ? null : row.id)}
+                      className="w-full text-left p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:bg-surface-secondary/40 transition-colors"
+                    >
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${row.status === 'sent' ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                        {row.status === 'sent' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-foreground truncate">{row.to_number || '(no number)'}</span>
+                          {row.kind && (
+                            <span className="text-[10px] font-mono uppercase tracking-wide text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
+                              {row.kind}
+                            </span>
+                          )}
+                        </div>
+                        {row.body && (
+                          <p className="text-xs text-foreground-muted mt-0.5 truncate">{row.body}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          <span className="text-[11px] text-foreground-muted">
+                            {new Date(row.sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {row.from_number && (
+                            <span className="text-[11px] text-foreground-muted">From: {row.from_number}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        {isExpanded
+                          ? <ChevronUp className="w-4 h-4 text-foreground-muted" />
+                          : <ChevronDown className="w-4 h-4 text-foreground-muted" />
+                        }
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="border-t border-border-default">
+                        {row.error && (
+                          <div className="px-4 py-2 bg-red-50 dark:bg-red-950/30 text-[11px] text-red-700 dark:text-red-300 font-mono break-all">
+                            {row.error}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-0 md:gap-4 text-xs">
+                          <dl className="px-4 py-3 space-y-1.5 bg-surface-secondary/40 md:bg-transparent">
+                            <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">To</dt><dd className="text-foreground break-all">{row.to_number}</dd></div>
+                            <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">From</dt><dd className="text-foreground break-all">{row.from_number || '—'}</dd></div>
+                            {row.kind && <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">Kind</dt><dd className="text-foreground">{row.kind}</dd></div>}
+                            {row.provider_sid && <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">Provider SID</dt><dd className="text-foreground font-mono text-[10px] break-all">{row.provider_sid}</dd></div>}
+                          </dl>
+                          <div className="p-3 sm:p-4">
+                            {row.body ? (
+                              <pre className="text-xs whitespace-pre-wrap text-foreground bg-surface-secondary/50 p-3 rounded border border-border-default max-h-96 overflow-auto">{row.body}</pre>
+                            ) : (
+                              <p className="text-xs text-foreground-muted italic">No body recorded for this message.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {!smsLoading && smsTotal > smsPageSize && (() => {
+            const totalPages = Math.ceil(smsTotal / smsPageSize)
+            return (
+              <div className="mt-6 flex items-center justify-between border-t border-border-default pt-4">
+                <p className="text-xs text-foreground-muted">
+                  Page <span className="font-medium text-foreground">{smsPage}</span> of <span className="font-medium text-foreground">{totalPages}</span> · {smsTotal} message{smsTotal !== 1 ? 's' : ''}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setSmsPage(p => Math.max(1, p - 1))} disabled={smsPage === 1} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => setSmsPage(p => Math.min(totalPages, p + 1))} disabled={smsPage >= totalPages} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"><ChevronRight className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+            )
+          })()}
+        </div>
+      )}
+
+      {pageTab === 'whatsapp_log' && (
+        <div>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+            <p className="text-sm text-foreground-muted">Every outbound WhatsApp notification (OTP is not logged).</p>
+            <button
+              type="button"
+              onClick={loadWaLog}
+              disabled={waLoading}
+              className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-50 self-start sm:self-auto"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${waLoading ? 'animate-spin' : ''}`} />
+              Refresh
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_180px_140px] gap-2 mb-4">
+            <input
+              type="text"
+              placeholder="Search by number or message..."
+              value={waQuery}
+              onChange={e => setWaQuery(e.target.value)}
+              className="text-sm px-3 py-1.5 rounded border border-border-default bg-surface-elevated text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500/30"
+            />
+            <AdminSelect
+              value={waKind}
+              onChange={(v) => setWaKind(v)}
+              options={[
+                { value: 'all', label: 'All kinds' },
+                { value: 'order_confirmed', label: 'Order confirmed' },
+                { value: 'order_shipped', label: 'Order shipped' },
+                { value: 'order_delivered', label: 'Order delivered' },
+                { value: 'order_cancelled', label: 'Order cancelled' },
+                { value: 'out_for_delivery', label: 'Out for delivery' },
+                { value: 'payment_failed', label: 'Payment failed' },
+              ]}
+              sm
+            />
+            <AdminSelect
+              value={waStatus}
+              onChange={(v) => setWaStatus(v)}
+              options={[
+                { value: 'all', label: 'All status' },
+                { value: 'sent', label: 'Sent' },
+                { value: 'failed', label: 'Failed' },
+              ]}
+              sm
+            />
+          </div>
+
+          {waLoading && waRows.length === 0 ? (
+            <div className="space-y-3">
+              {[1,2,3,4,5].map(i => <div key={i} className="h-14 rounded-lg bg-surface-secondary animate-pulse" />)}
+            </div>
+          ) : waRows.length === 0 ? (
+            <p className="text-sm text-foreground-muted italic">No WhatsApp messages found.</p>
+          ) : (
+            <div className="space-y-2">
+              {waRows.map(row => {
+                const isExpanded = expandedWaId === row.id
+                return (
+                  <div key={row.id} className="bg-surface-elevated border border-border-default rounded-lg overflow-hidden">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedWaId(isExpanded ? null : row.id)}
+                      className="w-full text-left p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:bg-surface-secondary/40 transition-colors"
+                    >
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${row.status === 'sent' ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                        {row.status === 'sent' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-foreground truncate">{row.to_number || '(no number)'}</span>
+                          {row.kind && (
+                            <span className="text-[10px] font-mono uppercase tracking-wide text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded">
+                              {row.kind}
+                            </span>
+                          )}
+                        </div>
+                        {row.body && (
+                          <p className="text-xs text-foreground-muted mt-0.5 truncate">{row.body}</p>
+                        )}
+                        <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                          <span className="text-[11px] text-foreground-muted">
+                            {new Date(row.sent_at).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                          {row.from_number && (
+                            <span className="text-[11px] text-foreground-muted">From: {row.from_number}</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="shrink-0">
+                        {isExpanded
+                          ? <ChevronUp className="w-4 h-4 text-foreground-muted" />
+                          : <ChevronDown className="w-4 h-4 text-foreground-muted" />
+                        }
+                      </div>
+                    </button>
+
+                    {isExpanded && (
+                      <div className="border-t border-border-default">
+                        {row.error && (
+                          <div className="px-4 py-2 bg-red-50 dark:bg-red-950/30 text-[11px] text-red-700 dark:text-red-300 font-mono break-all">
+                            {row.error}
+                          </div>
+                        )}
+                        <div className="grid grid-cols-1 md:grid-cols-[200px_1fr] gap-0 md:gap-4 text-xs">
+                          <dl className="px-4 py-3 space-y-1.5 bg-surface-secondary/40 md:bg-transparent">
+                            <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">To</dt><dd className="text-foreground break-all">{row.to_number}</dd></div>
+                            <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">From</dt><dd className="text-foreground break-all">{row.from_number || '—'}</dd></div>
+                            {row.kind && <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">Kind</dt><dd className="text-foreground">{row.kind}</dd></div>}
+                            {row.provider_sid && <div><dt className="text-foreground-muted text-[10px] uppercase tracking-wide">Provider SID</dt><dd className="text-foreground font-mono text-[10px] break-all">{row.provider_sid}</dd></div>}
+                          </dl>
+                          <div className="p-3 sm:p-4">
+                            {row.body ? (
+                              <pre className="text-xs whitespace-pre-wrap text-foreground bg-surface-secondary/50 p-3 rounded border border-border-default max-h-96 overflow-auto">{row.body}</pre>
+                            ) : (
+                              <p className="text-xs text-foreground-muted italic">No body recorded for this message.</p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {!waLoading && waTotal > waPageSize && (() => {
+            const totalPages = Math.ceil(waTotal / waPageSize)
+            return (
+              <div className="mt-6 flex items-center justify-between border-t border-border-default pt-4">
+                <p className="text-xs text-foreground-muted">
+                  Page <span className="font-medium text-foreground">{waPage}</span> of <span className="font-medium text-foreground">{totalPages}</span> · {waTotal} message{waTotal !== 1 ? 's' : ''}
+                </p>
+                <div className="flex items-center gap-1">
+                  <button type="button" onClick={() => setWaPage(p => Math.max(1, p - 1))} disabled={waPage === 1} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"><ChevronLeft className="w-3.5 h-3.5" /></button>
+                  <button type="button" onClick={() => setWaPage(p => Math.min(totalPages, p + 1))} disabled={waPage >= totalPages} className="p-1.5 rounded border border-border-default text-foreground-muted hover:bg-surface-secondary disabled:opacity-40"><ChevronRight className="w-3.5 h-3.5" /></button>
                 </div>
               </div>
             )

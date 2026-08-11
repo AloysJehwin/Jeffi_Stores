@@ -12,6 +12,7 @@ import { computeEdd } from '@/lib/edd'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { createDraftInvoice } from '@/lib/invoice'
 import { parseBody, zNonEmpty } from '@/lib/validate'
+import { sendOrderConfirmedSMS } from '@/lib/sms'
 
 const CreateOrderSchema = z.object({
   paymentMethod: z.enum(['razorpay', 'manual', 'cod']),
@@ -381,6 +382,9 @@ export async function POST(request: NextRequest) {
       createDraftInvoice(order.id).catch(() => {})
       sendOrderConfirmationEmail(user.email, confirmedOrder, orderItems).catch(() => {})
       sendNewOrderNotification(confirmedOrder, orderItems, user).catch(() => {})
+      if (user.notification_channel === 'sms' && user.phone) {
+        sendOrderConfirmedSMS({ phone: user.phone, orderNumber: order.order_number, total: Number(order.total_amount) }).catch(() => {})
+      }
     }
 
     logActivity({

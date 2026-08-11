@@ -1008,7 +1008,7 @@ export async function getCustomerById(id: string) {
     SELECT
       u.id, u.email, u.phone, u.first_name, u.last_name,
       u.is_active, u.is_flagged, u.flag_reason, u.created_at,
-      u.user_type,
+      u.user_type, u.notification_channel, u.marketing_opt_out,
       cp.customer_type, cp.company_name, cp.gst_number, cp.credit_limit,
       bp.company_name AS bp_company_name,
       bp.approval_status AS bp_approval_status,
