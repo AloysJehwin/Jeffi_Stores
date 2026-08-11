@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { MessageCircle, Send, ChevronDown, Check, X } from 'lucide-react'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 interface ThreadMessage {
   id: string
@@ -192,20 +193,18 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
             )}
 
             <div className="space-y-2">
-              <select
+              <AdminSelect
                 value={selectedTemplate}
-                onChange={e => { setSelectedTemplate(e.target.value); setTemplateVars({}); setSendError('') }}
-                className="w-full px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-              >
-                <option value="">Select a template…</option>
-                {Object.entries(groupedTemplates).map(([cat, entries]) => (
-                  <optgroup key={cat} label={cat === 'marketing' ? 'Marketing' : 'Support'}>
-                    {entries.map(([key, tpl]) => (
-                      <option key={key} value={key}>{tpl.label}</option>
-                    ))}
-                  </optgroup>
-                ))}
-              </select>
+                onChange={(v) => { setSelectedTemplate(v); setTemplateVars({}); setSendError('') }}
+                placeholder="Select a template…"
+                options={Object.entries(groupedTemplates).flatMap(([cat, entries]) =>
+                  entries.map(([key, tpl]) => ({
+                    value: key,
+                    label: tpl.label,
+                    group: cat === 'marketing' ? 'Marketing' : 'Support',
+                  }))
+                )}
+              />
 
               {activeTemplate && activeTemplate.fields.map(field => (
                 <input
