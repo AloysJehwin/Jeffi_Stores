@@ -198,12 +198,10 @@ describe('POST /api/business/login', () => {
       vi.mocked(db.queryOne).mockResolvedValue(APPROVED_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
-      await loginPOST(loginRequest({ email: 'biz@example.com', otp: '123456' }) as any)
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        'business_sid',
-        expect.any(String),
-        expect.objectContaining({ httpOnly: true })
-      )
+      const res = await loginPOST(loginRequest({ email: 'biz@example.com', otp: '123456' }) as any)
+      const cookie = res.cookies.get('business_sid')
+      expect(cookie?.value).toBeTruthy()
+      expect(cookie?.httpOnly).toBe(true)
     })
 
     it('calls deleteOTP and resetSendOtpCounter after login', async () => {

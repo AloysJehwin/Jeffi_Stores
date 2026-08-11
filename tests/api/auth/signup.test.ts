@@ -170,12 +170,10 @@ describe('POST /api/auth/signup', () => {
         .mockResolvedValueOnce(NEW_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
-      await POST(makeRequest(VALID_BODY) as any)
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        'user_sid',
-        'user-sid',
-        expect.objectContaining({ httpOnly: true })
-      )
+      const res = await POST(makeRequest(VALID_BODY) as any)
+      const cookie = res.cookies.get('user_sid')
+      expect(cookie?.value).toBe('user-sid')
+      expect(cookie?.httpOnly).toBe(true)
     })
 
     it('deletes OTP and resets counter after signup', async () => {
