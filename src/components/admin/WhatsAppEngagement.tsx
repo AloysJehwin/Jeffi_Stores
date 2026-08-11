@@ -25,7 +25,6 @@ interface TemplateEntry {
 interface Props {
   customerId: string
   phone: string | null
-  notificationChannel?: string | null
   marketingOptOut?: boolean
 }
 
@@ -36,7 +35,7 @@ function formatTime(ts: string | null): string {
   return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-export default function WhatsAppEngagement({ customerId, phone, notificationChannel, marketingOptOut }: Props) {
+export default function WhatsAppEngagement({ customerId, phone, marketingOptOut }: Props) {
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [thread, setThread] = useState<ThreadMessage[]>([])
@@ -146,11 +145,6 @@ export default function WhatsAppEngagement({ customerId, phone, notificationChan
           {marketingOptOut && (
             <span className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-2 py-0.5 rounded-full border border-amber-400/40">
               Opted out
-            </span>
-          )}
-          {notificationChannel && (
-            <span className="text-xs text-foreground-muted bg-surface px-2 py-0.5 rounded-full border border-border-default">
-              Prefers: {notificationChannel}
             </span>
           )}
         </div>

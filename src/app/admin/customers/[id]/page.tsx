@@ -384,7 +384,6 @@ export default async function CustomerDetailPage({
           <WhatsAppEngagement
             customerId={customer.id}
             phone={customer.phone}
-            notificationChannel={customer.notification_channel}
             marketingOptOut={customer.marketing_opt_out}
           />
         </div>
