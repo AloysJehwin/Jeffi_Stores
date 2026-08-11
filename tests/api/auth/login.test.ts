@@ -22,6 +22,13 @@ vi.mock('@/lib/db', () => ({
   query: vi.fn().mockResolvedValue({ rows: [] }),
 }))
 
+// Opaque sessions: login issues a server-side session and sets cookie = sid.
+// Mocking issueUserToken avoids exercising createSession's DB INSERT.
+vi.mock('@/lib/issue-session', () => ({
+  issueUserToken: vi.fn().mockResolvedValue({ sid: 'user-sid' }),
+  USER_SESSION_TTL_S: 7 * 24 * 60 * 60,
+}))
+
 vi.mock('@/lib/activity', () => ({
   logActivity: vi.fn().mockResolvedValue(undefined),
 }))
@@ -39,16 +46,19 @@ vi.mock('next/headers', () => ({
 }))
 
 import { POST } from '@/app/api/auth/login/route'
+import { NextRequest } from 'next/server'
 import * as otpLib from '@/lib/otp'
 import * as db from '@/lib/db'
 
 // ── helpers ─────────────────────────────────────────────────────────────────
-function makeRequest(body: object) {
-  return new Request('http://localhost/api/auth/login', {
+function makeRequest(body: object, sessionCookie?: string) {
+  const req = new NextRequest('http://localhost/api/auth/login', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   })
+  if (sessionCookie) req.cookies.set('session_id', sessionCookie)
+  return req
 }
 
 const ACTIVE_USER = {
@@ -154,12 +164,10 @@ describe('POST /api/auth/login', () => {
       vi.mocked(db.queryOne).mockResolvedValue(ACTIVE_USER)
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
 
-      await POST(makeRequest({ email: 'user@example.com', otp: '123456' }) as any)
-      expect(mockCookieStore.set).toHaveBeenCalledWith(
-        'user_sid',
-        expect.any(String),
-        expect.objectContaining({ httpOnly: true })
-      )
+      const res = await POST(makeRequest({ email: 'user@example.com', otp: '123456' }) as any)
+      const cookie = res.cookies.get('user_sid')
+      expect(cookie?.value).toBeTruthy()
+      expect(cookie?.httpOnly).toBe(true)
     })
 
     it('calls deleteOTP and resetSendOtpCounter after login', async () => {
@@ -180,9 +188,8 @@ describe('POST /api/auth/login', () => {
         .mockResolvedValueOnce(ACTIVE_USER)
         .mockResolvedValueOnce({ id: 'guest-1' })
       vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
-      mockCookieStore.get.mockReturnValue({ value: 'guest_12345_abc' })
 
-      await POST(makeRequest({ email: 'user@example.com', otp: '123456' }) as any)
+      await POST(makeRequest({ email: 'user@example.com', otp: '123456' }, 'guest_12345_abc') as any)
       expect(db.query).toHaveBeenCalledWith(
         expect.stringContaining('merge_guest_cart_to_user'),
         expect.arrayContaining(['guest-1', 'user-1'])

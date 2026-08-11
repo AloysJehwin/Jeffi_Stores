@@ -180,15 +180,14 @@ function SignupPage() {
       const verifyData = await verifyResponse.json()
       if (!verifyResponse.ok) throw new Error(verifyData.error || 'Invalid OTP')
 
-      // OTP verified — create account (channel is extra, gracefully omitted if API ignores it)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      // OTP verified — create account
       await signup({
         email,
         otp: otpValue,
         firstName,
         lastName: lastName || undefined,
         phone: phone.length === 10 ? `+91${phone}` : undefined,
-      } as any)
+      })
       await refreshCart()
       router.push(redirectTo)
     } catch (err: unknown) {
