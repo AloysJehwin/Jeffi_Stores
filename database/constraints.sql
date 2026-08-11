@@ -531,6 +531,14 @@ ALTER TABLE ONLY public.email_logs
     ADD CONSTRAINT email_logs_pkey PRIMARY KEY (id);
 
 
+--
+-- Name: message_logs message_logs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.message_logs
+    ADD CONSTRAINT message_logs_pkey PRIMARY KEY (id);
+
+
 
 --
 -- Name: expense_payments expense_payments_pkey; Type: CONSTRAINT; Schema: public; Owner: -
