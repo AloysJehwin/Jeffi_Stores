@@ -8,6 +8,7 @@ import { hasScope } from '@/lib/scopes'
 import CustomerActionButton from '@/components/admin/CustomerActionButton'
 import CustomerMailerPanel from '@/components/admin/CustomerMailerPanel'
 import AdminSupportChat from '@/components/admin/AdminSupportChat'
+import WhatsAppEngagement from '@/components/admin/WhatsAppEngagement'
 import CustomerTags from '@/components/admin/CustomerTags'
 import CustomerNotes from '@/components/admin/CustomerNotes'
 import CustomerTasks from '@/components/admin/CustomerTasks'
@@ -378,6 +379,14 @@ export default async function CustomerDetailPage({
 
           {/* Support chat */}
           <AdminSupportChat customerId={customer.id} autoOpen={resolvedSearchParams.chat === 'true'} />
+
+          {/* WhatsApp engagement */}
+          <WhatsAppEngagement
+            customerId={customer.id}
+            phone={customer.phone}
+            notificationChannel={customer.notification_channel}
+            marketingOptOut={customer.marketing_opt_out}
+          />
         </div>
 
         {/* Right column: Timeline + Orders table (spans 2 cols) */}
