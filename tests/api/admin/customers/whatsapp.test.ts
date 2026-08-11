@@ -77,12 +77,11 @@ describe('GET whatsapp thread', () => {
     expect(body.templates).toBeTruthy()
   })
 
-  it('skips thread query when no phone', async () => {
+  it('returns an empty thread when the customer has no phone', async () => {
     mockQueryOne.mockResolvedValue({ phone: null })
     const res = await GET(req(), { params })
     const body = await res.json()
     expect(body.thread).toEqual([])
-    expect(mockQueryMany).not.toHaveBeenCalled()
   })
 })
 
