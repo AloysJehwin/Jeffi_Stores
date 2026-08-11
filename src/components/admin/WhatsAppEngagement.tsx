@@ -150,7 +150,7 @@ export default function WhatsAppEngagement({ customerId, phone, notificationChan
           )}
           {notificationChannel && (
             <span className="text-xs text-foreground-muted bg-surface px-2 py-0.5 rounded-full border border-border-default">
-              {notificationChannel}
+              Prefers: {notificationChannel}
             </span>
           )}
         </div>
