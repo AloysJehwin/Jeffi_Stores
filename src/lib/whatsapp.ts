@@ -27,12 +27,12 @@ const TEMPLATES = {
   outForDelivery: process.env.TWILIO_WA_OUT_FOR_DELIVERY_SID || 'HXfa11093ed4bc99a14151f8b3bc90b749',
   paymentFailed: process.env.TWILIO_WA_PAYMENT_FAILED_SID || '',
   // Marketing
-  promoOffer: process.env.TWILIO_WA_PROMO_OFFER_SID || 'HX3db2a4641ad74025d10eeac6db0ea50c',
-  newArrivals: process.env.TWILIO_WA_NEW_ARRIVALS_SID || 'HXa503d921fce7851723541abaa91229f6',
-  abandonedCart: process.env.TWILIO_WA_ABANDONED_CART_SID || 'HX5e390a4a46682f1460b357bbdd9e6c83',
-  backInStock: process.env.TWILIO_WA_BACK_IN_STOCK_SID || 'HX7f8136e4eb9f2818c9e17f7c6fb8f9b1',
-  festiveGreeting: process.env.TWILIO_WA_FESTIVE_GREETING_SID || 'HXf39e53109f5f1600ced018ad35120bdd',
-  reorderReminder: process.env.TWILIO_WA_REORDER_REMINDER_SID || 'HX57559e8ba0c987cf20d149884dd8e3f6',
+  promoOffer: process.env.TWILIO_WA_PROMO_OFFER_SID || 'HX4500f4beac783d988ccaea62396927a3',
+  newArrivals: process.env.TWILIO_WA_NEW_ARRIVALS_SID || 'HXe16b084ecee38483663765275d3afd20',
+  abandonedCart: process.env.TWILIO_WA_ABANDONED_CART_SID || 'HX3b662d590c448e238ee4d6d4d638ef24',
+  backInStock: process.env.TWILIO_WA_BACK_IN_STOCK_SID || 'HXd4d3cf0ced879c6fb2397e25d21805f6',
+  festiveGreeting: process.env.TWILIO_WA_FESTIVE_GREETING_SID || 'HX5c3fad2143bddcd9709c5e4ffc7a5564',
+  reorderReminder: process.env.TWILIO_WA_REORDER_REMINDER_SID || 'HX1f3a4b0168671e57ff5f54c9dd155984',
   // Support
   supportAck: process.env.TWILIO_WA_SUPPORT_ACK_SID || 'HX95ce2cea26825b06e22b24aa802dddf8',
   supportTicketCreated: process.env.TWILIO_WA_SUPPORT_TICKET_SID || 'HX3fee423887ba430b9d9c83f78ba6a2bb',

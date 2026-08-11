@@ -23,6 +23,19 @@ interface TemplateEntry {
   fields: string[]
 }
 
+interface Prefill {
+  cartItemsSummary: string
+  cartCount: number
+  latestOrder: { order_number: string; total_amount: string | number; id: string } | null
+  latestOrderProduct: string
+  notifyProduct: string
+  feedbackUrl: string
+  cartUrl: string
+  amountFormatted: string
+}
+
+type Availability = Record<string, boolean>
+
 interface Props {
   customerId: string
   phone: string | null
@@ -41,6 +54,8 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
   const [isLoading, setIsLoading] = useState(false)
   const [thread, setThread] = useState<ThreadMessage[]>([])
   const [templates, setTemplates] = useState<Record<string, TemplateEntry>>({})
+  const [prefill, setPrefill] = useState<Prefill | null>(null)
+  const [availability, setAvailability] = useState<Availability>({})
   const [selectedTemplate, setSelectedTemplate] = useState('')
   const [templateVars, setTemplateVars] = useState<Record<string, string>>({})
   const [freeText, setFreeText] = useState('')
@@ -71,6 +86,8 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
         const data = await res.json()
         setThread(Array.isArray(data.thread) ? data.thread : [])
         if (data.templates) setTemplates(data.templates)
+        if (data.prefill) setPrefill(data.prefill)
+        if (data.availability) setAvailability(data.availability)
       }
     } catch {}
     if (showLoading) setIsLoading(false)
@@ -102,8 +119,52 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
     setIsSending(false)
   }
 
+  function defaultVarsFor(key: string): Record<string, string> {
+    if (!prefill) return {}
+    switch (key) {
+      case 'abandoned_cart':
+        return { items: prefill.cartItemsSummary }
+      case 'reorder_reminder':
+        return { product: prefill.latestOrderProduct }
+      case 'back_in_stock':
+        return { product: prefill.notifyProduct }
+      case 'feedback_request':
+        return { orderNumber: prefill.latestOrder?.order_number || '', url: prefill.feedbackUrl }
+      case 'return_initiated':
+        return { orderNumber: prefill.latestOrder?.order_number || '' }
+      case 'refund_processed':
+        return { amount: prefill.amountFormatted, orderNumber: prefill.latestOrder?.order_number || '' }
+      default:
+        return {}
+    }
+  }
+
+  function unavailableNote(key: string): string {
+    switch (key) {
+      case 'abandoned_cart':
+        return ' — no cart items'
+      case 'back_in_stock':
+        return ' — no back-in-stock request'
+      case 'reorder_reminder':
+        return ' — no orders yet'
+      case 'return_initiated':
+      case 'refund_processed':
+      case 'feedback_request':
+        return ' — no orders yet'
+      default:
+        return ' — unavailable'
+    }
+  }
+
+  function handleTemplateSelect(v: string) {
+    setSelectedTemplate(v)
+    setTemplateVars(v ? defaultVarsFor(v) : {})
+    setSendError('')
+  }
+
   function handleSendTemplate() {
     if (!selectedTemplate) return
+    if (availability[selectedTemplate] === false) return
     send({ templateKey: selectedTemplate, variables: templateVars })
   }
 
@@ -120,6 +181,8 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
   }, {})
 
   const activeTemplate = selectedTemplate ? templates[selectedTemplate] : null
+  const isSelectedUnavailable = !!selectedTemplate && availability[selectedTemplate] === false
+  const showOptOutWarning = !!marketingOptOut && activeTemplate?.category === 'marketing'
 
   if (!phone) {
     return (
@@ -195,12 +258,12 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
             <div className="space-y-2">
               <AdminSelect
                 value={selectedTemplate}
-                onChange={(v) => { setSelectedTemplate(v); setTemplateVars({}); setSendError('') }}
+                onChange={handleTemplateSelect}
                 placeholder="Select a template…"
                 options={Object.entries(groupedTemplates).flatMap(([cat, entries]) =>
                   entries.map(([key, tpl]) => ({
                     value: key,
-                    label: tpl.label,
+                    label: availability[key] === false ? `${tpl.label}${unavailableNote(key)}` : tpl.label,
                     group: cat === 'marketing' ? 'Marketing' : 'Support',
                   }))
                 )}
@@ -218,13 +281,20 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
               ))}
 
               {activeTemplate && (
-                <button
-                  onClick={handleSendTemplate}
-                  disabled={isSending}
-                  className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {isSending ? 'Sending…' : 'Send Template'}
-                </button>
+                <>
+                  {showOptOutWarning && (
+                    <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-xl border border-amber-400/40 leading-snug">
+                      This customer opted out of marketing. Sending anyway will override their preference.
+                    </p>
+                  )}
+                  <button
+                    onClick={handleSendTemplate}
+                    disabled={isSending || isSelectedUnavailable}
+                    className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSending ? 'Sending…' : isSelectedUnavailable ? `Unavailable${unavailableNote(selectedTemplate)}` : 'Send Template'}
+                  </button>
+                </>
               )}
             </div>
 

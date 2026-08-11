@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import type { BotPayload, BotOrderCard, BotAction, BotNavLink, BotChip } from '@/lib/support-bot'
+import { renderTextWithLinks } from '@/lib/linkify'
 
 interface Message {
   id: string
@@ -513,8 +514,8 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
     if (isUser) {
       return (
         <div key={msg.id} className="flex justify-end">
-          <div className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed bg-primary-500 text-white">
-            {msg.message}
+          <div className="max-w-[85%] px-3.5 py-2.5 rounded-2xl rounded-br-sm text-sm leading-relaxed whitespace-pre-wrap bg-primary-500 text-white">
+            {renderTextWithLinks(msg.message)}
           </div>
         </div>
       )
@@ -538,7 +539,7 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
               onOrderSelect={handleOrderSelect}
             />
           ) : (
-            <p className="text-sm leading-relaxed whitespace-pre-wrap">{fallbackText}</p>
+            <p className="text-sm leading-relaxed whitespace-pre-wrap">{renderTextWithLinks(fallbackText ?? '')}</p>
           )}
         </div>
       </div>
@@ -612,13 +613,13 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
       {mode === 'live' && (
         <div className="px-4 pb-4 pt-2 border-t border-border-default shrink-0">
           <div className="flex gap-2">
-            <input
-              type="text"
+            <textarea
+              rows={1}
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
-              className="flex-1 px-3.5 py-2.5 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
+              className="flex-1 px-3.5 py-2.5 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm resize-none focus:outline-none focus:ring-2 focus:ring-primary-400"
             />
             <button
               onClick={sendLiveMessage}
