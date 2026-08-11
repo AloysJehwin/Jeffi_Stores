@@ -12,6 +12,10 @@ import { restoreOrderStock } from '@/lib/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { attributeConversion } from '@/lib/marketing'
 import { parseBody } from '@/lib/validate'
+import {
+  notifyOrderConfirmed, notifyOrderShipped, notifyOrderDelivered,
+  notifyOrderCancelled, notifyOutForDelivery, notifyPaymentFailed,
+} from '@/lib/notify'
 
 const OrderPatchSchema = z.object({
   status: z.string().nullish(),
@@ -504,6 +508,7 @@ export async function PATCH(
     const notify = async () => {
       let invoicePdfBuffer: Buffer | null = null
       const effectivePaymentStatus = payment_status || currentOrder.payment_status
+
       if (statusChanged && (status === 'confirmed' || status === 'processing') && effectivePaymentStatus === 'paid') {
         try { invoicePdfBuffer = await generateOrderInvoice(orderId) } catch {}
       }
@@ -532,12 +537,30 @@ export async function PATCH(
             userEmail, userName, currentOrder.order_number, orderId, status,
             currentOrder.status, invoicePdfBuffer
           ).catch(() => {})
+          // SMS / WhatsApp per customer preference — covers all status transitions
+          const uid = currentOrder.user_id
+          const on = currentOrder.order_number
+          if (status === 'confirmed' || status === 'processing') {
+            notifyOrderConfirmed(uid, on, parseFloat(currentOrder.total_amount)).catch(() => {})
+          } else if (status === 'shipped') {
+            const awb = await queryOne<{ awb_number: string | null }>('SELECT awb_number FROM orders WHERE id = $1', [orderId])
+            notifyOrderShipped(uid, on, 'Delhivery', awb?.awb_number || null).catch(() => {})
+          } else if (status === 'out_for_delivery') {
+            notifyOutForDelivery(uid, on).catch(() => {})
+          } else if (status === 'delivered') {
+            notifyOrderDelivered(uid, on).catch(() => {})
+          } else if (status === 'cancelled') {
+            notifyOrderCancelled(uid, on).catch(() => {})
+          }
         }
         if (paymentStatusChanged) {
           await sendPaymentStatusUpdate(
             userEmail, userName, currentOrder.order_number, orderId,
             payment_status, parseFloat(currentOrder.total_amount)
           ).catch(() => {})
+          if (payment_status === 'failed') {
+            notifyPaymentFailed(currentOrder.user_id, currentOrder.order_number).catch(() => {})
+          }
         }
       }
     }

@@ -3,7 +3,6 @@ import { verifyOTP, deleteOTP, resetSendOtpCounter } from '@/lib/otp'
 import { queryOne, query } from '@/lib/db'
 import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
-import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 import { POLICY_VERSION } from '@/app/legal/policies'
@@ -21,13 +20,13 @@ async function recordFailedLogin(req: NextRequest, email: string, reason: string
        VALUES ($1, $2, $3, $4, $5)`,
       [email.toLowerCase(), userId, ip, ua, reason]
     )
-  } catch (err) { console.error("[route]", err) }
+  } catch { /* swallow */ }
 }
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { email, otp, policiesAccepted } = body
+    const { email, otp, policiesAccepted, channel } = body
 
     if (!email || !otp) {
       return NextResponse.json({ error: 'Email and OTP are required' }, { status: 400 })
@@ -46,8 +45,6 @@ export async function POST(request: NextRequest) {
     )
 
     if (!user) {
-      // Check if a business account exists — if so, treat them as an existing user
-      // rather than sending isNewUser=true which would trigger signup and create a duplicate.
       const bizUser = await queryOne(
         "SELECT id FROM users WHERE email = $1 AND user_type = 'business'",
         [email.toLowerCase()]
@@ -72,6 +69,10 @@ export async function POST(request: NextRequest) {
 
     await query('UPDATE users SET last_login = NOW() WHERE id = $1', [user.id])
 
+    if (channel && channel !== user.notification_channel) {
+      await query('UPDATE users SET notification_channel = $1 WHERE id = $2', [channel, user.id])
+    }
+
     logActivity({
       userId: user.id,
       kind: 'login',
@@ -79,15 +80,15 @@ export async function POST(request: NextRequest) {
       metadata: { provider: 'otp' },
     }).catch(() => {})
 
-    const cookieStore = await cookies()
-    const guestSessionId = cookieStore.get('session_id')?.value
+    // Read guest session from request cookies directly (avoids Next.js 15 cookies() context issues)
+    const guestSessionId = request.cookies.get('session_id')?.value
     if (guestSessionId && guestSessionId.startsWith('guest_')) {
       const guestUser = await queryOne(
         'SELECT id FROM users WHERE session_id = $1 AND is_guest = true',
         [guestSessionId]
       )
       if (guestUser) {
-        await query('SELECT merge_guest_cart_to_user($1, $2)', [guestUser.id, user.id])
+        await query('SELECT merge_guest_cart_to_user($1, $2)', [guestUser.id, user.id]).catch(() => {})
       }
     }
 
@@ -103,28 +104,19 @@ export async function POST(request: NextRequest) {
       fpHash: signals.fpHash,
     })
 
-    cookieStore.set('user_sid', sid, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: USER_SESSION_TTL_S,
-      path: '/',
-      ...cookieDomainOption(),
-    })
-
-    cookieStore.set('session_id', user.id, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: USER_SESSION_TTL_S,
-      path: '/',
-      ...cookieDomainOption(),
-    })
-
     await deleteOTP(email)
     await resetSendOtpCounter(email)
 
-    return NextResponse.json({
+    const cookieOpts = {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict' as const,
+      maxAge: USER_SESSION_TTL_S,
+      path: '/',
+      ...cookieDomainOption(),
+    }
+
+    const res = NextResponse.json({
       message: 'Login successful',
       user: {
         id: user.id,
@@ -134,6 +126,9 @@ export async function POST(request: NextRequest) {
         phone: user.phone,
       },
     })
+    res.cookies.set('user_sid', sid, cookieOpts)
+    res.cookies.set('session_id', user.id, cookieOpts)
+    return res
   } catch (err: any) {
     return NextResponse.json({ error: 'Login failed', detail: err?.message }, { status: 500 })
   }
