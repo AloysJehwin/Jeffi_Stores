@@ -577,6 +577,20 @@ CREATE INDEX idx_email_logs_kind ON public.email_logs USING btree (kind);
 CREATE INDEX idx_email_logs_sent_at ON public.email_logs USING btree (sent_at DESC);
 
 
+--
+-- Name: idx_message_logs_channel_sent_at; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_logs_channel_sent_at ON public.message_logs USING btree (channel, sent_at DESC);
+
+
+--
+-- Name: idx_message_logs_kind; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_message_logs_kind ON public.message_logs USING btree (kind);
+
+
 
 --
 -- Name: idx_email_logs_status_sent_at; Type: INDEX; Schema: public; Owner: -

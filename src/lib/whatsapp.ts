@@ -1,4 +1,5 @@
 import twilio from 'twilio'
+import { logMessage } from '@/lib/message-log'
 
 // WhatsApp notifications via Twilio (Meta BSP).
 // Business-initiated WhatsApp messages must use approved Content Templates
@@ -45,63 +46,77 @@ function normalizePhone(phone: string | null | undefined): string | null {
 async function sendTemplate(
   to: string | null | undefined,
   contentSid: string,
-  variables: Record<string, string>
+  variables: Record<string, string>,
+  kind: string,
+  summary: string
 ): Promise<boolean> {
   const normalized = normalizePhone(to)
   if (!normalized) return false
   if (DISABLED) return false
   const client = getClient()
   if (!client) return false
+  const waFrom = `whatsapp:${WA_FROM}`
   try {
-    await client.messages.create({
-      from: `whatsapp:${WA_FROM}`,
+    const msg = await client.messages.create({
+      from: waFrom,
       to: `whatsapp:${normalized}`,
       contentSid,
       contentVariables: JSON.stringify(variables),
     })
+    logMessage({ channel: 'whatsapp', to: normalized, from: WA_FROM, body: summary, kind, status: 'sent', providerSid: msg.sid })
     return true
-  } catch {
+  } catch (err: any) {
+    logMessage({ channel: 'whatsapp', to: normalized, from: WA_FROM, body: summary, kind, status: 'failed', error: err?.message })
     return false
   }
 }
 
+const STORE = 'Jeffi Stores'
+
 export async function sendOTPWhatsApp(params: { phone?: string | null; otp: string }): Promise<boolean> {
-  return sendTemplate(params.phone, TEMPLATES.otp, { '1': params.otp })
+  return sendTemplate(params.phone, TEMPLATES.otp, { '1': params.otp }, 'otp',
+    `${STORE}: Your verification code is ${params.otp}.`)
 }
 
 export async function sendOrderConfirmedWhatsApp(params: {
   phone?: string | null; orderNumber: string; total: number
 }): Promise<boolean> {
   const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(params.total)
-  return sendTemplate(params.phone, TEMPLATES.orderConfirmed, { '1': params.orderNumber, '2': amount })
+  return sendTemplate(params.phone, TEMPLATES.orderConfirmed, { '1': params.orderNumber, '2': amount }, 'order_confirmed',
+    `${STORE}: Your order ${params.orderNumber} is confirmed! Total: ${amount}.`)
 }
 
 export async function sendOrderShippedWhatsApp(params: {
   phone?: string | null; orderNumber: string; courier?: string | null; trackingId?: string | null
 }): Promise<boolean> {
+  const courier = params.courier || 'courier'
+  const tracking = params.trackingId || 'jeffistores.in/orders'
   return sendTemplate(params.phone, TEMPLATES.orderShipped, {
     '1': params.orderNumber,
-    '2': params.courier || 'courier',
-    '3': params.trackingId || 'jeffistores.in/orders',
-  })
+    '2': courier,
+    '3': tracking,
+  }, 'order_shipped', `${STORE}: Your order ${params.orderNumber} has been shipped via ${courier}. Tracking: ${tracking}.`)
 }
 
 export async function sendOrderDeliveredWhatsApp(params: {
   phone?: string | null; orderNumber: string
 }): Promise<boolean> {
-  return sendTemplate(params.phone, TEMPLATES.orderDelivered, { '1': params.orderNumber })
+  return sendTemplate(params.phone, TEMPLATES.orderDelivered, { '1': params.orderNumber }, 'order_delivered',
+    `${STORE}: Your order ${params.orderNumber} has been delivered.`)
 }
 
 export async function sendOrderCancelledWhatsApp(params: {
   phone?: string | null; orderNumber: string
 }): Promise<boolean> {
-  return sendTemplate(params.phone, TEMPLATES.orderCancelled, { '1': params.orderNumber })
+  return sendTemplate(params.phone, TEMPLATES.orderCancelled, { '1': params.orderNumber }, 'order_cancelled',
+    `${STORE}: Your order ${params.orderNumber} has been cancelled.`)
 }
 
 export async function sendOutForDeliveryWhatsApp(params: {
   phone?: string | null; orderNumber: string
 }): Promise<boolean> {
-  return sendTemplate(params.phone, TEMPLATES.outForDelivery, { '1': params.orderNumber })
+  return sendTemplate(params.phone, TEMPLATES.outForDelivery, { '1': params.orderNumber }, 'out_for_delivery',
+    `${STORE}: Your order ${params.orderNumber} is out for delivery today.`)
 }
 
 export async function sendPaymentFailedWhatsApp(params: {
@@ -109,5 +124,6 @@ export async function sendPaymentFailedWhatsApp(params: {
 }): Promise<boolean> {
   // No dedicated payment-failed template yet; skip unless configured.
   if (!TEMPLATES.paymentFailed) return false
-  return sendTemplate(params.phone, TEMPLATES.paymentFailed, { '1': params.orderNumber })
+  return sendTemplate(params.phone, TEMPLATES.paymentFailed, { '1': params.orderNumber }, 'payment_failed',
+    `${STORE}: Payment for order ${params.orderNumber} failed.`)
 }
