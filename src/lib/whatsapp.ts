@@ -26,6 +26,21 @@ const TEMPLATES = {
   orderCancelled: process.env.TWILIO_WA_ORDER_CANCELLED_SID || 'HX05b47f8c139e462a443a428af823f8dc',
   outForDelivery: process.env.TWILIO_WA_OUT_FOR_DELIVERY_SID || 'HXfa11093ed4bc99a14151f8b3bc90b749',
   paymentFailed: process.env.TWILIO_WA_PAYMENT_FAILED_SID || '',
+  // Marketing
+  promoOffer: process.env.TWILIO_WA_PROMO_OFFER_SID || 'HX3db2a4641ad74025d10eeac6db0ea50c',
+  newArrivals: process.env.TWILIO_WA_NEW_ARRIVALS_SID || 'HXa503d921fce7851723541abaa91229f6',
+  abandonedCart: process.env.TWILIO_WA_ABANDONED_CART_SID || 'HX5e390a4a46682f1460b357bbdd9e6c83',
+  backInStock: process.env.TWILIO_WA_BACK_IN_STOCK_SID || 'HX7f8136e4eb9f2818c9e17f7c6fb8f9b1',
+  festiveGreeting: process.env.TWILIO_WA_FESTIVE_GREETING_SID || 'HXf39e53109f5f1600ced018ad35120bdd',
+  reorderReminder: process.env.TWILIO_WA_REORDER_REMINDER_SID || 'HX57559e8ba0c987cf20d149884dd8e3f6',
+  // Support
+  supportAck: process.env.TWILIO_WA_SUPPORT_ACK_SID || 'HX95ce2cea26825b06e22b24aa802dddf8',
+  supportTicketCreated: process.env.TWILIO_WA_SUPPORT_TICKET_SID || 'HX3fee423887ba430b9d9c83f78ba6a2bb',
+  supportReply: process.env.TWILIO_WA_SUPPORT_REPLY_SID || 'HX16911ee6dd59658012abcc99d5a7d61a',
+  supportResolved: process.env.TWILIO_WA_SUPPORT_RESOLVED_SID || 'HXde26b207aff33bb29e4f420ac1f1f9fb',
+  returnInitiated: process.env.TWILIO_WA_RETURN_INITIATED_SID || 'HX7b0dfa4a553817d5a14d3920d7beb3c4',
+  refundProcessed: process.env.TWILIO_WA_REFUND_PROCESSED_SID || 'HX97f829b9e7f9222341e3c5ab3a861205',
+  feedbackRequest: process.env.TWILIO_WA_FEEDBACK_REQUEST_SID || 'HX4f34db44ae6e5e4c31c0048745cafb82',
 }
 
 function getClient() {
@@ -126,4 +141,119 @@ export async function sendPaymentFailedWhatsApp(params: {
   if (!TEMPLATES.paymentFailed) return false
   return sendTemplate(params.phone, TEMPLATES.paymentFailed, { '1': params.orderNumber }, 'payment_failed',
     `${STORE}: Payment for order ${params.orderNumber} failed.`)
+}
+
+// ── Marketing ──────────────────────────────────────────────────────────────
+
+export async function sendPromoOfferWhatsApp(p: { phone?: string | null; headline: string; code: string; discount: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.promoOffer, { '1': p.headline, '2': p.code, '3': p.discount }, 'promo_offer',
+    `${STORE}: ${p.headline}! Use code ${p.code} for ${p.discount} off.`)
+}
+export async function sendNewArrivalsWhatsApp(p: { phone?: string | null; items: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.newArrivals, { '1': p.items }, 'new_arrivals',
+    `${STORE}: New arrivals — ${p.items} now in stock.`)
+}
+export async function sendAbandonedCartWhatsApp(p: { phone?: string | null; items: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.abandonedCart, { '1': p.items }, 'abandoned_cart',
+    `${STORE}: You left ${p.items} in your cart.`)
+}
+export async function sendBackInStockWhatsApp(p: { phone?: string | null; product: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.backInStock, { '1': p.product }, 'back_in_stock',
+    `${STORE}: ${p.product} is back in stock.`)
+}
+export async function sendFestiveGreetingWhatsApp(p: { phone?: string | null; festival: string; discount: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.festiveGreeting, { '1': p.festival, '2': p.discount }, 'festive_greeting',
+    `${STORE}: ${p.festival} wishes! Enjoy ${p.discount} off storewide.`)
+}
+export async function sendReorderReminderWhatsApp(p: { phone?: string | null; product: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.reorderReminder, { '1': p.product }, 'reorder_reminder',
+    `${STORE}: Running low on ${p.product}? Reorder now.`)
+}
+
+// ── Support ────────────────────────────────────────────────────────────────
+
+export async function sendSupportAckWhatsApp(p: { phone?: string | null }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.supportAck, {}, 'support_ack',
+    `${STORE}: We received your message and an agent will reply shortly.`)
+}
+export async function sendSupportTicketCreatedWhatsApp(p: { phone?: string | null; ticket: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.supportTicketCreated, { '1': p.ticket }, 'support_ticket_created',
+    `${STORE}: Your support request #${p.ticket} is registered.`)
+}
+export async function sendSupportReplyWhatsApp(p: { phone?: string | null; message: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.supportReply, { '1': p.message }, 'support_reply',
+    `${STORE} support: ${p.message}`)
+}
+export async function sendSupportResolvedWhatsApp(p: { phone?: string | null; ticket: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.supportResolved, { '1': p.ticket }, 'support_resolved',
+    `${STORE}: Your support request #${p.ticket} is resolved.`)
+}
+export async function sendReturnInitiatedWhatsApp(p: { phone?: string | null; orderNumber: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.returnInitiated, { '1': p.orderNumber }, 'return_initiated',
+    `${STORE}: Your return for order ${p.orderNumber} has been initiated.`)
+}
+export async function sendRefundProcessedWhatsApp(p: { phone?: string | null; amount: string; orderNumber: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.refundProcessed, { '1': p.amount, '2': p.orderNumber }, 'refund_processed',
+    `${STORE}: A refund of ${p.amount} for order ${p.orderNumber} has been processed.`)
+}
+export async function sendFeedbackRequestWhatsApp(p: { phone?: string | null; orderNumber: string; url: string }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.feedbackRequest, { '1': p.orderNumber, '2': p.url }, 'feedback_request',
+    `${STORE}: How was your order ${p.orderNumber}? Share feedback at ${p.url}.`)
+}
+
+// ── Free-text (only delivers within the 24h customer-service window) ─────────
+// Used for support replies after a customer has messaged first. Outside the
+// window Meta blocks it and this returns false (caller should fall back to a template).
+export async function sendFreeTextWhatsApp(params: { phone?: string | null; body: string; kind?: string }): Promise<boolean> {
+  const normalized = normalizePhone(params.phone)
+  if (!normalized) return false
+  if (DISABLED) return false
+  const client = getClient()
+  if (!client) return false
+  const waFrom = `whatsapp:${WA_FROM}`
+  const kind = params.kind || 'support_reply'
+  try {
+    const msg = await client.messages.create({ from: waFrom, to: `whatsapp:${normalized}`, body: params.body })
+    logMessage({ channel: 'whatsapp', to: normalized, from: WA_FROM, body: params.body, kind, status: 'sent', providerSid: msg.sid })
+    return true
+  } catch (err: any) {
+    logMessage({ channel: 'whatsapp', to: normalized, from: WA_FROM, body: params.body, kind, status: 'failed', error: err?.message })
+    return false
+  }
+}
+
+// Registry of send-from-UI templates for the admin WhatsApp Engagement card.
+// Each entry: the label + the variable fields the admin must fill.
+export const WA_TEMPLATE_REGISTRY: Record<string, { label: string; category: 'marketing' | 'support'; fields: string[] }> = {
+  promo_offer: { label: 'Promo Offer', category: 'marketing', fields: ['headline', 'code', 'discount'] },
+  new_arrivals: { label: 'New Arrivals', category: 'marketing', fields: ['items'] },
+  abandoned_cart: { label: 'Abandoned Cart', category: 'marketing', fields: ['items'] },
+  back_in_stock: { label: 'Back in Stock', category: 'marketing', fields: ['product'] },
+  festive_greeting: { label: 'Festive Greeting', category: 'marketing', fields: ['festival', 'discount'] },
+  reorder_reminder: { label: 'Reorder Reminder', category: 'marketing', fields: ['product'] },
+  support_ticket_created: { label: 'Ticket Created', category: 'support', fields: ['ticket'] },
+  support_reply: { label: 'Support Reply', category: 'support', fields: ['message'] },
+  support_resolved: { label: 'Ticket Resolved', category: 'support', fields: ['ticket'] },
+  return_initiated: { label: 'Return Initiated', category: 'support', fields: ['orderNumber'] },
+  refund_processed: { label: 'Refund Processed', category: 'support', fields: ['amount', 'orderNumber'] },
+  feedback_request: { label: 'Feedback Request', category: 'support', fields: ['orderNumber', 'url'] },
+}
+
+// Dispatch a registry template by key with a variables object (used by the engagement API).
+export async function sendTemplateByKey(phone: string | null | undefined, key: string, vars: Record<string, string>): Promise<boolean> {
+  switch (key) {
+    case 'promo_offer': return sendPromoOfferWhatsApp({ phone, headline: vars.headline, code: vars.code, discount: vars.discount })
+    case 'new_arrivals': return sendNewArrivalsWhatsApp({ phone, items: vars.items })
+    case 'abandoned_cart': return sendAbandonedCartWhatsApp({ phone, items: vars.items })
+    case 'back_in_stock': return sendBackInStockWhatsApp({ phone, product: vars.product })
+    case 'festive_greeting': return sendFestiveGreetingWhatsApp({ phone, festival: vars.festival, discount: vars.discount })
+    case 'reorder_reminder': return sendReorderReminderWhatsApp({ phone, product: vars.product })
+    case 'support_ticket_created': return sendSupportTicketCreatedWhatsApp({ phone, ticket: vars.ticket })
+    case 'support_reply': return sendSupportReplyWhatsApp({ phone, message: vars.message })
+    case 'support_resolved': return sendSupportResolvedWhatsApp({ phone, ticket: vars.ticket })
+    case 'return_initiated': return sendReturnInitiatedWhatsApp({ phone, orderNumber: vars.orderNumber })
+    case 'refund_processed': return sendRefundProcessedWhatsApp({ phone, amount: vars.amount, orderNumber: vars.orderNumber })
+    case 'feedback_request': return sendFeedbackRequestWhatsApp({ phone, orderNumber: vars.orderNumber, url: vars.url })
+    default: return false
+  }
 }
