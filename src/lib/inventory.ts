@@ -6,6 +6,89 @@ import { round2 } from './gst'
 export type TransactionType = 'purchase' | 'sale' | 'return' | 'adjustment'
 export type ReferenceType = 'order' | 'grn' | 'manual' | 'cash_sale'
 
+export type StockStatus = 'In Stock' | 'Low Stock' | 'Out of Stock'
+
+// Map an on-hand quantity to a stock_status. Used only when a product's
+// inventory_sync flag is ON. threshold null/undefined → binary In/Out (no Low
+// Stock band); otherwise 0<qty<=threshold → Low Stock.
+export function deriveStockStatus(qty: number, threshold?: number | null): StockStatus {
+  if (!(qty > 0)) return 'Out of Stock'
+  if (threshold != null && qty <= threshold) return 'Low Stock'
+  return 'In Stock'
+}
+
+// Read a product's inventory-sync config once per operation. Callers gate their
+// stock_status recompute on `enabled`.
+export async function getInventorySync(
+  client: { query: (sql: string, params?: any[]) => Promise<{ rows: any[] }> } | null,
+  productId: string
+): Promise<{ enabled: boolean; threshold: number | null }> {
+  const run = client
+    ? (sql: string, params: any[]) => client.query(sql, params)
+    : (sql: string, params: any[]) => query(sql, params)
+  const res = await run(
+    `SELECT inventory_sync, low_stock_threshold FROM products WHERE id = $1`,
+    [productId]
+  )
+  const row = res.rows[0]
+  return {
+    enabled: !!row?.inventory_sync,
+    threshold: row?.low_stock_threshold != null ? parseFloat(row.low_stock_threshold) : null,
+  }
+}
+
+// When inventory_sync is ON, recompute stock_status from the CURRENT
+// inventory_quantity for the product, its active variants, and their active
+// sub-variants. No-op when the flag is OFF (manual status is preserved). Callers
+// invoke this after any inventory_quantity mutation on paths that don't already
+// flow through syncCentralInventory (sales, order restore, PO direct bumps).
+export async function recomputeStockStatusForProduct(
+  client: { query: (sql: string, params?: any[]) => Promise<{ rows: any[] }> } | null,
+  productId: string
+): Promise<void> {
+  const run = client
+    ? (sql: string, params: any[]) => client.query(sql, params)
+    : (sql: string, params: any[]) => query(sql, params)
+  const { enabled, threshold } = await getInventorySync(client, productId)
+  if (!enabled) return
+  // Derive in SQL to keep it one round-trip per grain. Mirror deriveStockStatus:
+  //   qty<=0 → Out of Stock; threshold set & qty<=threshold → Low Stock; else In Stock.
+  // Parent grains derive from the ROLLED-UP quantity (variant = SUM active subs when
+  // any exist, product = SUM active variants) so status matches the effective stock
+  // even on paths (e.g. a leaf-only sale deduct) that didn't cascade quantities.
+  const statusExpr = (qtyExpr: string) => `
+    CASE WHEN COALESCE(${qtyExpr},0) <= 0 THEN 'Out of Stock'
+         WHEN $2::numeric IS NOT NULL AND COALESCE(${qtyExpr},0) <= $2::numeric THEN 'Low Stock'
+         ELSE 'In Stock' END`
+  // Sub-variants: from their own inventory_quantity (leaf).
+  await run(
+    `UPDATE product_sub_variants sv SET stock_status = ${statusExpr('sv.inventory_quantity')}, updated_at = now()
+     WHERE sv.variant_id IN (SELECT id FROM product_variants WHERE product_id = $1)`,
+    [productId, threshold]
+  )
+  // Variants: from SUM(active sub-variants) when any exist, else own inventory_quantity.
+  await run(
+    `UPDATE product_variants pv SET stock_status = ${statusExpr(
+      `CASE WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+            THEN (SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+            ELSE pv.inventory_quantity END`
+    )}, updated_at = now()
+     WHERE pv.product_id = $1`,
+    [productId, threshold]
+  )
+  // Product: from SUM(active variants) when any exist, else own inventory_quantity.
+  await run(
+    `UPDATE products p SET stock_status = ${statusExpr(
+      `CASE WHEN EXISTS (SELECT 1 FROM product_variants v WHERE v.product_id = p.id AND v.is_active = true)
+            THEN (SELECT SUM(v.inventory_quantity) FROM product_variants v WHERE v.product_id = p.id AND v.is_active = true)
+            ELSE p.inventory_quantity END`
+    )}, updated_at = now()
+     WHERE p.id = $1`,
+    [productId, threshold]
+  )
+}
+
+
 export async function logStockMovement(
   client: PoolClient | null,
   params: {
@@ -77,13 +160,19 @@ export async function updateWeightedAvgCost(
   params: {
     productId: string
     variantId: string | null
+    subVariantId?: string | null
     qtyReceived: number
     unitCost: number
   }
 ) {
-  const { productId, variantId, qtyReceived, unitCost } = params
+  const { productId, variantId, subVariantId, qtyReceived, unitCost } = params
 
-  if (variantId) {
+  if (subVariantId) {
+    // Sub-variants have no cost_price column of their own — cost is tracked at the
+    // product/variant level. Skip the WAC write here rather than corrupting the
+    // main product's cost (the previous behaviour). Stock qty is handled by the caller.
+    return
+  } else if (variantId) {
     const row = await client.query<{ inventory_quantity: number; cost_price: number }>(
       'SELECT inventory_quantity, cost_price FROM product_variants WHERE id = $1 FOR UPDATE', [variantId])
     const cur = row.rows[0]

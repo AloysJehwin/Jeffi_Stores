@@ -27,15 +27,23 @@ vi.mock('@/lib/gst', () => ({
 
 vi.mock('@/lib/pricing', () => ({
   lineItemFromMrpIncl: vi.fn(),
+  lineItemExGst: vi.fn(),
 }))
 
 vi.mock('@/lib/inventory', () => ({
   logStockMovement: vi.fn(),
+  recomputeStockStatusForProduct: vi.fn(),
 }))
 
 vi.mock('@/lib/shelf', () => ({
   decrementNonPerishableShelfStock: vi.fn().mockResolvedValue(undefined),
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
+}))
+
+// The route now reads GST state via getFeatureFlags() instead of ENABLE_GST
+// directly. Mirror that env-driven state so per-test ENABLE_GST still applies.
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: vi.fn(async () => ({ gstEnabled: process.env.ENABLE_GST === 'true' })),
 }))
 
 vi.mock('@/lib/validate', () => {
@@ -63,8 +71,9 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { withTransaction } from '@/lib/db'
 import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence } from '@/lib/gst'
-import { lineItemFromMrpIncl } from '@/lib/pricing'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { parseBody } from '@/lib/validate'
 
 // ---------------------------------------------------------------------------
@@ -127,6 +136,8 @@ describe('POST /api/admin/invoices/cash-sale', () => {
     vi.mocked(generateInvoiceNumber).mockReturnValue('JS/24-25/APR/1')
     vi.mocked(getNextInvoiceSequence).mockResolvedValue(1 as any)
     vi.mocked(lineItemFromMrpIncl).mockReturnValue(100)
+    vi.mocked(lineItemExGst).mockReturnValue(84.75)
+    vi.mocked(getFeatureFlags).mockImplementation(async () => ({ gstEnabled: process.env.ENABLE_GST === 'true' }) as any)
     vi.mocked(logStockMovement).mockResolvedValue(undefined)
     // Re-setup parseBody — resetAllMocks wipes the factory implementation
     vi.mocked(parseBody).mockImplementation((schema: any, data: any) => {

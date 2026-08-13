@@ -118,6 +118,22 @@ describe('GET /api/admin/campaigns/[kind]', () => {
     const body = await res.json()
     expect(body.total).toBe(0)
   })
+
+  it('includes whatsappLogs in the response', async () => {
+    const waLogs = [
+      { to_number: '+919876543210', body: 'We miss you!', status: 'sent', error: null, sent_at: '2024-01-02' },
+    ]
+    mockQueryOne.mockResolvedValueOnce(sampleCampaign as any)   // campaign lookup
+    mockQueryMany
+      .mockResolvedValueOnce(sampleSends as any)                // recentSends
+      .mockResolvedValueOnce(waLogs as any)                     // whatsappLogs
+    mockQueryOne.mockResolvedValueOnce({ total: '1' } as any)   // count
+
+    const res = await GET(makeGet('welcome'), { params: Promise.resolve({ kind: 'welcome' }) })
+    expect(res.status).toBe(200)
+    const body = await res.json()
+    expect(body.whatsappLogs).toEqual(waLogs)
+  })
 })
 
 // ── PATCH tests ───────────────────────────────────────────────────────────────

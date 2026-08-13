@@ -12,6 +12,7 @@ CREATE TABLE public.grn_items (
     po_item_id uuid,
     product_id uuid,
     variant_id uuid,
+    sub_variant_id uuid,
     quantity_received numeric(14,3) NOT NULL,
     unit_cost numeric(12,2) NOT NULL,
     purchase_unit_factor numeric(14,6) DEFAULT 1 NOT NULL

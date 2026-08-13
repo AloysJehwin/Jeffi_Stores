@@ -2,10 +2,12 @@ import { queryOne } from '@/lib/db'
 import {
   sendOrderConfirmedSMS, sendOrderShippedSMS, sendOrderDeliveredSMS,
   sendOrderCancelledSMS, sendPaymentFailedSMS, sendOutForDeliverySMS,
+  sendVariantChangeRequestedSMS,
 } from '@/lib/sms'
 import {
   sendOrderConfirmedWhatsApp, sendOrderShippedWhatsApp, sendOrderDeliveredWhatsApp,
   sendOrderCancelledWhatsApp, sendPaymentFailedWhatsApp, sendOutForDeliveryWhatsApp,
+  sendVariantChangeRequestedWhatsApp,
 } from '@/lib/whatsapp'
 
 // Unified order-notification dispatcher.
@@ -89,4 +91,15 @@ export async function notifyPaymentFailed(userId: string | null, orderNumber: st
   dispatch(r.notification_channel, r.phone,
     () => sendPaymentFailedSMS({ phone: r.phone, orderNumber }),
     () => sendPaymentFailedWhatsApp({ phone: r.phone, orderNumber }))
+}
+
+// Admin-initiated variant change awaiting the customer's approval. Needs the
+// order deep-link, so the caller passes a prebuilt URL. WhatsApp uses the
+// variant-change template (falls back to SMS if not yet configured).
+export async function notifyVariantChangeRequested(userId: string | null, orderNumber: string, orderUrl: string): Promise<void> {
+  const r = await getRecipient(userId)
+  if (!r) return
+  dispatch(r.notification_channel, r.phone,
+    () => sendVariantChangeRequestedSMS({ phone: r.phone, orderNumber, orderUrl }),
+    () => sendVariantChangeRequestedWhatsApp({ phone: r.phone, orderNumber, url: orderUrl, entity: { entityType: 'orders' } }))
 }

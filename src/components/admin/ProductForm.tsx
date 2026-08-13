@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
@@ -77,6 +77,11 @@ interface VariantGroup {
   variant_type: string
 }
 
+// Bootstrap ("Assign Existing Stock") per-grain types. A grain is one
+// variant / sub-variant (or the bare product) that already holds stock.
+type BsGrain = { variant_id: string|null; sub_variant_id: string|null; label: string; qty: number }
+type BsEntry = { expiry: string; mfg: string; lot: string; location: string; serials: string[]; selected: boolean; assignQty: number }
+
 interface ProductFormProps {
   categories: Category[]
   brands: Brand[]
@@ -87,6 +92,13 @@ interface ProductFormProps {
   perishableBatchTotal?: number
   serializedStockTotal?: number
   isDraft?: boolean
+  // On-hand stock grains computed server-side from the LIVE product. Preferred over
+  // deriving from `product` because the draft merge replaces product_variants with a
+  // snapshot that lacks inventory_quantity. Absent on the add/new form.
+  liveStockGrains?: BsGrain[]
+  // Bootstrap capture (per-grain lot/expiry/serials) persisted in the draft, so a
+  // half-filled "assign existing stock" capture survives a draft save / reload.
+  initialBsEntries?: Record<string, BsEntry> | null
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
@@ -219,10 +231,11 @@ function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: (
   )
 }
 
-export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0, serializedStockTotal = 0, isDraft = false }: ProductFormProps) {
+export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0, serializedStockTotal = 0, isDraft = false, liveStockGrains, initialBsEntries = null }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const topErrorRef = useRef<HTMLDivElement | null>(null)
   const [productName, setProductName] = useState<string>(product?.name || '')
   const [description, setDescription] = useState<string>(product?.description || '')
   const [brandId, setBrandId] = useState<string>(product?.brand_id || '')
@@ -352,14 +365,15 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [confirmUnperishable, setConfirmUnperishable] = useState(false)
   const [serialized, setSerialized] = useState(product?.serialized ?? false)
   const [confirmUnSerialized, setConfirmUnSerialized] = useState(false)
-  // Bootstrap inline section state
+  // Bootstrap inline section state — per-grain (variant / sub-variant) assignment.
   const [bootstrapError, setBootstrapError] = useState<string | null>(null)
-  const [bsExpiryDate, setBsExpiryDate] = useState('')
-  const [bsManufactureDate, setBsManufactureDate] = useState('')
-  const [bsLotNumber, setBsLotNumber] = useState('')
-  const [bsLocationId, setBsLocationId] = useState('')
-  const [bsSerials, setBsSerials] = useState<string[]>([])
+  // Grain key = `${variant_id||''}:${sub_variant_id||''}`. Each entry holds the
+  // batch/serial capture for that one grain of existing stock.
+  const [bsEntries, setBsEntries] = useState<Record<string, BsEntry>>(initialBsEntries ?? {})
   const [bsShelfLocations, setBsShelfLocations] = useState<{id:string;display_code:string}[]>([])
+  // Serial entry: refs to every bootstrap serial input, keyed "grainKey#slotIdx",
+  // so an Enter (from the scanner or manual) can advance focus to the next field.
+  const bsSerialRefs = useRef<Record<string, HTMLInputElement | null>>({})
   // Certifications & Standards
   const [certifications, setCertifications] = useState(Array.isArray(product?.certifications) ? product.certifications.join(', ') : '')
   const [complianceStandard, setComplianceStandard] = useState(product?.compliance_standard || '')
@@ -401,6 +415,12 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [metaTitle, setMetaTitle] = useState(product?.meta_title || '')
   const [metaDescription, setMetaDescription] = useState(product?.meta_description || '')
   const [isSearchable, setIsSearchable] = useState(product?.is_searchable ?? true)
+  // Inventory sync: when ON, stock_status is auto-derived from inventory_quantity
+  // (product/variant/sub-variant), with low_stock_threshold defining the Low Stock band.
+  const [inventorySync, setInventorySync] = useState(product?.inventory_sync ?? false)
+  const [lowStockThreshold, setLowStockThreshold] = useState(
+    product?.low_stock_threshold != null ? String(product.low_stock_threshold) : ''
+  )
   // Tax & Finance
   const [taxClass, setTaxClass] = useState(product?.tax_class || 'standard')
   const [inclusiveTax, setInclusiveTax] = useState(product?.inclusive_tax ?? false)
@@ -577,6 +597,10 @@ export default function ProductForm({ categories, brands, action, product, produ
         discountPct,
         topPriceLockSide, topMrpLockSide,
         gstRate, isActive,
+        // "Assign existing stock" bootstrap fields (per-grain lot/expiry/serials)
+        // so a half-filled capture survives a draft save / reload.
+        perishable, serialized,
+        bsEntries,
       }
       localStorage.setItem(draftKey, JSON.stringify(snapshot))
       setHasDraft(true)
@@ -587,6 +611,8 @@ export default function ProductForm({ categories, brands, action, product, produ
     basePrice, mrp, mrpExGst, salePrice, costPrice, discountPct,
     topPriceLockSide, topMrpLockSide,
     gstRate, isActive, draftKey,
+    perishable, serialized,
+    bsEntries,
   ])
 
   // Server autosave — fires 5s after last change, only in draft mode
@@ -632,6 +658,8 @@ export default function ProductForm({ categories, brands, action, product, produ
     fields.serialized = serialized
     fields.is_cod_allowed = isCodAllowed
     fields.is_searchable = isSearchable
+    fields.inventory_sync = inventorySync
+    fields.low_stock_threshold = lowStockThreshold !== '' ? lowStockThreshold : null
     fields.is_oversized = isOversized
     fields.is_digital = isDigital
     fields.is_subscription = isSubscription
@@ -679,6 +707,18 @@ export default function ProductForm({ categories, brands, action, product, produ
     fields.volume_ml = volumeMl || null
     fields.net_weight_grams = netWeightGrams || null
     fields.grade = grade || null
+    // Technical specs (key/value rows) — stored as a JSON object so it survives
+    // AUTOSAVE too (previously only the explicit Save/Publish serialized it, so an
+    // autosave-then-reload lost spec edits). Publish reads fields->'specifications'.
+    fields.specifications = specifications.reduce(
+      (acc: Record<string, string>, { key, value }) => (key.trim() ? { ...acc, [key.trim()]: value } : acc),
+      {}
+    )
+    // Persist the bootstrap "assign existing stock" capture (per-grain lot/expiry/
+    // serials) into the draft so it survives reload — localStorage alone is lost on
+    // discard or a different browser. Namespaced under _bsEntries so it never
+    // collides with a real product column on merge/publish.
+    fields._bsEntries = bsEntries
     try {
       const r = await fetch(`/api/admin/products/${productId}/draft`, {
         method: 'PATCH',
@@ -744,47 +784,145 @@ export default function ProductForm({ categories, brands, action, product, produ
     variants, groups,
     // sub-variant leaf edits (incl. per-sub-variant supplier rows) live here
     subVariantsMap,
+    // bootstrap "assign existing stock" capture — autosave when it changes
+    // (perishable/serialized already listed above under "physical")
+    bsEntries,
   ])
 
   const wasPerishableOff = !(product?.perishable)
   const wasSerializedOff = !(product?.serialized)
-  const _bsActiveVariant = product?.has_variants && Array.isArray(product?.product_variants)
-    ? product.product_variants.find((v: any) => !v._isDeleted && parseFloat(v.inventory_quantity) > 0) ?? null
-    : null
-  const _bsVariantId: string | null = _bsActiveVariant?.id ?? null
-  const _bsStockQty = _bsActiveVariant
-    ? parseFloat(_bsActiveVariant.inventory_quantity) || 0
-    : (parseFloat(product?.inventory_quantity ?? '0') || 0)
-  const showBootstrap = _bsStockQty > 0 && (
-    (perishable && wasPerishableOff && perishableBatchTotal === 0) ||
-    (serialized && wasSerializedOff && serializedStockTotal === 0)
-  )
+  // Break the product's existing stock into per-grain rows. A grain is one
+  // sub-variant (when the variant has sub-variants), one variant (when it has
+  // none), or the bare product (when it has no variants at all).
+  const bsGrains: BsGrain[] = useMemo(() => {
+    // Prefer server-computed live grains (edit page). They carry accurate on-hand
+    // quantities that the draft-merged `product` no longer has after the first
+    // autosave (the draft variant snapshot drops inventory_quantity).
+    if (Array.isArray(liveStockGrains)) return liveStockGrains
+    const grains: BsGrain[] = []
+    if (product?.has_variants && Array.isArray(product?.product_variants)) {
+      for (const v of product.product_variants) {
+        if (v?._isDeleted) continue
+        const subs = Array.isArray(v?.sub_variants) ? v.sub_variants : []
+        if (subs.length > 0) {
+          for (const sv of subs) {
+            const qty = parseFloat(sv?.inventory_quantity) || 0
+            if (qty > 0) {
+              grains.push({
+                variant_id: v.id,
+                sub_variant_id: sv.id,
+                label: `${v.variant_name} / ${sv.sub_variant_name}`,
+                qty,
+              })
+            }
+          }
+        } else {
+          const qty = parseFloat(v?.inventory_quantity) || 0
+          if (qty > 0) {
+            grains.push({ variant_id: v.id, sub_variant_id: null, label: v.variant_name, qty })
+          }
+        }
+      }
+    } else {
+      const qty = parseFloat(product?.inventory_quantity ?? '0') || 0
+      if (qty > 0) grains.push({ variant_id: null, sub_variant_id: null, label: 'Product', qty })
+    }
+    return grains
+  }, [product, liveStockGrains])
+  const _bsStockTotal = bsGrains.reduce((s, g) => s + g.qty, 0)
+  // Show the "assign existing stock" capture when the product has on-hand stock and a
+  // tracking flag is on but no batches/serials exist yet.
+  //  • Published edit: only when the flag was just toggled ON (wasXOff), so we don't
+  //    nag on every edit of an already-tracked product.
+  //  • Draft mode: the merged draft fields already report the flag as ON (so wasXOff
+  //    would be false and wrongly hide it). Here we key purely off "flag on + nothing
+  //    assigned yet", so reopening a draft always re-surfaces the pending capture.
+  const _perishablePending = perishable && perishableBatchTotal === 0 && (isDraft || wasPerishableOff)
+  const _serializedPending = serialized && serializedStockTotal === 0 && (isDraft || wasSerializedOff)
+  const showBootstrap = _bsStockTotal > 0 && (_perishablePending || _serializedPending)
+  // Lazily build the default entry for a grain (auto lot, open-shelf location).
+  const _bsMakeEntry = useCallback((defaultQty = 0): BsEntry => {
+    const skuPart = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
+    const today = new Date()
+    const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
+    const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
+    const open = bsShelfLocations.find((l: any) => l.is_open_shelf)
+    return {
+      expiry: '',
+      mfg: '',
+      lot: `LOT-${skuPart ? skuPart + '-' : ''}${ymd}-${rand}`,
+      location: open?.id || '',
+      serials: [],
+      selected: true,
+      assignQty: defaultQty,
+    }
+  }, [product, bsShelfLocations])
 
   useEffect(() => {
     if (!showBootstrap) return
     // auto-expand Physical Attributes section
     setPhysicalExpanded(true)
-    // init lot number once
-    if (!bsLotNumber) {
-      const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
-      const today = new Date()
-      const ymd = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`
-      const rand = Math.random().toString(36).substring(2, 5).toUpperCase()
-      setBsLotNumber(`LOT-${sku ? sku + '-' : ''}${ymd}-${rand}`)
-    }
-    // fetch shelf locations once, auto-select open shelf
+    // fetch shelf locations once (per-grain entries default their location to it)
     if (bsShelfLocations.length === 0) {
-      fetch('/api/admin/shelving/locations').then(r => r.ok ? r.json() : null).then(j => {
+      fetch('/api/admin/shelving/locations', { credentials: 'include' }).then(r => r.ok ? r.json() : null).then(j => {
         if (j) {
           const locs: {id:string;display_code:string;is_open_shelf?:boolean}[] = j.locations || []
           setBsShelfLocations(locs)
-          const open = locs.find(l => l.is_open_shelf)
-          if (open && !bsLocationId) setBsLocationId(open.id)
         }
       })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showBootstrap])
+
+  // Seed real per-grain entries into state once shelf locations are loaded, so
+  // the auto lot/location/selection/assignQty defaults are persisted (and saved
+  // in drafts) even if the user never edits a field. Only fills MISSING keys —
+  // never clobbers an entry the user (or a restored draft) already populated.
+  useEffect(() => {
+    if (!showBootstrap) return
+    if (bsShelfLocations.length === 0) return
+    setBsEntries(prev => {
+      let changed = false
+      const next = { ...prev }
+      for (const g of bsGrains) {
+        const key = `${g.variant_id || ''}:${g.sub_variant_id || ''}`
+        if (!next[key]) {
+          next[key] = _bsMakeEntry(g.qty)
+          changed = true
+        }
+      }
+      return changed ? next : prev
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showBootstrap, bsGrains, bsShelfLocations])
+
+  // --- Serial entry: PO-receive-style auto-advance + barcode scan --------------
+  // Ref key format is `${grainKey}#${slotIdx}` (grainKey is "variant:sub", so we
+  // separate the slot index with '#' to avoid colliding with the ':' in the key).
+  const bsGrainKey = useCallback((g: BsGrain) => `${g.variant_id || ''}:${g.sub_variant_id || ''}`, [])
+
+  // Move focus to the next EMPTY serial input after the given ref key, wrapping
+  // across all grains — identical behaviour to PO receive's focusNextSerial.
+  const bsFocusNextSerial = useCallback((afterKey: string) => {
+    const keys = Object.keys(bsSerialRefs.current)
+      .filter(k => bsSerialRefs.current[k])
+      .sort((a, b) => {
+        const [ag, asRaw] = a.split('#'); const [bg, bsRaw] = b.split('#')
+        if (ag !== bg) return ag < bg ? -1 : 1
+        return Number(asRaw) - Number(bsRaw)
+      })
+    const start = keys.indexOf(afterKey)
+    if (start === -1) return
+    for (let step = 1; step <= keys.length; step++) {
+      const el = bsSerialRefs.current[keys[(start + step) % keys.length]]
+      if (el && !el.value) { el.focus(); return }
+    }
+  }, [])
+
+  // Serial entry uses plain editable fields: a barcode scanner types the code +
+  // Enter directly into the focused input (identical to manual typing), and the
+  // input's own onKeyDown Enter advances to the next empty field via
+  // bsFocusNextSerial. No global keystroke-capture hook is needed.
 
   function restoreDraft() {
     const saved = localStorage.getItem(draftKey)
@@ -811,6 +949,10 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (snap.topMrpLockSide !== undefined) setTopMrpLockSide(snap.topMrpLockSide)
       if (snap.gstRate !== undefined) setGstRate(snap.gstRate)
       if (snap.isActive !== undefined) setIsActive(snap.isActive)
+      // Restore "Assign existing stock" bootstrap fields.
+      if (snap.perishable !== undefined) setPerishable(snap.perishable)
+      if (snap.serialized !== undefined) setSerialized(snap.serialized)
+      if (snap.bsEntries && typeof snap.bsEntries === 'object') setBsEntries(snap.bsEntries)
     } catch {}
   }
 
@@ -1181,17 +1323,61 @@ export default function ProductForm({ categories, brands, action, product, produ
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault()
 
-    if (showBootstrap) {
-      if (perishable && !bsExpiryDate) { setBootstrapError('Expiry date is required'); return }
-      const needed = Math.round(_bsStockQty)
-      if (serialized && bsSerials.filter(Boolean).length !== needed) {
-        setBootstrapError(`Enter all ${needed} serial number${needed !== 1 ? 's' : ''}`); return
-      }
-    }
+    // Which button was clicked — only enforce the full bootstrap capture on publish.
+    // A draft save may leave the lot/serials partially filled.
+    const submitterEl = (e.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null
+    const isPublishIntent = submitterEl?.name === 'intent' && submitterEl.value === 'publish'
+
+    // Clear any prior error up-front; validation below sets a fresh one if needed.
+    setError(null)
     setBootstrapError(null)
 
+    if (showBootstrap && isPublishIntent) {
+      // Surface bootstrap validation both in the panel AND the top-level error box
+      // (near the buttons), then scroll it into view — otherwise a failed publish
+      // looks like "nothing happened" because the button gives no feedback.
+      const failBootstrap = (msg: string) => {
+        setBootstrapError(msg)
+        setError(msg)
+        setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
+      }
+      const seenSerials = new Map<string, string>() // serial -> first grain label
+      for (const g of bsGrains) {
+        const key = `${g.variant_id || ''}:${g.sub_variant_id || ''}`
+        const entry = bsEntries[key]
+        // Skip grains the user opted out of tracking.
+        if (entry && entry.selected === false) continue
+        const assignQty = entry?.assignQty ?? g.qty
+        if (!(assignQty > 0)) {
+          failBootstrap(`Enter a quantity greater than 0 for "${g.label}" (or uncheck it).`); return
+        }
+        if (!entry?.location) {
+          failBootstrap(`Select a shelf location for "${g.label}".`); return
+        }
+        if (perishable && !entry?.expiry) {
+          failBootstrap(`Expiry date is required for "${g.label}"`); return
+        }
+        if (serialized) {
+          const serials = (entry?.serials || []).filter(Boolean)
+          const filled = serials.length
+          if (filled !== assignQty) {
+            failBootstrap(`Enter all ${assignQty} serial number${assignQty !== 1 ? 's' : ''} for "${g.label}"`); return
+          }
+          // No two serial numbers may be identical — across every grain.
+          for (const sn of serials) {
+            const norm = sn.trim()
+            if (!norm) continue
+            if (seenSerials.has(norm)) {
+              failBootstrap(`Duplicate serial number "${norm}" (used in both "${seenSerials.get(norm)}" and "${g.label}"). Serial numbers must be unique.`)
+              return
+            }
+            seenSerials.set(norm, g.label)
+          }
+        }
+      }
+    }
+
     setIsSubmitting(true)
-    setError(null)
 
     try {
       const formData = new FormData(e.currentTarget)
@@ -1321,27 +1507,66 @@ export default function ProductForm({ categories, brands, action, product, produ
         formData.set('variants_json', JSON.stringify(convertedVariants))
       }
 
+      // Carry the bootstrap "assign existing stock" capture to the server action so
+      // an explicit Save-as-Draft/Publish does not wipe what autosave persisted.
+      formData.set('bs_entries_json', JSON.stringify(bsEntries))
+
       await action(formData)
       localStorage.removeItem(draftKey)
       pendingPopupVariantIdRef.current = null
     } catch (err: any) {
       if (err?.digest?.startsWith('NEXT_REDIRECT')) {
-        if (showBootstrap && productId) {
+        // Only register serials/batches on publish — a draft save keeps them in the
+        // draft snapshot and defers actual stock creation until publish.
+        if (showBootstrap && productId && isPublishIntent) {
           try {
-            await fetch(`/api/admin/products/${productId}/bootstrap-stock`, {
+            const assignments = bsGrains
+              .filter(g => {
+                const key = `${g.variant_id || ''}:${g.sub_variant_id || ''}`
+                return bsEntries[key]?.selected !== false
+              })
+              .map(g => {
+                const key = `${g.variant_id || ''}:${g.sub_variant_id || ''}`
+                const entry = bsEntries[key]
+                const assignQty = entry?.assignQty ?? g.qty
+                return {
+                  variant_id: g.variant_id,
+                  sub_variant_id: g.sub_variant_id,
+                  quantity: assignQty,
+                  lot_number: entry?.lot || null,
+                  manufacture_date: entry?.mfg || null,
+                  expiry_date: entry?.expiry || null,
+                  location_id: entry?.location || null,
+                  ...(serialized ? { serial_numbers: (entry?.serials || []).filter(Boolean).slice(0, assignQty) } : {}),
+                }
+              })
+            const bsRes = await fetch(`/api/admin/products/${productId}/bootstrap-stock`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                variant_id: _bsVariantId || null,
-                lot_number: bsLotNumber || null,
-                manufacture_date: bsManufactureDate || null,
-                expiry_date: bsExpiryDate || null,
-                location_id: bsLocationId || null,
-                ...(serialized ? { serial_numbers: bsSerials.filter(Boolean) } : {}),
-              }),
+              body: JSON.stringify({ assignments }),
             })
+            if (!bsRes.ok) {
+              // Publish already succeeded (we're mid-redirect), but stock assignment
+              // failed (e.g. a serial already exists in stock). Stash the message so
+              // the product page can surface it after navigation instead of losing it.
+              const j = await bsRes.json().catch(() => ({}))
+              try { sessionStorage.setItem('bootstrap_stock_error', j?.error || 'Failed to assign existing stock (serial/lot conflict).') } catch { /* ignore */ }
+            } else {
+              // Stash the just-created batches/serials so the destination product page
+              // can offer to print labels (the form unmounts on the redirect below).
+              const j = await bsRes.json().catch(() => ({}))
+              const batchIds: string[] = Array.isArray(j?.batch_ids) ? j.batch_ids : []
+              const serialNumbers: string[] = Array.isArray(j?.serial_numbers) ? j.serial_numbers : []
+              if (batchIds.length || serialNumbers.length) {
+                try {
+                  sessionStorage.setItem('bootstrap_labels', JSON.stringify({
+                    product_id: productId, batch_ids: batchIds, serial_numbers: serialNumbers,
+                  }))
+                } catch { /* ignore */ }
+              }
+            }
           } catch {
-            // bootstrap failed silently — product was saved
+            // network error assigning stock — product was still saved
           }
         }
         throw err
@@ -1426,7 +1651,7 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
         )}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">
+          <div ref={topErrorRef} className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-300">
             {error}
           </div>
         )}
@@ -1791,8 +2016,41 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
           )}
 
-          {/* Stock Status — hidden when has variants */}
-          {!hasVariants && (
+          {/* Inventory sync — auto-derive stock_status from inventory_quantity */}
+          <div>
+            <Toggle
+              id="inventory_sync_toggle"
+              checked={inventorySync}
+              onChange={setInventorySync}
+              label="Auto stock status (inventory sync)"
+            />
+            {/* Hidden inputs so the server-action formData carries these on explicit save */}
+            <input type="hidden" name="inventory_sync" value={inventorySync ? 'true' : 'false'} />
+            <input type="hidden" name="low_stock_threshold" value={lowStockThreshold} />
+            <p className="text-xs text-foreground-muted mt-1">
+              When on, In/Low/Out of Stock is set automatically from the on-hand quantity (inherited by variants &amp; sub-variants). When off, you set it manually below.
+            </p>
+            {inventorySync && (
+              <div className="mt-2">
+                <label htmlFor="low_stock_threshold_input" className="block text-sm font-medium text-foreground-secondary mb-1">
+                  Low stock threshold
+                </label>
+                <input
+                  type="number"
+                  id="low_stock_threshold_input"
+                  min="0"
+                  step="any"
+                  value={lowStockThreshold}
+                  onChange={e => setLowStockThreshold(e.target.value)}
+                  className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
+                  placeholder="e.g., 5 — at or below this qty shows Low Stock (leave blank for none)"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Stock Status — hidden when has variants OR when inventory sync is on */}
+          {!hasVariants && !inventorySync && (
             <>
               <div>
                 <label htmlFor="stock_status" className="block text-sm font-medium text-foreground-secondary mb-2">
@@ -1801,7 +2059,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 <AdminSelect
                   id="stock_status"
                   name="stock_status"
-                  required={!hasVariants}
+                  required={!hasVariants && !inventorySync}
                   defaultValue={product?.stock_status || 'In Stock'}
                   options={[
                     { value: 'In Stock', label: 'In Stock' },
@@ -2098,13 +2356,13 @@ export default function ProductForm({ categories, brands, action, product, produ
             )}
           </div>
 
-          {/* Product Details (grouped accordion) */}
+          {/* Product Details (grouped accordion) — force-open while stock must be assigned */}
           <div className="md:col-span-2 border border-border-default rounded-lg overflow-hidden">
-            <button type="button" onClick={() => setPhysicalExpanded(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
-              <span>Product Details</span>
-              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${physicalExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+            <button type="button" onClick={() => { if (!showBootstrap) setPhysicalExpanded(v => !v) }} className="w-full flex items-center justify-between px-4 py-3 bg-background hover:bg-surface-secondary text-sm font-semibold text-foreground transition-colors">
+              <span>Product Details{showBootstrap ? ' — stock to assign' : ''}</span>
+              <svg className={`w-4 h-4 text-foreground-muted transition-transform ${(physicalExpanded || showBootstrap) ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
             </button>
-            {physicalExpanded && (
+            {(physicalExpanded || showBootstrap) && (
               <div className="border-t border-border-default divide-y divide-border-default">
 
                 {/* Physical Attributes */}
@@ -2176,114 +2434,206 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
 
                       {showBootstrap && (() => {
-                        const needed = Math.round(_bsStockQty)
                         const sku = (product?.sku || '').replace(/[^A-Z0-9]/gi, '').slice(0, 8).toUpperCase()
                         const dtStamp = () => new Date().toISOString().replace(/[-T:.Z]/g, '').slice(0, 14)
                         const randSuffix = () => Math.random().toString(36).slice(2, 8).toUpperCase()
                         const autoSerial = () => `${sku ? sku + '-' : 'SN-'}${dtStamp()}-${randSuffix()}`
-                        const entered = bsSerials.filter(Boolean).length
-                        const updateSerial = (i: number, val: string) =>
-                          setBsSerials(arr => { const a = [...arr]; a[i] = val; return a })
+                        const keyOf = (g: BsGrain) => `${g.variant_id || ''}:${g.sub_variant_id || ''}`
+                        // Read a grain's entry, materialising the lazy default when absent.
+                        // Backfill the newer selected/assignQty fields for entries restored
+                        // from a pre-change draft (they'd otherwise be undefined).
+                        const entryOf = (g: BsGrain): BsEntry => {
+                          const e = bsEntries[keyOf(g)]
+                          if (!e) return _bsMakeEntry(g.qty)
+                          return {
+                            ...e,
+                            selected: e.selected ?? true,
+                            assignQty: e.assignQty ?? g.qty,
+                          }
+                        }
+                        const patchEntry = (g: BsGrain, patch: Partial<BsEntry>) => {
+                          const key = keyOf(g)
+                          setBsEntries(prev => {
+                            const base = prev[key] ?? _bsMakeEntry(g.qty)
+                            return { ...prev, [key]: { ...base, ...patch } }
+                          })
+                        }
+                        const regenLot = (g: BsGrain) => {
+                          const today = new Date()
+                          const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`
+                          const rand = Math.random().toString(36).substring(2,5).toUpperCase()
+                          patchEntry(g, { lot: `LOT-${sku ? sku+'-' : ''}${ymd}-${rand}` })
+                        }
+                        const updateSerial = (g: BsGrain, i: number, val: string) => {
+                          const key = keyOf(g)
+                          setBsEntries(prev => {
+                            const base = prev[key] ?? _bsMakeEntry(g.qty)
+                            const a = [...(base.serials || [])]
+                            a[i] = val
+                            return { ...prev, [key]: { ...base, serials: a } }
+                          })
+                        }
+                        const generateAll = (g: BsGrain) => {
+                          const n = entryOf(g).assignQty
+                          patchEntry(g, { serials: Array.from({ length: n }, () => autoSerial()) })
+                        }
+                        // Clamp an assignQty edit to [1, g.qty]; also trim serials to fit.
+                        const setAssignQty = (g: BsGrain, raw: number) => {
+                          const key = keyOf(g)
+                          const clamped = Math.max(1, Math.min(g.qty, Math.floor(raw) || 1))
+                          setBsEntries(prev => {
+                            const base = prev[key] ?? _bsMakeEntry(g.qty)
+                            const serials = (base.serials || []).slice(0, clamped)
+                            return { ...prev, [key]: { ...base, assignQty: clamped, serials } }
+                          })
+                        }
+                        // Running total of units that will be tracked (selected grains).
+                        const selectedTotal = bsGrains.reduce((s, g) => {
+                          const e = entryOf(g)
+                          return s + (e.selected === false ? 0 : e.assignQty)
+                        }, 0)
                         return (
                           <div className="mt-4 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/60 dark:bg-amber-900/10 p-4 space-y-4">
                             <div>
                               <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 uppercase tracking-wide">Assign Existing Stock</p>
                               <p className="text-xs text-foreground-secondary mt-0.5">
-                                <span className="font-semibold">{_bsStockQty} unit(s)</span> already in stock — fill in details below so tracking is accurate.
+                                Choose which variants and how many units to track.
+                              </p>
+                              <p className="text-xs text-foreground-muted mt-0.5">
+                                <span className="font-semibold">{selectedTotal}</span> of {_bsStockTotal} units will be tracked; {_bsStockTotal - selectedTotal} stay as plain stock.
                               </p>
                             </div>
 
-                            {perishable && wasPerishableOff && (
-                              <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-900/10 p-3">
-                                <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">Batch Details</p>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                  <div>
-                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Expiry Date <span className="text-red-500">*</span></label>
-                                    <DatePicker value={bsExpiryDate} onChange={setBsExpiryDate} />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Manufacture Date</label>
-                                    <DatePicker value={bsManufactureDate} onChange={setBsManufactureDate} />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Lot Number</label>
-                                    <div className="flex gap-1">
+                            {bsGrains.map(g => {
+                              const entry = entryOf(g)
+                              const serials = entry.serials || []
+                              const entered = serials.filter(Boolean).length
+                              const isSelected = entry.selected !== false
+                              const assignQty = entry.assignQty
+                              return (
+                                <div key={keyOf(g)} className="rounded-lg border border-border-default bg-surface/60 p-3 space-y-3">
+                                  <div className="flex items-center justify-between gap-3">
+                                    <label className="flex items-center gap-2 min-w-0">
                                       <input
-                                        type="text"
-                                        className="field-compact border border-border-default bg-surface text-foreground flex-1 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                        value={bsLotNumber}
-                                        onChange={e => setBsLotNumber(e.target.value)}
+                                        type="checkbox"
+                                        checked={isSelected}
+                                        onChange={e => patchEntry(g, { selected: e.target.checked })}
+                                        className="h-4 w-4 rounded border-border-default text-secondary-600 focus:ring-secondary-500"
                                       />
-                                      <button
-                                        type="button"
-                                        title="Regenerate"
-                                        onClick={() => {
-                                          const today = new Date()
-                                          const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`
-                                          const rand = Math.random().toString(36).substring(2,5).toUpperCase()
-                                          setBsLotNumber(`LOT-${sku ? sku+'-' : ''}${ymd}-${rand}`)
-                                        }}
-                                        className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
-                                      >↺</button>
+                                      <span className="text-xs font-semibold text-foreground truncate">{g.label}</span>
+                                    </label>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={g.qty}
+                                        disabled={!isSelected}
+                                        value={assignQty}
+                                        onChange={e => setAssignQty(g, Number(e.target.value))}
+                                        className="field-compact w-16 border border-border-default bg-surface text-foreground text-xs text-right disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                      />
+                                      <span className="text-xs text-foreground-muted">/ {g.qty}</span>
                                     </div>
                                   </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Shelf Location</label>
-                                    <AdminSelect
-                                      id="bs-location"
-                                      value={bsLocationId}
-                                      onChange={setBsLocationId}
-                                      sm
-                                      options={[
-                                        { value: '', label: '— none —' },
-                                        ...bsShelfLocations.map(sl => ({ value: sl.id, label: sl.display_code })),
-                                      ]}
-                                    />
-                                  </div>
-                                </div>
-                              </div>
-                            )}
 
-                            {serialized && wasSerializedOff && (
-                              <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-3">
-                                <div className="flex items-center justify-between mb-3">
-                                  <div>
-                                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Serial Numbers</p>
-                                    <span className="text-xs text-foreground-muted">({needed} required)</span>
-                                  </div>
-                                  <div className="flex items-center gap-2">
-                                    {entered === needed
-                                      ? <span className="text-xs text-green-600 dark:text-green-400">{entered}/{needed} entered ✓</span>
-                                      : <span className="text-xs text-amber-600 dark:text-amber-400">{entered}/{needed} entered</span>
-                                    }
-                                    <button
-                                      type="button"
-                                      className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                                      onClick={() => setBsSerials(Array.from({ length: needed }, () => autoSerial()))}
-                                    >Generate All</button>
-                                  </div>
-                                </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
-                                  {Array.from({ length: needed }, (_, n) => (
-                                    <div key={n} className="flex gap-1">
-                                      <input
-                                        type="text"
-                                        placeholder={autoSerial()}
-                                        className="field-compact border border-border-default bg-surface text-foreground font-mono text-xs flex-1 min-w-0 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
-                                        value={bsSerials[n] ?? ''}
-                                        onChange={e => updateSerial(n, e.target.value)}
-                                      />
-                                      <button
-                                        type="button"
-                                        title="Auto-generate"
-                                        className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
-                                        onClick={() => updateSerial(n, autoSerial())}
-                                      >Auto</button>
+                                  {isSelected && _perishablePending && (
+                                    <div className="rounded-lg border border-orange-200 dark:border-orange-800 bg-orange-50/60 dark:bg-orange-900/10 p-3">
+                                      <p className="text-xs font-semibold text-orange-700 dark:text-orange-400 uppercase tracking-wide mb-3">Batch Details</p>
+                                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        <div>
+                                          <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Expiry Date <span className="text-red-500">*</span></label>
+                                          <DatePicker value={entry.expiry} onChange={v => patchEntry(g, { expiry: v })} />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Manufacture Date</label>
+                                          <DatePicker value={entry.mfg} onChange={v => patchEntry(g, { mfg: v })} />
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Lot Number</label>
+                                          <div className="flex gap-1">
+                                            <input
+                                              type="text"
+                                              className="field-compact border border-border-default bg-surface text-foreground flex-1 focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent"
+                                              value={entry.lot}
+                                              onChange={e => patchEntry(g, { lot: e.target.value })}
+                                            />
+                                            <button
+                                              type="button"
+                                              title="Regenerate"
+                                              onClick={() => regenLot(g)}
+                                              className="px-2 py-1 rounded border border-border-default bg-surface hover:bg-surface-elevated text-foreground-muted hover:text-foreground transition-colors text-xs"
+                                            >↺</button>
+                                          </div>
+                                        </div>
+                                        <div>
+                                          <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Shelf Location</label>
+                                          <AdminSelect
+                                            id={`bs-location-${keyOf(g)}`}
+                                            value={entry.location}
+                                            onChange={v => patchEntry(g, { location: v })}
+                                            sm
+                                            options={[
+                                              { value: '', label: '— none —' },
+                                              ...bsShelfLocations.map(sl => ({ value: sl.id, label: sl.display_code })),
+                                            ]}
+                                          />
+                                        </div>
+                                      </div>
                                     </div>
-                                  ))}
+                                  )}
+
+                                  {isSelected && _serializedPending && (
+                                    <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-900/10 p-3">
+                                      <div className="flex items-center justify-between mb-3">
+                                        <div>
+                                          <p className="text-xs font-semibold text-blue-700 dark:text-blue-400 uppercase tracking-wide">Serial Numbers</p>
+                                          <span className="text-xs text-foreground-muted">({assignQty} required)</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                          {entered === assignQty
+                                            ? <span className="text-xs text-green-600 dark:text-green-400">{entered}/{assignQty} entered ✓</span>
+                                            : <span className="text-xs text-amber-600 dark:text-amber-400">{entered}/{assignQty} entered</span>
+                                          }
+                                          <button
+                                            type="button"
+                                            className="text-xs px-2 py-1 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                            onClick={() => generateAll(g)}
+                                          >Generate All</button>
+                                        </div>
+                                      </div>
+                                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-64 overflow-y-auto pr-1">
+                                        {Array.from({ length: assignQty }, (_, n) => (
+                                          <div key={n} className="flex gap-1">
+                                            <input
+                                              ref={el => { bsSerialRefs.current[`${keyOf(g)}#${n}`] = el }}
+                                              type="text"
+                                              placeholder={autoSerial()}
+                                              className="field-compact rounded border border-border-secondary bg-surface text-foreground font-mono text-xs flex-1 min-w-0 focus:outline-none focus:border-secondary-500"
+                                              value={serials[n] ?? ''}
+                                              onChange={e => updateSerial(g, n, e.target.value)}
+                                              onKeyDown={e => {
+                                                // A barcode scanner types the code then sends Enter — commit and
+                                                // jump to the next empty serial field (same for manual Enter).
+                                                if (e.key === 'Enter') {
+                                                  e.preventDefault()
+                                                  bsFocusNextSerial(`${keyOf(g)}#${n}`)
+                                                }
+                                              }}
+                                            />
+                                            <button
+                                              type="button"
+                                              title="Auto-generate"
+                                              className="shrink-0 text-xs px-1.5 rounded border border-border-default bg-surface-elevated hover:bg-surface-hover text-foreground-secondary"
+                                              onClick={() => updateSerial(g, n, autoSerial())}
+                                            >Auto</button>
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
                                 </div>
-                              </div>
-                            )}
+                              )
+                            })}
 
                             {bootstrapError && (
                               <div className="p-3 rounded-lg bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-800 dark:text-red-300 text-xs">

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/lib/db', () => ({ withTransaction: vi.fn() }))
-vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/inventory', () => ({ logStockMovement: vi.fn().mockResolvedValue(undefined), recomputeStockStatusForProduct: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/shelf', () => ({ syncPerishableStock: vi.fn().mockResolvedValue(undefined) }))
 
 import { deductOrderStock, deductStockForLines } from '@/lib/inventory-deduct'

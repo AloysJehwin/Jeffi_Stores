@@ -21,6 +21,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/shelf', () => ({
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),
   upsertShelfStock: vi.fn().mockResolvedValue(undefined),
+  syncCentralInventory: vi.fn().mockResolvedValue(undefined),
 }))
 
 vi.mock('@/lib/inventory', () => ({
@@ -122,41 +123,14 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     expect(json.error).toMatch(/perishable nor serialized/)
   })
 
-  // --- 404 variant not found ---
+  // --- 400 shelf location required per grain ---
 
-  it('returns 404 when variant_id provided but variant not found', async () => {
-    vi.mocked(queryOne)
-      .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '10' })
-      .mockResolvedValueOnce(null) // variant lookup
-    const res = await POST(postReq({ variant_id: VARIANT_ID }), paramsFor())
-    expect(res.status).toBe(404)
-    const json = await res.json()
-    expect(json.error).toBe('Variant not found')
-  })
-
-  // --- 400 no existing stock ---
-
-  it('returns 400 when inventory qty is zero', async () => {
-    vi.mocked(queryOne).mockResolvedValueOnce({
-      id: PRODUCT_ID,
-      perishable: true,
-      serialized: false,
-      inventory_quantity: '0',
-    })
-    const res = await POST(postReq({}), paramsFor())
+  it('returns 400 when a grain has quantity but no location_id', async () => {
+    vi.mocked(queryOne).mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '10' })
+    const res = await POST(postReq({ assignments: [{ quantity: 5, expiry_date: '2027-01-01' }] }), paramsFor())
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toBe('No existing stock to bootstrap')
-  })
-
-  it('returns 400 when variant inventory qty is zero', async () => {
-    vi.mocked(queryOne)
-      .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '10' })
-      .mockResolvedValueOnce({ inventory_quantity: '0', sub_variant_id: null })
-    const res = await POST(postReq({ variant_id: VARIANT_ID }), paramsFor())
-    expect(res.status).toBe(400)
-    const json = await res.json()
-    expect(json.error).toBe('No existing stock to bootstrap')
+    expect(json.error).toMatch(/shelf location is required/)
   })
 
   // --- 400 perishable requires expiry_date ---
@@ -168,7 +142,7 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
       serialized: false,
       inventory_quantity: '5',
     })
-    const res = await POST(postReq({}), paramsFor())
+    const res = await POST(postReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID }] }), paramsFor())
     expect(res.status).toBe(400)
     const json = await res.json()
     expect(json.error).toMatch(/Expiry date is required/)
@@ -183,34 +157,38 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
       serialized: true,
       inventory_quantity: '3',
     })
-    const res = await POST(postReq({ serial_numbers: ['A', 'B'] }), paramsFor())
+    const res = await POST(postReq({ assignments: [{ quantity: 3, location_id: LOCATION_ID, serial_numbers: ['A', 'B'] }] }), paramsFor())
     expect(res.status).toBe(400)
     const json = await res.json()
-    expect(json.error).toMatch(/serial number\(s\) required/)
+    expect(json.error).toMatch(/needs 3 serial/)
   })
 
-  // --- 409 already bootstrapped ---
+  // --- 409 serial already exists in stock ---
 
-  it('returns 409 when already bootstrapped (existing batch)', async () => {
-    vi.mocked(queryOne)
-      .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '5' })
-      .mockResolvedValueOnce({ total: 1 }) // existing batch count
-      .mockResolvedValueOnce({ total: 0 }) // existing serial count
-    const res = await POST(postReq({ expiry_date: '2027-01-01' }), paramsFor())
-    expect(res.status).toBe(409)
-    const json = await res.json()
-    expect(json.error).toBe('Stock already bootstrapped')
-  })
-
-  it('returns 409 when already bootstrapped (existing serial)', async () => {
+  it('returns 409 when a serial already exists in stock', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '3' })
-      .mockResolvedValueOnce({ total: 0 })
-      .mockResolvedValueOnce({ total: 3 })
-    const res = await POST(postReq({ serial_numbers: ['A', 'B', 'C'] }), paramsFor())
+      .mockResolvedValueOnce({ serial_number: 'A' }) // clash
+    const res = await POST(postReq({ assignments: [{ quantity: 3, location_id: LOCATION_ID, serial_numbers: ['A', 'B', 'C'] }] }), paramsFor())
     expect(res.status).toBe(409)
     const json = await res.json()
-    expect(json.error).toBe('Stock already bootstrapped')
+    expect(json.error).toMatch(/already exists in stock/)
+  })
+
+  // --- Idempotent: already bootstrapped grain returns 200, skips new insert ---
+
+  it('idempotent: already-bootstrapped grain returns 200 and skips new batch', async () => {
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '5' })
+      .mockResolvedValueOnce({ total: 1 }) // existing active stock
+    const client = makeClient()
+    vi.mocked(getClient).mockResolvedValueOnce(client as any)
+    const res = await POST(postReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2027-01-01' }] }), paramsFor())
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.success).toBe(true)
+    expect(json.batch_ids).toEqual([]) // no new batch
+    expect(syncPerishableStock).toHaveBeenCalled() // still re-synced
   })
 
   // --- Success: perishable product ---
@@ -219,16 +197,18 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '10' })
       .mockResolvedValueOnce({ total: 0 })
-      .mockResolvedValueOnce({ total: 0 })
 
     const client = makeClient()
     vi.mocked(getClient).mockResolvedValueOnce(client as any)
 
     const res = await POST(postReq({
-      expiry_date: '2027-01-01',
-      lot_number: 'LOT-1',
-      manufacture_date: '2026-01-01',
-      location_id: LOCATION_ID,
+      assignments: [{
+        quantity: 10,
+        expiry_date: '2027-01-01',
+        lot_number: 'LOT-1',
+        manufacture_date: '2026-01-01',
+        location_id: LOCATION_ID,
+      }],
     }), paramsFor())
     expect(res.status).toBe(200)
     const json = await res.json()
@@ -245,16 +225,18 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
   it('bootstraps a variant-scoped perishable product', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '10' })
-      .mockResolvedValueOnce({ inventory_quantity: '5', sub_variant_id: null })
-      .mockResolvedValueOnce({ total: 0 })
       .mockResolvedValueOnce({ total: 0 })
 
     const client = makeClient()
     vi.mocked(getClient).mockResolvedValueOnce(client as any)
 
     const res = await POST(postReq({
-      variant_id: VARIANT_ID,
-      expiry_date: '2027-01-01',
+      assignments: [{
+        variant_id: VARIANT_ID,
+        quantity: 5,
+        location_id: LOCATION_ID,
+        expiry_date: '2027-01-01',
+      }],
     }), paramsFor())
     expect(res.status).toBe(200)
     const json = await res.json()
@@ -266,15 +248,18 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
   it('bootstraps a serialized product successfully', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '3' })
-      .mockResolvedValueOnce({ total: 0 })
+      .mockResolvedValueOnce(null) // no serial clash
       .mockResolvedValueOnce({ total: 0 })
 
     const client = makeClient()
     vi.mocked(getClient).mockResolvedValueOnce(client as any)
 
     const res = await POST(postReq({
-      serial_numbers: ['SN-1', 'SN-2', 'SN-3'],
-      location_id: LOCATION_ID,
+      assignments: [{
+        quantity: 3,
+        serial_numbers: ['SN-1', 'SN-2', 'SN-3'],
+        location_id: LOCATION_ID,
+      }],
     }), paramsFor())
     expect(res.status).toBe(200)
     const json = await res.json()
@@ -288,29 +273,11 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     )
   })
 
-  it('bootstraps a serialized product without location_id (no shelf_stock insert)', async () => {
-    vi.mocked(queryOne)
-      .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: false, serialized: true, inventory_quantity: '2' })
-      .mockResolvedValueOnce({ total: 0 })
-      .mockResolvedValueOnce({ total: 0 })
-
-    const client = makeClient()
-    vi.mocked(getClient).mockResolvedValueOnce(client as any)
-
-    const res = await POST(postReq({
-      serial_numbers: ['A', 'B'],
-    }), paramsFor())
-    expect(res.status).toBe(200)
-    const json = await res.json()
-    expect(json.success).toBe(true)
-  })
-
   // --- 500 on DB error inside transaction ---
 
   it('rolls back and returns 500 on DB error during batch insert', async () => {
     vi.mocked(queryOne)
       .mockResolvedValueOnce({ id: PRODUCT_ID, perishable: true, serialized: false, inventory_quantity: '5' })
-      .mockResolvedValueOnce({ total: 0 })
       .mockResolvedValueOnce({ total: 0 })
 
     const client = {
@@ -326,7 +293,7 @@ describe('POST /api/admin/products/[id]/bootstrap-stock', () => {
     }
     vi.mocked(getClient).mockResolvedValueOnce(client as any)
 
-    const res = await POST(postReq({ expiry_date: '2027-01-01' }), paramsFor())
+    const res = await POST(postReq({ assignments: [{ quantity: 5, location_id: LOCATION_ID, expiry_date: '2027-01-01' }] }), paramsFor())
     expect(res.status).toBe(500)
     const json = await res.json()
     expect(json.error).toBe('Duplicate lot number')

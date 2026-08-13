@@ -42,12 +42,32 @@ export async function POST(request: NextRequest) {
   if (log.rolled_back_at) return NextResponse.json({ error: 'This operation has already been rolled back' }, { status: 409 })
   if (log.is_rollback) return NextResponse.json({ error: 'Cannot roll back a rollback entry' }, { status: 409 })
 
-  const snapshot: { id: string; name: string; before: Record<string, unknown> }[] = log.snapshot ?? []
-  if (!snapshot.length) return NextResponse.json({ error: 'No snapshot data — cannot rollback this operation' }, { status: 409 })
+  const raw = log.snapshot ?? null
+
+  // Normalise both snapshot shapes:
+  //  • legacy: bare array of { id, name, before } (products only)
+  //  • current: { products, variants, subs, variantUnits }
+  type Row = { id: string; name?: string; before: Record<string, unknown> }
+  type UnitRow = { variant_id: string; product_id: string; before: Record<string, unknown> | null }
+  let products: Row[] = []
+  let variants: Row[] = []
+  let subs: Row[] = []
+  let variantUnits: UnitRow[] = []
+  if (Array.isArray(raw)) {
+    products = raw as Row[]
+  } else if (raw && typeof raw === 'object') {
+    products = raw.products ?? []
+    variants = raw.variants ?? []
+    subs = raw.subs ?? []
+    variantUnits = raw.variantUnits ?? []
+  }
+
+  if (!products.length && !variants.length && !subs.length && !variantUnits.length) {
+    return NextResponse.json({ error: 'No snapshot data — cannot rollback this operation' }, { status: 409 })
+  }
 
   const operation: string = log.operation
 
-  const PRICE_FIELDS = ['mrp_ex_gst', 'mrp', 'price_ex_gst', 'base_price', 'discount_pct']
   const SIMPLE_FIELD_MAP: Record<string, string[]> = {
     set_tax_class:         ['tax_class'],
     set_condition:         ['condition'],
@@ -65,33 +85,32 @@ export async function POST(request: NextRequest) {
 
   let restored = 0
 
+  // Restore a set of rows on `table` by writing back every captured `before` field.
+  async function restoreRows(client: any, table: string, rows: Row[]) {
+    for (const row of rows) {
+      const b = row.before as Record<string, unknown>
+      const fields = Object.keys(b)
+      if (!fields.length) continue
+      const sets = fields.map((f, i) => `${f} = $${i + 2}`).join(', ')
+      await client.query(
+        `UPDATE ${table} SET ${sets}, updated_at = NOW() WHERE id = $1`,
+        [row.id, ...fields.map(f => b[f])]
+      )
+      restored++
+    }
+  }
+
   try {
     await withTransaction(async (client) => {
       if (['inflate_price', 'set_discount', 'set_mrp_ex_gst'].includes(operation)) {
-        for (const row of snapshot) {
-          const b = row.before as any
-          const fields = PRICE_FIELDS.filter(f => f in b)
-          if (!fields.length) continue
-          const sets = fields.map((f, i) => `${f} = $${i + 2}`).join(', ')
-          await client.query(
-            `UPDATE products SET ${sets}, updated_at = NOW() WHERE id = $1`,
-            [row.id, ...fields.map(f => b[f])]
-          )
-          restored++
-        }
+        await restoreRows(client, 'products', products)
+        await restoreRows(client, 'product_variants', variants)
+        await restoreRows(client, 'product_sub_variants', subs)
       } else if (SIMPLE_FIELD_MAP[operation]) {
-        const fields = SIMPLE_FIELD_MAP[operation]
-        for (const row of snapshot) {
-          const b = row.before as any
-          const sets = fields.map((f, i) => `${f} = $${i + 2}`).join(', ')
-          await client.query(
-            `UPDATE products SET ${sets}, updated_at = NOW() WHERE id = $1`,
-            [row.id, ...fields.map(f => b[f])]
-          )
-          restored++
-        }
+        await restoreRows(client, 'products', products)
       } else if (operation === 'set_selling_unit') {
-        for (const row of snapshot) {
+        // Product-level base unit
+        for (const row of products) {
           const b = row.before as any
           if (b.unit == null) {
             await client.query(
@@ -109,6 +128,33 @@ export async function POST(request: NextRequest) {
           }
           restored++
         }
+        // Variant base unit rows + product_variants.unit
+        for (const vu of variantUnits) {
+          const b = vu.before
+          // Restore the simple varchar on the variant row
+          const variantUnit = (b as any)?.variant_unit ?? null
+          await client.query(
+            `UPDATE product_variants SET unit = $1, updated_at = NOW() WHERE id = $2`,
+            [variantUnit, vu.variant_id]
+          )
+          if (!b || (b as any).unit == null) {
+            // There was no base unit row before — remove any the operation created
+            await client.query(
+              `DELETE FROM product_units WHERE variant_id = $1 AND is_base = true`,
+              [vu.variant_id]
+            )
+          } else {
+            const ub = b as any
+            await client.query(
+              `INSERT INTO product_units (product_id, variant_id, unit, factor, dimension, display_label, min_qty, max_qty, qty_step, is_base, is_purchase_default)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, false)
+               ON CONFLICT (variant_id, unit) WHERE variant_id IS NOT NULL
+               DO UPDATE SET factor=$4, dimension=$5, display_label=$6, min_qty=$7, max_qty=$8, qty_step=$9, is_base=true, updated_at=NOW()`,
+              [vu.product_id, vu.variant_id, ub.unit, ub.factor, ub.dimension, ub.display_label, ub.min_qty, ub.max_qty, ub.qty_step]
+            )
+          }
+          restored++
+        }
       } else {
         throw new Error(`Rollback not supported for operation: ${operation}`)
       }
@@ -121,7 +167,7 @@ export async function POST(request: NextRequest) {
       await client.query(
         `INSERT INTO controls_operation_log (operation, product_ids, value, snapshot, applied_by, admin_id, product_count, is_rollback)
          VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
-        [operation, snapshot.map(r => r.id), null, JSON.stringify(snapshot), admin.email ?? null, admin.adminId ?? null, snapshot.length]
+        [operation, products.map(r => r.id), null, JSON.stringify(raw), admin.email ?? null, admin.adminId ?? null, products.length]
       )
     })
 

@@ -4,7 +4,12 @@
  * Runs micro gradient steps in the background after a successful order,
  * adapting the recap model towards the user's style preferences.
  *
- * Gated by NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE=true.
+ * NOTE: This worker is not currently instantiated anywhere (no `new Worker(...)`
+ * spawn path exists), so the DB flag `feature_ondevice_finetune_enabled`
+ * (useStoreConfig().flags.ondeviceFinetuneEnabled) is inert until a spawner is
+ * wired. When wiring one, gate the spawn on that DB flag and pass it into the
+ * worker's init message rather than relying on the build-time env read below.
+ *
  * Saves LoRA weights to IndexedDB key 'jeffi_lora_v1'.
  *
  * Protocol (main → worker):
@@ -24,11 +29,6 @@ const LORA_DB_NAME = 'jeffi-ondevice'
 const LORA_STORE = 'lora-weights'
 const LORA_KEY = 'jeffi_lora_v1'
 const FINETUNE_STEPS = 3
-
-function isFineTuneEnabled(): boolean {
-  return process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === 'true' ||
-         process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1'
-}
 
 async function openLoraDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -64,7 +64,8 @@ async function loadLoraWeights(): Promise<ArrayBuffer | null> {
 }
 
 async function runFineTune(examples: FineTuneExample[]): Promise<number> {
-  if (!isFineTuneEnabled()) throw new Error('fine-tune disabled')
+  // Gating (DB feature flag + device capability) is decided on the main thread
+  // before this worker is ever spawned — see maybeRunFineTune() in runtime.ts.
   if (!examples.length) return 0
 
   // Filter to liked examples only (or all if no feedback yet)

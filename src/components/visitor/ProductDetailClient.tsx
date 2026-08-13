@@ -10,6 +10,8 @@ import BusinessPriceBadge from './BusinessPriceBadge'
 import RazorpayOffers from './RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { pickUnitPrice } from '@/lib/pricing'
 import { useRouter } from 'next/navigation'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
@@ -395,6 +397,7 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
   const pincodeRef = useRef<HTMLInputElement>(null)
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
+  const gstEnabled = useStoreConfig().flags.gstEnabled
   const router = useRouter()
 
   useEffect(() => {
@@ -448,8 +451,11 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
   }, [product.id])
 
   const hasVariants = product.has_variants && product.product_variants?.length > 0
-  const displayPrice = Number(product.base_price)
-  const mrp = product.mrp ? Number(product.mrp) : null
+  const displayPrice = pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
+  // Keep the MRP on the same basis as the shown price so the discount % is honest.
+  const gstRatePdp = product.gst_percentage ? Number(product.gst_percentage) : 0
+  const rawMrp = product.mrp ? Number(product.mrp) : null
+  const mrp = (!gstEnabled && rawMrp != null && gstRatePdp > 0) ? rawMrp / (1 + gstRatePdp / 100) : rawMrp
   const mrpDiscount = mrp && mrp > displayPrice
     ? Math.round(((mrp - displayPrice) / mrp) * 100)
     : 0
@@ -614,8 +620,9 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
           sku={product.sku}
           stockStatus={product.stock_status}
           basePrice={displayPrice}
+          basePriceExGst={product.price_ex_gst ?? null}
           salePrice={null}
-          mrp={mrp}
+          mrp={rawMrp}
           gstPercentage={product.gst_percentage ? Number(product.gst_percentage) : null}
           variants={hasVariants ? product.product_variants : []}
           variantType={product.variant_type || 'Variant'}

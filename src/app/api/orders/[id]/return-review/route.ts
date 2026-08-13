@@ -220,7 +220,7 @@ export async function POST(
           ? (await queryOne(`SELECT payment_status FROM orders WHERE id = $1`, [paymentOrderId]))?.payment_status
           : order.payment_status
 
-        if (effectivePaymentStatus === 'paid' && isRazorpayEnabled()) {
+        if (effectivePaymentStatus === 'paid' && (await isRazorpayEnabled())) {
           const paymentRecord = await queryOne(
             `SELECT id, transaction_id, amount, gateway_response FROM payments
              WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed'

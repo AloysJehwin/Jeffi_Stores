@@ -3,9 +3,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { canRunOnDeviceSummary, generateCartInsight, disposeSummarizer } from '@/lib/on-device/runtime'
 import { readUserProfile } from '@/lib/on-device/user-profile'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import type { CartLine } from '@/lib/on-device/prompt'
 
 export default function CartInsightPanel({ items }: { items: CartLine[] }) {
+  const ondeviceEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
   const [text, setText] = useState('')
   const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle')
   const started = useRef(false)
@@ -21,6 +23,7 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
   }, [items])
 
   useEffect(() => {
+    if (!ondeviceEnabled) return
     if (state !== 'idle' || started.current || !items.length) return
     started.current = true
     setState('loading')
@@ -39,9 +42,11 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
         .catch(() => setState('idle'))
     })
     return () => disposeSummarizer()
-  }, [state, items])
+  }, [state, items, ondeviceEnabled])
 
-  if (state === 'idle' || (state === 'done' && !text.trim())) return null
+  // Only render once real text has started streaming — never flash a loading box
+  // that would then vanish on devices where the model can't load (most mobiles).
+  if (!text.trim()) return null
 
   return (
     <div className="flex items-start gap-2.5 px-4 py-3 mt-4 mb-4 bg-surface-elevated rounded-xl border border-border-default">
@@ -49,10 +54,7 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
         <path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
       </svg>
       <p className="text-sm text-foreground leading-relaxed flex-1">
-        {state === 'loading' && !text
-          ? <span className="text-foreground-muted animate-pulse">Building your overview…</span>
-          : <>{text}{state === 'loading' && <span className="animate-pulse">▍</span>}</>
-        }
+        {text}{state === 'loading' && <span className="animate-pulse">▍</span>}
       </p>
       <span className="text-[9px] text-foreground-muted self-start mt-0.5 flex-shrink-0">on-device</span>
     </div>

@@ -8,7 +8,16 @@ type SnapshotRow = {
   id: string
   name: string
   before: Record<string, unknown>
-  after?: Record<string, unknown>
+}
+
+// Full operation snapshot. Older logs stored a bare SnapshotRow[]; new logs store
+// this object so rollback can restore child rows (variants / sub-variants / units)
+// that an operation also mutated. Rollback reads both shapes.
+type OperationSnapshot = {
+  products: SnapshotRow[]
+  variants: SnapshotRow[]
+  subs: SnapshotRow[]
+  variantUnits: { variant_id: string; product_id: string; before: Record<string, unknown> | null }[]
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -117,9 +126,11 @@ export async function POST(request: NextRequest) {
 
     await withTransaction(async (client) => {
       // ── capture snapshot (before values) ────────────────────────────────
-      const snapshot: SnapshotRow[] = []
+      const snapshot: OperationSnapshot = { products: [], variants: [], subs: [], variantUnits: [] }
 
       const PRICE_FIELDS = ['mrp_ex_gst', 'mrp', 'price_ex_gst', 'base_price', 'discount_pct']
+      // Variant price rows use `price` instead of `base_price`.
+      const VARIANT_PRICE_FIELDS = ['mrp_ex_gst', 'mrp', 'price_ex_gst', 'price', 'discount_pct']
       const SIMPLE_FIELD_MAP: Record<string, string[]> = {
         set_tax_class:        ['tax_class'],
         set_condition:        ['condition'],
@@ -141,7 +152,32 @@ export async function POST(request: NextRequest) {
           [ids]
         )
         for (const r of rows.rows) {
-          snapshot.push({ id: r.id, name: r.name, before: Object.fromEntries(PRICE_FIELDS.map(f => [f, r[f]])) })
+          snapshot.products.push({ id: r.id, name: r.name, before: Object.fromEntries(PRICE_FIELDS.map(f => [f, r[f]])) })
+        }
+        // inflate_price and set_discount also mutate variants (and inflate also
+        // mutates sub-variants), so snapshot those too. set_mrp_ex_gst is
+        // product-only, so skip child capture for it.
+        if (operation === 'inflate_price' || operation === 'set_discount') {
+          const vrows = await client.query(
+            `SELECT pv.id, ${VARIANT_PRICE_FIELDS.map(f => `pv.${f}`).join(', ')}
+             FROM product_variants pv WHERE pv.product_id = ANY($1::uuid[]) AND pv.is_active = true`,
+            [ids]
+          )
+          for (const r of vrows.rows) {
+            snapshot.variants.push({ id: r.id, name: '', before: Object.fromEntries(VARIANT_PRICE_FIELDS.map(f => [f, r[f]])) })
+          }
+        }
+        if (operation === 'inflate_price' || operation === 'set_discount') {
+          const srows = await client.query(
+            `SELECT psv.id, ${VARIANT_PRICE_FIELDS.map(f => `psv.${f}`).join(', ')}
+             FROM product_sub_variants psv
+             JOIN product_variants pv ON pv.id = psv.variant_id
+             WHERE pv.product_id = ANY($1::uuid[]) AND pv.is_active = true AND psv.is_active = true`,
+            [ids]
+          )
+          for (const r of srows.rows) {
+            snapshot.subs.push({ id: r.id, name: '', before: Object.fromEntries(VARIANT_PRICE_FIELDS.map(f => [f, r[f]])) })
+          }
         }
       } else if (SIMPLE_FIELD_MAP[operation]) {
         const fields = SIMPLE_FIELD_MAP[operation]
@@ -150,7 +186,7 @@ export async function POST(request: NextRequest) {
           [ids]
         )
         for (const r of rows.rows) {
-          snapshot.push({ id: r.id, name: r.name, before: Object.fromEntries(fields.map(f => [f, r[f]])) })
+          snapshot.products.push({ id: r.id, name: r.name, before: Object.fromEntries(fields.map(f => [f, r[f]])) })
         }
       } else if (operation === 'set_selling_unit') {
         const rows = await client.query(
@@ -162,7 +198,28 @@ export async function POST(request: NextRequest) {
           [ids]
         )
         for (const r of rows.rows) {
-          snapshot.push({ id: r.id, name: r.name, before: { unit: r.unit, factor: r.factor, dimension: r.dimension, display_label: r.display_label, min_qty: r.min_qty, max_qty: r.max_qty, qty_step: r.qty_step } })
+          snapshot.products.push({ id: r.id, name: r.name, before: { unit: r.unit, factor: r.factor, dimension: r.dimension, display_label: r.display_label, min_qty: r.min_qty, max_qty: r.max_qty, qty_step: r.qty_step } })
+        }
+        // When inheriting to variants we also change each variant's base unit row
+        // and product_variants.unit — snapshot both so rollback can restore them.
+        if (inherit_to_variants) {
+          const vrows = await client.query(
+            `SELECT pv.id AS variant_id, pv.product_id, pv.unit AS variant_unit,
+                    pu.unit, pu.factor, pu.dimension, pu.display_label, pu.min_qty, pu.max_qty, pu.qty_step
+             FROM product_variants pv
+             LEFT JOIN product_units pu ON pu.variant_id = pv.id AND pu.is_base = true
+             WHERE pv.product_id = ANY($1::uuid[]) AND pv.is_active = true`,
+            [ids]
+          )
+          for (const r of vrows.rows) {
+            snapshot.variantUnits.push({
+              variant_id: r.variant_id,
+              product_id: r.product_id,
+              before: r.unit == null
+                ? { variant_unit: r.variant_unit }
+                : { unit: r.unit, factor: r.factor, dimension: r.dimension, display_label: r.display_label, min_qty: r.min_qty, max_qty: r.max_qty, qty_step: r.qty_step, variant_unit: r.variant_unit },
+            })
+          }
         }
       }
 
@@ -256,8 +313,28 @@ export async function POST(request: NextRequest) {
           if (!isNaN(cur) && cur > 0) {
             const d = deriveFromMrpEx(cur, disc, parseFloat(v.gst_percentage) || 0)
             await client.query(
-              `UPDATE product_variants SET mrp=$1, price_ex_gst=$2, price=$3, updated_at=NOW() WHERE id=$4`,
-              [d.mrp, d.price_ex_gst, d.base_price, v.id]
+              `UPDATE product_variants SET discount_pct=$1, mrp=$2, price_ex_gst=$3, price=$4, updated_at=NOW() WHERE id=$5`,
+              [disc, d.mrp, d.price_ex_gst, d.base_price, v.id]
+            )
+          }
+        }
+
+        // Sub-variants carry their own price and must be discounted too, otherwise a
+        // product's cheapest sub-variant keeps its old (undiscounted) price.
+        const subs = await client.query(
+          `SELECT psv.id, psv.mrp_ex_gst, p.gst_percentage
+           FROM product_sub_variants psv
+           JOIN product_variants pv ON pv.id=psv.variant_id
+           JOIN products p ON p.id=pv.product_id
+           WHERE pv.product_id=ANY($1::uuid[]) AND pv.is_active=true AND psv.is_active=true`, [ids]
+        )
+        for (const sv of subs.rows) {
+          const cur = parseFloat(sv.mrp_ex_gst)
+          if (!isNaN(cur) && cur > 0) {
+            const d = deriveFromMrpEx(cur, disc, parseFloat(sv.gst_percentage) || 0)
+            await client.query(
+              `UPDATE product_sub_variants SET discount_pct=$1, mrp=$2, price_ex_gst=$3, price=$4, updated_at=NOW() WHERE id=$5`,
+              [disc, d.mrp, d.price_ex_gst, d.base_price, sv.id]
             )
           }
         }

@@ -112,12 +112,11 @@ describe('POST /api/orders/[id]/cancel-review', () => {
     const body = await res.json()
     expect(body.success).toBe(true)
     expect(body.newStatus).toBe('cancelled')
-    expect(body.refundFailed).toBe(false)
   })
 
-  it('approves cancellation for paid order with razorpay refund', async () => {
+  it('approves cancellation for paid order (leaves payment_status paid)', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     const mockRefund = vi.fn().mockResolvedValue({ id: 'refund_1' })
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
       payments: { refund: mockRefund },
@@ -125,7 +124,6 @@ describe('POST /api/orders/[id]/cancel-review', () => {
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, payment_status: 'paid' })
       .mockResolvedValueOnce(null) // no sale record
-      .mockResolvedValueOnce({ id: 'pay-1', transaction_id: 'pay_rzp_1', amount: '500', gateway_response: '{}' })
     const res = await POST(makeRequest({ action: 'approve' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
@@ -133,22 +131,24 @@ describe('POST /api/orders/[id]/cancel-review', () => {
     expect(body.newStatus).toBe('cancelled')
   })
 
-  it('handles razorpay refund failure gracefully', async () => {
+  it('approves a paid-order cancellation without refunding (refund is a separate step)', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
-    const mockRefund = vi.fn().mockRejectedValue(new Error('Gateway error'))
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
+    const mockRefund = vi.fn().mockResolvedValue({ id: 'refund_1' })
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
       payments: { refund: mockRefund },
     } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, payment_status: 'paid' })
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 'pay-1', transaction_id: 'pay_rzp_1', amount: '500', gateway_response: '{}' })
+      .mockResolvedValueOnce(null) // no sale record
     const res = await POST(makeRequest({ action: 'approve' }) as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.newStatus).toBe('cancelled')
-    expect(body.refundFailed).toBe(true)
+    // Cancel-review no longer issues the refund — it is deferred to /refund.
+    expect(mockRefund).not.toHaveBeenCalled()
+    const sqls = vi.mocked(db.query).mock.calls.map(c => c[0] as string)
+    expect(sqls.some(s => /payment_status = 'refunded'/.test(s))).toBe(false)
   })
 
   it('rejects cancellation with a note', async () => {

@@ -34,6 +34,7 @@ const defaultOpts = {
     healthScoreMax: 50,
     sendCooldownDays: 60,
     maxRecipientsPerSweep: 50,
+    whatsappEnabled: false,
   },
 }
 

@@ -1,6 +1,6 @@
 import { withTransaction } from '@/lib/db'
 import type { PoolClient } from 'pg'
-import { logStockMovement } from '@/lib/inventory'
+import { logStockMovement, recomputeStockStatusForProduct } from '@/lib/inventory'
 import { syncPerishableStock } from '@/lib/shelf'
 import { toSellingUnit, toBaseQuantity, serialCountForQuantity } from '@/lib/selling-unit'
 
@@ -436,4 +436,7 @@ async function deductPlain(
     referenceId: orderId,
     currentStock: before,
   })
+  // If inventory_sync is ON, flip stock_status to match the new quantity (e.g. the
+  // storefront buy button goes Out of Stock at qty 0). No-op when OFF.
+  await recomputeStockStatusForProduct(client, item.product_id)
 }

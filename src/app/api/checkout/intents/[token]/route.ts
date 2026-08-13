@@ -4,6 +4,7 @@ import { queryOne } from '@/lib/db'
 import { verifyIntent } from '@/lib/checkout-intent'
 import { resolveBuyNowItem, loadActiveCart, cartSubtotal } from '@/lib/order-commit'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { round2 } from '@/lib/gst'
 
 interface ProductDisplay {
@@ -28,6 +29,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
   const { token } = await params
   const intent = await verifyIntent(token)
   if (!intent) return NextResponse.json({ error: 'Invalid or expired intent' }, { status: 400 })
+  const { gstEnabled } = await getFeatureFlags()
 
   if (intent.mode === 'cart') {
     const auth = await authenticateAnyUser(req)
@@ -40,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     return NextResponse.json({
       mode: 'cart',
       itemCount: cart.length,
-      subtotal: cartSubtotal(cart),
+      subtotal: cartSubtotal(cart, gstEnabled),
       addressId: (intent as any).addressId ?? null,
       shippingCharge: (intent as any).shippingCharge ?? null,
     })
@@ -53,6 +55,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ toke
     qty: intent.qty,
     buyMode: intent.buyMode,
     buyUnit: intent.buyUnit,
+    gstEnabled,
   })
   if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
 

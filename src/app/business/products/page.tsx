@@ -3,7 +3,9 @@ export const dynamic = 'force-dynamic'
 import Link from 'next/link'
 import { headers } from 'next/headers'
 import { queryMany, queryOne } from '@/lib/db'
-import { mrpDiscountPct } from '@/lib/pricing'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL } from '@/lib/queries'
+import { getFeatureFlags } from '@/lib/site-controls'
 import SortDropdown from '@/components/visitor/SortDropdown'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
@@ -120,6 +122,9 @@ async function getProducts(searchParams: any) {
       ? `${buildSearchRank(searchParams.search, 'p.name')}, p.name ASC`
       : `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
 
+  const { gstEnabled } = await getFeatureFlags()
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
+
   const sql = `
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -131,17 +136,7 @@ async function getProducts(searchParams: any) {
       ) AS product_images,
       COALESCE((SELECT COUNT(CASE WHEN pv.stock_status != 'Out of Stock' THEN 1 END)
       FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
-      (SELECT MIN(price) FROM (
-        SELECT pv.price AS price
-        FROM product_variants pv
-        WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
-        UNION ALL
-        SELECT sv.price AS price
-        FROM product_sub_variants sv
-        JOIN product_variants pv ON pv.id = sv.variant_id
-        WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
-      ) AS combined_prices) AS variant_min_price,
+      ${MIN_PRICE_SQL} AS variant_min_price,
       (SELECT MIN(mrp) FROM (
         SELECT pv.mrp
         FROM product_variants pv
@@ -163,7 +158,7 @@ async function getProducts(searchParams: any) {
   `
 
   const products = await queryMany(sql, params)
-  return { products, total, page, totalPages: Math.ceil(total / PAGE_SIZE) }
+  return { products, total, page, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
 }
 
 async function getCategories() {
@@ -213,7 +208,7 @@ export default async function ProductsPage({
   const resolvedSearchParams = await searchParams
   const hdrs = await headers()
   const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
-  const { products, total, page, totalPages } = await getProducts(resolvedSearchParams)
+  const { products, total, page, totalPages, gstEnabled } = await getProducts(resolvedSearchParams)
   const categories = await getCategories()
   const brands = await getBrands()
 
@@ -448,15 +443,18 @@ export default async function ProductsPage({
                     const hasVariants = product.has_variants
                     const displayPrice = hasVariants && product.variant_min_price
                       ? product.variant_min_price
-                      : (product.price_ex_gst || product.base_price)
+                      : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
                     const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
-                    const mrp = hasVariants
+                    const rawMrp = hasVariants
                       ? (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
                       : (product.mrp ? Number(product.mrp) : null)
-                    const inclPrice = hasVariants && product.variant_min_price
-                      ? Number(product.variant_min_price)
-                      : Number(product.base_price)
-                    const mrpDiscount = mrpDiscountPct(mrp, inclPrice)
+                    // When GST is off, displayPrice is ex-GST, so put the (inclusive)
+                    // MRP on the same ex-GST basis before computing discount / striking through.
+                    const gstRate = Number(product.gst_percentage ?? 0)
+                    const mrpBasis = (!gstEnabled && rawMrp != null && gstRate > 0)
+                      ? rawMrp / (1 + gstRate / 100)
+                      : rawMrp
+                    const mrpDiscount = mrpDiscountPct(mrpBasis, Number(displayPrice))
 
                     return (
                       <ProductCard
@@ -466,7 +464,7 @@ export default async function ProductsPage({
                         slug={product.slug}
                         hasVariants={hasVariants}
                         displayPrice={Number(displayPrice)}
-                        mrp={mrp}
+                        mrp={mrpBasis}
                         mrpDiscount={mrpDiscount}
                         effectiveStock={effectiveStock}
                         primaryImage={primaryImage}

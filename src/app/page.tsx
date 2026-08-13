@@ -1,16 +1,20 @@
 import Link from 'next/link'
 import { queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { heroSlideHref } from '@/lib/hero-slides'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import ReviewCouponPopup from '@/components/visitor/ReviewCouponPopup'
 import ProductCard from '@/components/visitor/ProductCard'
 import HeroCarousel from '@/components/visitor/HeroCarousel'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import { getHost } from '@/lib/get-host'
+import { getStorefrontContent, getFeatureFlags } from '@/lib/site-controls'
+import { pickUnitPrice } from '@/lib/pricing'
 
 export const revalidate = 120
 
-async function getFeaturedProducts() {
+async function getFeaturedProducts(limit: number, gstEnabled: boolean) {
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   return queryMany(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -21,17 +25,18 @@ async function getFeaturedProducts() {
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${MIN_PRICE_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.is_featured = true AND p.is_active = true
-    LIMIT 8
-  `)
+    LIMIT $1
+  `, [limit])
 }
 
-async function getNewArrivals() {
+async function getNewArrivals(limit: number, gstEnabled: boolean) {
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   return queryMany(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -42,15 +47,15 @@ async function getNewArrivals() {
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${MIN_PRICE_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
     LEFT JOIN brands b ON p.brand_id = b.id
     WHERE p.is_active = true
     ORDER BY p.created_at DESC
-    LIMIT 4
-  `)
+    LIMIT $1
+  `, [limit])
 }
 
 async function getMainCategories() {
@@ -63,8 +68,26 @@ async function getMainCategories() {
 }
 
 async function getHeroSlides() {
+  // Prefer admin-managed hero_slides. Each carries its own copy, image and a CTA
+  // link built from assigned product filters (or a manual URL).
+  const managed = await queryMany<any>(
+    `SELECT * FROM hero_slides WHERE is_active = true ORDER BY display_order ASC, created_at ASC`
+  )
+  if (managed.length > 0) {
+    return managed.map(s => ({
+      id: s.id,
+      title: s.title,
+      subtitle: s.subtitle,
+      badge_text: s.badge_text,
+      badge_color: s.badge_color,
+      image_url: s.image_url,
+      image_url_mobile: s.image_url_mobile,
+      href: heroSlideHref(s),
+    }))
+  }
+
+  // Fallback: derive slides from active parent categories (legacy behaviour).
   // Pick 4 categories daily using a date-seeded deterministic shuffle.
-  // Prioritise categories with hero images; fall back to any active parent category.
   const all = await queryMany<{
     name: string; slug: string;
     hero_image_mobile: string | null; hero_image_desktop: string | null;
@@ -92,14 +115,18 @@ async function getHeroSlides() {
   return shuffled.slice(0, 4)
 }
 
-function productCardProps(product: any) {
+function productCardProps(product: any, gstEnabled: boolean) {
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
   const hasVariants = product.has_variants
   const displayPrice = hasVariants && product.variant_min_price
     ? Number(product.variant_min_price)
-    : Number(product.base_price)
+    : pickUnitPrice({ inclusive: Number(product.base_price), exGst: product.price_ex_gst != null ? Number(product.price_ex_gst) : undefined }, gstEnabled)
   const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
-  const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+  const rawMrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+  // MRP is stored GST-inclusive. When GST is off, displayPrice is ex-GST, so put
+  // the MRP on the same ex-GST basis before computing the discount / strike-through.
+  const gstRate = Number(product.gst_percentage ?? 0)
+  const mrp = (!gstEnabled && rawMrp != null && gstRate > 0) ? rawMrp / (1 + gstRate / 100) : rawMrp
   const mrpDiscount = mrp && mrp > displayPrice ? Math.round(((mrp - displayPrice) / mrp) * 100) : 0
   return {
     id: product.id,
@@ -117,7 +144,8 @@ function productCardProps(product: any) {
     extraDeliveryDays: Number(product.extra_delivery_days ?? 0) }
 }
 
-async function getBestSellers() {
+async function getBestSellers(gstEnabled: boolean) {
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   return queryMany(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -128,7 +156,7 @@ async function getBestSellers() {
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${MIN_PRICE_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp,
       COALESCE((SELECT SUM(oi.quantity) FROM order_items oi WHERE oi.product_id = p.id), 0) AS total_sold
     FROM products p
@@ -152,7 +180,8 @@ async function getTopBrands() {
   `)
 }
 
-async function getDealOfTheDay() {
+async function getDealOfTheDay(gstEnabled: boolean) {
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   return queryMany(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -163,7 +192,7 @@ async function getDealOfTheDay() {
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${MIN_PRICE_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
@@ -196,7 +225,7 @@ async function getCategoryShowcase() {
   const result = await Promise.all(categories.map(async cat => {
     const products = await queryMany(`
       SELECT p.id, p.name, p.slug, p.has_variants,
-        p.base_price, p.discount_pct,
+        p.base_price, p.price_ex_gst, p.discount_pct,
         (SELECT json_agg(json_build_object('image_url', pi2.image_url, 'thumbnail_url', pi2.thumbnail_url))
           FROM product_images pi2 WHERE pi2.product_id = p.id LIMIT 1) AS product_images,
         MIN(pv.price) FILTER (WHERE pv.is_active) AS variant_min_price
@@ -214,13 +243,33 @@ async function getCategoryShowcase() {
 }
 
 export default async function HomePage() {
+  const storefront = await getStorefrontContent()
+  const { gstEnabled } = await getFeatureFlags()
+
+  // Homepage stats tiles — admin-editable JSON, fall back to defaults.
+  const DEFAULT_STATS = [
+    { value: '10+', label: 'Years in Business' },
+    { value: '1000+', label: 'Happy Customers' },
+  ]
+  let stats: { value: string; label: string }[] = DEFAULT_STATS
+  if (storefront.statsJson.trim()) {
+    try {
+      const parsed = JSON.parse(storefront.statsJson)
+      if (Array.isArray(parsed) && parsed.length && parsed.every(s => s && typeof s.value === 'string' && typeof s.label === 'string')) {
+        stats = parsed
+      }
+    } catch { /* keep defaults */ }
+  }
+  const aboutCopy = storefront.aboutCopy.trim() ||
+    'Jeffi Stores is built for industry — offering machinery parts, fasteners, tools, and electrical components for manufacturing, construction, and industrial repairs.'
+
   const [featuredProducts, newArrivals, mainCategories, heroSlides, categoryShowcase, bestSellers, topBrands, freeShippingThreshold] = await Promise.all([
-    getFeaturedProducts(),
-    getNewArrivals(),
+    getFeaturedProducts(storefront.featuredLimit, gstEnabled),
+    getNewArrivals(storefront.newArrivalsLimit, gstEnabled),
     getMainCategories(),
     getHeroSlides(),
     getCategoryShowcase(),
-    getBestSellers(),
+    getBestSellers(gstEnabled),
     getTopBrands(),
     getFreeShippingThreshold(),
   ])
@@ -317,7 +366,7 @@ export default async function HomePage() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
               {featuredProducts.map((product) => (
-                <ProductCard key={product.id} {...productCardProps(product)} />
+                <ProductCard key={product.id} {...productCardProps(product, gstEnabled)} />
               ))}
             </div>
 
@@ -386,7 +435,7 @@ export default async function HomePage() {
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-5">
               {newArrivals.map((product) => (
-                <ProductCard key={product.id} {...productCardProps(product)} />
+                <ProductCard key={product.id} {...productCardProps(product, gstEnabled)} />
               ))}
             </div>
           </div>
@@ -423,7 +472,7 @@ export default async function HomePage() {
                   <div className="grid grid-cols-2 gap-1 p-2 pt-1">
                     {cat.products.slice(0, 4).map((p: any) => {
                       const img = p.product_images?.[0]
-                      const price = p.has_variants && p.variant_min_price ? Number(p.variant_min_price) : Number(p.base_price)
+                      const price = p.has_variants && p.variant_min_price ? Number(p.variant_min_price) : pickUnitPrice({ inclusive: Number(p.base_price), exGst: p.price_ex_gst != null ? Number(p.price_ex_gst) : undefined }, gstEnabled)
                       return (
                         <Link key={p.id} href={`/products/${p.slug}`}
                           className="group bg-surface rounded-xl p-2 flex flex-col gap-1.5 hover:bg-surface-secondary transition-colors">
@@ -466,7 +515,7 @@ export default async function HomePage() {
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
               {bestSellers.map((product: any) => (
-                <ProductCard key={product.id} {...productCardProps(product)} />
+                <ProductCard key={product.id} {...productCardProps(product, gstEnabled)} />
               ))}
             </div>
           </div>
@@ -552,14 +601,12 @@ export default async function HomePage() {
               />
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 via-transparent to-transparent" />
               <div className="absolute bottom-4 left-4 right-4 flex gap-3">
-                <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/15 flex-1">
-                  <p className="text-white font-black text-2xl">10+</p>
-                  <p className="text-white/60 text-xs font-semibold mt-0.5">Years in Business</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/15 flex-1">
-                  <p className="text-white font-black text-2xl">1000+</p>
-                  <p className="text-white/60 text-xs font-semibold mt-0.5">Happy Customers</p>
-                </div>
+                {stats.map((s, i) => (
+                  <div key={i} className="bg-white/10 backdrop-blur-md rounded-xl px-4 py-3 border border-white/15 flex-1">
+                    <p className="text-white font-black text-2xl">{s.value}</p>
+                    <p className="text-white/60 text-xs font-semibold mt-0.5">{s.label}</p>
+                  </div>
+                ))}
               </div>
             </div>
 
@@ -571,7 +618,7 @@ export default async function HomePage() {
                 </h2>
               </div>
               <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">
-                Jeffi Stores is built for industry — offering machinery parts, fasteners, tools, and electrical components for manufacturing, construction, and industrial repairs.
+                {aboutCopy}
               </p>
               <p className="text-sm md:text-base text-foreground-secondary leading-relaxed">
                 We combine product breadth with expert service so your operations stay seamless and efficient.

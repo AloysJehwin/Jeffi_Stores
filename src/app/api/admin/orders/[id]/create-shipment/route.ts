@@ -5,14 +5,10 @@ import { queryOne, query, queryMany } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { computeShipmentDims, ShipmentItem, PackageType } from '@/lib/shipping'
 import { sendOrderShippedSMS } from '@/lib/sms'
+import { getBusinessValues } from '@/lib/site-controls'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
 const TOKEN = process.env.DELHIVERY_API_KEY
-const ORIGIN_PIN = process.env.DELHIVERY_ORIGIN_PINCODE || '492001'
-const PICKUP_LOCATION = process.env.DELHIVERY_PICKUP_LOCATION || 'Jeffi Stores'
-const SELLER_NAME = process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores'
-const SELLER_ADD = process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
-const SELLER_PHONE = process.env.DELHIVERY_SELLER_PHONE || '07713585374'
 
 function addBusinessDays(from: Date, days: number): Date {
   const d = new Date(from)
@@ -30,6 +26,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'orders:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    const bv = await getBusinessValues()
+    const ORIGIN_PIN = bv.delhiveryOriginPincode
+    const PICKUP_LOCATION = bv.pickupLocation
+    const SELLER_NAME = bv.sellerName
+    const SELLER_ADD = bv.sellerAddress
+    const SELLER_PHONE = bv.sellerPhone
 
     if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
 

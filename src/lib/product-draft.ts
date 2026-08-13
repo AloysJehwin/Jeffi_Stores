@@ -1,4 +1,5 @@
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
+import { recomputeStockStatusForProduct } from '@/lib/inventory'
 
 interface ProductDraft {
   product_id: string
@@ -22,8 +23,29 @@ export async function publishProductDraft(productId: string): Promise<void> {
   )
   if (!draft) throw new Error('Draft not found')
 
-  // If draft variants/sub_variants are empty, fall back to live data
-  const variants = Array.isArray(draft.variants) && draft.variants.length > 0
+  // Capture the LIVE tracking flags before publishing so we can detect a toggle
+  // from ON→OFF and clean up the now-orphaned batch/serial/shelf records below.
+  const liveFlags = await queryOne<{ perishable: boolean; serialized: boolean; has_variants: boolean }>(
+    `SELECT perishable, serialized, has_variants FROM products WHERE id = $1`,
+    [productId]
+  )
+  const fields: any = draft.fields || {}
+  const newPerishable = fields.perishable === true || fields.perishable === 'true'
+  const newSerialized = fields.serialized === true || fields.serialized === 'true'
+  const newHasVariants = fields.has_variants === true || fields.has_variants === 'true'
+  const turnedOffPerishable = !!liveFlags?.perishable && !newPerishable
+  const turnedOffSerialized = !!liveFlags?.serialized && !newSerialized
+  // Product changed from variant-based → simple. Its old variants/sub-variants (and
+  // their orphaned batches/serials/shelf) must be cleaned up; and we must NOT let the
+  // live-data fallback below re-activate them.
+  const turnedOffVariants = !newHasVariants && !!liveFlags?.has_variants
+
+  // If draft variants/sub_variants are empty, fall back to live data — UNLESS the
+  // product just became simple (then there are no intended variants; keep it empty
+  // so the upsert doesn't re-persist/re-activate the old ones).
+  const variants = turnedOffVariants
+    ? []
+    : Array.isArray(draft.variants) && draft.variants.length > 0
     ? draft.variants
     : await queryMany(`SELECT * FROM product_variants WHERE product_id = $1`, [productId])
 
@@ -70,6 +92,8 @@ export async function publishProductDraft(productId: string): Promise<void> {
          supplier_id              = NULLIF(($2::jsonb)->>'supplier_id', '')::uuid,
          extra_delivery_days      = NULLIF(($2::jsonb)->>'extra_delivery_days', '')::integer,
          inventory_quantity       = COALESCE(NULLIF(($2::jsonb)->>'inventory_quantity', '')::numeric, 0),
+         inventory_sync           = COALESCE((($2::jsonb)->>'inventory_sync')::boolean, false),
+         low_stock_threshold      = NULLIF(($2::jsonb)->>'low_stock_threshold', '')::numeric,
          mrp_ex_gst               = NULLIF(($2::jsonb)->>'mrp_ex_gst', '')::numeric,
          sub_variant_type         = ($2::jsonb)->>'sub_variant_type',
          ai_description           = ($2::jsonb)->>'ai_description',
@@ -196,7 +220,12 @@ export async function publishProductDraft(productId: string): Promise<void> {
          weight_grams = EXCLUDED.weight_grams, length_cm = EXCLUDED.length_cm,
          breadth_cm = EXCLUDED.breadth_cm, height_cm = EXCLUDED.height_cm,
          package_type = EXCLUDED.package_type, cost_price = EXCLUDED.cost_price,
-         inventory_quantity = EXCLUDED.inventory_quantity, mrp_ex_gst = EXCLUDED.mrp_ex_gst,
+         -- inventory_quantity is managed out-of-band (shelf_stock / batches / serials
+         -- via syncCentralInventory / bootstrap), NOT by the draft form snapshot which
+         -- drops it. Overwriting with the snapshot's COALESCE(...,0) zeroed live stock
+         -- on a 2nd publish. On conflict, PRESERVE the existing live value — the draft
+         -- is not the source of truth for variant stock.
+         inventory_quantity = product_variants.inventory_quantity, mrp_ex_gst = EXCLUDED.mrp_ex_gst,
          variant_type = EXCLUDED.variant_type, sub_variant_type = EXCLUDED.sub_variant_type,
          sub_variant_type_on = EXCLUDED.sub_variant_type_on,
          use_own_images = EXCLUDED.use_own_images, discount_pct = EXCLUDED.discount_pct,
@@ -242,10 +271,12 @@ export async function publishProductDraft(productId: string): Promise<void> {
       [productId, JSON.stringify(draft.images)]
     )
 
-    // Apply staged sub-variants — only if admin actually made changes in draft mode
-    // (draft.sub_variants either has _cleared sentinels or draft-sv- prefixed IDs)
+    // Apply staged sub-variants — only if the admin actually made sub-variant
+    // changes in draft mode. Detected by any of: a _cleared sentinel (deletion), a
+    // draft-sv- prefixed id (new row), or a _seeded/_edited marker (the draft now
+    // holds the variant's COMPLETE snapshot because an edit/add/delete touched it).
     const hasSubVariantChanges = (subVariants as any[]).some(
-      (sv: any) => sv._cleared || (sv.id && String(sv.id).startsWith('draft-sv-'))
+      (sv: any) => sv._cleared || sv._seeded || sv._edited || (sv.id && String(sv.id).startsWith('draft-sv-'))
     )
     if (hasSubVariantChanges) {
       const stagedSubVariants = (subVariants as any[]).filter((sv: any) => !sv._cleared && sv.sub_variant_name && sv.variant_id)
@@ -294,6 +325,32 @@ export async function publishProductDraft(productId: string): Promise<void> {
         }
       }
     }
+
+    // ── Roll variant/product inventory up from the child grains ──────────────
+    // The variant upsert can't set variant inventory_quantity (the draft snapshot
+    // drops it), so for a variant that HAS active sub-variants, recompute its
+    // inventory = SUM(active sub-variants). Then roll the product up = SUM(active
+    // variants). This runs on EVERY publish (not just the first), so a 2nd publish
+    // no longer leaves the variant at 0 when the client-side bootstrap re-sync
+    // doesn't fire. Variants WITHOUT sub-variants keep their preserved value (the
+    // EXISTS guard + COALESCE fallback leave them untouched).
+    await client.query(
+      `UPDATE product_variants pv SET inventory_quantity = COALESCE(
+         (SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv
+          WHERE sv.variant_id = pv.id AND sv.is_active = true), pv.inventory_quantity),
+         updated_at = NOW()
+       WHERE pv.product_id = $1
+         AND EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)`,
+      [productId]
+    )
+    await client.query(
+      `UPDATE products SET inventory_quantity = COALESCE(
+         (SELECT SUM(inventory_quantity) FROM product_variants WHERE product_id = $1 AND is_active = true), inventory_quantity),
+         updated_at = NOW()
+       WHERE id = $1
+         AND EXISTS (SELECT 1 FROM product_variants WHERE product_id = $1 AND is_active = true)`,
+      [productId]
+    )
 
     // ── Reconcile suppliers per LEAF ─────────────────────────────────────────
     // Runs AFTER the variant + sub-variant upserts above so variant_sku /
@@ -504,8 +561,12 @@ export async function publishProductDraft(productId: string): Promise<void> {
     // Delete only product-level units first (safe — variant-level kept to avoid FK issues)
     await client.query(`DELETE FROM product_units WHERE product_id = $1 AND variant_id IS NULL AND sub_variant_id IS NULL`, [productId])
 
-    // Insert product-level units from draft
-    const productUnits = (units as any[]).filter((u: any) => !u._cleared && (!u.variant_id || u.variant_id === 'null'))
+    // Insert product-level units from draft (scope: no variant AND no sub-variant).
+    const productUnits = (units as any[]).filter((u: any) =>
+      !u._cleared &&
+      (!u.variant_id || u.variant_id === 'null') &&
+      (!u.sub_variant_id || u.sub_variant_id === 'null')
+    )
     if (productUnits.length > 0) {
       await client.query(
         `INSERT INTO product_units (
@@ -566,6 +627,230 @@ export async function publishProductDraft(productId: string): Promise<void> {
         ]
       )
     }
+
+    // UPSERT sub-variant-level units from draft (scope: sub_variant_id set). These
+    // are stored with variant_id null + sub_variant_id in the draft; without this
+    // branch they were silently dropped on publish. Cleared ones are deleted first.
+    const clearedSubVariantUnitIds = (units as any[])
+      .filter((u: any) => u._cleared && u.sub_variant_id && u.sub_variant_id !== 'null')
+      .map((u: any) => u.sub_variant_id)
+    for (const svid of clearedSubVariantUnitIds) {
+      await client.query(
+        `DELETE FROM product_units WHERE product_id = $1 AND sub_variant_id = $2`,
+        [productId, svid]
+      )
+      await client.query(
+        `UPDATE product_sub_variants SET sell_unit_id = NULL, updated_at = NOW() WHERE id = $1`,
+        [svid]
+      )
+    }
+    const subVariantUnits = (units as any[]).filter((u: any) => !u._cleared && u.sub_variant_id && u.sub_variant_id !== 'null')
+    for (const u of subVariantUnits) {
+      // Sub-variant units are stored with variant_id NULL, so they fall under the
+      // product-level partial unique index (product_id, unit) WHERE variant_id IS NULL
+      // in addition to the sub-variant index. A same-`unit` product-level row would
+      // therefore raise a unique_violation that ON CONFLICT (sub_variant_id, unit)
+      // can't catch — and abort the whole publish. Guard with a savepoint: try the
+      // sub-variant upsert; on ANY unique collision, fall back to updating the
+      // existing sub-variant row (or skip if none), never failing the transaction.
+      await client.query('SAVEPOINT sv_unit')
+      try {
+        await client.query(
+          `INSERT INTO product_units (
+             product_id, variant_id, unit, factor, is_base, is_purchase_default,
+             price_override, display_label, notes, dimension, conversion_meta,
+             sub_variant_id, min_qty, max_qty, qty_step, created_at, updated_at
+           ) VALUES ($1, NULL, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW(), NOW())
+           ON CONFLICT (sub_variant_id, unit) WHERE sub_variant_id IS NOT NULL DO UPDATE SET
+             factor = EXCLUDED.factor, is_base = EXCLUDED.is_base,
+             is_purchase_default = EXCLUDED.is_purchase_default,
+             price_override = EXCLUDED.price_override, display_label = EXCLUDED.display_label,
+             notes = EXCLUDED.notes, dimension = EXCLUDED.dimension,
+             conversion_meta = EXCLUDED.conversion_meta, min_qty = EXCLUDED.min_qty,
+             max_qty = EXCLUDED.max_qty, qty_step = EXCLUDED.qty_step, updated_at = NOW()`,
+          [
+            productId, u.unit, u.factor ?? 1,
+            u.is_base ?? false, u.is_purchase_default ?? false,
+            u.price_override ?? null, u.display_label ?? null,
+            u.notes ?? null, u.dimension ?? 'count', u.conversion_meta ?? null,
+            u.sub_variant_id,
+            u.min_qty ?? 1, u.max_qty ?? null, u.qty_step ?? 1
+          ]
+        )
+        await client.query('RELEASE SAVEPOINT sv_unit')
+      } catch (e: any) {
+        await client.query('ROLLBACK TO SAVEPOINT sv_unit')
+        if (e?.code !== '23505') throw e // only swallow unique-violation cross-scope collisions
+        // Collided with a product-level (or other) row on (product_id, unit). Update
+        // the existing sub-variant unit in place if one exists; else leave it — a
+        // product-level unit of the same name already covers this grain.
+        await client.query(
+          `UPDATE product_units SET
+             factor = $3, is_base = $4, is_purchase_default = $5, price_override = $6,
+             display_label = $7, notes = $8, dimension = $9, conversion_meta = $10,
+             min_qty = $11, max_qty = $12, qty_step = $13, updated_at = NOW()
+           WHERE product_id = $1 AND sub_variant_id = $2 AND unit = $14`,
+          [
+            productId, u.sub_variant_id, u.factor ?? 1, u.is_base ?? false,
+            u.is_purchase_default ?? false, u.price_override ?? null, u.display_label ?? null,
+            u.notes ?? null, u.dimension ?? 'count', u.conversion_meta ?? null,
+            u.min_qty ?? 1, u.max_qty ?? null, u.qty_step ?? 1, u.unit,
+          ]
+        )
+      }
+    }
+
+    // ── Toggle-OFF cleanup: perishable/serialized turned OFF ──────────────────
+    // When a tracking flag is turned off, delete the now-orphaned batch/serial (and
+    // their shelf) records but PRESERVE the stock by rolling the on-hand count back
+    // into plain inventory_quantity at the correct grain. Runs AFTER the variant /
+    // sub-variant upserts above (which set inventory from the draft snapshot) so this
+    // is the final authority on the toggled-off grains. Counts are captured BEFORE
+    // any delete. Only in_stock serials / remaining batch qty count as live stock;
+    // sold/reserved serials are FK-referenced by orders and are left untouched.
+    if (turnedOffPerishable || turnedOffSerialized) {
+      // Per-grain on-hand count, captured BEFORE deleting. A grain may be tracked by
+      // batches (perishable), serials (serialized), or both — and for a both-flags
+      // product a batch of N carries N serials for the same units. So the true count
+      // per grain is the GREATER of the two sources being removed (they should be
+      // equal; MAX also covers a grain tracked by only one). We only include a source
+      // when that flag is actually turning off, so a still-active tracking type is
+      // never double-counted or wrongly dropped.
+      //   batchExpr  → SUM(product_batches.quantity_remaining) when perishable off
+      //   serialExpr → COUNT(product_serials in_stock)         when serialized off
+      // Combined via a UNION-based subquery aggregated per grain with GREATEST.
+      const sources: string[] = []
+      if (turnedOffPerishable) {
+        sources.push(`SELECT variant_id, sub_variant_id, COALESCE(quantity_remaining,0)::numeric AS q
+                      FROM product_batches WHERE product_id = $1`)
+      }
+      if (turnedOffSerialized) {
+        sources.push(`SELECT variant_id, sub_variant_id, 1::numeric AS q
+                      FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`)
+      }
+      // Each source contributes its own per-grain SUM; take the max across sources so
+      // a batch(N)+serials(N) grain reads N (not 2N), and a single-source grain reads N.
+      const unioned = sources.map((s, i) => `SELECT variant_id, sub_variant_id, SUM(q) AS total FROM (${s}) src${i} GROUP BY variant_id, sub_variant_id`).join(' UNION ALL ')
+      const perGrain = await client.query<{ variant_id: string | null; sub_variant_id: string | null; total: string }>(
+        `SELECT variant_id, sub_variant_id, MAX(total)::text AS total
+         FROM (${unioned}) u GROUP BY variant_id, sub_variant_id`,
+        [productId]
+      )
+      const subCounts = { rows: perGrain.rows.filter(r => r.sub_variant_id).map(r => ({ sub_variant_id: r.sub_variant_id as string, total: r.total })) }
+      const varCounts = { rows: perGrain.rows.filter(r => r.variant_id && !r.sub_variant_id).map(r => ({ variant_id: r.variant_id as string, total: r.total })) }
+      const prodTotal = perGrain.rows.find(r => !r.variant_id && !r.sub_variant_id)?.total ?? '0'
+      const prodCount = { rows: [{ total: prodTotal }] }
+
+      // Delete tracking records. Perishable-off drops batches; serialized-off drops
+      // in_stock serials (never sold/reserved). If BOTH are now off, drop both.
+      if (turnedOffSerialized) {
+        await client.query(`DELETE FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`, [productId])
+      }
+      // Drop batches only when perishable is off (a still-perishable product keeps them).
+      if (!newPerishable) {
+        await client.query(`DELETE FROM product_batches WHERE product_id = $1`, [productId])
+        // Batch-driven shelf rows are now orphaned; the count lives in inventory_quantity.
+        await client.query(`DELETE FROM shelf_stock WHERE product_id = $1`, [productId])
+      }
+
+      // Roll counts back into plain inventory at the correct grain.
+      for (const sv of subCounts.rows) {
+        await client.query(
+          `UPDATE product_sub_variants SET inventory_quantity = $1, stock_status = $2, updated_at = NOW() WHERE id = $3`,
+          [parseFloat(sv.total) || 0, (parseFloat(sv.total) || 0) > 0 ? 'In Stock' : 'Out of Stock', sv.sub_variant_id]
+        )
+      }
+      for (const v of varCounts.rows) {
+        // A variant with active sub-variants derives its qty from their rollup;
+        // otherwise it takes its own captured count.
+        await client.query(
+          `UPDATE product_variants pv SET inventory_quantity = CASE
+             WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+             THEN COALESCE((SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+             ELSE $1 END,
+             updated_at = NOW()
+           WHERE pv.id = $2`,
+          [parseFloat(v.total) || 0, v.variant_id]
+        )
+      }
+      // Ensure variants that only have sub-variant grains still roll up correctly.
+      await client.query(
+        `UPDATE product_variants pv SET inventory_quantity = COALESCE(
+           (SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), pv.inventory_quantity)
+         WHERE pv.product_id = $1
+           AND EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)`,
+        [productId]
+      )
+      // Product-level inventory: rollup of active variants for a variant product,
+      // else its own captured count. Derive "is a variant product" from STRUCTURE
+      // (does it have any active variant?), NOT from whether grains happened to have
+      // stock — otherwise a variant product whose grains are all at zero at toggle
+      // time would be misclassified as simple and force products.inventory_quantity=0,
+      // clobbering the correct variant rollup.
+      const structRow = await client.query<{ has_active_variant: boolean }>(
+        `SELECT EXISTS(SELECT 1 FROM product_variants WHERE product_id = $1 AND is_active = true) AS has_active_variant`,
+        [productId]
+      )
+      const isVariantProduct = !!structRow.rows[0]?.has_active_variant
+      if (isVariantProduct) {
+        await client.query(
+          `UPDATE products SET inventory_quantity = COALESCE(
+             (SELECT SUM(inventory_quantity) FROM product_variants WHERE product_id = $1 AND is_active = true), 0),
+             updated_at = NOW() WHERE id = $1`,
+          [productId]
+        )
+      } else {
+        await client.query(
+          `UPDATE products SET inventory_quantity = $1, updated_at = NOW() WHERE id = $2`,
+          [parseFloat(prodCount.rows[0]?.total ?? '0') || 0, productId]
+        )
+      }
+    }
+
+    // ── has_variants turned OFF: product became simple ───────────────────────
+    // The product no longer has variants, but old variant/sub-variant rows (and
+    // their orphaned batches/serials/shelf) linger. Product-grain inventory is the
+    // source of truth, so we DISCARD variant stock: delete the variants' in-stock
+    // serials + batches + shelf rows, then soft-deactivate the variants/sub-variants
+    // (never hard-delete — order_items FK is SET NULL / purchase_order_items is
+    // RESTRICT, so a delete would lose order provenance or throw). products.
+    // inventory_quantity is left as the publish set it from the product-grain field.
+    if (turnedOffVariants) {
+      // Delete orphaned tracking rows keyed to any variant/sub-variant of this
+      // product. Only in_stock serials (sold/reserved are order-FK'd history).
+      await client.query(
+        `DELETE FROM product_serials
+         WHERE product_id = $1 AND status = 'in_stock'
+           AND (variant_id IS NOT NULL OR sub_variant_id IS NOT NULL)`,
+        [productId]
+      )
+      await client.query(
+        `DELETE FROM product_batches
+         WHERE product_id = $1 AND (variant_id IS NOT NULL OR sub_variant_id IS NOT NULL)`,
+        [productId]
+      )
+      await client.query(
+        `DELETE FROM shelf_stock
+         WHERE product_id = $1 AND (variant_id IS NOT NULL OR sub_variant_id IS NOT NULL)`,
+        [productId]
+      )
+      // Soft-deactivate the sub-variants then the variants (FK-safe).
+      await client.query(
+        `UPDATE product_sub_variants SET is_active = false, updated_at = NOW()
+         WHERE variant_id IN (SELECT id FROM product_variants WHERE product_id = $1)`,
+        [productId]
+      )
+      await client.query(
+        `UPDATE product_variants SET is_active = false, updated_at = NOW()
+         WHERE product_id = $1`,
+        [productId]
+      )
+    }
+
+    // If inventory_sync is ON for this product, derive stock_status from the final
+    // quantities at every grain (backfill on flag flip + steady-state on each
+    // publish). No-op when OFF, so the manual stock_status written above stands.
+    await recomputeStockStatusForProduct(client, productId)
 
     await client.query(`DELETE FROM product_drafts WHERE product_id = $1`, [productId])
   })

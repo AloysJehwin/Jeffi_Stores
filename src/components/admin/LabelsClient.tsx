@@ -1,9 +1,12 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { createPortal } from 'react-dom'
-import { LabelSpec, LabelSize } from '@/lib/label-pdf'
+import { LabelSpec, LabelSize } from '@/lib/label-sizes'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
+import BatchSerialLabels from '@/components/admin/BatchSerialLabels'
+import { LabelPreview, fmtPrice, type PreviewProduct } from '@/components/admin/label-preview'
 
 interface Category {
   id: string
@@ -36,282 +39,31 @@ interface Props {
   categories: Category[]
 }
 
-function fmtPrice(p: number | null | undefined): string {
-  if (!p || p === 0) return ''
-  return `Rs. ${Number(p).toFixed(0)}`
-}
-
-function PriceBlock({ exGst, mrp, gstPct, mainSize, subSize, gap }: {
-  exGst: number | null
-  mrp: number | null
-  gstPct: number
-  mainSize: number
-  subSize: number
-  gap: number
-}) {
-  if (!exGst || exGst === 0) return null
-  const gstFactor = 1 + (gstPct || 0) / 100
-  const incGst = Number((exGst * gstFactor).toFixed(2))
-  const mrpIncGst = mrp && mrp > 0 ? Number((mrp * gstFactor).toFixed(2)) : null
-  const showExGst = gstPct > 0
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap }}>
-      {mrpIncGst && mrpIncGst !== incGst && (
-        <span style={{ fontSize: subSize, color: '#aaa', textDecoration: 'line-through', lineHeight: 1 }}>Rs. {mrpIncGst.toFixed(2)}</span>
-      )}
-      <span style={{ fontSize: mainSize, fontWeight: 700, color: '#c0392b', lineHeight: 1 }}>Rs. {incGst.toFixed(2)}</span>
-      {showExGst && (
-        <span style={{ fontSize: subSize - 1, color: '#888', lineHeight: 1 }}>ex. GST Rs. {Number(exGst).toFixed(2)}</span>
-      )}
-    </div>
-  )
-}
-
-const BARCODE_BARS = [3,1,2,1,3,1,1,2,1,2,3,1,2,1,1,2,3,1,1,2,2,1,3,1,2,1,2,1,3,1,1]
-
-function BarcodePlaceholder({ width, height, text }: { width: number; height: number; text: string }) {
-  const totalW = BARCODE_BARS.reduce((s, b) => s + b, 0)
-  let curX = 0
-  return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block' }}>
-      {BARCODE_BARS.map((barW, i) => {
-        const x = (curX / totalW) * width
-        const bw = (barW / totalW) * width
-        curX += barW
-        return i % 2 === 0
-          ? <rect key={i} x={x} y={0} width={Math.max(0.5, bw - 0.5)} height={height * 0.8} fill="#1a1a1a"/>
-          : null
-      })}
-      <text
-        x={width / 2} y={height * 0.98}
-        textAnchor="middle"
-        fontSize={Math.max(5, height * 0.17)}
-        fill="#333"
-        fontFamily="monospace"
-        dominantBaseline="auto"
-      >
-        {text.slice(0, 16)}
-      </text>
-    </svg>
-  )
-}
-
-function QRPlaceholder({ size }: { size: number }) {
-  const cells = [
-    [1,1,1,1,1,1,1,0,1,0,0,1,0,1,1,1,1,1,1,1,1],
-    [1,0,0,0,0,0,1,0,0,1,0,0,0,1,0,0,0,0,0,0,1],
-    [1,0,1,1,1,0,1,0,1,0,1,0,1,1,0,1,1,1,0,0,1],
-    [1,0,1,1,1,0,1,0,0,0,0,1,0,1,0,1,1,1,0,0,1],
-    [1,0,0,0,0,0,1,0,1,1,0,0,1,1,0,0,0,0,0,0,1],
-    [1,1,1,1,1,1,1,0,1,0,1,0,1,0,1,1,1,1,1,1,1],
-    [0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0],
-    [1,0,1,1,0,1,0,1,0,0,1,0,0,1,0,0,1,1,0,1,1],
-    [0,1,0,0,1,0,1,0,1,1,0,0,1,0,1,0,0,1,1,0,0],
-    [1,0,0,1,0,1,0,0,0,0,1,1,0,1,0,0,1,0,0,1,0],
-    [0,0,1,0,0,0,1,1,0,1,0,0,1,0,1,1,0,0,1,0,1],
-    [0,0,0,0,0,0,0,0,1,0,1,0,0,1,0,0,0,1,0,1,0],
-    [1,1,1,1,1,1,1,0,0,1,0,1,1,0,1,0,1,0,1,0,1],
-    [1,0,0,0,0,0,1,0,1,0,0,0,0,1,0,1,0,0,0,1,0],
-    [1,0,1,1,1,0,1,0,0,0,1,1,0,0,1,0,1,1,1,0,1],
-    [1,0,1,1,1,0,1,0,1,0,0,1,0,1,0,1,0,0,0,1,0],
-    [1,0,0,0,0,0,1,0,0,1,1,0,1,0,1,1,1,1,0,1,1],
-    [1,1,1,1,1,1,1,0,1,0,0,0,0,1,0,0,0,1,0,0,1],
-  ]
-  const cols = cells[0].length
-  const cs = size / cols
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-      <rect width={size} height={size} fill="white"/>
-      {cells.flatMap((row, ri) =>
-        row.map((cell, ci) =>
-          cell ? <rect key={`${ri}-${ci}`} x={ci * cs} y={ri * cs} width={cs} height={cs} fill="#111"/> : null
-        )
-      )}
-    </svg>
-  )
-}
-
-function LabelPreview({ size, product, scale, showPrice }: {
-  size: LabelSpec
-  product: ProductResult | null
-  scale: number
-  showPrice: boolean
-}) {
-  const w = Math.round(size.widthPt * scale)
-  const h = Math.round(size.heightPt * scale)
-  const pad = Math.max(3, Math.round(2.5 * scale))
-
-  const name = product?.name || 'Product Name'
-  const variantName = product?.variant_name || null
-  const sku = product?.sku || 'SKU-001'
-  const brand = product?.brand_name || null
-  const gstPct = product?.gst_percentage ?? 0
-  const gstFactor = 1 + (gstPct || 0) / 100
-  const exGst = product ? (product.price_ex_gst ?? (product.base_price / (gstFactor || 1))) : null
-  const mrp = product?.mrp && product.mrp > 0 ? product.mrp / (gstFactor || 1) : null
-  const barcodeText = product?.sku || 'SKU-001'
-
-  const barH = Math.round(h * 0.22)
-  const nameFontSize = Math.round(8 * scale)
-  const smallFontSize = Math.round(5.5 * scale)
-  const priceFontSize = Math.round(10 * scale)
-
-  const base: React.CSSProperties = {
-    width: w,
-    height: h,
-    position: 'relative',
-    overflow: 'hidden',
-    background: '#ffffff',
-    border: '1px solid #d1d5db',
-    borderRadius: 2,
-    boxSizing: 'border-box',
-    fontFamily: 'Helvetica, Arial, sans-serif',
-    flexShrink: 0,
-  }
-
-  if (size.size === '30x20') {
-    const nameFs = Math.round(5 * scale)
-    const varFs = Math.round(4.5 * scale)
-    return (
-      <div style={base}>
-        <div style={{ position: 'absolute', top: pad, left: pad, right: pad, bottom: barH + pad, overflow: 'hidden' }}>
-          <div style={{ fontSize: nameFs, fontWeight: 700, lineHeight: 1.2, color: '#111', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{name}</div>
-          {variantName && (
-            <div style={{ fontSize: varFs, color: '#555', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
-          )}
-          <div style={{ marginTop: 1 }}>
-            {showPrice && <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={nameFs} subSize={varFs * 0.85} gap={0} />}
-          </div>
-        </div>
-        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
-          <BarcodePlaceholder width={w - pad * 2} height={barH} text={barcodeText} />
-        </div>
-      </div>
-    )
-  }
-
-  if (size.size === '80x20') {
-    const nameFs = Math.round(7 * scale)
-    const varFs = Math.round(6 * scale)
-    const priceFs = Math.round(6.5 * scale)
-    const exGstFs = Math.round(4.5 * scale)
-    const topH = h - barH - pad
-    const midY = pad + Math.round(topH * 0.5) - Math.round(nameFs * 0.6)
-    return (
-      <div style={base}>
-        <div style={{ position: 'absolute', top: pad, left: pad, right: pad, height: topH - pad, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-          <div style={{ fontSize: nameFs, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>{name}</div>
-          {variantName && (
-            <div style={{ fontSize: varFs, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>{variantName}</div>
-          )}
-          {exGst && exGst > 0 && showPrice && (
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: Math.round(3 * scale), flexWrap: 'wrap' }}>
-              {mrp && mrp > 0 && (mrp * (1 + gstPct / 100)).toFixed(2) !== (exGst * (1 + gstPct / 100)).toFixed(2) && (
-                <span style={{ fontSize: exGstFs, color: '#aaa', textDecoration: 'line-through' }}>Rs. {(mrp * (1 + gstPct / 100)).toFixed(2)}</span>
-              )}
-              <span style={{ fontSize: priceFs, fontWeight: 700, color: '#c0392b' }}>Rs. {(exGst * (1 + gstPct / 100)).toFixed(2)}</span>
-              {gstPct > 0 && (
-                <span style={{ fontSize: exGstFs, color: '#888' }}>ex.GST Rs. {Number(exGst).toFixed(2)}</span>
-              )}
-            </div>
-          )}
-        </div>
-        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
-          <BarcodePlaceholder width={w - pad * 2} height={barH} text={barcodeText} />
-        </div>
-      </div>
-    )
-  }
-
-  if (size.size === '30x50') {
-    return (
-      <div style={base}>
-        <div style={{ position: 'absolute', top: pad, left: pad, right: pad, bottom: barH + pad + 12, overflow: 'hidden' }}>
-          <div style={{ fontSize: nameFontSize, fontWeight: 700, lineHeight: 1.3, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: variantName ? 2 : 3, WebkitBoxOrient: 'vertical' as any }}>{name}</div>
-          {variantName && (
-            <div style={{ fontSize: smallFontSize, color: '#333', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
-          )}
-          <div style={{ marginTop: 2 }}>
-            {showPrice && <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />}
-          </div>
-        </div>
-        <div style={{ position: 'absolute', bottom: barH + pad + 1, left: pad, right: pad, fontSize: smallFontSize * 0.85, color: '#777', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-          {sku}
-        </div>
-        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
-          <BarcodePlaceholder width={w - pad * 2} height={barH} text={barcodeText} />
-        </div>
-      </div>
-    )
-  }
-
-  if (size.size === '40x60') {
-    const qrSize = Math.round(Math.min(w, h) * 0.27)
-    return (
-      <div style={base}>
-        <div style={{ position: 'absolute', top: pad, right: pad }}>
-          <QRPlaceholder size={qrSize} />
-        </div>
-        <div style={{ position: 'absolute', top: pad, left: pad, right: qrSize + pad * 2 + 2, bottom: barH + pad, overflow: 'hidden' }}>
-          <div style={{ fontSize: nameFontSize, fontWeight: 700, lineHeight: 1.25, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: variantName ? 1 : 2, WebkitBoxOrient: 'vertical' as any }}>{name}</div>
-          {variantName && (
-            <div style={{ fontSize: smallFontSize, color: '#333', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
-          )}
-          <div style={{ fontSize: smallFontSize * 0.9, color: '#666', marginTop: 2 }}>SKU: {sku}</div>
-          <div style={{ marginTop: 3 }}>
-            {showPrice && <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize * 0.9} subSize={smallFontSize * 0.85} gap={1} />}
-          </div>
-        </div>
-        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
-          <BarcodePlaceholder width={w - pad * 2} height={barH} text={barcodeText} />
-        </div>
-      </div>
-    )
-  }
-
-  if (size.size === '50x50') {
-    const qrSize = Math.round(w * 0.29)
-    const gapAfterQR = Math.round(pad * 0.7)
-    const rightX = pad + qrSize + gapAfterQR
-    const rightW = w - rightX - pad
-    const contentH = h - barH - pad * 2 - 6
-    const skuRowH = Math.round(smallFontSize * 0.85) + 3
-    const infoH = contentH - skuRowH
-    return (
-      <div style={base}>
-        {/* QR — top left */}
-        <div style={{ position: 'absolute', top: pad, left: pad, width: qrSize, height: Math.min(qrSize, infoH), overflow: 'hidden' }}>
-          <QRPlaceholder size={qrSize} />
-        </div>
-        {/* Right column */}
-        <div style={{ position: 'absolute', top: pad, left: rightX, width: rightW, height: infoH, overflow: 'hidden' }}>
-          <div style={{ fontSize: nameFontSize, fontWeight: 700, lineHeight: 1.25, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: variantName ? 1 : 2, WebkitBoxOrient: 'vertical' as any }}>{name}</div>
-          {variantName && (
-            <div style={{ fontSize: smallFontSize, color: '#333', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
-          )}
-          {brand && (
-            <div style={{ fontSize: Math.round(smallFontSize * 0.85), color: '#888', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{brand}</div>
-          )}
-          <div style={{ marginTop: 3 }}>
-            {showPrice && <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={priceFontSize} subSize={smallFontSize * 0.9} gap={1} />}
-          </div>
-        </div>
-        {/* SKU row above barcode */}
-        <div style={{ position: 'absolute', bottom: barH + pad + 1, left: pad, right: pad, fontSize: Math.round(smallFontSize * 0.85), color: '#666', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
-          SKU: {sku}
-        </div>
-        {/* Barcode */}
-        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
-          <BarcodePlaceholder width={w - pad * 2} height={barH} text={barcodeText} />
-        </div>
-      </div>
-    )
-  }
-
-  return null
-}
-
 export default function LabelsClient({ labelSizes, categories }: Props) {
+  const searchParams = useSearchParams()
+  const router = useRouter()
+  const pathname = usePathname()
+  const TAB_KEYS = ['product', 'batch', 'serial'] as const
+  type LabelTab = typeof TAB_KEYS[number]
+  const urlTab = searchParams.get('tab') as LabelTab | null
+  const [labelTab, setLabelTab] = useState<LabelTab>(urlTab && TAB_KEYS.includes(urlTab) ? urlTab : 'product')
+
+  // Keep the tab in the URL so browser back/forward (and swipe-back) move between
+  // tabs. Sync FROM the URL when it changes externally (back/forward navigation).
+  useEffect(() => {
+    const t = searchParams.get('tab') as LabelTab | null
+    const next = t && TAB_KEYS.includes(t) ? t : 'product'
+    setLabelTab(prev => (prev === next ? prev : next))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
+
+  function changeTab(t: LabelTab) {
+    setLabelTab(t)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', t)
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
+  }
+
   const [selectedSize, setSelectedSize] = useState<LabelSize>('40x60')
   const [outputMode, setOutputMode] = useState<'thermal' | 'sheet'>('thermal')
   const [copies, setCopies] = useState(1)
@@ -471,6 +223,25 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
   const RULER_LEFT = 28 // px reserved for y-axis ruler
 
   return (
+    <div className="space-y-5">
+      {/* Label type tabs */}
+      <div className="flex items-center gap-1 border-b border-border-default">
+        {([
+          { key: 'product', label: 'Product' },
+          { key: 'batch', label: 'Batch product' },
+          { key: 'serial', label: 'Serial product' },
+        ] as const).map(t => (
+          <button key={t.key} type="button" onClick={() => changeTab(t.key)}
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${labelTab === t.key ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}>
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {labelTab === 'batch' && <BatchSerialLabels mode="batch" labelSizes={labelSizes} />}
+      {labelTab === 'serial' && <BatchSerialLabels mode="serial" labelSizes={labelSizes} />}
+
+      {labelTab === 'product' && (
     <div className="flex flex-col xl:flex-row gap-6 items-start">
 
       {/* ── Left panel ── */}
@@ -875,6 +646,8 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           </div>
         </div>
       </div>
+    </div>
+      )}
     </div>
   )
 }

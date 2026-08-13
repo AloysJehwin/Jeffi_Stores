@@ -115,29 +115,40 @@ describe('POST /api/admin/mailer/[id]/send', () => {
     )
   })
 
-  it('dispatches immediately when dispatchNow is true even with future scheduled_at', async () => {
+  it('queues immediate dispatch when dispatchNow is true even with future scheduled_at', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(futureCampaign)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockSendCampaign.mockResolvedValue({ sent: 50, failed: 2 })
 
     const res = await POST(makeRequest('campaign-1', { dispatchNow: true }), { params: Promise.resolve({ id: 'campaign-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.sent).toBe(50)
-    expect(body.failed).toBe(2)
+    // The send is now fire-and-forget: the route returns immediately after
+    // marking the campaign 'sending' and kicking off a background dispatch.
+    expect(body.queued).toBe(true)
+    expect(body.batch_size).toBe(50)
+    expect(mockQuery).toHaveBeenCalledWith(
+      expect.stringContaining("status = 'sending'"),
+      ['campaign-1'],
+    )
   })
 
-  it('dispatches draft campaign without scheduled_at', async () => {
+  it('queues dispatch of a draft campaign without scheduled_at', async () => {
     mockAuth.mockResolvedValue(adminPayload)
     mockHasScope.mockReturnValue(true)
     mockQueryOne.mockResolvedValue(draftCampaign)
+    mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockSendCampaign.mockResolvedValue({ sent: 100, failed: 0 })
 
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'campaign-1' }) })
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.sent).toBe(100)
-    expect(mockSendCampaign).toHaveBeenCalledWith('campaign-1')
+    expect(body.queued).toBe(true)
+    expect(body.batch_size).toBe(50)
+    // Background dispatch fires after the response; allow the microtask to run.
+    await new Promise((r) => setTimeout(r, 0))
+    expect(mockSendCampaign).toHaveBeenCalledWith('campaign-1', expect.objectContaining({ batchSize: 50 }))
   })
 })

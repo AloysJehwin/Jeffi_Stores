@@ -5,6 +5,8 @@ import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { pickUnitPrice } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
 import QuantityInput from '@/components/shared/QuantityInput'
 import { round2 } from '@/lib/gst'
@@ -68,6 +70,7 @@ interface ProductActionsProps {
   sku: string
   stockStatus: string
   basePrice: number
+  basePriceExGst?: number | null
   salePrice: number | null
   mrp: number | null
   gstPercentage: number | null
@@ -111,7 +114,7 @@ function getPerUnitRate(price: number, numeric_value: number, unit: string): str
 
 export default function ProductActions({
   productId, productName, sku, stockStatus,
-  basePrice, salePrice, mrp, gstPercentage,
+  basePrice, basePriceExGst, salePrice, mrp, gstPercentage,
   variants, variantType, initialSkuParam, discountPct,
   onVariantChange, onSelectionChange, onUnitChange, categoryId,
   productUnits: productUnitsProp, sellUnitId, extraDeliveryDays = 0, handlingDays = 2, is_active = true,
@@ -121,6 +124,7 @@ export default function ProductActions({
   const { showToast } = useToast()
   const router = useRouter()
   const { user } = useAuth()
+  const gstEnabled = useStoreConfig().flags.gstEnabled
   const [edd, setEdd] = useState<string | null>(null)
   const [addresses, setAddresses] = useState<any[]>([])
   const [selectedPin, setSelectedPin] = useState<string | null>(null)
@@ -262,25 +266,57 @@ export default function ProductActions({
 
   const gstMultiplier = 1 + (gstPercentage ?? 0) / 100
   const toInclGst = (exGst: number) => round2(exGst * gstMultiplier)
+  const toExGst = (incl: number) => (gstMultiplier > 0 ? round2(incl / gstMultiplier) : incl)
+  const discFactor = 1 - (discountPct ?? 0) / 100
+
+  // Authoritative pricing (mirrors the admin product form): when the product
+  // carries a discount_pct, the stored price equals the MRP and the discount is
+  // applied on top, so the sale price is MRP × (1 − discountPct/100). When
+  // discount_pct is 0, use the stored price as-is (may already be discounted).
+  // MRP is taken in the correct GST basis (ex-GST when the GST flag is off).
+  const priceFromMrp = (inclMrp: number | null | undefined, exGstMrp: number | null | undefined): number | null => {
+    if (!(discountPct != null && discountPct > 0)) return null
+    const mrpBasis = !gstEnabled
+      ? (exGstMrp != null && Number(exGstMrp) > 0 ? Number(exGstMrp)
+         : (inclMrp != null && Number(inclMrp) > 0 ? toExGst(Number(inclMrp)) : null))
+      : (inclMrp != null && Number(inclMrp) > 0 ? Number(inclMrp)
+         : (exGstMrp != null && Number(exGstMrp) > 0 ? toInclGst(Number(exGstMrp)) : null))
+    return mrpBasis != null ? round2(mrpBasis * discFactor) : null
+  }
 
   const rawEffectivePrice = hasVariants
     ? (() => {
         if (selectedSubVariant) {
+          const fromMrp = priceFromMrp(selectedSubVariant.mrp, null)
+          if (fromMrp != null) return fromMrp
+          if (!gstEnabled) return round2(pickUnitPrice({ inclusive: selectedSubVariant.price, exGst: selectedSubVariant.price_ex_gst }, false))
           if (selectedSubVariant.price != null) return round2(Number(selectedSubVariant.price))
           if (selectedSubVariant.price_ex_gst != null) return toInclGst(Number(selectedSubVariant.price_ex_gst))
         }
-        if (selectedVariant?.price != null) return round2(Number(selectedVariant.price))
-        const varMrp = selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : null
-        if (varMrp != null && discountPct != null) return round2(varMrp * (1 - discountPct / 100))
-        return basePrice
+        if (selectedVariant) {
+          const fromMrp = priceFromMrp(selectedVariant.mrp, selectedVariant.mrp_ex_gst)
+          if (fromMrp != null) return fromMrp
+          if (!gstEnabled) return round2(pickUnitPrice({ inclusive: selectedVariant.price, exGst: selectedVariant.price_ex_gst }, false))
+          if (selectedVariant.price != null) return round2(Number(selectedVariant.price))
+        }
+        return round2(pickUnitPrice({ inclusive: basePrice, exGst: basePriceExGst }, gstEnabled))
       })()
-    : (salePrice ?? basePrice)
+    : ((() => {
+        const fromMrp = priceFromMrp(mrp, null)
+        if (fromMrp != null) return fromMrp
+        return round2(pickUnitPrice({ inclusive: salePrice ?? basePrice, exGst: basePriceExGst }, gstEnabled))
+      })())
   const effectivePrice = businessDiscountPct > 0
     ? rawEffectivePrice * (1 - businessDiscountPct / 100)
     : rawEffectivePrice
-  const effectiveMrp = hasVariants
+  const effectiveMrpRaw = hasVariants
     ? (selectedSubVariant?.mrp != null ? Number(selectedSubVariant.mrp) : (selectedVariant?.mrp != null ? Number(selectedVariant.mrp) : mrp))
     : mrp
+  // GST off ⇒ the shown price is ex-GST; strip GST from the MRP too so the
+  // strike-through and discount % stay on the same basis.
+  const effectiveMrp = (!gstEnabled && effectiveMrpRaw != null && gstMultiplier > 0)
+    ? round2(Number(effectiveMrpRaw) / gstMultiplier)
+    : effectiveMrpRaw
   const effectiveStock = hasVariants
     ? ((selectedSubVariant ? selectedSubVariant.stock_status : selectedVariant?.stock_status) !== 'Out of Stock' ? 9999 : 0)
     : (stockStatus !== 'Out of Stock' ? 9999 : 0)
@@ -338,6 +374,11 @@ export default function ProductActions({
   })()
   const baseUnitLabel = baseUnit?.display_label ?? baseUnit?.unit ?? (unitFactor !== 1 && sellUnit?.dimension === 'count' ? 'pc' : null)
   const showPerBasePrice = unitFactor !== 1
+  // Resolved per-unit label + whether to show the "/ unit" suffix. Hidden for
+  // generic pieces so we never render a dangling "/".
+  const perUnitLabel = showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel
+  const GENERIC_UNITS = new Set(['unit', 'units', 'pc', 'pcs', 'piece', 'pieces', 'nos', 'no', 'each'])
+  const showPerUnit = !!perUnitLabel && !GENERIC_UNITS.has(String(perUnitLabel).trim().toLowerCase())
   const qtyStep = sellUnit?.dimension === 'count'
     ? 1
     : (sellUnit?.qty_step != null ? Number(sellUnit.qty_step) : (isContinuous ? 0.001 : 1))
@@ -557,7 +598,7 @@ export default function ProductActions({
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-sm text-foreground-secondary">/ <UnitLabel label={effectiveUnitLabel} /></span>
+                  {showPerUnit && <span className="text-sm text-foreground-secondary">/ <UnitLabel label={perUnitLabel} /></span>}
                   {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
                       Rs.&nbsp;{(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -599,7 +640,7 @@ export default function ProductActions({
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{(effectivePrice * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-sm text-foreground-secondary">/ <UnitLabel label={effectiveUnitLabel} /></span>
+                  {showPerUnit && <span className="text-sm text-foreground-secondary">/ <UnitLabel label={perUnitLabel} /></span>}
                   {effectiveMrp && effectiveMrp * unitFactor > effectivePrice * unitFactor && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
                       Rs.&nbsp;{(effectiveMrp * unitFactor).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -638,9 +679,11 @@ export default function ProductActions({
                 {perUnitRate}
               </p>
             )}
-            <p className="text-xs text-foreground-muted">
-              Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
-            </p>
+            {gstEnabled && (
+              <p className="text-xs text-foreground-muted">
+                Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
+              </p>
+            )}
           </div>
 
           <div>
@@ -732,7 +775,7 @@ export default function ProductActions({
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
+                  {showPerUnit && <span className="text-sm text-foreground-secondary">/ <UnitLabel label={perUnitLabel} /></span>}
                   {effectiveMrp && effectiveMrp > effectivePrice && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
                       Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -777,7 +820,7 @@ export default function ProductActions({
                   <span className="text-4xl font-bold text-primary-600 dark:text-primary-400 tabular-nums">
                     Rs.&nbsp;{effectivePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
-                  <span className="text-sm text-foreground-secondary">/ <UnitLabel label={showPerBasePrice ? (baseUnitLabel ?? effectiveUnitLabel) : effectiveUnitLabel} /></span>
+                  {showPerUnit && <span className="text-sm text-foreground-secondary">/ <UnitLabel label={perUnitLabel} /></span>}
                   {effectiveMrp && effectiveMrp > effectivePrice && (
                     <span className="text-xl text-foreground-muted line-through tabular-nums">
                       Rs.&nbsp;{effectiveMrp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -814,9 +857,11 @@ export default function ProductActions({
                 )}
               </>
             )}
-            <p className="text-xs text-foreground-muted">
-              Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
-            </p>
+            {gstEnabled && (
+              <p className="text-xs text-foreground-muted">
+                Inclusive of all taxes{gstPercentage ? ` (${gstPercentage}% GST)` : ''}
+              </p>
+            )}
           </div>
 
           <div>

@@ -192,6 +192,8 @@ async function updateProduct(productId: string, formData: FormData) {
   const metaTitle = (formData.get('meta_title') as string) || null
   const metaDescription = (formData.get('meta_description') as string) || null
   const isSearchable = formData.get('is_searchable') !== 'false'
+  const inventorySync = formData.get('inventory_sync') === 'true'
+  const lowStockThreshold = formData.get('low_stock_threshold') ? parseFloat(formData.get('low_stock_threshold') as string) : null
   const taxClass = (formData.get('tax_class') as string) || 'standard'
   const inclusiveTax = formData.get('inclusive_tax') === 'true'
   const ageMin = formData.get('age_min') ? parseInt(formData.get('age_min') as string) : null
@@ -201,14 +203,20 @@ async function updateProduct(productId: string, formData: FormData) {
 
   try {
     // Check if a product_drafts row exists for this product
-    const draftRow = await queryOne<{ product_id: string }>(
-      `SELECT product_id FROM product_drafts WHERE product_id = $1`,
+    const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown> }>(
+      `SELECT product_id, fields FROM product_drafts WHERE product_id = $1`,
       [productId]
     )
     const hasDraft = !!draftRow
 
     // If draft exists: save form fields to product_drafts.fields first
     if (hasDraft) {
+      // Bootstrap "assign existing stock" capture (per-grain lot/expiry/serials).
+      // The form emits it as a hidden JSON field; carry it through so an explicit
+      // Save-as-Draft/Publish through this action does not wipe what autosave stored.
+      let bsEntriesFromForm: unknown = undefined
+      const bsEntriesRaw = formData.get('bs_entries_json') as string | null
+      if (bsEntriesRaw) { try { bsEntriesFromForm = JSON.parse(bsEntriesRaw) } catch { /* ignore malformed */ } }
       const draftFields = {
         name, slug, description, category_id: categoryId,
         brand_id: brandId || null, base_price: basePrice, mrp, mrp_ex_gst: mrpExGst,
@@ -238,6 +246,10 @@ async function updateProduct(productId: string, formData: FormData) {
         meta_title: metaTitle, meta_description: metaDescription, is_searchable: isSearchable,
         tax_class: taxClass, inclusive_tax: inclusiveTax,
         age_min: ageMin, age_max: ageMax, target_gender: targetGender, target_audience: targetAudience,
+        inventory_sync: inventorySync, low_stock_threshold: lowStockThreshold,
+        // Preserve the bootstrap capture across explicit saves. Fall back to the
+        // existing draft value when the form didn't send one (so we never wipe it).
+        _bsEntries: bsEntriesFromForm ?? (draftRow as any)?.fields?._bsEntries ?? undefined,
       }
       // Snapshot variants from form and images/sub_variants/units from live DB
       const variantsJsonRaw = formData.get('variants_json') as string | null
@@ -352,13 +364,51 @@ async function updateProduct(productId: string, formData: FormData) {
     )
     // If perishable was toggled OFF, roll up remaining batch qty into inventory_quantity then clean up batches
     if (prevRow?.perishable && !perishable) {
+      // Capture per-grain batch totals BEFORE deleting.
       const batchSum = await queryOne<{ total: string }>(
         `SELECT COALESCE(SUM(quantity_remaining), 0)::text AS total FROM product_batches WHERE product_id = $1`,
         [productId]
       )
       const converted = parseFloat(batchSum?.total ?? '0') || 0
+      const variantBatch = await queryMany<{ variant_id: string | null; total: string }>(
+        `SELECT variant_id, COALESCE(SUM(quantity_remaining),0)::text AS total FROM product_batches
+         WHERE product_id = $1 AND variant_id IS NOT NULL GROUP BY variant_id`,
+        [productId]
+      )
+      const subVariantBatch = await queryMany<{ sub_variant_id: string | null; total: string }>(
+        `SELECT sub_variant_id, COALESCE(SUM(quantity_remaining),0)::text AS total FROM product_batches
+         WHERE product_id = $1 AND sub_variant_id IS NOT NULL GROUP BY sub_variant_id`,
+        [productId]
+      )
+
       await query('DELETE FROM product_batches WHERE product_id = $1', [productId])
-      await query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [converted, productId])
+
+      // Write converted stock back at the correct grain.
+      const hasVariantsRow = await queryOne<{ has_variants: boolean }>('SELECT has_variants FROM products WHERE id = $1', [productId])
+      if (hasVariantsRow?.has_variants && (variantBatch.length || subVariantBatch.length)) {
+        for (const sv of subVariantBatch) {
+          await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [parseFloat(sv.total) || 0, sv.sub_variant_id])
+        }
+        for (const v of variantBatch) {
+          await query(
+            `UPDATE product_variants pv SET inventory_quantity = CASE
+               WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+               THEN COALESCE((SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+               ELSE $1 END
+             WHERE pv.id = $2`,
+            [parseFloat(v.total) || 0, v.variant_id]
+          )
+        }
+        await query(
+          `UPDATE products SET inventory_quantity = COALESCE(
+             (SELECT SUM(inventory_quantity) FROM product_variants WHERE product_id = $1 AND is_active = true), 0)
+           WHERE id = $1`,
+          [productId]
+        )
+      } else {
+        await query('UPDATE products SET inventory_quantity = $1 WHERE id = $2', [converted, productId])
+      }
+
       // Keep shelf_stock rows — update total quantity across locations to match converted qty
       const shelfRows = await queryOne<{ cnt: string }>(
         `SELECT COUNT(*)::text AS cnt FROM shelf_stock WHERE product_id = $1`, [productId]
@@ -378,11 +428,26 @@ async function updateProduct(productId: string, formData: FormData) {
     }
     // If serialized was toggled OFF, count in-stock serials → set as inventory_quantity, clean up serials + batches + shelf_stock
     if (prevRow?.serialized && !serialized) {
+      // Capture per-grain counts BEFORE deleting the serials (order matters:
+      // deleting first would leave nothing to count and strand the stock).
       const serialCount = await queryOne<{ total: string }>(
         `SELECT COUNT(*)::text AS total FROM product_serials WHERE product_id = $1 AND status = 'in_stock'`,
         [productId]
       )
       const converted = parseInt(serialCount?.total ?? '0') || 0
+      const variantCounts = await queryMany<{ variant_id: string | null; cnt: string }>(
+        `SELECT variant_id, COUNT(*)::text AS cnt FROM product_serials
+         WHERE product_id = $1 AND status = 'in_stock' AND variant_id IS NOT NULL
+         GROUP BY variant_id`,
+        [productId]
+      )
+      const subVariantCounts = await queryMany<{ sub_variant_id: string | null; cnt: string }>(
+        `SELECT sub_variant_id, COUNT(*)::text AS cnt FROM product_serials
+         WHERE product_id = $1 AND status = 'in_stock' AND sub_variant_id IS NOT NULL
+         GROUP BY sub_variant_id`,
+        [productId]
+      )
+
       await query(`DELETE FROM product_serials WHERE product_id = $1`, [productId])
       // Only delete batches if NOT still perishable (perishable cleanup above handles that case)
       if (!perishable) {
@@ -403,23 +468,36 @@ async function updateProduct(productId: string, formData: FormData) {
           )
         }
       }
-      await query(
-        `UPDATE products SET inventory_quantity = $1 WHERE id = $2`,
-        [converted, productId]
-      )
-      // Also update variant inventory_quantity if product has variants
-      await query(
-        `UPDATE product_variants pv
-         SET inventory_quantity = sub.cnt
-         FROM (
-           SELECT variant_id, COUNT(*)::numeric AS cnt
-           FROM product_serials
-           WHERE product_id = $1 AND status = 'in_stock'
-           GROUP BY variant_id
-         ) sub
-         WHERE pv.id = sub.variant_id`,
-        [productId]
-      )
+
+      // Write the converted stock back at the CORRECT grain so it shows in inventory.
+      const hasVariantsRow = await queryOne<{ has_variants: boolean }>('SELECT has_variants FROM products WHERE id = $1', [productId])
+      if (hasVariantsRow?.has_variants && (variantCounts.length || subVariantCounts.length)) {
+        // Sub-variant-tracked stock
+        for (const sv of subVariantCounts) {
+          await query('UPDATE product_sub_variants SET inventory_quantity = $1 WHERE id = $2', [parseFloat(sv.cnt) || 0, sv.sub_variant_id])
+        }
+        // Variant-tracked stock (only for variants without sub-variants; those roll up separately)
+        for (const v of variantCounts) {
+          await query(
+            `UPDATE product_variants pv SET inventory_quantity = CASE
+               WHEN EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+               THEN COALESCE((SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0)
+               ELSE $1 END
+             WHERE pv.id = $2`,
+            [parseFloat(v.cnt) || 0, v.variant_id]
+          )
+        }
+        // Product-level rollup = sum of variants
+        await query(
+          `UPDATE products SET inventory_quantity = COALESCE(
+             (SELECT SUM(inventory_quantity) FROM product_variants WHERE product_id = $1 AND is_active = true), 0)
+           WHERE id = $1`,
+          [productId]
+        )
+      } else {
+        // Simple product — serials were product-level
+        await query(`UPDATE products SET inventory_quantity = $1 WHERE id = $2`, [converted, productId])
+      }
     }
 
     if (imageCount > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
@@ -732,6 +810,34 @@ export default async function EditProductPage({ params, searchParams }: { params
     ? { ...product, ...draftRow.fields, ...(draftVariants ? { product_variants: draftVariants } : {}) }
     : product
 
+  // On-hand stock grains for the "assign existing stock" bootstrap. These MUST be
+  // read from the LIVE product (getProduct), never from the draft merge above: the
+  // draft's variant snapshot (autosaved from the form) has no inventory_quantity, so
+  // deriving grains from productForForm would collapse every qty to 0 and hide the
+  // bootstrap capture after the first autosave. Stock is intrinsic to the live
+  // product and is not edited by the draft, so compute it here once.
+  const liveStockGrains: { variant_id: string | null; sub_variant_id: string | null; label: string; qty: number }[] = []
+  {
+    const p: any = product
+    if (p?.has_variants && Array.isArray(p?.product_variants)) {
+      for (const v of p.product_variants) {
+        const subs = Array.isArray(v?.sub_variants) ? v.sub_variants : []
+        if (subs.length > 0) {
+          for (const sv of subs) {
+            const qty = parseFloat(sv?.inventory_quantity) || 0
+            if (qty > 0) liveStockGrains.push({ variant_id: v.id, sub_variant_id: sv.id, label: `${v.variant_name} / ${sv.sub_variant_name}`, qty })
+          }
+        } else {
+          const qty = parseFloat(v?.inventory_quantity) || 0
+          if (qty > 0) liveStockGrains.push({ variant_id: v.id, sub_variant_id: null, label: v.variant_name, qty })
+        }
+      }
+    } else {
+      const qty = parseFloat(p?.inventory_quantity ?? '0') || 0
+      if (qty > 0) liveStockGrains.push({ variant_id: null, sub_variant_id: null, label: 'Product', qty })
+    }
+  }
+
   return (
     <div className="p-4 sm:p-6">
       <div className="flex items-center gap-2 mb-6 text-sm">
@@ -767,6 +873,8 @@ export default async function EditProductPage({ params, searchParams }: { params
         perishableBatchTotal={perishableBatchTotal}
         serializedStockTotal={serializedStockTotal}
         isDraft={isDraft}
+        liveStockGrains={liveStockGrains}
+        initialBsEntries={(draftRow?.fields as any)?._bsEntries ?? null}
       />
     </div>
   )

@@ -40,6 +40,7 @@ interface Props {
   customerId: string
   phone: string | null
   marketingOptOut?: boolean
+  forceOpen?: boolean
 }
 
 function formatTime(ts: string | null): string {
@@ -49,8 +50,8 @@ function formatTime(ts: string | null): string {
   return d.toLocaleString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
-export default function WhatsAppEngagement({ customerId, phone, marketingOptOut }: Props) {
-  const [isOpen, setIsOpen] = useState(false)
+export default function WhatsAppEngagement({ customerId, phone, marketingOptOut, forceOpen }: Props) {
+  const [isOpen, setIsOpen] = useState(!!forceOpen)
   const [isLoading, setIsLoading] = useState(false)
   const [thread, setThread] = useState<ThreadMessage[]>([])
   const [templates, setTemplates] = useState<Record<string, TemplateEntry>>({})
@@ -122,37 +123,25 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
   function defaultVarsFor(key: string): Record<string, string> {
     if (!prefill) return {}
     switch (key) {
-      case 'abandoned_cart':
-        return { items: prefill.cartItemsSummary }
-      case 'reorder_reminder':
-        return { product: prefill.latestOrderProduct }
-      case 'back_in_stock':
-        return { product: prefill.notifyProduct }
-      case 'feedback_request':
-        return { orderNumber: prefill.latestOrder?.order_number || '', url: prefill.feedbackUrl }
-      case 'return_initiated':
-        return { orderNumber: prefill.latestOrder?.order_number || '' }
-      case 'refund_processed':
-        return { amount: prefill.amountFormatted, orderNumber: prefill.latestOrder?.order_number || '' }
-      default:
-        return {}
+      case 'abandoned_cart':      return { items: prefill.cartItemsSummary }
+      case 'reorder_reminder':    return { product: prefill.latestOrderProduct }
+      case 'back_in_stock':       return { product: prefill.notifyProduct }
+      case 'feedback_request':    return { orderNumber: prefill.latestOrder?.order_number || '', url: prefill.feedbackUrl }
+      case 'return_initiated':    return { orderNumber: prefill.latestOrder?.order_number || '' }
+      case 'refund_processed':    return { amount: prefill.amountFormatted, orderNumber: prefill.latestOrder?.order_number || '' }
+      default:                    return {}
     }
   }
 
   function unavailableNote(key: string): string {
     switch (key) {
-      case 'abandoned_cart':
-        return ' — no cart items'
-      case 'back_in_stock':
-        return ' — no back-in-stock request'
+      case 'abandoned_cart':    return ' — no cart items'
+      case 'back_in_stock':     return ' — no back-in-stock request'
       case 'reorder_reminder':
-        return ' — no orders yet'
       case 'return_initiated':
       case 'refund_processed':
-      case 'feedback_request':
-        return ' — no orders yet'
-      default:
-        return ' — unavailable'
+      case 'feedback_request':  return ' — no orders yet'
+      default:                  return ' — unavailable'
     }
   }
 
@@ -163,8 +152,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
   }
 
   function handleSendTemplate() {
-    if (!selectedTemplate) return
-    if (availability[selectedTemplate] === false) return
+    if (!selectedTemplate || availability[selectedTemplate] === false) return
     send({ templateKey: selectedTemplate, variables: templateVars })
   }
 
@@ -184,9 +172,109 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
   const isSelectedUnavailable = !!selectedTemplate && availability[selectedTemplate] === false
   const showOptOutWarning = !!marketingOptOut && activeTemplate?.category === 'marketing'
 
+  // Shared compose + thread markup (used in both forceOpen and accordion modes)
+  const threadArea = (tall: boolean) => (
+    <div className={`overflow-y-auto px-4 py-3 space-y-2.5 border-t border-border-default bg-surface ${tall ? 'flex-1' : 'h-80'}`}>
+      {isLoading ? (
+        <div className="flex items-center justify-center h-full text-sm text-foreground-muted py-8">Loading conversation...</div>
+      ) : thread.length === 0 ? (
+        <div className="flex items-center justify-center h-full text-sm text-foreground-muted py-8">No WhatsApp messages yet.</div>
+      ) : (
+        thread.map(msg => (
+          <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
+              msg.direction === 'outbound'
+                ? 'bg-accent-500 text-white rounded-br-sm'
+                : 'bg-surface-elevated border border-border-default text-foreground rounded-bl-sm'
+            }`}>
+              <div className={`flex items-center gap-1.5 mb-0.5 text-xs ${msg.direction === 'outbound' ? 'text-white/70' : 'text-foreground-muted'}`}>
+                {msg.kind && <span className="font-semibold">{msg.kind}</span>}
+              </div>
+              {msg.body}
+              <div className={`flex items-center gap-1 mt-0.5 text-[11px] ${msg.direction === 'outbound' ? 'text-white/70' : 'text-foreground-muted'}`}>
+                <span>{formatTime(msg.sent_at)}</span>
+                {msg.direction === 'outbound' && msg.status === 'sent' && <Check className="w-3 h-3" />}
+                {msg.direction === 'outbound' && msg.status === 'failed' && <X className="w-3 h-3 text-red-300" />}
+              </div>
+            </div>
+          </div>
+        ))
+      )}
+      <div ref={bottomRef} />
+    </div>
+  )
+
+  const composeArea = (
+    <div className="px-4 py-3 border-t border-border-default space-y-3 shrink-0">
+      {sendError && <p className="text-xs text-red-600 dark:text-red-400 leading-snug">{sendError}</p>}
+      <div className="space-y-2">
+        <AdminSelect
+          value={selectedTemplate}
+          onChange={handleTemplateSelect}
+          placeholder="Select a template…"
+          options={Object.entries(groupedTemplates).flatMap(([cat, entries]) =>
+            entries.map(([key, tpl]) => ({
+              value: key,
+              label: availability[key] === false ? `${tpl.label}${unavailableNote(key)}` : tpl.label,
+              group: cat === 'marketing' ? 'Marketing' : 'Support',
+            }))
+          )}
+        />
+        {activeTemplate && activeTemplate.fields.map(field => (
+          <input
+            key={field}
+            type="text"
+            value={templateVars[field] || ''}
+            onChange={e => setTemplateVars(v => ({ ...v, [field]: e.target.value }))}
+            placeholder={field}
+            className="w-full px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+          />
+        ))}
+        {activeTemplate && (
+          <>
+            {showOptOutWarning && (
+              <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-xl border border-amber-400/40 leading-snug">
+                This customer opted out of marketing. Sending anyway will override their preference.
+              </p>
+            )}
+            <button
+              onClick={handleSendTemplate}
+              disabled={isSending || isSelectedUnavailable}
+              className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSending ? 'Sending…' : isSelectedUnavailable ? `Unavailable${unavailableNote(selectedTemplate)}` : 'Send Template'}
+            </button>
+          </>
+        )}
+      </div>
+      <div className="pt-3 border-t border-border-default">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={freeText}
+            onChange={e => setFreeText(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendFreeText() } }}
+            placeholder="Free text message…"
+            className="flex-1 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+          />
+          <button
+            onClick={handleSendFreeText}
+            disabled={isSending || !freeText.trim()}
+            className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Send className="w-4 h-4" />
+          </button>
+        </div>
+        <p className="mt-1.5 text-[11px] text-foreground-muted leading-snug">
+          Free text only delivers within 24h of the customer&apos;s last message.
+        </p>
+      </div>
+    </div>
+  )
+
   if (!phone) {
     return (
-      <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+      <div className={forceOpen ? 'p-5' : 'bg-surface-elevated rounded-xl border border-border-default p-5'}>
         <div className="flex items-center gap-2 mb-2">
           <MessageCircle className="w-4 h-4 text-foreground-muted" />
           <h2 className="font-semibold text-foreground">WhatsApp Engagement</h2>
@@ -196,6 +284,17 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
     )
   }
 
+  // Modal mode: no accordion, content fills the modal height
+  if (forceOpen) {
+    return (
+      <div className="flex flex-col h-full">
+        {threadArea(true)}
+        {composeArea}
+      </div>
+    )
+  }
+
+  // Standalone accordion mode (original behaviour)
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
       <button
@@ -214,113 +313,10 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut 
         </div>
         <ChevronDown className={`w-4 h-4 text-foreground-muted transition-transform ${isOpen ? 'rotate-180' : ''}`} />
       </button>
-
       {isOpen && (
         <>
-          <div className="h-80 overflow-y-auto px-4 py-3 space-y-2.5 border-t border-border-default bg-surface">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full text-sm text-foreground-muted">
-                Loading conversation...
-              </div>
-            ) : thread.length === 0 ? (
-              <div className="flex items-center justify-center h-full text-sm text-foreground-muted">
-                No WhatsApp messages yet.
-              </div>
-            ) : (
-              thread.map(msg => (
-                <div key={msg.id} className={`flex ${msg.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap ${
-                    msg.direction === 'outbound'
-                      ? 'bg-accent-500 text-white rounded-br-sm'
-                      : 'bg-surface-elevated border border-border-default text-foreground rounded-bl-sm'
-                  }`}>
-                    <div className={`flex items-center gap-1.5 mb-0.5 text-xs ${msg.direction === 'outbound' ? 'text-white/70' : 'text-foreground-muted'}`}>
-                      {msg.kind && <span className="font-semibold">{msg.kind}</span>}
-                    </div>
-                    {msg.body}
-                    <div className={`flex items-center gap-1 mt-0.5 text-[11px] ${msg.direction === 'outbound' ? 'text-white/70' : 'text-foreground-muted'}`}>
-                      <span>{formatTime(msg.sent_at)}</span>
-                      {msg.direction === 'outbound' && msg.status === 'sent' && <Check className="w-3 h-3" />}
-                      {msg.direction === 'outbound' && msg.status === 'failed' && <X className="w-3 h-3 text-red-300" />}
-                    </div>
-                  </div>
-                </div>
-              ))
-            )}
-            <div ref={bottomRef} />
-          </div>
-
-          <div className="px-4 py-3 border-t border-border-default space-y-3">
-            {sendError && (
-              <p className="text-xs text-red-600 dark:text-red-400 leading-snug">{sendError}</p>
-            )}
-
-            <div className="space-y-2">
-              <AdminSelect
-                value={selectedTemplate}
-                onChange={handleTemplateSelect}
-                placeholder="Select a template…"
-                options={Object.entries(groupedTemplates).flatMap(([cat, entries]) =>
-                  entries.map(([key, tpl]) => ({
-                    value: key,
-                    label: availability[key] === false ? `${tpl.label}${unavailableNote(key)}` : tpl.label,
-                    group: cat === 'marketing' ? 'Marketing' : 'Support',
-                  }))
-                )}
-              />
-
-              {activeTemplate && activeTemplate.fields.map(field => (
-                <input
-                  key={field}
-                  type="text"
-                  value={templateVars[field] || ''}
-                  onChange={e => setTemplateVars(v => ({ ...v, [field]: e.target.value }))}
-                  placeholder={field}
-                  className="w-full px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-                />
-              ))}
-
-              {activeTemplate && (
-                <>
-                  {showOptOutWarning && (
-                    <p className="text-xs text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-900/20 px-3 py-2 rounded-xl border border-amber-400/40 leading-snug">
-                      This customer opted out of marketing. Sending anyway will override their preference.
-                    </p>
-                  )}
-                  <button
-                    onClick={handleSendTemplate}
-                    disabled={isSending || isSelectedUnavailable}
-                    className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSending ? 'Sending…' : isSelectedUnavailable ? `Unavailable${unavailableNote(selectedTemplate)}` : 'Send Template'}
-                  </button>
-                </>
-              )}
-            </div>
-
-            <div className="pt-3 border-t border-border-default">
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={freeText}
-                  onChange={e => setFreeText(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendFreeText() } }}
-                  placeholder="Free text message…"
-                  className="flex-1 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
-                />
-                <button
-                  onClick={handleSendFreeText}
-                  disabled={isSending || !freeText.trim()}
-                  className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  <Send className="w-4 h-4" />
-                </button>
-              </div>
-              <p className="mt-1.5 text-[11px] text-foreground-muted leading-snug">
-                Free text only delivers within 24h of the customer&apos;s last message.
-              </p>
-            </div>
-          </div>
+          {threadArea(false)}
+          {composeArea}
         </>
       )}
     </div>

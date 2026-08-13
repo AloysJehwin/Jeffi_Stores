@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { detectOnDeviceCapability, type CapabilityVerdict } from '@/lib/on-device/capability'
-import { isOnDeviceSummaryEnabled } from '@/lib/on-device/flag'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 /**
  * Debug readout for the on-device model capability gate. Drop this on any page
@@ -11,6 +11,8 @@ import { isOnDeviceSummaryEnabled } from '@/lib/on-device/flag'
  */
 export default function OnDeviceCapabilityDebug() {
   const [verdict, setVerdict] = useState<CapabilityVerdict | null>(null)
+  const flagEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
+  const finetuneFlag = useStoreConfig().flags.ondeviceFinetuneEnabled
 
   useEffect(() => {
     let alive = true
@@ -40,7 +42,8 @@ export default function OnDeviceCapabilityDebug() {
       </div>
       <Row k="reason" v={verdict.reason} />
       <div className="border-t border-border-default my-2" />
-      <Row k="feature flag" v={isOnDeviceSummaryEnabled() ? 'enabled' : 'disabled'} />
+      <Row k="feature flag" v={flagEnabled ? 'enabled' : 'disabled'} />
+      <Row k="fine-tune flag" v={finetuneFlag ? 'enabled' : 'disabled'} />
       <Row k="WebGPU" v={d.hasWebGPU ? 'yes' : 'no'} />
       <Row k="GPU adapter" v={d.hasAdapter ? 'yes' : 'no'} />
       <Row k="GPU vendor" v={d.gpuVendor ?? '—'} />

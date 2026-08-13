@@ -10,6 +10,7 @@ import {
   cartItemsForHash,
   validateCouponForUser,
 } from '@/lib/order-commit'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 
 const CreateRazorpayOrderSchema = z.object({
@@ -19,7 +20,7 @@ const CreateRazorpayOrderSchema = z.object({
 
 export async function POST(request: NextRequest) {
   try {
-    if (!isRazorpayEnabled()) {
+    if (!(await isRazorpayEnabled())) {
       return NextResponse.json({ error: 'Online payments are not available' }, { status: 400 })
     }
 
@@ -54,6 +55,7 @@ async function handleDraftToken(token: string, userId: string) {
   if (draft.userId !== userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
 
   let subtotal = 0
+  const { gstEnabled } = await getFeatureFlags()
   if (draft.mode === 'cart') {
     const cart = await loadActiveCart(userId)
     if (cart.length === 0) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
@@ -61,7 +63,7 @@ async function handleDraftToken(token: string, userId: string) {
     if (draft.cartHash && draft.cartHash !== hash) {
       return NextResponse.json({ error: 'Cart changed since checkout was started. Please review and try again.' }, { status: 409 })
     }
-    subtotal = cartSubtotal(cart)
+    subtotal = cartSubtotal(cart, gstEnabled)
   } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
     subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
   } else {

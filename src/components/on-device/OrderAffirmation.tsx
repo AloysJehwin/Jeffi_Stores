@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { canRunOnDeviceSummary, generateAffirmation } from '@/lib/on-device/runtime'
+import { canRunOnDeviceSummary, generateAffirmation, maybeRunFineTune } from '@/lib/on-device/runtime'
 import { readUserProfile, updateUserProfile } from '@/lib/on-device/user-profile'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface OrderItem {
   productName: string
@@ -17,11 +18,14 @@ interface Props {
 }
 
 export default function OrderAffirmation({ items, total }: Props) {
+  const ondeviceEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
+  const finetuneEnabled = useStoreConfig().flags.ondeviceFinetuneEnabled
   const [text, setText] = useState('')
   const [done, setDone] = useState(false)
   const started = useRef(false)
 
   useEffect(() => {
+    if (!ondeviceEnabled) return
     if (started.current || !items.length) return
     started.current = true
 
@@ -39,10 +43,19 @@ export default function OrderAffirmation({ items, total }: Props) {
       const profile = readUserProfile()
       const itemNames = items.map(i => i.productName)
       generateAffirmation(itemNames, total, profile, isMobile, partial => setText(partial))
-        .then(final => { setText(final); setDone(true) })
+        .then(final => {
+          setText(final)
+          setDone(true)
+          // Best-effort on-device LoRA fine-tune from this affirmation (gated on
+          // the DB fine-tune flag + capability inside maybeRunFineTune).
+          maybeRunFineTune(finetuneEnabled, [{
+            prompt: `Order affirmation for: ${itemNames.join(', ')}`,
+            completion: final,
+          }])
+        })
         .catch(() => {})
     })
-  }, [items, total])
+  }, [items, total, ondeviceEnabled, finetuneEnabled])
 
   if (!text) return null
 

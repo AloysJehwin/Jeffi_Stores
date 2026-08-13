@@ -5,7 +5,6 @@ import { authenticateAnyUser as authenticateUser, authenticateAdmin } from '@/li
 import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
-import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { logActivity } from '@/lib/activity'
 import { deductOrderStock } from '@/lib/inventory-deduct'
 import { restoreOrderStock } from '@/lib/order-stock'
@@ -136,6 +135,18 @@ export async function GET(
       WHERE oi.order_id = $1
     `, [orderId])
 
+    // Pending variant-change request (admin-proposed swap awaiting this customer).
+    const pendingVcr = await queryOne<any>(
+      `SELECT vcr.id, vcr.order_item_id, vcr.old_unit_price, vcr.new_unit_price, vcr.qty,
+              vcr.price_diff, vcr.settlement_type, vcr.status,
+              oi.product_name, vcr.old_variant_name, vcr.new_variant_name
+       FROM variant_change_requests vcr
+       JOIN order_items oi ON oi.id = vcr.order_item_id
+       WHERE vcr.order_id = $1 AND vcr.status IN ('pending_customer','awaiting_payment')
+       ORDER BY vcr.created_at DESC LIMIT 1`,
+      [orderId]
+    )
+
     const orderDetails = {
       id: order.id,
       orderNumber: order.order_number,
@@ -185,6 +196,18 @@ export async function GET(
         replacementAllowed: item.replacement_allowed === false ? false : !!item.replacement_allowed,
         replacementWindowDays: parseInt(item.replacement_window_days) || 7,
       })),
+      pendingVariantChange: pendingVcr ? {
+        id: pendingVcr.id,
+        productName: pendingVcr.product_name,
+        oldVariantName: pendingVcr.old_variant_name,
+        newVariantName: pendingVcr.new_variant_name,
+        oldUnitPrice: parseFloat(pendingVcr.old_unit_price),
+        newUnitPrice: parseFloat(pendingVcr.new_unit_price),
+        qty: parseFloat(pendingVcr.qty),
+        priceDiff: parseFloat(pendingVcr.price_diff),
+        settlementType: pendingVcr.settlement_type,
+        status: pendingVcr.status,
+      } : null,
     }
 
     return NextResponse.json({ order: orderDetails })
@@ -366,58 +389,15 @@ export async function PATCH(
           metadata: { from: currentOrder.status, to: status, orderNumber: currentOrder.order_number },
         }).catch(() => {})
 
-        if (status === 'cancelled' && currentOrder.payment_status === 'paid' && (payment_status !== 'refunded')) {
-          // Attempt automatic Razorpay refund; fall back to manual task on failure
-          ;(async () => {
-            try {
-              if (!isRazorpayEnabled()) throw new Error('Razorpay disabled')
-              const paymentRecord = await queryOne<{ id: string; transaction_id: string; amount: string }>(
-                `SELECT id, transaction_id, amount FROM payments WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed' LIMIT 1`,
-                [orderId]
-              )
-              if (!paymentRecord?.transaction_id) throw new Error('No Razorpay payment found')
-              const razorpay = getRazorpayInstance()
-              const amountInPaise = Math.round(parseFloat(paymentRecord.amount) * 100)
-              const refund = await razorpay.payments.refund(paymentRecord.transaction_id, { amount: amountInPaise })
-              await query(
-                `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
-                [JSON.stringify(refund), paymentRecord.id]
-              )
-              await query(
-                `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
-                [orderId]
-              )
-              sendPaymentStatusUpdate(
-                currentOrder.customer_email,
-                currentOrder.customer_name,
-                currentOrder.order_number,
-                orderId,
-                'refunded',
-                parseFloat(currentOrder.total_amount)
-              ).catch(() => {})
-              logActivity({
-                userId: currentOrder.user_id,
-                actorId: admin.adminId,
-                kind: 'payment_status',
-                referenceId: orderId,
-                referenceType: 'orders',
-                summary: `Auto-refund issued for cancelled order #${currentOrder.order_number}`,
-                metadata: { refundId: (refund as any).id, amount: paymentRecord.amount },
-              }).catch(() => {})
-              completeAutoTask('process_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
-            } catch {
-              createAutoTask({
-                userId: currentOrder.user_id,
-                sourceKind: 'process_refund',
-                sourceRefId: orderId,
-                title: `Issue refund for cancelled #${currentOrder.order_number}`,
-                description: `Order was paid (₹${currentOrder.total_amount}) and is now cancelled — refund the customer.`,
-                priority: 'urgent',
-                dueInDays: 0,
-              }).catch(() => {})
-            }
-          })()
-        }
+        // NOTE: cancelling a paid order does NOT auto-refund here. Refunding is a
+        // separate, explicit admin step — the "Refund Pending" card (rendered when
+        // status='cancelled' && payment_status='paid') calls /api/orders/[id]/refund,
+        // which refunds ALL completed payments (initial charge + any variant-change
+        // top-ups), not just the first. We therefore leave payment_status untouched
+        // (stays 'paid') on cancel so that card surfaces and the admin refunds
+        // deliberately. Removing the old auto-refund also fixes the bug where the UI
+        // pre-set payment_status='refunded', the auto-refund guard skipped, and the
+        // order showed "Refunded" with no money actually returned.
 
         if (status === 'processing') {
           completeAutoTask('process_confirmed', orderId, { actorAdminId: admin.adminId }).catch(() => {})

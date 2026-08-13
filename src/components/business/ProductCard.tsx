@@ -5,6 +5,7 @@ import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
 import { resolveEdd } from '@/lib/edd-cache'
@@ -37,6 +38,7 @@ export default function ProductCard({
   fragile, hazardous, flammable,
 }: ProductCardProps) {
   const { user } = useAuth()
+  const gstEnabled = useStoreConfig().flags.gstEnabled
 
   // Apply per-category business discount off the selling price, show combined % off MRP
   const discountPct = categoryId ? (user?.businessDiscountMap?.[categoryId] ?? 0) : 0
@@ -188,7 +190,7 @@ export default function ProductCard({
               {businessPrice && (
                 <p className="text-[10px] text-accent-600 dark:text-accent-400 font-medium mb-0.5">Your business price</p>
               )}
-              <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>
+              {gstEnabled && <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>}
               <div className="flex items-center justify-between gap-1">
                 <span className={`text-xs font-medium whitespace-nowrap ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
@@ -274,7 +276,7 @@ export default function ProductCard({
                 <span className={`w-1.5 h-1.5 rounded-full ${effectiveStock > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
                 {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
               </span>
-              <span className="text-xs text-foreground-muted">Incl. all taxes</span>
+              <span className="text-xs text-foreground-muted">{gstEnabled ? 'Incl. all taxes' : 'Tax-free'}</span>
             </div>
 
             <Link

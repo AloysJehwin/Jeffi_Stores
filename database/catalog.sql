@@ -280,6 +280,8 @@ CREATE TABLE public.products (
     package_type character varying(30),
     cost_price numeric(12,2) DEFAULT 0,
     inventory_quantity numeric(14,3) DEFAULT 0 NOT NULL,
+    inventory_sync boolean DEFAULT false NOT NULL,
+    low_stock_threshold numeric(14,3),
     mrp_ex_gst numeric(12,2),
     sub_variant_type character varying(100),
     ai_description text,
@@ -399,6 +401,7 @@ CREATE TABLE public.product_serials (
     batch_id uuid,
     grn_id uuid,
     serial_number character varying(100) NOT NULL,
+    receive_seq integer,
     status character varying(20) DEFAULT 'in_stock'::character varying NOT NULL,
     order_id uuid,
     order_item_id uuid,
@@ -492,3 +495,37 @@ CREATE TABLE public.controls_operation_log (
 -- Drop stale non-partial unique constraint superseded by partial indexes
 -- uniq_product_units_product_unit + uniq_product_units_variant_unit
 ALTER TABLE product_units DROP CONSTRAINT IF EXISTS product_units_product_id_unit_key;
+
+
+--
+-- Name: hero_slides; Type: TABLE; Schema: public; Owner: -
+-- Admin-managed homepage hero carousel slides. Supports both category-linked and
+-- fully custom slides. The CTA link is either a manual URL (cta_url) or built from
+-- the assigned product filters (filter_* columns -> /products?...). Managed from
+-- Site Controls -> Hero Slides.
+--
+
+CREATE TABLE public.hero_slides (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    title character varying(255) NOT NULL,
+    subtitle character varying(500),
+    badge_text character varying(100),
+    badge_color character varying(30) DEFAULT 'bg-primary-500'::character varying,
+    image_url text,
+    image_url_mobile text,
+    cta_label character varying(100),
+    cta_url text,
+    filter_category character varying(255),
+    filter_brand character varying(255),
+    filter_grade character varying(255),
+    filter_material character varying(255),
+    filter_min_price numeric(12,2),
+    filter_max_price numeric(12,2),
+    filter_in_stock boolean DEFAULT false NOT NULL,
+    filter_on_sale boolean DEFAULT false NOT NULL,
+    display_order integer DEFAULT 0 NOT NULL,
+    is_active boolean DEFAULT true NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT hero_slides_pkey PRIMARY KEY (id)
+);

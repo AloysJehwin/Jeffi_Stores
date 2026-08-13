@@ -15,7 +15,7 @@ beforeEach(() => {
 })
 
 describe('logMessage', () => {
-  it('does NOT insert when kind === "otp"', () => {
+  it('inserts OTP messages but redacts the code in the body', () => {
     logMessage({
       channel: 'sms',
       to: '+919876543210',
@@ -24,7 +24,13 @@ describe('logMessage', () => {
       kind: 'otp',
       status: 'sent',
     })
-    expect(mockQuery).not.toHaveBeenCalled()
+    expect(mockQuery).toHaveBeenCalledTimes(1)
+    const [sql, values] = mockQuery.mock.calls[0]!
+    expect(sql).toContain('INSERT INTO message_logs')
+    // The code itself is masked; the surrounding wording is preserved.
+    expect(values![4]).toBe('Your OTP is ••••••')
+    expect(values![4]).not.toContain('123456')
+    expect(values![5]).toBe('otp')
   })
 
   it('inserts a normal message with correct params and defaults direction to outbound', () => {
@@ -51,7 +57,39 @@ describe('logMessage', () => {
       null, // error default
       'SM1',
       null, // userId default
+      null, // entityType default
+      null, // entityId default
     ])
+  })
+
+  it('passes entityType/entityId through to the INSERT params when provided', () => {
+    logMessage({
+      channel: 'whatsapp',
+      to: '+919876543210',
+      from: '+18722179910',
+      body: 'We miss you!',
+      kind: 'winback_90',
+      status: 'sent',
+      entityType: 'campaign',
+      entityId: 'winback_90',
+    })
+    const [, values] = mockQuery.mock.calls[0]!
+    expect(values![10]).toBe('campaign')
+    expect(values![11]).toBe('winback_90')
+  })
+
+  it('defaults entityType/entityId to null when omitted', () => {
+    logMessage({
+      channel: 'whatsapp',
+      to: '+919876543210',
+      from: '+18722179910',
+      body: 'hi',
+      kind: 'promo_offer',
+      status: 'sent',
+    })
+    const [, values] = mockQuery.mock.calls[0]!
+    expect(values![10]).toBeNull()
+    expect(values![11]).toBeNull()
   })
 
   it('passes inbound direction through when provided', () => {

@@ -13,6 +13,7 @@ import InitiateRefundButton from '@/components/admin/InitiateRefundButton'
 import RetryPaymentEmailButton from '@/components/admin/RetryPaymentEmailButton'
 import CreateShipmentButton from '@/components/admin/CreateShipmentButton'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
+import VariantChangeRequest from '@/components/admin/VariantChangeRequest'
 import CustomerMailPanel from '@/components/admin/CustomerMailPanel'
 import MailLogsPanel from '@/components/admin/MailLogsPanel'
 import ExtendEddButton from '@/components/admin/ExtendEddButton'
@@ -509,6 +510,20 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
           </div>
           )}
 
+          {order.status === 'confirmed' && !order.awb_number && canWrite && (
+            <VariantChangeRequest
+              orderId={order.id}
+              items={(order.order_items || []).map((it: any) => ({
+                id: it.id,
+                productId: it.product_id,
+                productName: it.product_name,
+                variantName: it.variant_name,
+                unitPrice: Number(it.unit_price),
+                quantity: Number(it.quantity),
+              }))}
+            />
+          )}
+
           {order.status === 'processing' && !['cancelled', 'cancel_requested', 'cancel_rejected', ...RETURN_STATUSES].includes(order.status) && canWrite && (
           <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default">
             <div className="px-6 py-4 border-b border-border-default">
@@ -645,31 +660,59 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                     {order.payment_status}
                   </span>
                 </div>
-                {order.payments && order.payments.length > 0 && (
-                  <>
-                    <div className="flex justify-between">
-                      <span className="text-foreground-secondary">Method</span>
-                      <span className="text-foreground capitalize">{order.payments[0].payment_method}</span>
-                    </div>
-                    {order.payments[0].transaction_id && (
-                      <div className="flex justify-between">
-                        <span className="text-foreground-secondary">Transaction ID</span>
-                        <span className="text-foreground font-mono text-xs">{order.payments[0].transaction_id}</span>
-                      </div>
-                    )}
-                    {order.payments[0].payment_gateway && (
-                      <div className="flex justify-between">
-                        <span className="text-foreground-secondary">Gateway</span>
-                        <span className="text-foreground capitalize">{order.payments[0].payment_gateway}</span>
-                      </div>
-                    )}
-                    <div className="flex justify-between">
-                      <span className="text-foreground-secondary">Amount</span>
-                      <span className="text-foreground font-semibold">Rs. {Number(order.payments[0].amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    </div>
-                  </>
-                )}
               </div>
+
+              {/* All payment transactions on this order (initial charge, variant-change
+                  top-ups, etc.) — the transaction IDs feed the refund flow. */}
+              {order.payments && order.payments.length > 0 && (
+                <div className="mt-3 space-y-3">
+                  {order.payments.map((p: any, idx: number) => {
+                    const resp = typeof p.gateway_response === 'string' ? (() => { try { return JSON.parse(p.gateway_response) } catch { return {} } })() : (p.gateway_response || {})
+                    const isVariantChange = resp?.purpose === 'variant_change'
+                    const refunded = resp?.refund || resp?.variantChangeRefund
+                    return (
+                      <div key={p.id || idx} className="rounded-lg border border-border-default p-3 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-semibold text-foreground">
+                            {isVariantChange ? 'Variant-change top-up' : idx === 0 ? 'Order payment' : 'Payment'}
+                          </span>
+                          <span className={`px-2 py-0.5 rounded-full text-[11px] font-medium ${
+                            p.status === 'completed' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                            : p.status === 'refunded' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                          }`}>{p.status}</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-foreground-secondary">Method</span>
+                          <span className="text-foreground capitalize">{p.payment_method}</span>
+                        </div>
+                        {p.transaction_id && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-foreground-secondary">Transaction ID</span>
+                            <span className="text-foreground font-mono text-xs">{p.transaction_id}</span>
+                          </div>
+                        )}
+                        {p.payment_gateway && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-foreground-secondary">Gateway</span>
+                            <span className="text-foreground capitalize">{p.payment_gateway}</span>
+                          </div>
+                        )}
+                        <div className="flex justify-between text-sm">
+                          <span className="text-foreground-secondary">Amount</span>
+                          <span className="text-foreground font-semibold">Rs. {Number(p.amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                        {refunded?.id && (
+                          <div className="flex justify-between text-sm">
+                            <span className="text-foreground-secondary">Refund</span>
+                            <span className="text-foreground font-mono text-xs">{refunded.id}{refunded.amount ? ` · Rs. ${(Number(refunded.amount) / 100).toFixed(2)}` : ''}</span>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>

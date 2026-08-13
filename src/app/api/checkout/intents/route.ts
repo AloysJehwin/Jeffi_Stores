@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { resolveBuyNowItem, loadActiveCart } from '@/lib/order-commit'
 import { signIntent } from '@/lib/checkout-intent'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { parseBody, zUuid } from '@/lib/validate'
 
 const IntentSchema = z.object({
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'productId and qty required' }, { status: 400 })
   }
 
+  const { gstEnabled } = await getFeatureFlags()
   const resolved = await resolveBuyNowItem({
     productId: parsed.data.productId,
     variantId: parsed.data.variantId ?? null,
@@ -50,6 +52,7 @@ export async function POST(req: NextRequest) {
     qty: parsed.data.qty,
     buyMode: parsed.data.buyMode ?? undefined,
     buyUnit: parsed.data.buyUnit ?? null,
+    gstEnabled,
   })
   if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
 

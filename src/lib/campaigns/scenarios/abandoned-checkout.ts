@@ -5,6 +5,7 @@ import {
   sendCampaignEmail,
   renderItemRows,
 } from '@/lib/automation-emails'
+import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -12,6 +13,7 @@ interface Params extends Record<string, unknown> {
   autoCancelMaxMinutes: number
   sendCooldownDays: number
   maxRecipientsPerSweep: number
+  whatsappEnabled: boolean
 }
 
 interface Row {
@@ -31,12 +33,14 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     autoCancelMaxMinutes: 15,
     sendCooldownDays: 1,
     maxRecipientsPerSweep: 50,
+    whatsappEnabled: false,
   },
   paramSchema: {
     minMinutesAfterCancel: { type: 'integer', min: 1, max: 120, label: 'Minimum minutes after cancel', description: 'Wait at least this many minutes after the order was cancelled' },
     autoCancelMaxMinutes:  { type: 'integer', min: 5, max: 120, label: 'Auto-cancel detection (minutes)', description: 'Only treat as auto-cancel if cancelled within N minutes of order creation. Filters out manual late cancellations.' },
     sendCooldownDays:      { type: 'integer', min: 1, max: 30,  label: 'Per-user cooldown (days)',     description: 'Skip users sent this campaign within N days' },
     maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',       description: 'Hard limit per sweep' },
+    whatsappEnabled:       { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
   },
 
   async findEligible({ campaign, params }) {
@@ -115,7 +119,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
     }))
   },
 
-  async send(row, { campaign }) {
+  async send(row, { campaign, params }) {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
@@ -143,7 +147,7 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
-    return sendCampaignEmail({
+    const emailResult = await sendCampaignEmail({
       campaign,
       user,
       referenceId: row.id,
@@ -157,5 +161,11 @@ export const abandonedCheckout: ScenarioModule<Params, Row> = {
         ctaUrl: `${user.baseUrl}/cart`,
       },
     })
+    if ((params as any).whatsappEnabled) {
+      const names = items.map(i => i.name)
+      const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }).catch(() => {})
+    }
+    return emailResult
   },
 }

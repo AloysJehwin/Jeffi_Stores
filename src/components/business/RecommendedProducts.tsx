@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import ProductCard from '@/components/business/ProductCard'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { pickUnitPrice } from '@/lib/pricing'
 
 interface Product {
   id: string
@@ -10,6 +12,7 @@ interface Product {
   base_price: number
   price_ex_gst: number | null
   mrp: number | null
+  gst_percentage: number | string | null
   has_variants: boolean
   variant_min_price: number | null
   variant_min_mrp: number | null
@@ -28,6 +31,7 @@ interface RecommendedProductsProps {
 
 export default function BusinessRecommendedProducts({ title = 'You Might Also Like', limit = 4 }: RecommendedProductsProps) {
   const [products, setProducts] = useState<Product[]>([])
+  const gstEnabled = useStoreConfig().flags.gstEnabled
 
   useEffect(() => {
     fetch(`/api/products?limit=${limit}&sort=newest&is_active=true`)
@@ -49,11 +53,13 @@ export default function BusinessRecommendedProducts({ title = 'You Might Also Li
           const hasVariants = product.has_variants
           const displayPrice = hasVariants && product.variant_min_price
             ? Number(product.variant_min_price)
-            : Number(product.base_price)
+            : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
           const effectiveStock = hasVariants
             ? Number(product.variant_stock_total ?? 0)
             : (product.stock_status !== 'Out of Stock' ? 1 : 0)
-          const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+          const rawMrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+          const gstRate = Number(product.gst_percentage ?? 0)
+          const mrp = (!gstEnabled && rawMrp != null && gstRate > 0) ? rawMrp / (1 + gstRate / 100) : rawMrp
           const mrpDiscount = mrp && mrp > displayPrice
             ? Math.round(((mrp - displayPrice) / mrp) * 100)
             : 0

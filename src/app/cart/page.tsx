@@ -4,10 +4,11 @@ import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import RecommendedProducts from '@/components/visitor/RecommendedProducts'
+import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import CartInsightPanel from '@/components/on-device/CartInsightPanel'
 
@@ -27,6 +28,7 @@ function UnitLabel({ label }: { label: string }) {
 
 export default function CartPage() {
   const { cartItems, savedItems, cartCount, isLoading, removeFromCart, updateQuantity, saveForLater, moveToCart, getCartTotal, getCartTax } = useCart()
+  const gstEnabled = useStoreConfig().flags.gstEnabled
   const hasInactiveItems = cartItems.some((item: any) => item.products?.is_active === false)
   const { user } = useAuth()
   const { showToast } = useToast()
@@ -528,7 +530,7 @@ export default function CartPage() {
               qty: Number(i.quantity),
             }))} />
 
-            <RecommendedProducts title="You Might Also Like" limit={4} />
+            <FeaturedForYou compact limit={4} />
           </div>
 
           {/* Order Summary */}
@@ -578,10 +580,12 @@ export default function CartPage() {
                   <span>Subtotal ({cartCount} items)</span>
                   <span>₹{total.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
-                <div className="flex justify-between text-foreground-muted text-sm">
-                  <span>Incl. GST</span>
-                  <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                </div>
+                {gstEnabled && (
+                  <div className="flex justify-between text-foreground-muted text-sm">
+                    <span>Incl. GST</span>
+                    <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
                 {discount > 0 && (
                   <div className="flex justify-between text-green-600 dark:text-green-400 text-sm font-medium">
                     <span>Coupon ({appliedCoupon!.code})</span>
@@ -596,7 +600,7 @@ export default function CartPage() {
                   {discount > 0 && (
                     <p className="text-xs text-green-600 dark:text-green-400 mt-1">You save ₹{discount.toLocaleString('en-IN', { minimumFractionDigits: 2 })} with this coupon</p>
                   )}
-                  <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>
+                  {gstEnabled && <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>}
                 </div>
               </div>
 
