@@ -7,6 +7,7 @@ import { buildVectorSearchClause } from '@/lib/search'
 import { z } from 'zod'
 import { parseBody, zNonEmpty, zEmail } from '@/lib/validate'
 import { lineItemExGst } from '@/lib/pricing'
+import { getFeatureFlags } from '@/lib/site-controls'
 
 type UnitRow = { unit: string; dimension: string; min_qty: string; max_qty: string | null; qty_step: string }
 
@@ -45,9 +46,10 @@ async function validateLineItemQty(
   return null
 }
 
-function calcTotals(items: any[]) {
+function calcTotals(items: any[], gstEnabled: boolean = true) {
   const subtotal = items.reduce((s: number, i: any) => s + i.amount, 0)
-  const cgst = items.reduce((s: number, i: any) => s + i.amount * i.gst_rate / 200, 0)
+  // GST off ⇒ quotation shows no tax; total equals the ex-GST subtotal.
+  const cgst = gstEnabled ? items.reduce((s: number, i: any) => s + i.amount * i.gst_rate / 200, 0) : 0
   const sgst = cgst
   const rawTotal = subtotal + cgst + sgst
   const total = round2(rawTotal)
@@ -174,7 +176,8 @@ export async function POST(request: NextRequest) {
       ...item,
       amount: Number(item.amount) || lineItemExGst(Number(item.quantity), Number(item.rate), Number(item.discount_pct) || 0),
     }))
-    const totals = calcTotals(computedItems)
+    const { gstEnabled } = await getFeatureFlags()
+    const totals = calcTotals(computedItems, gstEnabled)
 
     const now = new Date()
     const month = now.getMonth()
@@ -240,7 +243,7 @@ export async function POST(request: NextRequest) {
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
         [
           qt!.id, idx,
-          item.description, item.hsn_code || null, Number(item.gst_rate) || 18,
+          item.description, item.hsn_code || null, gstEnabled ? (Number(item.gst_rate) || 18) : 0,
           Number(item.quantity), item.unit || 'PCS', item.buy_unit || null,
           item.sell_unit_factor && item.sell_unit_factor > 1 ? item.sell_unit_factor : null,
           item.sell_unit_factor && item.sell_unit_factor > 1 ? Number(item.quantity) * item.sell_unit_factor : null,

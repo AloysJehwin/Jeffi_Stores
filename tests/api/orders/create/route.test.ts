@@ -27,6 +27,17 @@ vi.mock('@/lib/order-commit', () => ({
 }))
 vi.mock('@/lib/invoice', () => ({ createDraftInvoice: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/business-discount', () => ({ getBusinessDiscountMap: vi.fn().mockResolvedValue({}) }))
+// GST enabled ⇒ line price follows the price_at_addition/variant/sub_variant/base_price
+// precedence these tests assert (the GST-off path charges the ex-GST column instead).
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: vi.fn().mockResolvedValue({
+    razorpayEnabled: false,
+    gstEnabled: true,
+    ondeviceSummaryEnabled: false,
+    ondeviceFinetuneEnabled: false,
+  }),
+  getBusinessValues: vi.fn().mockResolvedValue({ businessStateCode: '22' }),
+}))
 vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }

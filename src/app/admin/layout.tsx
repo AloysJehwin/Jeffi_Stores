@@ -7,6 +7,7 @@ import { getAdminSession } from '@/lib/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
 import { AdminMobileProvider } from '@/contexts/AdminMobileProvider'
 import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
+import { LogOut } from 'lucide-react'
 
 export const metadata = {
   title: 'Admin Panel - Jeffi Stores',
@@ -72,7 +73,8 @@ export default async function AdminLayout({
     { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings' },
     { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings' },
     { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', superAdminOnly: true },
-    { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings' },
+    { href: '/admin/settings/site-controls', label: 'Site Controls', scope: 'settings:write', group: 'Settings' },
+    { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings', exactMatch: true },
   ]
 
   const filteredNavLinks = navLinks.filter(link => {
@@ -90,9 +92,11 @@ export default async function AdminLayout({
     <form action={logoutAction}>
       <button
         type="submit"
-        className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-medium transition-colors"
+        className="h-9 inline-flex items-center gap-2 bg-white/10 hover:bg-red-600 text-white px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
+        title="Log out"
       >
-        Logout
+        <LogOut className="w-5 h-5" />
+        <span className="hidden sm:inline">Logout</span>
       </button>
     </form>
   )

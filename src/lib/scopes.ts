@@ -422,6 +422,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/delhivery')) return 'orders:read'
   if (pathname.startsWith('/api/admin/support')) return 'customers:read'
   if (pathname.startsWith('/api/admin/users')) return 'settings:read'
+  if (pathname.startsWith('/api/admin/site-controls')) return 'settings:read'
   if (pathname.startsWith('/api/admin/certificates')) return 'settings:read'
   if (pathname.startsWith('/api/admin/reviews')) return 'reviews:read'
   if (pathname.startsWith('/api/admin/coupons')) return 'coupons:read'

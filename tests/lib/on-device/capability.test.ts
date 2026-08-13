@@ -1,14 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-// Control the feature flag per-test
-vi.mock('@/lib/on-device/flag', () => ({
-  isOnDeviceSummaryEnabled: vi.fn(() => true),
-}))
-
 import { detectOnDeviceCapability, MODEL_CACHE_NAME } from '@/lib/on-device/capability'
-import { isOnDeviceSummaryEnabled } from '@/lib/on-device/flag'
-
-const flagMock = vi.mocked(isOnDeviceSummaryEnabled)
 
 const MB = 1024 * 1024
 
@@ -61,7 +53,6 @@ describe('on-device/capability', () => {
     savedNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator')
     savedCaches = Object.getOwnPropertyDescriptor(globalThis, 'caches')
     savedWindow = Object.getOwnPropertyDescriptor(globalThis, 'window')
-    flagMock.mockReturnValue(true)
     // Default: no caches API present unless a test overrides it
     setCaches(undefined)
   })
@@ -75,16 +66,6 @@ describe('on-device/capability', () => {
 
   it('exports the model cache name constant', () => {
     expect(MODEL_CACHE_NAME).toBe('jeffi-on-device-model-v1')
-  })
-
-  it('returns "disabled" when the feature flag is off', async () => {
-    flagMock.mockReturnValue(false)
-    const v = await detectOnDeviceCapability()
-    expect(v.capable).toBe(false)
-    expect(v.reason).toBe('disabled')
-    // Details untouched defaults
-    expect(v.details.hasWebGPU).toBe(false)
-    expect(v.details.isMobile).toBe(false)
   })
 
   it('returns "no-window" when window is undefined', async () => {

@@ -1,13 +1,15 @@
 'use client'
 
 import { useCart } from '@/contexts/CartContext'
+import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import Link from 'next/link'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
-import { mrpDiscountPct } from '@/lib/pricing'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
@@ -16,8 +18,6 @@ function UnitLabel({ label }: { label: string | null | undefined }) {
   if (match) return <>{match[1]}<sup>2</sup></>
   return <>{label}</>
 }
-
-const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 
 export default function CheckoutPageWrapper() {
   return (
@@ -31,6 +31,8 @@ function CheckoutPage() {
   const { cartItems, cartCount, getCartTotal, getCartTax, clearCart, isLoading: cartLoading } = useCart()
   const { user, isLoading: authLoading } = useAuth()
   const { showToast } = useToast()
+  const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
+  const gstEnabled = useStoreConfig().flags.gstEnabled
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -48,7 +50,12 @@ function CheckoutPage() {
         const categoryId = item.products.category_id
         const discountPct = categoryId ? (user.businessDiscountMap?.[categoryId] ?? 0) : 0
         if (discountPct <= 0) return sum
-        const price = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        const price = !gstEnabled
+          ? pickUnitPrice({
+              inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
+              exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
+            }, false)
+          : (Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price))
         return sum + price * Number(item.quantity) * discountPct / 100
       }, 0) * 100) / 100
     : 0
@@ -58,7 +65,7 @@ function CheckoutPage() {
   const [address, setAddress] = useState<any>(null)
   const [isLoadingAddress, setIsLoadingAddress] = useState(true)
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual'>('razorpay')
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual'>(isRazorpayEnabled ? 'razorpay' : 'manual')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
@@ -274,6 +281,12 @@ function CheckoutPage() {
     script.onerror = () => setError('Failed to load payment gateway. Please try manual payment.')
     document.body.appendChild(script)
   }, [paymentMethod, razorpayLoaded])
+
+  // If online payments get disabled while on this page, fall back to manual so
+  // we never submit a Razorpay order the server will reject.
+  useEffect(() => {
+    if (!isRazorpayEnabled && paymentMethod === 'razorpay') setPaymentMethod('manual')
+  }, [isRazorpayEnabled, paymentMethod])
 
   const fetchShipping = (postalCode: string) => {
     if (isBuyNow && !buyNowItem) return
@@ -793,7 +806,7 @@ function CheckoutPage() {
                         </div>
                           )
                         })()}
-                        {buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
+                        {gstEnabled && buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
                           const isBuyNowFractional = (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') || !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
                           const lineTotal = buyNowItem.price * (isBuyNowFractional ? buyNowItem.qty : Math.round(buyNowItem.qty))
                           const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
@@ -809,7 +822,12 @@ function CheckoutPage() {
                     cartItems.map((item) => {
                       const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
                       const isCustomQty = item.buy_mode && item.buy_mode !== 'unit'
-                      const price = isCustomQty ? item.price_at_addition : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+                      const price = !gstEnabled
+                        ? pickUnitPrice({
+                            inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
+                            exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
+                          }, false)
+                        : (isCustomQty ? item.price_at_addition : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price))
                       const effectiveQty = isCustomQty ? Number(item.quantity) : Math.round(Number(item.quantity))
                       const itemTotal = price * effectiveQty
                       const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
@@ -903,22 +921,26 @@ function CheckoutPage() {
                 />
               </div>
 
-              {/* Payment Method — only shown for orders ≥ ₹1,00,000 */}
-              {finalTotal >= 100000 && (
+              {/* Payment Method — shown for orders ≥ ₹1,00,000, OR whenever online
+                  payments are disabled (so the customer sees the manual option
+                  instead of a silent, server-rejected Razorpay default). */}
+              {(finalTotal >= 100000 || !isRazorpayEnabled) && (
                 <>
                   <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-8">
                     <h2 className="text-xl font-bold text-foreground mb-4">Payment Method</h2>
                     <div className="space-y-3">
-                      <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                        <input type="radio" name="paymentMethod" value="razorpay" checked={paymentMethod === 'razorpay'} onChange={() => setPaymentMethod('razorpay')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
-                        <div className="flex-1">
-                          <p className="font-semibold text-foreground">Pay Online</p>
-                          <p className="text-sm text-foreground-secondary">UPI, Cards, Net Banking, Wallets</p>
-                        </div>
-                        <svg className="w-8 h-8 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                        </svg>
-                      </label>
+                      {isRazorpayEnabled && (
+                        <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
+                          <input type="radio" name="paymentMethod" value="razorpay" checked={paymentMethod === 'razorpay'} onChange={() => setPaymentMethod('razorpay')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
+                          <div className="flex-1">
+                            <p className="font-semibold text-foreground">Pay Online</p>
+                            <p className="text-sm text-foreground-secondary">UPI, Cards, Net Banking, Wallets</p>
+                          </div>
+                          <svg className="w-8 h-8 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                          </svg>
+                        </label>
+                      )}
                       <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
                         <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
                         <div className="flex-1">
@@ -1001,7 +1023,7 @@ function CheckoutPage() {
                     <span>Subtotal{!isBuyNow ? ` (${cartCount} items)` : ''}</span>
                     <span>₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
-                  {!isBuyNow && (
+                  {!isBuyNow && gstEnabled && (
                     <div className="flex justify-between text-foreground-muted text-sm">
                       <span>Incl. GST</span>
                       <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -1083,6 +1105,9 @@ function CheckoutPage() {
             </div>
           </div>
         </form>
+      </div>
+      <div className="container mx-auto px-4 pb-8">
+        <FeaturedForYou variant="business" compact limit={4} />
       </div>
     </div>
   )

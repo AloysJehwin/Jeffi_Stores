@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { LABEL_SIZES } from '@/lib/label-sizes'
 
 describe('LABEL_SIZES', () => {
-  it('exports an array of 5 sizes', () => {
-    expect(LABEL_SIZES).toHaveLength(5)
+  it('exports an array of 6 sizes', () => {
+    expect(LABEL_SIZES).toHaveLength(6)
   })
 
   it('each entry has required fields', () => {

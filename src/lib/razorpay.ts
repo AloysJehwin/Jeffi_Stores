@@ -1,4 +1,5 @@
 import Razorpay from 'razorpay'
+import { getFeatureFlags } from '@/lib/site-controls'
 
 export function getRazorpayInstance() {
   if (!process.env.RAZORPAY_KEY_ID || !process.env.RAZORPAY_KEY_SECRET) {
@@ -10,6 +11,6 @@ export function getRazorpayInstance() {
   })
 }
 
-export function isRazorpayEnabled(): boolean {
-  return process.env.ENABLE_RAZORPAY === 'true'
+export async function isRazorpayEnabled(): Promise<boolean> {
+  return (await getFeatureFlags()).razorpayEnabled
 }

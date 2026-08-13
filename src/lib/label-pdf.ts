@@ -22,27 +22,10 @@ export interface LabelProduct {
   showPrice?: boolean
 }
 
-export type LabelSize = '30x20' | '30x50' | '40x60' | '50x50' | '80x20' | 'shelf-card'
-
-export interface LabelSpec {
-  size: LabelSize
-  widthPt: number
-  heightPt: number
-  label: string
-  widthMm: number
-  heightMm: number
-}
-
-const MM = 2.8346
-
-export const LABEL_SIZES: LabelSpec[] = [
-  { size: '30x20', widthMm: 30, heightMm: 20, widthPt: 30 * MM, heightPt: 20 * MM, label: '30×20 mm' },
-  { size: '30x50', widthMm: 50, heightMm: 30, widthPt: 50 * MM, heightPt: 30 * MM, label: '30×50 mm' },
-  { size: '40x60', widthMm: 60, heightMm: 40, widthPt: 60 * MM, heightPt: 40 * MM, label: '40×60 mm' },
-  { size: '50x50', widthMm: 50, heightMm: 50, widthPt: 50 * MM, heightPt: 50 * MM, label: '50×50 mm' },
-  { size: '80x20', widthMm: 80, heightMm: 20, widthPt: 80 * MM, heightPt: 20 * MM, label: '80×20 mm (Cable)' },
-  { size: 'shelf-card', widthMm: 100, heightMm: 70, widthPt: 100 * MM, heightPt: 70 * MM, label: '100×70 mm (Shelf Card)' },
-]
+// Size specs live in the client-safe label-sizes module (no pdfkit); re-export
+// so server code has one source of truth.
+import { LABEL_SIZES, MM, findLabelSpec, type LabelSize, type LabelSpec } from '@/lib/label-sizes'
+export { LABEL_SIZES, type LabelSize, type LabelSpec }
 
 async function makeQRBuffer(text: string, size: number): Promise<Buffer> {
   return QRCode.toBuffer(text, { type: 'png', width: size, margin: 1 })
@@ -502,4 +485,172 @@ export async function generateShelfLabelPDF(
     }
     renderAll().catch(reject)
   })
+}
+
+// ── Batch & Serial labels ──────────────────────────────────────────────────
+// Batch label: encodes the lot/batch identifier; used for perishable/lot-tracked
+// stock. Serial label: one label per physical unit, encoding the serial number.
+
+export interface LabelBatch {
+  batchId: string
+  productName: string
+  variantName?: string | null
+  sku: string
+  lotNumber: string | null
+  manufactureDate?: string | null
+  expiryDate?: string | null
+  quantity?: number | null
+}
+
+export interface LabelSerial {
+  serialNumber: string
+  productName: string
+  variantName?: string | null
+  sku: string
+  lotNumber?: string | null
+}
+
+// Compact 40×25 mm label spec used for both batch and serial labels.
+const BATCH_SPEC: LabelSpec = { size: '30x50', widthMm: 50, heightMm: 30, widthPt: 50 * MM, heightPt: 30 * MM, label: '50×30 mm' }
+
+async function renderBatchLabel(doc: any, b: LabelBatch, x: number, y: number, w: number, h: number) {
+  const pad = 3.5
+  const qrSize = 13 * MM
+  // QR encodes a machine-readable batch reference; barcode carries the lot number.
+  const qrText = `BATCH:${b.batchId}`
+  const barText = b.lotNumber || b.sku
+  const qrBuf = await makeQRBuffer(qrText, Math.round(qrSize * 3))
+  const barBuf = await makeBarcodeBuffer(barText, 3)
+
+  const rightX = x + w - pad - qrSize
+  const textW = rightX - x - pad - 2
+  const barTop = y + h - pad - 6 * MM      // top of the barcode strip
+  const lineH = 8                          // fixed single-line step for detail rows
+  const maxY = barTop - 2                   // don't let detail text collide with barcode
+
+  // Product name — up to 2 lines, clipped to fit; then detail rows below it.
+  doc.font('Helvetica-Bold').fontSize(7).fillColor('#000000')
+  doc.text(clip(b.productName, textW * 2, doc, 'Helvetica-Bold', 7), x + pad, y + pad, { width: textW, lineBreak: true, height: 16, ellipsis: true })
+  let midY = y + pad + 16
+
+  // Each detail row is CLIPPED to one line (lineBreak:false) so a long lot number
+  // can't wrap and overlap the next row. Stop if we'd run into the barcode.
+  doc.font('Helvetica').fontSize(6).fillColor('#333333')
+  const row = (label: string, value: string) => {
+    if (midY > maxY) return
+    doc.text(clip(`${label}: ${value}`, textW, doc, 'Helvetica', 6), x + pad, midY, { width: textW, lineBreak: false })
+    midY += lineH
+  }
+  if (b.lotNumber) row('LOT', b.lotNumber)
+  if (b.expiryDate) row('EXP', b.expiryDate)
+  if (b.quantity != null) row('QTY', String(b.quantity))
+
+  if (qrBuf) doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
+  if (barBuf) doc.image(barBuf, x + pad, barTop, { width: w - pad * 2 - qrSize - 2, height: 6 * MM })
+}
+
+async function renderSerialLabel(doc: any, s: LabelSerial, x: number, y: number, w: number, h: number) {
+  const pad = 3.5
+  const qrSize = 13 * MM
+  const qrBuf = await makeQRBuffer(s.serialNumber, Math.round(qrSize * 3))
+  const barBuf = await makeBarcodeBuffer(s.serialNumber, 3)
+
+  const rightX = x + w - pad - qrSize
+  const textW = rightX - x - pad - 2
+  const barTop = y + h - pad - 6 * MM
+  const lineH = 8
+  const maxY = barTop - 2
+
+  doc.font('Helvetica-Bold').fontSize(7).fillColor('#000000')
+  doc.text(clip(s.productName, textW * 2, doc, 'Helvetica-Bold', 7), x + pad, y + pad, { width: textW, lineBreak: true, height: 16, ellipsis: true })
+  let midY = y + pad + 16
+
+  // Detail rows — each clipped to one line so long LOT/serial values can't wrap and
+  // overlap. The full serial is still in the QR + barcode text below.
+  const row = (label: string, value: string, bold = false) => {
+    if (midY > maxY) return
+    doc.font(bold ? 'Helvetica-Bold' : 'Helvetica').fontSize(6).fillColor(bold ? '#000000' : '#333333')
+    doc.text(clip(`${label}: ${value}`, textW, doc, bold ? 'Helvetica-Bold' : 'Helvetica', 6), x + pad, midY, { width: textW, lineBreak: false })
+    midY += lineH
+  }
+  row('SKU', s.sku)
+  if (s.lotNumber) row('LOT', s.lotNumber)
+  row('S/N', s.serialNumber, true)
+
+  if (qrBuf) doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
+  if (barBuf) doc.image(barBuf, x + pad, barTop, { width: w - pad * 2 - qrSize - 2, height: 6 * MM })
+}
+
+function makeGenerator<T>(renderOne: (doc: any, item: T, x: number, y: number, w: number, h: number) => Promise<void>) {
+  // One label per page (thermal).
+  const thermal = (items: T[], copies: number, spec: LabelSpec = BATCH_SPEC): Promise<Buffer> => {
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: [spec.widthPt, spec.heightPt], margin: 0, autoFirstPage: false })
+      const chunks: Buffer[] = []
+      doc.on('data', (c: Buffer) => chunks.push(c))
+      doc.on('end', () => resolve(Buffer.concat(chunks)))
+      doc.on('error', reject)
+      ;(async () => {
+        for (const item of items) {
+          for (let i = 0; i < copies; i++) {
+            doc.addPage()
+            await renderOne(doc, item, 0, 0, spec.widthPt, spec.heightPt)
+          }
+        }
+        doc.end()
+      })().catch(reject)
+    })
+  }
+  // A4 grid with cut lines (sheet).
+  const sheet = (items: T[], copies: number, spec: LabelSpec = BATCH_SPEC): Promise<Buffer> => {
+    const PAGE_W = 595.28, PAGE_H = 841.89, MARGIN = 18, GAP = 5
+    const cols = Math.max(1, Math.floor((PAGE_W - MARGIN * 2 + GAP) / (spec.widthPt + GAP)))
+    const rows = Math.max(1, Math.floor((PAGE_H - MARGIN * 2 + GAP) / (spec.heightPt + GAP)))
+    const all: T[] = []
+    for (const it of items) for (let i = 0; i < copies; i++) all.push(it)
+    return new Promise((resolve, reject) => {
+      const doc = new PDFDocument({ size: 'A4', margin: 0, autoFirstPage: false })
+      const chunks: Buffer[] = []
+      doc.on('data', (c: Buffer) => chunks.push(c))
+      doc.on('end', () => resolve(Buffer.concat(chunks)))
+      doc.on('error', reject)
+      ;(async () => {
+        let idx = 0
+        while (idx < all.length) {
+          doc.addPage()
+          for (let r = 0; r < rows && idx < all.length; r++) {
+            for (let c = 0; c < cols && idx < all.length; c++) {
+              const x = MARGIN + c * (spec.widthPt + GAP)
+              const y = MARGIN + r * (spec.heightPt + GAP)
+              doc.rect(x, y, spec.widthPt, spec.heightPt).dash(2, { space: 2 }).stroke('#bbbbbb').undash()
+              await renderOne(doc, all[idx], x, y, spec.widthPt, spec.heightPt)
+              idx++
+            }
+          }
+        }
+        doc.end()
+      })().catch(reject)
+    })
+  }
+  return { thermal, sheet }
+}
+
+const batchGen = makeGenerator<LabelBatch>(renderBatchLabel)
+const serialGen = makeGenerator<LabelSerial>(renderSerialLabel)
+
+// Resolve a requested size to a spec, defaulting to the compact BATCH_SPEC. The
+// 'shelf-card' size has no compact batch/serial layout, so it also falls back.
+function batchSpecFor(size?: string | null): LabelSpec {
+  if (!size || size === 'shelf-card') return BATCH_SPEC
+  return findLabelSpec(size) ?? BATCH_SPEC
+}
+
+export function generateBatchLabelPDF(batches: LabelBatch[], copies: number, sheet: boolean, size?: string | null): Promise<Buffer> {
+  const spec = batchSpecFor(size)
+  return sheet ? batchGen.sheet(batches, copies, spec) : batchGen.thermal(batches, copies, spec)
+}
+
+export function generateSerialLabelPDF(serials: LabelSerial[], copies: number, sheet: boolean, size?: string | null): Promise<Buffer> {
+  const spec = batchSpecFor(size)
+  return sheet ? serialGen.sheet(serials, copies, spec) : serialGen.thermal(serials, copies, spec)
 }

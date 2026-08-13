@@ -124,57 +124,56 @@ describe('loadActiveCart', () => {
 // ---------------------------------------------------------------------------
 
 describe('cartLineUnitPrice', () => {
-  it('returns price_at_addition when positive', () => {
+  it('GST on: returns price_at_addition when positive', () => {
     const item = makeCartLine({ price_at_addition: 250 })
-    expect(cartLineUnitPrice(item)).toBe(250)
+    expect(cartLineUnitPrice(item, true)).toBe(250)
   })
 
-  it('falls back to products.base_price when price_at_addition is 0', () => {
+  it('GST on: falls back to products.base_price when price_at_addition is 0', () => {
     const item = makeCartLine({ price_at_addition: 0 })
-    expect(cartLineUnitPrice(item)).toBe(100)
+    expect(cartLineUnitPrice(item, true)).toBe(100)
   })
 
-  it('uses sub_variant price_ex_gst first in fallback chain', () => {
+  it('GST off: uses sub_variant price_ex_gst first in fallback chain', () => {
     const item = makeCartLine({
       price_at_addition: 0,
       sub_variant: { id: 'sv-1', sub_variant_name: 'S', sku: null, price: 80, price_ex_gst: 70, mrp: null },
     })
-    // price_at_addition is 0 → falls back to basePrice = sub_variant.price_ex_gst = 70
-    expect(cartLineUnitPrice(item)).toBe(70)
+    expect(cartLineUnitPrice(item, false)).toBe(70)
   })
 
-  it('uses variant price_ex_gst when sub_variant is absent', () => {
+  it('GST off: uses variant price_ex_gst when sub_variant is absent', () => {
     const item = makeCartLine({
       price_at_addition: 0,
       variant: { id: 'v-1', variant_name: 'Red', sku: 'RED', price: 90, price_ex_gst: 85, mrp: null },
     })
-    expect(cartLineUnitPrice(item)).toBe(85)
+    expect(cartLineUnitPrice(item, false)).toBe(85)
   })
 
-  it('uses products.price_ex_gst when variant absent', () => {
+  it('GST off: uses products.price_ex_gst when variant absent', () => {
     const item = makeCartLine({
       price_at_addition: 0,
       products: { ...makeCartLine().products, price_ex_gst: 95, base_price: 110 },
     })
-    expect(cartLineUnitPrice(item)).toBe(95)
+    expect(cartLineUnitPrice(item, false)).toBe(95)
   })
 
-  it('falls back to sub_variant.price when price_ex_gst is null', () => {
+  it('GST off: falls back to sub_variant.price when price_ex_gst is null', () => {
     const item = makeCartLine({
       price_at_addition: 0,
       sub_variant: { id: 'sv-1', sub_variant_name: 'S', sku: null, price: 80, price_ex_gst: null, mrp: null },
       products: { ...makeCartLine().products, price_ex_gst: null },
     })
-    expect(cartLineUnitPrice(item)).toBe(80)
+    expect(cartLineUnitPrice(item, false)).toBe(80)
   })
 
-  it('falls back to variant.price when price_ex_gst fields are null', () => {
+  it('GST off: falls back to variant.price when price_ex_gst fields are null', () => {
     const item = makeCartLine({
       price_at_addition: 0,
       variant: { id: 'v-1', variant_name: 'Blue', sku: 'BLU', price: 75, price_ex_gst: null, mrp: null },
       products: { ...makeCartLine().products, price_ex_gst: null },
     })
-    expect(cartLineUnitPrice(item)).toBe(75)
+    expect(cartLineUnitPrice(item, false)).toBe(75)
   })
 })
 
@@ -218,11 +217,11 @@ describe('cartSubtotal', () => {
       makeCartLine({ price_at_addition: 100, quantity: 2 }),
       makeCartLine({ price_at_addition: 50, quantity: 3 }),
     ]
-    expect(cartSubtotal(items)).toBe(350)
+    expect(cartSubtotal(items, true)).toBe(350)
   })
 
   it('returns 0 for empty cart', () => {
-    expect(cartSubtotal([])).toBe(0)
+    expect(cartSubtotal([], true)).toBe(0)
   })
 })
 
@@ -234,7 +233,7 @@ describe('cartTaxAmount', () => {
   it('calculates tax as inclusive portion of each line total', () => {
     // line: 100 * 2 = 200, gst 18% → tax = 200 - 200/1.18 ≈ 30.51
     const items = [makeCartLine({ price_at_addition: 100, quantity: 2 })]
-    const tax = cartTaxAmount(items)
+    const tax = cartTaxAmount(items, true)
     expect(tax).toBeCloseTo(200 - 200 / 1.18, 1)
   })
 
@@ -244,11 +243,11 @@ describe('cartTaxAmount', () => {
       quantity: 1,
       products: { ...makeCartLine().products, gst_percentage: '0' },
     })
-    expect(cartTaxAmount([item])).toBe(0)
+    expect(cartTaxAmount([item], true)).toBe(0)
   })
 
   it('returns 0 for empty array', () => {
-    expect(cartTaxAmount([])).toBe(0)
+    expect(cartTaxAmount([], true)).toBe(0)
   })
 
   it('handles null gst_percentage', () => {
@@ -257,7 +256,7 @@ describe('cartTaxAmount', () => {
       quantity: 1,
       products: { ...makeCartLine().products, gst_percentage: null },
     })
-    expect(cartTaxAmount([item])).toBe(0)
+    expect(cartTaxAmount([item], true)).toBe(0)
   })
 })
 

@@ -15,12 +15,20 @@ vi.mock('razorpay', () => {
   return { default: Razorpay }
 })
 
+// Control the razorpay feature flag directly. isRazorpayEnabled() now reads
+// from getFeatureFlags() (site-controls) rather than the raw ENABLE_RAZORPAY env.
+const mockGetFeatureFlags = vi.fn()
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: mockGetFeatureFlags,
+}))
+
 beforeEach(() => {
   vi.resetModules()
   // Clear relevant env vars before each test so tests are independent
   delete process.env.RAZORPAY_KEY_ID
   delete process.env.RAZORPAY_KEY_SECRET
   delete process.env.ENABLE_RAZORPAY
+  mockGetFeatureFlags.mockReset()
 })
 
 describe('razorpay.ts module-level guard', () => {
@@ -87,26 +95,22 @@ describe('isRazorpayEnabled()', () => {
     process.env.RAZORPAY_KEY_SECRET = 'rzp_secret'
   })
 
-  it('returns false when ENABLE_RAZORPAY is not set', async () => {
+  it('returns false when razorpay feature flag is disabled', async () => {
+    mockGetFeatureFlags.mockResolvedValue({ razorpayEnabled: false })
     const { isRazorpayEnabled } = await import('@/lib/razorpay')
-    expect(isRazorpayEnabled()).toBe(false)
+    expect(await isRazorpayEnabled()).toBe(false)
   })
 
-  it('returns false when ENABLE_RAZORPAY is set to a non-true value', async () => {
-    process.env.ENABLE_RAZORPAY = 'false'
+  it('returns true when razorpay feature flag is enabled', async () => {
+    mockGetFeatureFlags.mockResolvedValue({ razorpayEnabled: true })
     const { isRazorpayEnabled } = await import('@/lib/razorpay')
-    expect(isRazorpayEnabled()).toBe(false)
+    expect(await isRazorpayEnabled()).toBe(true)
   })
 
-  it('returns false when ENABLE_RAZORPAY is "1" (not the literal string "true")', async () => {
-    process.env.ENABLE_RAZORPAY = '1'
+  it('delegates the enabled decision to getFeatureFlags', async () => {
+    mockGetFeatureFlags.mockResolvedValue({ razorpayEnabled: true })
     const { isRazorpayEnabled } = await import('@/lib/razorpay')
-    expect(isRazorpayEnabled()).toBe(false)
-  })
-
-  it('returns true when ENABLE_RAZORPAY is exactly "true"', async () => {
-    process.env.ENABLE_RAZORPAY = 'true'
-    const { isRazorpayEnabled } = await import('@/lib/razorpay')
-    expect(isRazorpayEnabled()).toBe(true)
+    await isRazorpayEnabled()
+    expect(mockGetFeatureFlags).toHaveBeenCalledTimes(1)
   })
 })

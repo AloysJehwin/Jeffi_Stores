@@ -7,11 +7,13 @@ import SearchBar from '@/components/visitor/SearchBar'
 import ThemeToggle from '@/components/ThemeToggle'
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { bp } from '@/lib/business-path'
 
 export default function BusinessHeader() {
   const { cartCount } = useCart()
   const { user, logout } = useAuth()
+  const { identity } = useStoreConfig()
   const pathname = usePathname()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -59,9 +61,9 @@ export default function BusinessHeader() {
             {/* Logo */}
             <Link href={bp('/business')} className="flex items-center shrink-0">
               <div className="flex items-center gap-2 sm:gap-3">
-                <img src="/images/logo.png" alt="Jeffi Stores Logo" className="h-8 sm:h-10 lg:h-12 w-auto" />
+                <img src={identity.logoUrl || '/images/logo.png'} alt={`${identity.name} Logo`} className="h-8 sm:h-10 lg:h-12 w-auto" />
                 <div>
-                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 leading-tight">Jeffi Stores</div>
+                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400 leading-tight">{identity.name}</div>
                   <div className="text-[10px] sm:text-xs text-accent-500 font-semibold leading-tight">Business</div>
                 </div>
               </div>
@@ -161,9 +163,9 @@ export default function BusinessHeader() {
           >
             <div className="flex items-center justify-between p-4 border-b border-border-default">
               <Link href={bp('/business')} className="flex items-center gap-2" onClick={() => setMobileMenuOpen(false)}>
-                <img src="/images/logo.png" alt="Jeffi Stores" className="h-10 w-auto" />
+                <img src={identity.logoUrl || '/images/logo.png'} alt={identity.name} className="h-10 w-auto" />
                 <div>
-                  <span className="font-bold text-secondary-500 dark:text-primary-400">Jeffi Stores</span>
+                  <span className="font-bold text-secondary-500 dark:text-primary-400">{identity.name}</span>
                   <p className="text-xs text-accent-500 font-semibold">Business</p>
                 </div>
               </Link>

@@ -15,6 +15,7 @@ vi.mock('@/lib/inventory', () => ({
   getStockLedger: vi.fn(),
   getStockValuation: vi.fn(),
   logStockMovement: vi.fn(),
+  recomputeStockStatusForProduct: vi.fn(),
 }))
 vi.mock('@/lib/admin-audit', () => ({ logAdminAudit: vi.fn() }))
 vi.mock('@/lib/validate', () => {

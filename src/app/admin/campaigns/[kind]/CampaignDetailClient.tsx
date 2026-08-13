@@ -5,6 +5,8 @@ import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import { MessageCircle } from 'lucide-react'
+import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
 
 interface EligibleRecipient {
   reference_id: string
@@ -72,6 +74,14 @@ interface RecentSend {
   send_count: number
 }
 
+interface WhatsAppLog {
+  to_number: string
+  body: string
+  status: string
+  error: string | null
+  sent_at: string
+}
+
 interface CouponOption {
   id: string
   code: string
@@ -124,6 +134,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
   const { showToast } = useToast()
   const [campaign, setCampaign] = useState<Campaign | null>(null)
   const [recentSends, setRecentSends] = useState<RecentSend[]>([])
+  const [whatsappLogs, setWhatsappLogs] = useState<WhatsAppLog[]>([])
   const [loading, setLoading] = useState(true)
   const [aiPrompt, setAiPrompt] = useState('')
   const [aiGenerating, setAiGenerating] = useState(false)
@@ -168,6 +179,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         const data = await campaignRes.json()
         setCampaign(data.campaign)
         setRecentSends(data.recentSends || [])
+        setWhatsappLogs(data.whatsappLogs || [])
         setSendsTotal(data.total || 0)
         const draft = data.campaign.draft_fields
         setHasDraft(!!draft)
@@ -412,6 +424,14 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
     return null
   })()
 
+  function maskNumber(num: string): string {
+    const digits = (num || '').replace(/[^\d]/g, '')
+    if (digits.length < 6) return num || '—'
+    const cc = digits.length > 10 ? digits.slice(0, digits.length - 10) : ''
+    const last4 = digits.slice(-4)
+    return `${cc ? `+${cc} ` : ''}••••• ${last4}`
+  }
+
   function status(s: RecentSend): { label: string; color: string } {
     if (s.bounced_at) return { label: 'Bounced', color: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300' }
     if (s.unsubscribed_at) return { label: 'Unsub', color: 'bg-zinc-200 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300' }
@@ -463,6 +483,24 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             <span className="text-sm font-medium text-foreground">{form.enabled ? 'Active' : 'Paused'}</span>
           </label>
         </div>
+
+        {campaignSupportsWhatsApp(kind) && (() => {
+          const waOn = !!form.parameters?.whatsappEnabled
+          return (
+            <div className="mt-3 flex">
+              <span
+                className={`inline-flex items-center gap-1.5 px-2.5 py-1 text-[11px] font-semibold rounded-full ${
+                  waOn
+                    ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                    : 'bg-zinc-200 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300'
+                }`}
+              >
+                <MessageCircle className="w-3.5 h-3.5" />
+                WhatsApp: {waOn ? 'On' : 'Off'}
+              </span>
+            </div>
+          )
+        })()}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
           <div>
@@ -558,28 +596,28 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         )}
 
         <div className="flex items-center gap-2 mt-5 flex-wrap">
-          <button
-            type="button"
-            onClick={save}
-            disabled={saving}
-            className="px-4 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save Draft'}
-          </button>
           <input
             type="email"
             value={testEmail}
             onChange={e => setTestEmail(e.target.value)}
             placeholder="your@email.com for test send"
-            className="field-normal flex-1 max-w-xs border border-border-secondary bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+            className="h-10 flex-1 min-w-[200px] max-w-xs px-3 rounded-lg border border-border-secondary bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-500"
           />
           <button
             type="button"
             onClick={sendTest}
             disabled={testBusy || !testEmail.trim()}
-            className="px-4 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+            className="h-10 inline-flex items-center justify-center px-4 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
           >
             {testBusy ? 'Sending…' : 'Send test'}
+          </button>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            className="h-10 inline-flex items-center justify-center px-4 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save Draft'}
           </button>
         </div>
       </div>
@@ -879,6 +917,51 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
           </>
         )}
       </div>
+
+      {campaignSupportsWhatsApp(kind) && (
+        <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+          <div className="px-5 py-3 border-b border-border-default flex items-center gap-2">
+            <MessageCircle className="w-4 h-4 text-foreground-muted" />
+            <h3 className="text-sm font-semibold text-foreground">WhatsApp Log ({whatsappLogs.length})</h3>
+          </div>
+          {whatsappLogs.length === 0 ? (
+            <p className="p-8 text-sm text-foreground-muted text-center">No WhatsApp messages sent yet.</p>
+          ) : (
+            <>
+              <div className="grid grid-cols-[140px_1fr_140px_80px] px-5 py-2 border-b border-border-default bg-surface-secondary/40">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Recipient</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Message</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted">Sent at</span>
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-foreground-muted text-right">Status</span>
+              </div>
+              <div className="divide-y divide-border-default">
+                {whatsappLogs.map((w, i) => {
+                  const sent = w.status === 'sent'
+                  return (
+                    <div key={`${w.to_number}-${w.sent_at}-${i}`} className="grid grid-cols-[140px_1fr_140px_80px] items-center px-5 py-3 hover:bg-surface-secondary/50">
+                      <p className="text-xs font-mono text-foreground truncate">{maskNumber(w.to_number)}</p>
+                      <p className="text-xs text-foreground-muted truncate" title={w.body}>{w.body}</p>
+                      <p className="text-xs text-foreground-muted">{new Date(w.sent_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+                      <div className="flex justify-end">
+                        <span
+                          className={`px-2 py-0.5 text-[10px] font-semibold rounded-full ${
+                            sent
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-300'
+                              : 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                          }`}
+                          title={!sent && w.error ? w.error : undefined}
+                        >
+                          {sent ? '✓ Sent' : '✕ Failed'}
+                        </span>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }

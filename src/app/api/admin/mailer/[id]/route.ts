@@ -43,7 +43,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const body = await request.json()
-  const { title, template_key, subject, template_data, audience_type, audience_filter, scheduled_at } = body
+  const { title, template_key, subject, template_data, audience_type, audience_filter } = body
+  // Normalise scheduled_at to IST-aware timestamp
+  const rawSched = body.scheduled_at as string | undefined | null
+  const scheduled_at = rawSched
+    ? (rawSched.includes('+') || rawSched.endsWith('Z') ? rawSched : `${rawSched}:00+05:30`)
+    : (rawSched === null ? null : undefined)
 
   await query(
     `UPDATE email_campaigns SET

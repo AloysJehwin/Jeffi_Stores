@@ -65,7 +65,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 400 when Razorpay is disabled', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(false)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
 
     const res = await POST(makeRequest({ orderId: 'some-id' }) as any)
     const body = await res.json()
@@ -75,7 +75,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 401 when unauthenticated', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(null)
 
     const res = await POST(makeRequest({ orderId: 'some-id' }) as any)
@@ -86,7 +86,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 400 when neither draftToken nor orderId is provided', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
 
     const res = await POST(makeRequest({}) as any)
@@ -97,7 +97,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('creates a Razorpay order for a legacy orderId and returns razorpayOrderId + key fields', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({               // order lookup
@@ -123,7 +123,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 400 when legacy order is already paid', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
       id: 'order-uuid',
@@ -141,7 +141,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('creates a Razorpay order for a draftToken', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue({
       userId: 'user-123',
@@ -169,7 +169,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 400 when draftToken is invalid/expired', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue(null)
 
@@ -181,7 +181,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 403 when draftToken userId does not match authenticated user', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue({
       userId: 'different-user-id',
@@ -201,7 +201,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 400 when cart is empty for draftToken in cart mode', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -222,7 +222,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 409 when cart changed since draft was created', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -245,7 +245,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 400 when draft mode is invalid (neither cart nor buyNow)', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -265,7 +265,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 400 when draft total is zero (fully discounted)', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -290,7 +290,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('creates Razorpay order for draftToken with buyNow mode', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(orderDraft.verifyDraftToken).mockResolvedValue({
       userId: AUTH_USER.userId,
@@ -314,7 +314,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('creates Razorpay order for legacy orderId with isBusiness header', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue({ ...AUTH_USER, isBusiness: false } as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ email: AUTH_USER.email, phone: null }) // bizUser lookup
@@ -340,7 +340,7 @@ describe('POST /api/razorpay/create-order', () => {
   })
 
   it('returns 404 when legacy orderId not found', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(null) // order not found
 

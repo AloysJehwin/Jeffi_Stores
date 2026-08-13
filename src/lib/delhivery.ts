@@ -1,10 +1,8 @@
 import { query } from '@/lib/db'
+import { getBusinessValues } from '@/lib/site-controls'
 
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
-
-const ORIGIN_PIN = process.env.DELHIVERY_ORIGIN_PINCODE || '492001'
-const PICKUP_LOCATION = process.env.DELHIVERY_PICKUP_LOCATION || 'Jeffi Stores'
 const SELLER_NAME = process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores'
 const SELLER_ADD = process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
 const SELLER_PHONE = process.env.DELHIVERY_SELLER_PHONE || '07713585374'
@@ -48,6 +46,13 @@ export async function createRVPShipment(params: {
 }): Promise<string> {
   const token = process.env.DELHIVERY_API_KEY
   if (!token) throw new Error('DELHIVERY_API_KEY not configured')
+
+  const bv = await getBusinessValues()
+  const ORIGIN_PIN = bv.delhiveryOriginPincode
+  const PICKUP_LOCATION = bv.pickupLocation
+  const SELLER_NAME = bv.sellerName
+  const SELLER_ADD = bv.sellerAddress
+  const SELLER_PHONE = bv.sellerPhone
 
   const {
     consigneeName, address, pin, city, state,

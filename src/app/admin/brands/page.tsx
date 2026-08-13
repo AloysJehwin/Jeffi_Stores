@@ -51,7 +51,7 @@ async function AddBrandButton() {
     <div className="hidden md:block">
       <Link
         href={ap('/admin/brands/add', host)}
-        className="bg-accent-500 hover:bg-accent-600 text-white px-5 py-2.5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
+        className="inline-flex items-center justify-center h-11 bg-accent-500 hover:bg-accent-600 text-white px-5 rounded-lg font-semibold transition-colors text-center text-sm sm:text-base"
       >
         Add New Brand
       </Link>
@@ -251,7 +251,7 @@ export default function BrandsPage({ searchParams }: { searchParams: Promise<{ [
         <div className="flex flex-col sm:flex-row gap-2">
           <BrochureButton mode="brand" />
           <Suspense fallback={
-            <span className="bg-accent-500 text-white px-5 py-2.5 rounded-lg font-semibold text-center text-sm sm:text-base opacity-80">
+            <span className="hidden md:inline-flex items-center justify-center h-11 bg-accent-500 text-white px-5 rounded-lg font-semibold text-center text-sm sm:text-base opacity-80">
               Add New Brand
             </span>
           }>

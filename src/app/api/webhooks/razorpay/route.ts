@@ -10,6 +10,8 @@ import {
   validateCouponForUser, commitOrder,
 } from '@/lib/order-commit'
 import { createDraftInvoice } from '@/lib/invoice'
+import { getFeatureFlags } from '@/lib/site-controls'
+import { settleVariantChangePayment } from '@/lib/variant-change'
 import { logActivity } from '@/lib/activity'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 
@@ -73,6 +75,15 @@ async function handlePaymentCaptured(payment: any) {
   )
 
   if (!paymentRecord) {
+    // Variant-change top-up: order created for a pending variant_change request.
+    const vcr = await queryOne<{ id: string }>(
+      `SELECT id FROM variant_change_requests WHERE razorpay_order_id = $1 AND status = 'awaiting_payment'`,
+      [razorpayOrderId]
+    )
+    if (vcr) {
+      await settleVariantChangePayment({ razorpayOrderId, razorpayPaymentId, amountPaise: Number(payment.amount) || 0 }).catch(() => {})
+      return
+    }
     // Draft-token flow: no payments row yet — try pending_payment_intents fallback
     await commitDraftFromWebhook(razorpayOrderId, razorpayPaymentId, payment)
     return
@@ -290,12 +301,13 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
   let taxAmount = 0
   let cartItems: Awaited<ReturnType<typeof loadActiveCart>> = []
   let buyNowSnapshot: { product: any; variant: any | null; subVariant: any | null } | null = null
+  const { gstEnabled } = await getFeatureFlags()
 
   if (draft.mode === 'cart') {
     cartItems = await loadActiveCart(intent.user_id)
     if (cartItems.length === 0) return
-    subtotal = cartSubtotal(cartItems)
-    taxAmount = cartTaxAmount(cartItems)
+    subtotal = cartSubtotal(cartItems, gstEnabled)
+    taxAmount = cartTaxAmount(cartItems, gstEnabled)
   } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
     const product = await queryOne<any>(`SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`, [draft.buyNowItem.productId])
     if (!product) return
@@ -308,7 +320,7 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
     buyNowSnapshot = { product, variant, subVariant }
     subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
     const gstRate = parseFloat(String(product.gst_percentage || '0'))
-    taxAmount = subtotal - subtotal / (1 + gstRate / 100)
+    taxAmount = gstEnabled ? (subtotal - subtotal / (1 + gstRate / 100)) : 0
   } else {
     return
   }

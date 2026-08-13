@@ -2,18 +2,27 @@ import twilio from 'twilio'
 import { logMessage } from '@/lib/message-log'
 
 // Twilio SMS client — initialized lazily so missing creds don't crash the app.
-// Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_FROM_NUMBER in env.
+// Set TWILIO_ACCOUNT_SID + TWILIO_FROM_NUMBER, plus EITHER:
+//   - TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET (preferred — revocable API key), OR
+//   - TWILIO_AUTH_TOKEN (account auth token).
 // Set SMS_DISABLED=true to suppress all sends (useful in dev/test).
 
 const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
+const API_KEY_SID = process.env.TWILIO_API_KEY_SID
+const API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET
 const FROM_NUMBER = process.env.TWILIO_FROM_NUMBER || '+18722179910'
 const DISABLED = process.env.SMS_DISABLED === 'true'
 const STORE_NAME = 'Jeffi Stores'
 
 function getClient() {
-  if (!ACCOUNT_SID || !AUTH_TOKEN) return null
-  return twilio(ACCOUNT_SID, AUTH_TOKEN)
+  if (!ACCOUNT_SID) return null
+  // Prefer API key auth (revocable) when available; fall back to account auth token.
+  if (API_KEY_SID && API_KEY_SECRET) {
+    return twilio(API_KEY_SID, API_KEY_SECRET, { accountSid: ACCOUNT_SID })
+  }
+  if (AUTH_TOKEN) return twilio(ACCOUNT_SID, AUTH_TOKEN)
+  return null
 }
 
 // Normalize Indian mobile numbers to E.164 format (+91XXXXXXXXXX).
@@ -54,7 +63,7 @@ export async function sendOrderConfirmedSMS(params: {
   const amount = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(params.total)
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} is confirmed! Total: ${amount}. Track at jeffistores.in/orders. Reply STOP to opt out.`,
+    `${STORE_NAME}: Your order ${params.orderNumber} is confirmed! Total: ${amount}. Track at jeffistores.in/orders.`,
     'order_confirmed'
   )
 }
@@ -69,7 +78,7 @@ export async function sendOrderShippedSMS(params: {
   const courier = params.courier ? ` via ${params.courier}` : ''
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} has been shipped${courier}!${tracking} Track at jeffistores.in/orders. Reply STOP to opt out.`,
+    `${STORE_NAME}: Your order ${params.orderNumber} has been shipped${courier}!${tracking} Track at jeffistores.in/orders.`,
     'order_shipped'
   )
 }
@@ -80,7 +89,7 @@ export async function sendOrderDeliveredSMS(params: {
 }): Promise<boolean> {
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} has been delivered. Thank you for shopping with us! Shop again at jeffistores.in. Reply STOP to opt out.`,
+    `${STORE_NAME}: Your order ${params.orderNumber} has been delivered. Thank you for shopping with us! Shop again at jeffistores.in.`,
     'order_delivered'
   )
 }
@@ -93,7 +102,7 @@ export async function sendOrderCancelledSMS(params: {
   const reason = params.reason ? ` Reason: ${params.reason}.` : ''
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Your order ${params.orderNumber} has been cancelled.${reason} For help, visit jeffistores.in/support. Reply STOP to opt out.`,
+    `${STORE_NAME}: Your order ${params.orderNumber} has been cancelled.${reason} For help, visit jeffistores.in/support.`,
     'order_cancelled'
   )
 }
@@ -104,8 +113,20 @@ export async function sendOTPSMS(params: {
 }): Promise<boolean> {
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Your OTP is ${params.otp}. Valid for 10 minutes. Do not share this with anyone. Reply STOP to opt out.`,
+    `${STORE_NAME}: Your OTP is ${params.otp}. Valid for 10 minutes. Do not share this with anyone.`,
     'otp'
+  )
+}
+
+export async function sendVariantChangeRequestedSMS(params: {
+  phone?: string | null
+  orderNumber: string
+  orderUrl: string
+}): Promise<boolean> {
+  return sendSMS(
+    params.phone,
+    `${STORE_NAME}: Order ${params.orderNumber} needs your approval for a variant change. Review & confirm: ${params.orderUrl}`,
+    'variant_change_requested'
   )
 }
 
@@ -115,7 +136,7 @@ export async function sendPaymentFailedSMS(params: {
 }): Promise<boolean> {
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Payment for order ${params.orderNumber} failed. Please retry at jeffistores.in/orders or contact support. Reply STOP to opt out.`,
+    `${STORE_NAME}: Payment for order ${params.orderNumber} failed. Please retry at jeffistores.in/orders or contact support.`,
     'payment_failed'
   )
 }
@@ -126,7 +147,7 @@ export async function sendOutForDeliverySMS(params: {
 }): Promise<boolean> {
   return sendSMS(
     params.phone,
-    `${STORE_NAME}: Great news! Your order ${params.orderNumber} is out for delivery today. Please be available. Reply STOP to opt out.`,
+    `${STORE_NAME}: Great news! Your order ${params.orderNumber} is out for delivery today. Please be available.`,
     'out_for_delivery'
   )
 }

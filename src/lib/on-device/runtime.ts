@@ -126,3 +126,36 @@ export function disposeSummarizer() {
   if (worker) { worker.terminate(); worker = null }
   pending.clear()
 }
+
+/**
+ * Fire-and-forget on-device LoRA fine-tuning. Spawns the fine-tune worker ONLY
+ * when the DB feature flag is on AND the device is capable. Best-effort: any
+ * failure is swallowed. The worker self-terminates after one pass.
+ *
+ *   enabled — useStoreConfig().flags.ondeviceFinetuneEnabled (DB-backed)
+ *   examples — recent {prompt, completion, feedback} training examples
+ */
+export async function maybeRunFineTune(
+  enabled: boolean,
+  examples: import('./fine-tune.worker').FineTuneExample[],
+): Promise<void> {
+  try {
+    if (!enabled) return
+    if (typeof window === 'undefined' || typeof Worker === 'undefined') return
+    if (!examples || examples.length === 0) return
+    const { capable } = await canRunOnDeviceSummary()
+    if (!capable) return
+
+    const ftWorker = new Worker(new URL('./fine-tune.worker.ts', import.meta.url), { type: 'module' })
+    const cleanup = () => { try { ftWorker.terminate() } catch {} }
+    ftWorker.addEventListener('message', (e: MessageEvent) => {
+      const msg = e.data
+      if (msg?.type === 'finetune-done' || msg?.type === 'finetune-error') cleanup()
+    })
+    ftWorker.addEventListener('error', cleanup)
+    ftWorker.addEventListener('messageerror', cleanup)
+    ftWorker.postMessage({ type: 'finetune', examples })
+  } catch {
+    // best-effort — never surface fine-tune failures to the user
+  }
+}

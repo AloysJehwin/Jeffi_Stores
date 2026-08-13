@@ -163,9 +163,10 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
           router.refresh()
           return
         }
-        // Save draft
+        // Save draft, then return to the list.
         const res = await fetch(`/api/admin/review-forms/${formId}/draft`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
         if (!res.ok) { const d = await res.json(); setError(d.error || 'Failed to save draft'); return }
+        router.push(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')
         router.refresh()
         return
       }

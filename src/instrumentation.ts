@@ -76,6 +76,11 @@ export async function register() {
   }, 90_000)
 
   setTimeout(() => {
+    callCron('dispatch_mailer', '/api/cron/dispatch-mailer', 'GET', ONE_MIN - 5_000)
+    setInterval(() => callCron('dispatch_mailer', '/api/cron/dispatch-mailer', 'GET', ONE_MIN - 5_000), ONE_MIN)
+  }, 60_000)
+
+  setTimeout(() => {
     callCron('run_campaigns', '/api/cron/run-campaigns', 'GET', THIRTY_MIN - 30_000)
     setInterval(() => callCron('run_campaigns', '/api/cron/run-campaigns', 'GET', THIRTY_MIN - 30_000), THIRTY_MIN)
   }, 120_000)

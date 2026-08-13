@@ -5,6 +5,7 @@ vi.mock('@/lib/jwt', () => ({
 }))
 vi.mock('@/lib/db', () => ({
   queryOne: vi.fn(),
+  queryMany: vi.fn(),
   query: vi.fn(),
 }))
 vi.mock('@/lib/email', () => ({
@@ -58,7 +59,8 @@ describe('POST /api/orders/[id]/refund', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.mocked(db.query).mockResolvedValue({ rows: [] } as any)
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(db.queryMany).mockResolvedValue([] as any)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
   })
 
   it('returns 401 when not admin', async () => {
@@ -95,7 +97,7 @@ describe('POST /api/orders/[id]/refund', () => {
   it('returns 400 when razorpay not enabled', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER)
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(false)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
     const res = await POST(makeRequest() as any, PARAMS)
     expect(res.status).toBe(400)
     const body = await res.json()
@@ -104,21 +106,19 @@ describe('POST /api/orders/[id]/refund', () => {
 
   it('returns 400 when no payment record found', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(null) // no payment record
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([] as any) // no completed payments
     const res = await POST(makeRequest() as any, PARAMS)
     expect(res.status).toBe(400)
     const body = await res.json()
-    // isRazorpayEnabled passes, then payment record lookup returns null
+    // isRazorpayEnabled passes, then payment records lookup returns none
     expect(body.error).toMatch(/No Razorpay payment record|not configured/i)
   })
 
   it('processes refund successfully', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(MOCK_PAYMENT)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([MOCK_PAYMENT] as any)
     const mockRefund = vi.fn().mockResolvedValue({ id: 'rfnd_123' })
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
       payments: { refund: mockRefund },
@@ -127,15 +127,16 @@ describe('POST /api/orders/[id]/refund', () => {
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.success).toBe(true)
-    expect(body.refundId).toBe('rfnd_123')
+    // Refund now covers every completed payment; refundIds is an array.
+    expect(body.refundIds).toEqual(['rfnd_123'])
+    expect(body.totalRefunded).toBe(500)
     expect(mockRefund).toHaveBeenCalledWith('pay_rzp_123', { amount: 50000 })
   })
 
   it('processes refund for returned order', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'returned' })
-      .mockResolvedValueOnce(MOCK_PAYMENT)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ ...MOCK_ORDER, status: 'returned' })
+    vi.mocked(db.queryMany).mockResolvedValueOnce([MOCK_PAYMENT] as any)
     const mockRefund = vi.fn().mockResolvedValue({ id: 'rfnd_456' })
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
       payments: { refund: mockRefund },
@@ -143,14 +144,13 @@ describe('POST /api/orders/[id]/refund', () => {
     const res = await POST(makeRequest() as any, PARAMS)
     expect(res.status).toBe(200)
     const body = await res.json()
-    expect(body.refundId).toBe('rfnd_456')
+    expect(body.refundIds).toEqual(['rfnd_456'])
   })
 
   it('returns 500 on razorpay gateway error', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(db.queryOne)
-      .mockResolvedValueOnce(MOCK_ORDER)
-      .mockResolvedValueOnce(MOCK_PAYMENT)
+    vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValueOnce([MOCK_PAYMENT] as any)
     const mockRefund = vi.fn().mockRejectedValue(new Error('Gateway error'))
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue({
       payments: { refund: mockRefund },

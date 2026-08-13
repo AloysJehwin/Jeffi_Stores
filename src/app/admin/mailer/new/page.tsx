@@ -7,7 +7,6 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import RichTextEditor from '@/components/admin/RichTextEditor'
-
 import { ap } from '@/lib/admin-path'
 
 const TEMPLATES = [
@@ -41,6 +40,10 @@ interface Recipient {
   first_name: string | null
 }
 
+type SaveState = 'idle' | 'saving' | 'saved' | 'error'
+
+const DRAFT_STORAGE_KEY = 'mailer_draft_id'
+
 export default function NewCampaignPage() {
   const router = useRouter()
   const [step, setStep] = useState(1)
@@ -61,16 +64,93 @@ export default function NewCampaignPage() {
   const [audienceLoading, setAudienceLoading] = useState(false)
   const previewDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const audienceDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const autoSaveRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [scenarioPrompt, setScenarioPrompt] = useState('')
   const [scenarioLoading, setScenarioLoading] = useState(false)
   const [scenarioError, setScenarioError] = useState<string | null>(null)
+
+  // Draft state
+  const [draftId, setDraftId] = useState<string | null>(null)
+  const [saveState, setSaveState] = useState<SaveState>('idle')
+  const [showRestoreBanner, setShowRestoreBanner] = useState(false)
+  const draftIdRef = useRef<string | null>(null)
+
+  // Step 1 AI assist — unused (AI assist is on step 2 only)
 
   useEffect(() => {
     fetch('/api/admin/review-forms?page=1')
       .then(r => r.json())
       .then(data => setReviewForms(data.forms || []))
       .catch(() => {})
+
+    // Check for existing draft in localStorage
+    const saved = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (saved) setShowRestoreBanner(true)
   }, [])
+
+  // Keep ref in sync
+  useEffect(() => { draftIdRef.current = draftId }, [draftId])
+
+  // Auto-save on step 2 changes (debounced 1.5s)
+  const triggerAutoSave = useCallback(() => {
+    if (step !== 2) return
+    if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
+    setSaveState('saving')
+    autoSaveRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/admin/mailer/draft', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            draft_id: draftIdRef.current,
+            template_key: templateKey,
+            title: title || subject || 'Draft',
+            subject,
+            template_data: templateData,
+          }),
+        })
+        if (!res.ok) throw new Error()
+        const data = await res.json()
+        if (!draftIdRef.current) {
+          setDraftId(data.id)
+          localStorage.setItem(DRAFT_STORAGE_KEY, data.id)
+        }
+        setSaveState('saved')
+        setTimeout(() => setSaveState('idle'), 2500)
+      } catch {
+        setSaveState('error')
+      }
+    }, 1500)
+  }, [step, templateKey, title, subject, templateData])
+
+  useEffect(() => {
+    if (step === 2) triggerAutoSave()
+  }, [templateKey, templateData, subject, title, step, triggerAutoSave])
+
+  async function restoreDraft() {
+    const id = localStorage.getItem(DRAFT_STORAGE_KEY)
+    if (!id) return
+    try {
+      const res = await fetch(`/api/admin/mailer/${id}`, { credentials: 'include' })
+      if (!res.ok) { localStorage.removeItem(DRAFT_STORAGE_KEY); setShowRestoreBanner(false); return }
+      const { campaign } = await res.json()
+      if (campaign.status !== 'draft') { localStorage.removeItem(DRAFT_STORAGE_KEY); setShowRestoreBanner(false); return }
+      setDraftId(id)
+      setTemplateKey(campaign.template_key || 'review_form_share')
+      setTitle(campaign.title || '')
+      setSubject(campaign.subject || '')
+      setTemplateData(campaign.template_data || {})
+      setStep(2)
+    } catch { /* ignore */ }
+    setShowRestoreBanner(false)
+  }
+
+  function discardDraft() {
+    localStorage.removeItem(DRAFT_STORAGE_KEY)
+    setShowRestoreBanner(false)
+    setDraftId(null)
+  }
 
   const loadPreview = useCallback(async () => {
     setPreviewLoading(true)
@@ -97,9 +177,7 @@ export default function NewCampaignPage() {
   const loadAudience = useCallback(async () => {
     setAudienceLoading(true)
     try {
-      const audienceFilter = audienceType === 'order_history'
-        ? { daysSinceOrder: parseInt(daysSinceOrder, 10) }
-        : {}
+      const audienceFilter = audienceType === 'order_history' ? { daysSinceOrder: parseInt(daysSinceOrder, 10) } : {}
       const res = await fetch('/api/admin/mailer/audience-preview', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -135,11 +213,55 @@ export default function NewCampaignPage() {
         body: JSON.stringify({ scenario: scenarioPrompt, subject }),
       })
       const data = await res.json() as { html?: string; error?: string }
-      if (!res.ok || !data.html) {
-        setScenarioError(data.error || 'Generation failed')
-        return
+      if (!res.ok || !data.html) { setScenarioError(data.error || 'Generation failed'); return }
+
+      const html = data.html
+
+      // Extract plain text from HTML for non-custom templates
+      const stripTags = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+      const extractFirstLine = (h: string) => stripTags(h).split(/[.\n!]/)[0].trim()
+
+      if (templateKey === 'custom') {
+        setField('htmlBody', html)
+      } else if (templateKey === 'promotion' || templateKey === 'announcement') {
+        // Extract heading → headline, body paragraphs → body, CTA → ctaText+ctaUrl
+        const h2Match = html.match(/<h2[^>]*>(.*?)<\/h2>/i)
+        const headline = h2Match ? stripTags(h2Match[1]) : extractFirstLine(html)
+        const parasMatches = [...html.matchAll(/<p[^>]*>(.*?)<\/p>/gi)]
+        const bodyParas = parasMatches
+          .map(m => stripTags(m[1]))
+          .filter(t => t && !t.startsWith('Dear') && t.length > 20)
+          .slice(0, 3)
+          .join('\n\n')
+        const ctaMatch = html.match(/href="([^"]+)"[^>]*style="[^"]*background[^"]*"[^>]*>(.*?)<\/a>/i)
+        if (!subject) setSubject(headline)
+        setTemplateData(prev => ({
+          ...prev,
+          headline: headline || prev.headline,
+          body: bodyParas || prev.body,
+          ...(ctaMatch ? { ctaUrl: ctaMatch[1], ctaText: stripTags(ctaMatch[2]) } : {}),
+        }))
+      } else if (templateKey === 'event') {
+        const h2Match = html.match(/<h2[^>]*>(.*?)<\/h2>/i)
+        const eventName = h2Match ? stripTags(h2Match[1]) : extractFirstLine(html)
+        const parasMatches = [...html.matchAll(/<p[^>]*>(.*?)<\/p>/gi)]
+        const details = parasMatches
+          .map(m => stripTags(m[1]))
+          .filter(t => t && !t.startsWith('Dear') && t.length > 20)
+          .slice(0, 3)
+          .join('\n\n')
+        const ctaMatch = html.match(/href="([^"]+)"[^>]*style="[^"]*background[^"]*"[^>]*>(.*?)<\/a>/i)
+        if (!subject) setSubject(eventName)
+        setTemplateData(prev => ({
+          ...prev,
+          eventName: eventName || prev.eventName,
+          eventDetails: details || prev.eventDetails,
+          ...(ctaMatch ? { ctaUrl: ctaMatch[1] } : {}),
+        }))
+      } else {
+        // Fallback for any other template — switch to custom and put HTML there
+        setField('htmlBody', html)
       }
-      setField('htmlBody', data.html)
     } catch {
       setScenarioError('Network error')
     } finally {
@@ -151,47 +273,71 @@ export default function NewCampaignPage() {
     setSubmitting(true)
     setError('')
     try {
-      const audienceFilter = audienceType === 'order_history'
-        ? { daysSinceOrder: parseInt(daysSinceOrder, 10) }
-        : {}
+      const audienceFilter = audienceType === 'order_history' ? { daysSinceOrder: parseInt(daysSinceOrder, 10) } : {}
 
-      const createRes = await fetch('/api/admin/mailer', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: title || subject,
-          template_key: templateKey,
-          subject,
-          template_data: templateData,
-          audience_type: audienceType,
-          audience_filter: audienceFilter,
-        }),
-      })
-      if (!createRes.ok) throw new Error((await createRes.json()).error || 'Failed to create campaign')
-      const { id } = await createRes.json()
-
-      if (scheduledAt) {
-        await fetch(`/api/admin/mailer/${id}`, {
+      // 1. Create or update campaign record (includes scheduled_at)
+      let id = draftId
+      if (id) {
+        const r = await fetch(`/api/admin/mailer/${id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ scheduled_at: scheduledAt }),
+          credentials: 'include',
+          body: JSON.stringify({
+            title: title || subject,
+            template_key: templateKey,
+            subject,
+            template_data: templateData,
+            audience_type: audienceType,
+            audience_filter: audienceFilter,
+            scheduled_at: scheduledAt || null,
+          }),
         })
+        if (!r.ok) throw new Error((await r.json()).error || 'Failed to update campaign')
+      } else {
+        const createRes = await fetch('/api/admin/mailer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            title: title || subject,
+            template_key: templateKey,
+            subject,
+            template_data: templateData,
+            audience_type: audienceType,
+            audience_filter: audienceFilter,
+          }),
+        })
+        if (!createRes.ok) throw new Error((await createRes.json()).error || 'Failed to create campaign')
+        id = (await createRes.json()).id
+        // Persist scheduled_at if set
+        if (scheduledAt) {
+          await fetch(`/api/admin/mailer/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ scheduled_at: scheduledAt }),
+          })
+        }
       }
 
+      // 2. Dispatch — pass scheduled_at in body so the send route has it atomically
       if (sendNow) {
         await fetch(`/api/admin/mailer/${id}/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
           body: JSON.stringify({ dispatchNow: true }),
         })
       } else if (scheduledAt) {
         await fetch(`/api/admin/mailer/${id}/send`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ dispatchNow: false }),
+          credentials: 'include',
+          body: JSON.stringify({ dispatchNow: false, scheduled_at: scheduledAt }),
         })
       }
 
+      localStorage.removeItem(DRAFT_STORAGE_KEY)
       router.push(ap('/admin/mailer'))
     } catch (err) {
       setError(String(err))
@@ -201,14 +347,47 @@ export default function NewCampaignPage() {
 
   return (
     <div className="p-4 sm:p-6">
+      {/* Restore draft banner */}
+      {showRestoreBanner && (
+        <div className="mb-4 flex items-center justify-between gap-4 px-4 py-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-lg">
+          <div className="flex items-center gap-2">
+            <svg className="w-4 h-4 text-amber-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+            <span className="text-sm font-medium text-amber-800 dark:text-amber-300">You have an unsaved draft — want to continue where you left off?</span>
+          </div>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={restoreDraft} className="px-3 py-1 text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-white rounded-md transition-colors">Restore</button>
+            <button onClick={discardDraft} className="px-3 py-1 text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 rounded-md transition-colors">Discard</button>
+          </div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 mb-6">
         <Link href={ap('/admin/mailer')} className="text-foreground-muted hover:text-foreground transition-colors">
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </Link>
-        <div>
+        <div className="flex-1">
           <h1 className="text-2xl font-bold text-secondary-500 dark:text-foreground">New Campaign</h1>
           <p className="text-sm text-foreground-secondary mt-0.5">Step {step} of 3</p>
         </div>
+        {/* Auto-save indicator — always visible on step 2 */}
+        {step === 2 && (
+          <div className={`flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full border transition-all ${
+            saveState === 'saving' ? 'text-foreground-muted bg-surface-secondary border-border-default' :
+            saveState === 'saved' ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' :
+            saveState === 'error' ? 'text-red-500 bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800' :
+            draftId ? 'text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-700' :
+            'text-foreground-muted bg-surface-secondary border-border-default'
+          }`}>
+            {saveState === 'saving' && <svg className="w-3 h-3 animate-spin shrink-0" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>}
+            {saveState === 'saved' && <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>}
+            {saveState === 'error' && <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>}
+            {saveState === 'idle' && draftId && <svg className="w-3 h-3 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>}
+            {saveState === 'saving' ? 'Saving draft…' :
+             saveState === 'saved' ? 'Draft saved' :
+             saveState === 'error' ? 'Save failed — retry?' :
+             draftId ? 'Draft' : 'Auto-save enabled'}
+          </div>
+        )}
       </div>
 
       <div className="flex gap-1 mb-6 max-w-3xl">
@@ -217,6 +396,7 @@ export default function NewCampaignPage() {
         ))}
       </div>
 
+      {/* ── Step 1 ── */}
       {step === 1 && (
         <div className="max-w-3xl space-y-5">
           <div>
@@ -233,28 +413,53 @@ export default function NewCampaignPage() {
               ))}
             </div>
           </div>
+
           <button type="button" onClick={() => setStep(2)} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors">
             Continue
           </button>
         </div>
       )}
 
+      {/* ── Step 2 ── */}
       {step === 2 && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
-          {/* Left: form fields */}
           <div className="space-y-5">
+            {/* AI Assist — available for all templates */}
+            <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-4 space-y-3">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-violet-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
+                <p className="text-sm font-semibold text-violet-700 dark:text-violet-300">AI Assist</p>
+              </div>
+              <textarea
+                value={scenarioPrompt}
+                onChange={e => setScenarioPrompt(e.target.value)}
+                rows={2}
+                className={textareaClass}
+                placeholder="Describe your campaign — e.g. 'Diwali sale 20% off power tools, CTA to /products' or 'Re-engage customers who haven't ordered in 60 days'"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={generateFromScenario}
+                  disabled={scenarioLoading || scenarioPrompt.trim().length < 10}
+                  className="inline-flex items-center gap-2 px-4 py-1.5 bg-violet-500 hover:bg-violet-600 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {scenarioLoading
+                    ? <><svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>Generating…</>
+                    : <><svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>{templateData.htmlBody ? 'Regenerate' : 'Generate content'}</>
+                  }
+                </button>
+                {scenarioError && <span className="text-xs text-red-500">{scenarioError}</span>}
+              </div>
+            </div>
+
             <div>
               <label className={labelClass}>Campaign Title (internal)</label>
               <input value={title} onChange={e => setTitle(e.target.value)} className={inputClass} placeholder="e.g. May Google Review Push" />
             </div>
             <div>
               <label className={labelClass}>Email Subject *</label>
-              <AIEnrichButton
-                fieldLabel="Email Subject"
-                value={subject}
-                onChange={setSubject}
-                context={`Template: ${templateKey}`}
-              >
+              <AIEnrichButton fieldLabel="Email Subject" value={subject} onChange={setSubject} context={`Template: ${templateKey}`}>
                 <input value={subject} onChange={e => setSubject(e.target.value)} className={`${inputClass} pr-8`} placeholder="Subject line customers will see" required />
               </AIEnrichButton>
             </div>
@@ -264,21 +469,12 @@ export default function NewCampaignPage() {
                 <AdminSelect
                   label="Review Form *"
                   placeholder={reviewForms.length === 0 ? 'No active forms found' : 'Select a form…'}
-                  options={reviewForms.map(f => ({
-                    value: f.id,
-                    label: f.title,
-                    group: undefined,
-                  }))}
+                  options={reviewForms.map(f => ({ value: f.id, label: f.title, group: undefined }))}
                   value={templateData.formId || ''}
                   onChange={formId => {
                     const chosen = reviewForms.find(f => f.id === formId)
                     if (!chosen) return
-                    setTemplateData(prev => ({
-                      ...prev,
-                      formId: chosen.id,
-                      formTitle: chosen.title,
-                      formUrl: `https://forms.jeffistores.in/${chosen.slug}`,
-                    }))
+                    setTemplateData(prev => ({ ...prev, formId: chosen.id, formTitle: chosen.title, formUrl: `https://forms.jeffistores.in/${chosen.slug}` }))
                   }}
                   disabled={reviewForms.length === 0}
                 />
@@ -288,9 +484,7 @@ export default function NewCampaignPage() {
                   </div>
                 )}
                 {reviewForms.length === 0 && (
-                  <p className="text-xs text-amber-600">
-                    No review forms found. <Link href={ap('/admin/review-forms/add')} className="underline">Create one first.</Link>
-                  </p>
+                  <p className="text-xs text-amber-600">No review forms found. <Link href={ap('/admin/review-forms/add')} className="underline">Create one first.</Link></p>
                 )}
               </>
             )}
@@ -333,60 +527,42 @@ export default function NewCampaignPage() {
             )}
 
             {templateKey === 'custom' && (
-              <div className="space-y-4">
-                <div className="bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800 rounded-lg p-4 space-y-3">
-                  <div>
-                    <label className={`${labelClass} flex items-center gap-1.5`}>
-                      <svg className="w-4 h-4 text-violet-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-                      Generate with AI
-                    </label>
-                    <textarea
-                      value={scenarioPrompt}
-                      onChange={e => setScenarioPrompt(e.target.value)}
-                      rows={3}
-                      className={`${textareaClass}`}
-                      placeholder="Describe the email scenario — e.g. 'Diwali sale 20% off all power tools, valid till 5 Nov, include CTA to /products' or 'Welcome new business customers, mention 10-day net credit and bulk discount tier'."
-                    />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={generateFromScenario}
-                      disabled={scenarioLoading || scenarioPrompt.trim().length < 10}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-violet-500 hover:bg-violet-600 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {scenarioLoading ? (
-                        <>
-                          <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" /></svg>
-                          Generating…
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-                          {templateData.htmlBody ? 'Regenerate' : 'Generate Email Body'}
-                        </>
-                      )}
-                    </button>
-                    {scenarioError && <span className="text-xs text-red-500">{scenarioError}</span>}
-                  </div>
-                  <p className="text-[11px] text-foreground-muted">
-                    AI uses placeholder tags like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code> that get replaced per recipient at send time.
-                  </p>
-                </div>
-                <div>
-                  <label className={labelClass}>Email Body</label>
-                  <RichTextEditor
-                    value={templateData.htmlBody || ''}
-                    onChange={v => setField('htmlBody', v)}
-                    placeholder="Click 'Generate Email Body' above, or write your own here."
-                    minHeight={360}
-                  />
-                </div>
+              <div>
+                <label className={labelClass}>Email Body</label>
+                <p className="text-[11px] text-foreground-muted mb-2">
+                  Use the AI Assist above to generate, or write your own. AI uses tags like <code className="font-mono bg-surface-secondary px-1 rounded">{'{customer_first_name}'}</code> replaced per recipient at send time.
+                </p>
+                <RichTextEditor value={templateData.htmlBody || ''} onChange={v => setField('htmlBody', v)} placeholder="Click 'Generate content' above, or write your own here." minHeight={360} />
               </div>
             )}
 
-            <div className="flex gap-3 pt-2">
+            <div className="flex items-center gap-3 pt-2">
               <button type="button" onClick={() => setStep(1)} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">Back</button>
+              <button
+                type="button"
+                onClick={async () => {
+                  if (autoSaveRef.current) clearTimeout(autoSaveRef.current)
+                  setSaveState('saving')
+                  try {
+                    const res = await fetch('/api/admin/mailer/draft', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      credentials: 'include',
+                      body: JSON.stringify({ draft_id: draftIdRef.current, template_key: templateKey, title: title || subject || 'Draft', subject, template_data: templateData }),
+                    })
+                    if (!res.ok) throw new Error()
+                    const data = await res.json()
+                    if (!draftIdRef.current) { setDraftId(data.id); localStorage.setItem(DRAFT_STORAGE_KEY, data.id) }
+                    setSaveState('saved')
+                    setTimeout(() => setSaveState('idle'), 2500)
+                  } catch { setSaveState('error') }
+                }}
+                disabled={saveState === 'saving'}
+                className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground-secondary rounded-lg font-medium transition-colors text-sm disabled:opacity-50 flex items-center gap-1.5"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" /></svg>
+                Save Draft
+              </button>
               <button type="button" onClick={() => setStep(3)} disabled={!subject} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50">Continue</button>
             </div>
           </div>
@@ -397,35 +573,23 @@ export default function NewCampaignPage() {
             <div className="border border-border-default rounded-lg overflow-hidden bg-surface-elevated" style={{ minHeight: '520px' }}>
               {previewLoading && (
                 <div className="flex items-center justify-center h-[520px] text-foreground-muted text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full" />
-                    Rendering…
-                  </div>
+                  <div className="flex items-center gap-2"><div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full" />Rendering…</div>
                 </div>
               )}
-              {!previewLoading && previewHtml && (
-                <iframe srcDoc={previewHtml} className="w-full h-[600px] bg-white" title="Email preview" />
-              )}
+              {!previewLoading && previewHtml && <iframe srcDoc={previewHtml} className="w-full h-[600px] bg-white" title="Email preview" />}
               {!previewLoading && !previewHtml && (
-                <div className="flex items-center justify-center h-[520px] text-foreground-muted text-sm text-center px-6">
-                  Fill in the fields on the left to see a live preview
-                </div>
+                <div className="flex items-center justify-center h-[520px] text-foreground-muted text-sm text-center px-6">Fill in the fields on the left to see a live preview</div>
               )}
             </div>
           </div>
         </div>
       )}
 
+      {/* ── Step 3 ── */}
       {step === 3 && (
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8 items-start">
-          {/* Left: audience + schedule */}
           <div className="space-y-5">
-            <AdminSelect
-              label="Audience"
-              options={AUDIENCE_OPTIONS}
-              value={audienceType}
-              onChange={setAudienceType}
-            />
+            <AdminSelect label="Audience" options={AUDIENCE_OPTIONS} value={audienceType} onChange={setAudienceType} />
 
             {audienceType === 'order_history' && (
               <div>
@@ -444,11 +608,14 @@ export default function NewCampaignPage() {
             <div className="flex flex-wrap gap-3 pt-2">
               <button type="button" onClick={() => setStep(2)} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">Back</button>
               <button type="button" onClick={() => handleSubmit(false)} disabled={submitting} className="px-5 py-2 bg-surface-secondary hover:bg-border-default text-foreground-secondary rounded-lg font-medium transition-colors text-sm disabled:opacity-50">
-                {scheduledAt ? 'Schedule' : 'Save as Draft'}
+                {submitting ? '…' : scheduledAt ? 'Schedule' : 'Save as Draft'}
               </button>
-              <button type="button" onClick={() => handleSubmit(true)} disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50">
-                {submitting ? 'Sending…' : 'Send Now'}
+              <button type="button" onClick={() => handleSubmit(true)} disabled={submitting || !!scheduledAt} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50">
+                {submitting ? 'Queuing…' : 'Send Now'}
               </button>
+              {scheduledAt && (
+                <p className="text-xs text-foreground-muted self-center">Sending at {new Date(scheduledAt).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</p>
+              )}
             </div>
           </div>
 
@@ -463,16 +630,11 @@ export default function NewCampaignPage() {
             <div className="border border-border-default rounded-lg overflow-hidden bg-surface-elevated" style={{ minHeight: '400px' }}>
               {audienceLoading && (
                 <div className="flex items-center justify-center h-[400px] text-foreground-muted text-sm">
-                  <div className="flex items-center gap-2">
-                    <div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full" />
-                    Loading…
-                  </div>
+                  <div className="flex items-center gap-2"><div className="animate-spin w-4 h-4 border-2 border-accent-500 border-t-transparent rounded-full" />Loading…</div>
                 </div>
               )}
               {!audienceLoading && audienceRecipients.length === 0 && audienceCount !== null && (
-                <div className="flex items-center justify-center h-[400px] text-foreground-muted text-sm">
-                  No customers match this filter
-                </div>
+                <div className="flex items-center justify-center h-[400px] text-foreground-muted text-sm">No customers match this filter</div>
               )}
               {!audienceLoading && audienceRecipients.length > 0 && (
                 <div className="overflow-y-auto" style={{ maxHeight: '520px' }}>
@@ -480,9 +642,7 @@ export default function NewCampaignPage() {
                     {audienceRecipients.map((r, i) => (
                       <div key={i} className="flex items-center gap-3 px-4 py-2.5">
                         <div className="w-7 h-7 rounded-full bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center shrink-0">
-                          <span className="text-xs font-semibold text-accent-600 dark:text-accent-400">
-                            {(r.first_name?.[0] || r.email[0]).toUpperCase()}
-                          </span>
+                          <span className="text-xs font-semibold text-accent-600 dark:text-accent-400">{(r.first_name?.[0] || r.email[0]).toUpperCase()}</span>
                         </div>
                         <div className="min-w-0">
                           {r.first_name && <p className="text-sm font-medium text-foreground truncate">{r.first_name}</p>}

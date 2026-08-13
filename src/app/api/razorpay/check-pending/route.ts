@@ -10,6 +10,7 @@ import {
 } from '@/lib/order-commit'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
 import { createDraftInvoice } from '@/lib/invoice'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { logActivity } from '@/lib/activity'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { createAutoTask } from '@/lib/auto-tasks'
@@ -97,14 +98,15 @@ export async function POST(request: NextRequest) {
       let subtotal = 0, taxAmount = 0
       let cartItems: Awaited<ReturnType<typeof loadActiveCart>> = []
       let buyNowSnapshot: { product: any; variant: any | null; subVariant: any | null } | null = null
+      const { gstEnabled } = await getFeatureFlags()
 
       if (draft.mode === 'cart') {
         cartItems = await loadActiveCart(authUser.userId)
         if (cartItems.length === 0) {
           return NextResponse.json({ error: 'Cart is empty — cannot create order. Contact support with payment ID: ' + capturedPayment.id }, { status: 409 })
         }
-        subtotal = cartSubtotal(cartItems)
-        taxAmount = cartTaxAmount(cartItems)
+        subtotal = cartSubtotal(cartItems, gstEnabled)
+        taxAmount = cartTaxAmount(cartItems, gstEnabled)
       } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
         const product = await queryOne<any>(`SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`, [draft.buyNowItem.productId])
         if (!product) return NextResponse.json({ error: 'Product not found' }, { status: 404 })
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
         buyNowSnapshot = { product, variant, subVariant }
         subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
         const gstRate = parseFloat(String(product.gst_percentage || '0'))
-        taxAmount = subtotal - subtotal / (1 + gstRate / 100)
+        taxAmount = gstEnabled ? (subtotal - subtotal / (1 + gstRate / 100)) : 0
       } else {
         return NextResponse.json({ error: 'Invalid draft' }, { status: 400 })
       }

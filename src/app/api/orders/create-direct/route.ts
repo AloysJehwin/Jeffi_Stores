@@ -6,6 +6,7 @@ import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/emai
 import { isInterState, calculateGST, round2 } from '@/lib/gst'
 import { recordImplicitSignal } from '@/lib/ai-feedback'
 import { resolveBuyNowItem, quoteShipping, validateCouponForUser, loadAddress } from '@/lib/order-commit'
+import { getFeatureFlags, getBusinessValues } from '@/lib/site-controls'
 import { computeEdd } from '@/lib/edd'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { parseBody, zUuid } from '@/lib/validate'
@@ -35,10 +36,9 @@ const CreateDirectOrderSchema = z.object({
 })
 
 
-const isGSTEnabled = process.env.ENABLE_GST === 'true'
-
 export async function POST(request: NextRequest) {
   try {
+    const isGSTEnabled = (await getFeatureFlags()).gstEnabled
     const authUser = await authenticateUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
       qty: Number(item.qty),
       buyMode: item.buyMode ?? undefined,
       buyUnit: item.buyUnit ?? null,
+      gstEnabled: isGSTEnabled,
     })
     if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
 
@@ -181,7 +182,7 @@ export async function POST(request: NextRequest) {
     let isIGST = false
 
     if (isGSTEnabled) {
-      const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'
+      const sellerStateCode = (await getBusinessValues()).businessStateCode
       const buyerState = shippingAddress?.state || ''
       isIGST = isInterState(buyerState, sellerStateCode)
       const gst = calculateGST(itemTotal, gstRate, isIGST)
@@ -191,7 +192,8 @@ export async function POST(request: NextRequest) {
       orderSgst = round2(gst.sgst)
       orderIgst = round2(gst.igst)
     } else {
-      taxAmount = round2(itemTotal - (itemTotal / (1 + gstRate / 100)))
+      // GST off ⇒ unitPrice is already the ex-GST price ⇒ no embedded tax.
+      taxAmount = 0
     }
 
     const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)

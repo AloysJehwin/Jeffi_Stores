@@ -44,6 +44,6 @@ describe('winback180 scenario', () => {
 
   it('has paramSchema', () => {
     expect(winback180.paramSchema).toBeDefined()
-    expect(Object.keys(winback180.paramSchema)).toHaveLength(6)
+    expect(Object.keys(winback180.paramSchema)).toHaveLength(7)
   })
 })

@@ -3,6 +3,7 @@
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import Link from 'next/link'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -10,7 +11,7 @@ import AddressFormModal from '@/components/visitor/AddressFormModal'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
-import { mrpDiscountPct } from '@/lib/pricing'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
 import { round2 } from '@/lib/gst'
 import { bp } from '@/lib/business-path'
 import CheckoutRecapSummary from '@/components/on-device/CheckoutRecapSummary'
@@ -31,12 +32,12 @@ interface CouponResult {
   discountAmount: number
 }
 
-const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
-
 function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const { cartItems, cartCount, getCartTotal, getCartTax, clearCart, isLoading: cartLoading } = useCart()
   const { user, isLoading: authLoading } = useAuth()
   const { showToast } = useToast()
+  const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
+  const gstEnabled = useStoreConfig().flags.gstEnabled
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -981,7 +982,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                           </div>
                         )
                       })()}
-                      {buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
+                      {gstEnabled && buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
                         const isFractional = (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') || !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
                         const lineTotal = buyNowItem.price * (isFractional ? buyNowItem.qty : Math.round(buyNowItem.qty))
                         const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
@@ -997,7 +998,12 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                   cartItems.map((item) => {
                     const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
                     const isCustomQty = item.buy_mode && item.buy_mode !== 'unit'
-                    const price = isCustomQty ? item.price_at_addition : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+                    const price = !gstEnabled
+                      ? pickUnitPrice({
+                          inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
+                          exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
+                        }, false)
+                      : (isCustomQty ? item.price_at_addition : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price))
                     const effectiveQty = isCustomQty ? Number(item.quantity) : Math.round(Number(item.quantity))
                     const itemTotal = price * effectiveQty
                     const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
@@ -1147,7 +1153,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                   <span>Subtotal{!isBuyNow ? ` (${cartCount} items)` : ''}</span>
                   <span>₹{cartSubtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
-                {!isBuyNow && (
+                {!isBuyNow && gstEnabled && (
                   <div className="flex justify-between text-foreground-muted text-sm">
                     <span>Incl. GST</span>
                     <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -1198,7 +1204,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                     <span>Total</span>
                     <span>₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
-                  <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>
+                  {gstEnabled && <p className="text-xs text-foreground-muted mt-1">Price inclusive of all taxes</p>}
                 </div>
               </div>
 

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useRouter } from 'next/navigation'
 import { resolveEdd } from '@/lib/edd-cache'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
@@ -37,6 +38,7 @@ export default function ProductCard({
 }: ProductCardProps) {
   const { user } = useAuth()
   const { showToast, showConfirm } = useToast()
+  const gstEnabled = useStoreConfig().flags.gstEnabled
   const router = useRouter()
   const [isInWishlist, setIsInWishlist] = useState(false)
   const [wishlistLoading, setWishlistLoading] = useState(false)
@@ -221,7 +223,7 @@ export default function ProductCard({
                   </span>
                 )}
               </div>
-              <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>
+              {gstEnabled && <p className="text-[10px] text-foreground-muted mb-2 sm:mb-3">Inclusive of all taxes</p>}
               <div className="flex items-center justify-between gap-1">
                 <span className={`text-xs font-medium whitespace-nowrap ${effectiveStock > 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
@@ -296,7 +298,7 @@ export default function ProductCard({
                 <span className={`w-1.5 h-1.5 rounded-full ${effectiveStock > 0 ? 'bg-green-500' : 'bg-red-500'}`} />
                 {effectiveStock > 0 ? 'In Stock' : 'Out of Stock'}
               </span>
-              <span className="text-xs text-foreground-muted">Incl. all taxes</span>
+              <span className="text-xs text-foreground-muted">{gstEnabled ? 'Incl. all taxes' : 'Tax-free'}</span>
             </div>
 
             <Link

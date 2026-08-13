@@ -7,8 +7,7 @@ import { getHost } from '@/lib/get-host'
 import { hasScope } from '@/lib/scopes'
 import CustomerActionButton from '@/components/admin/CustomerActionButton'
 import CustomerMailerPanel from '@/components/admin/CustomerMailerPanel'
-import AdminSupportChat from '@/components/admin/AdminSupportChat'
-import WhatsAppEngagement from '@/components/admin/WhatsAppEngagement'
+import CustomerEngagementChips from '@/components/admin/CustomerEngagementChips'
 import CustomerTags from '@/components/admin/CustomerTags'
 import CustomerNotes from '@/components/admin/CustomerNotes'
 import CustomerTasks from '@/components/admin/CustomerTasks'
@@ -249,8 +248,14 @@ export default async function CustomerDetailPage({
 
         {/* Left column: Actions + Business details + Contact */}
         <div className="space-y-5">
-          {/* Health Score */}
+          {/* Engagement chips + Health Score */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
+            <CustomerEngagementChips
+              customerId={customer.id}
+              phone={customer.phone}
+              marketingOptOut={customer.marketing_opt_out}
+              autoOpenChat={resolvedSearchParams.chat === 'true'}
+            />
             <HealthScoreCard customerId={customer.id} initial={customer.health || null} />
           </div>
 
@@ -377,15 +382,6 @@ export default async function CustomerDetailPage({
             </div>
           )}
 
-          {/* Support chat */}
-          <AdminSupportChat customerId={customer.id} autoOpen={resolvedSearchParams.chat === 'true'} />
-
-          {/* WhatsApp engagement */}
-          <WhatsAppEngagement
-            customerId={customer.id}
-            phone={customer.phone}
-            marketingOptOut={customer.marketing_opt_out}
-          />
         </div>
 
         {/* Right column: Timeline + Orders table (spans 2 cols) */}

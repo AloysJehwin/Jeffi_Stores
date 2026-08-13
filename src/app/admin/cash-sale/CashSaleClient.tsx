@@ -134,6 +134,17 @@ export default function CashSaleClient() {
   const [serialAssignments, setSerialAssignments] = useState<SerialAssignment[]>([])
   const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
 
+  // Prune serial assignments whose line was removed or whose product was cleared
+  // (LineItemsSection doesn't notify on remove/clear). Keeps assignments in lockstep
+  // with the current serialized lines so no orphan serial is submitted.
+  useEffect(() => {
+    const validIds = new Set(items.filter(it => it.product_id && it.serialized).map(it => it.id))
+    setSerialAssignments(prev => {
+      const next = prev.filter(sa => validIds.has(sa.order_item_id))
+      return next.length === prev.length ? prev : next
+    })
+  }, [items])
+
   const totalPages = Math.ceil(total / 25)
 
   const SORT_KEYS: Record<string, keyof CashSale> = {
@@ -229,10 +240,37 @@ export default function CashSaleClient() {
     const res = await fetch(`/api/admin/inventory/batches/available?${params}`, { credentials: 'include' })
     const data = await res.json()
     if (data.serialized_items?.length > 0) {
-      setSerialPickerItems(data.serialized_items)
+      // Pre-fill any serials already assigned to this line (e.g. auto-recorded from
+      // a scan) so the modal only asks for the delta.
+      const pre = serialAssignments.filter(sa => sa.order_item_id === item.id).map(sa => sa.serial_number)
+      setSerialPickerItems(data.serialized_items.map((si: SerialItem) =>
+        si.order_item_id === item.id ? { ...si, preassigned: pre } : si
+      ))
     } else if (data.items?.length > 0) {
       setBatchPickerItem(data.items[0])
     }
+  }
+
+  // A serialized unit was added via a serial scan → auto-record it as this line's
+  // assignment (so it doesn't re-prompt). Dedupe GLOBALLY by serial_number — a
+  // physical unit can't belong to two lines.
+  function handleSerialScanned(lineId: string, serial: { serial_number: string }) {
+    setSerialAssignments(prev =>
+      prev.some(sa => sa.serial_number === serial.serial_number)
+        ? prev
+        : [...prev, { order_item_id: lineId, serial_number: serial.serial_number }]
+    )
+  }
+
+  // Quantity dropped below the assigned-serial count → trim the extra (tail)
+  // assignments for that line so it doesn't over-assign.
+  function handleQuantityReduced(lineId: string, keep: number) {
+    setSerialAssignments(prev => {
+      const forLine = prev.filter(sa => sa.order_item_id === lineId)
+      if (forLine.length <= keep) return prev
+      const trimmed = new Set(forLine.slice(keep).map(sa => sa.serial_number))
+      return prev.filter(sa => !(sa.order_item_id === lineId && trimmed.has(sa.serial_number)))
+    })
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -489,6 +527,7 @@ export default function CashSaleClient() {
                   variant_name: lineItem.variant_name || null,
                   required_qty: totalQty,
                   already_assigned: false,
+                  preassigned: serialAssignments.filter(sa => sa.order_item_id === lineItem.id).map(sa => sa.serial_number),
                   product_id: lineItem.product_id || undefined,
                   variant_id: lineItem.variant_id || null,
                   sub_variant_id: lineItem.sub_variant_id || null,
@@ -504,7 +543,13 @@ export default function CashSaleClient() {
             onConfirm={assignments => {
               setSerialAssignments(prev => {
                 const itemIds = new Set(assignments.map(a => a.order_item_id))
-                return [...prev.filter(a => !itemIds.has(a.order_item_id)), ...assignments]
+                // Serials confirmed in this modal, so we can drop them from OTHER
+                // lines too — a physical unit belongs to exactly one line.
+                const confirmedSerials = new Set(assignments.map(a => a.serial_number))
+                const kept = prev.filter(a =>
+                  !itemIds.has(a.order_item_id) && !confirmedSerials.has(a.serial_number)
+                )
+                return [...kept, ...assignments]
               })
               setSerialPickerItems(null)
             }}
@@ -536,7 +581,7 @@ export default function CashSaleClient() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
               <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-                <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} />
+                <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} onSerialScanned={handleSerialScanned} onQuantityReduced={handleQuantityReduced} />
               </div>
 
               <div className="bg-surface-elevated border border-border-default rounded-xl p-4">

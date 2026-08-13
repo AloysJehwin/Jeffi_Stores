@@ -1,15 +1,18 @@
 import Link from 'next/link'
 import { queryMany, queryOne } from '@/lib/db'
-import SortDropdown from '@/components/visitor/SortDropdown'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL } from '@/lib/queries'
+import { getFeatureFlags } from '@/lib/site-controls'
 import MobileFilterSheet from '@/components/visitor/MobileFilterSheet'
+import FilterSidebar from '@/components/visitor/FilterSidebar'
 import ProductsSearch from '@/components/visitor/ProductsSearch'
 import { buildProductSearchClause, buildProductSearchRank } from '@/lib/search'
+import { buildProductFilterClauses, getFilterFacets } from '@/lib/product-filters'
 import Pagination from '@/components/ui/Pagination'
-import ProductCard from '@/components/visitor/ProductCard'
+import ProductGrid from '@/components/visitor/ProductGrid'
 import CompareStripLazy from '@/components/visitor/CompareStripLazy'
 import SearchInsightBanner from '@/components/on-device/SearchInsightBanner'
 
-const PAGE_SIZE = 21
+const PAGE_SIZE = 60
 
 async function getProducts(searchParams: any) {
   const conditions: string[] = ['p.is_active = true']
@@ -49,6 +52,11 @@ async function getProducts(searchParams: any) {
     params.push(...brandVals)
   }
 
+  const filterClauses = buildProductFilterClauses(searchParams, paramIndex)
+  conditions.push(...filterClauses.conditions)
+  params.push(...filterClauses.params)
+  paramIndex = filterClauses.nextIdx
+
   if (searchParams.search) {
     const sc = buildProductSearchClause(searchParams.search, 'p.name', 'p.sku', 'p.search_vector', paramIndex)
     conditions.push(sc.clause)
@@ -62,6 +70,7 @@ async function getProducts(searchParams: any) {
   const allowedSortColumns: Record<string, string> = {
     created_at: 'p.created_at',
     name: 'p.name',
+    category: 'c.name, p.name',  // group-by-category sort
     base_price: `CASE WHEN p.has_variants THEN (
       SELECT MIN(price) FROM (
         SELECT pv2.price FROM product_variants pv2
@@ -114,6 +123,9 @@ async function getProducts(searchParams: any) {
     orderBy = `p.is_featured DESC, COALESCE(pc.display_order, c.display_order, 9999) ASC, c.display_order ASC, p.created_at DESC`
   }
 
+  const { gstEnabled } = await getFeatureFlags()
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
+
   const sql = `
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -125,17 +137,7 @@ async function getProducts(searchParams: any) {
       ) AS product_images,
       COALESCE((SELECT COUNT(CASE WHEN pv.stock_status != 'Out of Stock' THEN 1 END)
       FROM product_variants pv WHERE pv.product_id = p.id AND pv.is_active = true), 0) AS variant_stock_total,
-      (SELECT MIN(price) FROM (
-        SELECT pv.price AS price
-        FROM product_variants pv
-        WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
-          AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
-        UNION ALL
-        SELECT sv.price AS price
-        FROM product_sub_variants sv
-        JOIN product_variants pv ON pv.id = sv.variant_id
-        WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
-      ) AS combined_prices) AS variant_min_price,
+      ${MIN_PRICE_SQL} AS variant_min_price,
       (SELECT MIN(mrp) FROM (
         SELECT pv.mrp
         FROM product_variants pv
@@ -157,7 +159,7 @@ async function getProducts(searchParams: any) {
   `
 
   const products = await queryMany(sql, [...params, ...rankParams])
-  return { products, total, page, totalPages: Math.ceil(total / PAGE_SIZE) }
+  return { products, total, page, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
 }
 
 async function getCategories() {
@@ -187,6 +189,34 @@ async function getBrands() {
   `)
 }
 
+async function getCategoryBanners(gstEnabled: boolean) {
+  const cats = await queryMany<{ id: string; name: string; slug: string }>(`
+    SELECT c.id, c.name, c.slug FROM categories c
+    WHERE c.parent_category_id IS NULL AND c.is_active = true
+      AND EXISTS (
+        SELECT 1 FROM products p
+        JOIN categories sub ON p.category_id = sub.id
+        WHERE sub.parent_category_id = c.id AND p.is_active = true
+      )
+    ORDER BY c.display_order ASC LIMIT 6
+  `)
+  const withProducts = await Promise.all(cats.map(async cat => {
+    const products = await queryMany<any>(`
+      SELECT p.id, p.name, p.slug, p.has_variants, p.base_price, p.price_ex_gst,
+        MIN(pv.price) FILTER (WHERE pv.is_active) AS variant_min_price,
+        (SELECT json_agg(json_build_object('image_url', pi2.image_url, 'thumbnail_url', pi2.thumbnail_url))
+           FROM product_images pi2 WHERE pi2.product_id = p.id LIMIT 1) AS product_images
+      FROM products p
+      JOIN categories sub ON p.category_id = sub.id AND sub.parent_category_id = $1
+      LEFT JOIN product_variants pv ON pv.product_id = p.id
+      WHERE p.is_active = true
+      GROUP BY p.id ORDER BY p.is_featured DESC, p.created_at DESC LIMIT 12
+    `, [cat.id])
+    return { ...cat, products }
+  }))
+  return withProducts.filter(c => c.products.length >= 2)
+}
+
 function buildPageUrl(searchParams: Record<string, string | undefined>, page: number) {
   const params = new URLSearchParams()
   if (searchParams.category) params.set('category', searchParams.category)
@@ -194,6 +224,21 @@ function buildPageUrl(searchParams: Record<string, string | undefined>, page: nu
   if (searchParams.search)   params.set('search',   searchParams.search)
   if (searchParams.sort)     params.set('sort',     searchParams.sort)
   if (searchParams.order)    params.set('order',    searchParams.order)
+  if (searchParams.minPrice)   params.set('minPrice',   searchParams.minPrice)
+  if (searchParams.maxPrice)   params.set('maxPrice',   searchParams.maxPrice)
+  if (searchParams.inStock)    params.set('inStock',    searchParams.inStock)
+  if (searchParams.onSale)     params.set('onSale',     searchParams.onSale)
+  if (searchParams.color)      params.set('color',      searchParams.color)
+  if (searchParams.grade)      params.set('grade',      searchParams.grade)
+  if (searchParams.material)   params.set('material',   searchParams.material)
+  if (searchParams.finish)     params.set('finish',     searchParams.finish)
+  if (searchParams.compliance) params.set('compliance', searchParams.compliance)
+  if (searchParams.origin)     params.set('origin',     searchParams.origin)
+  if (searchParams.minRating)  params.set('minRating',  searchParams.minRating)
+  if (searchParams.variantType) params.set('variantType', searchParams.variantType)
+  if (searchParams.variantValue) params.set('variantValue', searchParams.variantValue)
+  if (searchParams.specKey)    params.set('specKey',    searchParams.specKey)
+  if (searchParams.specValue)  params.set('specValue',  searchParams.specValue)
   if (page > 1) params.set('page', String(page))
   const qs = params.toString()
   return `/products${qs ? `?${qs}` : ''}`
@@ -205,211 +250,59 @@ export default async function ProductsPage({
   searchParams: Promise<{ [key: string]: string | undefined }>
 }) {
   const resolvedSearchParams = await searchParams
-  const { products, total, page, totalPages } = await getProducts(resolvedSearchParams)
-  const categories = await getCategories()
-  const brands = await getBrands()
+  const { products, total, page, totalPages, gstEnabled } = await getProducts(resolvedSearchParams)
+  const [categories, brands] = await Promise.all([getCategories(), getBrands()])
+  const categoryBanners = await getCategoryBanners(gstEnabled)
+
+  // Facets are computed against the category+brand+search base only (not the
+  // active scalar filters) so counts stay meaningful when toggling grade/material/etc.
+  const facetBaseConditions: string[] = ['p.is_active = true']
+  const facetBaseParams: any[] = []
+  let facetIdx = 1
+  if (resolvedSearchParams.category) {
+    const catVals = String(resolvedSearchParams.category).split(',').filter(Boolean)
+    if (catVals.length === 1) {
+      facetBaseConditions.push(`p.category_id IN (
+        WITH RECURSIVE cat_tree AS (
+          SELECT id FROM categories WHERE id::text = $${facetIdx} OR slug = $${facetIdx}
+          UNION ALL
+          SELECT c.id FROM categories c JOIN cat_tree ct ON c.parent_category_id = ct.id
+        )
+        SELECT id FROM cat_tree
+      )`)
+      facetBaseParams.push(catVals[0]); facetIdx++
+    } else {
+      const parts = catVals.map(() => { const p = facetIdx++; return `(id::text = $${p} OR slug = $${p})` })
+      facetBaseConditions.push(`p.category_id IN (SELECT id FROM categories WHERE ${parts.join(' OR ')})`)
+      facetBaseParams.push(...catVals)
+    }
+  }
+  if (resolvedSearchParams.brand) {
+    const brandVals = String(resolvedSearchParams.brand).split(',').filter(Boolean)
+    const parts = brandVals.map(() => { const p = facetIdx++; return `(id::text = $${p} OR slug = $${p})` })
+    facetBaseConditions.push(`p.brand_id IN (SELECT id FROM brands WHERE ${parts.join(' OR ')})`)
+    facetBaseParams.push(...brandVals)
+  }
+  const facets = await getFilterFacets(facetBaseConditions, facetBaseParams)
 
   const start = (page - 1) * PAGE_SIZE + 1
   const end = Math.min(page * PAGE_SIZE, total)
 
-  const [allCats, setAllCats] = [categories as any[], null]
+  const allCats = categories as any[]
   const mainCats = allCats.filter((c: any) => !c.parent_category_id)
   const subCats = allCats.filter((c: any) => c.parent_category_id)
 
   return (
-    <div className="bg-surface min-h-screen lg:h-[calc(100vh-5rem)] lg:overflow-hidden">
-      <div className="container mx-auto px-4 h-full">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8 lg:h-full">
+    <div className="bg-surface min-h-screen">
+      <div className="container mx-auto px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6 lg:gap-8">
           {/* Sidebar Filters — desktop only */}
-          <aside className="hidden lg:block lg:col-span-1 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
-            {/* Desktop sidebar filter */}
-            <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
-                <h2 className="font-bold text-lg text-foreground mb-4">Filters</h2>
-
-                {/* Search */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-foreground-secondary mb-2">
-                    Search
-                  </label>
-                  <ProductsSearch defaultValue={resolvedSearchParams.search} />
-                </div>
-
-                {/* Categories Filter */}
-                <div className="mb-6">
-                  <h3 className="font-semibold text-foreground mb-3">Categories</h3>
-                  <div className="space-y-1 max-h-64 overflow-y-auto">
-                    {(() => {
-                      const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
-                      const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
-
-                      function catIsActive(cat: any) {
-                        return activeCats.includes(cat.id) || activeCats.includes(cat.slug)
-                      }
-
-                      function toggleCatUrl(cat: any) {
-                        const active = catIsActive(cat)
-                        const next = active
-                          ? activeCats.filter(v => v !== cat.id && v !== cat.slug)
-                          : [...activeCats.filter(v => v !== cat.id && v !== cat.slug), cat.id]
-                        const p = new URLSearchParams()
-                        if (next.length) p.set('category', next.join(','))
-                        if (activeBrands.length) p.set('brand', activeBrands.join(','))
-                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
-                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
-                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
-                        return `/products${p.toString() ? `?${p.toString()}` : ''}`
-                      }
-
-                      return (
-                        <>
-                          <Link
-                            href="/products"
-                            className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                              activeCats.length === 0
-                                ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
-                                : 'text-foreground-secondary hover:bg-surface-secondary'
-                            }`}
-                          >
-                            All Categories
-                          </Link>
-                          {mainCats.map((cat: any) => {
-                            const subs = subCats.filter((s: any) => s.parent_category_id === cat.id)
-                            const isActive = catIsActive(cat)
-                            return (
-                              <div key={cat.id}>
-                                <Link
-                                  href={toggleCatUrl(cat)}
-                                  className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors font-medium ${
-                                    isActive
-                                      ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400'
-                                      : 'text-foreground hover:bg-surface-secondary'
-                                  }`}
-                                >
-                                  {cat.name}
-                                  {isActive && (
-                                    <svg className="w-3.5 h-3.5 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                    </svg>
-                                  )}
-                                </Link>
-                                {subs.map((sub: any) => {
-                                  const isSubActive = catIsActive(sub)
-                                  return (
-                                    <Link
-                                      key={sub.id}
-                                      href={toggleCatUrl(sub)}
-                                      className={`flex items-center justify-between pl-6 pr-3 py-1.5 rounded-lg text-sm transition-colors ${
-                                        isSubActive
-                                          ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
-                                          : 'text-foreground-secondary hover:bg-surface-secondary'
-                                      }`}
-                                    >
-                                      {sub.name}
-                                      {isSubActive && (
-                                        <svg className="w-3.5 h-3.5 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                        </svg>
-                                      )}
-                                    </Link>
-                                  )
-                                })}
-                              </div>
-                            )
-                          })}
-                        </>
-                      )
-                    })()}
-                  </div>
-                </div>
-
-                {/* Brands Filter */}
-                <div className="mb-6">
-                  <h3 className="font-semibold text-foreground mb-3">Brands</h3>
-                  <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {(() => {
-                      const activeCats = resolvedSearchParams.category ? resolvedSearchParams.category.split(',') : []
-                      const activeBrands = resolvedSearchParams.brand ? resolvedSearchParams.brand.split(',') : []
-
-                      function brandIsActive(brand: any) {
-                        return activeBrands.includes(brand.id) || activeBrands.includes(brand.slug)
-                      }
-
-                      function toggleBrandUrl(brand: any) {
-                        const active = brandIsActive(brand)
-                        const next = active
-                          ? activeBrands.filter(v => v !== brand.id && v !== brand.slug)
-                          : [...activeBrands.filter(v => v !== brand.id && v !== brand.slug), brand.id]
-                        const p = new URLSearchParams()
-                        if (activeCats.length) p.set('category', activeCats.join(','))
-                        if (next.length) p.set('brand', next.join(','))
-                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
-                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
-                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
-                        return `/products${p.toString() ? `?${p.toString()}` : ''}`
-                      }
-
-                      const clearBrandsUrl = (() => {
-                        const p = new URLSearchParams()
-                        if (activeCats.length) p.set('category', activeCats.join(','))
-                        if (resolvedSearchParams.sort) p.set('sort', resolvedSearchParams.sort)
-                        if (resolvedSearchParams.order) p.set('order', resolvedSearchParams.order)
-                        if (resolvedSearchParams.search) p.set('search', resolvedSearchParams.search)
-                        return `/products${p.toString() ? `?${p.toString()}` : ''}`
-                      })()
-
-                      return (
-                        <>
-                          <Link
-                            href={clearBrandsUrl}
-                            className={`block px-3 py-2 rounded-lg text-sm transition-colors ${
-                              activeBrands.length === 0
-                                ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
-                                : 'text-foreground-secondary hover:bg-surface-secondary'
-                            }`}
-                          >
-                            All Brands
-                          </Link>
-                          {brands.map((brand: any) => {
-                            const isActive = brandIsActive(brand)
-                            return (
-                              <Link
-                                key={brand.id}
-                                href={toggleBrandUrl(brand)}
-                                className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors ${
-                                  isActive
-                                    ? 'bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400 font-medium'
-                                    : 'text-foreground-secondary hover:bg-surface-secondary'
-                                }`}
-                              >
-                                {brand.name}
-                                {isActive && (
-                                  <svg className="w-3.5 h-3.5 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                                  </svg>
-                                )}
-                              </Link>
-                            )
-                          })}
-                        </>
-                      )
-                    })()}
-                  </div>
-                </div>
-
-                {/* Clear Filters */}
-                {(resolvedSearchParams.category || resolvedSearchParams.brand || resolvedSearchParams.search) && (
-                  <Link
-                    href="/products"
-                    className="block text-center w-full px-4 py-2 border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface-secondary font-medium transition-colors"
-                  >
-                    Clear All Filters
-                  </Link>
-                )}
-            </div>
+          <aside className="hidden lg:block lg:col-span-1 py-6 sticky top-0 self-start max-h-screen overflow-y-auto">
+            <FilterSidebar facets={facets} categories={allCats} />
           </aside>
 
-          {/* Products Grid */}
-          <div className="lg:col-span-3 lg:h-full lg:overflow-y-auto py-4 sm:py-6 lg:py-6">
+          {/* Products area */}
+          <div className="lg:col-span-3 py-6">
             {/* Page heading */}
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
@@ -417,21 +310,10 @@ export default async function ProductsPage({
                 <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of hardware and industrial tools</p>
               </div>
               <div className="lg:hidden shrink-0">
-                <MobileFilterSheet categories={allCats} brands={brands as any[]} />
+                <MobileFilterSheet categories={allCats} brands={brands as any[]} facets={facets} />
               </div>
             </div>
-            {/* Sort Bar */}
-            <div className="flex items-center justify-between mb-6">
-              <p className="text-foreground-secondary text-sm">
-                {total > 0
-                  ? <><span className="font-semibold text-foreground">{start}–{end}</span> of <span className="font-semibold text-foreground">{total}</span> products</>
-                  : '0 products found'
-                }
-              </p>
-              <SortDropdown />
-            </div>
-
-            {/* Compare strip — shows selected products + Compare button */}
+            {/* Compare strip */}
             <CompareStripLazy />
 
             {/* Profile-based insight banner */}
@@ -448,44 +330,7 @@ export default async function ProductsPage({
             {/* Products Grid */}
             {products.length > 0 ? (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 stagger-grid">
-                  {products.map((product) => {
-                    const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
-                    const hasVariants = product.has_variants
-                    const displayPrice = hasVariants && product.variant_min_price
-                      ? Number(product.variant_min_price)
-                      : Number(product.base_price)
-                    const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
-                    const mrp = hasVariants
-                      ? (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
-                      : (product.mrp ? Number(product.mrp) : null)
-                    const mrpDiscount = mrp && mrp > displayPrice
-                      ? Math.round(((mrp - displayPrice) / mrp) * 100)
-                      : 0
-
-                    return (
-                      <ProductCard
-                        key={product.id}
-                        id={product.id}
-                        name={product.name}
-                        slug={product.slug}
-                        hasVariants={hasVariants}
-                        displayPrice={Number(displayPrice)}
-                        mrp={mrp}
-                        mrpDiscount={mrpDiscount}
-                        effectiveStock={effectiveStock}
-                        primaryImage={primaryImage}
-                        brandName={product.brands?.name ?? null}
-                        categoryName={product.categories?.name ?? null}
-                        discountPct={Number(product.discount_pct ?? 0)}
-                        extraDeliveryDays={Number(product.extra_delivery_days ?? 0)}
-                        handlingDays={Number(product.handling_days ?? 2)}
-                      />
-                    )
-                  })}
-                </div>
-
-                {/* Pagination */}
+                <ProductGrid products={products as any[]} gstEnabled={gstEnabled} categoryBanners={categoryBanners as any[]} total={total} start={start} end={end} />
                 <Pagination
                   page={page}
                   totalPages={totalPages}

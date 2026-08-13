@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import Link from 'next/link'
-import { getCustomers } from '@/lib/queries'
+import { getCustomers, getCustomerStats, getCustomerSegments, getCustomerChannelMix } from '@/lib/queries'
 import AdminFilters from '@/components/admin/AdminFilters'
 import Pagination from '@/components/admin/Pagination'
 import CustomersTableRows from '@/components/admin/CustomersTableRows'
@@ -10,6 +10,7 @@ import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import CustomerEngagementChart from '@/components/admin/CustomerEngagementChart'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -19,31 +20,42 @@ const PAGE_SIZE = 25
 type SP = { [key: string]: string | undefined }
 
 async function CustomersStats() {
-  const allStats = await getCustomers({})
-
-  const activeCount = allStats.customers?.filter((c: any) => c.is_active && !c.is_flagged).length || 0
-  const inactiveCount = allStats.customers?.filter((c: any) => !c.is_active && !c.is_flagged).length || 0
-  const flaggedCount = allStats.customers?.filter((c: any) => c.is_flagged).length || 0
+  const [stats, segments, channelMix] = await Promise.all([
+    getCustomerStats(),
+    getCustomerSegments(),
+    getCustomerChannelMix(),
+  ])
 
   return (
     <div className="animate-fade-in">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 sm:gap-6 mb-6">
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Total Customers</p>
-          <p className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground mt-2">{allStats.total}</p>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6 lg:h-56">
+        {/* Left: Total Customers + the 4 customer stats as tiles */}
+        <div className="bg-gradient-to-r from-primary-500 to-accent-500 p-4 sm:p-6 rounded-lg shadow-sm flex flex-col justify-between text-white">
+          <div>
+            <p className="text-white/80 text-sm">Total Customers</p>
+            <p className="text-3xl sm:text-4xl font-bold mt-1">{stats.total.toLocaleString('en-IN')}</p>
+          </div>
+          <div className="grid grid-cols-4 gap-2 sm:gap-3 mt-4">
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{stats.total}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Total</p>
+            </div>
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{stats.active}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Active</p>
+            </div>
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{stats.inactive}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Inactive</p>
+            </div>
+            <div className="rounded-lg bg-white/15 backdrop-blur-sm px-2 py-2 sm:px-3 sm:py-2.5">
+              <p className="text-lg sm:text-2xl font-bold leading-none">{stats.flagged}</p>
+              <p className="text-[10px] sm:text-xs text-white/80 mt-1">Flagged</p>
+            </div>
+          </div>
         </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Active</p>
-          <p className="text-2xl sm:text-3xl font-bold text-green-500 mt-2">{activeCount}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Inactive</p>
-          <p className="text-2xl sm:text-3xl font-bold text-orange-500 mt-2">{inactiveCount}</p>
-        </div>
-        <div className="bg-surface-elevated p-4 sm:p-6 rounded-lg shadow-sm border border-border-default">
-          <p className="text-foreground-secondary text-sm">Flagged</p>
-          <p className="text-2xl sm:text-3xl font-bold text-red-500 mt-2">{flaggedCount}</p>
-        </div>
+        {/* Right: customer engagement chart */}
+        <CustomerEngagementChart segments={segments} channelMix={channelMix} />
       </div>
     </div>
   )

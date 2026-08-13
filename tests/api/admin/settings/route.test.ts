@@ -62,8 +62,8 @@ describe('PATCH /api/admin/settings', () => {
     expect(res.status).toBe(200)
     expect((await res.json()).success).toBe(true)
     expect(mockQuery).toHaveBeenCalledWith(
-      expect.stringContaining('UPDATE site_settings'),
-      ['500', 'min_order_amount']
+      expect.stringContaining('INSERT INTO site_settings'),
+      ['min_order_amount', '500']
     )
   })
 

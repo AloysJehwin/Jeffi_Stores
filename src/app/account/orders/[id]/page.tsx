@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { use, useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { navItems } from '@/components/visitor/AccountSidebar'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
@@ -13,7 +14,6 @@ import ReviewModal from '@/components/shared/ReviewModal'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
 const RETURN_STATUSES = ['return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned']
-const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 
 interface OrderItem {
   id: string
@@ -80,6 +80,18 @@ interface OrderDetails {
     phone: string
   } | null
   items: OrderItem[]
+  pendingVariantChange?: {
+    id: string
+    productName: string
+    oldVariantName: string | null
+    newVariantName: string | null
+    oldUnitPrice: number
+    newUnitPrice: number
+    qty: number
+    priceDiff: number
+    settlementType: 'refund' | 'collect' | 'cod_adjust' | 'none'
+    status: string
+  } | null
 }
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
@@ -164,6 +176,7 @@ function getPaymentStatusColor(status: string) {
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { user, isLoading: authLoading } = useAuth()
+  const { flags: { razorpayEnabled: isRazorpayEnabled }, orderAutoCancelMinutes } = useStoreConfig()
   const avatarUrl = user?.avatarUrl ?? null
   const router = useRouter()
   const pathname = usePathname()
@@ -176,6 +189,8 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
 
   const [paymentError, setPaymentError] = useState('')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
+  const [vcrBusy, setVcrBusy] = useState(false)
+  const [vcrError, setVcrError] = useState('')
   const [timeLeft, setTimeLeft] = useState<number | null>(null)
   const [isAutoCancelling, setIsAutoCancelling] = useState(false)
   const autoCancelTriggeredRef = useRef(false)
@@ -281,7 +296,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     if (!isRazorpayEnabled) return
 
     const orderCreatedAt = new Date(order.createdAt).getTime()
-    const deadline = orderCreatedAt + 10 * 60 * 1000
+    const deadline = orderCreatedAt + orderAutoCancelMinutes * 60 * 1000
 
     const tick = () => {
       const remaining = Math.max(0, deadline - Date.now())
@@ -295,7 +310,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [order, handleAutoCancel])
+  }, [order, handleAutoCancel, orderAutoCancelMinutes, isRazorpayEnabled])
 
   const handleCancelOrder = async () => {
     setIsCancelling(true)
@@ -482,6 +497,81 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
     } catch (err: any) {
       setPaymentError(err.message)
       setIsPayingNow(false)
+    }
+  }
+
+  const handleConfirmVariantChange = async () => {
+    if (!order) return
+    setVcrBusy(true); setVcrError('')
+    try {
+      const res = await fetch(`/api/orders/${order.id}/variant-change/confirm`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to confirm change')
+
+      // Collect path: pay the extra via Razorpay Checkout; the swap applies on verify.
+      if (data.settlement === 'collect' && data.razorpayOrderId) {
+        await loadRazorpayScript()
+        const options = {
+          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+          amount: data.amount,
+          currency: data.currency,
+          name: 'Jeffi Stores',
+          description: `Variant change — Order #${order.orderNumber}`,
+          order_id: data.razorpayOrderId,
+          handler: async function (response: any) {
+            try {
+              const vr = await fetch('/api/razorpay/verify', {
+                method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                }),
+              })
+              const vd = await vr.json()
+              if (!vr.ok) throw new Error(vd.error || 'Verification failed')
+              await fetchOrder()
+              setVcrBusy(false)
+            } catch (err: any) {
+              setVcrError(err?.message || 'Payment received but confirmation failed. Contact support — your payment is safe.')
+              setVcrBusy(false)
+            }
+          },
+          prefill: { name: order.shippingAddress?.full_name || '', email: user?.email || '', contact: order.shippingAddress?.phone || '' },
+          theme: { color: '#f97316' },
+          modal: { ondismiss: function () { setVcrBusy(false) } },
+        }
+        const rzp = new (window as any).Razorpay(options)
+        rzp.on('payment.failed', function (r: any) { setVcrError(`Payment failed: ${r.error?.description || ''}`); setVcrBusy(false) })
+        rzp.open()
+        return
+      }
+
+      // Refund / COD / no-diff: applied server-side.
+      await fetchOrder()
+      setVcrBusy(false)
+    } catch (err: any) {
+      setVcrError(err.message)
+      setVcrBusy(false)
+    }
+  }
+
+  const handleRejectVariantChange = async () => {
+    if (!order) return
+    setVcrBusy(true); setVcrError('')
+    try {
+      const res = await fetch(`/api/orders/${order.id}/variant-change/reject`, {
+        method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' }, body: '{}',
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to decline change')
+      await fetchOrder()
+    } catch (err: any) {
+      setVcrError(err.message)
+    } finally {
+      setVcrBusy(false)
     }
   }
 
@@ -807,6 +897,43 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <p className="text-orange-800 dark:text-orange-300 text-sm">
                     Your cancellation request is pending review by our team. You will receive an email once it is approved or rejected.
                   </p>
+                </div>
+              </div>
+            )}
+
+            {/* Pending variant-change request — awaiting this customer's approval */}
+            {order.pendingVariantChange && order.pendingVariantChange.status === 'pending_customer' && (
+              <div className="bg-orange-50 dark:bg-orange-900/30 border border-orange-200 dark:border-orange-800 rounded-lg p-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-orange-600 dark:text-orange-400 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                  </svg>
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold text-foreground">A variant change needs your approval</h3>
+                    <p className="text-sm text-foreground-secondary mt-1">
+                      For <strong>{order.pendingVariantChange.productName}</strong>, we propose changing{' '}
+                      <span className="line-through">{order.pendingVariantChange.oldVariantName || '—'}</span> →{' '}
+                      <strong>{order.pendingVariantChange.newVariantName || '—'}</strong>.
+                    </p>
+                    <p className="text-sm mt-1">
+                      {order.pendingVariantChange.settlementType === 'refund'
+                        ? <>We&apos;ll <strong>refund ₹{Math.abs(order.pendingVariantChange.priceDiff).toFixed(2)}</strong> to your original payment.</>
+                        : order.pendingVariantChange.settlementType === 'collect'
+                          ? <>An extra <strong>₹{Math.abs(order.pendingVariantChange.priceDiff).toFixed(2)}</strong> is payable — you&apos;ll pay it securely on confirm.</>
+                          : order.pendingVariantChange.settlementType === 'cod_adjust'
+                            ? <>Your total will be adjusted; you pay the updated amount on delivery.</>
+                            : <>No change to your total.</>}
+                    </p>
+                    {vcrError && <p className="text-sm text-red-600 mt-2">{vcrError}</p>}
+                    <div className="flex gap-2 mt-3">
+                      <button onClick={handleConfirmVariantChange} disabled={vcrBusy}
+                        className="px-4 py-2 text-sm font-semibold text-white bg-orange-600 hover:bg-orange-700 rounded-lg disabled:opacity-50">
+                        {vcrBusy ? 'Processing…' : (order.pendingVariantChange.settlementType === 'collect' ? 'Confirm & pay difference' : 'Confirm change')}
+                      </button>
+                      <button onClick={handleRejectVariantChange} disabled={vcrBusy}
+                        className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground disabled:opacity-50">Decline</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
@@ -1200,7 +1327,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     {order.totalAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
                   </span>
                 </div>
-                <p className="text-xs text-foreground-muted">Price inclusive of all taxes</p>
+                {order.taxAmount > 0 && <p className="text-xs text-foreground-muted">Price inclusive of all taxes</p>}
               </div>
             </div>
 

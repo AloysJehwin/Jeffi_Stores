@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, query } from '@/lib/db'
+import { queryOne, queryMany, query } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { sendPaymentStatusUpdate } from '@/lib/email'
@@ -39,38 +39,44 @@ export async function POST(
       return NextResponse.json({ error: 'Order has not been paid or has already been refunded.' }, { status: 400 })
     }
 
-    if (!isRazorpayEnabled()) {
+    if (!(await isRazorpayEnabled())) {
       return NextResponse.json({ error: 'Payment gateway is not configured.' }, { status: 400 })
     }
 
     const paymentOrderId = order.original_order_id || orderId
 
-    const paymentRecord = await queryOne(
+    // Refund EVERY completed Razorpay payment on the order — the initial charge
+    // AND any later top-ups (e.g. a variant-change collection). A single LIMIT 1
+    // refund would leave top-ups un-refunded.
+    const paymentRecords = await queryMany<any>(
       `SELECT id, transaction_id, amount, gateway_response FROM payments
-       WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed'
-       LIMIT 1`,
+       WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed'`,
       [paymentOrderId]
     )
 
-    if (!paymentRecord || !paymentRecord.transaction_id) {
+    const refundable = (paymentRecords || []).filter((p: any) => p.transaction_id)
+    if (refundable.length === 0) {
       return NextResponse.json({ error: 'No Razorpay payment record found for this order.' }, { status: 400 })
     }
 
     const razorpay = getRazorpayInstance()
-    const amountInPaise = Math.round(parseFloat(paymentRecord.amount) * 100)
+    const refundIds: string[] = []
+    let totalRefunded = 0
+    for (const paymentRecord of refundable) {
+      const amountInPaise = Math.round(parseFloat(paymentRecord.amount) * 100)
+      const refund = await razorpay.payments.refund(paymentRecord.transaction_id, { amount: amountInPaise })
+      refundIds.push(refund.id)
+      totalRefunded += Number(paymentRecord.amount)
 
-    const refund = await razorpay.payments.refund(paymentRecord.transaction_id, {
-      amount: amountInPaise,
-    })
+      const existingResponse = typeof paymentRecord.gateway_response === 'string'
+        ? JSON.parse(paymentRecord.gateway_response)
+        : (paymentRecord.gateway_response || {})
 
-    const existingResponse = typeof paymentRecord.gateway_response === 'string'
-      ? JSON.parse(paymentRecord.gateway_response)
-      : (paymentRecord.gateway_response || {})
-
-    await query(
-      `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
-      [JSON.stringify({ ...existingResponse, refund }), paymentRecord.id]
-    )
+      await query(
+        `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
+        [JSON.stringify({ ...existingResponse, refund }), paymentRecord.id]
+      )
+    }
 
     await query(
       `UPDATE orders SET payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
@@ -95,12 +101,12 @@ export async function POST(
         kind: 'payment_status',
         referenceId: orderId,
         referenceType: 'orders',
-        summary: `Refund issued for #${order.order_number} (₹${parseFloat(order.total_amount).toFixed(0)})`,
-        metadata: { payment_status: 'refunded', amount: parseFloat(order.total_amount), refundId: refund.id },
+        summary: `Refund issued for #${order.order_number} (₹${totalRefunded.toFixed(0)}${refundIds.length > 1 ? `, ${refundIds.length} payments` : ''})`,
+        metadata: { payment_status: 'refunded', amount: totalRefunded, refundIds },
       }).catch(() => {})
     }
 
-    return NextResponse.json({ success: true, refundId: refund.id })
+    return NextResponse.json({ success: true, refundIds, totalRefunded })
   } catch (err: any) {
     const message = err?.error?.description || err?.message || 'Failed to initiate refund'
     return NextResponse.json({ error: message }, { status: 500 })

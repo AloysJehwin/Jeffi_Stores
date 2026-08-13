@@ -4,10 +4,12 @@ import { query, queryOne, queryMany, withTransaction } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification } from '@/lib/email'
 import { isInterState, calculateGST, round2 } from '@/lib/gst'
+import { pickUnitPrice } from '@/lib/pricing'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { quoteShipping, validateCouponForUser } from '@/lib/order-commit'
+import { getFeatureFlags, getBusinessValues } from '@/lib/site-controls'
 import { computeEdd } from '@/lib/edd'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { createDraftInvoice } from '@/lib/invoice'
@@ -24,10 +26,9 @@ const CreateOrderSchema = z.object({
   shippingAmount: z.number().nonnegative().nullish(),
 })
 
-const isGSTEnabled = process.env.ENABLE_GST === 'true'
-
 export async function POST(request: NextRequest) {
   try {
+    const isGSTEnabled = (await getFeatureFlags()).gstEnabled
     const authUser = await authenticateUser(request)
     if (!authUser) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -112,10 +113,24 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const subtotal: number = cartItems.reduce((sum: number, item: any) => {
+    // Resolve the charged unit price for a cart line, honouring the GST flag.
+    // GST off ⇒ charge the ex-GST column (fallback to inclusive/price_at_addition).
+    const lineUnitPrice = (item: any): number => {
+      if (!isGSTEnabled) {
+        return pickUnitPrice(
+          {
+            inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
+            exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
+          },
+          false,
+        )
+      }
       const pia = parseFloat(item.price_at_addition)
-      const price = (pia > 0) ? pia : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-      return sum + (price * parseFloat(item.quantity))
+      return (pia > 0) ? pia : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+    }
+
+    const subtotal: number = cartItems.reduce((sum: number, item: any) => {
+      return sum + (lineUnitPrice(item) * parseFloat(item.quantity))
     }, 0)
 
     const minOrderSetting = await queryOne(`SELECT value FROM site_settings WHERE key = 'min_order_amount'`, [])
@@ -131,20 +146,15 @@ export async function POST(request: NextRequest) {
         const catId = (item as any).products?.category_id
         const pct = catId ? (bizDiscountMap[catId] ?? 0) : 0
         if (pct > 0) {
-          const _pia = parseFloat(item.price_at_addition)
-          const linePrice = (_pia > 0)
-            ? _pia
-            : parseFloat((item as any).sub_variant?.price ?? (item as any).variant?.price ?? (item as any).products.base_price)
-          businessDiscountAmount += linePrice * parseFloat(item.quantity) * pct / 100
+          const linePrice = lineUnitPrice(item)
+          businessDiscountAmount += linePrice * parseFloat((item as any).quantity) * pct / 100
         }
       }
       businessDiscountAmount = round2(businessDiscountAmount)
     }
 
-    const taxAmount = cartItems.reduce((sum: number, item: any) => {
-      const _pia2 = parseFloat(item.price_at_addition)
-      const _p = (_pia2 > 0) ? _pia2 : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-      const lineTotal = _p * parseFloat(item.quantity)
+    const taxAmount = !isGSTEnabled ? 0 : cartItems.reduce((sum: number, item: any) => {
+      const lineTotal = lineUnitPrice(item) * parseFloat(item.quantity)
       const gstRate = parseFloat(item.products.gst_percentage || '0')
       return sum + (lineTotal - (lineTotal / (1 + gstRate / 100)))
     }, 0)
@@ -214,16 +224,13 @@ export async function POST(request: NextRequest) {
       let isIGST = false
 
       if (isGSTEnabled) {
-        const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'
+        const sellerStateCode = (await getBusinessValues()).businessStateCode
         const buyerState = shippingAddress?.state || ''
         isIGST = isInterState(buyerState, sellerStateCode)
       }
 
       const itemsWithGST = cartItems.map((item: any) => {
-        const _pia3 = parseFloat(item.price_at_addition)
-        const unitPrice = (_pia3 > 0)
-          ? _pia3
-          : parseFloat(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        const unitPrice = lineUnitPrice(item)
         const qty = parseFloat(item.quantity)
         const gstRate = parseFloat(item.products.gst_percentage || '0')
         const itemTotal = unitPrice * qty
@@ -237,8 +244,8 @@ export async function POST(request: NextRequest) {
           return { item, unitPrice, gstRate, itemTotal, gst }
         }
 
-        const itemTax = round2(itemTotal - (itemTotal / (1 + gstRate / 100)))
-        return { item, unitPrice, gstRate, itemTotal, itemTax }
+        // GST off ⇒ unitPrice is already ex-GST ⇒ no embedded tax.
+        return { item, unitPrice, gstRate, itemTotal, itemTax: 0 }
       })
 
       orderTaxableAmount = round2(orderTaxableAmount)

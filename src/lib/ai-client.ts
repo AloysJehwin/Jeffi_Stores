@@ -173,24 +173,16 @@ async function callOpenAi(req: AiChatRequest): Promise<{ content: string; toolCa
 
 export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
   const start = Date.now()
-  const provider = (req.forceProvider ?? process.env.AI_PROVIDER ?? 'openai').toLowerCase() as 'openai' | 'ollama'
-  const fallbackEnabled = process.env.OLLAMA_FALLBACK_TO_OPENAI === 'true'
+  // Ollama-only: default to Ollama and never fall back to OpenAI. A caller can
+  // still force OpenAI explicitly via forceProvider (kept for edge cases/testing),
+  // but the ambient AI_PROVIDER default is Ollama and there is no auto-fallback.
+  const provider = (req.forceProvider ?? process.env.AI_PROVIDER ?? 'ollama').toLowerCase() as 'openai' | 'ollama'
 
   if (provider === 'ollama') {
     const reachable = await isOllamaReachable()
-    if (reachable) {
-      try {
-        const r = await callOllama(req)
-        return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
-      } catch (err) {
-        if (!fallbackEnabled) throw err
-      }
-    }
-    if (fallbackEnabled) {
-      const r = await callOpenAi(req)
-      return { content: r.content, toolCalls: r.toolCalls, provider: 'openai', model: r.model, latencyMs: Date.now() - start, fallbackUsed: true }
-    }
-    throw new AiClientError('Ollama unreachable and fallback disabled', 'ollama')
+    if (!reachable) throw new AiClientError('Ollama is not reachable', 'ollama')
+    const r = await callOllama(req)
+    return { content: r.content, toolCalls: r.toolCalls, provider: 'ollama', model: r.model, latencyMs: Date.now() - start, fallbackUsed: false }
   }
 
   const r = await callOpenAi(req)
@@ -198,5 +190,5 @@ export async function aiChat(req: AiChatRequest): Promise<AiChatResponse> {
 }
 
 export function getAiProvider(): 'openai' | 'ollama' {
-  return (process.env.AI_PROVIDER || 'openai').toLowerCase() as 'openai' | 'ollama'
+  return (process.env.AI_PROVIDER || 'ollama').toLowerCase() as 'openai' | 'ollama'
 }

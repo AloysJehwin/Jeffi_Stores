@@ -45,3 +45,46 @@ export function mrpDiscountPct(mrp: number | null | undefined, price: number): n
   if (!mrp || mrp <= price) return 0
   return Math.round(((mrp - price) / mrp) * 100)
 }
+
+/**
+ * Choose the unit price for a line based on the GST feature flag.
+ *
+ * Product prices are stored GST-INCLUSIVE. When GST is enabled we charge that
+ * inclusive price. When GST is disabled we charge the stored ex-GST price
+ * (`price_ex_gst`) instead — no recalculation — falling back to the inclusive
+ * price when the ex-GST column is NULL / 0. So "GST off" genuinely charges the
+ * lower ex-GST amount and there is no embedded tax to strip.
+ */
+export function pickUnitPrice(
+  fields: { inclusive: number | null | undefined; exGst: number | null | undefined },
+  gstEnabled: boolean,
+): number {
+  const incl = Number(fields.inclusive ?? 0)
+  if (gstEnabled) return incl
+  const ex = fields.exGst == null ? null : Number(fields.exGst)
+  return ex != null && ex > 0 ? ex : incl
+}
+
+/**
+ * Resolve the winning unit price across the sub_variant → variant → product
+ * precedence, honouring the GST flag at every level. Each level supplies its
+ * inclusive price and its ex-GST price; the most specific level with a value
+ * wins. Keeps the precedence rule in one place so every call site agrees.
+ */
+export function resolveLineUnitPrice(
+  levels: {
+    subVariant?: { inclusive: number | null | undefined; exGst: number | null | undefined } | null
+    variant?: { inclusive: number | null | undefined; exGst: number | null | undefined } | null
+    product: { inclusive: number | null | undefined; exGst: number | null | undefined }
+  },
+  gstEnabled: boolean,
+): number {
+  const hasVal = (v: number | null | undefined) => v != null && Number(v) > 0
+  if (levels.subVariant && hasVal(levels.subVariant.inclusive)) {
+    return pickUnitPrice(levels.subVariant, gstEnabled)
+  }
+  if (levels.variant && hasVal(levels.variant.inclusive)) {
+    return pickUnitPrice(levels.variant, gstEnabled)
+  }
+  return pickUnitPrice(levels.product, gstEnabled)
+}

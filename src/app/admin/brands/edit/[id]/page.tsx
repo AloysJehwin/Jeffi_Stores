@@ -69,9 +69,11 @@ async function updateBrand(brandId: string, formData: FormData) {
         redirect(ap('/admin/brands', host))
       }
 
+      // Save as Draft always returns to the list.
       revalidatePath(`/admin/brands/edit/${brandId}`)
+      revalidatePath('/admin/brands')
       const back = formData.get('_back') as string | null
-      redirect(ap(back && back.startsWith('/admin/brands') ? back : `/admin/brands/edit/${brandId}`, host))
+      redirect(ap(back && back.startsWith('/admin/brands') ? back : '/admin/brands', host))
     }
 
     // Unreachable: no draft means the edit page redirected before rendering the

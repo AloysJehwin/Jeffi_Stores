@@ -245,3 +245,50 @@ ALTER TABLE ONLY public.return_request_items
 ALTER TABLE ONLY public.return_requests
     ADD CONSTRAINT return_requests_reviewed_by_fkey
     FOREIGN KEY (reviewed_by) REFERENCES public.admins(id) ON DELETE SET NULL;
+
+--
+-- Name: variant_change_requests; Type: TABLE; Schema: public; Owner: -
+-- Admin-initiated post-order variant/sub-variant swap on a CONFIRMED order (pre-shipment).
+-- Customer confirms; price difference is refunded (online-cheaper), collected
+-- (online-pricier, via Razorpay top-up), or absorbed into the COD total.
+--
+
+CREATE TABLE public.variant_change_requests (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    order_id uuid NOT NULL,
+    order_item_id uuid NOT NULL,
+    requested_by_admin_id uuid,
+    old_variant_id uuid,
+    old_sub_variant_id uuid,
+    new_variant_id uuid,
+    new_sub_variant_id uuid,
+    old_variant_name character varying(255),
+    new_variant_name character varying(255),
+    old_unit_price numeric(12,2) NOT NULL,
+    new_unit_price numeric(12,2) NOT NULL,
+    qty numeric(10,3) NOT NULL DEFAULT 1,
+    price_diff numeric(12,2) NOT NULL,
+    settlement_type character varying(20) NOT NULL,
+    status character varying(30) DEFAULT 'pending_customer'::character varying NOT NULL,
+    admin_notes text,
+    razorpay_order_id character varying(255),
+    razorpay_payment_id character varying(255),
+    refund_id character varying(255),
+    applied_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now(),
+    updated_at timestamp with time zone DEFAULT now()
+);
+
+-- FKs (order_items / product_variants / product_sub_variants / admins)
+ALTER TABLE ONLY public.variant_change_requests
+    ADD CONSTRAINT variant_change_requests_order_id_fkey
+    FOREIGN KEY (order_id) REFERENCES public.orders(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.variant_change_requests
+    ADD CONSTRAINT variant_change_requests_order_item_id_fkey
+    FOREIGN KEY (order_item_id) REFERENCES public.order_items(id) ON DELETE CASCADE;
+
+ALTER TABLE ONLY public.variant_change_requests
+    ADD CONSTRAINT variant_change_requests_requested_by_admin_id_fkey
+    FOREIGN KEY (requested_by_admin_id) REFERENCES public.admins(id) ON DELETE SET NULL;
+

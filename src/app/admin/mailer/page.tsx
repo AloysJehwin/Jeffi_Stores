@@ -179,7 +179,7 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-3">
                       {(c.status === 'draft' || c.status === 'scheduled') && (
-                        <DispatchCampaignButton id={c.id} />
+                        <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />
                       )}
                       <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 hover:underline text-sm">View</Link>
                       {c.status !== 'sending' && <DeleteCampaignButton id={c.id} title={c.title} />}
@@ -206,7 +206,7 @@ async function MailerListContent({ resolvedSearchParams }: { resolvedSearchParam
               <p className="text-xs text-foreground-muted">{TEMPLATE_LABELS[c.template_key]} · {c.audience_type.replace('_', ' ')}</p>
               {c.recipient_count != null && <p className="text-xs text-foreground-muted">{c.recipient_count} recipients</p>}
               <div className="flex gap-3 pt-1">
-                {(c.status === 'draft' || c.status === 'scheduled') && <DispatchCampaignButton id={c.id} />}
+                {(c.status === 'draft' || c.status === 'scheduled') && <DispatchCampaignButton id={c.id} scheduledAt={c.scheduled_at} />}
                 <Link href={ap(`/admin/mailer/${c.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-xs text-accent-500 hover:underline">View</Link>
                 {c.status !== 'sending' && <div className="hidden md:block"><DeleteCampaignButton id={c.id} title={c.title} /></div>}
               </div>

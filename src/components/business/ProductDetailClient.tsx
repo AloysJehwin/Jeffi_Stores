@@ -8,7 +8,8 @@ import RequestQuoteButton from '@/components/business/RequestQuoteButton'
 import RazorpayOffers from '@/components/visitor/RazorpayOffers'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
-import { applyDiscount, mrpDiscountPct } from '@/lib/pricing'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { applyDiscount, mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 interface ProductImage {
@@ -244,6 +245,7 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
   const [selectedUnit, setSelectedUnit] = useState<{ key: string; label: string | null; min: number; max: number | null; step: number; factor: number; dimension: string }>({ key: 'Nos', label: null, min: 1, max: null, step: 1, factor: 1, dimension: 'count' })
   const { user } = useAuth()
   const { showToast } = useToast()
+  const gstEnabled = useStoreConfig().flags.gstEnabled
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -254,8 +256,10 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
   }, [product.id])
 
   const hasVariants = product.has_variants && product.product_variants?.length > 0
-  const baseDisplayPrice = Number(product.base_price)
-  const mrp = product.mrp ? Number(product.mrp) : null
+  const baseDisplayPrice = pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
+  const gstRatePdp = product.gst_percentage ? Number(product.gst_percentage) : 0
+  const rawMrp = product.mrp ? Number(product.mrp) : null
+  const mrp = (!gstEnabled && rawMrp != null && gstRatePdp > 0) ? rawMrp / (1 + gstRatePdp / 100) : rawMrp
 
   // Apply per-category business discount
   const categoryId = product.categories?.id
@@ -351,8 +355,9 @@ export default function ProductDetailClient({ product, initialSkuParam, freeShip
           sku={product.sku}
           stockStatus={product.stock_status}
           basePrice={displayPrice}
+          basePriceExGst={product.price_ex_gst ?? null}
           salePrice={null}
-          mrp={mrp}
+          mrp={rawMrp}
           gstPercentage={product.gst_percentage ? Number(product.gst_percentage) : null}
           variants={hasVariants ? product.product_variants : []}
           variantType={product.variant_type || 'Variant'}

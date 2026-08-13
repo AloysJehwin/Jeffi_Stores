@@ -21,6 +21,18 @@ vi.mock('@/lib/gst', () => ({
 }))
 vi.mock('@/lib/pricing', () => ({
   lineItemFromMrpIncl: vi.fn(),
+  lineItemExGst: vi.fn(),
+}))
+vi.mock('@/lib/site-controls', () => ({
+  // gstEnabled is read live from the env var so tests that set/delete
+  // ENABLE_GST continue to drive the GST-enabled code path.
+  getFeatureFlags: vi.fn(async () => ({
+    razorpayEnabled: false,
+    gstEnabled: process.env.ENABLE_GST === 'true',
+    ondeviceSummaryEnabled: false,
+    ondeviceFinetuneEnabled: false,
+  })),
+  getBusinessValues: vi.fn(async () => ({ businessStateCode: '22' })),
 }))
 vi.mock('@/lib/inventory', () => ({
   logStockMovement: vi.fn(),

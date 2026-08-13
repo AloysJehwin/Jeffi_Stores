@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { getFeatureFlags, getBusinessValues } from '@/lib/site-controls'
 import { withTransaction } from '@/lib/db'
 import { isInterState, calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, round2 } from '@/lib/gst'
-import { lineItemFromMrpIncl } from '@/lib/pricing'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
 import { deductOrderStock } from '@/lib/inventory-deduct'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { z } from 'zod'
@@ -72,8 +73,9 @@ export async function POST(request: NextRequest) {
       notes,
     } = parsed.data
 
-    const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
+    const sellerStateCode = (await getBusinessValues()).businessStateCode
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
+    const gstEnabled = (await getFeatureFlags()).gstEnabled
 
     let subtotal = 0
     let totalTaxable = 0
@@ -88,6 +90,40 @@ export async function POST(request: NextRequest) {
       const baseQty = qty * factor
       const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
+
+      if (!gstEnabled) {
+        // GST off ⇒ charge the ex-GST equivalent, write zero tax.
+        const exUnit = gstRate > 0 ? unitPrice / (1 + gstRate / 100) : unitPrice
+        const lineTotal = round2(lineItemExGst(baseQty, exUnit, discPct))
+        subtotal += lineTotal
+        return {
+          product_id: item.product_id || null,
+          product_name: item.product_name,
+          product_sku: item.product_sku || '',
+          variant_id: item.variant_id || null,
+          sub_variant_id: item.sub_variant_id || null,
+          variant_name: item.variant_name || null,
+          hsn_code: item.hsn_code || null,
+          gst_rate: 0,
+          quantity: qty,
+          buy_unit: item.buy_unit || null,
+          buy_mode: item.buy_mode || 'unit',
+          sold_unit_factor: factor > 1 ? factor : null,
+          base_quantity: factor > 1 ? baseQty : null,
+          unit_price: unitPrice,
+          mrp: unitPrice,
+          discount_pct: discPct,
+          discount_amount: discPct > 0 ? round2(baseQty * exUnit * (discPct / 100)) : 0,
+          total_price: lineTotal,
+          taxable_amount: 0,
+          cgst_amount: 0,
+          sgst_amount: 0,
+          igst_amount: 0,
+          tax_amount: 0,
+          temp_id: item.temp_id || null,
+        }
+      }
+
       const lineTotal = round2(lineItemFromMrpIncl(baseQty, unitPrice, discPct, gstRate))
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
@@ -295,7 +331,7 @@ export async function POST(request: NextRequest) {
           client
         )
 
-        const isGSTEnabled = process.env.ENABLE_GST === 'true'
+        const isGSTEnabled = (await getFeatureFlags()).gstEnabled
         if (isGSTEnabled) {
           const settingsResult = await client.query("SELECT value FROM site_settings WHERE key = 'invoice_prefix'")
           const prefix = settingsResult.rows[0]?.value || 'JS'

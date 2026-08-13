@@ -3,7 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, getClient } from '@/lib/db'
 import { round2 } from '@/lib/gst'
-import { logStockMovement, updateWeightedAvgCost } from '@/lib/inventory'
+import { logStockMovement, updateWeightedAvgCost, recomputeStockStatusForProduct } from '@/lib/inventory'
 import { adjustStock, syncPerishableStock, getOrCreateOpenShelf } from '@/lib/shelf'
 import { sendPOReceiveNotificationEmail } from '@/lib/email'
 import { z } from 'zod'
@@ -99,6 +99,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       )
       const grnId = grnRow.rows[0].id
       const perishableProductIds = new Set<string>()
+      // Collected for the label-printing popup: batches created + serials received.
+      const createdBatchIds: string[] = []
+      const createdSerials: string[] = []
 
       for (const item of items) {
         const factor = item.purchase_unit_factor ?? 1
@@ -113,12 +116,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         const subVariantId = item.sub_variant_id || null
 
         await client.query(
-          `INSERT INTO grn_items (grn_id, po_item_id, product_id, variant_id, quantity_received, unit_cost, purchase_unit_factor)
-           VALUES ($1,$2,$3,$4,$5,$6,$7)`,
-          [grnId, poItemId, productId, variantId, qtyReceived, unitCost, factor]
+          `INSERT INTO grn_items (grn_id, po_item_id, product_id, variant_id, sub_variant_id, quantity_received, unit_cost, purchase_unit_factor)
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
+          [grnId, poItemId, productId, variantId, subVariantId, qtyReceived, unitCost, factor]
         )
 
-        await updateWeightedAvgCost(client, { productId, variantId, qtyReceived, unitCost })
+        await updateWeightedAvgCost(client, { productId, variantId, subVariantId, qtyReceived, unitCost })
 
         // Fetch perishable + serialized flags
         const productRow = await client.query<{ perishable: boolean; serialized: boolean }>(
@@ -193,6 +196,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             ]
           )
           newBatchId = batchInsert.rows[0].id
+          createdBatchIds.push(newBatchId)
         } else {
           if (subVariantId) {
             const row = await client.query<{ inventory_quantity: string }>(
@@ -231,11 +235,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         if (isSerialised && serials.length > 0) {
           for (let si = 0; si < serials.length; si++) {
             const sn = serials[si]
+            createdSerials.push(sn)
             await client.query(
               `INSERT INTO product_serials
-                 (product_id, variant_id, sub_variant_id, batch_id, grn_id, serial_number, status)
-               VALUES ($1,$2,$3,$4,$5,$6,'in_stock')`,
-              [productId, variantId, subVariantId, newBatchId, grnId, sn]
+                 (product_id, variant_id, sub_variant_id, batch_id, grn_id, serial_number, receive_seq, status)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,'in_stock')`,
+              [productId, variantId, subVariantId, newBatchId, grnId, sn, si]
             )
             await logStockMovement(client, {
               productId,
@@ -291,12 +296,25 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         [newStatus, id]
       )
 
+      // If inventory_sync is ON, derive stock_status from the received quantities,
+      // in-transaction (deduped per product). No-op when OFF. Covers the
+      // non-perishable direct bumps (incl. the no-shelf-location case). Perishable
+      // items are re-derived post-commit by syncPerishableStock → syncCentralInventory
+      // (idempotent), so any pre-sync value here is harmless.
+      const statusSyncedPids = new Set<string>()
+      for (const item of items) {
+        if (!item.product_id || statusSyncedPids.has(item.product_id)) continue
+        statusSyncedPids.add(item.product_id)
+        await recomputeStockStatusForProduct(client, item.product_id)
+      }
+
       await client.query('COMMIT')
 
       // Update shelf_stock for any item that had a location assigned.
       // Perishable: recompute shelf_stock from product_batches then sync inventory_quantity.
       // Non-perishable: increment shelf_stock directly via adjustStock.
       const syncedPerishable = new Set<string>()
+      const shelfWarnings: string[] = []
       for (const item of items) {
         const factor = item.purchase_unit_factor ?? 1
         const qtyReceived = item.quantity_received * factor
@@ -318,8 +336,14 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
               `GRN receive — PO ${po.po_number}`,
               admin.id,
             )
+          } else {
+            // Non-perishable with no shelf location: inventory_quantity was bumped but
+            // shelf_stock cannot be — flag so the divergence is visible, not silent.
+            shelfWarnings.push(`No shelf location for product ${item.product_id} — stock added but not placed on a shelf.`)
           }
-        } catch (_) {}
+        } catch (err: any) {
+          shelfWarnings.push(`Shelf update failed for product ${item.product_id}: ${err?.message || 'unknown error'}`)
+        }
       }
 
       if (receivedAmount > 0) {
@@ -392,7 +416,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         } catch (_) {}
       }
 
-      return NextResponse.json({ success: true, grn_id: grnId, grn_number: grnNumber })
+      return NextResponse.json({ success: true, grn_id: grnId, grn_number: grnNumber, batch_ids: createdBatchIds, serial_numbers: createdSerials, ...(shelfWarnings.length ? { warnings: shelfWarnings } : {}) })
     } catch (err) {
       await client.query('ROLLBACK')
       throw err

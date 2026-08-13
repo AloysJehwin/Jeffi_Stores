@@ -4,7 +4,8 @@ import { query, queryMany, queryOne } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { cookies } from 'next/headers'
 import { getUserIdForSession } from '@/lib/guest-user'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { logActivity } from '@/lib/activity'
 import { parseBody, zUuid } from '@/lib/validate'
 
@@ -29,6 +30,9 @@ export async function GET(request: NextRequest) {
   try {
     const userId = await resolveUserId(request)
 
+    const { gstEnabled } = await getFeatureFlags()
+    const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
+
     const wishlistItems = await queryMany(`
       SELECT
         wi.*,
@@ -38,7 +42,7 @@ export async function GET(request: NextRequest) {
           'mrp', p.mrp, 'has_variants', p.has_variants,
           'stock_status', p.stock_status,
           'variant_stock_total', ${VARIANT_STOCK_TOTAL_SQL},
-          'variant_min_price', ${VARIANT_MIN_PRICE_INCL_GST_SQL},
+          'variant_min_price', ${MIN_PRICE_SQL},
           'variant_min_mrp', ${VARIANT_MIN_MRP_SQL},
           'fragile', p.fragile,
           'hazardous', p.hazardous,

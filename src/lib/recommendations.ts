@@ -3,9 +3,12 @@ import { findSimilarProductIds } from '@/lib/rag'
 import { aiChat, AiClientError } from '@/lib/ai-client'
 import {
   VARIANT_MIN_PRICE_INCL_GST_SQL,
+  VARIANT_MIN_PRICE_EX_GST_SQL,
   VARIANT_MIN_MRP_SQL,
   VARIANT_STOCK_TOTAL_SQL,
 } from '@/lib/queries'
+import { getFeatureFlags } from '@/lib/site-controls'
+import { pickUnitPrice } from '@/lib/pricing'
 
 // ── "Featured For You" recommender ─────────────────────────────────────────
 // Turns a logged-in user's captured browsing/purchase signals into a curated
@@ -20,6 +23,7 @@ export interface RecCard {
   slug: string
   has_variants: boolean
   base_price: number
+  price_ex_gst: number | null
   mrp: number | null
   variant_min_price: number | null
   variant_min_mrp: number | null
@@ -101,7 +105,8 @@ function withTimeout<T>(p: Promise<T>, ms: number): Promise<T> {
 // Selects the SAME shape as the homepage getBestSellers/getFeaturedProducts
 // queries so productCardProps() (page.tsx) / the client mapper render cards
 // pixel-identical to the rest of the homepage.
-const CARD_SELECT = `
+function buildCardSelect(minPriceSql: string): string {
+  return `
   SELECT p.*,
     json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
     json_build_object('id', b.id, 'name', b.name) AS brands,
@@ -111,17 +116,20 @@ const CARD_SELECT = `
       '[]'::json
     ) AS product_images,
     ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-    ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+    ${minPriceSql} AS variant_min_price,
     ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
   FROM products p
   LEFT JOIN categories c ON p.category_id = c.id
   LEFT JOIN brands b ON p.brand_id = b.id
 `
+}
 
 async function hydrate(ids: string[]): Promise<RecCard[]> {
   if (!ids.length) return []
+  const { gstEnabled } = await getFeatureFlags()
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   const rows = await queryMany<RecCard>(
-    `${CARD_SELECT} WHERE p.is_active = true AND p.id = ANY($1::uuid[])`,
+    `${buildCardSelect(MIN_PRICE_SQL)} WHERE p.is_active = true AND p.id = ANY($1::uuid[])`,
     [ids]
   )
   const order = new Map(ids.map((id, i) => [id, i]))
@@ -273,6 +281,62 @@ Rules: use only the numbers shown; order best-first; prefer variety across categ
 
 interface CandidateMeta { id: string; name: string; category: string | null; brand: string | null; price: number }
 
+// Collapse a product name to its "family" — strips trailing size/variant tokens
+// so "... Screw Metric 12.9 M4", "... M6", "... M10" all map to one family. This
+// stops the row from filling with near-identical variants of the same product.
+function familyKey(m: CandidateMeta): string {
+  const base = (m.name || '')
+    .toLowerCase()
+    // drop common size/spec tokens: M6, 12.9, 250mm, 1/2", 1m, sizes, grades
+    .replace(/\b[mM]\d+(\.\d+)?\b/g, ' ')       // M6, M10, 12.9-style M-codes
+    .replace(/\b\d+(\.\d+)?\s?(mm|cm|m|inch|in|")\b/g, ' ') // 250mm, 1m, 1/2"
+    .replace(/\b\d+(\.\d+)?\b/g, ' ')            // bare numbers/grades (12.9)
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(/\s+/).slice(0, 6).join(' ')          // first few descriptive words
+  return `${m.brand ?? ''}|${m.category ?? ''}|${base}`
+}
+
+/**
+ * Enforce variety on an ordered id list. Keeps the given order but limits how
+ * many items share the same product family and the same brand+category, so a
+ * pool dominated by one product line (e.g. all Unbrako screws) still yields a
+ * varied row. Tops back up from the leftovers if the caps thin the list below
+ * `want`, so the row is always filled.
+ */
+function diversify(orderedIds: string[], meta: Map<string, CandidateMeta>, want: number): string[] {
+  const MAX_PER_FAMILY = 1
+  const MAX_PER_BRAND_CAT = 2
+  const famCount = new Map<string, number>()
+  const brandCatCount = new Map<string, number>()
+  const picked: string[] = []
+  const deferred: string[] = []
+
+  for (const id of orderedIds) {
+    const m = meta.get(id)
+    if (!m) continue
+    const fk = familyKey(m)
+    const bc = `${m.brand ?? ''}|${m.category ?? ''}`
+    if ((famCount.get(fk) ?? 0) >= MAX_PER_FAMILY || (brandCatCount.get(bc) ?? 0) >= MAX_PER_BRAND_CAT) {
+      deferred.push(id)
+      continue
+    }
+    famCount.set(fk, (famCount.get(fk) ?? 0) + 1)
+    brandCatCount.set(bc, (brandCatCount.get(bc) ?? 0) + 1)
+    picked.push(id)
+    if (picked.length >= want) break
+  }
+  // Fill remaining slots from deferred (keeps the row full when the pool is
+  // narrow), preserving original order.
+  if (picked.length < want) {
+    for (const id of deferred) {
+      if (!picked.includes(id)) picked.push(id)
+      if (picked.length >= want) break
+    }
+  }
+  return picked.slice(0, want)
+}
+
 async function curate(
   candidates: CandidateMeta[],
   signals: UserSignals,
@@ -352,6 +416,7 @@ export async function getFeaturedForUser(userId: string, want = 8): Promise<RecR
   const { ids: candidateIds, source, seedQuery } = await getCandidates(signals, Math.max(24, want * 3))
 
   // Hydrate candidates once — needed both for LLM metadata and final cards.
+  const { gstEnabled } = await getFeatureFlags()
   const candidateCards = await hydrate(candidateIds)
   const candidateMeta: CandidateMeta[] = candidateCards.map(c => ({
     id: c.id,
@@ -359,7 +424,9 @@ export async function getFeaturedForUser(userId: string, want = 8): Promise<RecR
     category: c.categories?.name ?? null,
     brand: c.brands?.name ?? null,
     price: Number(
-      c.has_variants && c.variant_min_price != null ? c.variant_min_price : c.base_price
+      c.has_variants && c.variant_min_price != null
+        ? c.variant_min_price
+        : pickUnitPrice({ inclusive: c.base_price, exGst: c.price_ex_gst }, gstEnabled)
     ),
   }))
 
@@ -383,7 +450,11 @@ export async function getFeaturedForUser(userId: string, want = 8): Promise<RecR
   }
 
   const byId = new Map(candidateCards.map(c => [c.id, c]))
-  const products = picks.map(id => byId.get(id)).filter(Boolean) as RecCard[]
+  // Enforce variety so the row isn't filled with near-identical variants of the
+  // same product line, regardless of what the candidate pool / LLM returned.
+  const metaById = new Map(candidateMeta.map(m => [m.id, m]))
+  const diversePicks = diversify(picks, metaById, want)
+  const products = diversePicks.map(id => byId.get(id)).filter(Boolean) as RecCard[]
 
   const result: RecResult = {
     products,
@@ -402,6 +473,19 @@ export async function getFeaturedForUser(userId: string, want = 8): Promise<RecR
 
 // Best-sellers list for logged-out visitors (no personalisation, not cached per-user).
 export async function getBestSellerCards(want = 8): Promise<RecCard[]> {
-  const ids = await bestSellerIds([], want)
-  return hydrate(ids)
+  // Pull a wider pool then diversify so the row isn't all one product line.
+  const ids = await bestSellerIds([], Math.max(24, want * 3))
+  const cards = await hydrate(ids)
+  const meta = new Map<string, CandidateMeta>(
+    cards.map(c => [c.id, {
+      id: c.id,
+      name: c.name,
+      category: c.categories?.name ?? null,
+      brand: c.brands?.name ?? null,
+      price: 0,
+    }])
+  )
+  const diverseIds = diversify(cards.map(c => c.id), meta, want)
+  const byId = new Map(cards.map(c => [c.id, c]))
+  return diverseIds.map(id => byId.get(id)).filter(Boolean) as RecCard[]
 }

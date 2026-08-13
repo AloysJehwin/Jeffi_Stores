@@ -1,0 +1,41 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
+import { query, queryOne } from '@/lib/db'
+import { uploadGalleryImage } from '@/lib/s3'
+
+export const dynamic = 'force-dynamic'
+
+const ALLOWED = ['image/png', 'image/jpeg', 'image/webp']
+const MAX = 5 * 1024 * 1024
+
+// POST /api/admin/hero-slides/[id]/image — upload a slide banner image.
+// FormData: file, plus optional field=image_url|image_url_mobile (default image_url).
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const { id } = await params
+    const admin = await authenticateAdmin(request)
+    if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!hasScope(admin.role, admin.scopes, 'settings:write')) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+
+    const slide = await queryOne<{ id: string }>(`SELECT id FROM hero_slides WHERE id = $1`, [id])
+    if (!slide) return NextResponse.json({ error: 'Slide not found' }, { status: 404 })
+
+    const formData = await request.formData()
+    const file = formData.get('file') as File | null
+    const field = (formData.get('field') as string) === 'image_url_mobile' ? 'image_url_mobile' : 'image_url'
+    if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+    if (!ALLOWED.includes(file.type)) return NextResponse.json({ error: 'Unsupported image type' }, { status: 400 })
+    if (file.size > MAX) return NextResponse.json({ error: 'Image must be under 5 MB' }, { status: 400 })
+
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const { url } = await uploadGalleryImage(buffer, file.name)
+
+    await query(`UPDATE hero_slides SET ${field} = $1, updated_at = NOW() WHERE id = $2`, [url, id])
+    return NextResponse.json({ url, field })
+  } catch (err: any) {
+    return NextResponse.json({ error: err?.message || 'Failed to upload image' }, { status: 500 })
+  }
+}

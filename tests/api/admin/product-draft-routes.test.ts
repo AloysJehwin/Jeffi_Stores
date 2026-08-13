@@ -150,6 +150,9 @@ describe('products draft sub-variants route', () => {
 
   it('POST adds sub-variant to draft', async () => {
     mockQueryOne.mockResolvedValueOnce({ sub_variants: [] })
+    // Variant is untouched → ensureVariantSeeded reads the live sub-variant set
+    // (complete-snapshot seeding). No live rows here, so nothing is seeded.
+    mockQueryMany.mockResolvedValueOnce([])
     mockQuery.mockResolvedValueOnce({})
     const r = reqWithParams('POST', { variant_id: 'v-1' }, { sub_variant_name: 'Red', price: 100 })
     const res = await svPost(r, { params: idParams })
