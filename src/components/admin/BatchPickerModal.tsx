@@ -177,7 +177,7 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">Assign Batches</h2>
-            <p className="text-sm text-foreground-muted mt-0.5">Select batches per item — quantities auto-filled (FIFO). Scan a lot label or a unit's serial to select.</p>
+            <p className="text-sm text-foreground-muted mt-0.5">Select batches per item — quantities auto-filled (FIFO). Scan a lot label or a unit&apos;s serial to select.</p>
           </div>
           <div className="flex items-center gap-3">
             {scanMsg ? (
