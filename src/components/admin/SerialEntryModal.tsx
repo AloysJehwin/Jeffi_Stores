@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 
 export interface SerialItem {
   order_item_id: string
@@ -8,6 +8,11 @@ export interface SerialItem {
   variant_name: string | null
   required_qty: number
   already_assigned: boolean
+  /** Serials already assigned to this line (e.g. auto-recorded from a serial scan).
+   *  The modal pre-fills these as selected and treats them as VALID even if the
+   *  in-stock availability query no longer returns them (a reserved serial). The
+   *  operator can still untick/swap them (editable). Only the delta is collected. */
+  preassigned?: string[]
   // optional — used to fetch available serials
   product_id?: string
   variant_id?: string | null
@@ -35,15 +40,18 @@ export function SerialPicker({
   item,
   selected,
   onChange,
+  scanEnabled = true,
 }: {
   item: SerialItem
   selected: Set<string>
   onChange: (next: Set<string>) => void
+  scanEnabled?: boolean
 }) {
   const [available, setAvailable] = useState<AvailableSerial[]>([])
   const [loading, setLoading] = useState(false)
   const [search, setSearch] = useState('')
   const [collapsedBatches, setCollapsedBatches] = useState<Set<string>>(new Set())
+  const [scanMsg, setScanMsg] = useState<{ text: string; kind: 'ok' | 'err' | 'info' } | null>(null)
 
   useEffect(() => {
     if (!item.product_id) return
@@ -56,9 +64,15 @@ export function SerialPicker({
       .then(data => {
         const list: AvailableSerial[] = data.serials || []
         setAvailable(list)
-        // Auto-select first N
-        const autoSelected = new Set(list.slice(0, item.required_qty).map(s => s.serial_number))
-        onChange(autoSelected)
+        // Keep any pre-assigned serials already in `selected` (seeded by the parent
+        // from a scan), then auto-fill the REMAINING delta from the in-stock list —
+        // skipping serials already selected. Never exceed required_qty.
+        const keep = new Set(selected)
+        for (const s of list) {
+          if (keep.size >= item.required_qty) break
+          if (!keep.has(s.serial_number)) keep.add(s.serial_number)
+        }
+        onChange(keep)
       })
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -75,6 +89,119 @@ export function SerialPicker({
     onChange(next)
   }
 
+  // ── Scan mode: N plain fields (one per required unit) ──────────────────────
+  // When scan is on we render `required_qty` text inputs. The scanner types a
+  // serial into the focused field and its trailing Enter advances to the next
+  // empty field (same reliable pattern as PO-receive / bootstrap — no global
+  // keystroke interception, so it works with any USB/Bluetooth HID scanner).
+  // Entries are validated against the available in-stock list on change; only
+  // valid, unique serials flow into `selected` (which drives confirm).
+  const [entries, setEntries] = useState<string[]>([])
+  const fieldRefs = useRef<Record<number, HTMLInputElement | null>>({})
+  // Raw per-field text as the DOM accumulates a scan burst (uncontrolled inputs).
+  // We only read/validate this on the terminator, never per keystroke.
+  const dirtyRef = useRef<Record<number, string>>({})
+  // Bumping this key remounts the scan fields so their defaultValue resets to ''
+  // (uncontrolled inputs otherwise keep stale DOM text across a mode reset).
+  const [scanFieldsKey, setScanFieldsKey] = useState(0)
+  // Pre-assigned serials (e.g. auto-recorded from a scan) count as VALID even if the
+  // in-stock availability query no longer returns them (a reserved serial).
+  const preassignedSet = useMemo(
+    () => new Set((item.preassigned ?? []).map(s => s.toLowerCase())),
+    [item.preassigned]
+  )
+  const availSet = useMemo(
+    () => new Set([
+      ...available.map(s => s.serial_number.toLowerCase()),
+      ...preassignedSet,
+    ]),
+    [available, preassignedSet]
+  )
+
+  // Switching modes:
+  //  • → scan: start with empty fields so the operator scans each unit fresh, and
+  //    clear `selected` (a half-scanned capture must not confirm with stale picks).
+  //  • → click: re-apply the auto-select-first-N so the checkbox mode isn't blank
+  //    (the earlier scan-mode clear emptied `selected`).
+  useEffect(() => {
+    if (scanEnabled) {
+      // Pre-fill the first fields with any pre-assigned serials (editable); the rest
+      // are empty for the operator to scan the delta. Keeps `selected` in sync so a
+      // fully-preassigned line already confirms without a re-scan.
+      const pre = (item.preassigned ?? []).slice(0, item.required_qty)
+      const seeded = Array.from({ length: item.required_qty }, (_, i) => pre[i] ?? '')
+      setEntries(seeded)
+      dirtyRef.current = {}
+      setScanFieldsKey(k => k + 1) // remount fields → reset stale DOM text
+      onChange(new Set(pre))
+    } else if (available.length > 0 && selected.size === 0) {
+      const pre = (item.preassigned ?? []).slice(0, item.required_qty)
+      const autoSelected = new Set(pre)
+      for (const s of available) {
+        if (autoSelected.size >= item.required_qty) break
+        autoSelected.add(s.serial_number)
+      }
+      onChange(autoSelected)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanEnabled, item.required_qty, available.length])
+
+  // Put the cursor in the first field once scan mode is active and serials loaded,
+  // so the operator can scan immediately without clicking.
+  useEffect(() => {
+    if (!scanEnabled || loading || available.length === 0) return
+    const el = fieldRefs.current[0]
+    if (el) el.focus()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanEnabled, loading, available.length])
+
+  // Sync valid+unique entries into `selected` so confirm sees them.
+  function commitEntries(next: string[]) {
+    setEntries(next)
+    const seen = new Set<string>()
+    const valid = new Set<string>()
+    for (const raw of next) {
+      const sn = raw.trim()
+      if (!sn) continue
+      const match = available.find(s => s.serial_number.toLowerCase() === sn.toLowerCase())
+      // Accept a serial that's in stock OR already pre-assigned to this line (a
+      // reserved serial may no longer be in the in-stock list but is still valid).
+      const canonical = match?.serial_number
+        ?? (item.preassigned ?? []).find(p => p.toLowerCase() === sn.toLowerCase())
+      if (!canonical) continue // invalid — not in stock and not pre-assigned
+      if (seen.has(canonical)) continue // duplicate
+      seen.add(canonical)
+      valid.add(canonical)
+    }
+    onChange(valid)
+  }
+
+  // Terminator/blur handler for the uncontrolled scan fields: read the field's
+  // full DOM value ONCE (the whole scanned burst), write it into entries[i], and
+  // run the single validation/commit. No per-keystroke work → no dropped chars.
+  function commitFieldFromDom(i: number) {
+    const domVal = fieldRefs.current[i]?.value ?? dirtyRef.current[i] ?? ''
+    if ((entries[i] ?? '') === domVal) { commitEntries([...entries]); return }
+    const next = [...entries]
+    next[i] = domVal
+    delete dirtyRef.current[i]
+    commitEntries(next)
+  }
+
+  function focusNextEntry(from: number) {
+    for (let step = 1; step <= item.required_qty; step++) {
+      const idx = (from + step) % item.required_qty
+      const el = fieldRefs.current[idx]
+      if (el && !el.value) { el.focus(); return }
+    }
+  }
+
+  useEffect(() => {
+    if (!scanMsg) return
+    const t = setTimeout(() => setScanMsg(null), 2000)
+    return () => clearTimeout(t)
+  }, [scanMsg])
+
   function toggleBatch(lotKey: string) {
     setCollapsedBatches(prev => {
       const next = new Set(prev)
@@ -84,13 +211,21 @@ export function SerialPicker({
     })
   }
 
-  // Group by lot_number (null lot = "No Lot")
+  // Group by lot_number (null lot = "No Lot"). Include any pre-assigned serial that
+  // is no longer in-stock (reserved) as a pseudo-row so click mode can still show +
+  // untick it — otherwise a reserved preassigned serial would be uneditable.
+  const availableWithPre: AvailableSerial[] = [...available]
+  for (const sn of item.preassigned ?? []) {
+    if (!available.some(s => s.serial_number.toLowerCase() === sn.toLowerCase())) {
+      availableWithPre.push({ serial_number: sn, batch_id: null, lot_number: null })
+    }
+  }
   const filtered = search
-    ? available.filter(s =>
+    ? availableWithPre.filter(s =>
         s.serial_number.toLowerCase().includes(search.toLowerCase()) ||
         (s.lot_number || '').toLowerCase().includes(search.toLowerCase())
       )
-    : available
+    : availableWithPre
 
   const batches: { lotKey: string; lotLabel: string; serials: AvailableSerial[] }[] = []
   for (const s of filtered) {
@@ -110,19 +245,82 @@ export function SerialPicker({
         <p className="text-sm font-semibold text-foreground">
           {item.product_name}{item.variant_name ? ` / ${item.variant_name}` : ''}
         </p>
-        <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
-          isOver  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-          : isOk  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-          : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
-        }`}>
-          {selected.size} / {item.required_qty} selected
-        </span>
+        <div className="flex items-center gap-2">
+          {scanMsg && (
+            <span className={`text-xs font-medium px-2 py-0.5 rounded ${
+              scanMsg.kind === 'ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+              : scanMsg.kind === 'err' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+              : 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400'
+            }`}>{scanMsg.text}</span>
+          )}
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded ${
+            isOver  ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+            : isOk  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+            : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400'
+          }`}>
+            {selected.size} / {item.required_qty} selected
+          </span>
+        </div>
       </div>
 
       {loading ? (
         <div className="text-xs text-foreground-muted py-4 text-center">Loading serials…</div>
-      ) : available.length === 0 ? (
+      ) : available.length === 0 && !(item.preassigned && item.preassigned.length > 0) ? (
         <div className="text-xs text-red-500 py-3 text-center">No in-stock serials found for this product</div>
+      ) : scanEnabled ? (
+        <>
+          {/* Scan mode: one field per required unit. Scan a serial → its Enter jumps
+              to the next empty field. Each field validates against the in-stock list. */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {Array.from({ length: item.required_qty }, (_, i) => {
+              const val = entries[i] ?? ''
+              const trimmed = val.trim()
+              const valid = !trimmed || availSet.has(trimmed.toLowerCase())
+              const dup = !!trimmed && entries.filter(e => e.trim().toLowerCase() === trimmed.toLowerCase()).length > 1
+              const bad = !!trimmed && (!valid || dup)
+              return (
+                <div key={`${scanFieldsKey}-${i}`} className="flex items-center gap-1.5">
+                  <span className="text-xs text-foreground-muted w-5 shrink-0 text-right">{i + 1}.</span>
+                  <input
+                    ref={el => { fieldRefs.current[i] = el }}
+                    type="text"
+                    defaultValue={val}
+                    onInput={e => {
+                      // Uncontrolled: the DOM accumulates the scanner burst. Do NO
+                      // per-keystroke validation/commit here (that re-render race is
+                      // what drops characters). Just track dirtiness for styling.
+                      dirtyRef.current[i] = (e.target as HTMLInputElement).value
+                    }}
+                    onKeyDown={e => {
+                      // Commit + validate + advance ONLY on the terminator (scanner
+                      // sends Enter/CR; some send Tab). One validation per serial.
+                      if (e.key === 'Enter' || e.key === 'Tab') {
+                        e.preventDefault()
+                        commitFieldFromDom(i)
+                        focusNextEntry(i)
+                      }
+                    }}
+                    onBlur={() => commitFieldFromDom(i)}
+                    placeholder={`Scan serial ${i + 1}`}
+                    className={`flex-1 min-w-0 px-2.5 py-1.5 text-sm rounded-lg border bg-surface text-foreground font-mono focus:outline-none focus:ring-1 ${
+                      bad ? 'border-red-400 focus:ring-red-400' : 'border-border-default focus:ring-secondary-500'
+                    }`}
+                  />
+                </div>
+              )
+            })}
+          </div>
+          <p className="text-xs text-foreground-muted mt-2">
+            Scan or type each serial. Must match an in-stock serial for this product ({available.length} available).
+            {(() => {
+              const bad = entries.some(e => e.trim() && !availSet.has(e.trim().toLowerCase()))
+              const dups = new Set(entries.map(e => e.trim().toLowerCase()).filter(Boolean)).size !== entries.filter(e => e.trim()).length
+              if (bad) return <span className="text-red-500 font-medium"> Some serials are not in stock.</span>
+              if (dups) return <span className="text-red-500 font-medium"> Duplicate serials entered.</span>
+              return null
+            })()}
+          </p>
+        </>
       ) : (
         <>
           {available.length > 8 && (
@@ -192,9 +390,17 @@ export function SerialPicker({
 
 export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) {
   const itemsNeedingEntry = items.filter(i => !i.already_assigned)
+  // Default ON: scanner mode is the primary path — N fields, cursor in the first.
+  // Toggle off to fall back to the click/checkbox picker.
+  const [scanEnabled, setScanEnabled] = useState(true)
 
   const [selections, setSelections] = useState<Record<string, Set<string>>>(() =>
-    Object.fromEntries(itemsNeedingEntry.map(i => [i.order_item_id, new Set<string>()]))
+    Object.fromEntries(itemsNeedingEntry.map(i => [
+      i.order_item_id,
+      // Seed with any pre-assigned serials (e.g. auto-recorded from a scan), capped
+      // at required_qty. The SerialPicker fills the remaining delta.
+      new Set<string>((i.preassigned ?? []).slice(0, i.required_qty)),
+    ]))
   )
 
   const canConfirm = itemsNeedingEntry.every(item =>
@@ -219,7 +425,22 @@ export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) 
             <h2 className="text-lg font-bold text-foreground">Select Serial Numbers</h2>
             <p className="text-sm text-foreground-muted mt-0.5">Serials grouped by batch — top {itemsNeedingEntry[0]?.required_qty ?? 'N'} pre-selected</p>
           </div>
-          <button onClick={onCancel} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setScanEnabled(v => !v)}
+              title={scanEnabled ? 'Scanner mode on — scan a serial to select it' : 'Click to select manually, or turn on scanner mode'}
+              className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                scanEnabled
+                  ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400'
+                  : 'border-border-default text-foreground-muted hover:bg-surface-secondary'
+              }`}
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14" /></svg>
+              {scanEnabled ? 'Scan: on' : 'Scan: off'}
+            </button>
+            <button onClick={onCancel} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+          </div>
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-6">
@@ -229,6 +450,7 @@ export default function SerialEntryModal({ items, onConfirm, onCancel }: Props) 
               item={item}
               selected={selections[item.order_item_id] || new Set()}
               onChange={next => setSelections(s => ({ ...s, [item.order_item_id]: next }))}
+              scanEnabled={scanEnabled}
             />
           ))}
         </div>

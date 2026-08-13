@@ -8,7 +8,7 @@ export default function ThemeToggle({ variant = 'header' }: { variant?: 'header'
 
   const baseClasses = 'inline-flex items-center justify-center rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500'
   const variantClasses = variant === 'admin'
-    ? 'p-2 text-gray-300 hover:text-white hover:bg-white/10'
+    ? 'h-9 w-9 text-white bg-white/10 hover:bg-white/20'
     : 'p-2.5 min-w-[44px] min-h-[44px] text-foreground-secondary hover:bg-surface-secondary'
 
   return (

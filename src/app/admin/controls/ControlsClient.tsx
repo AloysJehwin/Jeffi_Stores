@@ -5,6 +5,14 @@ import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ALL_DIMENSIONS, DIMENSION_LABEL, UNITS, type Dimension, computeAreaFactor, computeVolumeFactor } from '@/lib/units'
 
+type SnapRow = { id: string; name?: string; before: Record<string, any> }
+type OperationSnapshot = {
+  products?: SnapRow[]
+  variants?: SnapRow[]
+  subs?: SnapRow[]
+  variantUnits?: { variant_id: string; product_id: string; before: Record<string, any> | null }[]
+}
+
 interface ControlsLog {
   id: string
   operation: string
@@ -14,7 +22,8 @@ interface ControlsLog {
   rolled_back_at: string | null
   is_rollback: boolean
   value: any
-  snapshot: { id: string; name: string; before: Record<string, any> }[] | null
+  // Legacy logs store SnapRow[]; current logs store OperationSnapshot.
+  snapshot: SnapRow[] | OperationSnapshot | null
 }
 
 interface Category { id: string; name: string; parent_category_id: string | null }
@@ -827,9 +836,29 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
               <div className="divide-y divide-border-default">
                 {pageLogs.map(log => {
                   const opLabel = OPERATIONS.find(o => o.key === log.operation)?.label ?? log.operation
-                  const valueStr = (!log.value || typeof log.value === 'object') ? null : String(log.value)
+                  // Human-readable value: strings shown as-is; the selling-unit object
+                  // is summarised (e.g. "set (×5)"); other objects are skipped.
+                  let valueStr: string | null = null
+                  if (log.value != null) {
+                    if (typeof log.value === 'object') {
+                      const v = log.value as any
+                      if (v.unit) valueStr = `${v.unit}${v.factor ? ` (×${v.factor})` : ''}`
+                    } else {
+                      valueStr = String(log.value)
+                    }
+                  }
                   const isExpanded = expandedLogId === log.id
-                  const snapshotRows = log.snapshot ?? []
+                  // Normalise both snapshot shapes for display.
+                  const snap = log.snapshot
+                  const productRows: SnapRow[] = Array.isArray(snap) ? snap : (snap?.products ?? [])
+                  const variantCount = Array.isArray(snap) ? 0 : (snap?.variants?.length ?? 0)
+                  const subCount = Array.isArray(snap) ? 0 : (snap?.subs?.length ?? 0)
+                  const unitCount = Array.isArray(snap) ? 0 : (snap?.variantUnits?.length ?? 0)
+                  const childSummary = [
+                    variantCount ? `${variantCount} variant${variantCount !== 1 ? 's' : ''}` : null,
+                    subCount ? `${subCount} sub-variant${subCount !== 1 ? 's' : ''}` : null,
+                    unitCount ? `${unitCount} variant unit${unitCount !== 1 ? 's' : ''}` : null,
+                  ].filter(Boolean).join(', ')
                   return (
                     <div key={log.id} className={log.rolled_back_at ? 'opacity-50' : ''}>
                       <button
@@ -846,6 +875,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
                           </p>
                           <p className="text-xs text-foreground-muted mt-0.5">
                             {log.product_count} product{log.product_count !== 1 ? 's' : ''}
+                            {childSummary ? ` (+ ${childSummary})` : ''}
                             {log.applied_by ? ` · ${log.applied_by}` : ''}
                             {' · '}{new Date(log.applied_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}
                             {log.rolled_back_at ? ' · Rolled back' : ''}
@@ -862,11 +892,11 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
                         )}
                       </button>
 
-                      {isExpanded && snapshotRows.length > 0 && (
+                      {isExpanded && productRows.length > 0 && (
                         <div className="px-4 pb-3 space-y-1 bg-surface">
-                          {snapshotRows.map(row => (
+                          {productRows.map(row => (
                             <div key={row.id} className="text-xs border border-border-default rounded p-2 space-y-0.5">
-                              <p className="font-medium text-foreground">{row.name}</p>
+                              <p className="font-medium text-foreground">{row.name || row.id}</p>
                               <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-foreground-muted">
                                 {Object.entries(row.before).map(([k, v]) => (
                                   <span key={k}><span className="text-foreground-secondary">{k}:</span> {v == null ? '—' : String(v)}</span>
@@ -874,6 +904,11 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
                               </div>
                             </div>
                           ))}
+                          {childSummary && (
+                            <p className="text-[11px] text-foreground-muted pt-1">
+                              Rollback also restores {childSummary}.
+                            </p>
+                          )}
                         </div>
                       )}
                     </div>

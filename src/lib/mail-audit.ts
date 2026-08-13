@@ -70,7 +70,7 @@ async function logMail(opts: {
   userId: string | null
   templateName: string | null
   metadata: Record<string, unknown> | null
-  status: 'sent' | 'failed'
+  status: 'sent' | 'failed' | 'skipped'
   error: string | null
   messageId: string | null
 }) {
@@ -109,6 +109,28 @@ export async function sendAuditedMail(o: SendAuditedMailOptions): Promise<{ mess
   const to = Array.isArray(o.to) ? o.to.join(', ') : o.to
   const cc = joinAddrs(o.cc)
   const bcc = joinAddrs(o.bcc)
+
+  // Local kill-switch: when MAIL_DISABLED=true (dev), do NOT hit SES — but still
+  // write the audit row so you can see what would have been sent in /admin/audit.
+  if (process.env.MAIL_DISABLED === 'true') {
+    await logMail({
+      to, from, cc, bcc,
+      subject: o.subject,
+      html: o.redactBody ? null : (o.html ?? null),
+      text: o.redactBody ? null : (o.text ?? null),
+      kind: o.kind,
+      entityType: o.entityType ?? null,
+      entityId: o.entityId ?? null,
+      userId: o.userId ?? null,
+      templateName: o.templateName ?? null,
+      metadata: { ...(o.metadata ?? {}), mailDisabled: true },
+      status: 'skipped',
+      error: null,
+      messageId: null,
+    })
+    return {}
+  }
+
   try {
     const info = await getTransporter().sendMail({
       from,

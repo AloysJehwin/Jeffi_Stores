@@ -246,6 +246,7 @@ describe('GET /api/orders/[id]/invoice', () => {
       expect.objectContaining({ full_name: 'Billing Name' }),
       expect.any(Boolean),
       expect.any(String),
+      expect.any(Boolean),
     )
   })
 
@@ -267,6 +268,7 @@ describe('GET /api/orders/[id]/invoice', () => {
       undefined,
       expect.any(Boolean),
       expect.any(String),
+      expect.any(Boolean),
     )
   })
 

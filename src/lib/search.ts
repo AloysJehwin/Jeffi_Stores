@@ -73,20 +73,44 @@ export function buildProductSearchRank(
   if (!q) return { rank: '0', params: [], nextIdx: startIdx }
 
   const tsq = tsQuery(q)
+  const words = searchWords(q)
+  const params: unknown[] = []
   let i = startIdx
-  // Lower = better (ORDER BY ascending). Exact prefix/substring win first; then
-  // full-text rank; then trigram word similarity so fuzzy hits still order well.
-  const rank = `(
-    CASE WHEN ${nameCol} ILIKE $${i} THEN 0 ELSE 2 END
-    + CASE WHEN ${nameCol} ILIKE $${i + 1} THEN 0 ELSE 1 END
-    - ts_rank_cd(${vectorCol}, to_tsquery('english', $${i + 2}))
-    - word_similarity($${i + 3}::text, ${nameCol})
-  )`
-  return {
-    rank,
-    params: [`${q}%`, `%${q}%`, tsq || "''", q],
-    nextIdx: i + 4,
+
+  // Tier A — STEMMED lexeme match (best). `plainto_tsquery` stems BOTH sides with the
+  // English dictionary, so a query word that stems to a lexeme the name actually has
+  // wins decisively: "lightning" → matches "…Lightning…" (lexeme `lightn`) but NOT
+  // "…Light…" (lexeme `light`). This is the reliable discriminator between "lightning"
+  // and generic "light" products (the prefix `:*` query can't tell them apart because
+  // the stemmer collapses "lightning"→"lightn", which "lightin" doesn't prefix).
+  const stemIdx = i; params.push(q); i++
+
+  // Tier B — per-word WORD-BOUNDARY prefix on the raw name (catches partial words that
+  // literally prefix a name word, e.g. "arre" → "Arrester", before the stemmer runs).
+  const wordTierExprs: string[] = []
+  for (const w of words) {
+    params.push(`\\m${w}`) // \m = start-of-word boundary; ~* = case-insensitive regex
+    wordTierExprs.push(`CASE WHEN ${nameCol} ~* $${i} THEN 0 ELSE 1 END`)
+    i++
   }
+  const wordTier = wordTierExprs.length ? `LEAST(${wordTierExprs.join(', ')})` : '1'
+
+  // Tier C/D — whole-query substring + prefix FTS rank + trigram word similarity, as
+  // finer discriminators so fuzzy/partial hits still order sensibly among ties.
+  const subIdx = i; params.push(`%${q}%`); i++
+  const tsIdx = i; params.push(tsq || "''"); i++
+  const simIdx = i; params.push(q); i++
+
+  // Lower = better. A stemmed-lexeme match dominates (weight 4); then word-prefix;
+  // then substring; then the continuous FTS/trigram scores break remaining ties.
+  const rank = `(
+    CASE WHEN ${vectorCol} @@ plainto_tsquery('english', $${stemIdx}) THEN 0 ELSE 4 END
+    + ${wordTier}
+    + CASE WHEN ${nameCol} ILIKE $${subIdx} THEN 0 ELSE 1 END
+    - ts_rank_cd(${vectorCol}, to_tsquery('english', $${tsIdx}))
+    - word_similarity($${simIdx}::text, ${nameCol})
+  )`
+  return { rank, params, nextIdx: i }
 }
 
 export function buildVectorSearchClause(

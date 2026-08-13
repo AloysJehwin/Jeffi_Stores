@@ -1,4 +1,5 @@
 import { query, queryMany, queryOne, getClient } from '@/lib/db'
+import { recomputeStockStatusForProduct } from '@/lib/inventory'
 
 export interface Warehouse {
   id: string
@@ -288,7 +289,7 @@ export async function getStockForProduct(productId: string, variantId?: string |
   )
 }
 
-async function syncCentralInventory(
+export async function syncCentralInventory(
   client: any,
   productId: string,
   variantId: string | null,
@@ -304,12 +305,53 @@ async function syncCentralInventory(
   const total = parseFloat(totalRow.rows[0].total) || 0
 
   if (subVariantId) {
-    await client.query(`UPDATE product_sub_variants SET stock_status = $1, updated_at = now() WHERE id = $2`, [total > 0 ? 'In Stock' : 'Out of Stock', subVariantId])
+    // Sub-variant grain: write BOTH inventory_quantity and stock_status from its
+    // shelf total, then CASCADE the rollup up to the parent variant and product so
+    // the read-time totals stay consistent (getProduct rolls a variant up from its
+    // active sub-variants, and the product from its active variants). Without this
+    // cascade a sub-variant sale would leave the sub qty stale and the parent at 0.
+    await client.query(
+      `UPDATE product_sub_variants SET inventory_quantity = $1, stock_status = $2, updated_at = now() WHERE id = $3`,
+      [total, total > 0 ? 'In Stock' : 'Out of Stock', subVariantId]
+    )
+    if (variantId) {
+      await client.query(
+        `UPDATE product_variants pv SET inventory_quantity = COALESCE(
+           (SELECT SUM(sv.inventory_quantity) FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true), 0),
+           updated_at = now()
+         WHERE pv.id = $1`,
+        [variantId]
+      )
+    }
+    await client.query(
+      `UPDATE products SET inventory_quantity = COALESCE(
+         (SELECT SUM(inventory_quantity) FROM product_variants WHERE product_id = $1 AND is_active = true), 0),
+         updated_at = now()
+       WHERE id = $1`,
+      [productId]
+    )
   } else if (variantId) {
     await client.query(`UPDATE product_variants SET inventory_quantity = $1, updated_at = now() WHERE id = $2`, [total, variantId])
+    // Roll the product up from its active variants (this variant has no sub-variants
+    // at this grain, but the product total must still reflect all variants).
+    await client.query(
+      `UPDATE products SET inventory_quantity = COALESCE(
+         (SELECT SUM(inventory_quantity) FROM product_variants WHERE product_id = $1 AND is_active = true), 0),
+         updated_at = now()
+       WHERE id = $1`,
+      [productId]
+    )
   } else {
     await client.query(`UPDATE products SET inventory_quantity = $1, updated_at = now() WHERE id = $2`, [total, productId])
   }
+
+  // When the product's inventory_sync flag is ON, derive stock_status from the
+  // freshly-written inventory_quantity at every grain (product/variant/sub-variant).
+  // No-op when OFF, so manual status is preserved. The sub-variant branch above
+  // still writes a binary status inline for back-compat; this overwrites it with the
+  // threshold-aware value when sync is on, and — critically — also covers the
+  // variant/product grains that the branches above leave untouched.
+  await recomputeStockStatusForProduct(client, productId)
 }
 
 // For perishable products: recompute shelf_stock per location from product_batches,
@@ -648,7 +690,10 @@ export async function upsertShelfStock(
     mode: 'add' | 'set'
   }
 ): Promise<void> {
-  const { locationId, productId, variantId, subVariantId, quantity, mode } = opts
+  const { locationId, productId, variantId, subVariantId, mode } = opts
+  // Guard against a non-finite quantity (e.g. parseFloat(undefined)/NaN upstream)
+  // ever reaching the numeric column — a NaN here poisons every downstream SUM.
+  const quantity = Number.isFinite(opts.quantity) ? opts.quantity : 0
   const existing = await client.query(
     `SELECT id, quantity FROM shelf_stock
      WHERE location_id = $1 AND product_id = $2

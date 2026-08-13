@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getStockLedger, getStockValuation, logStockMovement } from '@/lib/inventory'
+import { getStockLedger, getStockValuation, logStockMovement, recomputeStockStatusForProduct } from '@/lib/inventory'
 import { getClient, queryOne, query } from '@/lib/db'
 import { getOrCreateOpenShelf, upsertShelfStock } from '@/lib/shelf'
 import { logAdminAudit } from '@/lib/admin-audit'
@@ -200,6 +200,10 @@ export async function PATCH(request: NextRequest) {
         unitFactor: unitFactor !== 1 ? unitFactor : null,
         quantityInUnit,
       })
+
+      // If inventory_sync is ON, derive stock_status from the adjusted quantity
+      // (inside the txn, before COMMIT). No-op when OFF.
+      await recomputeStockStatusForProduct(client, product_id)
 
       await client.query('COMMIT')
 

@@ -3,7 +3,8 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { withTransaction, queryMany } from '@/lib/db'
 import { calculateGST, getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, round2 } from '@/lib/gst'
-import { lineItemFromMrpIncl } from '@/lib/pricing'
+import { getFeatureFlags } from '@/lib/site-controls'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
 import { deductStockForLines, type LineItem } from '@/lib/inventory-deduct'
 import { z } from 'zod'
 import { parseBody } from '@/lib/validate'
@@ -85,6 +86,10 @@ export async function POST(request: NextRequest) {
     let totalSgst = 0
     let totalIgst = 0
 
+    // GST off ⇒ charge the ex-GST equivalent of the admin-entered incl price and
+    // write zero tax columns. GST on ⇒ existing MRP-incl behaviour.
+    const gstEnabled = (await getFeatureFlags()).gstEnabled
+
     const processedItems = items.map((item: any) => {
       const unitPrice = parseFloat(item.unit_price) || 0
       const rawQty = parseFloat(item.quantity) || 0
@@ -92,6 +97,38 @@ export async function POST(request: NextRequest) {
       const gstRate = parseFloat(item.gst_rate || '18')
       const unitInfo = unitFactorMap.get(`${item.product_id}:${item.variant_id ?? ''}:${item.buy_unit}`)
       const effectiveQty = (unitInfo?.dimension === 'count' && unitInfo.factor > 1) ? rawQty * unitInfo.factor : rawQty
+
+      if (!gstEnabled) {
+        // Strip GST out of the entered incl price, apply discount, no tax added.
+        const exUnit = gstRate > 0 ? unitPrice / (1 + gstRate / 100) : unitPrice
+        const lineTotal = round2(lineItemExGst(effectiveQty, exUnit, discPct))
+        subtotal += lineTotal
+        const mrpLineTotal = round2(effectiveQty * unitPrice)
+        const discountAmount = discPct > 0 ? round2(mrpLineTotal - lineTotal) : 0
+        return {
+          product_id: item.product_id || null,
+          product_name: item.product_name || '',
+          product_sku: item.product_sku || '',
+          variant_id: item.variant_id || null,
+          sub_variant_id: item.sub_variant_id || null,
+          variant_name: item.variant_name || null,
+          hsn_code: item.hsn_code || null,
+          gst_rate: 0,
+          quantity: rawQty,
+          buy_unit: item.buy_unit || null,
+          buy_mode: item.buy_mode || 'unit',
+          unit_price: unitPrice,
+          total_price: lineTotal,
+          discount_amount: discountAmount,
+          taxable_amount: 0,
+          cgst_amount: 0,
+          sgst_amount: 0,
+          igst_amount: 0,
+          tax_amount: 0,
+          temp_id: item.temp_id || null,
+        }
+      }
+
       const lineTotal = round2(lineItemFromMrpIncl(effectiveQty, unitPrice, discPct, gstRate))
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
@@ -136,7 +173,7 @@ export async function POST(request: NextRequest) {
       const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
       const saleNumber = `CS-${ts}-${rand}`
 
-      const isGSTEnabled = process.env.ENABLE_GST === 'true'
+      const isGSTEnabled = (await getFeatureFlags()).gstEnabled
       let invoiceNumber: string | null = null
       let fy: string | null = null
       let seq: number | null = null

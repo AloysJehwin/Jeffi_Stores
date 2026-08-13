@@ -2,6 +2,8 @@
 
 import { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react'
 import { useAuth } from './AuthContext'
+import { useStoreConfig } from './StoreConfigContext'
+import { pickUnitPrice } from '@/lib/pricing'
 
 interface CartItem {
   id: string
@@ -92,6 +94,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   const [savedItems, setSavedItems] = useState<CartItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const { user } = useAuth()
+  const gstEnabled = useStoreConfig().flags.gstEnabled
   const prevUserIdRef = useRef<string | null | undefined>(undefined)
 
   const portalHeaders = (): Record<string, string> =>
@@ -242,14 +245,26 @@ export function CartProvider({ children }: { children: ReactNode }) {
     return cartItems.reduce((total, item) => {
       const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count')
       const unitFactor = (!isCustomQty && item.cart_item_unit?.factor) ? Number(item.cart_item_unit.factor) : 1
-      const price = isCustomQty
-        ? item.price_at_addition
-        : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * unitFactor
+      // GST off ⇒ charge the ex-GST column (fallback to inclusive when null).
+      // GST on  ⇒ the inclusive price (frozen add-time price for custom qty).
+      const price = !gstEnabled
+        ? pickUnitPrice(
+            {
+              inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
+              exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
+            },
+            false,
+          ) * unitFactor
+        : (isCustomQty
+            ? item.price_at_addition
+            : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price) * unitFactor)
       return total + price * item.quantity
     }, 0)
   }
 
   const getCartTax = () => {
+    // GST off ⇒ prices are ex-GST ⇒ no tax to display.
+    if (!gstEnabled) return 0
     return cartItems.reduce((tax, item) => {
       const isCustomQty = !!(item.cart_item_unit?.dimension && item.cart_item_unit.dimension !== 'count')
       const unitFactor = (!isCustomQty && item.cart_item_unit?.factor) ? Number(item.cart_item_unit.factor) : 1

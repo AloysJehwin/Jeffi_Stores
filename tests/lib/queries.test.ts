@@ -40,6 +40,9 @@ import {
   getReturnRequest,
   getRevenueTrendBySource,
   getProductBreakdowns,
+  getCustomerStats,
+  getCustomerSegments,
+  getCustomerChannelMix,
   getBrochureProductsByCategories,
   getBrochureProductsByBrands,
   getBrochureProductsByIds,
@@ -1574,5 +1577,58 @@ describe('getBrochureProductsByIds', () => {
     const result = await getBrochureProductsByIds(['p1', 'p-missing'])
     expect(result.length).toBe(1)
     expect(result[0].id).toBe('p1')
+  })
+})
+
+describe('getCustomerStats', () => {
+  it('returns real COUNT-based stats', async () => {
+    mockQueryOne.mockResolvedValue({ total: 68, active: 68, inactive: 0, flagged: 0 })
+    const r = await getCustomerStats()
+    expect(r).toEqual({ total: 68, active: 68, inactive: 0, flagged: 0 })
+    const sql = String(mockQueryOne.mock.calls[0]![0])
+    expect(sql).toContain('COUNT(*) FILTER (WHERE is_active AND NOT is_flagged)')
+    expect(sql).toContain('is_guest = false')
+  })
+
+  it('defaults to zeros when no row', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    expect(await getCustomerStats()).toEqual({ total: 0, active: 0, inactive: 0, flagged: 0 })
+  })
+})
+
+describe('getCustomerSegments', () => {
+  it('maps segment counts to BreakdownSlice[]', async () => {
+    mockQueryOne.mockResolvedValue({ vip: 2, loyal: 3, repeat: 5, one_time: 10, new: 4, at_risk: 1, dormant: 6, lead: 20 })
+    const r = await getCustomerSegments()
+    const vip = r.find(s => s.label === 'VIP')
+    expect(vip?.value).toBe(2)
+    expect(r.find(s => s.label === 'Lead')?.value).toBe(20)
+    expect(r.every(s => typeof s.color === 'string')).toBe(true)
+  })
+
+  it('defaults to zeros when no row', async () => {
+    mockQueryOne.mockResolvedValue(null)
+    const r = await getCustomerSegments()
+    expect(r.every(s => s.value === 0)).toBe(true)
+  })
+})
+
+describe('getCustomerChannelMix', () => {
+  it('maps channel rows to labelled slices, sorted desc', async () => {
+    mockQueryMany.mockResolvedValue([
+      { channel: 'sms', count: '1' },
+      { channel: 'email', count: '67' },
+    ])
+    const r = await getCustomerChannelMix()
+    expect(r[0].label).toBe('Email')
+    expect(r[0].value).toBe(67)
+    expect(r[1].label).toBe('SMS')
+  })
+
+  it('falls back to email label for null channel', async () => {
+    mockQueryMany.mockResolvedValue([{ channel: null, count: '5' }])
+    const r = await getCustomerChannelMix()
+    expect(r[0].label).toBe('Email')
+    expect(r[0].value).toBe(5)
   })
 })

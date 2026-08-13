@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryOne, query, withTransaction } from '@/lib/db'
+import { queryOne, query } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
-import { sendOrderStatusUpdate, sendPaymentStatusUpdate } from '@/lib/email'
-import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
+import { sendOrderStatusUpdate } from '@/lib/email'
 import { cancelDelhiveryShipment } from '@/lib/delhivery'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { logActivity } from '@/lib/activity'
@@ -51,9 +50,15 @@ export async function POST(
     }
 
     let newStatus: string
-    let refundFailed = false
 
     if (action === 'approve') {
+      // Approving a cancellation ONLY cancels the order (+ restores stock +
+      // cancels any shipment). It deliberately does NOT touch money — the refund
+      // is a separate, explicit step ("Initiate Refund") that refunds ALL
+      // payments (the initial charge plus any top-ups) via /api/orders/[id]/refund.
+      // We therefore leave payment_status = 'paid' so the "Refund Pending" card
+      // surfaces and the admin can trigger the full refund deliberately.
+
       // Stock is only deducted when an admin moves the order to 'processing'.
       // A confirmed (paid) order cancelled before reaching processing has no stock
       // impact. Detect an actual sale rather than inferring from payment/status.
@@ -63,59 +68,10 @@ export async function POST(
       )
       const wasStockDeducted = !!saleRecord
 
-      let refundSuccess = false
-      if (order.payment_status === 'paid' && isRazorpayEnabled()) {
-        const paymentRecord = await queryOne(
-          `SELECT id, transaction_id, amount, gateway_response FROM payments
-           WHERE order_id = $1 AND payment_gateway = 'razorpay' AND status = 'completed'
-           LIMIT 1`,
-          [orderId]
-        )
-
-        if (paymentRecord && paymentRecord.transaction_id) {
-          try {
-            const razorpay = getRazorpayInstance()
-            const amountInPaise = Math.round(parseFloat(paymentRecord.amount) * 100)
-            const refund = await razorpay.payments.refund(paymentRecord.transaction_id, {
-              amount: amountInPaise,
-            })
-
-            await withTransaction(async (client) => {
-              await client.query(
-                `UPDATE orders SET status = 'cancelled', payment_status = 'refunded', updated_at = NOW() WHERE id = $1`,
-                [orderId]
-              )
-              await client.query(
-                `UPDATE payments SET status = 'refunded', gateway_response = $1, updated_at = NOW() WHERE id = $2`,
-                [JSON.stringify({ ...(typeof paymentRecord.gateway_response === 'string' ? JSON.parse(paymentRecord.gateway_response) : paymentRecord.gateway_response || {}), refund }), paymentRecord.id]
-              )
-            })
-            refundSuccess = true
-          } catch (err) {
-            refundFailed = true
-            await withTransaction(async (client) => {
-              await client.query(
-                `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
-                [orderId]
-              )
-            })
-          }
-        } else {
-          await withTransaction(async (client) => {
-            await client.query(
-              `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
-              [orderId]
-            )
-          })
-        }
-      } else {
-        await withTransaction(async (client) => {
-          await client.query(
-            `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
-            [orderId]
-          )
-        })
-      }
+      await query(
+        `UPDATE orders SET status = 'cancelled', updated_at = NOW() WHERE id = $1`,
+        [orderId]
+      )
 
       // Restore inventory via the shared helper: resets serials to in_stock,
       // reverses product_batches quantity_remaining, and syncs shelf_stock — the
@@ -129,18 +85,6 @@ export async function POST(
 
       if (order.awb_number) {
         await cancelDelhiveryShipment(order.awb_number).catch(() => {})
-      }
-
-      if (refundSuccess) {
-        const refundUser = order.users
-        const refundEmail = refundUser?.email || order.customer_email
-        const refundName = refundUser ? `${refundUser.first_name || ''} ${refundUser.last_name || ''}`.trim() : order.customer_name
-        if (refundEmail && refundName) {
-          sendPaymentStatusUpdate(
-            refundEmail, refundName, order.order_number, orderId,
-            'refunded', parseFloat(order.total_amount)
-          ).catch(() => {})
-        }
       }
     } else {
       await query(
@@ -175,13 +119,13 @@ export async function POST(
         referenceId: orderId,
         referenceType: 'orders',
         summary: newStatus === 'cancelled'
-          ? `Cancellation approved for #${order.order_number}${refundFailed ? ' (refund failed)' : ''}`
+          ? `Cancellation approved for #${order.order_number}`
           : `Cancellation rejected for #${order.order_number}: ${note.trim()}`,
-        metadata: { order_status: newStatus, action, note: note?.trim() || null, refundFailed },
+        metadata: { order_status: newStatus, action, note: note?.trim() || null },
       }).catch(() => {})
     }
 
-    return NextResponse.json({ success: true, newStatus, refundFailed })
+    return NextResponse.json({ success: true, newStatus })
   } catch (err) {
     return NextResponse.json({ error: 'Failed to process cancellation review' }, { status: 500 })
   }

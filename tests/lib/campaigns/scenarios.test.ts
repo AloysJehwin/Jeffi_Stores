@@ -579,7 +579,7 @@ describe('restock scenario', () => {
 
   it('findEligible passes maxWatchesPerSweep as $1 arg', async () => {
     mockQueryMany.mockResolvedValueOnce([])
-    const params = { maxWatchesPerSweep: 200 }
+    const params = { maxWatchesPerSweep: 200, whatsappEnabled: false }
 
     await restock.findEligible({
       campaign: makeCampaign({ kind: 'restock' }) as any,

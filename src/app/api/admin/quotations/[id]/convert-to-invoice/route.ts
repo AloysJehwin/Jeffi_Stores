@@ -7,6 +7,7 @@ import { deductOrderStock } from '@/lib/inventory-deduct'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { sendBusinessInvoiceGeneratedEmail } from '@/lib/email-business'
 import { lineItemExGst } from '@/lib/pricing'
+import { getFeatureFlags, getBusinessValues } from '@/lib/site-controls'
 import { getRazorpayInstance } from '@/lib/razorpay'
 import sharp from 'sharp'
 
@@ -56,8 +57,9 @@ export async function POST(
     const isBuyerSame = quotation.buyer_same !== false
     const buyerState = isBuyerSame ? quotation.consignee_state : (quotation.buyer_state || quotation.consignee_state)
     const buyerGstin = isBuyerSame ? quotation.consignee_gstin : (quotation.buyer_gstin || quotation.consignee_gstin)
-    const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
-    const orderIsIgst = buyerGstin ? isInterState(buyerState || '', sellerStateCode) : false
+    const gstEnabled = (await getFeatureFlags()).gstEnabled
+    const sellerStateCode = (await getBusinessValues()).businessStateCode
+    const orderIsIgst = gstEnabled && buyerGstin ? isInterState(buyerState || '', sellerStateCode) : false
 
     // When buyer_same=false the invoice is billed to the buyer, so use buyer contact details
     const customerName = isBuyerSame
@@ -134,10 +136,10 @@ export async function POST(
       const baseQty = isCountWithFactor ? rawQty * factor : rawQty
       const rate = parseFloat(item.rate)
       const exGstLineTotal = lineItemExGst(baseQty, rate, parseFloat(item.discount_pct) || 0)
-      const gstRate = parseFloat(item.gst_rate || '18')
+      const gstRate = gstEnabled ? parseFloat(item.gst_rate || '18') : 0
 
       let cgst = 0, sgst = 0, igst = 0
-      if (gstRate > 0) {
+      if (gstEnabled && gstRate > 0) {
         const lineTax = exGstLineTotal * gstRate / 100
         if (orderIsIgst) {
           igst = lineTax
@@ -176,7 +178,7 @@ export async function POST(
         buy_unit: item.buy_unit || null,
         buy_mode: 'unit',
         mrp: rate,
-        unit_price: round2(discountedRate * (1 + gstRate / 100)),
+        unit_price: gstEnabled ? round2(discountedRate * (1 + gstRate / 100)) : round2(discountedRate),
         total_price: round2(incGstLineTotal),
         taxable_amount: round2(exGstLineTotal),
         cgst_amount: round2(cgst),

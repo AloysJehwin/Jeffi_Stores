@@ -6,13 +6,13 @@ import { useRouter } from 'next/navigation'
 import { use, useEffect, useState, useRef, useCallback } from 'react'
 import Link from 'next/link'
 import { useCart } from '@/contexts/CartContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
 import DelhiveryTracking from '@/components/DelhiveryTracking'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { bp } from '@/lib/business-path'
 
 const CANCELLABLE_STATUSES = ['pending', 'confirmed', 'processing']
-const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 const PH = { 'X-Auth-Portal': 'business' }
 const CONTINUOUS_UNITS = new Set(['m', 'cm', 'mm', 'km', 'ft', 'in', 'kg', 'g', 'mg', 'lb', 'oz', 'l', 'ml', 'm2', 'cm2', 'mm2', 'm3', 'cm3'])
 
@@ -145,6 +145,7 @@ function statusLabel(status: string) {
 export default function BusinessOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { user, isLoading: authLoading } = useAuth()
+  const { flags: { razorpayEnabled: isRazorpayEnabled }, orderAutoCancelMinutes } = useStoreConfig()
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
@@ -204,7 +205,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
     if (!isRazorpayEnabled) return
     // UPI QR orders are paid by scanning — no countdown or auto-cancel
     if (order.paymentMode === 'upi_qr') return
-    const deadline = new Date(order.createdAt).getTime() + 10 * 60 * 1000
+    const deadline = new Date(order.createdAt).getTime() + orderAutoCancelMinutes * 60 * 1000
     const tick = () => {
       const remaining = Math.max(0, deadline - Date.now())
       setTimeLeft(remaining)
@@ -213,7 +214,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [order, handleAutoCancel])
+  }, [order, handleAutoCancel, orderAutoCancelMinutes, isRazorpayEnabled])
 
   // Poll every 5s for UPI QR orders until paid
   useEffect(() => {
@@ -617,7 +618,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
                     {order.totalAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}
                   </span>
                 </div>
-                <p className="text-xs text-foreground-muted">Price inclusive of all taxes</p>
+                {order.taxAmount > 0 && <p className="text-xs text-foreground-muted">Price inclusive of all taxes</p>}
               </div>
             </div>
 

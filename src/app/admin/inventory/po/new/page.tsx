@@ -1,12 +1,13 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
+import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import { ap } from '@/lib/admin-path'
 
 const PURCHASE_UNITS = [
@@ -38,7 +39,7 @@ const btnPrimary = 'px-4 py-1.5 rounded-lg text-sm font-medium bg-secondary-500 
 const btnSecondary = 'px-4 py-1.5 rounded-lg text-sm font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground transition-colors'
 
 type Supplier = { id: string; name: string }
-type POSearchMode = 'name' | 'sku' | 'category'
+type POSearchMode = 'name' | 'sku' | 'category' | 'scanner'
 
 type POLineItem = {
   id: string; product_id: string; variant_id: string; sub_variant_id: string; product_name: string
@@ -114,6 +115,17 @@ export default function NewPOPage() {
   const [pickerLoading, setPickerLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // Barcode scanning — default ON. A scan (SKU/barcode/GTIN/serial/lot, CR-terminated)
+  // resolves to a product and adds/increments a PO line. captureInInputs so it fires
+  // even while a form field is focused; the hook swallows the burst chars.
+  const [scanEnabled, setScanEnabled] = useState(true)
+  const [scanMsg, setScanMsg] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null)
+  // Per-line Scanner mode input text, keyed by line id (predictive-search fields
+  // drop chars mid-burst; a plain per-line scan field doesn't). data-scan-box so
+  // the global keyboard-wedge hook ignores it (no double-add).
+  const [scanInputs, setScanInputs] = useState<Record<string, string>>({})
+  const lineItemsRef = useRef(lineItems)
+  lineItemsRef.current = lineItems
 
   useEffect(() => {
     fetch('/api/admin/inventory/suppliers?limit=1000').then(r => r.json()).then(j => setSuppliers(j?.suppliers || []))
@@ -165,6 +177,129 @@ export default function NewPOPage() {
       })
       .filter(it => it.id !== targetItemId)
   }
+
+  // ── Barcode scan (SKU / barcode / GTIN / serial / lot → add PO line) ────────
+  // A PO is a purchase order (incoming stock), so ANY resolved code just adds/
+  // increments the product line — no serial-uniqueness rejection (serials are
+  // assigned at receive, not order). Resolve returns `item` (product/variant/batch)
+  // or `serial`; both carry product_id/variant_id/sub_variant_id + name/sku.
+  async function handlePoScan(code: string) {
+    try {
+      const res = await fetch('/api/admin/scan/resolve', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data.kind === 'not_found' || (!data.item && !data.serial)) {
+        setScanMsg({ text: `No product found for "${code}"`, kind: 'err' })
+        return
+      }
+      const s = data.kind === 'serial' ? data.serial : data.item
+      const name = s.name || s.product_name
+      const displayName = s.variant_name ? `${name} — ${s.variant_name}` : name
+      // Target the first blank line, else append a fresh one to merge into.
+      const cur = lineItemsRef.current
+      let targetId = cur.find(it => !it.product_id)?.id
+      let base: POLineItem[] = cur
+      if (!targetId) {
+        const blank = newPOLineItem()
+        base = [...cur, blank]
+        targetId = blank.id
+      }
+      const target = base.find(it => it.id === targetId)!
+      const populated: POLineItem = {
+        ...target,
+        product_id: s.product_id,
+        product_name: displayName,
+        sku: s.sku || s.variant_sku || s.product_sku || '',
+        variant_id: s.variant_id || '',
+        sub_variant_id: s.sub_variant_id || '',
+        tax_rate: s.gst_percentage != null ? String(Math.round(Number(s.gst_percentage))) : (target.tax_rate || '0'),
+        hsn_code: s.hsn_code || target.hsn_code || '',
+        mrp: Number(s.mrp) || target.mrp || 0,
+        sell_unit_label: s.sell_unit_label || target.sell_unit_label || '',
+        sell_unit_dimension: s.sell_unit_dimension || target.sell_unit_dimension || '',
+      }
+      if (!populated.product_id) return
+      // Always increment on duplicate (PO orders quantities; no serial uniqueness).
+      const dupIdx = base.findIndex(it =>
+        it.id !== targetId &&
+        it.product_id === populated.product_id &&
+        (it.variant_id || '') === (populated.variant_id || '')
+      )
+      if (dupIdx === -1) {
+        setLineItems(base.map(it => it.id === targetId ? populated : it))
+      } else {
+        const addQty = parseFloat(String(populated.quantity)) || 1
+        setLineItems(base
+          .map((it, i) => i === dupIdx ? { ...it, quantity: String((parseFloat(String(it.quantity)) || 0) + addQty) } : it)
+          .filter(it => it.id !== targetId))
+      }
+      setScanMsg({ text: `✓ ${displayName}`, kind: 'ok' })
+    } catch {
+      setScanMsg({ text: 'Scan lookup failed', kind: 'err' })
+    }
+  }
+
+  useBarcodeScanner({ onScan: handlePoScan, enabled: scanEnabled, captureInInputs: true })
+
+  // Per-line Scanner mode: resolve the scanned code and FILL this line (it.id),
+  // then auto-append a fresh blank line (also in Scanner mode) so the operator can
+  // keep scanning continuously. Mirrors applyPickerProduct's fill path.
+  async function fillScanLine(itemId: string, code: string) {
+    const trimmed = code.trim()
+    if (!trimmed) return
+    const target = lineItems.find(it => it.id === itemId)
+    if (!target) return
+    try {
+      const res = await fetch('/api/admin/scan/resolve', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: trimmed }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || data.kind === 'not_found' || (!data.item && !data.serial)) {
+        setScanMsg({ text: `No product found for "${trimmed}"`, kind: 'err' })
+        // Clear this line's scan field so the operator can immediately re-scan.
+        setScanInputs(p => { const n = { ...p }; delete n[itemId]; return n })
+        return
+      }
+      const s = data.kind === 'serial' ? data.serial : data.item
+      const name = s.name || s.product_name
+      const displayName = s.variant_name ? `${name} — ${s.variant_name}` : name
+      const populated: POLineItem = {
+        ...target,
+        product_id: s.product_id,
+        product_name: displayName,
+        sku: s.sku || s.variant_sku || s.product_sku || '',
+        variant_id: s.variant_id || '',
+        sub_variant_id: s.sub_variant_id || '',
+        tax_rate: s.gst_percentage != null ? String(Math.round(Number(s.gst_percentage))) : (target.tax_rate || '0'),
+        hsn_code: s.hsn_code || target.hsn_code || '',
+        mrp: Number(s.mrp) || target.mrp || 0,
+        sell_unit_label: s.sell_unit_label || target.sell_unit_label || '',
+        sell_unit_dimension: s.sell_unit_dimension || target.sell_unit_dimension || '',
+      }
+      if (!populated.product_id) return
+      // Fill/merge this line, then append a fresh blank line in Scanner mode so the
+      // next scan has somewhere to land without the operator adding a line manually.
+      const merged = mergeOrReplaceLineItem(itemId, populated)
+      const blank = newPOLineItem()
+      setLineItems([...merged, blank])
+      setSearchModes(p => ({ ...p, [blank.id]: 'scanner' }))
+      setScanInputs(p => { const n = { ...p }; delete n[itemId]; return n })
+      setScanMsg({ text: `✓ ${displayName}`, kind: 'ok' })
+    } catch {
+      setScanMsg({ text: 'Scan lookup failed', kind: 'err' })
+    }
+  }
+
+  useEffect(() => {
+    if (!scanMsg) return
+    const t = setTimeout(() => setScanMsg(null), 2500)
+    return () => clearTimeout(t)
+  }, [scanMsg])
 
   function applyPickerProduct(p: PickerProduct) {
     if (!pickerItemId) return
@@ -301,16 +436,30 @@ export default function NewPOPage() {
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
           <div className="flex items-center justify-between">
             <h2 className="text-sm font-semibold text-foreground">Line Items</h2>
-            <button type="button" onClick={() => setLineItems(items => [...items, newPOLineItem()])}
-              className="flex items-center gap-1 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors">
-              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              Add Item
-            </button>
+            <div className="flex items-center gap-3">
+              {scanMsg && (
+                <span className={`text-xs font-medium px-2 py-0.5 rounded ${scanMsg.kind === 'ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'}`}>{scanMsg.text}</span>
+              )}
+              <button
+                type="button"
+                onClick={() => setScanEnabled(v => !v)}
+                title={scanEnabled ? 'Barcode scanning on — scan SKU/lot/serial to add a line' : 'Barcode scanning off'}
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${scanEnabled ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14" /></svg>
+                {scanEnabled ? 'Scan: on' : 'Scan: off'}
+              </button>
+              <button type="button" onClick={() => setLineItems(items => [...items, newPOLineItem()])}
+                className="flex items-center gap-1 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                Add Item
+              </button>
+            </div>
           </div>
 
           <div className="space-y-3">
             {lineItems.map((it, idx) => {
-              const mode = searchModes[it.id] ?? 'name'
+              const mode = searchModes[it.id] ?? 'scanner'
               const hasProduct = !!it.product_name
               return (
                 <div key={it.id} className="border border-border-default rounded-lg p-3 space-y-3 bg-surface">
@@ -336,15 +485,16 @@ export default function NewPOPage() {
                   ) : (
                     <div className="space-y-2">
                       <div className="flex gap-1 p-1 bg-surface-secondary rounded-lg w-fit">
-                        {(['name', 'sku', 'category'] as POSearchMode[]).map(m => (
+                        {(['name', 'sku', 'category', 'scanner'] as POSearchMode[]).map(m => (
                           <button key={m} type="button"
                             onClick={() => {
                               setSearchModes(p => ({ ...p, [it.id]: m }))
                               setNameInputs(p => { const n = { ...p }; delete n[it.id]; return n })
                               setSkuInputs(p => { const n = { ...p }; delete n[it.id]; return n })
+                              setScanInputs(p => { const n = { ...p }; delete n[it.id]; return n })
                             }}
                             className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${mode === m ? 'bg-secondary-500 dark:bg-secondary-400 text-white dark:text-secondary-900 shadow-sm' : 'text-foreground-secondary hover:text-foreground'}`}>
-                            {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : 'Category'}
+                            {m === 'name' ? 'Name' : m === 'sku' ? 'SKU' : m === 'category' ? 'Category' : 'Scanner'}
                           </button>
                         ))}
                       </div>
@@ -383,6 +533,31 @@ export default function NewPOPage() {
                             className="px-3 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 disabled:opacity-40 text-white text-xs font-semibold rounded-lg transition-colors whitespace-nowrap">
                             Select Product
                           </button>
+                        </div>
+                      )}
+                      {mode === 'scanner' && (
+                        <div className="flex items-center gap-2 px-3 py-2 rounded-lg border border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20">
+                          <svg className="w-4 h-4 shrink-0 text-secondary-600 dark:text-secondary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14" />
+                          </svg>
+                          <input
+                            data-scan-box
+                            type="text"
+                            value={scanInputs[it.id] ?? ''}
+                            onChange={e => setScanInputs(p => ({ ...p, [it.id]: e.target.value }))}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                fillScanLine(it.id, scanInputs[it.id] ?? '')
+                              }
+                            }}
+                            className="flex-1 bg-transparent border-none outline-none text-sm text-foreground placeholder:text-foreground-muted"
+                            placeholder="Scan a SKU / lot / serial…"
+                            autoComplete="off"
+                            spellCheck={false}
+                            autoFocus
+                          />
                         </div>
                       )}
                     </div>

@@ -44,7 +44,8 @@ describe('email-campaigns', () => {
     it('wraps body in HTML with branding', () => {
       const html = baseLayout('Test Title', '<p>body content</p>')
       expect(html).toContain('body content')
-      expect(html).toContain('Jeffi Store')
+      // Branding is now a {store_name} token, resolved at send time.
+      expect(html).toContain('{store_name}')
     })
   })
 
@@ -262,7 +263,7 @@ describe('email-campaigns', () => {
         subject: 'Test',
         htmlBody: '<p>Just a paragraph</p>',
       })
-      expect(html).toContain('Jeffi Store')
+      expect(html).toContain('{store_name}')
       expect(html).toContain('Just a paragraph')
     })
 
@@ -271,7 +272,7 @@ describe('email-campaigns', () => {
         subject: 'Empty',
         htmlBody: '',
       })
-      expect(html).toContain('Jeffi Store')
+      expect(html).toContain('{store_name}')
     })
 
     // ── review_form_share: no couponCode → subject uses 'a reward' ───────────

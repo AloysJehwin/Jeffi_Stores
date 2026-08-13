@@ -3,7 +3,8 @@ import { query, queryMany } from '@/lib/db'
 import { cookies } from 'next/headers'
 import { authenticateUser } from '@/lib/jwt'
 import { buildProductSearchClause, buildProductSearchRank, buildSearchClause } from '@/lib/search'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL } from '@/lib/queries'
+import { getFeatureFlags } from '@/lib/site-controls'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,12 +20,15 @@ export async function GET(request: NextRequest) {
     const rk = buildProductSearchRank(q, 'p.name', 'p.search_vector', sc.nextIdx)
     const catSc = buildSearchClause(q, ['name'], 1)
 
+    const { gstEnabled } = await getFeatureFlags()
+    const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
+
     const [products, categories] = await Promise.all([
       queryMany(`
         SELECT
           p.id, p.name, p.slug, p.base_price, p.price_ex_gst, p.has_variants,
           json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
-          ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+          ${MIN_PRICE_SQL} AS variant_min_price,
           COALESCE(
             (SELECT json_agg(json_build_object('image_url', pi.image_url, 'thumbnail_url', pi.thumbnail_url, 'is_primary', pi.is_primary))
              FROM product_images pi WHERE pi.product_id = p.id),

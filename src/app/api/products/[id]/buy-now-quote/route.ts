@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { resolveBuyNowItem } from '@/lib/order-commit'
+import { getFeatureFlags } from '@/lib/site-controls'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const body = await req.json().catch(() => ({}))
+  const { gstEnabled } = await getFeatureFlags()
   const resolved = await resolveBuyNowItem({
     productId: id,
     variantId: body.variantId || null,
@@ -13,6 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     qty: Number(body.qty) || 1,
     buyMode: body.buyMode,
     buyUnit: body.buyUnit,
+    gstEnabled,
   })
   if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
   return NextResponse.json({

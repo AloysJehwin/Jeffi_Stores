@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { queryOne, queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { getFeatureFlags } from '@/lib/site-controls'
+import { pickUnitPrice } from '@/lib/pricing'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 import Pagination from '@/components/ui/Pagination'
 import ProductCard from '@/components/visitor/ProductCard'
@@ -26,6 +28,9 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[],
   const allCategoryIds = [categoryId, ...subcategoryIds]
   const offset = (page - 1) * PAGE_SIZE
 
+  const { gstEnabled } = await getFeatureFlags()
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
+
   const countRow = await queryOne<{ total: string }>(
     `SELECT COUNT(*)::text AS total FROM products WHERE category_id = ANY($1) AND is_active = true`,
     [allCategoryIds]
@@ -42,7 +47,7 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[],
         '[]'::json
       ) AS product_images,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${MIN_PRICE_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
     FROM products p
     LEFT JOIN categories c ON p.category_id = c.id
@@ -52,7 +57,7 @@ async function getCategoryProducts(categoryId: string, subcategoryIds: string[],
     LIMIT $2 OFFSET $3
   `, [allCategoryIds, PAGE_SIZE, offset])
 
-  return { products, total, totalPages: Math.ceil(total / PAGE_SIZE) }
+  return { products, total, totalPages: Math.ceil(total / PAGE_SIZE), gstEnabled }
 }
 
 export default async function CategoryDetailPage({
@@ -74,7 +79,7 @@ export default async function CategoryDetailPage({
   const page = Math.max(1, parseInt(pageParam, 10) || 1)
 
   const subcategories = await getSubcategories(category.id)
-  const { products, total, totalPages } = await getCategoryProducts(
+  const { products, total, totalPages, gstEnabled } = await getCategoryProducts(
     category.id,
     subcategories.map(sub => sub.id),
     page,
@@ -153,9 +158,13 @@ export default async function CategoryDetailPage({
                 const hasVariants = product.has_variants
                 const displayPrice = hasVariants && product.variant_min_price
                   ? Number(product.variant_min_price)
-                  : Number(product.base_price)
+                  : pickUnitPrice({ inclusive: Number(product.base_price), exGst: product.price_ex_gst != null ? Number(product.price_ex_gst) : undefined }, gstEnabled)
                 const effectiveStock = hasVariants ? Number(product.variant_stock_total) : (product.stock_status !== 'Out of Stock' ? 1 : 0)
-                const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                const rawMrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+                const gstRate = Number(product.gst_percentage ?? 0)
+                const mrp = (!gstEnabled && rawMrp != null && gstRate > 0)
+                  ? rawMrp / (1 + gstRate / 100)
+                  : rawMrp
                 const mrpDiscount = mrp && mrp > displayPrice
                   ? Math.round(((mrp - displayPrice) / mrp) * 100)
                   : 0

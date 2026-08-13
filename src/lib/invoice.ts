@@ -2,8 +2,7 @@ import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { getFinancialYear, generateInvoiceNumber, getNextInvoiceSequence, isInterState, calculateGST, round2 } from '@/lib/gst'
 import { generateInvoicePDF, InvoiceBusinessSettings, InvoiceOrder, InvoiceOrderItem, InvoiceBuyerAddress } from '@/lib/invoice-pdf'
 import { uploadInvoicePDF } from '@/lib/s3'
-
-const isGSTEnabled = process.env.ENABLE_GST === 'true'
+import { getFeatureFlags } from '@/lib/site-controls'
 
 /**
  * Creates a placeholder invoice row (status='draft', no invoice number) when an
@@ -26,15 +25,15 @@ export async function createDraftInvoice(orderId: string): Promise<void> {
  * until remittance) — gets an invoice number/document at that point. The PDF is
  * rendered later by `generateOrderInvoice` once the order is paid.
  *
- * Idempotent: no-op if the order already has an invoice_number, or if GST is off.
+ * Idempotent: no-op if the order already has an invoice_number. When GST is off
+ * the invoice is still numbered (a tax-free Bill of Supply) — only the tax lines
+ * are omitted at render time.
  * Runs on the caller's transaction client.
  */
 export async function assignInvoiceNumber(
   client: { query: (sql: string, params?: any[]) => Promise<any> },
   orderId: string
 ): Promise<string | null> {
-  if (!isGSTEnabled) return null
-
   const ord = await client.query(
     `SELECT invoice_number, source FROM orders WHERE id = $1 FOR UPDATE`,
     [orderId]
@@ -81,7 +80,7 @@ export async function assignInvoiceNumber(
 }
 
 export async function generateOrderInvoice(orderId: string): Promise<Buffer | null> {
-  if (!isGSTEnabled) return null
+  const gstEnabled = (await getFeatureFlags()).gstEnabled
 
   const existingInvoice = await queryOne(
     `SELECT id FROM invoices WHERE order_id = $1 AND status = 'finalized'`,
@@ -126,7 +125,7 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     let igstAmount = parseFloat(order.igst_amount || '0')
     let orderIsIgst = order.is_igst || false
 
-    if (taxableAmount === 0 && parseFloat(order.tax_amount || '0') > 0) {
+    if (gstEnabled && taxableAmount === 0 && parseFloat(order.tax_amount || '0') > 0) {
       const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'
       const buyerState = order.state || ''
       orderIsIgst = isInterState(buyerState, sellerStateCode)
@@ -155,6 +154,15 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
       cgstAmount = round2(totalCgst)
       sgstAmount = round2(totalSgst)
       igstAmount = round2(totalIgst)
+    }
+
+    // Tax-free invoice (GST off): the total IS the taxable value, no tax lines.
+    if (!gstEnabled) {
+      taxableAmount = round2(parseFloat(order.total_amount || '0'))
+      cgstAmount = 0
+      sgstAmount = 0
+      igstAmount = 0
+      orderIsIgst = false
     }
 
     await client.query(
@@ -295,7 +303,15 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     }
   }
 
-  const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress)
+  // Tax-free (Bill of Supply) is a property of the ORDER, not the current global
+  // flag: an order placed while GST was off carries zero tax and must always
+  // render tax-free, even if GST is later re-enabled.
+  const invoiceIsTaxFree = invoiceData.cgstAmount === 0
+    && invoiceData.sgstAmount === 0
+    && invoiceData.igstAmount === 0
+    && parseFloat(order.tax_amount || '0') === 0
+
+  const pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, false, undefined, invoiceIsTaxFree)
 
   const fy = getFinancialYear(new Date(invoiceData.invoiceDate))
   const s3Url = await uploadInvoicePDF(pdfBuffer, invoiceData.invoiceNumber, fy)

@@ -9,6 +9,7 @@ import {
   CARTON_MAX_WEIGHT_GRAMS,
 } from '@/lib/shipping'
 import { getDeliverySettings, applyDeliveryRules } from '@/lib/delivery-settings'
+import { getBusinessValues } from '@/lib/site-controls'
 import { z } from 'zod'
 import { parseBody, zIndianPin, zCurrency } from '@/lib/validate'
 
@@ -19,12 +20,7 @@ const postSchema = z.object({
 })
 
 const DELHIVERY_API = 'https://track.delhivery.com/api/kinko/v1/invoice/charges/.json'
-const ORIGIN_PIN = process.env.DELHIVERY_ORIGIN_PINCODE || '492001'
 const TOKEN = process.env.DELHIVERY_API_KEY
-const SHIPPING_MIN_CHARGE = parseFloat(process.env.SHIPPING_MIN_CHARGE || '0') || 0
-const SHIPPING_MAX_CHARGE = parseFloat(process.env.SHIPPING_MAX_CHARGE || '200') || 200
-const COD_SURCHARGE_FLAT = parseFloat(process.env.COD_SURCHARGE_FLAT || '40') || 40
-const COD_SURCHARGE_PCT = parseFloat(process.env.COD_SURCHARGE_PCT || '2') || 2
 
 interface RateBreakdown {
   charge: number
@@ -36,12 +32,12 @@ interface RateBreakdown {
   freeShippingThreshold?: number
 }
 
-async function callDelhiveryForCarton(weightGrams: number, destinationPin: string, isCod: boolean) {
+async function callDelhiveryForCarton(weightGrams: number, destinationPin: string, isCod: boolean, originPin: string) {
   const params = new URLSearchParams({
     md: 'S',
     ss: 'Delivered',
     d_pin: destinationPin,
-    o_pin: ORIGIN_PIN,
+    o_pin: originPin,
     cgm: String(weightGrams),
     pt: isCod ? 'COD' : 'Pre-paid',
     cod: isCod ? '0' : '0',
@@ -66,6 +62,7 @@ async function callDelhiveryForCarton(weightGrams: number, destinationPin: strin
 
 export async function POST(request: NextRequest) {
   try {
+    const bv = await getBusinessValues()
     const { destinationPin, cartItems, subtotal, isCod } = await request.json()
 
     if (!destinationPin || !/^\d{6}$/.test(destinationPin)) {
@@ -98,7 +95,7 @@ export async function POST(request: NextRequest) {
         if (v) {
           shipmentItems.push({
             packageType: (v.package_type as PackageType) || null,
-            weightGrams: parseFloat(v.weight_grams) || 500,
+            weightGrams: parseFloat(v.weight_grams) || bv.defaultProductWeightG,
             quantity: item.quantity || 1,
             storedDims: {
               length_cm:  v.length_cm  ? parseFloat(v.length_cm)  : null,
@@ -122,7 +119,7 @@ export async function POST(request: NextRequest) {
         if (p) {
           shipmentItems.push({
             packageType: (p.package_type as PackageType) || null,
-            weightGrams: parseFloat(p.weight_grams) || 500,
+            weightGrams: parseFloat(p.weight_grams) || bv.defaultProductWeightG,
             quantity: item.quantity || 1,
             storedDims: {
               length_cm:  p.length_cm  ? parseFloat(p.length_cm)  : null,
@@ -174,7 +171,7 @@ export async function POST(request: NextRequest) {
     if (TOKEN) {
       try {
         for (const c of cartons) {
-          const r = await callDelhiveryForCarton(c.chargedWeightGrams, destinationPin, !!isCod)
+          const r = await callDelhiveryForCarton(c.chargedWeightGrams, destinationPin, !!isCod, bv.delhiveryOriginPincode)
           totalCharge += r.charge
           totalChargedWeight += r.chargedWeight
           zone = r.zone || zone
@@ -195,7 +192,7 @@ export async function POST(request: NextRequest) {
         const r = fallbackShippingRate({
           chargedWeightGrams: c.chargedWeightGrams,
           destinationPin,
-          originPin: ORIGIN_PIN,
+          originPin: bv.delhiveryOriginPincode,
           cartonCount: cartons.length,
         })
         totalCharge += r.charge
@@ -205,18 +202,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (SHIPPING_MIN_CHARGE > 0 && totalCharge > 0 && totalCharge < SHIPPING_MIN_CHARGE) {
-      totalCharge = SHIPPING_MIN_CHARGE
+    if (bv.shippingMinCharge > 0 && totalCharge > 0 && totalCharge < bv.shippingMinCharge) {
+      totalCharge = bv.shippingMinCharge
     }
 
-    if (SHIPPING_MAX_CHARGE > 0 && totalCharge > SHIPPING_MAX_CHARGE) {
-      totalCharge = SHIPPING_MAX_CHARGE
+    if (bv.shippingMaxCharge > 0 && totalCharge > bv.shippingMaxCharge) {
+      totalCharge = bv.shippingMaxCharge
     }
 
     if (isCod) {
       const codFee = typeof subtotal === 'number'
-        ? Math.max(COD_SURCHARGE_FLAT, (COD_SURCHARGE_PCT / 100) * subtotal)
-        : COD_SURCHARGE_FLAT
+        ? Math.max(bv.codSurchargeFlat, (bv.codSurchargePct / 100) * subtotal)
+        : bv.codSurchargeFlat
       totalCharge += codFee
     }
 

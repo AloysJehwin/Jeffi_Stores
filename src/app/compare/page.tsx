@@ -2,7 +2,9 @@ import { notFound } from 'next/navigation'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { queryMany, queryOne } from '@/lib/db'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { getFeatureFlags } from '@/lib/site-controls'
+import { pickUnitPrice } from '@/lib/pricing'
 import type { Metadata } from 'next'
 import CompareChangeButton from '@/components/visitor/CompareChangeButton'
 import CompareAddButton from '@/components/visitor/CompareAddButton'
@@ -10,9 +12,10 @@ import CompareAddButton from '@/components/visitor/CompareAddButton'
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Compare Products | Jeffi Stores' }
 
-async function getProductsByIds(ids: string[]) {
+async function getProductsByIds(ids: string[], gstEnabled: boolean) {
   if (!ids.length) return []
   const placeholders = ids.map((_, i) => `$${i + 1}`).join(', ')
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   return queryMany(`
     SELECT p.*,
       json_build_object('id', b.id, 'name', b.name) AS brands,
@@ -22,7 +25,7 @@ async function getProductsByIds(ids: string[]) {
          FROM product_images pi WHERE pi.product_id = p.id),
         '[]'::json
       ) AS product_images,
-      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${MIN_PRICE_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total
     FROM products p
@@ -116,7 +119,8 @@ export default async function ComparePage({
     )
   }
 
-  const rawProducts = await getProductsByIds(ids)
+  const { gstEnabled } = await getFeatureFlags()
+  const rawProducts = await getProductsByIds(ids, gstEnabled)
   // Preserve order from URL
   const products = ids
     .map(id => rawProducts.find((p: any) => p.id === id))
@@ -160,8 +164,12 @@ export default async function ComparePage({
                 <th className="w-36 sm:w-44 p-4 text-left text-xs font-semibold text-foreground-muted uppercase tracking-wide bg-surface-secondary" />
                 {products.map((p: any, i: number) => {
                   const img = p.product_images?.find((x: any) => x.is_primary) || p.product_images?.[0]
-                  const price = p.has_variants && p.variant_min_price ? Number(p.variant_min_price) : Number(p.base_price)
-                  const mrp = p.mrp ? Number(p.mrp) : (p.variant_min_mrp ? Number(p.variant_min_mrp) : null)
+                  const price = p.has_variants && p.variant_min_price
+                    ? Number(p.variant_min_price)
+                    : pickUnitPrice({ inclusive: Number(p.base_price), exGst: p.price_ex_gst != null ? Number(p.price_ex_gst) : undefined }, gstEnabled)
+                  const rawMrp = p.mrp ? Number(p.mrp) : (p.variant_min_mrp ? Number(p.variant_min_mrp) : null)
+                  const gstRate = Number(p.gst_percentage ?? 0)
+                  const mrp = (!gstEnabled && rawMrp != null && gstRate > 0) ? rawMrp / (1 + gstRate / 100) : rawMrp
                   const inStock = p.has_variants
                     ? Number(p.variant_stock_total ?? 0) > 0
                     : p.stock_status !== 'Out of Stock'

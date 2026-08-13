@@ -8,9 +8,11 @@ import MobileDrawer from './MobileDrawer'
 import ThemeToggle from '@/components/ThemeToggle'
 import AiAssistantButton from './AiAssistantButton'
 import { useCart } from '@/contexts/CartContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 export default function Header() {
   const { cartCount } = useCart()
+  const { identity } = useStoreConfig()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [pulseBadge, setPulseBadge] = useState(false)
@@ -35,12 +37,12 @@ export default function Header() {
             <Link href="/" className="flex items-center shrink-0">
               <div className="flex items-center gap-2 sm:gap-3">
                 <img
-                  src="/images/logo.png"
-                  alt="Jeffi Stores Logo"
+                  src={identity.logoUrl || '/images/logo.png'}
+                  alt={`${identity.name} Logo`}
                   className="h-8 sm:h-10 lg:h-12 w-auto"
                 />
                 <div>
-                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400">Jeffi Stores</div>
+                  <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400">{identity.name}</div>
                   <div className="hidden sm:block text-xs text-foreground-muted">Hardware & Tools</div>
                 </div>
               </div>

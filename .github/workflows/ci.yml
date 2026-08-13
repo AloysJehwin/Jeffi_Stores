@@ -233,6 +233,8 @@ jobs:
     permissions:
       contents: read
       deployments: write
+    outputs:
+      deployment_id: ${{ steps.create_deployment.outputs.result }}
     steps:
       - name: Create deployment
         id: create_deployment
@@ -303,21 +305,6 @@ jobs:
 
             echo "── Pruning old images ──"
             docker image prune -f
-
-      - name: Mark deployment success
-        if: success()
-        uses: actions/github-script@v7
-        with:
-          script: |
-            await github.rest.repos.createDeploymentStatus({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              deployment_id: ${{ steps.create_deployment.outputs.result }},
-              state: 'success',
-              environment_url: 'https://jeffistores.in',
-              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
-              description: 'Deployed to EC2 successfully',
-            });
 
       - name: Mark deployment failure
         if: failure()
@@ -420,40 +407,34 @@ jobs:
             bash deploy/run-migrations.sh
 
   # ────────────────────────────────────────────────────────
-  # Stage 6 — Smoke test  (main only, gate: deploy)
+  # Stage 6 — Smoke test  (main only, gate: deploy + CDN invalidation)
+  # Hits the real domain health endpoint THROUGH CloudFront→nginx (nginx routes by
+  # server_name jeffistores.in, so a bare EC2-IP request never matched — that was
+  # the post-blue-green failure). Runs after invalidate-cdn so the edge cache is
+  # already cleared, and asserts 200 + {"status":"ok"} from /api/health.
   # ────────────────────────────────────────────────────────
   smoke-test:
     name: Smoke Test
     runs-on: ubuntu-latest
-    needs: [deploy]
+    needs: [deploy, invalidate-cdn]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
-      - name: Get EC2 public IP
-        id: ec2
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
+      - name: Health check (domain /api/health via CDN)
         run: |
-          IP=$(aws ec2 describe-instances \
-            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
-            --query 'Reservations[0].Instances[0].PublicIpAddress' \
-            --output text)
-          echo "host=$IP" >> $GITHUB_OUTPUT
-
-      - name: Health check
-        run: |
-          echo "Waiting for app to be ready..."
+          URL="https://jeffistores.in/api/health"
+          echo "Smoke-testing $URL ..."
+          LAST_STATUS="000"; LAST_BODY=""
           for i in $(seq 1 12); do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" --max-time 10 http://${{ steps.ec2.outputs.host }} || echo "000")
-            echo "Attempt $i: HTTP $STATUS"
-            if [[ "$STATUS" == "200" || "$STATUS" == "301" || "$STATUS" == "302" ]]; then
-              echo "App is up."
+            LAST_STATUS=$(curl -sS -o /tmp/health.json -w "%{http_code}" --max-time 10 "$URL" || echo "000")
+            LAST_BODY=$(cat /tmp/health.json 2>/dev/null || echo "")
+            echo "Attempt $i: HTTP $LAST_STATUS  body=$LAST_BODY"
+            if [[ "$LAST_STATUS" == "200" ]] && echo "$LAST_BODY" | grep -q '"status":"ok"'; then
+              echo "Smoke test passed — app is healthy at the edge."
               exit 0
             fi
             sleep 10
           done
-          echo "App did not respond after 2 minutes."
+          echo "Smoke test FAILED after 2 minutes. Last HTTP $LAST_STATUS, body: $LAST_BODY"
           exit 1
 
   # ────────────────────────────────────────────────────────
@@ -487,12 +468,70 @@ jobs:
           echo "Invalidation $INV_ID complete."
 
   # ────────────────────────────────────────────────────────
+  # Stage 8 — Finalize deployment  (main only)
+  # Marks the GitHub deployment success ONLY when deploy AND smoke both passed,
+  # else failure. This moves the success signal after the smoke gate so a bad
+  # deploy that serves an unhealthy app is never marked successful.
+  # ────────────────────────────────────────────────────────
+  finalize-deploy:
+    name: Finalize Deployment
+    runs-on: ubuntu-latest
+    needs: [deploy, smoke-test]
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      deployments: write
+    steps:
+      - name: Mark deployment status from smoke result
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const depId = ${{ needs.deploy.outputs.deployment_id }};
+            const ok = '${{ needs.deploy.result }}' === 'success' && '${{ needs.smoke-test.result }}' === 'success';
+            await github.rest.repos.createDeploymentStatus({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              deployment_id: depId,
+              state: ok ? 'success' : 'failure',
+              environment_url: 'https://jeffistores.in',
+              log_url: `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`,
+              description: ok ? 'Deployed and smoke-tested successfully' : 'Deploy or smoke test failed',
+            });
+            if (!ok) core.setFailed('Deployment not healthy (deploy or smoke failed)');
+
+  # ────────────────────────────────────────────────────────
+  # PR Gate  (pull_request only) — single required status check
+  # Set this ("PR Gate") as the required check in branch protection so the Test
+  # stage (and lint/typecheck/build) hard-block merges to main.
+  # ────────────────────────────────────────────────────────
+  pr-gate:
+    name: PR Gate
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck, test, build]
+    if: github.event_name == 'pull_request'
+    steps:
+      - name: Assert all PR checks passed
+        run: |
+          echo "Lint:       ${{ needs.lint.result }}"
+          echo "Type Check: ${{ needs.typecheck.result }}"
+          echo "Test:       ${{ needs.test.result }}"
+          echo "Build:      ${{ needs.build.result }}"
+          if [[ "${{ needs.lint.result }}"      != "success" ||
+                "${{ needs.typecheck.result }}" != "success" ||
+                "${{ needs.test.result }}"      != "success" ||
+                "${{ needs.build.result }}"     != "success" ]]; then
+            echo "PR Gate FAILED — lint, type check, test, and build must all pass."
+            exit 1
+          fi
+          echo "PR Gate PASSED — all required checks green."
+
+  # ────────────────────────────────────────────────────────
   # Final — Summary  (always runs)
   # ────────────────────────────────────────────────────────
   summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, build, docker, deploy, schema-diff, migrate, smoke-test, invalidate-cdn]
+    needs: [lint, typecheck, test, build, docker, deploy, schema-diff, migrate, smoke-test, invalidate-cdn, finalize-deploy, pr-gate]
     if: always()
     steps:
       - name: Result
@@ -513,6 +552,7 @@ jobs:
           echo "║  Run DB Migrations:  ${{ needs.migrate.result }}"
           echo "║  Smoke Test:         ${{ needs.smoke-test.result }}"
           echo "║  Invalidate CDN:     ${{ needs.invalidate-cdn.result }}"
+          echo "║  Finalize Deploy:    ${{ needs.finalize-deploy.result }}"
           fi
           echo "╠══════════════════════════════════════════╣"
           echo "║  Trigger: ${{ github.event_name }} → ${{ github.ref_name }}"
@@ -534,11 +574,16 @@ jobs:
                   "${{ needs.schema-diff.result }}"    == "failure" ||
                   "${{ needs.migrate.result }}"        == "failure" ||
                   "${{ needs.smoke-test.result }}"     == "failure" ||
-                  "${{ needs.invalidate-cdn.result }}" == "failure" ]]; then
+                  "${{ needs.invalidate-cdn.result }}" == "failure" ||
+                  "${{ needs.finalize-deploy.result }}" == "failure" ]]; then
               echo "PIPELINE FAILED at deployment stage."
               exit 1
             fi
             echo "DEPLOYMENT SUCCESSFUL"
           else
+            if [[ "${{ needs.pr-gate.result }}" != "success" ]]; then
+              echo "PR GATE FAILED — not ready to merge."
+              exit 1
+            fi
             echo "PR CHECKS PASSED — ready to merge"
           fi

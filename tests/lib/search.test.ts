@@ -100,44 +100,51 @@ describe('buildProductSearchRank', () => {
 
   it('builds rank for single word at startIdx=1', () => {
     const result = buildProductSearchRank('bolt', NAME, VEC, 1)
-    // params: [prefix, contains, tsq, per-word word_similarity term]
-    expect(result.nextIdx).toBe(5)
-    expect(result.params).toEqual(['bolt%', '%bolt%', 'bolt:*', 'bolt'])
-    expect(result.rank).toContain(`${NAME} ILIKE $1`)
-    expect(result.rank).toContain(`${NAME} ILIKE $2`)
-    expect(result.rank).toContain(`${VEC}, to_tsquery('english', $3)`)
-    expect(result.rank).toContain(`word_similarity($4::text, ${NAME})`)
+    // params: [stem query, per-word word-boundary regex, substring, tsq, whole-query sim]
+    expect(result.nextIdx).toBe(6)
+    expect(result.params).toEqual(['bolt', '\\mbolt', '%bolt%', 'bolt:*', 'bolt'])
+    expect(result.rank).toContain(`${VEC} @@ plainto_tsquery('english', $1)`)
+    expect(result.rank).toContain('$2')
+    expect(result.rank).toContain(`${NAME} ILIKE $3`)
+    expect(result.rank).toContain(`${VEC}, to_tsquery('english', $4)`)
+    expect(result.rank).toContain(`word_similarity($5::text, ${NAME})`)
   })
 
   it('builds rank at a custom startIdx', () => {
     const result = buildProductSearchRank('nut', NAME, VEC, 7)
-    expect(result.nextIdx).toBe(11)
+    expect(result.nextIdx).toBe(12)
     expect(result.rank).toContain('$7')
     expect(result.rank).toContain('$8')
     expect(result.rank).toContain('$9')
     expect(result.rank).toContain('$10')
+    expect(result.rank).toContain('$11')
   })
 
   it('uses ":*" tsQuery for special-char-only input (never falls back to "\'\'")', () => {
-    // '!!!' → stripped word = '' + ':*' = ':*' (truthy, kept)
+    // '!!!' → stripped word = '' + ':*' = ':*' (truthy, kept); no per-word params
     const result = buildProductSearchRank('!!!', NAME, VEC, 1)
+    // params: [stem, substring, tsq, whole-query sim] — tsq at index 2
     expect(result.params[2]).toBe(':*')
   })
 
   it('builds correct tsQuery for multi-word input', () => {
     const result = buildProductSearchRank('hex bolt', NAME, VEC, 1)
-    expect(result.params[0]).toBe('hex bolt%')
-    expect(result.params[1]).toBe('%hex bolt%')
-    expect(result.params[2]).toBe('hex:* & bolt:*')
-    // whole-query term feeds the per-word word_similarity rank component
-    expect(result.params[3]).toBe('hex bolt')
-    expect(result.nextIdx).toBe(5)
+    // [stem query, \m per-word x2, substring, tsq, whole-query sim]
+    expect(result.params[0]).toBe('hex bolt')
+    expect(result.params[1]).toBe('\\mhex')
+    expect(result.params[2]).toBe('\\mbolt')
+    expect(result.params[3]).toBe('%hex bolt%')
+    expect(result.params[4]).toBe('hex:* & bolt:*')
+    expect(result.params[5]).toBe('hex bolt')
+    expect(result.nextIdx).toBe(7)
   })
 
   it('trims input before building', () => {
     const result = buildProductSearchRank('  screw  ', NAME, VEC, 1)
-    expect(result.params[0]).toBe('screw%')
-    expect(result.params[1]).toBe('%screw%')
+    // [stem query, \m per-word, substring, tsq, whole-query sim]
+    expect(result.params[0]).toBe('screw')
+    expect(result.params[1]).toBe('\\mscrew')
+    expect(result.params[2]).toBe('%screw%')
   })
 })
 

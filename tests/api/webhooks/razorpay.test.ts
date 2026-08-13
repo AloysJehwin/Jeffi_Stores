@@ -54,6 +54,12 @@ vi.mock('@/lib/ai-feedback', () => ({
   recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined),
 }))
 
+// getFeatureFlags() runs a real queryMany (site-controls) unless mocked, which
+// would consume a queued db mock and desync the sequence. Stub it out.
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: vi.fn().mockResolvedValue({ gstEnabled: true }),
+}))
+
 // ---------------------------------------------------------------------------
 
 import { POST } from '@/app/api/webhooks/razorpay/route'
@@ -404,6 +410,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('intent claim null → no-op', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(null) // claim
     const res = await POST(signedRequest(draftCaptured({ id: 'pay_d', order_id: 'ro1', amount: 10000 })))
     expect(res.status).toBe(200)
@@ -412,6 +419,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('draft token expired → creates high-priority manual task', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce(null) // expired
     ;(createAutoTask as any).mockRejectedValueOnce(new Error('task fail'))
@@ -424,6 +432,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('amount mismatch → creates high-priority mismatch task', async () => {
     queryOne.mockResolvedValueOnce(null)
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent({ amount_paise: 10000 }))
     verifyDraftToken.mockResolvedValueOnce({ mode: 'cart', addressId: 'a1' })
     // captured amount far off
@@ -435,6 +444,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('user missing → early return', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({ mode: 'cart', addressId: 'a1' })
     queryOne.mockResolvedValueOnce(null) // user null
@@ -445,6 +455,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('cart mode with empty cart → early return', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({ mode: 'cart', addressId: 'a1' })
     queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com' }) // user
@@ -456,6 +467,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('cart mode with items + coupon applied → commits order + full follow-ups', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({
       mode: 'cart', addressId: 'a1', notes: 'n', couponId: 'c1',
@@ -485,6 +497,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('buyNow mode with product found → commits buyNow order', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({
       mode: 'buyNow', addressId: 'a1', shippingAmount: 0,
@@ -503,6 +516,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('buyNow mode with product NOT found → early return', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({
       mode: 'buyNow', addressId: 'a1', shippingAmount: 0,
@@ -517,6 +531,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('buyNow mode with no buyNowItem → falls to else branch, early return', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({ mode: 'buyNow', addressId: 'a1' }) // no buyNowItem
     queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com' }) // user
@@ -527,6 +542,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('unknown draft mode → else branch early return', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({ mode: 'weird', addressId: 'a1' })
     queryOne.mockResolvedValueOnce({ id: 'u1', email: 'a@b.com' }) // user
@@ -537,6 +553,7 @@ describe('commitDraftFromWebhook (draft-token recovery)', () => {
 
   it('buyNow without variant/subVariant ids → skips variant lookups', async () => {
     queryOne.mockResolvedValueOnce(null) // paymentRecord
+    queryOne.mockResolvedValueOnce(null) // variant_change_requests lookup (no vcr)
     queryOne.mockResolvedValueOnce(claimIntent()) // claim
     verifyDraftToken.mockResolvedValueOnce({
       mode: 'buyNow', addressId: 'a1', shippingAmount: 0,

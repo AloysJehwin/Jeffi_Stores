@@ -19,6 +19,9 @@ import { createAutoTask } from '@/lib/auto-tasks'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
 import { sendOrderConfirmedSMS } from '@/lib/sms'
+import { getFeatureFlags } from '@/lib/site-controls'
+import { getRazorpayInstance } from '@/lib/razorpay'
+import { settleVariantChangePayment } from '@/lib/variant-change'
 
 const VerifySchema = z.object({
   razorpay_order_id: zNonEmpty,
@@ -71,6 +74,27 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Variant-change top-up: no draftToken/orderId, but the razorpay order was
+    // created for a pending variant_change request. Signature is already verified
+    // above. Apply the swap now that the extra amount is paid.
+    const vcr = await queryOne<{ id: string; amountPaise: number | null }>(
+      `SELECT id FROM variant_change_requests WHERE razorpay_order_id = $1 AND status = 'awaiting_payment'`,
+      [razorpay_order_id]
+    )
+    if (vcr) {
+      let amountPaise = 0
+      try {
+        const rzp = getRazorpayInstance() as any
+        const rzpOrder = await rzp.orders.fetch(razorpay_order_id)
+        amountPaise = Number(rzpOrder?.amount) || 0
+      } catch { /* fall back to 0 — settle records the payment regardless */ }
+      const result = await settleVariantChangePayment({ razorpayOrderId: razorpay_order_id, razorpayPaymentId: razorpay_payment_id, amountPaise })
+      if (!result.applied && result.reason !== 'already_applied') {
+        return NextResponse.json({ error: `Payment received but change could not be applied: ${result.reason}. Contact support.` }, { status: 409 })
+      }
+      return NextResponse.json({ success: true, settlement: 'variant_change_applied' })
+    }
+
     return NextResponse.json({ error: 'draftToken or orderId is required' }, { status: 400 })
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Payment verification failed' }, { status: 500 })
@@ -106,6 +130,7 @@ async function commitDraft(args: {
   let taxAmount = 0
   let cartItems: Awaited<ReturnType<typeof loadActiveCart>> = []
   let buyNowSnapshot: { product: any; variant: any | null; subVariant: any | null } | null = null
+  const { gstEnabled } = await getFeatureFlags()
 
   if (draft.mode === 'cart') {
     cartItems = await loadActiveCart(args.userId)
@@ -125,8 +150,8 @@ async function commitDraft(args: {
         error: 'Cart changed during payment. Payment captured — contact support to release.',
       }, { status: 409 })
     }
-    subtotal = cartSubtotal(cartItems)
-    taxAmount = cartTaxAmount(cartItems)
+    subtotal = cartSubtotal(cartItems, gstEnabled)
+    taxAmount = cartTaxAmount(cartItems, gstEnabled)
   } else if (draft.mode === 'buyNow' && draft.buyNowItem) {
     const product = await queryOne<any>(
       `SELECT id, name, sku, gst_percentage, hsn_code, mrp, extra_delivery_days FROM products WHERE id = $1`,
@@ -142,7 +167,8 @@ async function commitDraft(args: {
     buyNowSnapshot = { product, variant, subVariant }
     subtotal = draft.buyNowItem.price * draft.buyNowItem.qty
     const gstRate = parseFloat(String(product.gst_percentage || '0'))
-    taxAmount = subtotal - subtotal / (1 + gstRate / 100)
+    // GST off ⇒ the draft price is already the ex-GST amount ⇒ no tax to strip.
+    taxAmount = gstEnabled ? (subtotal - subtotal / (1 + gstRate / 100)) : 0
   } else {
     return NextResponse.json({ error: 'Invalid draft' }, { status: 400 })
   }

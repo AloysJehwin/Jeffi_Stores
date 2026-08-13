@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useBarcodeScanner } from './useBarcodeScanner'
 
 export interface BatchOption {
   id: string
@@ -100,6 +101,61 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
     })
   }
 
+  const [scanMsg, setScanMsg] = useState<{ text: string; kind: 'ok' | 'err' | 'info' } | null>(null)
+  // Default OFF: click-select by default; toggle Scan on for a hardware scanner.
+  const [scanEnabled, setScanEnabled] = useState(false)
+
+  // Select (add-only) a specific batch on a specific item from a scan.
+  function selectBatchOn(item: BatchPickerItem, batch: BatchOption) {
+    if (selections[item.order_item_id]?.[batch.id]) {
+      setScanMsg({ text: `Batch ${batch.lot_number || batch.id.slice(0, 6)} already selected`, kind: 'info' })
+      return
+    }
+    toggleBatch(item.order_item_id, batch.id, batch.quantity_remaining, item.required_qty)
+    setScanMsg({ text: `✓ ${item.product_name}${item.variant_name ? ' / ' + item.variant_name : ''} — lot ${batch.lot_number || batch.id.slice(0, 6)}`, kind: 'ok' })
+  }
+
+  // Scan-to-select, dynamic by product tracking type:
+  //  • Batch/perishable-only products have no serials → operator scans the LOT label;
+  //    match a batch by lot_number locally.
+  //  • Serialized / both products → operator scans a UNIT's serial; resolve it and
+  //    select the batch it belongs to (serial.batch_id).
+  async function handleBatchScan(code: string) {
+    const c = code.trim()
+    if (!c) return
+    // (a) local lot-number match across all items needing selection
+    for (const item of itemsNeedingSelection) {
+      const b = item.batches.find(x => (x.lot_number || '').toLowerCase() === c.toLowerCase())
+      if (b) { selectBatchOn(item, b); return }
+    }
+    // (b) fall back to resolve: a scanned serial → its batch_id
+    try {
+      const res = await fetch('/api/admin/scan/resolve', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: c }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (data?.kind === 'serial' && data.serial?.batch_id) {
+        for (const item of itemsNeedingSelection) {
+          const b = item.batches.find(x => x.id === data.serial.batch_id)
+          if (b) { selectBatchOn(item, b); return }
+        }
+      }
+    } catch { /* ignore lookup failure */ }
+    setScanMsg({ text: `No matching batch for "${c}"`, kind: 'err' })
+  }
+
+  // captureInInputs: true — a focused checkbox/qty input would otherwise cause the
+  // hook to drop the scan burst. Only active in scanner mode.
+  useBarcodeScanner({ onScan: handleBatchScan, enabled: scanEnabled, captureInInputs: true })
+
+  useEffect(() => {
+    if (!scanMsg) return
+    const t = setTimeout(() => setScanMsg(null), 2200)
+    return () => clearTimeout(t)
+  }, [scanMsg])
+
   function handleConfirm() {
     const assignments: BatchAssignment[] = []
     for (const [order_item_id, batchQtys] of Object.entries(selections)) {
@@ -121,9 +177,32 @@ export default function BatchPickerModal({ items, onConfirm, onCancel }: Props) 
         <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
           <div>
             <h2 className="text-lg font-bold text-foreground">Assign Batches</h2>
-            <p className="text-sm text-foreground-muted mt-0.5">Select one or more batches per item — quantities auto-filled (FIFO)</p>
+            <p className="text-sm text-foreground-muted mt-0.5">Select batches per item — quantities auto-filled (FIFO). Scan a lot label or a unit's serial to select.</p>
           </div>
-          <button onClick={onCancel} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+          <div className="flex items-center gap-3">
+            {scanMsg ? (
+              <span className={`text-xs font-medium px-2 py-1 rounded ${
+                scanMsg.kind === 'ok' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                : scanMsg.kind === 'err' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
+                : 'bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400'
+              }`}>{scanMsg.text}</span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setScanEnabled(v => !v)}
+                title={scanEnabled ? 'Scanner mode on — scan a lot label or a unit serial' : 'Click to select manually, or turn on scanner mode'}
+                className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                  scanEnabled
+                    ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400'
+                    : 'border-border-default text-foreground-muted hover:bg-surface-secondary'
+                }`}
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14" /></svg>
+                {scanEnabled ? 'Scan: on' : 'Scan: off'}
+              </button>
+            )}
+            <button onClick={onCancel} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+          </div>
         </div>
 
         <div className="overflow-y-auto flex-1 px-6 py-4 space-y-6">

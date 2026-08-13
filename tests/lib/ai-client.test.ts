@@ -46,7 +46,7 @@ describe('getAiProvider', () => {
 
 describe('aiChat — openai provider', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    mockFetch.mockReset()
     process.env.AI_PROVIDER = 'openai'
     process.env.OPENAI_API_KEY = 'test-key'
     process.env.OPENAI_MODEL = 'gpt-4o-mini'
@@ -120,7 +120,7 @@ describe('aiChat — openai provider', () => {
 
 describe('aiChat — ollama provider', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    mockFetch.mockReset()
     process.env.AI_PROVIDER = 'ollama'
     process.env.OLLAMA_BASE_URL = 'http://localhost:11434'
     process.env.OLLAMA_FALLBACK_TO_OPENAI = 'false'
@@ -154,24 +154,21 @@ describe('aiChat — ollama provider', () => {
     expect(result.content).toBe('actual answer')
   })
 
-  it('throws AiClientError when Ollama unreachable and fallback disabled', async () => {
+  it('throws AiClientError when Ollama unreachable (no fallback)', async () => {
     mockFetch.mockRejectedValueOnce(new Error('connection refused')) // health check fails
 
     await expect(aiChat({ messages: [{ role: 'user', content: 'test' }] }))
-      .rejects.toThrow('Ollama unreachable and fallback disabled')
+      .rejects.toThrow('Ollama is not reachable')
   })
 
-  it('falls back to OpenAI when Ollama unreachable and fallback enabled', async () => {
+  it('throws AiClientError when Ollama unreachable even with fallback env set', async () => {
     process.env.OLLAMA_FALLBACK_TO_OPENAI = 'true'
 
     mockFetch.mockRejectedValueOnce(new Error('connection refused')) // health
-    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('fallback answer'))
 
-    const result = await aiChat({ messages: [{ role: 'user', content: 'test' }] })
-
-    expect(result.content).toBe('fallback answer')
-    expect(result.provider).toBe('openai')
-    expect(result.fallbackUsed).toBe(true)
+    // Ollama-only: fallback env is ignored, health failure surfaces directly.
+    await expect(aiChat({ messages: [{ role: 'user', content: 'test' }] }))
+      .rejects.toThrow('Ollama is not reachable')
   })
 
   it('uses thinking field when content is empty (Qwen3 extended-thinking)', async () => {
@@ -250,19 +247,17 @@ describe('aiChat — ollama provider', () => {
     expect(body.tools).toEqual(tools)
   })
 
-  it('falls back to OpenAI when Ollama call throws and fallback enabled', async () => {
+  it('throws when Ollama call fails (no fallback, fallback env ignored)', async () => {
     process.env.OLLAMA_FALLBACK_TO_OPENAI = 'true'
 
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health — reachable
     mockFetch.mockResolvedValueOnce({ ok: false, status: 503, text: async () => 'busy', json: async () => ({}) }) // ollama fails
-    mockFetch.mockResolvedValueOnce(makeOpenAiOkResponse('openai fallback'))
 
-    const result = await aiChat({ messages: [{ role: 'user', content: 'test' }] })
-    expect(result.content).toBe('openai fallback')
-    expect(result.fallbackUsed).toBe(true)
+    await expect(aiChat({ messages: [{ role: 'user', content: 'test' }] }))
+      .rejects.toThrow('Ollama HTTP 503')
   })
 
-  it('falls back to OpenAI with tool calls when Ollama times out', async () => {
+  it('throws with tools when Ollama call fails (no fallback)', async () => {
     process.env.OLLAMA_FALLBACK_TO_OPENAI = 'true'
     process.env.OPENAI_API_KEY = 'sk-test'
 
@@ -270,24 +265,15 @@ describe('aiChat — ollama provider', () => {
 
     mockFetch.mockResolvedValueOnce({ ok: true, json: async () => ({}) }) // health
     mockFetch.mockResolvedValueOnce({ ok: false, status: 503, text: async () => '', json: async () => ({}) }) // ollama fails
-    // OpenAI returns tool call
-    mockFetch.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        choices: [{ message: { tool_calls: [{ function: { name: 'search', arguments: '{"q":"test"}' } }] } }],
-      }),
-    })
 
-    const result = await aiChat({ messages: [{ role: 'user', content: 'test' }], tools })
-    expect(result.toolCalls).toHaveLength(1)
-    expect(result.toolCalls![0].name).toBe('search')
-    expect(result.fallbackUsed).toBe(true)
+    await expect(aiChat({ messages: [{ role: 'user', content: 'test' }], tools }))
+      .rejects.toThrow('Ollama HTTP 503')
   })
 })
 
 describe('aiChat — openai provider with tools', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
+    mockFetch.mockReset()
     process.env.AI_PROVIDER = 'openai'
     process.env.OPENAI_API_KEY = 'sk-test'
   })

@@ -235,6 +235,27 @@ export async function uploadAvatarImage(buffer: Buffer, userId: string): Promise
   return { url: getS3Url(s3Key), s3Key }
 }
 
+// Store logo. Preserves transparency (PNG), fits within a wide bounding box so
+// horizontal wordmark logos aren't cropped. Cache-busted via a version query param
+// on the returned URL so replacing the logo takes effect immediately.
+export async function uploadStoreLogo(buffer: Buffer): Promise<{ url: string; s3Key: string }> {
+  const s3Key = `branding/store-logo.png`
+  const resized = await sharp(buffer)
+    .rotate()
+    .resize(600, 200, { fit: 'inside', withoutEnlargement: true })
+    .png({ quality: 90 })
+    .toBuffer()
+  await s3Client.send(new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: `${KEY_PREFIX}${s3Key}`,
+    Body: resized,
+    ContentType: 'image/png',
+    CacheControl: 'public, max-age=60',
+  }))
+  return { url: `${getS3Url(s3Key)}?v=${Date.now()}`, s3Key }
+}
+
+
 export async function deleteGalleryImage(s3Key: string, s3ThumbnailKey: string) {
   await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}` }))
   if (s3ThumbnailKey) {

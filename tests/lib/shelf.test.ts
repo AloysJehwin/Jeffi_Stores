@@ -838,7 +838,8 @@ describe('syncPerishableStock', () => {
         .mockResolvedValueOnce({ rows: [] })                       // batchTotals — empty
         .mockResolvedValueOnce({ rows: [] })                       // existing shelf_stock — empty
         .mockResolvedValueOnce({ rows: [{ total: '0' }] })        // syncCentralInventory SUM
-        .mockResolvedValueOnce({ rows: [] }),                      // UPDATE products
+        .mockResolvedValueOnce({ rows: [] })                       // UPDATE products
+        .mockResolvedValueOnce({ rows: [{ inventory_sync: false }] }), // recompute getInventorySync — sync off, no-op
       release: vi.fn(),
     }
 

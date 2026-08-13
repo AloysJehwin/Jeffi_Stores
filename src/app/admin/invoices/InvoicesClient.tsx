@@ -210,6 +210,16 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
   const [serialAssignments, setSerialAssignments] = useState<SerialAssignment[]>([])
   const [serialPickerItems, setSerialPickerItems] = useState<SerialItem[] | null>(null)
 
+  // Prune serial assignments whose line was removed or product cleared, so scanned
+  // serials stay in lockstep with the current serialized lines (no orphans).
+  useEffect(() => {
+    const validIds = new Set(items.filter(it => it.product_id && it.serialized).map(it => it.id))
+    setSerialAssignments(prev => {
+      const next = prev.filter(sa => validIds.has(sa.order_item_id))
+      return next.length === prev.length ? prev : next
+    })
+  }, [items])
+
   // Draft-list finalize batch/serial picker
   const [draftFinalizeId, setDraftFinalizeId] = useState<string | null>(null)
   const [draftBatchItems, setDraftBatchItems] = useState<BatchPickerItem[]>([])
@@ -701,10 +711,33 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
     const res = await fetch(`/api/admin/inventory/batches/available?${params}`, { credentials: 'include' })
     const data = await res.json()
     if (data.serialized_items?.length > 0) {
-      setSerialPickerItems(data.serialized_items)
+      const pre = serialAssignments.filter(sa => sa.order_item_id === item.id).map(sa => sa.serial_number)
+      setSerialPickerItems(data.serialized_items.map((si: SerialItem) =>
+        si.order_item_id === item.id ? { ...si, preassigned: pre } : si
+      ))
     } else if (data.items?.length > 0) {
       setBatchPickerItem(data.items[0])
     }
+  }
+
+  // A serialized unit added via a serial scan → auto-record it as this line's
+  // assignment (deduped GLOBALLY by serial_number — a unit can't be on two lines).
+  function handleSerialScanned(lineId: string, serial: { serial_number: string }) {
+    setSerialAssignments(prev =>
+      prev.some(sa => sa.serial_number === serial.serial_number)
+        ? prev
+        : [...prev, { order_item_id: lineId, serial_number: serial.serial_number }]
+    )
+  }
+
+  // Quantity dropped below the assigned-serial count → trim the tail assignments.
+  function handleQuantityReduced(lineId: string, keep: number) {
+    setSerialAssignments(prev => {
+      const forLine = prev.filter(sa => sa.order_item_id === lineId)
+      if (forLine.length <= keep) return prev
+      const trimmed = new Set(forLine.slice(keep).map(sa => sa.serial_number))
+      return prev.filter(sa => !(sa.order_item_id === lineId && trimmed.has(sa.serial_number)))
+    })
   }
 
   async function handleFinalizeEdit(e: React.FormEvent) {
@@ -834,6 +867,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
                 variant_name: lineItem.variant_name || null,
                 required_qty: totalQty,
                 already_assigned: false,
+                preassigned: serialAssignments.filter(sa => sa.order_item_id === lineItem.id).map(sa => sa.serial_number),
                 product_id: lineItem.product_id || undefined,
                 variant_id: lineItem.variant_id || null,
                 sub_variant_id: lineItem.sub_variant_id || null,
@@ -849,7 +883,12 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           onConfirm={assignments => {
             setSerialAssignments(prev => {
               const itemIds = new Set(assignments.map(a => a.order_item_id))
-              return [...prev.filter(a => !itemIds.has(a.order_item_id)), ...assignments]
+              // Drop confirmed serials from OTHER lines too — one unit, one line.
+              const confirmedSerials = new Set(assignments.map(a => a.serial_number))
+              const kept = prev.filter(a =>
+                !itemIds.has(a.order_item_id) && !confirmedSerials.has(a.serial_number)
+              )
+              return [...kept, ...assignments]
             })
             setSerialPickerItems(null)
           }}
@@ -1094,7 +1133,7 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
           </div>
 
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-            <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} />
+            <LineItemsSection items={items} onChange={setItems} onStockBadgeClick={handleStockBadgeClick} assignedBatchLabels={assignedBatchLabels} onSerialScanned={handleSerialScanned} onQuantityReduced={handleQuantityReduced} />
           </div>
 
 

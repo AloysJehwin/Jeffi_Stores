@@ -123,7 +123,7 @@ export default function SortDropdown({ basePath = '/products' }: { basePath?: st
             }
           }}
           onKeyDown={handleKeyDown}
-      className={`px-4 py-2 bg-surface-elevated border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center gap-2 min-w-[190px]
+      className={`px-3 py-1.5 h-9 bg-surface-elevated border rounded-lg text-sm text-left transition-all cursor-pointer flex items-center gap-2 w-44
             ${isPending ? 'opacity-60' : ''}
             ${isOpen ? 'border-accent-500 ring-2 ring-accent-500/20' : 'border-border-secondary hover:border-gray-400'}
           `}

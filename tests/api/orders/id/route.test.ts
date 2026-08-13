@@ -310,7 +310,7 @@ describe('PATCH /api/orders/[id]', () => {
     expect(called).toMatch(/delivered_at/)
   })
 
-  it('creates refund auto-task when cancelling a paid order (razorpay disabled)', async () => {
+  it('does NOT auto-refund or create a refund task when cancelling a paid order', async () => {
     const { createAutoTask } = await import('@/lib/auto-tasks')
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce({
@@ -323,9 +323,15 @@ describe('PATCH /api/orders/[id]', () => {
 
     const res = await PATCH(makeReq('PATCH', { status: 'cancelled' }) as any, PARAMS)
     expect(res.status).toBe(200)
-    // Allow the fire-and-forget IIFE to schedule
+    // Allow any fire-and-forget side-effects to settle
     await new Promise(r => setTimeout(r, 10))
-    expect(vi.mocked(createAutoTask)).toHaveBeenCalled()
+    // Refunding is now an explicit admin step via /api/orders/[id]/refund —
+    // cancel must NOT create a process_refund task nor flip payment_status.
+    expect(vi.mocked(createAutoTask).mock.calls.some(
+      c => (c[0] as any)?.sourceKind === 'process_refund'
+    )).toBe(false)
+    const sqls = vi.mocked(db.query).mock.calls.map(c => c[0] as string)
+    expect(sqls.some(s => /UPDATE orders SET payment_status = 'refunded'/.test(s))).toBe(false)
   })
 
   it('handles failed payment_status (creates contact_failed_payment task)', async () => {
@@ -431,11 +437,10 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
     await new Promise(r => setTimeout(r, 20))
   }
 
-  it('issues a successful razorpay auto-refund on cancelling a paid order', async () => {
+  it('does NOT issue a razorpay auto-refund on cancelling a paid order', async () => {
     const razorpay = await import('@/lib/razorpay')
     const email = await import('@/lib/email')
     const autoTasks = await import('@/lib/auto-tasks')
-    const activity = await import('@/lib/activity')
 
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
@@ -448,10 +453,9 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
         users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
       }) // currentOrder
       .mockResolvedValueOnce(null) // sale ledger check → no restore
-      .mockResolvedValueOnce({ id: 'pay-1', transaction_id: 'pay_rzp_1', amount: '500' }) // payments row
 
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
-    vi.mocked(razorpay.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpay.isRazorpayEnabled).mockResolvedValue(true)
     const refundFn = vi.fn().mockResolvedValue({ id: 'rfnd_1' })
     vi.mocked(razorpay.getRazorpayInstance).mockReturnValue({
       payments: { refund: refundFn },
@@ -461,14 +465,12 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
     expect(res.status).toBe(200)
     await flush()
 
-    expect(refundFn).toHaveBeenCalledWith('pay_rzp_1', { amount: 50000 })
-    // payments + orders updated to refunded, plus completion task + refund email
+    // Auto-refund-on-cancel was removed — refunding is now an explicit admin step.
+    expect(refundFn).not.toHaveBeenCalled()
     const sqls = vi.mocked(db.query).mock.calls.map(c => c[0] as string)
-    expect(sqls.some(s => /UPDATE payments SET status = 'refunded'/.test(s))).toBe(true)
-    expect(sqls.some(s => /UPDATE orders SET payment_status = 'refunded'/.test(s))).toBe(true)
-    expect(vi.mocked(email.sendPaymentStatusUpdate)).toHaveBeenCalled()
-    expect(vi.mocked(autoTasks.completeAutoTask).mock.calls.some(c => c[0] === 'process_refund')).toBe(true)
-    expect(vi.mocked(activity.logActivity)).toHaveBeenCalled()
+    expect(sqls.some(s => /UPDATE payments SET status = 'refunded'/.test(s))).toBe(false)
+    expect(sqls.some(s => /UPDATE orders SET payment_status = 'refunded'/.test(s))).toBe(false)
+    expect(vi.mocked(autoTasks.completeAutoTask).mock.calls.some(c => c[0] === 'process_refund')).toBe(false)
   })
 
   it('swallows every rejecting side-effect on a cancelled+paid order (catch arrows)', async () => {
@@ -489,11 +491,10 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
         users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
       }) // currentOrder
       .mockResolvedValueOnce(null) // sale ledger check → no restore
-      .mockResolvedValueOnce({ id: 'pay-1', transaction_id: 'pay_rzp_1', amount: '500' }) // payments row
       .mockResolvedValueOnce({ awb_number: 'AWB123' }) // notify() awb lookup
 
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
-    vi.mocked(razorpay.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpay.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(razorpay.getRazorpayInstance).mockReturnValue({
       payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_1' }) },
     } as any)
@@ -515,7 +516,7 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
     expect(vi.mocked(email.sendOrderStatusUpdate)).toHaveBeenCalled()
   })
 
-  it('falls back to a manual refund task when razorpay has no payment record', async () => {
+  it('does NOT create a refund task on cancel even when razorpay is enabled', async () => {
     const razorpay = await import('@/lib/razorpay')
     const autoTasks = await import('@/lib/auto-tasks')
 
@@ -530,10 +531,9 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
         users: { email: 'a@b.com', first_name: 'A', last_name: 'B' },
       }) // currentOrder
       .mockResolvedValueOnce(null) // sale ledger check → no restore
-      .mockResolvedValueOnce(null) // payments row missing → throws inside IIFE → catch → createAutoTask
 
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
-    vi.mocked(razorpay.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpay.isRazorpayEnabled).mockResolvedValue(true)
 
     const res = await PATCH(makeReq('PATCH', { status: 'cancelled' }) as any, PARAMS)
     expect(res.status).toBe(200)
@@ -541,7 +541,7 @@ describe('PATCH /api/orders/[id] async side-effects', () => {
 
     expect(vi.mocked(autoTasks.createAutoTask).mock.calls.some(
       c => (c[0] as any)?.sourceKind === 'process_refund'
-    )).toBe(true)
+    )).toBe(false)
   })
 
   it('restores stock on cancellation when a sale ledger row exists', async () => {

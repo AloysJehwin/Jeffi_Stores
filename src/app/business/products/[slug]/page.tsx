@@ -6,18 +6,22 @@ import Link from 'next/link'
 import { cache } from 'react'
 import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/db'
-import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
-import { mrpDiscountPct } from '@/lib/pricing'
+import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
+import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { bp } from '@/lib/business-path'
 import ProductDetailClient from '@/components/business/ProductDetailClient'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ProductCard from '@/components/business/ProductCard'
 import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
 import RecentlyViewed from '@/components/visitor/RecentlyViewed'
+import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import PdpCompareSection from '@/components/visitor/PdpCompareSection'
 import ProductPitchLine from '@/components/on-device/ProductPitchLine'
 
 const getProductBySlug = cache(async (slug: string) => {
+  const { gstEnabled } = await getFeatureFlags()
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   return queryOne(`
     SELECT p.*,
       json_build_object('id', c.id, 'name', c.name, 'slug', c.slug,
@@ -72,7 +76,7 @@ const getProductBySlug = cache(async (slug: string) => {
         ),
         '[]'::json
       ) AS product_units,
-      ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+      ${MIN_PRICE_SQL} AS variant_min_price,
       ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp,
       ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total
     FROM products p
@@ -92,10 +96,11 @@ export async function generateMetadata({
   const product = await getProductBySlug(slug)
   if (!product) return { title: 'Product Not Found' }
 
+  const { gstEnabled } = await getFeatureFlags()
   const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
   const displayPrice = product.has_variants && product.variant_min_price
     ? product.variant_min_price
-    : (product.base_price || 0)
+    : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
 
   return {
@@ -188,6 +193,8 @@ function deduplicateByNameStem(products: any[], excludeStem: string): any[] {
 }
 
 async function getRelatedProducts(productId: string, categoryId: string, productName: string) {
+  const { gstEnabled } = await getFeatureFlags()
+  const MIN_PRICE_SQL = gstEnabled ? VARIANT_MIN_PRICE_INCL_GST_SQL : VARIANT_MIN_PRICE_EX_GST_SQL
   const cols = `
     p.*,
     json_build_object('id', c.id, 'name', c.name, 'slug', c.slug) AS categories,
@@ -198,7 +205,7 @@ async function getRelatedProducts(productId: string, categoryId: string, product
       '[]'::json
     ) AS product_images,
     ${VARIANT_STOCK_TOTAL_SQL} AS variant_stock_total,
-    ${VARIANT_MIN_PRICE_INCL_GST_SQL} AS variant_min_price,
+    ${MIN_PRICE_SQL} AS variant_min_price,
     ${VARIANT_MIN_MRP_SQL} AS variant_min_mrp
   `
 
@@ -308,6 +315,8 @@ export default async function ProductDetailPage({
   const hdrs = await headers()
   const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
 
+  const { gstEnabled } = await getFeatureFlags()
+
   const [relatedProducts, deliverySettings] = await Promise.all([
     getRelatedProducts(product.id, product.category_id, product.name),
     // Use the authoritative delivery setting (same one checkout uses), not the
@@ -323,10 +332,14 @@ export default async function ProductDetailPage({
   const hasVariants = product.has_variants && product.product_variants?.length > 0
   const displayPrice = hasVariants && product.variant_min_price
     ? product.variant_min_price
-    : (product.base_price || 0)
-  const mrp = product.mrp
+    : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
+  const rawMrp = product.mrp
     ? Number(product.mrp)
     : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+  const gstRate = Number(product.gst_percentage ?? 0)
+  // MRP is stored GST-inclusive. When GST is off, displayPrice is ex-GST, so put
+  // the MRP on the same ex-GST basis before computing/showing the discount.
+  const mrp = (!gstEnabled && rawMrp != null && gstRate > 0) ? rawMrp / (1 + gstRate / 100) : rawMrp
   const mrpDiscount = mrpDiscountPct(mrp, Number(displayPrice))
 
   return (
@@ -574,8 +587,11 @@ export default async function ProductDetailPage({
           const primaryImage = product.product_images?.find((img: any) => img.is_primary) || product.product_images?.[0]
           const displayPrice = product.has_variants && product.variant_min_price
             ? Number(product.variant_min_price)
-            : Number(product.base_price)
-          const mrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+            : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
+          const rawMrp = product.mrp ? Number(product.mrp) : (product.variant_min_mrp ? Number(product.variant_min_mrp) : null)
+          const gstRate = Number(product.gst_percentage ?? 0)
+          // MRP is GST-inclusive; when GST is off, rebase it to ex-GST to match displayPrice.
+          const mrp = (!gstEnabled && rawMrp != null && gstRate > 0) ? rawMrp / (1 + gstRate / 100) : rawMrp
           return (
             <PdpCompareSection
               currentProduct={{
@@ -610,8 +626,11 @@ export default async function ProductDetailPage({
               }}
               relatedProducts={relatedProducts.slice(0, 2).map((rp: any) => {
                 const rImg = rp.product_images?.find((img: any) => img.is_primary) || rp.product_images?.[0]
-                const rPrice = rp.has_variants && rp.variant_min_price ? Number(rp.variant_min_price) : Number(rp.base_price)
-                const rMrp = rp.mrp ? Number(rp.mrp) : (rp.variant_min_mrp ? Number(rp.variant_min_mrp) : null)
+                const rPrice = rp.has_variants && rp.variant_min_price ? Number(rp.variant_min_price) : pickUnitPrice({ inclusive: rp.base_price, exGst: rp.price_ex_gst }, gstEnabled)
+                const rRawMrp = rp.mrp ? Number(rp.mrp) : (rp.variant_min_mrp ? Number(rp.variant_min_mrp) : null)
+                const rGstRate = Number(rp.gst_percentage ?? 0)
+                // MRP is GST-inclusive; when GST is off, rebase it to ex-GST to match rPrice.
+                const rMrp = (!gstEnabled && rRawMrp != null && rGstRate > 0) ? rRawMrp / (1 + rGstRate / 100) : rRawMrp
                 return {
                   id: rp.id,
                   name: rp.name,
@@ -676,6 +695,9 @@ export default async function ProductDetailPage({
         {/* Recently Viewed */}
         <RecentlyViewed excludeId={product.id} basePath={bp('/business/products', host)} />
 
+        {/* Personalised picks */}
+        <FeaturedForYou variant="business" href={bp('/business/products', host)} />
+
         {/* Related Products */}
         {relatedProducts.length >= 4 && (
           <div className="mt-10">
@@ -686,15 +708,17 @@ export default async function ProductDetailPage({
                 const relatedHasVariants = relatedProduct.has_variants
                 const relatedDisplayPrice = relatedHasVariants && relatedProduct.variant_min_price
                   ? Number(relatedProduct.variant_min_price)
-                  : Number(relatedProduct.base_price)
-                const relatedMrp = relatedProduct.mrp
+                  : pickUnitPrice({ inclusive: relatedProduct.base_price, exGst: relatedProduct.price_ex_gst }, gstEnabled)
+                const relatedRawMrp = relatedProduct.mrp
                   ? Number(relatedProduct.mrp)
                   : (relatedProduct.variant_min_mrp ? Number(relatedProduct.variant_min_mrp) : null)
-                const relatedInclPrice = relatedHasVariants && relatedProduct.variant_min_price
-                  ? Number(relatedProduct.variant_min_price)
-                  : Number(relatedProduct.base_price)
-                const relatedMrpDiscount = relatedMrp && relatedMrp > relatedInclPrice
-                  ? Math.round(((relatedMrp - relatedInclPrice) / relatedMrp) * 100)
+                const relatedGstRate = Number(relatedProduct.gst_percentage ?? 0)
+                // MRP is GST-inclusive; when GST is off, rebase it to ex-GST to match relatedDisplayPrice.
+                const relatedMrp = (!gstEnabled && relatedRawMrp != null && relatedGstRate > 0)
+                  ? relatedRawMrp / (1 + relatedGstRate / 100)
+                  : relatedRawMrp
+                const relatedMrpDiscount = relatedMrp && relatedMrp > relatedDisplayPrice
+                  ? Math.round(((relatedMrp - relatedDisplayPrice) / relatedMrp) * 100)
                   : 0
                 const relatedStock = relatedHasVariants
                   ? Number(relatedProduct.variant_stock_total ?? 0)

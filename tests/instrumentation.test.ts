@@ -85,7 +85,7 @@ describe('register', () => {
     expect(hasPubUrl).toBe(true)
   })
 
-  it('schedules 6 cron jobs via setTimeout after full setup', async () => {
+  it('schedules 7 cron jobs via setTimeout after full setup', async () => {
     process.env.NEXT_RUNTIME = 'nodejs'
     process.env.CRON_SECRET = 'test-secret'
     process.env.APP_URL = 'http://localhost:3000'
@@ -99,8 +99,8 @@ describe('register', () => {
 
     await register()
 
-    // register() calls setTimeout 6 times (one per cron job)
-    expect(setTimeoutSpy).toHaveBeenCalledTimes(6)
+    // register() calls setTimeout 7 times (one per cron job)
+    expect(setTimeoutSpy).toHaveBeenCalledTimes(7)
   })
 
   it('calls delhivery_sync cron endpoint after 30s delay', async () => {

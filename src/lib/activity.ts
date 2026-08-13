@@ -37,6 +37,7 @@ export type ActivityKind =
   | 'marketing_opted_out'
   | 'marketing_opted_in'
   | 'whatsapp_sent'
+  | 'variant_change'
 
 interface LogActivityParams {
   userId: string

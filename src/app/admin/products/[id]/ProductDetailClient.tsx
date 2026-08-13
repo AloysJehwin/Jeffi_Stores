@@ -9,6 +9,7 @@ import HoverCard from '@/components/ui/HoverCard'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
 import UnitsManager from '@/components/admin/UnitsManager'
+import BatchSerialLabelModal from '@/components/admin/BatchSerialLabelModal'
 import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
@@ -512,6 +513,26 @@ export default function ProductDetailClient({ id }: { id: string }) {
   const [shelfStock, setShelfStock] = useState<ShelfRow[]>([])
   const [aiOpen, setAiOpen] = useState(false)
   const [showDraftModal, setShowDraftModal] = useState(false)
+  // Surface a stock-assignment failure stashed by the edit form during publish
+  // (the publish redirected here, so the error couldn't be shown on the form).
+  const [bootstrapStockError, setBootstrapStockError] = useState<string | null>(null)
+  // Batches/serials just created by an OFF→ON perishable/serialized conversion, to
+  // offer label printing (stashed by the edit form, which unmounted on redirect).
+  const [labelModal, setLabelModal] = useState<{ batchIds: string[]; serials: string[] } | null>(null)
+  useEffect(() => {
+    try {
+      const msg = sessionStorage.getItem('bootstrap_stock_error')
+      if (msg) { setBootstrapStockError(msg); sessionStorage.removeItem('bootstrap_stock_error') }
+      const raw = sessionStorage.getItem('bootstrap_labels')
+      if (raw) {
+        sessionStorage.removeItem('bootstrap_labels')
+        const parsed = JSON.parse(raw)
+        if (parsed?.product_id === id && (parsed.batch_ids?.length || parsed.serial_numbers?.length)) {
+          setLabelModal({ batchIds: parsed.batch_ids || [], serials: parsed.serial_numbers || [] })
+        }
+      }
+    } catch { /* ignore */ }
+  }, [id])
 
   const loadProduct = useCallback(() => {
     setLoading(true)
@@ -588,6 +609,26 @@ export default function ProductDetailClient({ id }: { id: string }) {
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
+      {bootstrapStockError && (
+        <div className="flex items-start justify-between gap-3 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-sm">
+          <div>
+            <span className="font-semibold">Product published, but existing stock was not assigned:</span>{' '}
+            {bootstrapStockError} You can re-open the product edit form and assign the stock again.
+          </div>
+          <button type="button" onClick={() => setBootstrapStockError(null)} className="shrink-0 text-amber-700 dark:text-amber-400 hover:opacity-70">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+      {labelModal && (
+        <BatchSerialLabelModal
+          preselectedBatchIds={labelModal.batchIds}
+          preselectedSerials={labelModal.serials}
+          initialMode={labelModal.batchIds.length ? 'batch' : 'serial'}
+          title="Print labels for assigned stock"
+          onClose={() => setLabelModal(null)}
+        />
+      )}
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
         <Link href={ap('/admin/products')} className="text-accent-500 hover:text-accent-600 transition-colors">Products</Link>
@@ -688,6 +729,21 @@ export default function ProductDetailClient({ id }: { id: string }) {
                   <p className="text-base font-semibold text-foreground">{formatINR(Number(val))}</p>
                 </div>
               ))}
+              {(() => {
+                // Prefer the explicit product discount_pct; otherwise derive it from MRP vs selling price.
+                const selling = Number(p.has_variants ? p.variant_min_price : p.base_price) || 0
+                const mrp = Number(p.mrp) || 0
+                const pct = p.discount_pct != null && Number(p.discount_pct) > 0
+                  ? Number(p.discount_pct)
+                  : (mrp > 0 && mrp > selling ? Math.round(((mrp - selling) / mrp) * 100) : 0)
+                if (pct <= 0) return null
+                return (
+                  <div>
+                    <p className="text-xs text-foreground-secondary mb-0.5">Discount</p>
+                    <p className="text-base font-semibold text-green-600 dark:text-green-400">{pct}% off</p>
+                  </div>
+                )
+              })()}
             </div>
           </div>
 
