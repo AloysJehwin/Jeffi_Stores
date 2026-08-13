@@ -5,6 +5,7 @@ import {
   sendCampaignEmail,
   renderItemRows,
 } from '@/lib/automation-emails'
+import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule, ParamSchema } from '../types'
 
 export interface WinbackParams extends Record<string, unknown> {
@@ -14,6 +15,7 @@ export interface WinbackParams extends Record<string, unknown> {
   healthScoreMax: number
   sendCooldownDays: number
   maxRecipientsPerSweep: number
+  whatsappEnabled: boolean
 }
 
 interface Row {
@@ -27,6 +29,7 @@ const winbackSchema: ParamSchema<WinbackParams> = {
   healthScoreMax:        { type: 'integer', min: 0,   max: 100, label: 'Health score max',          description: 'Customer health upper bound (exclusive)' },
   sendCooldownDays:      { type: 'integer', min: 1,   max: 365, label: 'Per-user cooldown (days)',  description: 'Skip users sent this campaign within N days' },
   maxRecipientsPerSweep: { type: 'integer', min: 1,   max: 500, label: 'Max recipients per run',    description: 'Hard limit per sweep' },
+  whatsappEnabled:       { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
 }
 
 export function buildWinbackScenario(opts: { kind: string; name: string; description: string; trigger: string; defaults: WinbackParams }): ScenarioModule<WinbackParams, Row> {
@@ -71,7 +74,7 @@ export function buildWinbackScenario(opts: { kind: string; name: string; descrip
       ])
     },
 
-    async send(row, { campaign }) {
+    async send(row, { campaign, params }) {
       const user = await fetchUserContext(row.id)
       if (!user) return { ok: false, reason: 'no_user' }
 
@@ -101,7 +104,7 @@ export function buildWinbackScenario(opts: { kind: string; name: string; descrip
         }))
       )
 
-      return sendCampaignEmail({
+      const emailResult = await sendCampaignEmail({
         campaign,
         user,
         referenceId: null,
@@ -113,6 +116,14 @@ export function buildWinbackScenario(opts: { kind: string; name: string; descrip
           ctaUrl: `${user.baseUrl}/products`,
         },
       })
+      if (params.whatsappEnabled) {
+        sendCampaignWhatsApp(campaign.kind, row.id, {
+          headline: 'We miss you!',
+          code: couponCode || '',
+          discount: discountPercent ? String(discountPercent) : '',
+        }).catch(() => {})
+      }
+      return emailResult
     },
   }
 }

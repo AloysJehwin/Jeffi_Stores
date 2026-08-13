@@ -8,7 +8,7 @@ import {
   Warehouse, TrendingUp, Wand2, ClipboardList, Tag,
   ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight,
   Clock, CheckCircle2, XCircle, RefreshCw, Play, Mail, ChevronDown, ChevronUp, Users, User, Database,
-  MessageSquare, MessageCircle,
+  MessageSquare, MessageCircle, ArrowDownLeft,
 } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
@@ -924,8 +924,8 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                       onClick={() => setExpandedSmsId(isExpanded ? null : row.id)}
                       className="w-full text-left p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:bg-surface-secondary/40 transition-colors"
                     >
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${row.status === 'sent' ? 'bg-emerald-500' : 'bg-red-500'}`}>
-                        {row.status === 'sent' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${row.status === 'received' ? 'bg-blue-500' : row.status === 'sent' ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                        {row.status === 'received' ? <ArrowDownLeft className="w-4 h-4" /> : row.status === 'sent' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
@@ -1069,8 +1069,8 @@ export default function AdminAuditClient({ canViewReplication = false }: { canVi
                       onClick={() => setExpandedWaId(isExpanded ? null : row.id)}
                       className="w-full text-left p-3 sm:p-4 flex items-center gap-3 sm:gap-4 hover:bg-surface-secondary/40 transition-colors"
                     >
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${row.status === 'sent' ? 'bg-emerald-500' : 'bg-red-500'}`}>
-                        {row.status === 'sent' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
+                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white shrink-0 ${row.status === 'received' ? 'bg-blue-500' : row.status === 'sent' ? 'bg-emerald-500' : 'bg-red-500'}`}>
+                        {row.status === 'received' ? <ArrowDownLeft className="w-4 h-4" /> : row.status === 'sent' ? <CheckCircle2 className="w-4 h-4" /> : <XCircle className="w-4 h-4" />}
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">

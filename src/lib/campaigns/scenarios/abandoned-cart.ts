@@ -5,6 +5,7 @@ import {
   sendCampaignEmail,
   renderItemRows,
 } from '@/lib/automation-emails'
+import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
@@ -13,6 +14,7 @@ interface Params extends Record<string, unknown> {
   maxRecipientsPerSweep: number
   maxItemsPerEmail: number
   secondEmailDelayHours: number
+  whatsappEnabled: boolean
 }
 
 interface Row {
@@ -31,6 +33,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     maxRecipientsPerSweep: 50,
     maxItemsPerEmail: 5,
     secondEmailDelayHours: 48,
+    whatsappEnabled: false,
   },
   paramSchema: {
     lookbackDays:            { type: 'integer', min: 1, max: 90,  label: 'Lookback (days)',              description: 'Only consider carts updated in the last N days' },
@@ -38,6 +41,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
     maxRecipientsPerSweep:   { type: 'integer', min: 1, max: 500, label: 'Max recipients per run',       description: 'Hard limit per sweep' },
     maxItemsPerEmail:        { type: 'integer', min: 1, max: 10,  label: 'Items shown in email',         description: 'Cap on cart items rendered in the email body' },
     secondEmailDelayHours:   { type: 'integer', min: 24, max: 168, label: 'Second email delay (hours)', description: 'Send follow-up email N hours after first email if cart still not checked out' },
+    whatsappEnabled:         { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
   },
 
   async findEligible({ campaign, params }) {
@@ -190,7 +194,7 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
       ? await resolveCoupon(campaign, row.user_id)
       : await resolveCoupon(campaign, row.user_id)
 
-    return sendCampaignEmail({
+    const emailResult = await sendCampaignEmail({
       campaign,
       user,
       referenceId: `seq${sequence}`,
@@ -206,6 +210,12 @@ export const abandonedCart: ScenarioModule<Params, Row> = {
         isFollowUp: sequence === 2 ? 'true' : '',
       },
     })
+    if ((params as any).whatsappEnabled) {
+      const names = items.map(i => i.name)
+      const summary = names.slice(0, 3).join(', ') + (names.length > 3 ? ` and ${names.length - 3} more` : '')
+      sendCampaignWhatsApp(campaign.kind, row.user_id, { items: summary }).catch(() => {})
+    }
+    return emailResult
   },
 }
 

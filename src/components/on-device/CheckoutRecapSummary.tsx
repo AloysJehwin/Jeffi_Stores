@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { ThumbsUp, ThumbsDown } from 'lucide-react'
 import { canRunOnDeviceSummary, generateRecap, disposeSummarizer } from '@/lib/on-device/runtime'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { getViewedProducts, getSearches } from '@/lib/on-device/session-signals'
 import { readUserProfile } from '@/lib/on-device/user-profile'
 import type { SessionSignals, CartLine } from '@/lib/on-device/prompt'
@@ -34,9 +35,9 @@ function saveFeedback(vote: 'liked' | 'disliked', text: string) {
 }
 
 export default function CheckoutRecapSummary({ items, total }: { items: CartLine[]; total: number }) {
+  const ondeviceEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
   const [verdict, setVerdict] = useState<{ capable: boolean; reason: string; isMobile: boolean } | null>(null)
   const [text, setText] = useState('')
-  const [errMsg, setErrMsg] = useState('')
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
   const [feedback, setFeedback] = useState<'liked' | 'disliked' | null>(null)
   const [wifiDismissed, setWifiDismissed] = useState(false)
@@ -44,6 +45,7 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
   const started = useRef(false)
 
   useEffect(() => {
+    if (!ondeviceEnabled) return
     let alive = true
     canRunOnDeviceSummary().then(v => {
       if (!alive) return
@@ -63,7 +65,7 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
       }
     })
     return () => { alive = false; disposeSummarizer() }
-  }, [])
+  }, [ondeviceEnabled])
 
   useEffect(() => {
     if (!verdict?.capable || started.current) return
@@ -86,7 +88,7 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
     setState('loading')
     generateRecap(signals, verdict.isMobile, (partial) => setText(partial))
       .then(final => { setText(final); setState('done') })
-      .catch((e) => { setErrMsg(e?.message || String(e)); setState('error') })
+      .catch(() => { setState('error') })
   }, [verdict, items, total])
 
   // Not-wifi banner
@@ -117,9 +119,12 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
   }
 
   if (!verdict?.capable) return null
-  if (state === 'error' && process.env.NODE_ENV === 'production') return null
+  if (state === 'error') return null
   if (state === 'idle') return null
-  if (state === 'done' && !text.trim()) return null
+  // Don't render the panel until real text has started streaming. This prevents a
+  // visible box (and any "loading" text) from flashing on mobile when the model
+  // download fails and the component then unmounts — matching the sibling panels.
+  if (!text.trim()) return null
 
   return (
     <>
@@ -144,19 +149,9 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
           <span className="text-[9px] text-foreground-muted ml-auto">on-device · private</span>
         </div>
 
-        {state === 'loading' && !text && (
-          <p className="text-sm text-foreground-muted animate-pulse">
-            {verdict.isMobile ? 'Downloading AI model (~200MB)…' : 'Preparing your summary…'}
-          </p>
-        )}
-        {state === 'error' && (
-          <p className="text-xs text-red-600 break-words font-mono">[dev] {errMsg || 'unknown error'}</p>
-        )}
-        {(text || state === 'loading') && state !== 'error' && (
-          <p className="text-sm text-foreground leading-relaxed">
-            {text}{state === 'loading' && <span className="animate-pulse">▍</span>}
-          </p>
-        )}
+        <p className="text-sm text-foreground leading-relaxed">
+          {text}{state === 'loading' && <span className="animate-pulse">▍</span>}
+        </p>
 
         {/* 👍/👎 feedback — only shown after completion */}
         {state === 'done' && text && !feedback && (

@@ -6,7 +6,6 @@ import { getAllCategories } from '@/lib/queries'
 import { query, queryOne } from '@/lib/db'
 import { publishCategoryDraft } from '@/lib/category-draft'
 import CategoryForm from '@/components/admin/CategoryForm'
-import CategoryHeroImages from '@/components/admin/CategoryHeroImages'
 import { suggestIcon } from '@/lib/iconSuggest'
 import { ChevronLeft } from 'lucide-react'
 
@@ -74,9 +73,11 @@ async function updateCategory(categoryId: string, formData: FormData) {
       redirect(ap(`/admin/categories`, host))
     }
 
+    // Save as Draft always returns to the list.
     revalidatePath(`/admin/categories/edit/${categoryId}`)
+    revalidatePath('/admin/categories')
     const back = formData.get('_back') as string | null
-    redirect(ap(back && back.startsWith('/admin/categories') ? back : `/admin/categories/edit/${categoryId}`, host))
+    redirect(ap(back && back.startsWith('/admin/categories') ? back : '/admin/categories', host))
   }
 
   // Unreachable: no draft means the edit page redirected before rendering the form.
@@ -154,16 +155,6 @@ export default async function EditCategoryPage({ params, searchParams }: { param
         backUrl={backUrl}
         isDraft={isDraft}
       />
-
-      {!category.parent_category_id && (
-        <div className="mt-6">
-          <CategoryHeroImages
-            categoryId={id}
-            mobileImage={(category as any).hero_image_mobile ?? null}
-            desktopImage={(category as any).hero_image_desktop ?? null}
-          />
-        </div>
-      )}
     </div>
   )
 }

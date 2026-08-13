@@ -203,7 +203,8 @@ export async function generateInvoicePDF(
   buyerAddress: InvoiceBuyerAddress,
   billingAddress?: InvoiceBuyerAddress,
   isCancelled?: boolean,
-  voidLabel?: string
+  voidLabel?: string,
+  taxFree?: boolean,
 ): Promise<Buffer> {
   const nicQRBuf = order.signed_qr_code ? await buildQRBuffer(order.signed_qr_code, 80) : null
   const payQRBuf = order.payment_link_url ? await buildQRBuffer(order.payment_link_url, 80) : null
@@ -226,7 +227,7 @@ export async function generateInvoicePDF(
 
     let y = 28
 
-    doc.font(FB).fontSize(12).text('Tax Invoice', LM, y, { width: pw, align: 'center' })
+    doc.font(FB).fontSize(12).text(taxFree ? 'Bill of Supply' : 'Tax Invoice', LM, y, { width: pw, align: 'center' })
     y += 16
 
     const topY = y
@@ -417,6 +418,11 @@ export async function generateInvoicePDF(
       // Rate (Incl. of Tax) = MRP when available, else unit_price
       const rateInclTax = item.mrp != null && item.mrp > 0 ? item.mrp : item.unit_price
 
+      // Amount column: for a tax invoice this is the ex-GST taxable value; for a
+      // tax-free Bill of Supply the whole net line value is the amount (there is
+      // no separate taxable split), so use the net selling total.
+      const lineAmount = taxFree ? netSellingTotal : item.taxable_amount
+
       const rowData = [
         String(i + 1),
         item.product_name,
@@ -426,7 +432,7 @@ export async function generateInvoicePDF(
         fmt(rateInclTax),
         perLabel,
         discLabel,
-        fmt(item.taxable_amount),
+        fmt(lineAmount),
       ]
 
       const descColW = itemCols[1].w - 4
@@ -452,16 +458,19 @@ export async function generateInvoicePDF(
     checkPageBreak(rowH)
     drawHLine(doc, LM, R, y)
     doc.font(F).fontSize(7)
-    doc.text(fmt(order.taxable_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
+    // Tax-free (Bill of Supply): the summary "taxable value" is the net line
+    // total (there is no GST split), not the persisted taxable_amount (which is 0).
+    const summaryTaxable = taxFree ? (itemsSubtotal - bizDiscount) : order.taxable_amount
+    doc.text(fmt(summaryTaxable), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
     y += rowH
 
-    if (order.is_igst) {
+    if (!taxFree && order.is_igst) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
       doc.font(FBI).fontSize(8).text('IGST', descLabelX, y + 2, { width: itemCols[1].w - 12 })
       doc.font(F).fontSize(7).text(fmt(order.igst_amount), amountColX + 2, y + 2, { width: amountColW - 4, align: 'right' })
       y += rowH
-    } else {
+    } else if (!taxFree) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
       doc.font(FBI).fontSize(8).text('CGST', descLabelX, y + 2, { width: itemCols[1].w - 12 })
@@ -475,7 +484,7 @@ export async function generateInvoicePDF(
       y += rowH
     }
 
-    const roundOff = order.total_amount - (order.taxable_amount + order.cgst_amount + order.sgst_amount + order.igst_amount + (order.shipping_amount || 0) - (order.discount_amount || 0) - (order.business_discount_amount || 0))
+    const roundOff = order.total_amount - (summaryTaxable + order.cgst_amount + order.sgst_amount + order.igst_amount + (order.shipping_amount || 0) - (order.discount_amount || 0) - (order.business_discount_amount || 0))
     if (order.discount_amount > 0) {
       checkPageBreak(rowH)
       drawHLine(doc, LM, R, y)
@@ -550,6 +559,8 @@ export async function generateInvoicePDF(
     y += 13
     drawRect(doc, LM, wordsY, pw, y - wordsY)
 
+    // HSN / tax-summary table — omitted entirely for a tax-free Bill of Supply.
+    if (!taxFree) {
     ensureSpace(60)
     let cx = LM
     const hsnY = y
@@ -703,6 +714,7 @@ export async function generateInvoicePDF(
     doc.text(`  INR ${numberToWords(totalTaxAmount)} Only`)
     y += 14
     drawRect(doc, LM, taxWordsY, pw, y - taxWordsY)
+    } // end if (!taxFree) — HSN/tax-summary table
 
     ensureSpace(110)
     const bottomY = y

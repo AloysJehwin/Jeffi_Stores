@@ -98,6 +98,7 @@ export default function EditSupplierPage() {
       })
       if (!res.ok) { const j = await res.json(); setError(j.error || 'Failed to save draft'); return }
       setHasDraft(true)
+      router.push(ap('/admin/inventory?tab=suppliers'))
     } finally { setSaving(false) }
   }
 

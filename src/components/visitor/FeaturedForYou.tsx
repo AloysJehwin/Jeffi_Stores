@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import ProductCard from '@/components/visitor/ProductCard'
+import BusinessProductCard from '@/components/business/ProductCard'
 
 interface CardProps {
   id: string
@@ -28,16 +29,21 @@ interface ApiResponse {
   fallback?: boolean
 }
 
-export default function FeaturedForYou() {
+export default function FeaturedForYou({
+  variant = 'visitor',
+  href = '/products',
+  compact = false,
+  limit,
+}: { variant?: 'visitor' | 'business'; href?: string; compact?: boolean; limit?: number } = {}) {
   const [products, setProducts] = useState<CardProps[]>([])
+  const Card = variant === 'business' ? BusinessProductCard : ProductCard
 
   useEffect(() => {
     fetch('/api/recommendations/for-you', { credentials: 'include' })
       .then(r => (r.ok ? r.json() : null))
       .then((data: ApiResponse | null) => {
         // Only show for genuine personalised results. Logged-out visitors get a
-        // best-sellers `fallback` — the homepage already has a Best Sellers
-        // section, so hide this one for them to avoid duplication.
+        // best-sellers `fallback` — hide this row for them to avoid duplication.
         if (data && !data.fallback && Array.isArray(data.products)) {
           setProducts(data.products)
         }
@@ -47,6 +53,28 @@ export default function FeaturedForYou() {
 
   if (products.length === 0) return null
 
+  const shown = typeof limit === 'number' ? products.slice(0, limit) : products
+
+  // Compact, boxed layout — matches the old "You Might Also Like" card so it
+  // drops into cart/checkout without changing the surrounding page rhythm.
+  if (compact) {
+    return (
+      <div className="mt-8 bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em]">Picked for you</p>
+            <h3 className="text-lg font-bold text-foreground">Featured For You</h3>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          {shown.map(p => (
+            <Card key={p.id} {...p} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <section className="py-12 md:py-16">
       <div className="container mx-auto px-4">
@@ -55,14 +83,14 @@ export default function FeaturedForYou() {
             <p className="text-accent-500 text-[10px] font-black uppercase tracking-[0.2em] mb-1">Picked for you</p>
             <h2 className="text-2xl md:text-3xl font-black text-foreground tracking-tight">Featured For You</h2>
           </div>
-          <Link href="/products" className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
+          <Link href={href} className="hidden sm:flex items-center gap-1 text-sm text-accent-500 hover:text-accent-400 font-semibold shrink-0 transition-colors">
             Explore more
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
           </Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {products.map(p => (
-            <ProductCard key={p.id} {...p} />
+          {shown.map(p => (
+            <Card key={p.id} {...p} />
           ))}
         </div>
       </div>

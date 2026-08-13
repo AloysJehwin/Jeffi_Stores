@@ -1,11 +1,11 @@
 import type { PoolClient } from 'pg'
 import { queryMany, queryOne, withTransaction } from './db'
 import { isInterState, calculateGST, round2 } from './gst'
+import { pickUnitPrice } from './pricing'
 import { createDraftInvoice } from './invoice'
 import { computeEdd } from './edd'
 import type { DraftBuyNowItem, DraftCartItem } from './order-draft'
-
-const isGSTEnabled = process.env.ENABLE_GST === 'true'
+import { getFeatureFlags, getBusinessValues } from './site-controls'
 
 export interface CartLine {
   product_id: string
@@ -65,14 +65,27 @@ export async function loadActiveCart(userId: string): Promise<CartLine[]> {
   `, [userId])
 }
 
-export function cartLineUnitPrice(item: CartLine): number {
-  const basePrice = Number(item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst ?? item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
-  // If the cart item was stored with a unit factor already applied in price_at_addition, use that directly.
-  // Otherwise fall back to raw variant price.
+// Resolve the charged unit price for a cart line, honouring the GST flag.
+// GST ON  → inclusive price (the frozen price_at_addition, else the incl chain).
+// GST OFF → the stored ex-GST column at the most specific level (sub → variant
+//           → product), falling back to the inclusive price when ex-GST is null.
+//           Per policy we prefer ex-GST even over a frozen price_at_addition so
+//           the charged amount matches what the storefront displays when off.
+export function cartLineUnitPrice(item: CartLine, gstEnabled: boolean): number {
+  if (!gstEnabled) {
+    return pickUnitPrice(
+      {
+        inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
+        exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
+      },
+      false,
+    )
+  }
+  // GST on: honour the frozen add-time price (already unit-factored), else the inclusive chain.
   if (item.price_at_addition && Number(item.price_at_addition) > 0) {
     return Number(item.price_at_addition)
   }
-  return basePrice
+  return Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
 }
 
 export function cartItemsForHash(items: CartLine[]): DraftCartItem[] {
@@ -87,13 +100,14 @@ export function cartItemsForHash(items: CartLine[]): DraftCartItem[] {
   }))
 }
 
-export function cartSubtotal(items: CartLine[]): number {
-  return items.reduce((sum, item) => sum + cartLineUnitPrice(item) * Number(item.quantity), 0)
+export function cartSubtotal(items: CartLine[], gstEnabled: boolean): number {
+  return items.reduce((sum, item) => sum + cartLineUnitPrice(item, gstEnabled) * Number(item.quantity), 0)
 }
 
-export function cartTaxAmount(items: CartLine[]): number {
+export function cartTaxAmount(items: CartLine[], gstEnabled: boolean): number {
+  if (!gstEnabled) return 0
   return items.reduce((sum, item) => {
-    const lineTotal = cartLineUnitPrice(item) * Number(item.quantity)
+    const lineTotal = cartLineUnitPrice(item, true) * Number(item.quantity)
     const gstRate = parseFloat(String(item.products.gst_percentage || '0'))
     return sum + (lineTotal - lineTotal / (1 + gstRate / 100))
   }, 0)
@@ -106,6 +120,7 @@ export async function resolveBuyNowItem(input: {
   qty: number
   buyMode?: string
   buyUnit?: string | null
+  gstEnabled?: boolean
 }): Promise<
   | { ok: true; item: { productId: string; variantId: string | null; subVariantId: string | null; qty: number; buyMode: string; buyUnit: string | null; price: number } }
   | { ok: false; error: string }
@@ -149,16 +164,20 @@ export async function resolveBuyNowItem(input: {
     if (!subVariant) return { ok: false, error: 'Sub-variant not found' }
   }
 
-  // Mirror the product page: prefer price_ex_gst → convert to incl-GST, else use price directly.
+  // Resolve the unit price honouring the GST flag:
+  //  GST ON  → prefer price_ex_gst converted UP to incl-GST (mirrors the product page), else raw incl price.
+  //  GST OFF → charge the stored ex-GST price directly, falling back to the incl price when ex-GST is null.
+  const gstEnabled = input.gstEnabled !== false
   const gstPct = Number(product.gst_percentage ?? 0)
   const gstMultiplier = 1 + gstPct / 100
   function toInclGst(exGst: number) { return round2(exGst * gstMultiplier) }
 
   const rawPriceExGst = subVariant?.price_ex_gst ?? variant?.price_ex_gst ?? product.price_ex_gst ?? null
   const rawPrice = subVariant?.price ?? variant?.price ?? product.base_price ?? null
-  let price: number = rawPriceExGst != null && Number(rawPriceExGst) > 0
-    ? toInclGst(Number(rawPriceExGst))
-    : Number(rawPrice ?? 0)
+  const hasExGst = rawPriceExGst != null && Number(rawPriceExGst) > 0
+  let price: number = !gstEnabled
+    ? (hasExGst ? Number(rawPriceExGst) : Number(rawPrice ?? 0))
+    : (hasExGst ? toInclGst(Number(rawPriceExGst)) : Number(rawPrice ?? 0))
   // Apply unit factor if buyMode is a real unit key (not 'unit')
   if (buyMode && buyMode !== 'unit') {
     const effectiveVariantId = input.variantId || null
@@ -404,7 +423,8 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     const estimatedDeliveryDate = computeEdd({ pin, handlingDays: maxHandlingDays, extraDays: maxExtraDays })
 
     const customerName = `${input.user.first_name || ''} ${input.user.last_name || ''}`.trim() || 'Customer'
-    const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'
+    const isGSTEnabled = (await getFeatureFlags()).gstEnabled
+    const sellerStateCode = (await getBusinessValues()).businessStateCode
     const isIGST = isGSTEnabled ? isInterState(address.state || '', sellerStateCode) : false
 
     let orderTaxableAmount = 0
@@ -433,7 +453,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     if (input.mode === 'cart') {
       itemRows = input.cartItems.map(item => {
         const isFractional = item.buy_mode && item.buy_mode !== 'unit'
-        const unitPrice = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+        const unitPrice = cartLineUnitPrice(item, isGSTEnabled)
         const qty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
         const gstRate = parseFloat(String(item.products.gst_percentage || '0'))
         const itemTotal = unitPrice * qty
@@ -561,7 +581,9 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
     const created = orderResult.rows[0]
 
     for (const r of itemRows) {
-      const taxAmt = r.gst ? r.gst.totalTax : round2(r.itemTotal - r.itemTotal / (1 + r.gstRate / 100))
+      // When GST is off we charge the ex-GST price, so there is NO embedded tax
+      // to strip — the per-item tax is 0, not a back-calculated amount.
+      const taxAmt = r.gst ? r.gst.totalTax : 0
       await client.query(
         `INSERT INTO order_items (
           order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name,

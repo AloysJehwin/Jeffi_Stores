@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer'
 import { query, queryMany, queryOne } from './db'
 import { sendAuditedMail } from './mail-audit'
 import { buildVarMap, substituteVars } from './template-vars'
+import { getStoreIdentity } from './site-controls'
 
 const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -13,7 +14,6 @@ const transporter = nodemailer.createTransport({
   },
 })
 
-const FROM = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
 
 type TemplateData = Record<string, string>
@@ -25,11 +25,11 @@ function baseLayout(title: string, body: string) {
   <tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
       <tr><td style="background:#1a3a4a;padding:20px 32px;border-radius:8px 8px 0 0;">
-        <a href="${BASE_URL}" style="text-decoration:none;color:#ffffff;font-size:20px;font-weight:700;">Jeffi Store's</a>
+        <a href="${BASE_URL}" style="text-decoration:none;color:#ffffff;font-size:20px;font-weight:700;">{store_name}</a>
       </td></tr>
       <tr><td style="background:#ffffff;padding:32px;border-radius:0 0 8px 8px;">${body}</td></tr>
       <tr><td style="padding:16px 0;text-align:center;font-size:12px;color:#999;">
-        &copy; ${new Date().getFullYear()} Jeffi Store's &bull; <a href="${BASE_URL}" style="color:#999;">jeffistores.in</a>
+        &copy; ${new Date().getFullYear()} {store_name} &bull; <a href="${BASE_URL}" style="color:#999;">{store_web}</a>
       </td></tr>
     </table>
   </td></tr>
@@ -150,7 +150,7 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
 </head>
 <body>
 <div class="wrap">
-  <div class="header"><a href="${ampBaseUrl}">Jeffi Store's</a></div>
+  <div class="header"><a href="${ampBaseUrl}">{store_name}</a></div>
   <div class="body">
     <p style="font-size:16px;color:#333;margin:0 0 12px;">Hi ${data.firstName || 'there'},</p>
     <h2 style="font-size:22px;color:#1a3a4a;margin:0 0 8px;">How did we do?</h2>
@@ -158,7 +158,7 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
     ${ampProductForms}
     ${ampCoupon}
   </div>
-  <div style="padding:16px;text-align:center;font-size:12px;color:#999;">&copy; ${new Date().getFullYear()} Jeffi Store's</div>
+  <div style="padding:16px;text-align:center;font-size:12px;color:#999;">&copy; ${new Date().getFullYear()} {store_name}</div>
 </div>
 </body>
 </html>`
@@ -286,7 +286,9 @@ async function resolveAudience(audienceType: string, audienceFilter: Record<stri
   return queryMany<Recipient>(`${base} ${where}`)
 }
 
-export async function sendCampaign(campaignId: string): Promise<{ sent: number; failed: number }> {
+export async function sendCampaign(campaignId: string, opts?: { batchSize?: number; batchDelay?: number }): Promise<{ sent: number; failed: number }> {
+  const batchSize = opts?.batchSize ?? 50
+  const batchDelay = opts?.batchDelay ?? 1000
   const campaign = await queryOne<{
     id: string
     title: string
@@ -305,66 +307,78 @@ export async function sendCampaign(campaignId: string): Promise<{ sent: number; 
 
   const recipients = await resolveAudience(campaign.audience_type, campaign.audience_filter)
 
+  // Store identity fetched once for the whole campaign — drives {store_*} vars
+  // and the From display name. Address stays the SES-verified sender.
+  const store = await getStoreIdentity()
+  const fromAddr = `"${store.name}" <${process.env.SES_FROM_EMAIL}>`
+
   let sent = 0
   let failed = 0
 
-  // Resolve coupon once — add recipients to coupon_eligible_users, not clone
+  // Resolve coupon once
   const sourceCouponId = campaign.audience_filter.couponId as string | undefined
-  let sourceCoupon: {
-    id: string; code: string; discount_type: string; discount_value: number;
-  } | null = null
+  let sourceCoupon: { id: string; code: string; discount_type: string; discount_value: number } | null = null
   if (sourceCouponId) {
-    sourceCoupon = await queryOne(
-      `SELECT id, code, discount_type, discount_value FROM coupons WHERE id = $1`,
-      [sourceCouponId]
-    )
+    sourceCoupon = await queryOne(`SELECT id, code, discount_type, discount_value FROM coupons WHERE id = $1`, [sourceCouponId])
   }
 
-  for (const recipient of recipients) {
-    try {
-      let templateData: Record<string, string> = { ...campaign.template_data, subject: campaign.subject }
+  // Send in batches to avoid blocking and stay under SES rate limits
+  for (let i = 0; i < recipients.length; i += batchSize) {
+    const batch = recipients.slice(i, i + batchSize)
 
-      if (sourceCoupon) {
-        // Grant coupon access to this recipient
-        await query(
-          `INSERT INTO coupon_eligible_users (coupon_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
-          [sourceCoupon.id, recipient.user_id]
-        )
-        const valLabel = sourceCoupon.discount_type === 'percentage'
-          ? `${sourceCoupon.discount_value}% off`
-          : `₹${sourceCoupon.discount_value} off`
-        templateData = {
-          ...templateData,
-          body: [templateData.body, `\nUse coupon code <strong>${sourceCoupon.code}</strong> for ${valLabel} on your next order.`].filter(Boolean).join('\n'),
+    await Promise.all(batch.map(async recipient => {
+      try {
+        let templateData: Record<string, string> = { ...campaign.template_data, subject: campaign.subject }
+
+        if (sourceCoupon) {
+          await query(
+            `INSERT INTO coupon_eligible_users (coupon_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+            [sourceCoupon.id, recipient.user_id]
+          )
+          const valLabel = sourceCoupon.discount_type === 'percentage'
+            ? `${sourceCoupon.discount_value}% off`
+            : `₹${sourceCoupon.discount_value} off`
+          templateData = {
+            ...templateData,
+            body: [templateData.body, `\nUse coupon code <strong>${sourceCoupon.code}</strong> for ${valLabel} on your next order.`].filter(Boolean).join('\n'),
+          }
         }
-      }
 
-      const { subject, html } = renderCampaignEmail(campaign.template_key, templateData, recipient.first_name || undefined)
-      const vars = buildVarMap({ recipient: { email: recipient.email, first_name: recipient.first_name } })
-      const finalSubject = substituteVars(subject, vars)
-      const finalHtml = substituteVars(html, vars)
-      await sendAuditedMail({
-        from: FROM,
-        to: recipient.email,
-        subject: finalSubject,
-        html: finalHtml,
-        kind: 'campaign',
-        templateName: campaign.template_key,
-        entityType: 'email_campaigns',
-        entityId: campaignId,
-        userId: recipient.user_id,
-      })
-      await query(
-        `INSERT INTO email_campaign_logs (campaign_id, email, status) VALUES ($1, $2, 'sent')`,
-        [campaignId, recipient.email]
-      )
-      sent++
-    } catch (err) {
-      await query(
-        `INSERT INTO email_campaign_logs (campaign_id, email, status, error) VALUES ($1, $2, 'failed', $3)`,
-        [campaignId, recipient.email, String(err)]
-      )
-      failed++
+        const { subject, html } = renderCampaignEmail(campaign.template_key, templateData, recipient.first_name || undefined)
+        const vars = buildVarMap({
+          recipient: { email: recipient.email, first_name: recipient.first_name },
+          store: { name: store.name, email: store.email, phone: store.phone, web: store.web },
+        })
+        const finalSubject = substituteVars(subject, vars)
+        const finalHtml = substituteVars(html, vars)
+        await sendAuditedMail({
+          from: fromAddr,
+          to: recipient.email,
+          subject: finalSubject,
+          html: finalHtml,
+          kind: 'campaign',
+          templateName: campaign.template_key,
+          entityType: 'email_campaigns',
+          entityId: campaignId,
+          userId: recipient.user_id,
+        })
+        await query(
+          `INSERT INTO email_campaign_logs (campaign_id, email, status) VALUES ($1, $2, 'sent')`,
+          [campaignId, recipient.email]
+        )
+        sent++
+      } catch (err) {
+        await query(
+          `INSERT INTO email_campaign_logs (campaign_id, email, status, error) VALUES ($1, $2, 'failed', $3)`,
+          [campaignId, recipient.email, String(err)]
+        )
+        failed++
+      }
+    }))
+
+    // Delay between batches (skip after last batch)
+    if (i + batchSize < recipients.length) {
+      await new Promise(r => setTimeout(r, batchDelay))
     }
   }
 

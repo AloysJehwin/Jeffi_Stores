@@ -54,6 +54,23 @@ export const VARIANT_MIN_PRICE_INCL_GST_SQL = `
   ) AS combined_prices)
 `
 
+// Ex-GST variant of the min-price SQL: prefer the stored ex-GST column, fall
+// back to the inclusive price when it is NULL/0. Used by listing pages when the
+// GST feature flag is OFF so displayed prices match what checkout will charge.
+export const VARIANT_MIN_PRICE_EX_GST_SQL = `
+  (SELECT MIN(price) FROM (
+    SELECT COALESCE(NULLIF(pv.price_ex_gst, 0), pv.price) AS price
+    FROM product_variants pv
+    WHERE pv.product_id = p.id AND pv.is_active = true AND pv.price IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+    UNION ALL
+    SELECT COALESCE(NULLIF(sv.price_ex_gst, 0), sv.price) AS price
+    FROM product_sub_variants sv
+    JOIN product_variants pv ON pv.id = sv.variant_id
+    WHERE pv.product_id = p.id AND pv.is_active = true AND sv.is_active = true AND sv.price IS NOT NULL
+  ) AS combined_prices)
+`
+
 export const VARIANT_MIN_MRP_SQL = `
   (SELECT MIN(mrp) FROM (
     SELECT pv.mrp
@@ -1760,4 +1777,98 @@ export async function getProductBreakdowns(): Promise<ProductStats> {
       color: BREAKDOWN_PALETTE[i % BREAKDOWN_PALETTE.length],
     })),
   }
+}
+
+// ── Customer stats + engagement (admin /customers page) ──────────────────────
+
+export interface CustomerStats {
+  total: number
+  active: number
+  inactive: number
+  flagged: number
+}
+
+// Real COUNT-based stats over all non-guest customers (matches getCustomers' filter).
+export async function getCustomerStats(): Promise<CustomerStats> {
+  const row = await queryOne<CustomerStats>(`
+    SELECT
+      COUNT(*)::int AS total,
+      COUNT(*) FILTER (WHERE is_active AND NOT is_flagged)::int AS active,
+      COUNT(*) FILTER (WHERE NOT is_active AND NOT is_flagged)::int AS inactive,
+      COUNT(*) FILTER (WHERE is_flagged)::int AS flagged
+    FROM users
+    WHERE is_guest = false
+  `)
+  return row ?? { total: 0, active: 0, inactive: 0, flagged: 0 }
+}
+
+// Engagement segments (VIP / loyal / repeat / one-time / new / at-risk / dormant / lead)
+// derived from order history — mirrors the CRM segment SQL.
+export async function getCustomerSegments(): Promise<BreakdownSlice[]> {
+  const row = await queryOne<{
+    vip: number; loyal: number; repeat: number; one_time: number;
+    new: number; at_risk: number; dormant: number; lead: number;
+  }>(`
+    WITH agg AS (
+      SELECT
+        u.id, u.created_at,
+        COALESCE(o.order_count, 0) AS order_count,
+        COALESCE(o.paid_orders, 0) AS paid_orders,
+        COALESCE(o.lifetime_value, 0) AS ltv,
+        o.last_order_at
+      FROM users u
+      LEFT JOIN (
+        SELECT user_id,
+               COUNT(*) AS order_count,
+               COUNT(*) FILTER (WHERE payment_status = 'paid') AS paid_orders,
+               SUM(total_amount) AS lifetime_value,
+               MAX(created_at) AS last_order_at
+        FROM orders GROUP BY user_id
+      ) o ON o.user_id = u.id
+      WHERE u.is_guest = false
+    )
+    SELECT
+      COUNT(*) FILTER (WHERE ltv >= 50000)::int AS vip,
+      COUNT(*) FILTER (WHERE paid_orders >= 5 AND ltv >= 25000)::int AS loyal,
+      COUNT(*) FILTER (WHERE order_count >= 3)::int AS repeat,
+      COUNT(*) FILTER (WHERE order_count = 1)::int AS one_time,
+      COUNT(*) FILTER (WHERE created_at >= NOW() - INTERVAL '30 days')::int AS new,
+      COUNT(*) FILTER (WHERE last_order_at IS NOT NULL AND last_order_at < NOW() - INTERVAL '90 days' AND last_order_at >= NOW() - INTERVAL '180 days')::int AS at_risk,
+      COUNT(*) FILTER (WHERE last_order_at IS NOT NULL AND last_order_at < NOW() - INTERVAL '180 days')::int AS dormant,
+      COUNT(*) FILTER (WHERE order_count = 0)::int AS lead
+    FROM agg
+  `)
+  const s = row ?? { vip: 0, loyal: 0, repeat: 0, one_time: 0, new: 0, at_risk: 0, dormant: 0, lead: 0 }
+  return [
+    { label: 'VIP', value: s.vip, color: '#8b5cf6' },
+    { label: 'Loyal', value: s.loyal, color: '#3b82f6' },
+    { label: 'Repeat', value: s.repeat, color: '#10b981' },
+    { label: 'One-time', value: s.one_time, color: '#14b8a6' },
+    { label: 'New', value: s.new, color: '#22c55e' },
+    { label: 'At risk', value: s.at_risk, color: '#f59e0b' },
+    { label: 'Dormant', value: s.dormant, color: '#ef4444' },
+    { label: 'Lead', value: s.lead, color: '#94a3b8' },
+  ]
+}
+
+// Notification-channel preference mix across non-guest customers.
+export async function getCustomerChannelMix(): Promise<BreakdownSlice[]> {
+  const rows = await queryMany<{ channel: string | null; count: string }>(`
+    SELECT notification_channel AS channel, COUNT(*)::int AS count
+    FROM users
+    WHERE is_guest = false
+    GROUP BY notification_channel
+  `)
+  const colors: Record<string, string> = { email: '#3b82f6', sms: '#10b981', whatsapp: '#22c55e' }
+  const labels: Record<string, string> = { email: 'Email', sms: 'SMS', whatsapp: 'WhatsApp' }
+  return rows
+    .map(r => {
+      const key = (r.channel || 'email').toLowerCase()
+      return {
+        label: labels[key] || (r.channel || 'Email'),
+        value: Number(r.count) || 0,
+        color: colors[key] || '#94a3b8',
+      }
+    })
+    .sort((a, b) => b.value - a.value)
 }

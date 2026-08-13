@@ -11,6 +11,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/admin-path'
+import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
+import BatchSerialLabelModal from '@/components/admin/BatchSerialLabelModal'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -259,7 +261,7 @@ type PO = {
 }
 
 type POItem = {
-  id: string; product_id: string; variant_id: string | null
+  id: string; product_id: string; variant_id: string | null; sub_variant_id: string | null
   product_name: string; variant_name: string | null; sku: string | null; product_sku?: string | null
   quantity: string; unit_cost: string; tax_rate: string; total_cost: string; quantity_received: string
   purchase_unit: string | null; purchase_unit_factor: string | null
@@ -307,6 +309,107 @@ function POTab({ initialPO }: { initialPO?: string }) {
   const [poSortCol, setPoSortCol] = useState<string | undefined>(undefined)
   const [poSortDir, setPoSortDir] = useState<SortDir | undefined>(undefined)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
+  const [scanSerials, setScanSerials] = useState(true)
+  const [draftRestored, setDraftRestored] = useState(false)
+  // Refs to every serial input, keyed "itemIdx:slotIdx", so Enter/scan can advance focus.
+  const serialInputRefs = React.useRef<Record<string, HTMLInputElement | null>>({})
+
+  // Move focus to the next empty serial input after the given one (wraps across items).
+  const focusNextSerial = useCallback((afterKey: string) => {
+    const keys = Object.keys(serialInputRefs.current)
+      .filter(k => serialInputRefs.current[k])
+      .sort((a, b) => {
+        const [ai, as] = a.split(':').map(Number)
+        const [bi, bs] = b.split(':').map(Number)
+        return ai - bi || as - bs
+      })
+    const start = keys.indexOf(afterKey)
+    for (let step = 1; step <= keys.length; step++) {
+      const el = serialInputRefs.current[keys[(start + step) % keys.length]]
+      if (el && !el.value) { el.focus(); return }
+    }
+  }, [])
+
+  // Serials that were just received — enables the "Print labels" action post-receive.
+  const [lastReceivedSerials, setLastReceivedSerials] = useState<string[]>([])
+  // Just-created batches/serials for the label popup shown right after a receive.
+  const [labelModal, setLabelModal] = useState<{ batchIds: string[]; serials: string[] } | null>(null)
+
+  // Fill the next empty serial slot (across serialized items, in order) from a scan.
+  // Dedupe: ignore a serial already entered anywhere in this receive.
+  const fillNextSerial = useCallback((code: string) => {
+    const sn = code.trim()
+    if (!sn) return
+    setReceiveItems(items => {
+      // already present?
+      for (const r of items) {
+        if (Array.isArray(r.serial_numbers) && (r.serial_numbers as string[]).includes(sn)) {
+          showToast(`Serial ${sn} already scanned`, 'error')
+          return items
+        }
+      }
+      const next = items.map(r => ({ ...r }))
+      for (let ri = 0; ri < next.length; ri++) {
+        const r = next[ri]
+        if (!r.serialized || parseFloat(r.receive_qty || '0') <= 0) continue
+        const needed = serialsRequired(r)
+        const arr = Array.isArray(r.serial_numbers) ? [...(r.serial_numbers as string[])] : []
+        while (arr.length < needed) arr.push('')
+        const empty = arr.findIndex(s => !s)
+        if (empty !== -1) {
+          arr[empty] = sn
+          r.serial_numbers = arr
+          showToast(`Serial ${sn} → ${r.product_name}`, 'success')
+          // Keep the cursor on the next empty slot for continuous scanning.
+          setTimeout(() => focusNextSerial(`${ri}:${empty}`), 0)
+          return next
+        }
+      }
+      showToast('All serial slots are full', 'info')
+      return items
+    })
+  }, [showToast])
+
+  useBarcodeScanner({ onScan: fillNextSerial, enabled: !!receiveMode && scanSerials, captureInInputs: true })
+
+  // Autosave the in-progress receive form to localStorage (keyed by PO id) so a
+  // long receive isn't lost on navigate-away/refresh. Restored in openReceive.
+  useEffect(() => {
+    if (!receiveMode?.po?.id || receiveItems.length === 0) return
+    const key = `po_receive_draft:${receiveMode.po.id}`
+    const t = setTimeout(() => {
+      try {
+        // Only persist the fields the user edits (not the whole product record).
+        const slim = receiveItems.map(it => ({
+          id: it.id, receive_qty: it.receive_qty, receive_cost: it.receive_cost,
+          lot_number: it.lot_number, expiry_date: it.expiry_date, manufacture_date: it.manufacture_date,
+          location_id: it.location_id, serial_numbers: it.serial_numbers,
+        }))
+        localStorage.setItem(key, JSON.stringify({ items: slim, notes: receiveNotes, warehouse_id: receiveWarehouseId, savedAt: Date.now() }))
+      } catch {}
+    }, 600)
+    return () => clearTimeout(t)
+  }, [receiveMode, receiveItems, receiveNotes, receiveWarehouseId])
+
+  async function printReceivedSerialLabels() {
+    if (!lastReceivedSerials.length) return
+    try {
+      const res = await fetch('/api/admin/labels/batch', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+        body: JSON.stringify({ serial_numbers: lastReceivedSerials, copies: 1, sheet: false }),
+      })
+      if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.error || 'Failed') }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `serial-labels-${new Date().toISOString().slice(0, 10)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch (e: any) {
+      showToast(e.message || 'Label print failed', 'error')
+    }
+  }
 
   async function sendPOEmail(po: PO) {
     setSendingEmailId(po.id)
@@ -375,6 +478,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
   }
 
   async function openReceive(id: string) {
+    setDraftRestored(false)
     const res = await fetch(`/api/admin/inventory/po/${id}`)
     const json = await res.json()
     const items = (json.items || []).map((it: POItem) => {
@@ -398,13 +502,31 @@ function POTab({ initialPO }: { initialPO?: string }) {
       }
     })
     setReceiveMode({ po: json.purchase_order })
+    // Restore an autosaved draft for this PO (survives navigate-away / refresh).
+    try {
+      const raw = localStorage.getItem(`po_receive_draft:${id}`)
+      if (raw) {
+        const draft = JSON.parse(raw)
+        if (draft && Array.isArray(draft.items)) {
+          // Merge saved per-item values by po_item_id onto the fresh item list.
+          const byId: Record<string, any> = {}
+          for (const d of draft.items) byId[d.id] = d
+          const merged = items.map((it: any) => byId[it.id] ? { ...it, ...byId[it.id] } : it)
+          setReceiveItems(merged)
+          setReceiveNotes(draft.notes || '')
+          if (draft.warehouse_id) setReceiveWarehouseId(draft.warehouse_id)
+          setDraftRestored(true)
+          return
+        }
+      }
+    } catch {}
     setReceiveItems(items)
     setReceiveNotes('')
     setReceiveWarehouseId('')
     // Fetch shelf locations and warehouses for pickers
     const [slRes, whRes] = await Promise.all([
-      fetch('/api/admin/shelving/locations').catch(() => null),
-      fetch('/api/admin/shelving/warehouses').catch(() => null),
+      fetch('/api/admin/shelving/locations', { credentials: 'include' }).catch(() => null),
+      fetch('/api/admin/shelving/warehouses', { credentials: 'include' }).catch(() => null),
     ])
     if (slRes?.ok) {
       const slJson = await slRes.json()
@@ -417,6 +539,27 @@ function POTab({ initialPO }: { initialPO?: string }) {
       if (whs.length === 1) setReceiveWarehouseId(whs[0].id)
       setEditWarehouses(whs)
     }
+  }
+
+  // Explicitly save the in-progress receive as a draft and exit. The form already
+  // autosaves as you type; this writes immediately (bypassing the debounce) so the
+  // user can confidently leave and resume later from the PO list.
+  function saveDraftAndExit() {
+    if (!receiveMode?.po?.id) return
+    try {
+      const slim = receiveItems.map(it => ({
+        id: it.id, receive_qty: it.receive_qty, receive_cost: it.receive_cost,
+        lot_number: it.lot_number, expiry_date: it.expiry_date, manufacture_date: it.manufacture_date,
+        location_id: it.location_id, serial_numbers: it.serial_numbers,
+      }))
+      localStorage.setItem(`po_receive_draft:${receiveMode.po.id}`, JSON.stringify({
+        items: slim, notes: receiveNotes, warehouse_id: receiveWarehouseId, savedAt: Date.now(),
+      }))
+      showToast('Draft saved — resume this receipt anytime from the PO list.', 'success')
+    } catch {
+      showToast('Could not save draft', 'error')
+    }
+    setReceiveMode(null)
   }
 
   async function submitReceive() {
@@ -440,6 +583,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
     setReceiveSaving(true)
     const items = receiveItems.filter(it => parseFloat(it.receive_qty) > 0).map(it => ({
       po_item_id: it.id, product_id: it.product_id, variant_id: it.variant_id || null,
+      sub_variant_id: it.sub_variant_id || null,
       quantity_received: parseFloat(it.receive_qty), unit_cost: parseFloat(it.receive_cost),
       purchase_unit_factor: parseFloat(it.purchase_unit_factor || '1'),
       ...(it.perishable ? {
@@ -458,7 +602,25 @@ function POTab({ initialPO }: { initialPO?: string }) {
     })
     const json = await res.json()
     setReceiveSaving(false)
-    if (json.success) { setReceiveMode(null); load(page) }
+    if (json.success) {
+      // Clear the autosaved draft for this PO now that it's received.
+      try { localStorage.removeItem(`po_receive_draft:${receiveMode.po.id}`) } catch {}
+      setDraftRestored(false)
+      // Stash received serials so labels can be printed from the PO list, then close.
+      const receivedSerials = items.flatMap((it: any) => Array.isArray(it.serial_numbers) ? it.serial_numbers : [])
+      setLastReceivedSerials(receivedSerials)
+      setReceiveMode(null)
+      load(page)
+      // Open the label popup for the just-created batches/serials (server-returned).
+      const createdBatchIds: string[] = Array.isArray(json.batch_ids) ? json.batch_ids : []
+      const createdSerials: string[] = Array.isArray(json.serial_numbers) ? json.serial_numbers : receivedSerials
+      if (createdBatchIds.length || createdSerials.length) {
+        setLabelModal({ batchIds: createdBatchIds, serials: createdSerials })
+      }
+      if (Array.isArray(json.warnings) && json.warnings.length) {
+        showToast(json.warnings[0], 'error')
+      }
+    }
     else showToast(json.error || 'Failed to receive goods', 'error')
   }
 
@@ -507,7 +669,31 @@ function POTab({ initialPO }: { initialPO?: string }) {
             <h3 className="font-semibold text-foreground">Receive Goods — {receiveMode.po.po_number}</h3>
             <p className="text-xs text-foreground-secondary mt-0.5">Supplier: {receiveMode.po.supplier_name}</p>
           </div>
+          {/* Barcode scan toggle for serial capture */}
+          <button type="button" onClick={() => setScanSerials(v => !v)}
+            title={scanSerials ? 'Scanning on — scan each unit to fill the next serial slot' : 'Serial scanning off'}
+            className={`ml-auto flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-colors ${scanSerials ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-muted hover:bg-surface-secondary'}`}>
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h1m3 0h1m3 0v12M4 18h1m11-12h1M8 18h1m7-12v12m3-12h1v12h-1" />
+            </svg>
+            {scanSerials ? 'Scan serials: on' : 'Scan serials: off'}
+          </button>
         </div>
+        {draftRestored && (
+          <div className="flex items-center gap-3 px-4 py-2.5 rounded-lg border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20">
+            <svg className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <p className="text-sm text-foreground flex-1">Restored your unsaved progress for this PO. Your entries auto-save as you go.</p>
+            <button type="button" onClick={() => {
+              try { localStorage.removeItem(`po_receive_draft:${receiveMode.po.id}`) } catch {}
+              setDraftRestored(false)
+              openReceive(receiveMode.po.id)
+            }} className="text-xs font-semibold text-amber-700 dark:text-amber-400 hover:underline shrink-0">
+              Discard draft
+            </button>
+          </div>
+        )}
         <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -685,11 +871,18 @@ function POTab({ initialPO }: { initialPO?: string }) {
                               {Array.from({ length: needed }, (_, n) => (
                                 <div key={n} className="flex gap-1">
                                   <input
+                                    ref={el => { serialInputRefs.current[`${idx}:${n}`] = el }}
                                     type="text"
                                     placeholder={autoSerial()}
                                     className={inputCls + ' font-mono text-xs flex-1 min-w-0'}
                                     value={serials[n] ?? ''}
                                     onChange={e => updateSerial(n, e.target.value)}
+                                    onKeyDown={e => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault()
+                                        focusNextSerial(`${idx}:${n}`)
+                                      }
+                                    }}
                                   />
                                   <button
                                     type="button"
@@ -734,6 +927,13 @@ function POTab({ initialPO }: { initialPO?: string }) {
         </div>
         <div className="flex gap-3">
           <button className={btnPrimary} onClick={submitReceive} disabled={receiveSaving}>{receiveSaving ? 'Saving...' : 'Confirm Receipt'}</button>
+          <button
+            className="px-4 py-2 rounded-lg text-sm font-medium border border-border-default text-foreground-secondary hover:bg-surface-secondary transition-colors"
+            onClick={saveDraftAndExit}
+            disabled={receiveSaving}
+          >
+            Save Draft
+          </button>
           <button className={btnSecondary} onClick={() => setReceiveMode(null)}>Cancel</button>
         </div>
       </div>
@@ -881,6 +1081,24 @@ function POTab({ initialPO }: { initialPO?: string }) {
 
   return (
     <div className="space-y-5">
+      {lastReceivedSerials.length > 0 && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-accent-300 dark:border-accent-800 bg-accent-50 dark:bg-accent-900/20">
+          <svg className="w-4 h-4 text-accent-600 dark:text-accent-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-sm text-foreground flex-1">
+            {lastReceivedSerials.length} serialized unit(s) received. Print labels to stick on each unit.
+          </p>
+          <button type="button" onClick={printReceivedSerialLabels}
+            className="px-3 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors">
+            Print serial labels
+          </button>
+          <button type="button" onClick={() => setLastReceivedSerials([])}
+            className="text-foreground-muted hover:text-foreground" title="Dismiss">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+      )}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
         <SummaryCard label="Open POs" value={String(openCount)} sub="draft · sent · partial" />
         <SummaryCard label="Pending Value" value={formatINR(pendingValue)} accent />
@@ -894,13 +1112,14 @@ function POTab({ initialPO }: { initialPO?: string }) {
             value={search}
             onChange={v => { setSearch(v); setPage(1) }}
             placeholder="PO number, supplier..."
-            inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
+            inputClassName="w-full h-9 px-3 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
           />
         </div>
         <div className="w-44">
           <label className={labelCls}>Status</label>
           <AdminSelect
             sm
+            className="[&_button]:h-9"
             value={statusFilter}
             onChange={v => { setStatusFilter(v); setPage(1) }}
             placeholder="All statuses"
@@ -914,13 +1133,11 @@ function POTab({ initialPO }: { initialPO?: string }) {
             ]}
           />
         </div>
-        <div className="flex flex-col">
+        <div className="hidden md:flex flex-col">
           <span className={labelCls}>&nbsp;</span>
-          <div className="hidden md:block">
-            <Link href={ap('/admin/inventory/po/new')} className={btnPrimary}>
-              + Create PO
-            </Link>
-          </div>
+          <Link href={ap('/admin/inventory/po/new')} className={`${btnPrimary} h-9 inline-flex items-center whitespace-nowrap`}>
+            + Create PO
+          </Link>
         </div>
       </div>
 
@@ -1016,6 +1233,16 @@ function POTab({ initialPO }: { initialPO?: string }) {
             <ClientPagination page={page} total={total} pageSize={PAGE_SIZE} onChange={p => { setPage(p); setLoading(true) }} />
           </div>
         </div>
+      )}
+
+      {labelModal && (
+        <BatchSerialLabelModal
+          preselectedBatchIds={labelModal.batchIds}
+          preselectedSerials={labelModal.serials}
+          initialMode={labelModal.batchIds.length ? 'batch' : 'serial'}
+          title="Print labels for received stock"
+          onClose={() => setLabelModal(null)}
+        />
       )}
 
     </div>
@@ -1640,6 +1867,7 @@ function StockTab() {
                 type="products"
                 value={valSearch}
                 onChange={v => { setValSearch(v); setValPage(1); syncUrl({ val_search: v }) }}
+                onSelect={item => { setValSearch(item.label); setValPage(1); syncUrl({ val_search: item.label }) }}
                 placeholder="Name, SKU, variant..."
                 inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
               />

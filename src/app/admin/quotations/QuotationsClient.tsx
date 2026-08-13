@@ -163,6 +163,8 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   const [convertStep, setConvertStep] = useState<'payment' | 'assign'>('payment')
   const [convertBatchSelections, setConvertBatchSelections] = useState<Record<string, Record<string, number>>>({})
   const [convertSerialSelections, setConvertSerialSelections] = useState<Record<string, Set<string>>>(() => ({}))
+  // Scanner mode for the Assign Stock serial pickers (default on — scan fields).
+  const [convertScanEnabled, setConvertScanEnabled] = useState(true)
   const [sendingEmailId, setSendingEmailId] = useState<string | null>(null)
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -914,7 +916,24 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                         {convertBatchPickerItems && convertSerialPickerItems ? 'Assign batches and serial numbers' : convertBatchPickerItems ? 'Select batches — quantities auto-filled (FIFO)' : 'Select serial numbers per item'}
                       </p>
                     </div>
-                    <button onClick={() => { setShowConvertModal(false) }} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+                    <div className="flex items-center gap-3">
+                      {convertSerialPickerItems && (
+                        <button
+                          type="button"
+                          onClick={() => setConvertScanEnabled(v => !v)}
+                          title={convertScanEnabled ? 'Scanner mode on — scan a serial to fill each field' : 'Click to select serials manually, or turn scanner mode on'}
+                          className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                            convertScanEnabled
+                              ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400'
+                              : 'border-border-default text-foreground-muted hover:bg-surface-secondary'
+                          }`}
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14" /></svg>
+                          {convertScanEnabled ? 'Scan: on' : 'Scan: off'}
+                        </button>
+                      )}
+                      <button onClick={() => { setShowConvertModal(false) }} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+                    </div>
                   </div>
                   <div className="overflow-y-auto flex-1 px-6 py-4 space-y-6">
                     {convertBatchPickerItems && (
@@ -1039,6 +1058,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                             item={item}
                             selected={convertSerialSelections[item.order_item_id] || new Set()}
                             onChange={next => setConvertSerialSelections(s => ({ ...s, [item.order_item_id]: next }))}
+                            scanEnabled={convertScanEnabled}
                           />
                         ))}
                       </>
@@ -1458,7 +1478,24 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                     {convertBatchPickerItems && convertSerialPickerItems ? 'Assign batches and serial numbers' : convertBatchPickerItems ? 'Select batches — quantities auto-filled (FIFO)' : 'Select serial numbers per item'}
                   </p>
                 </div>
-                <button onClick={() => setShowConvertModal(false)} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+                <div className="flex items-center gap-3">
+                  {convertSerialPickerItems && (
+                    <button
+                      type="button"
+                      onClick={() => setConvertScanEnabled(v => !v)}
+                      title={convertScanEnabled ? 'Scanner mode on — scan a serial to fill each field' : 'Click to select serials manually, or turn scanner mode on'}
+                      className={`inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full border transition-colors ${
+                        convertScanEnabled
+                          ? 'border-secondary-500 bg-secondary-50 dark:bg-secondary-900/20 text-secondary-700 dark:text-secondary-400'
+                          : 'border-border-default text-foreground-muted hover:bg-surface-secondary'
+                      }`}
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14" /></svg>
+                      {convertScanEnabled ? 'Scan: on' : 'Scan: off'}
+                    </button>
+                  )}
+                  <button onClick={() => setShowConvertModal(false)} className="text-foreground-muted hover:text-foreground transition-colors text-xl leading-none">×</button>
+                </div>
               </div>
               <div className="overflow-y-auto flex-1 px-6 py-4 space-y-6">
                 {convertBatchPickerItems && (
@@ -1583,6 +1620,7 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
                         item={item}
                         selected={convertSerialSelections[item.order_item_id] || new Set()}
                         onChange={next => setConvertSerialSelections(s => ({ ...s, [item.order_item_id]: next }))}
+                        scanEnabled={convertScanEnabled}
                       />
                     ))}
                   </>

@@ -15,6 +15,9 @@ vi.mock('@/lib/delivery-settings', () => ({
   getDeliverySettings: vi.fn(),
   applyDeliveryRules: vi.fn(),
 }))
+vi.mock('@/lib/site-controls', () => ({
+  getBusinessValues: vi.fn(),
+}))
 vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
@@ -28,12 +31,14 @@ import { POST } from '@/app/api/shipping/rate/route'
 import { queryMany } from '@/lib/db'
 import { packIntoCartons, fallbackShippingRate } from '@/lib/shipping'
 import { getDeliverySettings, applyDeliveryRules } from '@/lib/delivery-settings'
+import { getBusinessValues } from '@/lib/site-controls'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockPackIntoCartons = vi.mocked(packIntoCartons)
 const mockFallbackRate = vi.mocked(fallbackShippingRate)
 const mockGetDeliverySettings = vi.mocked(getDeliverySettings)
 const mockApplyRules = vi.mocked(applyDeliveryRules)
+const mockGetBusinessValues = vi.mocked(getBusinessValues)
 
 const defaultSettings = {
   enabled: true,
@@ -80,6 +85,16 @@ describe('POST /api/shipping/rate', () => {
     process.env.COD_SURCHARGE_FLAT = '40'
     process.env.COD_SURCHARGE_PCT = '2'
     process.env.SHIPPING_MIN_CHARGE = '0'
+    // getBusinessValues() is now called at the top of the route; provide the
+    // business values the assertions implicitly rely on (previously env-driven).
+    mockGetBusinessValues.mockResolvedValue({
+      codSurchargeFlat: 40,
+      codSurchargePct: 2,
+      shippingMinCharge: 0,
+      shippingMaxCharge: 200,
+      delhiveryOriginPincode: '492001',
+      defaultProductWeightG: 500,
+    } as any)
   })
 
   it('returns 400 for invalid destination pincode', async () => {

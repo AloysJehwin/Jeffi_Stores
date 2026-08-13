@@ -3,7 +3,7 @@ import { query, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
 
-const VALID_JOB_IDS = ['delhivery_sync', 'cancel_stale_orders', 'sweep_auto_tasks', 'run_campaigns', 'compute_health', 'daily_briefing']
+const VALID_JOB_IDS = ['delhivery_sync', 'cancel_stale_orders', 'sweep_auto_tasks', 'dispatch_mailer', 'run_campaigns', 'compute_health', 'daily_briefing']
 
 export async function POST(request: NextRequest) {
   const cronSecret = process.env.CRON_SECRET

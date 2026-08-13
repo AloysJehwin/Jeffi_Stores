@@ -43,7 +43,7 @@ const PAYMENT_ALLOWED_FOR_STATUS: Record<string, string[]> = {
   delivered:        ['paid', 'cod_collected'],
   cancel_requested: ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
   cancel_rejected:  ['pending', 'unpaid', 'cod_pending', 'paid', 'failed'],
-  cancelled:        ['pending', 'unpaid', 'failed', 'refunded'],
+  cancelled:        ['paid', 'pending', 'unpaid', 'failed', 'refunded'],
 }
 
 const ALL_STATUS_OPTIONS = [

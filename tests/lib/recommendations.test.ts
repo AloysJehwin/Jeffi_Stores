@@ -34,6 +34,7 @@ vi.mock('@/lib/ai-client', () => ({
 
 vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_PRICE_INCL_GST_SQL: 'VMIN_PRICE',
+  VARIANT_MIN_PRICE_EX_GST_SQL: 'VMIN_PRICE_EX',
   VARIANT_MIN_MRP_SQL: 'VMIN_MRP',
   VARIANT_STOCK_TOTAL_SQL: 'VSTOCK',
 }))

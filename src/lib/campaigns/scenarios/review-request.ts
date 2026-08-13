@@ -6,11 +6,13 @@ import {
   sendCampaignEmailRendered,
 } from '@/lib/automation-emails'
 import { renderCampaignEmail } from '@/lib/email-campaigns'
+import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
   lookbackDays: number
   maxRecipientsPerSweep: number
+  whatsappEnabled: boolean
 }
 
 interface Row {
@@ -27,10 +29,12 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
   defaultParams: {
     lookbackDays: 30,
     maxRecipientsPerSweep: 50,
+    whatsappEnabled: false,
   },
   paramSchema: {
     lookbackDays:          { type: 'integer', min: 1, max: 90,  label: 'Lookback (days)',        description: 'Only consider orders delivered in the last N days' },
     maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run', description: 'Hard limit per sweep' },
+    whatsappEnabled:       { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
   },
 
   async findEligible({ campaign, params }) {
@@ -58,7 +62,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
     `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.maxRecipientsPerSweep])
   },
 
-  async send(row, { campaign }) {
+  async send(row, { campaign, params }) {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
@@ -80,7 +84,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
         starLinks.push(`${user.baseUrl}/review?token=${token}&rating=${rating}`)
       }
       const productUrl = item.slug ? `${user.baseUrl}/products/${item.slug}` : null
-      return { name: item.name, imageUrl: item.image_url, starLinks, productUrl }
+      return { name: item.name, imageUrl: item.image_url, starLinks, productUrl, token }
     }))
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
@@ -93,7 +97,7 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       discountPercent: discountPercent ? String(discountPercent) : '',
     })
 
-    return sendCampaignEmailRendered({
+    const emailResult = await sendCampaignEmailRendered({
       campaign,
       user,
       referenceId: row.id,
@@ -101,5 +105,16 @@ export const reviewRequest: ScenarioModule<Params, Row> = {
       html,
       ampHtml,
     })
+    if ((params as any).whatsappEnabled) {
+      // Reuse the same token-based review link the email uses as the feedback URL.
+      const feedbackUrl = itemsWithLinks[0]?.token
+        ? `${user.baseUrl}/review?token=${itemsWithLinks[0].token}`
+        : `${user.baseUrl}/account/orders/${row.id}`
+      sendCampaignWhatsApp(campaign.kind, row.user_id, {
+        orderNumber: row.order_number,
+        url: feedbackUrl,
+      }).catch(() => {})
+    }
+    return emailResult
   },
 }

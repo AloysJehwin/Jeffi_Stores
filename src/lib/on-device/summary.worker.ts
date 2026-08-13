@@ -66,8 +66,10 @@ async function load() {
   loading = (async () => {
     tokenizer = await AutoTokenizer.from_pretrained(MODEL_ID)
     model = await AutoModelForCausalLM.from_pretrained(MODEL_ID, {
-      // q4 on mobile — smaller memory footprint, faster on mobile GPU
-      dtype: isMobile ? 'q4' : 'q8',
+      // Only the q8 build (onnx/model_quantized.onnx) is shipped. A q4 build
+      // (onnx/model_q4.onnx) is not present, so requesting 'q4' 404s and the
+      // load silently fails. Use 'q8' on all devices until a q4 file is added.
+      dtype: 'q8',
       device: 'webgpu',
     })
   })()

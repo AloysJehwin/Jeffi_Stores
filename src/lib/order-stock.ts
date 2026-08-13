@@ -1,5 +1,5 @@
 import { withTransaction } from '@/lib/db'
-import { logStockMovement } from '@/lib/inventory'
+import { logStockMovement, recomputeStockStatusForProduct } from '@/lib/inventory'
 import { syncPerishableStock } from '@/lib/shelf'
 
 /**
@@ -178,6 +178,17 @@ export async function restoreOrderStock(orderId: string): Promise<void> {
            AND (sub_variant_id = $4 OR ($4 IS NULL AND sub_variant_id IS NULL))`,
         [baseQty, item.product_id, item.variant_id || null, item.sub_variant_id || null]
       )
+    }
+
+    // If inventory_sync is ON, re-derive stock_status from the restored quantities
+    // (once per product, deduped). No-op when OFF. Perishable/serialized grains were
+    // already re-derived via syncPerishableStock above; this covers plain products
+    // and is idempotent for the rest.
+    const statusSynced = new Set<string>()
+    for (const item of itemsResult.rows) {
+      if (!item.product_id || statusSynced.has(item.product_id)) continue
+      statusSynced.add(item.product_id)
+      await recomputeStockStatusForProduct(client, item.product_id)
     }
   })
 }

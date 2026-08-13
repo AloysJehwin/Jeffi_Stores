@@ -46,11 +46,24 @@ vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
 })
+vi.mock('@/lib/sms', () => ({
+  sendOrderConfirmedSMS: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: vi.fn().mockResolvedValue({ gstEnabled: true }),
+}))
+vi.mock('@/lib/razorpay', () => ({
+  getRazorpayInstance: vi.fn(() => ({ orders: { fetch: vi.fn().mockResolvedValue({ amount: 15000 }) } })),
+}))
+vi.mock('@/lib/variant-change', () => ({
+  settleVariantChangePayment: vi.fn(),
+}))
 
 import { POST } from '@/app/api/razorpay/verify/route'
 import * as jwt from '@/lib/jwt'
 import * as db from '@/lib/db'
 import * as orderCommit from '@/lib/order-commit'
+import * as variantChange from '@/lib/variant-change'
 
 // ------------------------------------------------------------------ helpers
 
@@ -755,5 +768,336 @@ describe('POST /api/razorpay/verify', () => {
 
     expect(res.status).toBe(200)
     expect(vi.mocked(createAutoTask)).toHaveBeenCalled()
+  })
+
+  // ── variant-change top-up path (no draftToken/orderId) ────────────────────
+
+  it('variant-change: applies swap and returns success', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    // vcr lookup returns a pending variant_change_request
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'vcr-1', amountPaise: null } as any)
+    vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({ applied: true } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID,
+      razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE,
+    }) as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.success).toBe(true)
+    expect(body.settlement).toBe('variant_change_applied')
+    expect(variantChange.settleVariantChangePayment).toHaveBeenCalled()
+  })
+
+  it('variant-change: returns success when already_applied', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'vcr-2', amountPaise: 15000 } as any)
+    vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({ applied: false, reason: 'already_applied' } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID,
+      razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE,
+    }) as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.settlement).toBe('variant_change_applied')
+  })
+
+  it('variant-change: returns 409 when settle fails for another reason', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'vcr-3', amountPaise: 15000 } as any)
+    vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({ applied: false, reason: 'out_of_stock' } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID,
+      razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE,
+    }) as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.error).toMatch(/could not be applied/i)
+  })
+
+  it('variant-change: falls back to amount 0 when rzp fetch throws', async () => {
+    const { getRazorpayInstance } = await import('@/lib/razorpay')
+    vi.mocked(getRazorpayInstance).mockReturnValueOnce({
+      orders: { fetch: vi.fn().mockRejectedValue(new Error('rzp down')) },
+    } as any)
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne).mockResolvedValueOnce({ id: 'vcr-4', amountPaise: null } as any)
+    vi.mocked(variantChange.settleVariantChangePayment).mockResolvedValue({ applied: true } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID,
+      razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE,
+    }) as any)
+
+    expect(res.status).toBe(200)
+    expect(variantChange.settleVariantChangePayment).toHaveBeenCalledWith(
+      expect.objectContaining({ amountPaise: 0 })
+    )
+  })
+
+  it('commitDraft: sends SMS when user notification_channel is sms', async () => {
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    const { sendOrderConfirmedSMS } = await import('@/lib/sms')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-sms',
+      couponId: null, shippingAmount: 0, addressId: null, notes: null, businessDiscountAmount: 0,
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ ...MOCK_USER, notification_channel: 'sms', phone: '9999999999' })
+      .mockResolvedValue(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
+    vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
+    vi.mocked(hashCartItems).mockReturnValue('hash-sms')
+    vi.mocked(orderCommit.cartSubtotal).mockReturnValue(500)
+    vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(76)
+    vi.mocked(orderCommit.commitOrder).mockResolvedValue({
+      id: 'order-sms', order_number: 'ORD-SMS', total_amount: '500',
+    } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_sms',
+    }) as any)
+
+    expect(res.status).toBe(200)
+    expect(vi.mocked(sendOrderConfirmedSMS)).toHaveBeenCalled()
+  })
+
+  it('markLegacyOrderPaid: sends SMS when user notification_channel is sms', async () => {
+    const { sendOrderConfirmedSMS } = await import('@/lib/sms')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_ORDER)
+      .mockResolvedValueOnce({ ...MOCK_USER, notification_channel: 'sms', phone: '9999999999' })
+      .mockResolvedValueOnce(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) }
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
+    }) as any)
+
+    expect(res.status).toBe(200)
+    expect(vi.mocked(sendOrderConfirmedSMS)).toHaveBeenCalled()
+  })
+
+  it('commitDraft: exercises fire-and-forget catch handlers and item maps on rejection', async () => {
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    const email = await import('@/lib/email')
+    const invoice = await import('@/lib/invoice')
+    const activity = await import('@/lib/activity')
+    const aiFeedback = await import('@/lib/ai-feedback')
+    const autoTasks = await import('@/lib/auto-tasks')
+    const sms = await import('@/lib/sms')
+
+    // Make every fire-and-forget reject so its .catch(() => {}) closure runs.
+    vi.mocked(email.sendOrderConfirmationEmail).mockRejectedValue(new Error('x'))
+    vi.mocked(email.sendNewOrderNotification).mockRejectedValue(new Error('x'))
+    vi.mocked(email.sendPaymentStatusUpdate).mockRejectedValue(new Error('x'))
+    vi.mocked(invoice.createDraftInvoice).mockRejectedValue(new Error('x'))
+    vi.mocked(activity.logActivity).mockRejectedValue(new Error('x'))
+    vi.mocked(aiFeedback.recordImplicitSignalsForProducts).mockRejectedValue(new Error('x'))
+    vi.mocked(autoTasks.createAutoTask).mockRejectedValue(new Error('x'))
+    vi.mocked(sms.sendOrderConfirmedSMS).mockRejectedValue(new Error('x'))
+    // pending_payment_intents UPDATE rejects → its .catch fires
+    vi.mocked(db.query).mockRejectedValue(new Error('x'))
+
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-ff',
+      couponId: null, shippingAmount: 0, addressId: null, notes: null, businessDiscountAmount: 0,
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce({ ...MOCK_USER, notification_channel: 'sms', phone: '9999999999' })
+      .mockResolvedValue({ ...MOCK_ORDER, total_amount: '60000' })
+    // Non-empty order items so the .map() product_id callbacks execute
+    vi.mocked(db.queryMany).mockResolvedValue([{ product_id: 'p1' }, { product_id: 'p2' }] as any)
+    vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
+    vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
+    vi.mocked(hashCartItems).mockReturnValue('hash-ff')
+    vi.mocked(orderCommit.cartSubtotal).mockReturnValue(60000)
+    vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(9152)
+    vi.mocked(orderCommit.commitOrder).mockResolvedValue({
+      id: 'order-ff', order_number: 'ORD-FF', total_amount: '60000',
+    } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_ff',
+    }) as any)
+
+    expect(res.status).toBe(200)
+    // Give queued microtasks a tick so rejected .catch closures run before assertions end
+    await new Promise((r) => setTimeout(r, 0))
+    expect(vi.mocked(email.sendOrderConfirmationEmail)).toHaveBeenCalled()
+  })
+
+  it('markLegacyOrderPaid: exercises catch handlers and maps with non-empty items', async () => {
+    const email = await import('@/lib/email')
+    const invoice = await import('@/lib/invoice')
+    const aiFeedback = await import('@/lib/ai-feedback')
+    const sms = await import('@/lib/sms')
+
+    vi.mocked(email.sendOrderConfirmationEmail).mockRejectedValue(new Error('x'))
+    vi.mocked(email.sendNewOrderNotification).mockRejectedValue(new Error('x'))
+    vi.mocked(email.sendPaymentStatusUpdate).mockRejectedValue(new Error('x'))
+    vi.mocked(invoice.createDraftInvoice).mockRejectedValue(new Error('x'))
+    vi.mocked(aiFeedback.recordImplicitSignalsForProducts).mockRejectedValue(new Error('x'))
+    vi.mocked(sms.sendOrderConfirmedSMS).mockRejectedValue(new Error('x'))
+
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(MOCK_ORDER)
+      .mockResolvedValueOnce({ ...MOCK_USER, notification_channel: 'sms', phone: '9999999999' })
+      .mockResolvedValueOnce(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([{ product_id: 'p1' }] as any)
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) }
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
+    }) as any)
+
+    expect(res.status).toBe(200)
+    await new Promise((r) => setTimeout(r, 0))
+    expect(vi.mocked(invoice.createDraftInvoice)).toHaveBeenCalled()
+  })
+
+  it('commitDraft buyNow: GST disabled → taxAmount 0 and missing gst_percentage fallback', async () => {
+    const { verifyDraftToken } = await import('@/lib/order-draft')
+    const { getFeatureFlags } = await import('@/lib/site-controls')
+    vi.mocked(getFeatureFlags).mockResolvedValueOnce({ gstEnabled: false } as any)
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'buyNow',
+      buyNowItem: { productId: 'prod-1', variantId: null, subVariantId: null, price: 500, qty: 1 },
+      cartHash: null, couponId: null, shippingAmount: 0, addressId: null, notes: null, businessDiscountAmount: 0,
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValueOnce({ id: 'prod-1', name: 'Bolt', sku: 'B001', gst_percentage: null, hsn_code: '7318' })
+      .mockResolvedValue(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    vi.mocked(orderCommit.commitOrder).mockResolvedValue({
+      id: 'order-nogst', order_number: 'ORD-NG', total_amount: '500',
+    } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_nogst',
+    }) as any)
+
+    expect(res.status).toBe(200)
+    expect(orderCommit.commitOrder).toHaveBeenCalledWith(expect.objectContaining({ taxAmount: 0 }))
+  })
+
+  it('commitDraft: does not apply discount when coupon validation is not ok', async () => {
+    const { verifyDraftToken, hashCartItems } = await import('@/lib/order-draft')
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    vi.mocked(verifyDraftToken).mockResolvedValue({
+      userId: AUTH_USER.userId, mode: 'cart', cartHash: 'hash-cx',
+      couponId: 'coup-bad', shippingAmount: 0, addressId: null, notes: null, businessDiscountAmount: 0,
+    } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(MOCK_USER)
+      .mockResolvedValue(MOCK_ORDER)
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    vi.mocked(orderCommit.loadActiveCart).mockResolvedValue([{ product_id: 'p1' }] as any)
+    vi.mocked(orderCommit.cartItemsForHash).mockReturnValue([{ product_id: 'p1' }] as any)
+    vi.mocked(hashCartItems).mockReturnValue('hash-cx')
+    vi.mocked(orderCommit.cartSubtotal).mockReturnValue(500)
+    vi.mocked(orderCommit.cartTaxAmount).mockReturnValue(76)
+    vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({ ok: false } as any)
+    vi.mocked(orderCommit.commitOrder).mockResolvedValue({
+      id: 'order-cx', order_number: 'ORD-CX', total_amount: '500',
+    } as any)
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, draftToken: 'tok_couponbad',
+    }) as any)
+
+    expect(res.status).toBe(200)
+    expect(orderCommit.commitOrder).toHaveBeenCalledWith(expect.objectContaining({ appliedDiscount: 0 }))
+  })
+
+  it('markLegacyOrderPaid: isBusiness=true uses business order lookup, user null skips notifications', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue({ ...AUTH_USER, isBusiness: true } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce({ email: 'biz@example.com', phone: '8888888888' }) // bizUser
+      .mockResolvedValueOnce(MOCK_ORDER)                                          // order
+      .mockResolvedValueOnce(null)                                                // user null post-tx
+    vi.mocked(db.queryMany).mockResolvedValue([])
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) }
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
+    }) as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    expect(body.success).toBe(true)
+  })
+
+  it('markLegacyOrderPaid: bizUser null yields empty email/phone fallbacks', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue({ ...AUTH_USER, isBusiness: true } as any)
+    vi.mocked(db.queryOne)
+      .mockResolvedValueOnce(null)       // bizUser null → '' email, null phone
+      .mockResolvedValueOnce(MOCK_ORDER) // order
+      .mockResolvedValueOnce({ ...MOCK_USER, first_name: null, last_name: null }) // user w/o names → 'Customer'
+      .mockResolvedValueOnce(null)       // updatedOrder null → falls back to order
+    vi.mocked(db.queryMany).mockResolvedValue([{ product_id: 'p1' }] as any)
+    vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
+      const client = { query: vi.fn().mockResolvedValue({ rows: [], rowCount: 1 }) }
+      return fn(client)
+    })
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
+    }) as any)
+
+    expect(res.status).toBe(200)
+  })
+
+  it('returns 500 with generic message when a non-Error is thrown', async () => {
+    vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
+    // queryOne rejects with a non-Error (no .message) → error?.message is undefined → fallback string
+    vi.mocked(db.queryOne).mockRejectedValue('boom')
+
+    const res = await POST(makeRequest({
+      razorpay_order_id: RZP_ORDER_ID, razorpay_payment_id: RZP_PAYMENT_ID,
+      razorpay_signature: VALID_SIGNATURE, orderId: ORDER_UUID,
+    }) as any)
+    const body = await res.json()
+
+    expect(res.status).toBe(500)
+    expect(body.error).toMatch(/payment verification failed/i)
   })
 })

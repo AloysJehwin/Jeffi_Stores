@@ -20,6 +20,7 @@ vi.mock('@/lib/gst', () => ({
 }))
 vi.mock('@/lib/inventory', () => ({
   logStockMovement: vi.fn().mockResolvedValue(undefined),
+  recomputeStockStatusForProduct: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('@/lib/shelf', () => ({
   syncPerishableStock: vi.fn().mockResolvedValue(undefined),

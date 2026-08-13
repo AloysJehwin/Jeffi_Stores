@@ -14,6 +14,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/inventory', () => ({
   logStockMovement: vi.fn(),
   updateWeightedAvgCost: vi.fn(),
+  recomputeStockStatusForProduct: vi.fn(),
 }))
 vi.mock('@/lib/shelf', () => ({
   adjustStock: vi.fn(),
@@ -635,7 +636,7 @@ describe('POST /api/admin/inventory/po/[id]/receive', () => {
       query: vi.fn().mockImplementation((sql: string, p?: any[]) => {
         if (sql.includes('INSERT INTO grns')) return { rows: [{ id: 'grn-factor' }] }
         if (sql.includes('INSERT INTO grn_items')) {
-          capturedGrnItemQty = p?.[4] ?? null
+          capturedGrnItemQty = p?.[5] ?? null
           return { rows: [] }
         }
         if (sql.includes('FROM products WHERE id')) return { rows: [{ inventory_quantity: '20' }] }

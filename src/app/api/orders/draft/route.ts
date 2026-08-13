@@ -6,7 +6,7 @@ import { round2 } from '@/lib/gst'
 import {
   loadActiveCart,
   cartSubtotal,
-  cartTaxAmount,
+  cartLineUnitPrice,
   cartItemsForHash,
   validateCouponForUser,
   loadAddress,
@@ -18,6 +18,7 @@ import {
 import { signDraftToken, hashCartItems } from '@/lib/order-draft'
 import { getBusinessDiscountMap } from '@/lib/business-discount'
 import { verifyIntent } from '@/lib/checkout-intent'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { parseBody, zUuid } from '@/lib/validate'
 
 const DraftSchema = z.object({
@@ -73,11 +74,12 @@ export async function POST(req: NextRequest) {
   let buyNowItem: any = null
   let businessDiscountAmount = 0
   let shippingItems: { productId: string; variantId: string | null; quantity: number }[] = []
+  const { gstEnabled } = await getFeatureFlags()
 
   if (mode === 'cart') {
     const cart = await loadActiveCart(authUser.userId)
     if (cart.length === 0) return NextResponse.json({ error: 'Cart is empty' }, { status: 400 })
-    subtotal = cartSubtotal(cart)
+    subtotal = cartSubtotal(cart, gstEnabled)
     cartHash = hashCartItems(cartItemsForHash(cart))
     cartItemIds = cart.map(c => `${c.product_id}:${c.variant_id || ''}:${c.sub_variant_id || ''}:${c.buy_mode}`)
     shippingItems = cart.map(c => ({ productId: c.product_id, variantId: c.variant_id, quantity: Number(c.quantity) }))
@@ -88,7 +90,7 @@ export async function POST(req: NextRequest) {
         const catId = item.products.category_id
         const pct = catId ? (discountMap[catId] ?? 0) : 0
         if (pct > 0) {
-          const linePrice = Number(item.price_at_addition) || Number(item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+          const linePrice = cartLineUnitPrice(item, gstEnabled)
           businessDiscountAmount += linePrice * Number(item.quantity) * pct / 100
         }
       }
@@ -119,7 +121,7 @@ export async function POST(req: NextRequest) {
         buyUnit: item.buyUnit,
       }
     }
-    const resolved = await resolveBuyNowItem(resolveInput)
+    const resolved = await resolveBuyNowItem({ ...resolveInput, gstEnabled })
     if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
     subtotal = round2(resolved.item.price * resolved.item.qty)
     buyNowItem = resolved.item

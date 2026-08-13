@@ -149,7 +149,8 @@ export default async function EditCouponPage({ params, searchParams }: { params:
     const intent = formData.get('intent') as string | null
     const host = await getHost()
     const rawBack = formData.get('_back') as string | null
-    const destination = rawBack && rawBack.startsWith('/admin/coupons') ? rawBack : `/admin/coupons/edit/${id}`
+    // Save as Draft always returns to the list.
+    const destination = rawBack && rawBack.startsWith('/admin/coupons') ? rawBack : '/admin/coupons'
 
     const draftFields = { code, description: description || null, discount_type, discount_value, min_purchase_amount, max_discount_amount, usage_limit, usage_limit_per_user, valid_from, valid_until, is_active }
 

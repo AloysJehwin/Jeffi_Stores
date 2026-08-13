@@ -13,11 +13,11 @@ export default function AdminAgentTrigger({ canUse }: { canUse: boolean }) {
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="p-2 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors"
+        className="h-9 w-9 inline-flex items-center justify-center rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
         title="Admin Assistant"
         aria-label="Open admin assistant"
       >
-        <Bot className="w-4 h-4" />
+        <Bot className="w-5 h-5" />
       </button>
       <AdminAgentModal isOpen={open} onClose={() => setOpen(false)} />
     </>

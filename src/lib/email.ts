@@ -22,7 +22,7 @@ async function getAdminNotificationEmails(): Promise<string> {
       []
     )
     if (rows.length > 0) return rows.map(r => r.email).join(', ')
-  } catch (err) { console.error("[route]", err) }
+  } catch { /* fall back to ADMIN_EMAIL below */ }
   return process.env.ADMIN_EMAIL || 'admin@admin.jeffistores.in'
 }
 
@@ -2327,6 +2327,67 @@ export async function sendProductAnnouncementEmail(args: {
       kind: 'campaign',
       templateName: 'product_announcement',
       metadata: { productCount: products.length, productIds: products.map(p => p.id) },
+    })
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+// Admin-initiated post-order variant/sub-variant change awaiting customer approval.
+// Shows old → new variant, the price difference (refund owed / extra due /
+// COD-adjusted total), and a link to confirm on the order page.
+export async function sendVariantChangeRequestedEmail(params: {
+  customerEmail: string
+  customerName: string
+  orderNumber: string
+  orderId: string
+  oldVariantName: string | null
+  newVariantName: string | null
+  priceDiff: number
+  settlementType: 'refund' | 'collect' | 'cod_adjust' | 'none'
+  newTotal: number
+}): Promise<{ success: boolean; messageId?: string; error?: unknown }> {
+  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const orderUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${params.orderId}`
+  const absDiff = Math.abs(params.priceDiff)
+  const diffLine = params.settlementType === 'refund'
+    ? `We'll <strong>refund &#8377;${absDiff.toFixed(2)}</strong> to your original payment once you confirm.`
+    : params.settlementType === 'collect'
+      ? `An additional <strong>&#8377;${absDiff.toFixed(2)}</strong> is payable — you'll be asked to pay it securely when you confirm.`
+      : params.settlementType === 'cod_adjust'
+        ? `Your order total will be updated to <strong>&#8377;${params.newTotal.toFixed(2)}</strong> (payable on delivery).`
+        : `There is no change to your total.`
+
+  const subject = `Action needed: variant change on order ${params.orderNumber}`
+  const html = `<!DOCTYPE html><html><body style="font-family:Arial,Helvetica,sans-serif;background:#f4f4f5;margin:0;padding:24px;color:#111827;">
+    <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:10px;overflow:hidden;border:1px solid #e5e7eb;">
+      <div style="background:#111827;color:#fff;padding:20px 24px;"><h2 style="margin:0;font-size:18px;">Variant change requested</h2></div>
+      <div style="padding:24px;">
+        <p style="margin-top:0;">Hi ${params.customerName || 'there'},</p>
+        <p>For your order <strong>${params.orderNumber}</strong>, we'd like to substitute an item with a near-equivalent variant. Please review and confirm:</p>
+        <div style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin:16px 0;">
+          <p style="margin:0 0 6px;"><span style="color:#6b7280;">Current:</span> ${params.oldVariantName || '&#8212;'}</p>
+          <p style="margin:0;"><span style="color:#6b7280;">Proposed:</span> <strong>${params.newVariantName || '&#8212;'}</strong></p>
+        </div>
+        <p>${diffLine}</p>
+        <p style="text-align:center;margin:24px 0 8px;">
+          <a href="${orderUrl}" style="display:inline-block;background:#ea580c;color:#fff;padding:12px 28px;border-radius:6px;font-weight:bold;text-decoration:none;">Review &amp; Confirm</a>
+        </p>
+        <p style="font-size:12px;color:#6b7280;text-align:center;">The change is applied only after you confirm. You can also decline it.</p>
+      </div>
+    </div></body></html>`
+
+  try {
+    const info = await sendAuditedMail({
+      from,
+      to: params.customerEmail,
+      subject,
+      html,
+      kind: 'variant_change_requested',
+      templateName: 'variant_change_requested',
+      entityType: 'orders',
+      entityId: params.orderId,
     })
     return { success: true, messageId: info.messageId }
   } catch (error) {

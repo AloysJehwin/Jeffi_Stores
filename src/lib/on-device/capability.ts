@@ -5,15 +5,14 @@
  * Gemma 3 270M checkout-summary model. Pure feature detection — no model
  * download, no heavy work. Runs client-side only.
  *
- * Policy:
- * - Feature flag must be on
+ * Policy (HARDWARE ONLY — the enable/disable decision lives in the DB feature
+ * flag `feature_ondevice_summary_enabled`, which each consumer checks via
+ * useStoreConfig().flags.ondeviceSummaryEnabled BEFORE calling this):
  * - WebGPU adapter present
  * - Memory >= 4 GB (desktop) or WebGPU passes (mobile — deviceMemory unreliable)
  * - GPU buffer limits large enough (relaxed thresholds for mobile)
  * - Real Wi-Fi or ethernet (blocks cellular/hotspot, respects saveData)
  */
-
-import { isOnDeviceSummaryEnabled } from './flag'
 
 interface GPUAdapterLike {
   limits: Record<string, number>
@@ -119,10 +118,6 @@ export async function detectOnDeviceCapability(): Promise<CapabilityVerdict> {
     modelCached: false,
     isWifi: null,
     isMobile: false,
-  }
-
-  if (!isOnDeviceSummaryEnabled()) {
-    return { capable: false, reason: 'disabled', details }
   }
 
   if (typeof window === 'undefined' || typeof navigator === 'undefined') {

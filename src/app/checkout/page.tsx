@@ -3,10 +3,13 @@
 import { useCart } from '@/contexts/CartContext'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { pickUnitPrice } from '@/lib/pricing'
 import Link from 'next/link'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 
 function UnitLabel({ label }: { label: string | null | undefined }) {
   if (!label) return null
@@ -14,8 +17,6 @@ function UnitLabel({ label }: { label: string | null | undefined }) {
   if (match) return <>{match[1]}<sup>2</sup></>
   return <>{label}</>
 }
-
-const isRazorpayEnabled = process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true'
 
 export default function CheckoutPageWrapper() {
   return (
@@ -29,6 +30,8 @@ function CheckoutPage() {
   const { cartItems, cartCount, getCartTotal, getCartTax, clearCart, isLoading: cartLoading } = useCart()
   const { user, isLoading: authLoading } = useAuth()
   const { showToast } = useToast()
+  const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
+  const gstEnabled = useStoreConfig().flags.gstEnabled
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -775,7 +778,7 @@ function CheckoutPage() {
                         </div>
                           )
                         })()}
-                        {buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
+                        {gstEnabled && buyNowItem.gstPercentage != null && buyNowItem.gstPercentage > 0 && (() => {
                           const isBuyNowFractional = (buyNowItem.buyMode && buyNowItem.buyMode !== 'unit') || !!(buyNowItem.buyUnit && buyNowItem.buyUnit !== 'unit')
                           const lineTotal = buyNowItem.price * (isBuyNowFractional ? buyNowItem.qty : Math.round(buyNowItem.qty))
                           const gst = lineTotal - lineTotal / (1 + buyNowItem.gstPercentage / 100)
@@ -791,7 +794,12 @@ function CheckoutPage() {
                     cartItems.map((item) => {
                       const primaryImage = item.products.product_images?.find((img: any) => img.is_primary) || item.products.product_images?.[0]
                       const isFractional = item.buy_mode && item.buy_mode !== 'unit'
-                      const price = isFractional ? item.price_at_addition : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price)
+                      const price = !gstEnabled
+                        ? pickUnitPrice({
+                            inclusive: item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price,
+                            exGst: item.sub_variant?.price_ex_gst ?? item.variant?.price_ex_gst ?? item.products.price_ex_gst,
+                          }, false)
+                        : (isFractional ? item.price_at_addition : (item.sub_variant?.price ?? item.variant?.price ?? item.products.base_price))
                       const effectiveQty = isFractional ? Number(item.quantity) : Math.round(Number(item.quantity))
                       const itemTotal = price * effectiveQty
                       const mrp = item.sub_variant?.mrp ?? item.variant?.mrp ?? item.products.mrp ?? null
@@ -993,7 +1001,7 @@ function CheckoutPage() {
                     <span>Subtotal{!isBuyNow ? ` (${cartCount} items)` : ''}</span>
                     <span>₹{subtotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
-                  {!isBuyNow && (
+                  {!isBuyNow && gstEnabled && (
                     <div className="flex justify-between text-foreground-muted text-sm">
                       <span>Incl. GST</span>
                       <span>₹{tax.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
@@ -1076,6 +1084,9 @@ function CheckoutPage() {
             </div>
           </div>
         </form>
+      </div>
+      <div className="container mx-auto px-4 pb-8">
+        <FeaturedForYou compact limit={4} />
       </div>
     </div>
   )

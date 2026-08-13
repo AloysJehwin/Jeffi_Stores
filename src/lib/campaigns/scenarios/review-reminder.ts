@@ -5,11 +5,13 @@ import {
   sendCampaignEmail,
   renderItemRows,
 } from '@/lib/automation-emails'
+import { sendCampaignWhatsApp } from '@/lib/campaigns/whatsapp-dispatch'
 import type { ScenarioModule } from '../types'
 
 interface Params extends Record<string, unknown> {
   lookbackDays: number
   maxRecipientsPerSweep: number
+  whatsappEnabled: boolean
 }
 
 interface Row {
@@ -26,10 +28,12 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
   defaultParams: {
     lookbackDays: 30,
     maxRecipientsPerSweep: 50,
+    whatsappEnabled: false,
   },
   paramSchema: {
     lookbackDays:          { type: 'integer', min: 1, max: 90,  label: 'Lookback (days)',        description: 'Only consider orders delivered in the last N days' },
     maxRecipientsPerSweep: { type: 'integer', min: 1, max: 500, label: 'Max recipients per run', description: 'Hard limit per sweep' },
+    whatsappEnabled:       { type: 'boolean', label: 'Also send via WhatsApp', description: 'Additionally send this campaign to the customer\'s WhatsApp when a phone number is on file' },
   },
 
   async findEligible({ campaign, params }) {
@@ -57,7 +61,7 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
     `, [campaign.kind, campaign.delay_hours, params.lookbackDays, params.maxRecipientsPerSweep])
   },
 
-  async send(row, { campaign }) {
+  async send(row, { campaign, params }) {
     const user = await fetchUserContext(row.user_id)
     if (!user) return { ok: false, reason: 'no_user' }
 
@@ -82,7 +86,8 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
 
-    return sendCampaignEmail({
+    const ctaUrl = `${user.baseUrl}/account/orders/${row.id}`
+    const emailResult = await sendCampaignEmail({
       campaign,
       user,
       referenceId: row.id,
@@ -92,8 +97,15 @@ export const reviewReminder: ScenarioModule<Params, Row> = {
         itemsHtml,
         couponCode,
         discountPercent,
-        ctaUrl: `${user.baseUrl}/account/orders/${row.id}`,
+        ctaUrl,
       },
     })
+    if ((params as any).whatsappEnabled) {
+      sendCampaignWhatsApp(campaign.kind, row.user_id, {
+        orderNumber: row.order_number,
+        url: ctaUrl,
+      }).catch(() => {})
+    }
+    return emailResult
   },
 }

@@ -195,7 +195,7 @@ describe('POST /api/orders/[id]/return-review', () => {
 
   it('processes a refund return (no razorpay) successfully', async () => {
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(false)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received' })
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
@@ -243,7 +243,7 @@ describe('POST /api/orders/[id]/return-review', () => {
     const razorpayMock = {
       payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_123' }) },
     }
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
 
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
@@ -267,7 +267,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   })
 
   it('processes refund without razorpay — restock=false skips inventory update', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(false)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received' })
@@ -352,7 +352,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   // --- process/refund: Razorpay enabled but no payment record found (falls through) ---
 
   it('processes refund when razorpay enabled but no payment record — falls through to manual path', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid' })
@@ -369,7 +369,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   // --- process/refund: Razorpay enabled but payment record has no transaction_id ---
 
   it('processes refund when payment record has no transaction_id — falls through to manual path', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid' })
@@ -384,7 +384,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   // --- process/refund: original_order_id set — fetches payment_status from parent order ---
 
   it('processes refund with original_order_id — looks up parent payment_status', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(false)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid', original_order_id: 'parent-order-1' })
@@ -399,7 +399,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   // --- process/refund: restock=true (default) with variant items ---
 
   it('processes refund with restock — restocks variant items', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(false)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received' })
@@ -421,7 +421,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   // --- process/refund: no user_id (skips logActivity) ---
 
   it('processes refund for guest order (no user_id)', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(false)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', user_id: null, users: null })
@@ -438,7 +438,7 @@ describe('POST /api/orders/[id]/return-review', () => {
     const razorpayMock = {
       payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_456' }) },
     }
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
@@ -542,7 +542,7 @@ describe('POST /api/orders/[id]/return-review', () => {
   // --- process/refund: item-level records present → refundAmount computed via reduce (line 212) ---
 
   it('processes refund using item-level records (sums refund_amount)', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(false)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received' })
@@ -565,7 +565,7 @@ describe('POST /api/orders/[id]/return-review', () => {
     const razorpayMock = {
       payments: { refund: vi.fn().mockRejectedValue(new Error('gateway down')) },
     }
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
@@ -587,7 +587,7 @@ describe('POST /api/orders/[id]/return-review', () => {
     const razorpayMock = {
       payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_obj' }) },
     }
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
@@ -606,7 +606,7 @@ describe('POST /api/orders/[id]/return-review', () => {
     const razorpayMock = {
       payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd_null' }) },
     }
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
     vi.mocked(jwt.authenticateAdmin).mockResolvedValue(ADMIN as any)
     vi.mocked(db.queryOne)
@@ -760,7 +760,7 @@ describe('POST /api/orders/[id]/return-review — rejected side-effects hit .cat
   })
 
   it('process refund (manual path): swallows all rejected side effects', async () => {
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(false)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(false)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received' })
       .mockResolvedValueOnce(MOCK_RETURN_REQUEST)
@@ -771,7 +771,7 @@ describe('POST /api/orders/[id]/return-review — rejected side-effects hit .cat
 
   it('process refund (razorpay success path): swallows all rejected side effects', async () => {
     const razorpayMock = { payments: { refund: vi.fn().mockResolvedValue({ id: 'rfnd' }) } }
-    vi.mocked(razorpayLib.isRazorpayEnabled).mockReturnValue(true)
+    vi.mocked(razorpayLib.isRazorpayEnabled).mockResolvedValue(true)
     vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(razorpayMock as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received', payment_status: 'paid' })

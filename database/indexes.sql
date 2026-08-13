@@ -1355,6 +1355,29 @@ CREATE INDEX idx_return_requests_user_id ON public.return_requests USING btree (
 
 
 --
+-- Name: idx_variant_change_requests_order_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_variant_change_requests_order_id ON public.variant_change_requests USING btree (order_id);
+
+--
+-- Name: idx_variant_change_requests_status; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_variant_change_requests_status ON public.variant_change_requests USING btree (status);
+
+--
+-- Name: idx_variant_change_requests_rzp_order; Type: INDEX; Schema: public; Owner: -
+-- Partial-unique on the Razorpay order id — the idempotency anchor for the
+-- collect (top-up) path so a payment can only settle one change request.
+--
+
+CREATE UNIQUE INDEX idx_variant_change_requests_rzp_order ON public.variant_change_requests USING btree (razorpay_order_id) WHERE (razorpay_order_id IS NOT NULL);
+
+
+
+
+--
 -- Name: idx_reviews_product_id; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -1823,3 +1846,20 @@ CREATE INDEX idx_auth_sessions_expiry ON public.auth_sessions USING btree (expir
 -- most one session; NULL on legacy (pre-token) rows, which Postgres allows multiple of.
 CREATE UNIQUE INDEX idx_auth_sessions_token_hash ON public.auth_sessions USING btree (token_hash);
 
+
+-- hero_slides: active slides ordered for the homepage carousel
+CREATE INDEX idx_hero_slides_active_order ON public.hero_slides USING btree (is_active, display_order) WHERE (is_active = true);
+
+-- Barcode / serial scanning: fast lookup by scannable identifiers
+CREATE INDEX IF NOT EXISTS idx_products_barcode ON public.products USING btree (barcode) WHERE barcode IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_products_gtin ON public.products USING btree (gtin) WHERE gtin IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_product_variants_gtin ON public.product_variants USING btree (gtin) WHERE gtin IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_product_serials_serial ON public.product_serials USING btree (serial_number);
+CREATE INDEX IF NOT EXISTS idx_product_serials_product ON public.product_serials USING btree (product_id);
+CREATE INDEX IF NOT EXISTS idx_product_serials_status ON public.product_serials USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_product_serials_order ON public.product_serials USING btree (order_id) WHERE order_id IS NOT NULL;
+-- One in-stock serial per (product, serial_number): prevents duplicate in-stock units
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_product_serials_instock ON public.product_serials USING btree (product_id, serial_number) WHERE status = 'in_stock';
+-- Serial numbers must be globally unique among in-stock units (no two in-stock
+-- serials may share a number, even across different products).
+CREATE UNIQUE INDEX IF NOT EXISTS uniq_product_serials_instock_global ON public.product_serials USING btree (serial_number) WHERE status = 'in_stock';

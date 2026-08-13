@@ -233,7 +233,7 @@ describe('POST /api/orders/create', () => {
   })
 
   it('applies percentage coupon discount correctly', async () => {
-    const cartItem = { ...CART_ITEM, quantity: '1' } // unit price 100, qty 1 → subtotal = 100
+    const cartItem = { ...CART_ITEM, quantity: '1' } // GST off ⇒ ex-GST price 90, qty 1 → subtotal = 90
 
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
@@ -242,7 +242,7 @@ describe('POST /api/orders/create', () => {
     vi.mocked(db.queryMany).mockResolvedValue([cartItem])
 
     // Coupon validation now lives in validateCouponForUser (order-commit).
-    // 10% of subtotal 100 = 10.
+    // Mock returns a fixed applied discount of 10.
     vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({
       appliedDiscount: 10,
       ok: true,
@@ -268,9 +268,9 @@ describe('POST /api/orders/create', () => {
 
     expect(res.status).toBe(200)
     expect(vi.mocked(orderCommit.validateCouponForUser)).toHaveBeenCalledWith(
-      expect.objectContaining({ couponId: 'coupon-1', userId: 'user-123', subtotal: 100 })
+      expect.objectContaining({ couponId: 'coupon-1', userId: 'user-123', subtotal: 90 })
     )
-    // 10% of 100 = 10
+    // fixed mock applied discount = 10
     expect(capturedDiscount).toBe(10)
   })
 

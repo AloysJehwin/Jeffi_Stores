@@ -41,8 +41,17 @@ vi.mock('@/lib/guest-user', () => ({
 vi.mock('@/lib/queries', () => ({
   VARIANT_MIN_PRICE_SQL: `(SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id)`,
   VARIANT_MIN_PRICE_INCL_GST_SQL: `(SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id)`,
+  VARIANT_MIN_PRICE_EX_GST_SQL: `(SELECT MIN(pv.price) FROM product_variants pv WHERE pv.product_id = p.id)`,
   VARIANT_MIN_MRP_SQL: `(SELECT MIN(pv.mrp) FROM product_variants pv WHERE pv.product_id = p.id)`,
   VARIANT_STOCK_TOTAL_SQL: `(SELECT COALESCE(SUM(pv.inventory_quantity),0) FROM product_variants pv WHERE pv.product_id = p.id)`,
+}))
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: vi.fn().mockResolvedValue({
+    razorpayEnabled: false,
+    gstEnabled: false,
+    ondeviceSummaryEnabled: false,
+    ondeviceFinetuneEnabled: false,
+  }),
 }))
 
 // ---------------------------------------------------------------------------

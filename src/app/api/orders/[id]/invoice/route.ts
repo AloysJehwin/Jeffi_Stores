@@ -214,7 +214,10 @@ export async function GET(
       pdfBuffer = await generateReceiptPDF(receiptOrder, receiptItems, receiptBusiness)
     } else {
       const voidLabel = order.status === 'returned' ? 'RETURNED' : 'CANCELLED'
-      pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, isCancelled, voidLabel)
+      // Tax-free (Bill of Supply) when the order carries no GST at all.
+      const taxFree = (parseFloat(order.tax_amount || '0') === 0)
+        && (parseFloat(order.cgst_amount || '0') + parseFloat(order.sgst_amount || '0') + parseFloat(order.igst_amount || '0') === 0)
+      pdfBuffer = await generateInvoicePDF(invoiceOrder, invoiceItems, business, buyerAddress, billingAddress, isCancelled, voidLabel, taxFree)
     }
 
     if (!isCancelled && order.source !== 'cash_sale') {

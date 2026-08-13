@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
   const campaign = await queryOne(`SELECT * FROM campaigns WHERE kind = $1`, [kind])
   if (!campaign) return NextResponse.json({ error: 'Campaign not found' }, { status: 404 })
 
-  const [recentSends, countRow] = await Promise.all([
+  const [recentSends, countRow, whatsappLogs] = await Promise.all([
     queryMany(`
       SELECT
         ecs.id, ecs.user_id, ecs.reference_id, ecs.sent_at, ecs.opened_at, ecs.clicked_at,
@@ -40,11 +40,19 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ kind
       `SELECT COUNT(*) AS total FROM email_campaigns_sent WHERE campaign_kind = $1`,
       [kind]
     ),
+    queryMany(`
+      SELECT to_number, body, status, error, sent_at
+      FROM message_logs
+      WHERE channel = 'whatsapp' AND entity_type = 'campaign' AND entity_id = $1
+      ORDER BY sent_at DESC
+      LIMIT 50
+    `, [kind]),
   ])
 
   return NextResponse.json({
     campaign,
     recentSends,
+    whatsappLogs,
     total: parseInt(countRow?.total || '0', 10),
     limit,
     offset,

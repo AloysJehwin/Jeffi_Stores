@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { canRunOnDeviceSummary, generateProductPitch } from '@/lib/on-device/runtime'
 import { readUserProfile } from '@/lib/on-device/user-profile'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface Props {
   productName: string
@@ -25,12 +26,14 @@ async function fetchOllamaPitch(productName: string, brand: string | null, categ
 }
 
 export default function ProductPitchLine({ productName, brand, category }: Props) {
+  const ondeviceEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
   const [text, setText] = useState('')
   const [done, setDone] = useState(false)
   const [source, setSource] = useState<Source>('on-device')
   const started = useRef(false)
 
   useEffect(() => {
+    if (!ondeviceEnabled) return
     if (started.current) return
     started.current = true
 
@@ -61,7 +64,7 @@ export default function ProductPitchLine({ productName, brand, category }: Props
         }
       }
     }).catch(() => {})
-  }, [productName, brand, category])
+  }, [productName, brand, category, ondeviceEnabled])
 
   if (!text) return null
 

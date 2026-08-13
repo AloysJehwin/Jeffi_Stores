@@ -15,6 +15,8 @@ import { logMessage } from '@/lib/message-log'
 
 const ACCOUNT_SID = process.env.TWILIO_ACCOUNT_SID
 const AUTH_TOKEN = process.env.TWILIO_AUTH_TOKEN
+const API_KEY_SID = process.env.TWILIO_API_KEY_SID
+const API_KEY_SECRET = process.env.TWILIO_API_KEY_SECRET
 const WA_FROM = process.env.TWILIO_WHATSAPP_FROM || '+18722179910'
 const DISABLED = process.env.WHATSAPP_DISABLED === 'true'
 
@@ -27,12 +29,12 @@ const TEMPLATES = {
   outForDelivery: process.env.TWILIO_WA_OUT_FOR_DELIVERY_SID || 'HXfa11093ed4bc99a14151f8b3bc90b749',
   paymentFailed: process.env.TWILIO_WA_PAYMENT_FAILED_SID || '',
   // Marketing
-  promoOffer: process.env.TWILIO_WA_PROMO_OFFER_SID || 'HX3db2a4641ad74025d10eeac6db0ea50c',
-  newArrivals: process.env.TWILIO_WA_NEW_ARRIVALS_SID || 'HXa503d921fce7851723541abaa91229f6',
-  abandonedCart: process.env.TWILIO_WA_ABANDONED_CART_SID || 'HX5e390a4a46682f1460b357bbdd9e6c83',
-  backInStock: process.env.TWILIO_WA_BACK_IN_STOCK_SID || 'HX7f8136e4eb9f2818c9e17f7c6fb8f9b1',
-  festiveGreeting: process.env.TWILIO_WA_FESTIVE_GREETING_SID || 'HXf39e53109f5f1600ced018ad35120bdd',
-  reorderReminder: process.env.TWILIO_WA_REORDER_REMINDER_SID || 'HX57559e8ba0c987cf20d149884dd8e3f6',
+  promoOffer: process.env.TWILIO_WA_PROMO_OFFER_SID || 'HX4500f4beac783d988ccaea62396927a3',
+  newArrivals: process.env.TWILIO_WA_NEW_ARRIVALS_SID || 'HXe16b084ecee38483663765275d3afd20',
+  abandonedCart: process.env.TWILIO_WA_ABANDONED_CART_SID || 'HX3b662d590c448e238ee4d6d4d638ef24',
+  backInStock: process.env.TWILIO_WA_BACK_IN_STOCK_SID || 'HXd4d3cf0ced879c6fb2397e25d21805f6',
+  festiveGreeting: process.env.TWILIO_WA_FESTIVE_GREETING_SID || 'HX5c3fad2143bddcd9709c5e4ffc7a5564',
+  reorderReminder: process.env.TWILIO_WA_REORDER_REMINDER_SID || 'HX1f3a4b0168671e57ff5f54c9dd155984',
   // Support
   supportAck: process.env.TWILIO_WA_SUPPORT_ACK_SID || 'HX95ce2cea26825b06e22b24aa802dddf8',
   supportTicketCreated: process.env.TWILIO_WA_SUPPORT_TICKET_SID || 'HX3fee423887ba430b9d9c83f78ba6a2bb',
@@ -41,11 +43,20 @@ const TEMPLATES = {
   returnInitiated: process.env.TWILIO_WA_RETURN_INITIATED_SID || 'HX7b0dfa4a553817d5a14d3920d7beb3c4',
   refundProcessed: process.env.TWILIO_WA_REFUND_PROCESSED_SID || 'HX97f829b9e7f9222341e3c5ab3a861205',
   feedbackRequest: process.env.TWILIO_WA_FEEDBACK_REQUEST_SID || 'HX4f34db44ae6e5e4c31c0048745cafb82',
+  // Post-order variant change — needs a Meta-approved template with {1}=order, {2}=url.
+  // Set TWILIO_WA_VARIANT_CHANGE_SID once approved; until then sendTemplate's
+  // freeform fallback text (below) carries the message within the 24h window,
+  // and the notify.ts dispatcher falls back to SMS if WhatsApp returns false.
+  variantChange: process.env.TWILIO_WA_VARIANT_CHANGE_SID || '',
 }
 
 function getClient() {
-  if (!ACCOUNT_SID || !AUTH_TOKEN) return null
-  return twilio(ACCOUNT_SID, AUTH_TOKEN)
+  if (!ACCOUNT_SID) return null
+  if (API_KEY_SID && API_KEY_SECRET) {
+    return twilio(API_KEY_SID, API_KEY_SECRET, { accountSid: ACCOUNT_SID })
+  }
+  if (AUTH_TOKEN) return twilio(ACCOUNT_SID, AUTH_TOKEN)
+  return null
 }
 
 function normalizePhone(phone: string | null | undefined): string | null {
@@ -63,11 +74,13 @@ async function sendTemplate(
   contentSid: string,
   variables: Record<string, string>,
   kind: string,
-  summary: string
+  summary: string,
+  entity?: { entityType?: string; entityId?: string }
 ): Promise<boolean> {
   const normalized = normalizePhone(to)
   if (!normalized) return false
   if (DISABLED) return false
+  if (!contentSid) return false  // template not configured yet → let caller fall back (SMS)
   const client = getClient()
   if (!client) return false
   const waFrom = `whatsapp:${WA_FROM}`
@@ -78,10 +91,10 @@ async function sendTemplate(
       contentSid,
       contentVariables: JSON.stringify(variables),
     })
-    logMessage({ channel: 'whatsapp', to: normalized, from: WA_FROM, body: summary, kind, status: 'sent', providerSid: msg.sid })
+    logMessage({ channel: 'whatsapp', to: normalized, from: WA_FROM, body: summary, kind, status: 'sent', providerSid: msg.sid, entityType: entity?.entityType, entityId: entity?.entityId })
     return true
   } catch (err: any) {
-    logMessage({ channel: 'whatsapp', to: normalized, from: WA_FROM, body: summary, kind, status: 'failed', error: err?.message })
+    logMessage({ channel: 'whatsapp', to: normalized, from: WA_FROM, body: summary, kind, status: 'failed', error: err?.message, entityType: entity?.entityType, entityId: entity?.entityId })
     return false
   }
 }
@@ -145,21 +158,21 @@ export async function sendPaymentFailedWhatsApp(params: {
 
 // ── Marketing ──────────────────────────────────────────────────────────────
 
-export async function sendPromoOfferWhatsApp(p: { phone?: string | null; headline: string; code: string; discount: string }): Promise<boolean> {
+export async function sendPromoOfferWhatsApp(p: { phone?: string | null; headline: string; code: string; discount: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
   return sendTemplate(p.phone, TEMPLATES.promoOffer, { '1': p.headline, '2': p.code, '3': p.discount }, 'promo_offer',
-    `${STORE}: ${p.headline}! Use code ${p.code} for ${p.discount} off.`)
+    `${STORE}: ${p.headline}! Use code ${p.code} for ${p.discount} off.`, p.entity)
 }
 export async function sendNewArrivalsWhatsApp(p: { phone?: string | null; items: string }): Promise<boolean> {
   return sendTemplate(p.phone, TEMPLATES.newArrivals, { '1': p.items }, 'new_arrivals',
     `${STORE}: New arrivals — ${p.items} now in stock.`)
 }
-export async function sendAbandonedCartWhatsApp(p: { phone?: string | null; items: string }): Promise<boolean> {
+export async function sendAbandonedCartWhatsApp(p: { phone?: string | null; items: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
   return sendTemplate(p.phone, TEMPLATES.abandonedCart, { '1': p.items }, 'abandoned_cart',
-    `${STORE}: You left ${p.items} in your cart.`)
+    `${STORE}: You left ${p.items} in your cart.`, p.entity)
 }
-export async function sendBackInStockWhatsApp(p: { phone?: string | null; product: string }): Promise<boolean> {
+export async function sendBackInStockWhatsApp(p: { phone?: string | null; product: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
   return sendTemplate(p.phone, TEMPLATES.backInStock, { '1': p.product }, 'back_in_stock',
-    `${STORE}: ${p.product} is back in stock.`)
+    `${STORE}: ${p.product} is back in stock.`, p.entity)
 }
 export async function sendFestiveGreetingWhatsApp(p: { phone?: string | null; festival: string; discount: string }): Promise<boolean> {
   return sendTemplate(p.phone, TEMPLATES.festiveGreeting, { '1': p.festival, '2': p.discount }, 'festive_greeting',
@@ -196,9 +209,13 @@ export async function sendRefundProcessedWhatsApp(p: { phone?: string | null; am
   return sendTemplate(p.phone, TEMPLATES.refundProcessed, { '1': p.amount, '2': p.orderNumber }, 'refund_processed',
     `${STORE}: A refund of ${p.amount} for order ${p.orderNumber} has been processed.`)
 }
-export async function sendFeedbackRequestWhatsApp(p: { phone?: string | null; orderNumber: string; url: string }): Promise<boolean> {
+export async function sendFeedbackRequestWhatsApp(p: { phone?: string | null; orderNumber: string; url: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
   return sendTemplate(p.phone, TEMPLATES.feedbackRequest, { '1': p.orderNumber, '2': p.url }, 'feedback_request',
-    `${STORE}: How was your order ${p.orderNumber}? Share feedback at ${p.url}.`)
+    `${STORE}: How was your order ${p.orderNumber}? Share feedback at ${p.url}.`, p.entity)
+}
+export async function sendVariantChangeRequestedWhatsApp(p: { phone?: string | null; orderNumber: string; url: string; entity?: { entityType?: string; entityId?: string } }): Promise<boolean> {
+  return sendTemplate(p.phone, TEMPLATES.variantChange, { '1': p.orderNumber, '2': p.url }, 'variant_change_requested',
+    `${STORE}: Order ${p.orderNumber} needs your approval for a variant change. Review & confirm: ${p.url}`, p.entity)
 }
 
 // ── Free-text (only delivers within the 24h customer-service window) ─────────

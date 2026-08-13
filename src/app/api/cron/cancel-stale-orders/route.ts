@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
 import { cancelOrder } from '@/lib/orders'
-
-const STALE_PAYMENT_WINDOW_MINUTES = 10
+import { getBusinessValues } from '@/lib/site-controls'
 
 export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -13,13 +12,15 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // Integer-sanitised for safe SQL interval interpolation.
+    const staleWindowMinutes = Math.max(1, Math.round((await getBusinessValues()).orderAutoCancelMinutes))
     const stale = await queryMany<{ id: string; order_number: string; order_type: string }>(
       `SELECT id, order_number, order_type
        FROM orders
        WHERE status = 'pending'
          AND payment_status IN ('unpaid', 'failed')
          AND payment_mode IS DISTINCT FROM 'cod'
-         AND created_at < NOW() - INTERVAL '${STALE_PAYMENT_WINDOW_MINUTES} minutes'
+         AND created_at < NOW() - INTERVAL '${staleWindowMinutes} minutes'
        ORDER BY created_at
        LIMIT 100`
     )

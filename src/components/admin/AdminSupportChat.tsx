@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import { renderTextWithLinks } from '@/lib/linkify'
 
 interface Message {
   id: string
@@ -368,7 +369,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                     {msg.sender === 'bot' && (
                       <p className="text-xs font-semibold text-foreground-muted mb-0.5">Jeffi (auto-reply)</p>
                     )}
-                    {msg.sender === 'bot' ? renderBotText(msg.message) : msg.message}
+                    {msg.sender === 'bot' ? renderBotText(msg.message) : renderTextWithLinks(msg.message)}
                   </div>
                 </div>
               ))
@@ -440,13 +441,13 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                   </button>
-                  <input
-                    type="text"
+                  <textarea
+                    rows={1}
                     value={input}
                     onChange={e => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder="Reply to customer..."
-                    className="flex-1 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm focus:outline-none focus:ring-2 focus:ring-accent-400"
+                    className="flex-1 px-3.5 py-2 rounded-xl border border-border-default bg-surface text-foreground placeholder:text-foreground-muted text-sm resize-none focus:outline-none focus:ring-2 focus:ring-accent-400"
                   />
                   <button
                     onClick={() => sendMessage(undefined, isClosingReply)}
