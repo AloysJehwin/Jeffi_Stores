@@ -17,6 +17,7 @@
   "dependencies": {
     "@aws-sdk/client-apigatewaymanagementapi": "^3.1038.0",
     "@aws-sdk/client-s3": "^3.477.0",
+    "@aws-sdk/client-secrets-manager": "^3.1110.0",
     "@aws-sdk/rds-signer": "^3.1054.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
