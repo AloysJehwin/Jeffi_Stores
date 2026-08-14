@@ -83,6 +83,29 @@ function SignupPage() {
     return () => clearTimeout(t)
   }, [resendCooldown])
 
+  // Hash fallback: popup blocked → callback redirects back here with access_token in hash.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hash = window.location.hash.slice(1)
+    if (!hash) return
+    const params = new URLSearchParams(hash)
+    const accessToken = params.get('access_token')
+    if (!accessToken) return
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    setError(''); setGoogleLoading(true)
+    googleLoginWithAccessToken(accessToken)
+      .then(async (loggedInUser) => {
+        await refreshCart()
+        const needsPhone = !loggedInUser?.phone
+        const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
+        if (needsPhone || needsPolicy) { setPhoneRequiresPolicy(needsPolicy); setPolicyAccepted(false); setStep('phone') }
+        else router.push(redirectTo)
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
+      .finally(() => setGoogleLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Auto-switch channel back to email if phone is cleared
   useEffect(() => {
     if (phone.length === 0 && (channel === 'sms' || channel === 'whatsapp')) {
@@ -98,7 +121,7 @@ function SignupPage() {
       return
     }
     setGoogleLoading(true)
-    const result = await openGoogleOAuthPopup({ clientId })
+    const result = await openGoogleOAuthPopup({ clientId, returnTo: '/signup' })
     if (!result.accessToken) {
       if (result.error && result.error !== 'popup_closed') {
         setError(result.error)
