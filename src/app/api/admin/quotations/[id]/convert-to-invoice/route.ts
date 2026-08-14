@@ -354,23 +354,37 @@ export async function POST(
 
     if (!result.saveAsDraft && result.invoice_number) {
       if (customerEmail) {
-        const invoiceViewUrl = `https://invoice.jeffistores.in/invoice/${result.id}`
-        sendInvoiceFinalizedEmail(
-          customerEmail,
-          customerName,
-          result.invoice_number,
-          totalAmount,
-          result.order_number,
-          invoiceViewUrl
-        ).catch(() => {})
-        sendBusinessInvoiceGeneratedEmail(
-          customerEmail,
-          customerName,
-          result.invoice_number,
-          result.order_number,
-          totalAmount,
-          invoiceViewUrl
-        ).catch(() => {})
+        // Fetch the view_token so the invoice link is correct.
+        // The middleware rewrites invoice.jeffistores.in/<token> → /invoice/<token>.
+        const orderRow = await queryOne<{ view_token: string }>(
+          `SELECT view_token FROM orders WHERE id = $1`,
+          [result.id]
+        )
+        const invoiceViewUrl = orderRow?.view_token
+          ? `https://invoice.jeffistores.in/${orderRow.view_token}`
+          : `https://jeffistores.in/account/orders`
+
+        // B2B (came from an RFQ) → business-specific email; regular → standard invoice email.
+        // Never send both — the customer would receive two identical emails.
+        if (quotation.from_rfq) {
+          sendBusinessInvoiceGeneratedEmail(
+            customerEmail,
+            customerName,
+            result.invoice_number,
+            result.order_number,
+            totalAmount,
+            invoiceViewUrl
+          ).catch(() => {})
+        } else {
+          sendInvoiceFinalizedEmail(
+            customerEmail,
+            customerName,
+            result.invoice_number,
+            totalAmount,
+            result.order_number,
+            invoiceViewUrl
+          ).catch(() => {})
+        }
       }
     }
 
