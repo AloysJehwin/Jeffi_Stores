@@ -92,6 +92,9 @@ COPY --from=deps /app/node_modules/bwip-js ./node_modules/bwip-js
 # Copy cluster server wrapper
 COPY --from=builder --chown=nextjs:nodejs /app/cluster-server.js ./cluster-server.js
 
+# Copy secrets bootstrap script (fetches from AWS Secrets Manager at container start)
+COPY --from=builder --chown=nextjs:nodejs /app/deploy/load-secrets.mjs ./deploy/load-secrets.mjs
+
 # Copy database migration files
 COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 
@@ -125,4 +128,4 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["node", "cluster-server.js"]
+CMD ["sh", "-c", "node deploy/load-secrets.mjs && node cluster-server.js"]
