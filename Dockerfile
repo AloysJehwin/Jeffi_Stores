@@ -98,7 +98,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/deploy/load-secrets.mjs ./deploy/
 # Copy database migration files
 COPY --from=builder --chown=nextjs:nodejs /app/database ./database
 
-# Copy entire @aws-sdk + @smithy trees (rds-signer + s3 + all transitive deps — not bundled by Next.js standalone)
+# Copy entire @aws-sdk + @smithy trees (rds-signer + s3 + secrets-manager + all transitive deps — not bundled by Next.js standalone)
 COPY --from=deps /app/node_modules/@aws-sdk ./node_modules/@aws-sdk
 COPY --from=deps /app/node_modules/@smithy ./node_modules/@smithy
 
