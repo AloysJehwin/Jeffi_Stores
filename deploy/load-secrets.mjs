@@ -1,17 +1,19 @@
 #!/usr/bin/env node
 /**
- * Bootstrap secrets loader — runs before cluster-server.js.
+ * Bootstrap secrets loader — runs before cluster-server.js (prod) and as
+ * the `predev` npm script (local dev).
  *
- * Fetches all key/value pairs from AWS Secrets Manager (jeffi/production)
- * and writes them into process.env BEFORE the app starts, so every module
- * that reads process.env at require-time gets the real values.
+ * Auto-selects the right secret:
+ *   - SM_SECRET_ID env var overrides everything (explicit)
+ *   - NODE_ENV=production (or SM_ENV=production)  → jeffi/production
+ *   - everything else (local dev)                 → jeffi/local
  *
  * Override / fallback behaviour:
  *   - Any var already set in process.env (e.g. from docker-compose environment:
- *     block) is NOT overwritten — compose overrides win.
- *   - If SM_SECRET_ID is unset, defaults to 'jeffi/production'.
+ *     block, or .env.local loaded by Next.js) is NOT overwritten — existing
+ *     values always win, so local DB URL / local AWS creds are preserved.
  *   - If ALLOW_ENV_FALLBACK=true, a failed SM fetch is a warning, not a fatal
- *     error. Use this for local dev where .env.local is loaded by Next.js.
+ *     error. Set this in .env.local so dev still works if AWS is unreachable.
  *   - If AWS credentials are absent and ALLOW_ENV_FALLBACK=true, the script
  *     skips SM entirely (local dev with no AWS config).
  *
@@ -24,7 +26,9 @@ import {
   GetSecretValueCommand,
 } from '@aws-sdk/client-secrets-manager'
 
-const SECRET_ID = process.env.SM_SECRET_ID || 'jeffi/production'
+const isProduction = process.env.NODE_ENV === 'production' || process.env.SM_ENV === 'production'
+const DEFAULT_SECRET = isProduction ? 'jeffi/production' : 'jeffi/local'
+const SECRET_ID = process.env.SM_SECRET_ID || DEFAULT_SECRET
 const REGION    = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'us-east-1'
 const FALLBACK  = process.env.ALLOW_ENV_FALLBACK === 'true'
 

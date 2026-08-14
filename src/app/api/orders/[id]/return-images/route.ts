@@ -64,7 +64,7 @@ export async function POST(
     }))
 
     return NextResponse.json({ url: getS3Url(s3Key) })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Upload failed' }, { status: 500 })
+  } catch {
+    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
   }
 }
