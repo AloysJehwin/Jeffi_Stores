@@ -1,30 +1,41 @@
 #!/usr/bin/env node
 /**
- * Bootstrap secrets loader — runs before cluster-server.js (prod) and as
- * the `predev` npm script (local dev).
+ * Bootstrap secrets loader.
+ *
+ * TWO modes depending on context:
+ *
+ * PROD (container, NODE_ENV=production):
+ *   Runs in the same long-lived process as cluster-server.js. Fetches SM and
+ *   writes values into process.env before the app starts.
+ *   CMD: node deploy/load-secrets.mjs && node cluster-server.js
+ *
+ * DEV (predev npm script, NODE_ENV=development):
+ *   Runs in a short-lived child process — process.env changes die with it and
+ *   are NOT inherited by the next dev server. Instead, writes a .env.local file
+ *   that Next.js loads natively at startup (same mechanism as before, but
+ *   sourced from SM rather than a hand-edited file).
  *
  * Auto-selects the right secret:
- *   - SM_SECRET_ID env var overrides everything (explicit)
- *   - NODE_ENV=production (or SM_ENV=production)  → jeffi/production
- *   - everything else (local dev)                 → jeffi/local
+ *   - SM_SECRET_ID env var overrides everything
+ *   - NODE_ENV=production → jeffi/production
+ *   - everything else     → jeffi/local
  *
- * Override / fallback behaviour:
- *   - Any var already set in process.env (e.g. from docker-compose environment:
- *     block, or .env.local loaded by Next.js) is NOT overwritten — existing
- *     values always win, so local DB URL / local AWS creds are preserved.
- *   - If ALLOW_ENV_FALLBACK=true, a failed SM fetch is a warning, not a fatal
- *     error. Set this in .env.local so dev still works if AWS is unreachable.
- *   - If AWS credentials are absent and ALLOW_ENV_FALLBACK=true, the script
- *     skips SM entirely (local dev with no AWS config).
- *
- * Usage (container CMD):
- *   node scripts/load-secrets.mjs && node cluster-server.js
+ * Existing process.env values (docker-compose environment: block) are never
+ * overwritten in prod mode. In dev mode, existing .env.local entries win
+ * because Next.js loads the file and process.env is already set by the time
+ * the app reads it (so SM values written to .env.local act as defaults).
  */
 
 import {
   SecretsManagerClient,
   GetSecretValueCommand,
 } from '@aws-sdk/client-secrets-manager'
+import { writeFileSync, existsSync, readFileSync } from 'fs'
+import { resolve, dirname } from 'path'
+import { fileURLToPath } from 'url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+const REPO_ROOT = resolve(__dirname, '..')
 
 const isProduction = process.env.NODE_ENV === 'production' || process.env.SM_ENV === 'production'
 const DEFAULT_SECRET = isProduction ? 'jeffi/production' : 'jeffi/local'
@@ -33,18 +44,6 @@ const REGION    = process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || 'u
 const FALLBACK  = process.env.ALLOW_ENV_FALLBACK === 'true'
 
 async function loadSecrets() {
-  // If no AWS credentials and fallback is allowed, skip silently (local dev).
-  const hasCredentials =
-    process.env.AWS_ACCESS_KEY_ID ||
-    process.env.AWS_PROFILE ||
-    // EC2 instance metadata credentials — present when running on EC2 with an IAM role.
-    // We detect this by checking for the role name env var set by the IAM role.
-    process.env.AWS_EXECUTION_ENV ||
-    process.env.ECS_CONTAINER_METADATA_URI_V4 ||
-    // Simplest heuristic: if the instance metadata service is reachable we have creds.
-    // But we don't want to make an HTTP call here, so just check the AWS SDK's chain.
-    true // always attempt — the SDK will fail fast if no creds are available
-
   const client = new SecretsManagerClient({ region: REGION })
 
   let secretString
@@ -54,10 +53,10 @@ async function loadSecrets() {
   } catch (err) {
     const msg = `[load-secrets] Failed to fetch "${SECRET_ID}" from Secrets Manager: ${err.message}`
     if (FALLBACK) {
-      process.stderr.write(`${msg} — continuing with process.env (ALLOW_ENV_FALLBACK=true)\n`)
+      process.stderr.write(`${msg} — continuing (ALLOW_ENV_FALLBACK=true)\n`)
       return
     }
-    process.stderr.write(`${msg}\nSet ALLOW_ENV_FALLBACK=true to skip SM and use process.env instead.\n`)
+    process.stderr.write(`${msg}\nSet ALLOW_ENV_FALLBACK=true to skip SM.\n`)
     process.exit(1)
   }
 
@@ -76,19 +75,29 @@ async function loadSecrets() {
     process.exit(1)
   }
 
-  let loaded = 0
-  let skipped = 0
+  if (!isProduction) {
+    // DEV: write to .env.local so Next.js picks it up natively.
+    // Serialize each value safely — escape newlines (e.g. GOOGLE_PRIVATE_KEY).
+    const lines = Object.entries(secrets)
+      .filter(([, v]) => typeof v === 'string')
+      .map(([k, v]) => `${k}=${v.includes('\n') ? JSON.stringify(v) : v}`)
+      .join('\n')
+    const envPath = resolve(REPO_ROOT, '.env.local')
+    writeFileSync(envPath, lines + '\n', 'utf8')
+    process.stdout.write(
+      `[load-secrets] Wrote ${Object.keys(secrets).length} secrets from "${SECRET_ID}" → .env.local\n`
+    )
+    return
+  }
+
+  // PROD: inject into process.env (same process as the app).
+  let loaded = 0, skipped = 0
   for (const [key, value] of Object.entries(secrets)) {
     if (typeof value !== 'string') continue
-    if (process.env[key] !== undefined) {
-      // Already set (e.g. docker-compose environment: block) — compose wins.
-      skipped++
-      continue
-    }
+    if (process.env[key] !== undefined) { skipped++; continue }
     process.env[key] = value
     loaded++
   }
-
   process.stdout.write(
     `[load-secrets] Loaded ${loaded} secrets from "${SECRET_ID}" (${skipped} skipped — already set)\n`
   )
