@@ -39,6 +39,10 @@ const EDITABLE_KEYS = [
   'feature_gst_enabled',
   'feature_ondevice_summary_enabled',
   'feature_ondevice_finetune_enabled',
+  'feature_ondevice_summary_mobile_enabled',
+  'feature_ondevice_summary_desktop_enabled',
+  'feature_ondevice_finetune_mobile_enabled',
+  'feature_ondevice_finetune_desktop_enabled',
   // Business values
   'cod_surcharge_flat',
   'cod_surcharge_pct',

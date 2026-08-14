@@ -26,7 +26,8 @@ async function fetchOllamaPitch(productName: string, brand: string | null, categ
 }
 
 export default function ProductPitchLine({ productName, brand, category }: Props) {
-  const ondeviceEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
+  const flags = useStoreConfig().flags
+  const ondeviceEnabled = flags.ondeviceSummaryEnabled
   const [text, setText] = useState('')
   const [done, setDone] = useState(false)
   const [source, setSource] = useState<Source>('on-device')
@@ -40,7 +41,12 @@ export default function ProductPitchLine({ productName, brand, category }: Props
     canRunOnDeviceSummary().then(async ({ capable, isMobile }) => {
       let gotText = false
 
-      if (capable) {
+      // Per-platform gate: on-device only runs where the admin enabled it for
+      // this device class. Otherwise (or if the device can't run it) we fall
+      // through to the server (Ollama) path below.
+      const platformAllowed = isMobile ? flags.ondeviceSummaryMobileEnabled : flags.ondeviceSummaryDesktopEnabled
+
+      if (capable && platformAllowed) {
         const profile = readUserProfile()
         try {
           setSource('on-device')
@@ -64,7 +70,7 @@ export default function ProductPitchLine({ productName, brand, category }: Props
         }
       }
     }).catch(() => {})
-  }, [productName, brand, category, ondeviceEnabled])
+  }, [productName, brand, category, ondeviceEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled])
 
   if (!text) return null
 

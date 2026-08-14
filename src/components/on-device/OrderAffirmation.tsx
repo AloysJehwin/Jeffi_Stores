@@ -18,10 +18,12 @@ interface Props {
 }
 
 export default function OrderAffirmation({ items, total }: Props) {
-  const ondeviceEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
-  const finetuneEnabled = useStoreConfig().flags.ondeviceFinetuneEnabled
+  const flags = useStoreConfig().flags
+  const ondeviceEnabled = flags.ondeviceSummaryEnabled
+  const finetuneEnabled = flags.ondeviceFinetuneEnabled
   const [text, setText] = useState('')
   const [done, setDone] = useState(false)
+  const [source, setSource] = useState<'on-device' | 'ollama'>('on-device')
   const started = useRef(false)
 
   useEffect(() => {
@@ -38,24 +40,48 @@ export default function OrderAffirmation({ items, total }: Props) {
       buyMode: items[0]?.buyMode || null,
     })
 
-    canRunOnDeviceSummary().then(({ capable, isMobile }) => {
-      if (!capable) return
-      const profile = readUserProfile()
+    canRunOnDeviceSummary().then(async ({ capable, isMobile }) => {
+      const summaryAllowed = isMobile ? flags.ondeviceSummaryMobileEnabled : flags.ondeviceSummaryDesktopEnabled
+      const finetuneAllowed = isMobile ? flags.ondeviceFinetuneMobileEnabled : flags.ondeviceFinetuneDesktopEnabled
       const itemNames = items.map(i => i.productName)
-      generateAffirmation(itemNames, total, profile, isMobile, partial => setText(partial))
-        .then(final => {
+
+      if (capable && summaryAllowed) {
+        const profile = readUserProfile()
+        try {
+          setSource('on-device')
+          const final = await generateAffirmation(itemNames, total, profile, isMobile, partial => setText(partial))
           setText(final)
           setDone(true)
           // Best-effort on-device LoRA fine-tune from this affirmation (gated on
-          // the DB fine-tune flag + capability inside maybeRunFineTune).
-          maybeRunFineTune(finetuneEnabled, [{
+          // the DB fine-tune flag + its platform flag + capability).
+          maybeRunFineTune(finetuneEnabled && finetuneAllowed, [{
             prompt: `Order affirmation for: ${itemNames.join(', ')}`,
             completion: final,
           }])
+          return
+        } catch {
+          // fall through to server
+        }
+      }
+
+      // Server (Ollama) fallback — mobile default + any incapable device.
+      try {
+        setSource('ollama')
+        const res = await fetch('/api/ai-affirmation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ itemNames }),
         })
-        .catch(() => {})
+        if (!res.ok) throw new Error('ollama failed')
+        const data = await res.json() as { text?: string }
+        if (!data.text) throw new Error('empty')
+        setText(data.text)
+        setDone(true)
+      } catch {
+        // silently fail
+      }
     })
-  }, [items, total, ondeviceEnabled, finetuneEnabled])
+  }, [items, total, ondeviceEnabled, finetuneEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled, flags.ondeviceFinetuneMobileEnabled, flags.ondeviceFinetuneDesktopEnabled])
 
   if (!text) return null
 
@@ -67,7 +93,7 @@ export default function OrderAffirmation({ items, total }: Props) {
       <p className="text-sm text-foreground leading-relaxed flex-1">
         {text}{!done && <span className="animate-pulse">▍</span>}
       </p>
-      <span className="text-[9px] text-foreground-muted flex-shrink-0 mt-0.5">on-device</span>
+      <span className="text-[9px] text-foreground-muted flex-shrink-0 mt-0.5">{source}</span>
     </div>
   )
 }

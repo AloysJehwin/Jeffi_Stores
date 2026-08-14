@@ -35,14 +35,22 @@ function saveFeedback(vote: 'liked' | 'disliked', text: string) {
 }
 
 export default function CheckoutRecapSummary({ items, total }: { items: CartLine[]; total: number }) {
-  const ondeviceEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
+  const flags = useStoreConfig().flags
+  const ondeviceEnabled = flags.ondeviceSummaryEnabled
   const [verdict, setVerdict] = useState<{ capable: boolean; reason: string; isMobile: boolean } | null>(null)
   const [text, setText] = useState('')
   const [state, setState] = useState<'idle' | 'loading' | 'done' | 'error'>('idle')
+  const [source, setSource] = useState<'on-device' | 'ollama'>('on-device')
   const [feedback, setFeedback] = useState<'liked' | 'disliked' | null>(null)
   const [wifiDismissed, setWifiDismissed] = useState(false)
   const [showMobileToast, setShowMobileToast] = useState(false)
   const started = useRef(false)
+
+  // Whether the in-browser model is allowed to run on THIS device class.
+  const platformAllowed = verdict
+    ? (verdict.isMobile ? flags.ondeviceSummaryMobileEnabled : flags.ondeviceSummaryDesktopEnabled)
+    : false
+  const onDeviceRuns = !!verdict?.capable && platformAllowed
 
   useEffect(() => {
     if (!ondeviceEnabled) return
@@ -54,8 +62,10 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
       try {
         if (sessionStorage.getItem(WIFI_DISMISSED_KEY)) setWifiDismissed(true)
       } catch {}
-      // Show mobile explainer once
-      if (v.capable && v.isMobile) {
+      // Show mobile explainer once — only when on-device actually runs on mobile
+      // (not when the phone is using the server fallback).
+      const mobileOnDevice = v.capable && v.isMobile && flags.ondeviceSummaryMobileEnabled
+      if (mobileOnDevice) {
         try {
           if (!localStorage.getItem(MOBILE_TOAST_KEY)) {
             setShowMobileToast(true)
@@ -65,11 +75,14 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
       }
     })
     return () => { alive = false; disposeSummarizer() }
-  }, [ondeviceEnabled])
+  }, [ondeviceEnabled, flags.ondeviceSummaryMobileEnabled])
 
   useEffect(() => {
-    if (!verdict?.capable || started.current) return
+    if (!verdict || started.current) return
     if (!items || items.length === 0) return
+    // If on-device won't run here AND there's no server fallback path (feature
+    // disabled entirely is already handled by the ondeviceEnabled guard above),
+    // we still fall back to the server. Only bail when the feature is off.
     started.current = true
 
     const profile = readUserProfile()
@@ -86,13 +99,38 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
     }
 
     setState('loading')
-    generateRecap(signals, verdict.isMobile, (partial) => setText(partial))
-      .then(final => { setText(final); setState('done') })
-      .catch(() => { setState('error') })
-  }, [verdict, items, total])
 
-  // Not-wifi banner
-  if (verdict?.reason === 'not-wifi' && !wifiDismissed) {
+    const runServerFallback = async () => {
+      try {
+        setSource('ollama')
+        const res = await fetch('/api/ai-recap', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cart: items, total: signals.total, itemCount }),
+        })
+        if (!res.ok) throw new Error('ollama failed')
+        const data = await res.json() as { text?: string }
+        if (!data.text) throw new Error('empty')
+        setText(data.text); setState('done')
+      } catch {
+        setState('error')
+      }
+    }
+
+    if (onDeviceRuns) {
+      setSource('on-device')
+      generateRecap(signals, verdict.isMobile, (partial) => setText(partial))
+        .then(final => { setText(final); setState('done') })
+        .catch(() => { runServerFallback() })
+    } else {
+      // Device can't (or isn't allowed to) run on-device → server fallback.
+      runServerFallback()
+    }
+  }, [verdict, items, total, onDeviceRuns])
+
+  // Not-wifi banner — only relevant when on-device WOULD run on this device
+  // (platform-allowed). If the device uses the server fallback, wifi is irrelevant.
+  if (verdict?.reason === 'not-wifi' && platformAllowed && !wifiDismissed) {
     return (
       <div className="rounded-xl border border-border-default bg-surface-elevated px-4 py-3 mb-4 flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
@@ -118,12 +156,12 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
     )
   }
 
-  if (!verdict?.capable) return null
   if (state === 'error') return null
   if (state === 'idle') return null
   // Don't render the panel until real text has started streaming. This prevents a
-  // visible box (and any "loading" text) from flashing on mobile when the model
-  // download fails and the component then unmounts — matching the sibling panels.
+  // visible box (and any "loading" text) from flashing when generation fails and
+  // the component then unmounts — matching the sibling panels. (No capability
+  // guard here: incapable devices still render via the server/Ollama fallback.)
   if (!text.trim()) return null
 
   return (
@@ -146,7 +184,7 @@ export default function CheckoutRecapSummary({ items, total }: { items: CartLine
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
           <span className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Your order at a glance</span>
-          <span className="text-[9px] text-foreground-muted ml-auto">on-device · private</span>
+          <span className="text-[9px] text-foreground-muted ml-auto">{source === 'on-device' ? 'on-device · private' : 'AI summary'}</span>
         </div>
 
         <p className="text-sm text-foreground leading-relaxed">
