@@ -11,8 +11,9 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
  */
 export default function OnDeviceCapabilityDebug() {
   const [verdict, setVerdict] = useState<CapabilityVerdict | null>(null)
-  const flagEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
-  const finetuneFlag = useStoreConfig().flags.ondeviceFinetuneEnabled
+  const flags = useStoreConfig().flags
+  const flagEnabled = flags.ondeviceSummaryEnabled
+  const finetuneFlag = flags.ondeviceFinetuneEnabled
 
   useEffect(() => {
     let alive = true
@@ -42,8 +43,13 @@ export default function OnDeviceCapabilityDebug() {
       </div>
       <Row k="reason" v={verdict.reason} />
       <div className="border-t border-border-default my-2" />
-      <Row k="feature flag" v={flagEnabled ? 'enabled' : 'disabled'} />
+      <Row k="this device" v={d.isMobile ? 'mobile' : 'desktop'} />
+      <Row k="summary flag" v={flagEnabled ? 'enabled' : 'disabled'} />
+      <Row k="summary · desktop" v={flags.ondeviceSummaryDesktopEnabled ? 'on' : 'off'} />
+      <Row k="summary · mobile" v={flags.ondeviceSummaryMobileEnabled ? 'on' : 'off'} />
       <Row k="fine-tune flag" v={finetuneFlag ? 'enabled' : 'disabled'} />
+      <Row k="fine-tune · desktop" v={flags.ondeviceFinetuneDesktopEnabled ? 'on' : 'off'} />
+      <Row k="fine-tune · mobile" v={flags.ondeviceFinetuneMobileEnabled ? 'on' : 'off'} />
       <Row k="WebGPU" v={d.hasWebGPU ? 'yes' : 'no'} />
       <Row k="GPU adapter" v={d.hasAdapter ? 'yes' : 'no'} />
       <Row k="GPU vendor" v={d.gpuVendor ?? '—'} />

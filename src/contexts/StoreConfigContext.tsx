@@ -15,6 +15,10 @@ export interface StoreConfig {
     gstEnabled: boolean
     ondeviceSummaryEnabled: boolean
     ondeviceFinetuneEnabled: boolean
+    ondeviceSummaryMobileEnabled: boolean
+    ondeviceSummaryDesktopEnabled: boolean
+    ondeviceFinetuneMobileEnabled: boolean
+    ondeviceFinetuneDesktopEnabled: boolean
   }
   orderAutoCancelMinutes: number
   storefront: {
@@ -45,6 +49,23 @@ const DEFAULT_CONFIG: StoreConfig = {
     ondeviceFinetuneEnabled:
       process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === 'true' ||
       process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
+    // Desktop mirrors the master default; mobile off by default (server fallback).
+    ondeviceSummaryDesktopEnabled:
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP === 'true' ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP === '1' ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === 'true' ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
+    ondeviceSummaryMobileEnabled:
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE === 'true' ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE === '1',
+    ondeviceFinetuneDesktopEnabled:
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP === 'true' ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP === '1' ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === 'true' ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
+    ondeviceFinetuneMobileEnabled:
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE === 'true' ||
+      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE === '1',
   },
   orderAutoCancelMinutes: 10,
   storefront: {

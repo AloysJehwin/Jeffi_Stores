@@ -19,8 +19,16 @@ export interface StoreIdentity {
 export interface FeatureFlags {
   razorpayEnabled: boolean
   gstEnabled: boolean
+  // Master on/off for each on-device AI feature.
   ondeviceSummaryEnabled: boolean
   ondeviceFinetuneEnabled: boolean
+  // Per-platform gates: where on-device is allowed to run. Effective = master && platform.
+  // Mobile defaults to false (phones fall back to the server Ollama path instead of
+  // downloading the ~417MB model). Desktop mirrors the master default.
+  ondeviceSummaryMobileEnabled: boolean
+  ondeviceSummaryDesktopEnabled: boolean
+  ondeviceFinetuneMobileEnabled: boolean
+  ondeviceFinetuneDesktopEnabled: boolean
 }
 
 export interface BusinessValues {
@@ -73,6 +81,11 @@ const DEFAULTS: SiteControls = {
     gstEnabled: envBool(process.env.ENABLE_GST),
     ondeviceSummaryEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
     ondeviceFinetuneEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
+    // Desktop mirrors the master default; mobile is off by default (server fallback).
+    ondeviceSummaryDesktopEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP === '1' || envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
+    ondeviceSummaryMobileEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE === '1',
+    ondeviceFinetuneDesktopEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP === '1' || envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
+    ondeviceFinetuneMobileEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE === '1',
   },
   values: {
     codSurchargeFlat: envNum(process.env.COD_SURCHARGE_FLAT, 40),
@@ -100,6 +113,8 @@ const KEYS = [
   'business_name', 'business_email', 'business_phone', 'business_web', 'business_logo_url',
   'feature_razorpay_enabled', 'feature_gst_enabled',
   'feature_ondevice_summary_enabled', 'feature_ondevice_finetune_enabled',
+  'feature_ondevice_summary_mobile_enabled', 'feature_ondevice_summary_desktop_enabled',
+  'feature_ondevice_finetune_mobile_enabled', 'feature_ondevice_finetune_desktop_enabled',
   'cod_surcharge_flat', 'cod_surcharge_pct', 'shipping_min_charge', 'shipping_max_charge',
   'order_auto_cancel_minutes', 'delhivery_origin_pincode', 'business_state_code',
   'default_product_weight_g',
@@ -151,6 +166,10 @@ export async function getSiteControls(): Promise<SiteControls> {
         gstEnabled: bool('feature_gst_enabled', d.flags.gstEnabled),
         ondeviceSummaryEnabled: bool('feature_ondevice_summary_enabled', d.flags.ondeviceSummaryEnabled),
         ondeviceFinetuneEnabled: bool('feature_ondevice_finetune_enabled', d.flags.ondeviceFinetuneEnabled),
+        ondeviceSummaryMobileEnabled: bool('feature_ondevice_summary_mobile_enabled', d.flags.ondeviceSummaryMobileEnabled),
+        ondeviceSummaryDesktopEnabled: bool('feature_ondevice_summary_desktop_enabled', d.flags.ondeviceSummaryDesktopEnabled),
+        ondeviceFinetuneMobileEnabled: bool('feature_ondevice_finetune_mobile_enabled', d.flags.ondeviceFinetuneMobileEnabled),
+        ondeviceFinetuneDesktopEnabled: bool('feature_ondevice_finetune_desktop_enabled', d.flags.ondeviceFinetuneDesktopEnabled),
       },
       values: {
         codSurchargeFlat: Math.max(0, num('cod_surcharge_flat', d.values.codSurchargeFlat)),
