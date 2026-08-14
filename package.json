@@ -4,6 +4,7 @@
   "description": "Jeffi Stores - Industrial Hardware E-commerce Platform",
   "private": true,
   "scripts": {
+    "predev": "node deploy/load-secrets.mjs",
     "dev": "next dev --turbopack",
     "dev:https": "node server.js",
     "build": "next build",
