@@ -198,6 +198,28 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Fetch NEXT_PUBLIC vars from Secrets Manager
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          SECRET=$(aws secretsmanager get-secret-value \
+            --secret-id jeffi/production \
+            --query SecretString --output text)
+          # Write every NEXT_PUBLIC_ key from the secret into $GITHUB_ENV so
+          # subsequent steps see them as environment variables and they can be
+          # passed as docker --build-arg values.
+          echo "$SECRET" | node -e "
+            const s = require('fs').readFileSync('/dev/stdin','utf8');
+            const obj = JSON.parse(s);
+            const lines = Object.entries(obj)
+              .filter(([k]) => k.startsWith('NEXT_PUBLIC_'))
+              .map(([k,v]) => k + '=' + v)
+              .join('\n');
+            require('fs').appendFileSync(process.env.GITHUB_ENV, lines + '\n');
+          "
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -211,16 +233,16 @@ jobs:
           build-args: |
             DATABASE_URL=postgresql://localhost:5432/dummy
             JWT_SECRET=ci-build-secret
-            NEXT_PUBLIC_APP_URL=http://localhost:3000
+            NEXT_PUBLIC_APP_URL=${{ env.NEXT_PUBLIC_APP_URL }}
             SKIP_DB_CHECK=true
-            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ secrets.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
-            NEXT_PUBLIC_RAZORPAY_KEY_ID=${{ secrets.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
-            NEXT_PUBLIC_ENABLE_RAZORPAY=${{ secrets.NEXT_PUBLIC_ENABLE_RAZORPAY }}
-            NEXT_PUBLIC_ENABLE_GST=${{ secrets.NEXT_PUBLIC_ENABLE_GST }}
-            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ secrets.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
-            NEXT_PUBLIC_BASE_URL=${{ secrets.NEXT_PUBLIC_BASE_URL }}
-            NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY=${{ vars.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
-            NEXT_PUBLIC_ONDEVICE_MODEL_BASE=${{ vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
+            NEXT_PUBLIC_GOOGLE_CLIENT_ID=${{ env.NEXT_PUBLIC_GOOGLE_CLIENT_ID }}
+            NEXT_PUBLIC_RAZORPAY_KEY_ID=${{ env.NEXT_PUBLIC_RAZORPAY_KEY_ID }}
+            NEXT_PUBLIC_ENABLE_RAZORPAY=${{ env.NEXT_PUBLIC_ENABLE_RAZORPAY }}
+            NEXT_PUBLIC_ENABLE_GST=${{ env.NEXT_PUBLIC_ENABLE_GST }}
+            NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
+            NEXT_PUBLIC_BASE_URL=${{ env.NEXT_PUBLIC_BASE_URL }}
+            NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY=${{ env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
+            NEXT_PUBLIC_ONDEVICE_MODEL_BASE=${{ env.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
 
   # ────────────────────────────────────────────────────────
   # Stage 4 — Deploy to EC2  (main only, gate: docker)

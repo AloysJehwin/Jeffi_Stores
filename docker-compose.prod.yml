@@ -1,8 +1,8 @@
 services:
   app:
     image: ghcr.io/aloysjehwin/jeffi_stores:latest
-    env_file: .env.production
     environment:
+      - SM_SECRET_ID=jeffi/production
       - REDIS_URL=redis://redis:6379
       - WEB_CONCURRENCY=4
     volumes:
