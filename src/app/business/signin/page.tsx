@@ -67,6 +67,32 @@ function BusinessSignInPage() {
     return () => clearTimeout(t)
   }, [resendCooldown])
 
+  // Hash fallback: popup blocked → callback redirects back here with access_token in hash.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hash = window.location.hash.slice(1)
+    if (!hash) return
+    const params = new URLSearchParams(hash)
+    const accessToken = params.get('access_token')
+    if (!accessToken) return
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    setError(''); setGoogleLoading(true)
+    fetch('/api/business/google', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ accessToken }),
+    })
+      .then(async (res) => {
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'Google sign-in failed')
+        if (data.needsBusinessProfile) { router.push(`${bp('/business/signup')}?google=1&token=${accessToken}`); return }
+        if (data.approvalStatus === 'pending') { router.push(bp('/business/pending')); return }
+        router.push(bp('/business/dashboard'))
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
+      .finally(() => setGoogleLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   const handleSendOTP = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -200,7 +226,7 @@ function BusinessSignInPage() {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
     if (!clientId) { setError('Google sign-in is not configured'); return }
     setGoogleLoading(true)
-    const result = await openGoogleOAuthPopup({ clientId })
+    const result = await openGoogleOAuthPopup({ clientId, returnTo: '/business/signin' })
     if (!result.accessToken) {
       if (result.error && result.error !== 'popup_closed') setError(result.error)
       setGoogleLoading(false)

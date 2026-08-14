@@ -52,6 +52,32 @@ function LoginPage() {
     }
   }, [user, authLoading, showPhoneModal])
 
+  // Hash fallback: when the popup was blocked, the callback page redirects back
+  // here with the access_token in the URL hash. Pick it up and complete sign-in.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const hash = window.location.hash.slice(1)
+    if (!hash) return
+    const params = new URLSearchParams(hash)
+    const accessToken = params.get('access_token')
+    const hashError = params.get('error')
+    if (!accessToken && !hashError) return
+    window.history.replaceState(null, '', window.location.pathname + window.location.search)
+    if (hashError || !accessToken) { setError('Google sign-in failed. Please try again.'); return }
+    setError(''); setGoogleLoading(true)
+    googleLoginWithAccessToken(accessToken)
+      .then(async (loggedInUser) => {
+        await refreshCart()
+        const needsPhone = !loggedInUser?.phone
+        const needsPolicy = !!loggedInUser?.requiresPolicyAcceptance
+        if (needsPhone || needsPolicy) { setPhoneRequiresPolicy(needsPolicy); setShowPhoneModal(true) }
+        else router.push(redirect)
+      })
+      .catch((err: unknown) => setError(err instanceof Error ? err.message : 'Google sign-in failed'))
+      .finally(() => setGoogleLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   useEffect(() => {
     if (resendCooldown <= 0) return
     const t = setTimeout(() => setResendCooldown(c => c - 1), 1000)
@@ -66,7 +92,7 @@ function LoginPage() {
       return
     }
     setGoogleLoading(true)
-    const result = await openGoogleOAuthPopup({ clientId })
+    const result = await openGoogleOAuthPopup({ clientId, returnTo: '/login' })
     if (!result.accessToken) {
       if (result.error && result.error !== 'popup_closed') {
         setError(result.error)
