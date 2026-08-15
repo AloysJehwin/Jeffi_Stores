@@ -131,3 +131,55 @@ export async function createRVPShipment(params: {
 
   return pkg.waybill as string
 }
+
+export interface DelhiveryInvoiceCharges {
+  total: number
+  freight: number
+  codCharge: number
+  oda: number
+}
+
+// Pulls the actual billed charges Delhivery raised for a shipment once it's
+// invoiced. Non-fatal by design: the invoice may not be ready right after
+// delivery, so any failure resolves to null rather than throwing.
+export async function fetchDelhiveryInvoiceCharges(
+  awb: string
+): Promise<DelhiveryInvoiceCharges | null> {
+  const token = process.env.DELHIVERY_API_KEY
+  if (!token) return null
+
+  try {
+    const res = await fetch(
+      `https://track.delhivery.com/api/kinko/v1/invoice/charges/.json?waybill=${encodeURIComponent(awb)}`,
+      {
+        headers: { Authorization: `Token ${token}` },
+        signal: AbortSignal.timeout(10_000),
+        cache: 'no-store',
+      }
+    )
+
+    if (!res.ok) return null
+
+    const data = await res.json()
+    // Response shape varies across accounts — payload may be a bare object or
+    // wrapped in an array, and field names differ, so probe several aliases.
+    const record = Array.isArray(data) ? data[0] : data
+    if (!record || typeof record !== 'object') return null
+
+    const num = (...vals: unknown[]): number => {
+      for (const v of vals) {
+        if (v != null && v !== '' && !Number.isNaN(Number(v))) return Number(v)
+      }
+      return 0
+    }
+
+    return {
+      total: num(record.total_amount, record.total, record.charged_amount),
+      freight: num(record.freight_charge, record.frt_charge, record.freight),
+      codCharge: num(record.cod_charges, record.cod_charge, record.cod),
+      oda: num(record.oda_charge, record.oda_charges, record.oda),
+    }
+  } catch {
+    return null
+  }
+}

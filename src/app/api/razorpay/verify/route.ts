@@ -179,7 +179,7 @@ async function commitDraft(args: {
     if (r.ok) appliedDiscount = r.appliedDiscount
   }
 
-  const expectedAmountPaise = Math.round((Math.max(0, subtotal - appliedDiscount - draft.businessDiscountAmount + draft.shippingAmount)) * 100)
+  const expectedAmountPaise = Math.round((Math.max(0, subtotal - appliedDiscount - draft.businessDiscountAmount + draft.shippingAmount + draft.codFeeAmount)) * 100)
 
   const created = draft.mode === 'cart'
     ? await commitOrder({
@@ -190,6 +190,7 @@ async function commitDraft(args: {
         notes: draft.notes,
         couponId: draft.couponId,
         shippingAmount: draft.shippingAmount,
+        codFeeAmount: draft.codFeeAmount,
         cartItems,
         subtotal,
         taxAmount,
@@ -210,6 +211,7 @@ async function commitDraft(args: {
         notes: draft.notes,
         couponId: draft.couponId,
         shippingAmount: draft.shippingAmount,
+        codFeeAmount: draft.codFeeAmount,
         item: draft.buyNowItem!,
         product: buyNowSnapshot!.product,
         variant: buyNowSnapshot!.variant,

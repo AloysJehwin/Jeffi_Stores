@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback, useEffect } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
+import GalleryPicker from '@/components/admin/GalleryPicker'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ALL_DIMENSIONS, DIMENSION_LABEL, UNITS, type Dimension, computeAreaFactor, computeVolumeFactor } from '@/lib/units'
 
@@ -65,11 +66,11 @@ const FILTER_OPTIONS: { key: FilterKey; label: string; type: 'select' | 'text'; 
 ]
 
 // ── operation definitions ─────────────────────────────────────────────────────
-type OpKey = 'inflate_price' | 'set_discount' | 'set_mrp_ex_gst' | 'set_tax_class' | 'set_condition' | 'set_shipping_class' | 'set_handling_days' | 'set_warranty_months' | 'set_target_gender' | 'set_grade' | 'set_hsn_code' | 'set_country_of_origin' | 'set_featured' | 'set_searchable' | 'set_active' | 'set_selling_unit'
+type OpKey = 'inflate_price' | 'set_discount' | 'set_mrp_ex_gst' | 'set_tax_class' | 'set_condition' | 'set_shipping_class' | 'set_handling_days' | 'set_warranty_months' | 'set_target_gender' | 'set_grade' | 'set_hsn_code' | 'set_country_of_origin' | 'set_featured' | 'set_searchable' | 'set_active' | 'set_selling_unit' | 'set_images'
 
 interface OpDef {
   key: OpKey; label: string; group: string
-  inputType: 'number' | 'text' | 'select' | 'custom'
+  inputType: 'number' | 'text' | 'select' | 'custom' | 'images'
   placeholder?: string
   options?: { value: string; label: string }[]
   unit?: string
@@ -93,6 +94,7 @@ const OPERATIONS: OpDef[] = [
   { key: 'set_searchable',      label: 'Set Searchable',       group: 'Visibility', inputType: 'select', options: [{ value: 'true', label: 'Yes — Searchable' }, { value: 'false', label: 'No — Hidden from search' }] },
   { key: 'set_active',          label: 'Set Active/Inactive',  group: 'Visibility', inputType: 'select', danger: true, options: [{ value: 'true', label: 'Active' }, { value: 'false', label: 'Inactive (delisted)' }] },
   { key: 'set_selling_unit',    label: 'Set Selling Unit',     group: 'Attributes', inputType: 'custom' },
+  { key: 'set_images',          label: 'Replace Images',       group: 'Media', inputType: 'images', danger: true },
 ]
 
 const inputCls = 'w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm'
@@ -114,6 +116,16 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   const [opKey, setOpKey] = useState<OpKey | ''>('')
   const [opValue, setOpValue] = useState('')
   const [inheritToVariants, setInheritToVariants] = useState(true)
+  // set_images: one image replaces a chosen slot (1-based) on each product.
+  // Source is either a fresh upload or an existing gallery image.
+  const [imageSource, setImageSource] = useState<'upload' | 'gallery'>('upload')
+  const [imageFile, setImageFile] = useState<File | null>(null)
+  const [imageSlot, setImageSlot] = useState('1')
+  const [imageAlt, setImageAlt] = useState('')
+  const [imageError, setImageError] = useState<string | null>(null)
+  // Gallery picker (shared component)
+  const [galleryOpen, setGalleryOpen] = useState(false)
+  const [selectedGallery, setSelectedGallery] = useState<{ id: string; thumbnail_url: string | null; image_url: string; file_name: string } | null>(null)
   const [applying, setApplying] = useState(false)
   const [applyError, setApplyError] = useState<string | null>(null)
   const [applySuccess, setApplySuccess] = useState<string | null>(null)
@@ -121,6 +133,8 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   const [lastLogLabel, setLastLogLabel] = useState<string | null>(null)
   const [rollingBack, setRollingBack] = useState(false)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
+  // set_images runs as a background job we poll: track its id + progress here.
+  const [imageJob, setImageJob] = useState<{ id: string; total: number; done: number; skipped: number; label: string } | null>(null)
 
   // ── operation history ─────────────────────────────────────────────────────
   const [logs, setLogs] = useState<ControlsLog[]>([])
@@ -144,6 +158,36 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   }, [])
 
   useEffect(() => { loadLogs() }, [])
+
+  // Poll the bulk-image job while it runs; on completion surface success + enable
+  // Undo, on failure surface the error. The picker is cleared only once terminal.
+  useEffect(() => {
+    if (!imageJob) return
+    let cancelled = false
+    const timer = setInterval(async () => {
+      try {
+        const res = await fetch(`/api/admin/controls/jobs/${imageJob.id}`)
+        if (!res.ok) return
+        const { job } = await res.json()
+        if (cancelled || !job) return
+        setImageJob(prev => prev && prev.id === job.id ? { ...prev, done: job.done, skipped: job.skipped } : prev)
+        if (job.status === 'completed') {
+          clearInterval(timer)
+          const skippedNote = job.skipped ? ` (${job.skipped} skipped — no image in that slot)` : ''
+          setApplySuccess(`${imageJob.label} applied to ${job.done} product${job.done !== 1 ? 's' : ''}${skippedNote}.`)
+          if (job.log_id) { setLastLogId(job.log_id); setLastLogLabel(imageJob.label) }
+          setImageFile(null); setSelectedGallery(null); setImageAlt(''); setImageError(null)
+          setImageJob(null)
+          loadLogs()
+        } else if (job.status === 'failed') {
+          clearInterval(timer)
+          setApplyError(job.error || 'Image update failed')
+          setImageJob(null)
+        }
+      } catch { /* transient poll error — try again next tick */ }
+    }, 1500)
+    return () => { cancelled = true; clearInterval(timer) }
+  }, [imageJob?.id, loadLogs])
 
   // ── selling unit sub-fields ───────────────────────────────────────────────
   const [suDimension, setSuDimension] = useState<Dimension>('count')
@@ -308,7 +352,9 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
     const label = opDef.label
     const ok = await confirm({
       title: `Apply: ${label}?`,
-      message: `This will update ${selectedIds.size} product${selectedIds.size !== 1 ? 's' : ''}. Are you sure?`,
+      message: opKey === 'set_images'
+        ? `This will replace image #${imageSlot} on the selected products with the uploaded image (products without that image slot are skipped). Undoable from History. Continue?`
+        : `This will update ${selectedIds.size} product${selectedIds.size !== 1 ? 's' : ''}. Are you sure?`,
       confirmLabel: 'Yes, apply',
       cancelLabel: 'Cancel',
       variant: opDef.danger ? 'danger' : 'default',
@@ -319,21 +365,48 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
     setApplyError(null)
     setApplySuccess(null)
     try {
-      const value = opKey === 'set_selling_unit'
-        ? { unit: suUnitKey, factor: parseFloat(suEffectiveFactor), dimension: suDimension, display_label: suLabel || null, min_qty: parseFloat(suMinQty) || 1, max_qty: suMaxQty.trim() ? parseFloat(suMaxQty) : null, qty_step: parseFloat(suQtyStep) || 1 }
-        : opValue
-      const res = await fetch('/api/admin/controls', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ operation: opKey, value, product_ids: [...selectedIds], inherit_to_variants: inheritToVariants }),
-      })
+      let res: Response
+      if (opKey === 'set_images') {
+        // Multipart: replace image slot N on every selected product, from an
+        // uploaded file OR a chosen gallery image.
+        const fd = new FormData()
+        fd.append('operation', 'set_images')
+        fd.append('product_ids', JSON.stringify([...selectedIds]))
+        fd.append('slot', String(parseInt(imageSlot, 10) || 1))
+        if (imageSource === 'gallery' && selectedGallery) {
+          fd.append('gallery_image_id', selectedGallery.id)
+        } else if (imageFile) {
+          fd.append('image_count', '1')
+          fd.append('image_0', imageFile)
+        }
+        if (imageAlt.trim()) fd.append('alt_text', imageAlt.trim())
+        // No Content-Type header — the browser sets the multipart boundary.
+        res = await fetch('/api/admin/controls', { method: 'POST', body: fd })
+      } else {
+        const value = opKey === 'set_selling_unit'
+          ? { unit: suUnitKey, factor: parseFloat(suEffectiveFactor), dimension: suDimension, display_label: suLabel || null, min_qty: parseFloat(suMinQty) || 1, max_qty: suMaxQty.trim() ? parseFloat(suMaxQty) : null, qty_step: parseFloat(suQtyStep) || 1 }
+          : opValue
+        res = await fetch('/api/admin/controls', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operation: opKey, value, product_ids: [...selectedIds], inherit_to_variants: inheritToVariants }),
+        })
+      }
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed')
-      setApplySuccess(`${label} applied to ${data.updated} product${data.updated !== 1 ? 's' : ''}.`)
-      if (data.log_id) { setLastLogId(data.log_id); setLastLogLabel(label) }
-      setRollbackError(null)
-      setOpValue('')
-      loadLogs()
+      if (opKey === 'set_images') {
+        // Async: the server queued a job. Show progress and poll for completion;
+        // don't clear the picker until the job finishes (so a retry is easy on failure).
+        setImageJob({ id: data.job_id, total: data.total ?? 0, done: 0, skipped: data.skipped ?? 0, label })
+        setRollbackError(null)
+      } else {
+        const skippedNote = data.skipped ? ` (${data.skipped} skipped — no image in that slot)` : ''
+        setApplySuccess(`${label} applied to ${data.updated} product${data.updated !== 1 ? 's' : ''}${skippedNote}.`)
+        if (data.log_id) { setLastLogId(data.log_id); setLastLogLabel(label) }
+        setRollbackError(null)
+        setOpValue('')
+        loadLogs()
+      }
     } catch (e: any) {
       setApplyError(e.message)
     } finally {
@@ -396,11 +469,25 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   }  const suEffectiveFactor = suIsCustom && suDimension !== 'count' && suCustomPreview
     ? String(suCustomPreview.factor)
     : suFactor
-  const canApply = !!opDef && selectedIds.size > 0 && !applying && (
+  const canApply = !!opDef && selectedIds.size > 0 && !applying && !imageJob && (
     opKey === 'set_selling_unit'
       ? !!suUnitKey && parseFloat(suEffectiveFactor) > 0
-      : !!opValue
+      : opKey === 'set_images'
+        ? (imageSource === 'upload' ? !!imageFile : !!selectedGallery) && parseInt(imageSlot, 10) >= 1
+        : !!opValue
   )
+
+  // Validate + accept ONE picked image file (≤5MB, jpeg/png/webp — matches src/lib/s3.ts).
+  const MAX_IMG = 5 * 1024 * 1024
+  const IMG_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+  function pickImageFile(list: FileList | null) {
+    if (!list || list.length === 0) return
+    const f = list[0]
+    setImageError(null)
+    if (!IMG_TYPES.includes(f.type)) { setImageError(`"${f.name}" — only JPEG, PNG, WebP allowed.`); return }
+    if (f.size > MAX_IMG) { setImageError(`"${f.name}" exceeds the 5MB limit.`); return }
+    setImageFile(f)
+  }
 
   // ── operation groups ──────────────────────────────────────────────────────
   const opGroups = useMemo(() => {
@@ -414,21 +501,23 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
   )
 
   return (
-    <div className="p-4 sm:p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-5">
       <div>
         <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Product Controls</h1>
-        <p className="text-foreground-secondary mt-1 text-sm">Filter products by any attribute, select a subset, then apply a bulk operation. All price changes derive from MRP (Ex-GST) — GST, selling price, and discount are recalculated automatically.</p>
+        <p className="text-foreground-secondary mt-1 text-sm">Work through the steps: filter products, select a subset, then apply a bulk operation. Every change is logged and can be undone from History. Price changes derive from MRP (Ex-GST) — GST, selling price and discount recalculate automatically.</p>
       </div>
 
-      {/* ── Filters ──────────────────────────────────────────────────── */}
-      <div className="bg-surface-elevated rounded-lg border border-border-default p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-foreground">Filters</h2>
+      {/* ── Step 1 · Filter ──────────────────────────────────────────── */}
+      <section className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+        <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface">
+          <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent-500 text-white text-xs font-bold shrink-0">1</span>
+          <h2 className="text-sm font-semibold text-foreground flex-1">Filter products</h2>
           {Object.keys(activeFilters).length > 0 && (
             <button type="button" onClick={() => { setActiveFilters({}); setProducts([]); setSelectedIds(new Set()) }}
               className="text-xs text-foreground-muted hover:text-red-500 transition-colors">Clear all</button>
           )}
         </div>
+        <div className="p-4 space-y-3">
 
         {/* active filter chips */}
         <div className="flex flex-wrap gap-2">
@@ -490,20 +579,25 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
         </div>
 
         {loadError && <p className="text-xs text-red-500">{loadError}</p>}
-      </div>
+        </div>
+      </section>
 
-      {/* ── Product List ──────────────────────────────────────────────── */}
+      {/* ── Step 2 · Select ──────────────────────────────────────────── */}
       {(loading || products.length > 0) && (
-        <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
-          <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-default bg-surface gap-3 flex-wrap">
+        <section className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface flex-wrap">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent-500 text-white text-xs font-bold shrink-0">2</span>
+            <h2 className="text-sm font-semibold text-foreground flex-1">
+              Select products
+              {!loading && (
+                <span className="ml-2 font-normal text-foreground-muted">
+                  {selectedIds.size} of {products.length} selected
+                </span>
+              )}
+            </h2>
             {loading ? (
-              <p className="text-sm text-foreground-muted">Loading products…</p>
-            ) : (
-              <p className="text-sm font-medium text-foreground">
-                {selectedIds.size} of {products.length} product{products.length !== 1 ? 's' : ''} selected
-              </p>
-            )}
-            {!loading && products.length > 0 && (
+              <span className="text-sm text-foreground-muted">Loading…</span>
+            ) : products.length > 0 && (
               <button type="button" onClick={toggleAll}
                 className="text-xs font-medium text-accent-500 hover:text-accent-600 transition-colors">
                 {products.every(p => selectedIds.has(p.id)) ? 'Deselect All' : 'Select All'}
@@ -522,7 +616,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
               ))}
             </div>
           ) : (
-            <div className="max-h-80 overflow-y-auto divide-y divide-border-default">
+            <div className="max-h-[28rem] overflow-y-auto grid grid-cols-1 lg:grid-cols-2 gap-x-4 [&>label]:border-b [&>label]:border-border-default">
               {products.map(p => (
                 <label key={p.id} className="flex items-start gap-3 px-4 py-2.5 cursor-pointer hover:bg-surface transition-colors">
                   <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => toggleProduct(p.id)}
@@ -548,15 +642,24 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
               ))}
             </div>
           )}
-        </div>
+        </section>
       )}
 
-      {/* ── Operation Panel ───────────────────────────────────────────── */}
+      {/* ── Step 3 · Operation ─────────────────────────────────────────── */}
       {products.length > 0 && (
-        <div className="bg-surface-elevated rounded-lg border border-border-default p-4 space-y-4">
-          <h2 className="text-sm font-semibold text-foreground">Bulk Operation</h2>
+        <section className={`bg-surface-elevated rounded-xl border border-border-default overflow-hidden transition-opacity ${selectedIds.size === 0 ? 'opacity-60' : ''}`}>
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-border-default bg-surface">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-accent-500 text-white text-xs font-bold shrink-0">3</span>
+            <h2 className="text-sm font-semibold text-foreground flex-1">Choose operation</h2>
+            {selectedIds.size === 0 && <span className="text-xs text-foreground-muted">Select products first</span>}
+          </div>
+          <div className="p-4 space-y-4">
 
-          <div className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-3 items-end">
+          <div className={`grid grid-cols-1 gap-3 items-end ${
+            opDef && opDef.inputType !== 'custom' && opDef.inputType !== 'images'
+              ? 'sm:grid-cols-[1fr_1fr_auto]'   // Operation · Value · Apply
+              : 'sm:grid-cols-2'                 // Operation · Apply (equal halves)
+          }`}>
             <div>
               <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Operation</label>
               <AdminSelect
@@ -567,7 +670,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
               />
             </div>
 
-            {opDef && opDef.inputType !== 'custom' && (
+            {opDef && opDef.inputType !== 'custom' && opDef.inputType !== 'images' && (
               <div>
                 <label className="block text-xs font-medium text-foreground-secondary mb-1.5">
                   Value {opDef.unit ? <span className="text-foreground-muted">({opDef.unit})</span> : null}
@@ -586,13 +689,25 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
             )}
 
             <button type="button" onClick={handleApply} disabled={!canApply}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${
+              className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed ${
                 opDef?.danger
                   ? 'bg-red-600 hover:bg-red-700 text-white'
                   : 'bg-accent-500 hover:bg-accent-600 text-white'
               }`}>
-              {applying ? 'Applying…' : `Apply to ${selectedIds.size} product${selectedIds.size !== 1 ? 's' : ''}`}
+              {imageJob ? 'Replacing images…' : applying ? 'Applying…' : `Apply to ${selectedIds.size} product${selectedIds.size !== 1 ? 's' : ''}`}
             </button>
+
+            {imageJob && (
+              <div className="mt-2 rounded-lg border border-border-default bg-surface p-3">
+                <div className="flex items-center justify-between text-xs text-foreground-secondary mb-1.5">
+                  <span>Replacing image #{imageSlot}… {imageJob.done} of {imageJob.total}{imageJob.skipped ? ` · ${imageJob.skipped} skipped` : ''}</span>
+                  <span>{imageJob.total ? Math.round((imageJob.done / imageJob.total) * 100) : 0}%</span>
+                </div>
+                <div className="h-1.5 w-full rounded-full bg-surface-secondary overflow-hidden">
+                  <div className="h-full bg-accent-500 transition-all" style={{ width: `${imageJob.total ? (imageJob.done / imageJob.total) * 100 : 0}%` }} />
+                </div>
+              </div>
+            )}
           </div>
 
           {opKey === 'set_selling_unit' && (() => {
@@ -762,6 +877,107 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
             )
           })()}
 
+          {/* set_images — slot selector + single-image picker */}
+          {opKey === 'set_images' && (
+            <div className="bg-surface border border-border-default rounded-lg p-3 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-[10rem_1fr] gap-3 items-start">
+                {/* Which image slot to replace */}
+                <div>
+                  <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Replace image #</label>
+                  <AdminSelect
+                    value={imageSlot}
+                    options={Array.from({ length: 8 }, (_, i) => ({ value: String(i + 1), label: `Image ${i + 1}${i === 0 ? ' (primary)' : ''}` }))}
+                    onChange={setImageSlot}
+                  />
+                  <p className="text-[10px] text-foreground-muted mt-1">Products without this slot are skipped.</p>
+                </div>
+
+                {/* Picker / preview */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="block text-xs font-medium text-foreground-secondary">New image</label>
+                    {/* Source toggle: Upload / Gallery */}
+                    <div className="inline-flex rounded-md border border-border-secondary overflow-hidden text-xs">
+                      <button type="button" onClick={() => setImageSource('upload')}
+                        className={`px-2.5 py-1 ${imageSource === 'upload' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}>Upload</button>
+                      <button type="button" onClick={() => setImageSource('gallery')}
+                        className={`px-2.5 py-1 border-l border-border-secondary ${imageSource === 'gallery' ? 'bg-accent-500 text-white' : 'bg-surface text-foreground-secondary hover:bg-surface-secondary'}`}>Gallery</button>
+                    </div>
+                  </div>
+
+                  {/* Selected preview (shared for both sources) */}
+                  {(imageSource === 'upload' && imageFile) || (imageSource === 'gallery' && selectedGallery) ? (
+                    <div className="flex items-center gap-3">
+                      <div className="relative w-20 h-20 rounded-lg overflow-hidden border border-border-default shrink-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={imageSource === 'upload' && imageFile ? URL.createObjectURL(imageFile) : (selectedGallery!.thumbnail_url || selectedGallery!.image_url)}
+                          alt={imageSource === 'upload' && imageFile ? imageFile.name : selectedGallery!.file_name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm text-foreground truncate">{imageSource === 'upload' && imageFile ? imageFile.name : selectedGallery!.file_name}</p>
+                        <p className="text-xs text-foreground-muted">{imageSource === 'upload' ? 'Uploaded file' : 'From gallery'}</p>
+                        <button type="button" onClick={() => { if (imageSource === 'upload') setImageFile(null); else setSelectedGallery(null) }} className="text-xs text-red-500 hover:underline mt-0.5">Remove</button>
+                      </div>
+                    </div>
+                  ) : imageSource === 'upload' ? (
+                    <>
+                      <label
+                        htmlFor="bulk-image-input"
+                        className="flex flex-col items-center justify-center gap-1.5 border-2 border-dashed border-border-secondary rounded-lg py-6 px-4 cursor-pointer hover:border-accent-500 transition-colors text-center"
+                      >
+                        <svg className="w-6 h-6 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                        <span className="text-sm text-foreground font-medium">Click to add an image</span>
+                        <span className="text-xs text-foreground-muted">JPEG · PNG · WebP · up to 5MB</span>
+                      </label>
+                      <input
+                        id="bulk-image-input" type="file" accept="image/jpeg,image/png,image/webp" className="hidden"
+                        onChange={e => { pickImageFile(e.target.files); e.target.value = '' }}
+                      />
+                    </>
+                  ) : (
+                    <button type="button" onClick={() => setGalleryOpen(true)}
+                      className="flex flex-col items-center justify-center gap-1.5 w-full border-2 border-dashed border-border-secondary rounded-lg py-6 px-4 hover:border-accent-500 transition-colors text-center">
+                      <svg className="w-6 h-6 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 6a2 2 0 012-2h12a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm2 10l3.5-4.5 2.5 3 3.5-4.5L20 16" />
+                      </svg>
+                      <span className="text-sm text-foreground font-medium">Choose from gallery</span>
+                      <span className="text-xs text-foreground-muted">Reuse an existing uploaded image</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {imageError && <p className="text-xs text-red-500">{imageError}</p>}
+
+              <div>
+                <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Alt text <span className="text-foreground-muted">(optional)</span></label>
+                <input type="text" value={imageAlt} onChange={e => setImageAlt(e.target.value)} placeholder="Describes the image for accessibility & SEO" className={inputCls} />
+              </div>
+
+              <p className="text-xs text-orange-600 dark:text-orange-400 bg-orange-50 dark:bg-orange-900/20 rounded p-2.5 border border-orange-200 dark:border-orange-800">
+                Replaces image #{imageSlot} on the selected products with this image{imageSlot === '1' ? ' and makes it the primary image' : ''}. Other images are untouched. Undoable from History.
+              </p>
+
+              {/* Gallery picker — shared component, single-select */}
+              {galleryOpen && (
+                <GalleryPicker
+                  mode="single"
+                  onClose={() => setGalleryOpen(false)}
+                  onConfirm={imgs => {
+                    const g = imgs[0]
+                    if (g) setSelectedGallery({ id: g.id, thumbnail_url: g.thumbnail_url, image_url: g.image_url, file_name: g.custom_name || g.file_name })
+                    setGalleryOpen(false)
+                  }}
+                />
+              )}
+            </div>
+          )}
+
           {/* operation hint */}
           {opKey === 'inflate_price' && (
             <p className="text-xs text-foreground-muted bg-surface rounded p-2.5 border border-border-default">
@@ -799,7 +1015,8 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
             </div>
           )}
           {rollbackError && <p className="text-sm text-red-600 dark:text-red-400">{rollbackError}</p>}
-        </div>
+          </div>
+        </section>
       )}
 
       {Object.keys(activeFilters).length > 0 && !loading && products.length === 0 && (
@@ -816,9 +1033,14 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
       )}
 
       {/* ── Operation History ─────────────────────────────────────────────── */}
-      <div className="bg-surface-elevated rounded-lg border border-border-default overflow-hidden">
-        <div className="flex items-center justify-between px-4 py-2.5 border-b border-border-default bg-surface">
-          <h2 className="text-sm font-semibold text-foreground">Operation History</h2>
+      <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-border-default bg-surface">
+          <div className="flex items-center gap-3">
+            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-surface-secondary text-foreground-secondary text-xs font-bold shrink-0">
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </span>
+            <h2 className="text-sm font-semibold text-foreground">Operation History</h2>
+          </div>
           <button type="button" onClick={loadLogs} disabled={logsLoading}
             className="text-xs text-foreground-muted hover:text-foreground disabled:opacity-50 transition-colors">
             {logsLoading ? 'Loading…' : 'Refresh'}
@@ -843,6 +1065,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
                     if (typeof log.value === 'object') {
                       const v = log.value as any
                       if (v.unit) valueStr = `${v.unit}${v.factor ? ` (×${v.factor})` : ''}`
+                      else if (v.slot != null) valueStr = `image #${v.slot}`
                     } else {
                       valueStr = String(log.value)
                     }

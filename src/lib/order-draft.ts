@@ -32,6 +32,7 @@ export interface DraftPayload {
   addressId: string
   couponId: string | null
   shippingAmount: number
+  codFeeAmount: number
   cartHash: string | null
   cartItemIds: string[] | null
   buyNowItem: DraftBuyNowItem | null
@@ -64,6 +65,7 @@ export async function verifyDraftToken(token: string): Promise<DraftPayload | nu
       addressId: payload.addressId,
       couponId: (payload.couponId as string) || null,
       shippingAmount: typeof payload.shippingAmount === 'number' ? payload.shippingAmount : 0,
+      codFeeAmount: typeof payload.codFeeAmount === 'number' ? payload.codFeeAmount : 0,
       cartHash: (payload.cartHash as string) || null,
       cartItemIds: (payload.cartItemIds as string[]) || null,
       buyNowItem: (payload.buyNowItem as DraftBuyNowItem) || null,

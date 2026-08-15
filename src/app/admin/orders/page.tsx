@@ -94,6 +94,7 @@ async function OrdersListContent({ resolvedSearchParams }: { resolvedSearchParam
     shipment_status: sp(resolvedSearchParams, 'shipment_status'),
     payment_mode: sp(resolvedSearchParams, 'payment_mode'),
     coupon_code: sp(resolvedSearchParams, 'coupon_code'),
+    cod_pending: sp(resolvedSearchParams, 'cod_pending'),
     page,
     limit: PAGE_SIZE,
     sort,
@@ -341,6 +342,7 @@ export default function OrdersPage({ searchParams }: { searchParams: Promise<SP>
             { value: 'prepaid', label: 'Prepaid' },
           ]},
           { name: 'coupon_code', label: 'Coupon Code', type: 'text', section: 'Payment', placeholder: 'Search by coupon code' },
+          { name: 'cod_pending', label: 'COD pending remittance', type: 'boolean', section: 'Payment' },
         ]} mode="content" forceExpanded />}
       />
 

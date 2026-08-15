@@ -12,6 +12,9 @@ vi.mock('@/lib/jwt', () => ({
   authenticateUser: vi.fn(),
   verifyToken: vi.fn(),
 }))
+vi.mock('@/lib/scopes', () => ({
+  hasScope: vi.fn(() => true),
+}))
 vi.mock('@/lib/s3', () => ({
   uploadGalleryImage: vi.fn(),
   deleteGalleryImage: vi.fn(),
@@ -19,10 +22,12 @@ vi.mock('@/lib/s3', () => ({
 
 import { POST, OPTIONS } from '@/app/api/gallery/upload/route'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { uploadGalleryImage } from '@/lib/s3'
 import { queryOne } from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
+const mockHasScope = vi.mocked(hasScope)
 const mockUpload = vi.mocked(uploadGalleryImage)
 const mockQueryOne = vi.mocked(queryOne)
 
@@ -53,6 +58,7 @@ describe('OPTIONS /api/gallery/upload', () => {
 describe('POST /api/gallery/upload', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockHasScope.mockReturnValue(true) // cleared by clearAllMocks; default to allowed
     process.env.S3_BUCKET_NAME = 'test-bucket'
   })
 
@@ -65,6 +71,18 @@ describe('POST /api/gallery/upload', () => {
     })
     const res = await POST(req as any)
     expect(res.status).toBe(401)
+  })
+
+  it('returns 403 when the admin/token lacks products:write', async () => {
+    mockAuth.mockResolvedValueOnce({ adminId: 'a1', role: 'admin', scopes: [] } as any)
+    mockHasScope.mockReturnValueOnce(false)
+    const req = new Request('http://localhost/api/gallery/upload', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ imageUrl: 'https://example.com/img.jpg' }),
+    })
+    const res = await POST(req as any)
+    expect(res.status).toBe(403)
   })
 
   it('returns 400 when JSON body missing imageUrl', async () => {

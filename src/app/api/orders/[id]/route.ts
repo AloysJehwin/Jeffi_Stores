@@ -158,6 +158,7 @@ export async function GET(
       discountAmount: parseFloat(order.discount_amount || '0'),
       businessDiscountAmount: parseFloat(order.business_discount_amount || '0'),
       shippingAmount: parseFloat(order.shipping_amount || '0'),
+      codFeeAmount: parseFloat(order.cod_fee_amount || '0'),
       status: order.status,
       paymentStatus: order.payment_status,
       paymentMode: order.payment_mode || null,

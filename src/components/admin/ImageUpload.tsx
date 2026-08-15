@@ -1,15 +1,14 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createPortal } from 'react-dom'
-import AdminSelect from '@/components/admin/AdminSelect'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import GalleryPicker, { type GalleryImage } from '@/components/admin/GalleryPicker'
 
 interface LocalImage {
   file?: File
   previewUrl: string
   fileName: string
-  fileSize: number
+  fileSize?: number
   isPrimary?: boolean
   isExisting?: boolean
   isGallery?: boolean
@@ -23,25 +22,6 @@ interface ExistingImage {
   file_name: string
   file_size: number
   is_primary: boolean
-}
-
-interface GalleryImage {
-  id: string
-  image_url: string
-  thumbnail_url: string
-  file_name: string
-  file_size: number
-  width: number
-  height: number
-  custom_name: string | null
-  category_id: string | null
-  category_name: string | null
-}
-
-interface Category {
-  id: string
-  name: string
-  slug: string
 }
 
 interface ImageUploadProps {
@@ -59,12 +39,6 @@ export default function ImageUpload({
   const [images, setImages] = useState<LocalImage[]>([])
   const [error, setError] = useState<string | null>(null)
   const [showGallery, setShowGallery] = useState(false)
-  const [galleryImages, setGalleryImages] = useState<GalleryImage[]>([])
-  const [galleryLoading, setGalleryLoading] = useState(false)
-  const [selectedGalleryIds, setSelectedGalleryIds] = useState<string[]>([])
-  const [gallerySearch, setGallerySearch] = useState('')
-  const [galleryCategory, setGalleryCategory] = useState('')
-  const [categories, setCategories] = useState<Category[]>([])
   const dragIndex = useRef<number | null>(null)
   const dragOverIndex = useRef<number | null>(null)
 
@@ -185,57 +159,29 @@ export default function ImageUpload({
     notifyChange(updated)
   }
 
-  const openGallery = useCallback(async () => {
-    setShowGallery(true)
-    setSelectedGalleryIds([])
-    setGallerySearch('')
-    setGalleryCategory('')
-    setGalleryLoading(true)
-    try {
-      const [galleryRes, catRes] = await Promise.all([
-        fetch('/api/gallery?limit=100'),
-        fetch('/api/categories'),
-      ])
-      const galleryData = await galleryRes.json()
-      const catData = await catRes.json()
-      setGalleryImages(galleryData.images || [])
-      setCategories(catData.categories || [])
-    } catch {
-      setGalleryImages([])
-    } finally {
-      setGalleryLoading(false)
-    }
-  }, [])
+  const openGallery = useCallback(() => { setShowGallery(true) }, [])
 
-  function handleUseGalleryImages() {
+  function handleUseGalleryImages(picked: GalleryImage[]) {
+    setShowGallery(false)
     const slotsLeft = maxImages - images.length
     if (slotsLeft <= 0) {
       setError(`You can only upload up to ${maxImages} images`)
-      setShowGallery(false)
-      setSelectedGalleryIds([])
       return
     }
-    const toAdd = selectedGalleryIds.slice(0, slotsLeft)
     const existingIds = new Set(images.filter(i => i.id).map(i => i.id!))
-    const newImgs: LocalImage[] = toAdd
-      .filter(id => !existingIds.has(id))
-      .map((id, idx) => {
-        const gimg = galleryImages.find(g => g.id === id)!
-        return {
-          previewUrl: gimg.thumbnail_url || gimg.image_url,
-          fileName: gimg.custom_name || gimg.file_name || 'gallery-image.png',
-          fileSize: gimg.file_size,
-          isPrimary: images.length === 0 && idx === 0,
-          isGallery: true,
-          id: gimg.id,
-        }
-      })
+    const toAdd = picked.filter(g => !existingIds.has(g.id)).slice(0, slotsLeft)
+    const newImgs: LocalImage[] = toAdd.map((gimg, idx) => ({
+      previewUrl: gimg.thumbnail_url || gimg.image_url,
+      fileName: gimg.custom_name || gimg.file_name || 'gallery-image.png',
+      fileSize: gimg.file_size ?? undefined,
+      isPrimary: images.length === 0 && idx === 0,
+      isGallery: true,
+      id: gimg.id,
+    }))
     const updated = [...images, ...newImgs]
     setImages(updated)
     notifyChange(updated)
-    setShowGallery(false)
-    setSelectedGalleryIds([])
-    if (selectedGalleryIds.length > slotsLeft) {
+    if (picked.length > slotsLeft) {
       setError(`Only ${slotsLeft} slot(s) remaining. Added first ${slotsLeft} image(s).`)
     } else {
       setError(null)
@@ -367,114 +313,13 @@ export default function ImageUpload({
         </div>
       )}
 
-      {showGallery && typeof document !== 'undefined' && createPortal(
-        <div className="fixed inset-0 z-[300] flex items-center justify-center backdrop-blur-sm bg-black/50 p-4">
-          <div className="bg-surface-elevated rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
-              <h2 className="text-lg font-semibold text-foreground">Choose from Gallery</h2>
-              <button
-                type="button"
-                onClick={() => { setShowGallery(false); setSelectedGalleryIds([]) }}
-                className="text-foreground-muted hover:text-foreground transition-colors text-2xl leading-none"
-              >
-                &times;
-              </button>
-            </div>
-
-            <div className="px-6 py-3 border-b border-border-default flex gap-2 items-center">
-              <input
-                type="text"
-                placeholder="Search by name..."
-                value={gallerySearch}
-                onChange={e => setGallerySearch(e.target.value)}
-                className="flex-1 px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-              />
-              <div className="w-48 shrink-0">
-                <AdminSelect
-                  value={galleryCategory}
-                  onChange={setGalleryCategory}
-                  placeholder="All categories"
-                  options={[
-                    { value: '', label: 'All categories' },
-                    ...categories.map(c => ({ value: c.id, label: c.name })),
-                  ]}
-                />
-              </div>
-            </div>
-
-            <div className="overflow-y-auto flex-1 min-h-0 p-4 pr-3">
-              {galleryLoading && (
-                <div className="flex items-center justify-center py-16">
-                  <div className="w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
-              {!galleryLoading && galleryImages.length === 0 && (
-                <p className="text-center text-foreground-secondary py-16">No images in gallery yet. Use the Chrome extension to add images.</p>
-              )}
-              {!galleryLoading && galleryImages.length > 0 && (() => {
-                const q = gallerySearch.toLowerCase()
-                const filtered = galleryImages.filter(g => {
-                  const nameMatch = q ? (g.custom_name || '').toLowerCase().includes(q) : true
-                  const catMatch = galleryCategory ? g.category_id === galleryCategory : true
-                  return nameMatch && catMatch
-                })
-                return filtered.length === 0 ? (
-                  <p className="text-center text-foreground-secondary py-16">No images match &ldquo;{gallerySearch}&rdquo;</p>
-                ) : (
-                  <div className="grid grid-cols-4 gap-3 w-full">
-                    {filtered.map(gimg => {
-                      const selIdx = selectedGalleryIds.indexOf(gimg.id)
-                      const isSelected = selIdx !== -1
-                      return (
-                      <button
-                        key={gimg.id}
-                        type="button"
-                        onClick={() => setSelectedGalleryIds(prev =>
-                          prev.includes(gimg.id) ? prev.filter(id => id !== gimg.id) : [...prev, gimg.id]
-                        )}
-                        className={`relative rounded-lg overflow-hidden border-2 transition-colors text-left ${isSelected ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-default hover:border-accent-400'}`}
-                      >
-                        {isSelected && (
-                          <div className="absolute top-1 right-1 bg-accent-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold z-10">
-                            {selIdx + 1}
-                          </div>
-                        )}
-                        <div className="aspect-square">
-                          <ImgWithSkeleton src={gimg.thumbnail_url || gimg.image_url} alt={gimg.custom_name || gimg.file_name} className="w-full h-full object-cover" />
-                        </div>
-                        <div className="px-1.5 py-1 bg-surface-secondary">
-                          <p className="text-xs text-foreground-secondary truncate">{gimg.custom_name || gimg.file_name}</p>
-                          {gimg.category_name && (
-                            <p className="text-xs text-accent-500 truncate">{gimg.category_name}</p>
-                          )}
-                        </div>
-                      </button>
-                    )})}
-                  </div>
-                )
-              })()}
-            </div>
-
-            <div className="px-6 py-4 border-t border-border-default flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => { setShowGallery(false); setSelectedGalleryIds([]) }}
-                className="px-4 py-2 text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={handleUseGalleryImages}
-                disabled={selectedGalleryIds.length === 0}
-                className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:bg-surface-secondary disabled:text-foreground-muted text-white rounded-lg text-sm font-semibold transition-colors"
-              >
-                {selectedGalleryIds.length > 0 ? `Add ${selectedGalleryIds.length} Image${selectedGalleryIds.length > 1 ? 's' : ''}` : 'Add Images'}
-              </button>
-            </div>
-          </div>
-        </div>,
-        document.body
+      {showGallery && (
+        <GalleryPicker
+          mode="multi"
+          maxSelect={Math.max(0, maxImages - images.length)}
+          onClose={() => setShowGallery(false)}
+          onConfirm={handleUseGalleryImages}
+        />
       )}
     </div>
   )
