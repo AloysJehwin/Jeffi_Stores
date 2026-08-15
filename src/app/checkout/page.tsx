@@ -47,6 +47,7 @@ function CheckoutPage() {
   const [couponCode, setCouponCode] = useState<string | null>(null)
   const [discountAmount, setDiscountAmount] = useState(0)
   const [shippingCharge, setShippingCharge] = useState<number | null>(null)
+  const [codFee, setCodFee] = useState<number>(0)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
@@ -268,10 +269,13 @@ function CheckoutPage() {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
-      body: JSON.stringify({ destinationPin: postalCode, cartItems: items, subtotal }),
+      body: JSON.stringify({ destinationPin: postalCode, cartItems: items, subtotal, isCod: paymentMethod === 'cod' }),
     })
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.charge != null) setShippingCharge(Number(d.charge)) })
+      .then(d => {
+        if (d?.charge != null) setShippingCharge(Number(d.charge))
+        setCodFee(d?.codFee != null ? Number(d.codFee) : 0)
+      })
       .catch(() => {})
   }
 
@@ -307,6 +311,14 @@ function CheckoutPage() {
     fetchShipping(address.postal_code)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cartItems])
+
+  // Re-fetch shipping when the payment method changes — the COD handling fee
+  // only applies to COD orders, so switching to/from COD changes the total.
+  useEffect(() => {
+    if (!address?.postal_code) return
+    fetchShipping(address.postal_code)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paymentMethod])
 
   // Re-apply coupon from server once address + subtotal are known — never trust URL value
   useEffect(() => {
@@ -573,6 +585,7 @@ function CheckoutPage() {
         couponId: couponId || null,
         discountAmount: discountAmount || 0,
         shippingAmount: shippingCharge ?? 0,
+        codFeeAmount: paymentMethod === 'cod' ? codFee : 0,
       }
 
       if (isBuyNow && buyNowItem) {
@@ -677,7 +690,8 @@ function CheckoutPage() {
     ? (buyNowItem ? buyNowItem.price * buyNowItem.qty : 0)
     : getCartTotal()
   const tax = isBuyNow ? 0 : getCartTax()
-  const finalTotal = Math.max(0, subtotal - discountAmount + (shippingCharge ?? 0))
+  const effectiveCodFee = paymentMethod === 'cod' ? codFee : 0
+  const finalTotal = Math.max(0, subtotal - discountAmount + (shippingCharge ?? 0) + effectiveCodFee)
   const displayItems = isBuyNow ? (buyNowItem ? [buyNowItem] : []) : cartItems
 
   // COD is available if every item in the order allows it
@@ -1017,6 +1031,12 @@ function CheckoutPage() {
                     <div className="flex justify-between text-foreground-secondary text-sm">
                       <span>Delivery</span>
                       <span>{shippingCharge === 0 ? 'Free' : `₹${shippingCharge.toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}</span>
+                    </div>
+                  )}
+                  {paymentMethod === 'cod' && codFee > 0 && (
+                    <div className="flex justify-between text-foreground-secondary text-sm">
+                      <span>COD handling fee</span>
+                      <span>₹{codFee.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
                   )}
                   <div className="border-t border-border-default pt-3">

@@ -77,11 +77,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         oi.quantity,
         oi.variant_id,
         COALESCE(pv.variant_name, '') AS variant_name,
-        COALESCE(pv.weight_grams, p.weight_grams, 500) AS weight_grams,
-        COALESCE(pv.package_type, p.package_type) AS package_type,
-        COALESCE(pv.length_cm, p.length_cm) AS length_cm,
-        COALESCE(pv.breadth_cm, p.breadth_cm) AS breadth_cm,
-        COALESCE(pv.height_cm, p.height_cm) AS height_cm
+        COALESCE(oi.weight_grams, pv.weight_grams, p.weight_grams, 500) AS weight_grams,
+        COALESCE(oi.package_type, pv.package_type, p.package_type) AS package_type,
+        COALESCE(oi.length_cm, pv.length_cm, p.length_cm) AS length_cm,
+        COALESCE(oi.breadth_cm, pv.breadth_cm, p.breadth_cm) AS breadth_cm,
+        COALESCE(oi.height_cm, pv.height_cm, p.height_cm) AS height_cm
       FROM order_items oi
       LEFT JOIN products p ON p.id = oi.product_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id

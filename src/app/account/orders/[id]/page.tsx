@@ -56,6 +56,7 @@ interface OrderDetails {
   taxAmount: number
   discountAmount: number
   shippingAmount: number
+  codFeeAmount?: number
   status: string
   paymentStatus: string
   paymentMode?: string | null
@@ -1319,6 +1320,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                   <div className="flex justify-between text-sm text-foreground-secondary">
                     <span>Delivery</span>
                     <span>{order.shippingAmount.toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
+                  </div>
+                )}
+                {(order.codFeeAmount ?? 0) > 0 && (
+                  <div className="flex justify-between text-sm text-foreground-secondary">
+                    <span>COD handling fee</span>
+                    <span>{(order.codFeeAmount ?? 0).toLocaleString('en-IN', { style: 'currency', currency: 'INR' })}</span>
                   </div>
                 )}
                 <div className="flex justify-between items-center pt-2">

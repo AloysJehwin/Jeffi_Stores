@@ -133,6 +133,44 @@ async function updateProduct(productId: string, formData: FormData) {
   const intent = formData.get('intent') as string | null
   const isActive = (intent === 'draft' || intent === 'draft-stay') ? false : (formData.get('is_active') === 'true')
   const isFeatured = formData.get('is_featured') === 'true'
+
+  // Server-side weight & packaging validation — enforced on publish only, so a
+  // partial draft can still be saved. Mirrors the client checks in ProductForm so
+  // a direct/programmatic submit can't slip a null/zero weight or missing box dims
+  // past the UI. See src/lib/shipping.ts STORED_DIMS_REQUIRED.
+  if (intent === 'publish') {
+    const STORED_DIMS_TYPES = ['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
+    const errors: string[] = []
+    if (!hasVariants) {
+      if (weightGrams == null || !(weightGrams > 0)) {
+        errors.push('Shipping weight is required and must be greater than 0.')
+      }
+      if (packageType && STORED_DIMS_TYPES.includes(packageType) && (lengthCm == null || breadthCm == null || heightCm == null)) {
+        errors.push('Dimensions required for this package type')
+      }
+    } else {
+      const variantsJsonRaw = formData.get('variants_json') as string | null
+      let parsedVariants: any[] = []
+      try { parsedVariants = variantsJsonRaw ? JSON.parse(variantsJsonRaw) : [] } catch { parsedVariants = [] }
+      for (const v of parsedVariants) {
+        if (v?._isDeleted) continue
+        const w = v?.weight_grams != null && v.weight_grams !== '' ? parseFloat(v.weight_grams) : null
+        if (w == null || !(w > 0)) {
+          errors.push(`Shipping weight is required for variant "${v?.variant_name || v?.sku || ''}" and must be greater than 0.`)
+          break
+        }
+        const pt = v?.package_type || 'flat_poly_auto'
+        const blank = (x: any) => x == null || String(x).trim() === ''
+        if (STORED_DIMS_TYPES.includes(pt) && (blank(v?.length_cm) || blank(v?.breadth_cm) || blank(v?.height_cm))) {
+          errors.push(`Dimensions required for this package type (variant "${v?.variant_name || v?.sku || ''}")`)
+          break
+        }
+      }
+    }
+    if (errors.length > 0) {
+      throw new Error(errors[0])
+    }
+  }
   const imageCount = parseInt(formData.get('image_count') as string || '0')
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
   const existingImagesToKeep = existingImagesToKeepJson ? JSON.parse(existingImagesToKeepJson) : []
@@ -557,7 +595,13 @@ async function updateProduct(productId: string, formData: FormData) {
           [galleryImageRefs.map(r => r.id)]
         )
         for (const gimg of (galleryImages || [])) {
-          const copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, productId, gimg.image_url, gimg.thumbnail_url)
+          let copied
+          try {
+            copied = await copyGalleryImageToProduct(gimg.s3_key, gimg.s3_thumbnail_key, productId)
+          } catch (e) {
+            // Gallery source missing — skip rather than store a gallery/ path or abort.
+            continue
+          }
           const inserted = await queryOne<{ id: string }>(
             `INSERT INTO product_images (
               product_id, image_url, thumbnail_url, s3_bucket, s3_key,

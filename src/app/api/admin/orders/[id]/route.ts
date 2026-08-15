@@ -15,6 +15,8 @@ const patchSchema = z
     awb_number: z.string().optional(),
     notes: z.string().optional(),
     estimated_delivery_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Must be YYYY-MM-DD').optional(),
+    // COD remittance: true = mark cash received from Delhivery now, false = clear it.
+    cod_remitted: z.boolean().optional(),
   })
   .refine((d) => Object.values(d).some((v) => v !== undefined), {
     message: 'At least one field is required',
@@ -108,6 +110,10 @@ export async function PATCH(
     }
     if (d.notes !== undefined) { setClauses.push(`notes = $${values.length + 1}`); values.push(d.notes) }
     if (d.estimated_delivery_date !== undefined) { setClauses.push(`estimated_delivery_date = $${values.length + 1}`); values.push(d.estimated_delivery_date) }
+    if (d.cod_remitted !== undefined) {
+      // true → stamp now; false → clear. No param needed (NOW()/NULL are literals).
+      setClauses.push(d.cod_remitted ? `cod_remitted_at = NOW()` : `cod_remitted_at = NULL`)
+    }
 
     values.push(id)
     await queryOne(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${values.length}`, values)

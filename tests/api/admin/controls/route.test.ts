@@ -3,13 +3,24 @@ import { NextRequest } from 'next/server'
 
 vi.mock('@/lib/jwt', () => ({ authenticateAdmin: vi.fn() }))
 vi.mock('@/lib/scopes', () => ({ hasScope: vi.fn() }))
-vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), withTransaction: vi.fn() }))
+vi.mock('@/lib/db', () => ({ queryMany: vi.fn(), queryOne: vi.fn(), query: vi.fn(), withTransaction: vi.fn() }))
 vi.mock('@/lib/gst', () => ({ round2: vi.fn().mockImplementation((n: number) => Math.round(n * 100) / 100) }))
+vi.mock('@/lib/s3', () => ({
+  uploadProductImage: vi.fn().mockResolvedValue({
+    url: 'https://cdn/x.jpg', thumbnailUrl: 'https://cdn/x-t.jpg',
+    s3Key: 'products/p1/x.jpg', s3ThumbnailKey: 'products/p1/thumbnails/x.jpg',
+    fileName: 'x.jpg', fileSize: 1234, mimeType: 'image/jpeg', width: 800, height: 600,
+  }),
+  copyGalleryImageToProduct: vi.fn().mockResolvedValue({
+    url: 'https://cdn/g.jpg', thumbnailUrl: 'https://cdn/g-t.jpg',
+    s3Key: 'products/p1/g.jpg', s3ThumbnailKey: 'products/p1/thumbnails/g.jpg',
+  }),
+}))
 
 import { GET, POST } from '@/app/api/admin/controls/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { queryMany, withTransaction } from '@/lib/db'
+import { queryMany, queryOne, query, withTransaction } from '@/lib/db'
 
 const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['inflation:read', 'inflation:write'] }
 
@@ -416,5 +427,117 @@ describe('POST /api/admin/controls', () => {
     const res = await POST(makePost({ operation: 'unknown_op', value: '1', product_ids: ['p1'] }))
     expect(res.status).toBe(500)
     expect((await res.json()).error).toContain('Unknown operation')
+  })
+
+  // ── set_images (multipart, slot-based) ──────────────────────────────────────
+  function makeImagePost(fields: Record<string, string>, withFile = true) {
+    const fd = new FormData()
+    for (const [k, v] of Object.entries(fields)) fd.append(k, v)
+    if (withFile) fd.append('image_0', new File([new Uint8Array([1, 2, 3])], 'x.jpg', { type: 'image/jpeg' }))
+    return new NextRequest('http://localhost/api/admin/controls', { method: 'POST', body: fd })
+  }
+
+  it('set_images enqueues a job and returns job_id; background worker replaces the slot', async () => {
+    // Two products selected; only p1 has an image in slot 1 (display_order 0).
+    vi.mocked(queryMany).mockResolvedValueOnce([
+      { id: 'img1', product_id: 'p1', image_url: 'u', thumbnail_url: 't', s3_bucket: 'b', s3_key: 'k', s3_thumbnail_key: 'tk', file_name: 'old.jpg', file_size: 10, mime_type: 'image/jpeg', width: 100, height: 100, alt_text: null, display_order: 0, is_primary: true },
+    ] as any)
+    // queryOne is called first to INSERT the job row (returns id), then for the log row.
+    vi.mocked(queryOne).mockResolvedValueOnce({ id: 'job1' } as any).mockResolvedValueOnce({ id: 'log1' } as any)
+    vi.mocked(query).mockResolvedValue({ rows: [] } as any)
+    const client = makeMockClient({})
+    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
+
+    const res = await POST(makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1', 'p2']), slot: '1' }))
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.job_id).toBe('job1')
+    expect(json.total).toBe(1)   // only p1 has slot 1
+    expect(json.skipped).toBe(1) // p2 skipped
+
+    // Let the detached worker finish: it replaces the slot in a transaction and
+    // ticks progress via query(). Flush pending microtasks.
+    await new Promise(r => setTimeout(r, 0))
+    await new Promise(r => setTimeout(r, 0))
+    expect(withTransaction).toHaveBeenCalled()
+    // A completion UPDATE to bulk_image_jobs should have been issued.
+    expect(vi.mocked(query).mock.calls.some(c => String(c[0]).includes('bulk_image_jobs'))).toBe(true)
+  })
+
+  it('set_images 400 when no product has the target slot', async () => {
+    vi.mocked(queryMany).mockResolvedValueOnce([] as any)
+    const res = await POST(makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '3' }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toContain('slot 3')
+  })
+
+  it('set_images 400 when no image file provided', async () => {
+    const res = await POST(makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1' }, false))
+    expect(res.status).toBe(400)
+  })
+
+  it('set_images 400 for an unsupported multipart operation', async () => {
+    const res = await POST(makeImagePost({ operation: 'set_price', product_ids: JSON.stringify(['p1']), slot: '1' }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toContain('Unsupported multipart operation')
+  })
+
+  it('set_images 400 when product_ids is empty (multipart)', async () => {
+    const res = await POST(makeImagePost({ operation: 'set_images', product_ids: JSON.stringify([]), slot: '1' }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toContain('product_ids required')
+  })
+
+  it('set_images 400 for an invalid slot', async () => {
+    const res = await POST(makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '0' }))
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toContain('Invalid image slot')
+  })
+
+  it('set_images 404 when the referenced gallery image is not found', async () => {
+    vi.mocked(queryMany).mockResolvedValueOnce([] as any) // gallery lookup returns nothing
+    const res = await POST(makeImagePost(
+      { operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1', gallery_image_id: 'g-missing' },
+      false // no file → gallery path
+    ))
+    expect(res.status).toBe(404)
+    expect((await res.json()).error).toContain('Gallery image not found')
+  })
+
+  it('set_images from a GALLERY image enqueues a job and the worker copies via copyGalleryImageToProduct', async () => {
+    vi.mocked(queryMany)
+      .mockResolvedValueOnce([{ s3_key: 'gallery/g.png', s3_thumbnail_key: 'gallery/thumbnails/g.png', image_url: 'u', thumbnail_url: 't', file_name: 'g.png', file_size: 5, mime_type: 'image/png', width: 10, height: 10 }] as any) // gallery row
+      .mockResolvedValueOnce([{ id: 'img1', product_id: 'p1', image_url: 'u', thumbnail_url: 't', s3_bucket: 'b', s3_key: 'k', s3_thumbnail_key: 'tk', file_name: 'old.png', file_size: 1, mime_type: 'image/png', width: 1, height: 1, alt_text: null, display_order: 0, is_primary: true }] as any) // slot read
+    vi.mocked(queryOne).mockResolvedValueOnce({ id: 'jobG' } as any).mockResolvedValueOnce({ id: 'logG' } as any)
+    vi.mocked(query).mockResolvedValue({ rows: [] } as any)
+    const client = makeMockClient({})
+    vi.mocked(withTransaction).mockImplementation(fn => fn(client))
+
+    const res = await POST(makeImagePost(
+      { operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1', gallery_image_id: 'g1' },
+      false
+    ))
+    expect(res.status).toBe(200)
+    expect((await res.json()).job_id).toBe('jobG')
+    await new Promise(r => setTimeout(r, 0)); await new Promise(r => setTimeout(r, 0))
+    const { copyGalleryImageToProduct } = await import('@/lib/s3')
+    expect(copyGalleryImageToProduct).toHaveBeenCalled()
+  })
+
+  it('set_images worker marks the job FAILED when the per-product replace throws', async () => {
+    vi.mocked(queryMany).mockResolvedValueOnce([
+      { id: 'img1', product_id: 'p1', image_url: 'u', thumbnail_url: 't', s3_bucket: 'b', s3_key: 'k', s3_thumbnail_key: 'tk', file_name: 'old.jpg', file_size: 10, mime_type: 'image/jpeg', width: 100, height: 100, alt_text: null, display_order: 0, is_primary: true },
+    ] as any)
+    vi.mocked(queryOne).mockResolvedValueOnce({ id: 'jobF' } as any)
+    vi.mocked(query).mockResolvedValue({ rows: [] } as any)
+    // The replace transaction throws → worker catch sets status='failed'.
+    vi.mocked(withTransaction).mockRejectedValue(new Error('db down'))
+
+    const res = await POST(makeImagePost({ operation: 'set_images', product_ids: JSON.stringify(['p1']), slot: '1' }))
+    expect(res.status).toBe(200) // enqueue still succeeds
+    await new Promise(r => setTimeout(r, 0)); await new Promise(r => setTimeout(r, 0))
+    // A bulk_image_jobs UPDATE marking failure should have been issued.
+    const calls = vi.mocked(query).mock.calls.map(c => String(c[0]))
+    expect(calls.some(sql => sql.includes('bulk_image_jobs') && sql.includes("'failed'"))).toBe(true)
   })
 })

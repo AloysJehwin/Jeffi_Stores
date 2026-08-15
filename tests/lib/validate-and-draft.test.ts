@@ -296,6 +296,7 @@ const BASE_PAYLOAD: DraftPayload = {
   addressId: 'addr-456',
   couponId: null,
   shippingAmount: 0,
+  codFeeAmount: 0,
   businessDiscountAmount: 0,
   cartHash: 'abc123',
   cartItemIds: ['item-1', 'item-2'],
@@ -326,6 +327,7 @@ describe('signDraftToken + verifyDraftToken — round-trip', () => {
       mode: 'buyNow',
       couponId: 'SAVE10',
       shippingAmount: 49,
+      codFeeAmount: 15,
       notes: 'leave at door',
       cartHash: null,
       cartItemIds: null,
@@ -347,6 +349,7 @@ describe('signDraftToken + verifyDraftToken — round-trip', () => {
       expect(decoded.mode).toBe('buyNow')
       expect(decoded.couponId).toBe('SAVE10')
       expect(decoded.shippingAmount).toBe(49)
+      expect(decoded.codFeeAmount).toBe(15)
       expect(decoded.notes).toBe('leave at door')
       expect(decoded.cartItemIds).toBeNull()
       expect(decoded.buyNowItem?.productId).toBe('prod-1')

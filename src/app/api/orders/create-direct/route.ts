@@ -33,6 +33,7 @@ const CreateDirectOrderSchema = z.object({
   // but falls back to this when the live quote is unavailable so the charged total
   // never silently diverges from what the customer saw.
   shippingAmount: z.number().nonnegative().nullish(),
+  codFeeAmount: z.number().nonnegative().nullish(),
 })
 
 
@@ -56,6 +57,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response
     const { shippingAddress, notes, paymentMethod, couponId, addressId } = parsed.data
     const clientShipping = parsed.data.shippingAmount ?? null
+    const clientCodFee = parsed.data.codFeeAmount ?? null
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = paymentMethod === 'cod'
 
@@ -169,8 +171,12 @@ export async function POST(request: NextRequest) {
           subtotal,
           isCod,
         })
-      : 0
-    const appliedShipping = quoted > 0 ? quoted : (clientShipping != null ? round2(clientShipping) : 0)
+      : { shipping: 0, codFee: 0 }
+    const quoteResolved = quoted.shipping > 0
+    const appliedShipping = quoteResolved ? quoted.shipping : (clientShipping != null ? round2(clientShipping) : 0)
+    const appliedCodFee = !isCod ? 0
+      : quoteResolved ? quoted.codFee
+      : (clientCodFee != null ? round2(clientCodFee) : 0)
 
     const gstRate = parseFloat(product.gst_percentage || '0')
 
@@ -196,7 +202,7 @@ export async function POST(request: NextRequest) {
       taxAmount = 0
     }
 
-    const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
+    const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping + appliedCodFee)
     const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
 
     const _eddPin = String(destinationPin || '')
@@ -251,8 +257,8 @@ export async function POST(request: NextRequest) {
       }
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, payment_mode, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'direct', $23, $24, $25)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, payment_mode, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, order_type, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date, cod_fee_amount)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, 'direct', $23, $24, $25, $26)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
@@ -266,7 +272,7 @@ export async function POST(request: NextRequest) {
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
          shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null),
          shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null),
-         _edd]
+         _edd, round2(appliedCodFee)]
       )
 
       const createdOrder = orderResult.rows[0]

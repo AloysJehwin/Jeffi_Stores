@@ -36,6 +36,7 @@ export async function POST(request: NextRequest) {
   const expiresAt = new Date(Date.now() + ttlSeconds * 1000)
 
   const token = await new SignJWT({
+    type: 'extension_token',
     adminId: admin.adminId,
     first_name: admin.first_name,
     last_name: admin.last_name,

@@ -86,7 +86,12 @@ CREATE TABLE public.order_items (
     applied_rules jsonb,
     mrp numeric(12,2) DEFAULT NULL::numeric,
     batch_id uuid,
-    discount_pct numeric DEFAULT 0 NOT NULL
+    discount_pct numeric DEFAULT 0 NOT NULL,
+    weight_grams    integer,
+    package_type    varchar(30),
+    length_cm       numeric(6,2),
+    breadth_cm      numeric(6,2),
+    height_cm       numeric(6,2)
 );
 
 
@@ -121,6 +126,7 @@ CREATE TABLE public.orders (
     discount_amount numeric(12,2) DEFAULT 0,
     tax_amount numeric(12,2) DEFAULT 0,
     shipping_amount numeric(12,2) DEFAULT 0,
+    cod_fee_amount numeric(10,2) DEFAULT 0 NOT NULL,
     total_amount numeric(12,2) NOT NULL,
     shipping_address_id uuid,
     billing_address_id uuid,
@@ -150,6 +156,11 @@ CREATE TABLE public.orders (
     delhivery_quoted_weight_kg numeric(8,3),
     delhivery_charged_weight_kg numeric(8,3),
     delhivery_extra_charge numeric(10,2),
+    delhivery_billed_amount numeric(10,2),
+    delhivery_billed_at timestamp with time zone,
+    delhivery_freight_charge numeric(10,2),
+    delhivery_cod_charge numeric(10,2),
+    delhivery_oda_charge numeric(10,2),
     irn character varying(64),
     irn_ack_no character varying(32),
     irn_ack_dt timestamp with time zone,
