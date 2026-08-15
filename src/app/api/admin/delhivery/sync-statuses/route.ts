@@ -5,6 +5,7 @@ import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { resolveShipmentStatus, isAdvancement, shipmentStatusToSyncType, rankOf } from '@/lib/shipment-status'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { sendOrderDeliveredSMS, sendOutForDeliverySMS } from '@/lib/sms'
+import { fetchDelhiveryInvoiceCharges } from '@/lib/delhivery'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,9 +49,12 @@ export async function POST(request: NextRequest) {
     order_number: string; customer_name: string; customer_email: string
     user_id: string | null; payment_mode: string | null
     phone: string | null; notification_channel: string | null
+    shipping_amount: number | null; delhivery_quoted_weight_kg: number | null
+    delhivery_charged_weight_kg: number | null; delhivery_billed_at: string | null
   }>(
     `SELECT o.id, o.awb_number, o.status, o.shipment_status, o.order_number, o.user_id,
-            o.payment_mode,
+            o.payment_mode, o.shipping_amount, o.delhivery_quoted_weight_kg,
+            o.delhivery_charged_weight_kg, o.delhivery_billed_at,
             COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
             COALESCE(u.email, o.customer_email) AS customer_email,
             u.phone, u.notification_channel
@@ -140,6 +144,23 @@ export async function POST(request: NextRequest) {
           ).catch(() => {})
         }
 
+        // Persist charged weight and extra charge when Delhivery returns ChargedWeight.
+        const chargedWeightKg: number | null = shipment.ChargedWeight != null
+          ? Number(shipment.ChargedWeight) : null
+        if (chargedWeightKg != null && chargedWeightKg !== Number(order.delhivery_charged_weight_kg)) {
+          let extraCharge: number | null = null
+          if (order.delhivery_quoted_weight_kg != null && order.shipping_amount != null) {
+            const quotedKg = Number(order.delhivery_quoted_weight_kg)
+            if (chargedWeightKg > quotedKg && quotedKg > 0) {
+              extraCharge = Math.round(((chargedWeightKg / quotedKg) - 1) * Number(order.shipping_amount) * 100) / 100
+            }
+          }
+          await query(
+            `UPDATE orders SET delhivery_charged_weight_kg = $2, delhivery_extra_charge = $3, updated_at = NOW() WHERE id = $1`,
+            [order.id, chargedWeightKg, extraCharge]
+          ).catch(() => {})
+        }
+
         if (!syncRule) continue
         if (syncRule.onlyIfCurrent && !syncRule.onlyIfCurrent.includes(order.status)) continue
 
@@ -177,6 +198,25 @@ export async function POST(request: NextRequest) {
             `UPDATE orders SET payment_status = 'cod_collected', updated_at = NOW() WHERE id = $1 AND payment_status = 'cod_pending'`,
             [order.id]
           ).catch(() => {})
+        }
+
+        // Pull actual Delhivery invoice charges on delivery — only once (idempotent guard).
+        if (syncRule.orderStatus === 'delivered' && !order.delhivery_billed_at) {
+          const invoiceCharges = await fetchDelhiveryInvoiceCharges(awb).catch(() => null)
+          if (invoiceCharges) {
+            await query(
+              `UPDATE orders SET
+                delhivery_billed_amount = $2,
+                delhivery_freight_charge = $3,
+                delhivery_cod_charge = $4,
+                delhivery_oda_charge = $5,
+                delhivery_billed_at = NOW(),
+                delhivery_extra_charge = ROUND(($2 - shipping_amount)::numeric, 2),
+                updated_at = NOW()
+               WHERE id = $1`,
+              [order.id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda]
+            ).catch(() => {})
+          }
         }
 
         if (order.customer_email && order.customer_name) {

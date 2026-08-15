@@ -4,6 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { resolveShipmentStatus, isAdvancement, shipmentStatusToSyncType } from '@/lib/shipment-status'
+import { fetchDelhiveryInvoiceCharges } from '@/lib/delhivery'
 
 const TOKEN = process.env.DELHIVERY_API_KEY
 
@@ -42,8 +43,17 @@ export async function GET(
     const order = await queryOne<{
       awb_number: string | null; status: string; shipment_status: string | null
       order_number: string; customer_name: string; customer_email: string
+      shipping_amount: number | null; delhivery_quoted_weight_kg: number | null
+      delhivery_charged_weight_kg: number | null; delhivery_extra_charge: number | null
+      delhivery_billed_amount: number | null; delhivery_billed_at: string | null
+      delhivery_freight_charge: number | null; delhivery_cod_charge: number | null
+      delhivery_oda_charge: number | null
     }>(
       `SELECT o.awb_number, o.status, o.shipment_status, o.order_number,
+              o.shipping_amount, o.delhivery_quoted_weight_kg,
+              o.delhivery_charged_weight_kg, o.delhivery_extra_charge,
+              o.delhivery_billed_amount, o.delhivery_billed_at,
+              o.delhivery_freight_charge, o.delhivery_cod_charge, o.delhivery_oda_charge,
               COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
               COALESCE(u.email, o.customer_email) AS customer_email
        FROM orders o
@@ -72,6 +82,15 @@ export async function GET(
           origin: null,
           destination: null,
           scans: [],
+          quotedWeightKg: order.delhivery_quoted_weight_kg ?? null,
+          chargedWeightKg: order.delhivery_charged_weight_kg ?? null,
+          shippingAmount: order.shipping_amount ?? null,
+          extraCharge: order.delhivery_extra_charge ?? null,
+          billedAmount: order.delhivery_billed_amount ?? null,
+          billedAt: order.delhivery_billed_at ?? null,
+          freightCharge: order.delhivery_freight_charge ?? null,
+          codCharge: order.delhivery_cod_charge ?? null,
+          odaCharge: order.delhivery_oda_charge ?? null,
         },
         statusSynced: false,
         syncedTo: null,
@@ -166,8 +185,57 @@ export async function GET(
         [id, newShipmentStatus]
       ).catch(() => {})
     } else if (order.shipment_status) {
-      // Delhivery returned a stale/lower status — keep the DB value so the UI doesn't regress
       effectiveShipmentStatus = order.shipment_status as any
+    }
+
+    // Persist charged weight from Delhivery and compute extra charge vs original quote.
+    // ChargedWeight is the billing weight Delhivery used — may differ from quoted weight
+    // if the actual parcel was heavier/larger (volumetric) than declared at shipment creation.
+    const chargedWeightKg: number | null = shipment.ChargedWeight != null
+      ? Number(shipment.ChargedWeight) : null
+    let extraCharge: number | null = null
+    if (chargedWeightKg != null && order.delhivery_quoted_weight_kg != null && order.shipping_amount != null) {
+      const quotedKg = Number(order.delhivery_quoted_weight_kg)
+      if (chargedWeightKg > quotedKg && quotedKg > 0) {
+        // Estimate extra = (charged_kg / quoted_kg - 1) × shipping_amount
+        extraCharge = Math.round(((chargedWeightKg / quotedKg) - 1) * Number(order.shipping_amount) * 100) / 100
+      }
+    }
+    if (chargedWeightKg != null && chargedWeightKg !== Number(order.delhivery_charged_weight_kg)) {
+      await query(
+        `UPDATE orders SET delhivery_charged_weight_kg = $2, delhivery_extra_charge = $3, updated_at = NOW() WHERE id = $1`,
+        [id, chargedWeightKg, extraCharge]
+      ).catch(() => {})
+    }
+
+    // Pull actual invoice when status is delivered and not yet fetched
+    let billedAmount = order.delhivery_billed_amount ?? null
+    let billedAt = order.delhivery_billed_at ?? null
+    let freightCharge = order.delhivery_freight_charge ?? null
+    let codCharge = order.delhivery_cod_charge ?? null
+    let odaCharge = order.delhivery_oda_charge ?? null
+    if (newShipmentStatus === 'delivered' && !order.delhivery_billed_at) {
+      const invoiceCharges = await fetchDelhiveryInvoiceCharges(order.awb_number!).catch(() => null)
+      if (invoiceCharges) {
+        await query(
+          `UPDATE orders SET
+            delhivery_billed_amount = $2, delhivery_freight_charge = $3,
+            delhivery_cod_charge = $4, delhivery_oda_charge = $5,
+            delhivery_billed_at = NOW(),
+            delhivery_extra_charge = ROUND(($2 - shipping_amount)::numeric, 2),
+            updated_at = NOW()
+           WHERE id = $1`,
+          [id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda]
+        ).catch(() => {})
+        billedAmount = invoiceCharges.total
+        billedAt = new Date().toISOString()
+        freightCharge = invoiceCharges.freight
+        codCharge = invoiceCharges.codCharge
+        odaCharge = invoiceCharges.oda
+        if (order.shipping_amount != null) {
+          extraCharge = Math.round((invoiceCharges.total - Number(order.shipping_amount)) * 100) / 100
+        }
+      }
     }
 
     return NextResponse.json({
@@ -183,6 +251,15 @@ export async function GET(
         origin: shipment.Origin ?? null,
         destination: shipment.Destination ?? null,
         scans,
+        quotedWeightKg: order.delhivery_quoted_weight_kg ?? null,
+        chargedWeightKg: chargedWeightKg ?? order.delhivery_charged_weight_kg ?? null,
+        shippingAmount: order.shipping_amount ?? null,
+        extraCharge: extraCharge ?? order.delhivery_extra_charge ?? null,
+        billedAmount,
+        billedAt,
+        freightCharge,
+        codCharge,
+        odaCharge,
       },
       statusSynced,
       syncedTo: statusSynced && statusType ? STATUS_SYNC[statusType]?.orderStatus : null,

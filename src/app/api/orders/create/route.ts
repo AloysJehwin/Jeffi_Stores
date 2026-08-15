@@ -24,6 +24,9 @@ const CreateOrderSchema = z.object({
   // Client-quoted shipping; server re-quotes authoritatively and falls back to
   // this only when the live quote is unavailable (see below).
   shippingAmount: z.number().nonnegative().nullish(),
+  // Client-quoted COD handling fee (shown as its own line at checkout). Server
+  // re-quotes; this is the fallback when the live quote is unavailable.
+  codFeeAmount: z.number().nonnegative().nullish(),
 })
 
 export async function POST(request: NextRequest) {
@@ -47,6 +50,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response
     const { shippingAddress, notes, paymentMethod, couponId } = parsed.data
     const clientShipping = parsed.data.shippingAmount ?? null
+    const clientCodFee = parsed.data.codFeeAmount ?? null
     const isRazorpayPayment = paymentMethod === 'razorpay'
     const isCod = paymentMethod === 'cod'
 
@@ -64,14 +68,18 @@ export async function POST(request: NextRequest) {
           'is_cod_allowed', p.is_cod_allowed,
           'category_id', p.category_id, 'discount_pct', p.discount_pct,
           'extra_delivery_days', p.extra_delivery_days,
-          'handling_days', p.handling_days
+          'handling_days', p.handling_days,
+          'weight_grams', p.weight_grams, 'package_type', p.package_type,
+          'length_cm', p.length_cm, 'breadth_cm', p.breadth_cm, 'height_cm', p.height_cm
         ) AS products,
         CASE WHEN ci.variant_id IS NOT NULL THEN
           json_build_object(
             'id', pv.id, 'variant_name', pv.variant_name, 'sku', pv.sku,
             'price', pv.price, 'price_ex_gst', pv.price_ex_gst,
             'stock_status', pv.stock_status, 'inventory_quantity', pv.inventory_quantity,
-            'discount_pct', pv.discount_pct
+            'discount_pct', pv.discount_pct,
+            'weight_grams', pv.weight_grams, 'package_type', pv.package_type,
+            'length_cm', pv.length_cm, 'breadth_cm', pv.breadth_cm, 'height_cm', pv.height_cm
           )
         ELSE NULL END AS variant,
         CASE WHEN ci.sub_variant_id IS NOT NULL THEN
@@ -163,15 +171,24 @@ export async function POST(request: NextRequest) {
     // Server re-quotes with the correct COD flag; fall back to the client-quoted
     // amount when the live quote is unavailable so the charged total matches what
     // the customer saw instead of silently dropping shipping to 0.
-    const quotedShipping = destinationPin
+    const quote = destinationPin
       ? await quoteShipping({
           destinationPin,
           items: cartItems.map((c: any) => ({ productId: c.product_id, variantId: c.variant_id, quantity: Number(c.quantity) })),
           subtotal,
           isCod,
         })
-      : 0
-    const appliedShipping = quotedShipping > 0 ? quotedShipping : (clientShipping != null ? round2(clientShipping) : 0)
+      : { shipping: 0, codFee: 0 }
+    // Use the live server quote when it resolved a non-zero transport charge;
+    // otherwise fall back to the client-quoted values so the charged total matches
+    // what the customer saw instead of silently dropping shipping to 0.
+    const quoteResolved = quote.shipping > 0
+    const appliedShipping = quoteResolved ? quote.shipping : (clientShipping != null ? round2(clientShipping) : 0)
+    // COD fee only ever applies to COD orders. Prefer the live quote's codFee when the
+    // quote resolved; else fall back to the client value (still gated on isCod).
+    const appliedCodFee = !isCod ? 0
+      : quoteResolved ? quote.codFee
+      : (clientCodFee != null ? round2(clientCodFee) : 0)
 
     const _eddPin = String(destinationPin || '')
     const _eddHandling = Math.max(2, ...cartItems.map((i: any) => Number(i.products?.handling_days ?? 2)))
@@ -284,11 +301,11 @@ export async function POST(request: NextRequest) {
           appliedDiscount = couponResult.appliedDiscount
         }
       }
-      const txTotal = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping)
+      const txTotal = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + appliedShipping + appliedCodFee)
 
       const orderResult = await client.query(
-        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, payment_mode, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+        `INSERT INTO orders (order_number, user_id, customer_email, customer_phone, customer_name, status, payment_status, payment_mode, subtotal, discount_amount, business_discount_amount, tax_amount, shipping_amount, total_amount, shipping_address_id, billing_address_id, notes, taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst, shipping_address_snapshot, billing_address_snapshot, estimated_delivery_date, cod_fee_amount)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
          RETURNING *`,
         [orderNumber, userId, user.email, user.phone,
          `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer',
@@ -298,7 +315,7 @@ export async function POST(request: NextRequest) {
          isGSTEnabled ? orderCgst : 0, isGSTEnabled ? orderSgst : 0, isGSTEnabled ? orderIgst : 0, isIGST,
          shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null),
          shippingAddressSnapshot ? JSON.stringify(shippingAddressSnapshot) : (addrSnapshot ? JSON.stringify(addrSnapshot) : null),
-         _edd]
+         _edd, round2(appliedCodFee)]
       )
 
       const createdOrder = orderResult.rows[0]
@@ -319,9 +336,14 @@ export async function POST(request: NextRequest) {
           : item.variant?.mrp != null ? Number(item.variant.mrp)
           : item.products?.mrp != null ? Number(item.products.mrp)
           : null
+        const snapWeightGrams = item.variant?.weight_grams ?? item.products?.weight_grams ?? 500
+        const snapPackageType = item.variant?.package_type ?? item.products?.package_type ?? null
+        const snapLengthCm = item.variant?.length_cm ?? item.products?.length_cm ?? null
+        const snapBreadthCm = item.variant?.breadth_cm ?? item.products?.breadth_cm ?? null
+        const snapHeightCm = item.variant?.height_cm ?? item.products?.height_cm ?? null
         await client.query(
-          `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21)`,
+          `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, product_sku, variant_name, quantity, unit_price, total_price, discount_amount, tax_amount, hsn_code, gst_rate, taxable_amount, cgst_amount, sgst_amount, igst_amount, buy_mode, buy_unit, mrp, weight_grams, package_type, length_cm, breadth_cm, height_cm)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)`,
           [createdOrder.id, item.product_id, item.variant?.id || null,
            item.sub_variant?.id || null,
            item.sub_variant
@@ -340,7 +362,8 @@ export async function POST(request: NextRequest) {
            isGSTEnabled && gst ? gst.igst : 0,
            item.buy_mode || 'unit',
            item.buy_unit || null,
-           itemMrp]
+           itemMrp,
+           snapWeightGrams, snapPackageType, snapLengthCm, snapBreadthCm, snapHeightCm]
         )
       }
 

@@ -7,9 +7,11 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import type { CartLine } from '@/lib/on-device/prompt'
 
 export default function CartInsightPanel({ items }: { items: CartLine[] }) {
-  const ondeviceEnabled = useStoreConfig().flags.ondeviceSummaryEnabled
+  const flags = useStoreConfig().flags
+  const ondeviceEnabled = flags.ondeviceSummaryEnabled
   const [text, setText] = useState('')
   const [state, setState] = useState<'idle' | 'loading' | 'done'>('idle')
+  const [source, setSource] = useState<'on-device' | 'ollama'>('on-device')
   const started = useRef(false)
   const prevHash = useRef('')
 
@@ -28,21 +30,46 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
     started.current = true
     setState('loading')
 
-    canRunOnDeviceSummary().then(({ capable, isMobile }) => {
-      if (!capable) { setState('idle'); return }
-      const profile = readUserProfile()
-      const signals = {
-        cart: items,
-        total: null,
-        itemCount: items.reduce((s, i) => s + i.qty, 0),
-        userProfile: profile.purchaseCount > 0 ? profile : null,
+    canRunOnDeviceSummary().then(async ({ capable, isMobile }) => {
+      const platformAllowed = isMobile ? flags.ondeviceSummaryMobileEnabled : flags.ondeviceSummaryDesktopEnabled
+
+      if (capable && platformAllowed) {
+        const profile = readUserProfile()
+        const signals = {
+          cart: items,
+          total: null,
+          itemCount: items.reduce((s, i) => s + i.qty, 0),
+          userProfile: profile.purchaseCount > 0 ? profile : null,
+        }
+        try {
+          setSource('on-device')
+          const final = await generateCartInsight(signals, isMobile, partial => setText(partial))
+          setText(final); setState('done')
+          return
+        } catch {
+          // fall through to server
+        }
       }
-      generateCartInsight(signals, isMobile, partial => setText(partial))
-        .then(final => { setText(final); setState('done') })
-        .catch(() => setState('idle'))
+
+      // Server (Ollama) fallback — used on mobile by default and whenever the
+      // device can't run the in-browser model.
+      try {
+        setSource('ollama')
+        const res = await fetch('/api/ai-cart-insight', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ cart: items }),
+        })
+        if (!res.ok) throw new Error('ollama failed')
+        const data = await res.json() as { text?: string }
+        if (!data.text) throw new Error('empty')
+        setText(data.text); setState('done')
+      } catch {
+        setState('idle')
+      }
     })
     return () => disposeSummarizer()
-  }, [state, items, ondeviceEnabled])
+  }, [state, items, ondeviceEnabled, flags.ondeviceSummaryMobileEnabled, flags.ondeviceSummaryDesktopEnabled])
 
   // Only render once real text has started streaming — never flash a loading box
   // that would then vanish on devices where the model can't load (most mobiles).
@@ -56,7 +83,7 @@ export default function CartInsightPanel({ items }: { items: CartLine[] }) {
       <p className="text-sm text-foreground leading-relaxed flex-1">
         {text}{state === 'loading' && <span className="animate-pulse">▍</span>}
       </p>
-      <span className="text-[9px] text-foreground-muted self-start mt-0.5 flex-shrink-0">on-device</span>
+      <span className="text-[9px] text-foreground-muted self-start mt-0.5 flex-shrink-0">{source}</span>
     </div>
   )
 }

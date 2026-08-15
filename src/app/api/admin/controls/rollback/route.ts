@@ -49,10 +49,12 @@ export async function POST(request: NextRequest) {
   //  • current: { products, variants, subs, variantUnits }
   type Row = { id: string; name?: string; before: Record<string, unknown> }
   type UnitRow = { variant_id: string; product_id: string; before: Record<string, unknown> | null }
+  type ImageSnap = { product_id: string; rows: Record<string, unknown>[] }
   let products: Row[] = []
   let variants: Row[] = []
   let subs: Row[] = []
   let variantUnits: UnitRow[] = []
+  let productImages: ImageSnap[] = []
   if (Array.isArray(raw)) {
     products = raw as Row[]
   } else if (raw && typeof raw === 'object') {
@@ -60,9 +62,10 @@ export async function POST(request: NextRequest) {
     variants = raw.variants ?? []
     subs = raw.subs ?? []
     variantUnits = raw.variantUnits ?? []
+    productImages = raw.productImages ?? []
   }
 
-  if (!products.length && !variants.length && !subs.length && !variantUnits.length) {
+  if (!products.length && !variants.length && !subs.length && !variantUnits.length && !productImages.length) {
     return NextResponse.json({ error: 'No snapshot data — cannot rollback this operation' }, { status: 409 })
   }
 
@@ -155,6 +158,28 @@ export async function POST(request: NextRequest) {
           }
           restored++
         }
+      } else if (operation === 'set_images') {
+        // Slot-replace rollback: each snapshot entry holds the ONE row that was
+        // replaced (at its display_order). Delete whatever now occupies that slot
+        // for the product and re-insert the original row verbatim (its old S3 key
+        // was never deleted, so it's still valid). Sibling images are untouched.
+        for (const snap of productImages) {
+          for (const r of snap.rows) {
+            await client.query(
+              `DELETE FROM product_images WHERE product_id = $1 AND display_order = $2`,
+              [snap.product_id, r.display_order]
+            )
+            await client.query(
+              `INSERT INTO product_images (
+                 id, product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
+                 file_name, file_size, mime_type, width, height, alt_text, display_order, is_primary
+               ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+              [r.id, r.product_id, r.image_url, r.thumbnail_url, r.s3_bucket, r.s3_key, r.s3_thumbnail_key,
+               r.file_name, r.file_size, r.mime_type, r.width, r.height, r.alt_text, r.display_order, r.is_primary]
+            )
+          }
+          restored++
+        }
       } else {
         throw new Error(`Rollback not supported for operation: ${operation}`)
       }
@@ -164,10 +189,11 @@ export async function POST(request: NextRequest) {
         [log_id, admin.email ?? null]
       )
 
+      const affectedIds = products.length ? products.map(r => r.id) : productImages.map(s => s.product_id)
       await client.query(
         `INSERT INTO controls_operation_log (operation, product_ids, value, snapshot, applied_by, admin_id, product_count, is_rollback)
          VALUES ($1, $2, $3, $4, $5, $6, $7, true)`,
-        [operation, products.map(r => r.id), null, JSON.stringify(raw), admin.email ?? null, admin.adminId ?? null, products.length]
+        [operation, affectedIds, null, JSON.stringify(raw), admin.email ?? null, admin.adminId ?? null, affectedIds.length]
       )
     })
 

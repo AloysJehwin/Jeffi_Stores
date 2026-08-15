@@ -22,7 +22,7 @@ vi.mock('@/lib/activity', () => ({ logActivity: vi.fn().mockResolvedValue(undefi
 vi.mock('@/lib/auto-tasks', () => ({ createAutoTask: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/ai-feedback', () => ({ recordImplicitSignalsForProducts: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('@/lib/order-commit', () => ({
-  quoteShipping: vi.fn().mockResolvedValue(0),
+  quoteShipping: vi.fn().mockResolvedValue({ shipping: 0, codFee: 0 }),
   validateCouponForUser: vi.fn().mockResolvedValue({ appliedDiscount: 0, ok: false, reason: 'not_found' }),
 }))
 vi.mock('@/lib/invoice', () => ({ createDraftInvoice: vi.fn().mockResolvedValue(undefined) }))
@@ -136,7 +136,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     vi.clearAllMocks()
     vi.mocked(bizDiscount.getBusinessDiscountMap).mockResolvedValue({})
     vi.mocked(gstLib.isInterState).mockReturnValue(false)
-    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(0)
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 0, codFee: 0 })
     vi.mocked(orderCommit.validateCouponForUser).mockResolvedValue({ appliedDiscount: 0, ok: false, reason: 'not_found' } as any)
   })
 
@@ -476,7 +476,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       .mockResolvedValueOnce(MOCK_USER)
       .mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
-    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(75)
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 75, codFee: 0 })
 
     let capturedShipping = -1
     let capturedTotal = -1
@@ -864,12 +864,20 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       .mockResolvedValueOnce(MOCK_USER)
       .mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
-    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(50)
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 50, codFee: 30 })
 
+    let capturedShipping = -1
+    let capturedCodFee = -1
+    let capturedTotal = -1
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {
       const client = { query: vi.fn() }
-      client.query.mockImplementation(async (sql: string) => {
-        if (sql.includes('INSERT INTO orders')) return { rows: [CREATED_ORDER], rowCount: 1 }
+      client.query.mockImplementation(async (sql: string, params: any[]) => {
+        if (sql.includes('INSERT INTO orders')) {
+          capturedShipping = Number(params[12])
+          capturedTotal = Number(params[13])
+          capturedCodFee = Number(params[25])
+          return { rows: [CREATED_ORDER], rowCount: 1 }
+        }
         return { rows: [], rowCount: 0 }
       })
       return fn(client)
@@ -884,6 +892,11 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     expect(vi.mocked(orderCommit.quoteShipping)).toHaveBeenCalledWith(
       expect.objectContaining({ isCod: true, destinationPin: '400001' })
     )
+    // COD fee is stored separately from shipping, and folded into the total.
+    expect(capturedShipping).toBe(50)
+    expect(capturedCodFee).toBe(30)
+    // subtotal 200 - 0 discount + 50 shipping + 30 cod fee = 280
+    expect(capturedTotal).toBe(280)
   })
 
   it('falls back to client-quoted shipping when live quote returns 0', async () => {
@@ -892,7 +905,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       .mockResolvedValueOnce(MOCK_USER)
       .mockResolvedValueOnce(null)
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
-    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(0) // live quote unavailable
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 0, codFee: 0 }) // live quote unavailable
 
     let capturedShipping = -1
     vi.mocked(db.withTransaction).mockImplementation(async (fn: any) => {

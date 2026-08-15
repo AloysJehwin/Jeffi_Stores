@@ -100,6 +100,7 @@ const mockDbQueryOne = vi.mocked(dbMod.queryOne)
 import {
   verifyToken,
   authenticateAdmin,
+  verifyExtensionToken,
   authenticateUser,
   authenticateBusiness,
   authenticateAnyUser,
@@ -226,6 +227,60 @@ describe('authenticateAdmin', () => {
     const req = makeRequest({ authHeader: 'BEARER sometoken' })
     const result = await authenticateAdmin(req)
     expect(result?.adminId).toBe('admin-123')
+  })
+
+  // ── extension-token (scoped standalone JWT) fallback ──────────────────────────
+  it('falls back to a scoped extension token when the Bearer value is not a session', async () => {
+    mockResolveSession.mockResolvedValueOnce(null) // not a session sid
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'extension_token', adminId: 'ext-1', role: 'admin', scopes: ['products:write'] } })
+    const req = makeRequest({ authHeader: 'Bearer eyJext' })
+    const result = await authenticateAdmin(req)
+    expect(result).toMatchObject({ adminId: 'ext-1', scopes: ['products:write'] })
+    expect(result?.sid).toBeUndefined()
+  })
+
+  it('rejects a non-extension JWT (e.g. review token) on the fallback', async () => {
+    mockResolveSession.mockResolvedValueOnce(null)
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'review_token', adminId: 'x' } })
+    const req = makeRequest({ authHeader: 'Bearer eyJreview' })
+    expect(await authenticateAdmin(req)).toBeNull()
+  })
+
+  it('does NOT try the extension fallback for a cookie (Bearer-only)', async () => {
+    mockResolveSession.mockResolvedValueOnce(null) // cookie session fails
+    // Even if a valid extension JWT existed, a cookie must never be verified as one.
+    const req = makeRequest({ cookies: { admin_sid: 'eyJext' } })
+    expect(await authenticateAdmin(req)).toBeNull()
+    expect(mockJwtVerify).not.toHaveBeenCalled()
+  })
+})
+
+describe('verifyExtensionToken', () => {
+  it('accepts a valid type=extension_token JWT and maps its claims', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'extension_token', adminId: 'a9', email: 'a@x.com', role: 'admin', scopes: ['products:write'] } })
+    const r = await verifyExtensionToken('eyJok')
+    expect(r).toMatchObject({ adminId: 'a9', email: 'a@x.com', role: 'admin', scopes: ['products:write'] })
+  })
+
+  it('rejects a wrong type', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'review_token', adminId: 'a9' } })
+    expect(await verifyExtensionToken('eyJbad')).toBeNull()
+  })
+
+  it('rejects when adminId is missing', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'extension_token', scopes: [] } })
+    expect(await verifyExtensionToken('eyJnoadmin')).toBeNull()
+  })
+
+  it('returns null when verification throws (bad signature / expired)', async () => {
+    mockJwtVerify.mockRejectedValueOnce(new Error('signature verification failed'))
+    expect(await verifyExtensionToken('eyJexpired')).toBeNull()
+  })
+
+  it('defaults scopes to [] when the claim is not an array', async () => {
+    mockJwtVerify.mockResolvedValueOnce({ payload: { type: 'extension_token', adminId: 'a1', scopes: 'nope' } })
+    const r = await verifyExtensionToken('eyJoddscopes')
+    expect(r?.scopes).toEqual([])
   })
 })
 

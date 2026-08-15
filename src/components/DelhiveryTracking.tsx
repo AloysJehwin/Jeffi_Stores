@@ -29,6 +29,16 @@ type TrackingData = {
   reverseInTransit?: boolean
   destReceiveDate?: string | null
   returnedDate?: string | null
+  // Delivery cost breakdown
+  quotedWeightKg?: number | null
+  chargedWeightKg?: number | null
+  shippingAmount?: number | null
+  extraCharge?: number | null
+  billedAmount?: number | null
+  billedAt?: string | null
+  freightCharge?: number | null
+  codCharge?: number | null
+  odaCharge?: number | null
 }
 
 const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
@@ -380,6 +390,118 @@ export default function DelhiveryTracking({
             </button>
           </div>
         )}
+
+        {/* Delivery cost breakdown — actual invoice, weight estimate, or quote only */}
+        {(tracking.shippingAmount != null || tracking.chargedWeightKg != null || tracking.billedAmount != null) && (() => {
+          const inr = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
+          const hasBilled = tracking.billedAmount != null
+          const quoted = tracking.shippingAmount != null ? Number(tracking.shippingAmount) : null
+
+          // The "final" figure differs by state: actual billed, or quoted+estimate, or just quoted.
+          const estExtra = (!hasBilled && tracking.extraCharge != null && tracking.extraCharge > 0) ? Number(tracking.extraCharge) : 0
+          const finalAmount = hasBilled
+            ? Number(tracking.billedAmount)
+            : quoted != null ? quoted + estExtra : null
+          const diff = quoted != null && finalAmount != null
+            ? Math.round((finalAmount - quoted) * 100) / 100
+            : null
+          const overWeight = tracking.quotedWeightKg != null && tracking.chargedWeightKg != null
+            && tracking.chargedWeightKg > tracking.quotedWeightKg
+
+          // Delta chip styling: shortfall (we lost money) = orange, surplus = green, match = neutral.
+          const deltaTone = diff == null || diff === 0
+            ? 'bg-surface-secondary text-foreground-secondary'
+            : diff > 0
+              ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+              : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+
+          return (
+            <div className="border-t border-border-default pt-4 mt-1">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Delivery Cost</p>
+                <span className={`text-[10px] font-medium px-2 py-0.5 rounded-full ${hasBilled ? 'bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300' : 'bg-surface-secondary text-foreground-muted'}`}>
+                  {hasBilled ? 'Actual invoice' : estExtra > 0 ? 'Estimate' : 'Quoted'}
+                </span>
+              </div>
+
+              {/* Hero: Quoted → Final with delta chip */}
+              <div className="flex items-stretch gap-2 mb-3">
+                <div className="flex-1 rounded-lg border border-border-default bg-surface px-3 py-2">
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide">Quoted</p>
+                  <p className="text-base font-bold text-foreground tabular-nums">{quoted != null ? inr(quoted) : '—'}</p>
+                  {tracking.quotedWeightKg != null && (
+                    <p className="text-[10px] text-foreground-muted">{tracking.quotedWeightKg} kg</p>
+                  )}
+                </div>
+                <div className="flex items-center text-foreground-muted">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+                  </svg>
+                </div>
+                <div className={`flex-1 rounded-lg border px-3 py-2 ${diff && diff > 0 ? 'border-orange-300 dark:border-orange-700 bg-orange-50 dark:bg-orange-900/20' : hasBilled ? 'border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/20' : 'border-border-default bg-surface'}`}>
+                  <p className="text-[10px] text-foreground-muted uppercase tracking-wide">{hasBilled ? 'Billed' : estExtra > 0 ? 'Est. total' : 'Charged'}</p>
+                  <p className="text-base font-bold text-foreground tabular-nums">{finalAmount != null ? inr(finalAmount) : '—'}</p>
+                  {tracking.chargedWeightKg != null && (
+                    <p className={`text-[10px] ${overWeight ? 'text-orange-600 dark:text-orange-400 font-medium' : 'text-foreground-muted'}`}>
+                      {tracking.chargedWeightKg} kg{overWeight ? ' ↑' : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Delta chip */}
+              {diff != null && diff !== 0 && (
+                <div className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold mb-3 ${deltaTone}`}>
+                  {diff > 0 ? (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                      +{inr(Math.abs(diff))} over quote{!hasBilled ? ' (est.)' : ''}
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 17h8m0 0V9m0 8l-8-8-4 4-6-6" /></svg>
+                      −{inr(Math.abs(diff))} under quote
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Itemized breakdown — only meaningful for the actual invoice */}
+              {hasBilled && (
+                <dl className="rounded-lg bg-surface-secondary/50 divide-y divide-border-default text-xs">
+                  <div className="flex justify-between px-3 py-1.5">
+                    <dt className="text-foreground-muted">Freight</dt>
+                    <dd className="text-foreground font-medium tabular-nums">{inr(tracking.freightCharge ?? 0)}</dd>
+                  </div>
+                  {tracking.codCharge != null && tracking.codCharge > 0 && (
+                    <div className="flex justify-between px-3 py-1.5">
+                      <dt className="text-foreground-muted">COD handling</dt>
+                      <dd className="text-foreground font-medium tabular-nums">{inr(tracking.codCharge)}</dd>
+                    </div>
+                  )}
+                  {tracking.odaCharge != null && tracking.odaCharge > 0 && (
+                    <div className="flex justify-between px-3 py-1.5">
+                      <dt className="text-foreground-muted">ODA surcharge</dt>
+                      <dd className="text-foreground font-medium tabular-nums">{inr(tracking.odaCharge)}</dd>
+                    </div>
+                  )}
+                  <div className="flex justify-between px-3 py-1.5">
+                    <dt className="text-foreground font-semibold">Total billed</dt>
+                    <dd className="text-foreground font-bold tabular-nums">{inr(tracking.billedAmount!)}</dd>
+                  </div>
+                </dl>
+              )}
+
+              <p className="text-[10px] text-foreground-muted mt-2 leading-relaxed">
+                {hasBilled
+                  ? <>Actual charges from Delhivery&apos;s invoice{tracking.billedAt ? ` · billed ${new Date(tracking.billedAt).toLocaleDateString('en-IN')}` : ''}.</>
+                  : estExtra > 0
+                    ? 'Delhivery billed a higher weight than declared at pickup. Estimated extra is proportional — the actual invoice may differ.'
+                    : 'Final charge confirms once Delhivery raises the shipment invoice.'}
+              </p>
+            </div>
+          )
+        })()}
       </div>
     )
   }

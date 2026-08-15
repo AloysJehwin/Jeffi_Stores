@@ -50,9 +50,8 @@ describe('GET /api/gallery', () => {
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.images).toHaveLength(1)
-    // CLOUDFRONT_URL is a module-level constant — in tests it captures whatever
-    // process.env.CLOUDFRONT_URL was at import time (empty string), so the URL
-    // becomes '/<s3_key>'. The important assertion is that s3_key is used.
+    // The URL is built by getS3Url(s3_key), which prepends the env's S3_KEY_PREFIX.
+    // The important assertion is that the s3_key drives the URL (prefix-consistent).
     expect(json.images[0].image_url).toContain('gallery/img1.jpg')
     expect(json.total).toBe(1)
     expect(json.page).toBe(1)
@@ -66,9 +65,36 @@ describe('GET /api/gallery', () => {
     const res = await GET(makeRequest({ category: 'cat1' }) as any)
     expect(res.status).toBe(200)
     expect(mockQueryMany).toHaveBeenCalledWith(
-      expect.stringContaining('WHERE category_id'),
+      expect.stringContaining('gi.category_id'),
       expect.arrayContaining(['cat1'])
     )
+  })
+
+  it('filters by search across name + filename', async () => {
+    mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
+    mockQueryMany.mockResolvedValueOnce([])
+    mockQueryOne.mockResolvedValueOnce({ total: '0' })
+
+    const res = await GET(makeRequest({ search: 'bolt' }) as any)
+    expect(res.status).toBe(200)
+    expect(mockQueryMany).toHaveBeenCalledWith(
+      expect.stringContaining('ILIKE'),
+      expect.arrayContaining(['%bolt%'])
+    )
+  })
+
+  it('composes category + search filters', async () => {
+    mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
+    mockQueryMany.mockResolvedValueOnce([])
+    mockQueryOne.mockResolvedValueOnce({ total: '0' })
+
+    const res = await GET(makeRequest({ category: 'cat1', search: 'bolt' }) as any)
+    expect(res.status).toBe(200)
+    const [sql, params] = mockQueryMany.mock.calls[0]
+    expect(sql).toContain('gi.category_id')
+    expect(sql).toContain('ILIKE')
+    expect(params).toContain('cat1')
+    expect(params).toContain('%bolt%')
   })
 
   it('uses fallback image_url when s3_key is null', async () => {

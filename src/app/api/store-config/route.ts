@@ -22,6 +22,10 @@ export async function GET() {
         gstEnabled: c.flags.gstEnabled,
         ondeviceSummaryEnabled: c.flags.ondeviceSummaryEnabled,
         ondeviceFinetuneEnabled: c.flags.ondeviceFinetuneEnabled,
+        ondeviceSummaryMobileEnabled: c.flags.ondeviceSummaryMobileEnabled,
+        ondeviceSummaryDesktopEnabled: c.flags.ondeviceSummaryDesktopEnabled,
+        ondeviceFinetuneMobileEnabled: c.flags.ondeviceFinetuneMobileEnabled,
+        ondeviceFinetuneDesktopEnabled: c.flags.ondeviceFinetuneDesktopEnabled,
       },
       orderAutoCancelMinutes: c.values.orderAutoCancelMinutes,
       storefront: {

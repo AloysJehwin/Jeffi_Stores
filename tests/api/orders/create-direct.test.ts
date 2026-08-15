@@ -22,7 +22,7 @@ vi.mock('@/lib/ai-feedback', () => ({
 }))
 vi.mock('@/lib/order-commit', () => ({
   resolveBuyNowItem: vi.fn(),
-  quoteShipping: vi.fn().mockResolvedValue(0),
+  quoteShipping: vi.fn().mockResolvedValue({ shipping: 0, codFee: 0 }),
   validateCouponForUser: vi.fn().mockResolvedValue({ ok: false }),
   loadAddress: vi.fn(),
 }))
@@ -562,7 +562,7 @@ describe('POST /api/orders/create-direct — targeted fallback branches', () => 
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_PRODUCT)
       .mockResolvedValueOnce(null)
-    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(40)
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 40, codFee: 0 })
 
     const res = await POST(makeRequest({
       ...VALID_BODY,
@@ -712,7 +712,7 @@ describe('POST /api/orders/create-direct — additional branch coverage', () => 
       .mockResolvedValueOnce(MOCK_PRODUCT)
       .mockResolvedValueOnce(null) // min_order_amount
     // quoteShipping returns 0, clientShipping is 50
-    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(0)
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 0, codFee: 0 })
 
     const res = await POST(makeRequest({
       ...VALID_BODY,
@@ -734,7 +734,7 @@ describe('POST /api/orders/create-direct — additional branch coverage', () => 
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_PRODUCT)
       .mockResolvedValueOnce(null)
-    vi.mocked(orderCommit.quoteShipping).mockResolvedValue(80)
+    vi.mocked(orderCommit.quoteShipping).mockResolvedValue({ shipping: 80, codFee: 0 })
 
     const res = await POST(makeRequest({
       ...VALID_BODY,

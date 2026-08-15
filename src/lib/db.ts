@@ -23,8 +23,20 @@ function getPool(): Pool {
 
     const config: any = {
       max: poolMax,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
+      // Keep a connection warm so the pool is rarely fully cold. A cold IAM+TLS
+      // connect to RDS legitimately takes 0.5–3.3s (measured), so the previous
+      // 30s idle timeout + 5s connect timeout combo could wedge the pool: during
+      // low traffic every connection went idle-closed, then the next request had
+      // to cold-connect and a latency spike past 5s failed it, with nothing to
+      // fall back on. Warm keepalive'd connections + a longer connect budget fix that.
+      min: 1,
+      idleTimeoutMillis: 60000,
+      connectionTimeoutMillis: 10000,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000,
+      // Rotate connections before RDS's own idle/lifetime limits can silently kill them.
+      maxUses: 7500,
+      allowExitOnIdle: false,
     }
 
     if (useIamAuth) {
@@ -61,12 +73,15 @@ function getPool(): Pool {
     }
 
     pool = new Pool(config)
-    pool.on('error', (err) => {
-      pool!.query(
-        `INSERT INTO _debug_log (source, payload) VALUES ($1, $2)`,
-        ['pool.error', JSON.stringify({ msg: (err as any)?.message, code: (err as any)?.code })]
-      ).catch(() => {})
-    })
+    // Fires when an *idle* pooled client errors out (e.g. RDS drops the socket).
+    // pg has already removed the bad client from the pool by the time this runs,
+    // so the pool self-heals on its own. We must keep this listener registered so
+    // an idle-client error does not crash the process as an unhandled 'error'
+    // event — but we deliberately do NOTHING here. The previous handler issued a
+    // query on the *same* pool to log the error; if the pool was degraded that
+    // query failed too, and a connect-time failure never emits this event anyway,
+    // so it recorded nothing while adding load. No-op is the correct, safe choice.
+    pool.on('error', () => { /* idle-client error — pool already evicted it; no action needed */ })
   }
   return pool
 }

@@ -69,6 +69,9 @@ async function load() {
       // Only the q8 build (onnx/model_quantized.onnx) is shipped. A q4 build
       // (onnx/model_q4.onnx) is not present, so requesting 'q4' 404s and the
       // load silently fails. Use 'q8' on all devices until a q4 file is added.
+      // TODO(q4-mobile): once scripts/export-gemma-onnx.py emits an int4 build and
+      // it's deployed alongside q8, switch to `dtype: isMobile ? 'q4' : 'q8'` to
+      // roughly halve the ~417MB download on phones (the biggest remaining mobile cost).
       dtype: 'q8',
       device: 'webgpu',
     })
@@ -90,11 +93,19 @@ async function generate(id: number, prompt: string) {
     },
   })
 
+  // Lighter generation budget on mobile: each new token is an autoregressive
+  // forward pass, so halving the cap roughly halves generation latency on the
+  // weaker mobile GPU. The consumer prompts already target short outputs
+  // (cart/pitch/affirmation ask for "max 20 words"), so 40 is ample on mobile;
+  // desktop keeps the fuller 80. (Model download size is unchanged here — that's
+  // the q4 follow-up; this only trims the generation loop.)
+  const maxNewTokens = isMobile ? 40 : 80
+
   // generate() returns a 2-D Tensor [batch, seq]. Convert to a JS array and
   // drop the prompt tokens, then decode just the newly generated ids.
   const output = await model.generate({
     ...inputs,
-    max_new_tokens: 80,
+    max_new_tokens: maxNewTokens,
     do_sample: false,
     repetition_penalty: 1.3,
     streamer,

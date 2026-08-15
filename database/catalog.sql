@@ -492,6 +492,25 @@ CREATE TABLE public.controls_operation_log (
 );
 
 
+-- Async status for the bulk product-image controls operation. The controls POST
+-- inserts a row and processes products in the background; the admin UI polls it.
+CREATE TABLE public.bulk_image_jobs (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    status character varying(20) DEFAULT 'pending'::character varying NOT NULL,
+    operation character varying(40) NOT NULL,
+    total integer DEFAULT 0 NOT NULL,
+    done integer DEFAULT 0 NOT NULL,
+    skipped integer DEFAULT 0 NOT NULL,
+    slot integer,
+    log_id uuid,
+    error text,
+    admin_id uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT bulk_image_jobs_pkey PRIMARY KEY (id)
+);
+
+
 -- Drop stale non-partial unique constraint superseded by partial indexes
 -- uniq_product_units_product_unit + uniq_product_units_variant_unit
 ALTER TABLE product_units DROP CONSTRAINT IF EXISTS product_units_product_id_unit_key;

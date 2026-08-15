@@ -383,6 +383,7 @@ export async function getFilteredOrders(filters: {
   shipment_status?: string
   payment_mode?: string
   coupon_code?: string
+  cod_pending?: string
   page?: number
   limit?: number
   sort?: string
@@ -435,6 +436,10 @@ export async function getFilteredOrders(filters: {
   if (filters.coupon_code) {
     conditions.push(`o.coupon_code ILIKE '%' || $${i++} || '%'`)
     params.push(filters.coupon_code)
+  }
+  // COD cash collected on delivery but not yet remitted by Delhivery to the seller.
+  if (filters.cod_pending === 'true' || filters.cod_pending === '1') {
+    conditions.push(`o.payment_mode = 'cod' AND o.payment_status = 'cod_collected' AND o.cod_remitted_at IS NULL`)
   }
   if (filters.search) {
     const sc = buildVectorSearchClause(filters.search, 'o.search_vector', ['o.customer_name'], ['o.order_number'], i, 'simple')

@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { queryMany, withTransaction } from '@/lib/db'
+import { queryMany, queryOne, query, withTransaction } from '@/lib/db'
 import { round2 } from '@/lib/gst'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { uploadProductImage, copyGalleryImageToProduct } from '@/lib/s3'
 
 type SnapshotRow = {
   id: string
@@ -18,6 +19,9 @@ type OperationSnapshot = {
   variants: SnapshotRow[]
   subs: SnapshotRow[]
   variantUnits: { variant_id: string; product_id: string; before: Record<string, unknown> | null }[]
+  // set_images: full product_images rows per product, so rollback can restore them.
+  // The old S3 objects are never deleted on apply, so these rows remain valid.
+  productImages?: { product_id: string; rows: Record<string, unknown>[] }[]
 }
 
 // ── helpers ──────────────────────────────────────────────────────────────────
@@ -111,6 +115,12 @@ export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!hasScope(admin.role, admin.scopes, 'inflation:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+
+  // Bulk image change uploads files → multipart. Everything else is JSON.
+  const contentType = request.headers.get('content-type') || ''
+  if (contentType.includes('multipart/form-data')) {
+    return handleBulkImages(request, admin)
+  }
 
   const body = await request.json()
   const { operation, value, product_ids, filters = {}, inherit_to_variants = true } = body
@@ -479,4 +489,150 @@ export async function POST(request: NextRequest) {
   } catch (e: any) {
     return NextResponse.json({ error: e.message || 'Operation failed' }, { status: 500 })
   }
+}
+
+// ── set_images — bulk replace ONE image slot by position (multipart) ──────────
+// Replaces the image at slot N (1-based display_order) on every selected product
+// with the uploaded image. Products that don't have that slot are SKIPPED. Slot 1
+// carries the primary flag. Snapshots the replaced rows for rollback; old S3
+// objects are never deleted, so rollback restores them (new objects orphan on undo).
+const IMG_BUCKET = process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'
+
+async function handleBulkImages(request: NextRequest, admin: { email?: string | null; adminId?: string | null }) {
+  let form: FormData
+  try { form = await request.formData() } catch { return NextResponse.json({ error: 'Invalid form data' }, { status: 400 }) }
+
+  const operation = String(form.get('operation') || '')
+  if (operation !== 'set_images') return NextResponse.json({ error: 'Unsupported multipart operation' }, { status: 400 })
+
+  let ids: string[] = []
+  try { ids = JSON.parse(String(form.get('product_ids') || '[]')) } catch { ids = [] }
+  if (!Array.isArray(ids) || ids.length === 0) return NextResponse.json({ error: 'product_ids required' }, { status: 400 })
+
+  const altText = (form.get('alt_text') as string | null)?.trim() || null
+  // Slot is 1-based in the UI; convert to 0-based display_order.
+  const slot = parseInt(String(form.get('slot') || '1'), 10)
+  if (!Number.isFinite(slot) || slot < 1) return NextResponse.json({ error: 'Invalid image slot' }, { status: 400 })
+  const targetOrder = slot - 1
+
+  // Source is EITHER an uploaded file OR a gallery image reference.
+  const file = form.get('image_0')
+  const galleryImageId = (form.get('gallery_image_id') as string | null)?.trim() || null
+  const hasFile = file instanceof File && file.size > 0
+  if (!hasFile && !galleryImageId) return NextResponse.json({ error: 'An image (upload or gallery) is required' }, { status: 400 })
+
+  // The background worker outlives this request, so buffer the uploaded bytes now
+  // (the FormData stream is gone once we respond) and rebuild a File per product.
+  let fileBytes: ArrayBuffer | null = null
+  let fileName = ''
+  let fileType = ''
+  if (hasFile) {
+    fileBytes = await (file as File).arrayBuffer()
+    fileName = (file as File).name
+    fileType = (file as File).type
+  }
+
+  // If using a gallery image, resolve its S3 keys + metadata up front.
+  let gallery: { s3_key: string; s3_thumbnail_key: string; image_url: string; thumbnail_url: string; file_name: string; file_size: number | null; mime_type: string | null; width: number | null; height: number | null } | null = null
+  if (!hasFile && galleryImageId) {
+    const g = await queryMany<any>(
+      `SELECT s3_key, s3_thumbnail_key, image_url, thumbnail_url, file_name, file_size, mime_type, width, height
+       FROM gallery_images WHERE id = $1`,
+      [galleryImageId]
+    )
+    if (!g.length) return NextResponse.json({ error: 'Gallery image not found' }, { status: 404 })
+    gallery = g[0]
+  }
+
+  // Slot read is synchronous so we can fast-fail (bad slot, nothing to do) before
+  // enqueuing a job. The actual S3 work then runs in the background.
+  const existing = await queryMany<{
+    id: string; product_id: string; image_url: string; thumbnail_url: string | null
+    s3_bucket: string | null; s3_key: string | null; s3_thumbnail_key: string | null
+    file_name: string; file_size: number | null; mime_type: string | null
+    width: number | null; height: number | null; alt_text: string | null
+    display_order: number; is_primary: boolean
+  }>(
+    `SELECT id, product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
+            file_name, file_size, mime_type, width, height, alt_text, display_order, is_primary
+     FROM product_images
+     WHERE product_id = ANY($1::uuid[]) AND display_order = $2`,
+    [ids, targetOrder]
+  )
+  const slotRowByProduct = new Map(existing.map(r => [r.product_id, r]))
+  const targetIds = ids.filter(pid => slotRowByProduct.has(pid))
+  const skipped = ids.length - targetIds.length
+
+  if (targetIds.length === 0) {
+    return NextResponse.json({ error: `None of the selected products have an image in slot ${slot}.` }, { status: 400 })
+  }
+
+  // Enqueue the job and return immediately; the heavy S3 loop runs detached.
+  let jobId: string
+  try {
+    const jobRow = await queryOne<{ id: string }>(
+      `INSERT INTO bulk_image_jobs (status, operation, total, skipped, slot, admin_id)
+       VALUES ('running', $1, $2, $3, $4, $5) RETURNING id`,
+      [operation, targetIds.length, skipped, slot, admin.adminId ?? null]
+    )
+    jobId = jobRow!.id
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message || 'Could not create job' }, { status: 500 })
+  }
+
+  // ── background worker (fire-and-forget; not awaited) ──────────────────────────
+  ;(async () => {
+    type Acquired = { url: string; thumbnailUrl: string; s3Key: string; s3ThumbnailKey: string; fileName: string; fileSize: number | null; mimeType: string | null; width: number | null; height: number | null }
+    const snapshot: OperationSnapshot = { products: [], variants: [], subs: [], variantUnits: [], productImages: [] }
+    let done = 0
+    try {
+      for (const pid of targetIds) {
+        const old = slotRowByProduct.get(pid)!
+        // Acquire the image (upload resizes; gallery copies within the current env's S3 prefix).
+        let u: Acquired
+        if (hasFile) {
+          const f = new File([fileBytes as ArrayBuffer], fileName, { type: fileType })
+          u = await uploadProductImage(f, pid)
+        } else {
+          const c = await copyGalleryImageToProduct(gallery!.s3_key, gallery!.s3_thumbnail_key, pid)
+          u = { url: c.url, thumbnailUrl: c.thumbnailUrl, s3Key: c.s3Key, s3ThumbnailKey: c.s3ThumbnailKey, fileName: gallery!.file_name, fileSize: gallery!.file_size, mimeType: gallery!.mime_type, width: gallery!.width, height: gallery!.height }
+        }
+        // Replace the slot row in one small transaction per product, then record the
+        // snapshot only after it commits (so rollback matches what actually changed).
+        await withTransaction(async (client) => {
+          await client.query(`DELETE FROM product_images WHERE id = $1`, [old.id])
+          await client.query(
+            `INSERT INTO product_images (
+               product_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
+               file_name, file_size, mime_type, width, height, alt_text, display_order, is_primary
+             ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
+            [pid, u.url, u.thumbnailUrl, IMG_BUCKET, u.s3Key, u.s3ThumbnailKey,
+             u.fileName, u.fileSize, u.mimeType, u.width, u.height, altText ?? old.alt_text,
+             targetOrder, targetOrder === 0 ? true : old.is_primary]
+          )
+        })
+        snapshot.productImages!.push({ product_id: pid, rows: [old as unknown as Record<string, unknown>] })
+        done++
+        await query(`UPDATE bulk_image_jobs SET done = $2, updated_at = NOW() WHERE id = $1`, [jobId, done]).catch(() => {})
+      }
+
+      // Write the rollback log once, covering exactly the products that committed.
+      const logRow = await queryOne<{ id: string }>(
+        `INSERT INTO controls_operation_log (operation, product_ids, value, snapshot, applied_by, admin_id, product_count)
+         VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+        [operation, snapshot.productImages!.map(s => s.product_id), JSON.stringify({ slot }), JSON.stringify(snapshot), admin.email ?? null, admin.adminId ?? null, done]
+      )
+      await query(
+        `UPDATE bulk_image_jobs SET status = 'completed', done = $2, log_id = $3, updated_at = NOW() WHERE id = $1`,
+        [jobId, done, logRow?.id ?? null]
+      ).catch(() => {})
+    } catch (e: any) {
+      await query(
+        `UPDATE bulk_image_jobs SET status = 'failed', done = $2, error = $3, updated_at = NOW() WHERE id = $1`,
+        [jobId, done, e?.message || 'Image update failed']
+      ).catch(() => {})
+    }
+  })()
+
+  return NextResponse.json({ success: true, job_id: jobId, total: targetIds.length, skipped })
 }

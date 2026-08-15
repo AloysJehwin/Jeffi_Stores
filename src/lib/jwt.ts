@@ -95,6 +95,37 @@ function getTokenFromRequest(request: NextRequest, cookieName: string): string |
   return request.cookies.get(cookieName)?.value || null
 }
 
+// Return the Authorization: Bearer value only (no cookie fallback). Used to gate the
+// stateless extension-token path to Bearer requests, so a session cookie value can
+// never be reinterpreted as a signed JWT.
+function getBearerToken(request: NextRequest): string | null {
+  const authHeader = request.headers.get('authorization')
+  if (authHeader && authHeader.toLowerCase().startsWith('bearer ')) return authHeader.slice(7)
+  return null
+}
+
+// Verify a scoped extension token (minted by POST /api/admin/token/generate). This is a
+// STANDALONE signed JWT (not a session), so we jwtVerify it against JWT_SECRET and accept
+// ONLY tokens tagged type='extension_token' — rejecting review/other JWTs from being
+// replayed as admin. Returns an AdminJWTPayload (no sid) or null.
+export async function verifyExtensionToken(token: string): Promise<AdminJWTPayload | null> {
+  try {
+    const { payload } = await jwtVerify(token, JWT_SECRET)
+    if (payload.type !== 'extension_token') return null
+    if (!payload.adminId) return null
+    return {
+      adminId: payload.adminId as string,
+      email: (payload.email as string) || undefined,
+      first_name: (payload.first_name as string) || undefined,
+      last_name: (payload.last_name as string) || undefined,
+      role: (payload.role as string) || '',
+      scopes: Array.isArray(payload.scopes) ? (payload.scopes as string[]) : [],
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function authenticateUser(request: NextRequest): Promise<UserJWTPayload | null> {
   const sid = getTokenFromRequest(request, 'user_sid')
   if (!sid) return null
@@ -133,7 +164,16 @@ export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTP
   const sid = getTokenFromRequest(request, 'admin_sid')
   if (!sid) return null
   const s = await resolveSession(sid, extractSessionSignals(request))
-  if (!s || s.principalType !== 'admin') return null
+  if (!s || s.principalType !== 'admin') {
+    // Fallback: a scoped extension token (standalone JWT) sent via Authorization: Bearer.
+    // Bearer-only — a session cookie value must never be reinterpreted as a JWT.
+    const bearer = getBearerToken(request)
+    if (bearer) {
+      const ext = await verifyExtensionToken(bearer)
+      if (ext) return ext
+    }
+    return null
+  }
   const result: AdminJWTPayload = {
     adminId: s.principalId,
     email: s.email || undefined,

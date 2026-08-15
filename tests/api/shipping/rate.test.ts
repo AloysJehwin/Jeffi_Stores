@@ -423,7 +423,11 @@ describe('POST /api/shipping/rate', () => {
     }) as any)
     expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.charge).toBe(40)
+    // COD fee is now returned SEPARATELY from the transport charge (not folded in).
+    // Transport charge is 0 here (fallback rate mock), COD flat fee = 40.
+    expect(json.charge).toBe(0)
+    expect(json.codFee).toBe(40)
+    expect(json.totalCharge).toBe(40)
   })
 
   it('COD surcharge uses pct fee when pct of subtotal exceeds flat', async () => {
@@ -444,7 +448,9 @@ describe('POST /api/shipping/rate', () => {
     }) as any)
     expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.charge).toBe(100)
+    expect(json.charge).toBe(0)
+    expect(json.codFee).toBe(100)
+    expect(json.totalCharge).toBe(100)
   })
 
   it('COD surcharge uses flat fee when subtotal is not a number', async () => {
@@ -462,6 +468,8 @@ describe('POST /api/shipping/rate', () => {
     }) as any)
     expect(res.status).toBe(200)
     const json = await res.json()
-    expect(json.charge).toBe(40)
+    expect(json.charge).toBe(0)
+    expect(json.codFee).toBe(40)
+    expect(json.totalCharge).toBe(40)
   })
 })

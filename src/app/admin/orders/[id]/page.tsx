@@ -17,6 +17,7 @@ import VariantChangeRequest from '@/components/admin/VariantChangeRequest'
 import CustomerMailPanel from '@/components/admin/CustomerMailPanel'
 import MailLogsPanel from '@/components/admin/MailLogsPanel'
 import ExtendEddButton from '@/components/admin/ExtendEddButton'
+import CodRemittanceButton from '@/components/admin/CodRemittanceButton'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 
 export const dynamic = 'force-dynamic'
@@ -338,11 +339,28 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                   <span className="text-foreground-secondary">Shipping</span>
                   <span className="text-foreground">Rs. {Number(order.shipping_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
+                {Number(order.cod_fee_amount) > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span className="text-foreground-secondary">COD handling fee</span>
+                    <span className="text-foreground">Rs. {Number(order.cod_fee_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-lg font-bold pt-2 border-t border-border-default">
                   <span className="text-foreground">Total</span>
                   <span className="text-primary-500">Rs. {Number(order.total_amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                 </div>
               </div>
+
+              {/* COD remittance — shown once a COD order is delivered & cash collected */}
+              {order.payment_mode === 'cod' && order.payment_status === 'cod_collected' && (
+                <div className="mt-4">
+                  <CodRemittanceButton
+                    orderId={order.id}
+                    remittedAt={order.cod_remitted_at ?? null}
+                    codAmount={Number(order.total_amount)}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
