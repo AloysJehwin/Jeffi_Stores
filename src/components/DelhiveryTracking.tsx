@@ -29,6 +29,11 @@ type TrackingData = {
   reverseInTransit?: boolean
   destReceiveDate?: string | null
   returnedDate?: string | null
+  // Delivery cost breakdown
+  quotedWeightKg?: number | null
+  chargedWeightKg?: number | null
+  shippingAmount?: number | null
+  extraCharge?: number | null
 }
 
 const EXCEPTION_TYPES = new Set(['UD', 'NDR', 'HOLD', 'LOST', 'MIS'])
@@ -378,6 +383,58 @@ export default function DelhiveryTracking({
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
               </svg>
             </button>
+          </div>
+        )}
+
+        {/* Delivery cost breakdown — shown when a charged weight is available */}
+        {(tracking.shippingAmount != null || tracking.chargedWeightKg != null) && (
+          <div className="border-t border-border-default pt-3 mt-1">
+            <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide mb-2">Delivery Cost</p>
+            <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs">
+              {tracking.shippingAmount != null && (
+                <>
+                  <span className="text-foreground-muted">Quoted charge</span>
+                  <span className="text-foreground font-medium">
+                    ₹{Number(tracking.shippingAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    {tracking.quotedWeightKg != null && (
+                      <span className="text-foreground-muted font-normal ml-1">({tracking.quotedWeightKg} kg)</span>
+                    )}
+                  </span>
+                </>
+              )}
+              {tracking.chargedWeightKg != null && (
+                <>
+                  <span className="text-foreground-muted">Charged weight</span>
+                  <span className={`font-medium ${tracking.quotedWeightKg != null && tracking.chargedWeightKg > tracking.quotedWeightKg ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
+                    {tracking.chargedWeightKg} kg
+                    {tracking.quotedWeightKg != null && tracking.chargedWeightKg > tracking.quotedWeightKg && (
+                      <span className="ml-1">↑ vs {tracking.quotedWeightKg} kg quoted</span>
+                    )}
+                  </span>
+                </>
+              )}
+              {tracking.extraCharge != null && tracking.extraCharge > 0 && (
+                <>
+                  <span className="text-foreground-muted">Extra charge (est.)</span>
+                  <span className="text-orange-600 dark:text-orange-400 font-semibold">
+                    +₹{Number(tracking.extraCharge).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </>
+              )}
+              {tracking.extraCharge != null && tracking.extraCharge > 0 && tracking.shippingAmount != null && (
+                <>
+                  <span className="text-foreground-muted">Estimated total</span>
+                  <span className="text-foreground font-semibold">
+                    ₹{(Number(tracking.shippingAmount) + Number(tracking.extraCharge)).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                </>
+              )}
+            </div>
+            {tracking.extraCharge != null && tracking.extraCharge > 0 && (
+              <p className="text-[10px] text-foreground-muted mt-2">
+                Delhivery billed a higher weight than declared at pickup. Estimated extra is proportional — actual invoice may differ.
+              </p>
+            )}
           </div>
         )}
       </div>

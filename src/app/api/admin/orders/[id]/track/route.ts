@@ -42,8 +42,12 @@ export async function GET(
     const order = await queryOne<{
       awb_number: string | null; status: string; shipment_status: string | null
       order_number: string; customer_name: string; customer_email: string
+      shipping_amount: number | null; delhivery_quoted_weight_kg: number | null
+      delhivery_charged_weight_kg: number | null; delhivery_extra_charge: number | null
     }>(
       `SELECT o.awb_number, o.status, o.shipment_status, o.order_number,
+              o.shipping_amount, o.delhivery_quoted_weight_kg,
+              o.delhivery_charged_weight_kg, o.delhivery_extra_charge,
               COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
               COALESCE(u.email, o.customer_email) AS customer_email
        FROM orders o
@@ -72,6 +76,10 @@ export async function GET(
           origin: null,
           destination: null,
           scans: [],
+          quotedWeightKg: order.delhivery_quoted_weight_kg ?? null,
+          chargedWeightKg: order.delhivery_charged_weight_kg ?? null,
+          shippingAmount: order.shipping_amount ?? null,
+          extraCharge: order.delhivery_extra_charge ?? null,
         },
         statusSynced: false,
         syncedTo: null,
@@ -166,8 +174,27 @@ export async function GET(
         [id, newShipmentStatus]
       ).catch(() => {})
     } else if (order.shipment_status) {
-      // Delhivery returned a stale/lower status — keep the DB value so the UI doesn't regress
       effectiveShipmentStatus = order.shipment_status as any
+    }
+
+    // Persist charged weight from Delhivery and compute extra charge vs original quote.
+    // ChargedWeight is the billing weight Delhivery used — may differ from quoted weight
+    // if the actual parcel was heavier/larger (volumetric) than declared at shipment creation.
+    const chargedWeightKg: number | null = shipment.ChargedWeight != null
+      ? Number(shipment.ChargedWeight) : null
+    let extraCharge: number | null = null
+    if (chargedWeightKg != null && order.delhivery_quoted_weight_kg != null && order.shipping_amount != null) {
+      const quotedKg = Number(order.delhivery_quoted_weight_kg)
+      if (chargedWeightKg > quotedKg && quotedKg > 0) {
+        // Estimate extra = (charged_kg / quoted_kg - 1) × shipping_amount
+        extraCharge = Math.round(((chargedWeightKg / quotedKg) - 1) * Number(order.shipping_amount) * 100) / 100
+      }
+    }
+    if (chargedWeightKg != null && chargedWeightKg !== Number(order.delhivery_charged_weight_kg)) {
+      await query(
+        `UPDATE orders SET delhivery_charged_weight_kg = $2, delhivery_extra_charge = $3, updated_at = NOW() WHERE id = $1`,
+        [id, chargedWeightKg, extraCharge]
+      ).catch(() => {})
     }
 
     return NextResponse.json({
@@ -183,6 +210,10 @@ export async function GET(
         origin: shipment.Origin ?? null,
         destination: shipment.Destination ?? null,
         scans,
+        quotedWeightKg: order.delhivery_quoted_weight_kg ?? null,
+        chargedWeightKg: chargedWeightKg ?? order.delhivery_charged_weight_kg ?? null,
+        shippingAmount: order.shipping_amount ?? null,
+        extraCharge: extraCharge ?? order.delhivery_extra_charge ?? null,
       },
       statusSynced,
       syncedTo: statusSynced && statusType ? STATUS_SYNC[statusType]?.orderStatus : null,
