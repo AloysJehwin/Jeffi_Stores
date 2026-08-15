@@ -24,6 +24,8 @@ const TOKEN = process.env.DELHIVERY_API_KEY
 
 interface RateBreakdown {
   charge: number
+  codFee: number
+  totalCharge: number
   zone: string
   source: 'delhivery' | 'fallback' | 'free' | 'admin_disabled' | 'free_threshold' | 'discounted'
   chargedWeightGrams: number
@@ -139,23 +141,20 @@ export async function POST(request: NextRequest) {
     const deliverySettings = await getDeliverySettings()
     const totalWeightGrams = shipmentItems.reduce((s, i) => s + i.weightGrams * i.quantity, 0)
 
+    // Early returns for free/disabled — codFee is 0 here (isCod doesn't matter for free)
     if (!deliverySettings.enabled) {
       return NextResponse.json<RateBreakdown>({
-        charge: 0,
-        zone: 'Free',
-        source: 'admin_disabled',
-        chargedWeightGrams: totalWeightGrams,
-        cartonCount: 0,
+        charge: 0, codFee: 0, totalCharge: 0,
+        zone: 'Free', source: 'admin_disabled',
+        chargedWeightGrams: totalWeightGrams, cartonCount: 0,
       })
     }
 
     if (deliverySettings.freeThreshold > 0 && typeof subtotal === 'number' && subtotal >= deliverySettings.freeThreshold) {
       return NextResponse.json<RateBreakdown>({
-        charge: 0,
-        zone: 'Free',
-        source: 'free_threshold',
-        chargedWeightGrams: totalWeightGrams,
-        cartonCount: 0,
+        charge: 0, codFee: 0, totalCharge: 0,
+        zone: 'Free', source: 'free_threshold',
+        chargedWeightGrams: totalWeightGrams, cartonCount: 0,
         freeShippingThreshold: deliverySettings.freeThreshold,
       })
     }
@@ -210,12 +209,10 @@ export async function POST(request: NextRequest) {
       totalCharge = bv.shippingMaxCharge
     }
 
-    if (isCod) {
-      const codFee = typeof subtotal === 'number'
-        ? Math.max(bv.codSurchargeFlat, (bv.codSurchargePct / 100) * subtotal)
-        : bv.codSurchargeFlat
-      totalCharge += codFee
-    }
+    // Compute COD fee separately — NOT folded into totalCharge so callers can show it as its own line.
+    const codFee = isCod
+      ? Math.round(Math.max(bv.codSurchargeFlat, (bv.codSurchargePct / 100) * (typeof subtotal === 'number' ? subtotal : 0)) * 100) / 100
+      : 0
 
     const baseCharge = round2(totalCharge)
     const ruleResult = applyDeliveryRules({
@@ -226,6 +223,8 @@ export async function POST(request: NextRequest) {
 
     const result: RateBreakdown = {
       charge: ruleResult.charge,
+      codFee,
+      totalCharge: round2(ruleResult.charge + codFee),
       zone,
       source: ruleResult.source === 'as_is' ? source : ruleResult.source,
       chargedWeightGrams: totalChargedWeight,

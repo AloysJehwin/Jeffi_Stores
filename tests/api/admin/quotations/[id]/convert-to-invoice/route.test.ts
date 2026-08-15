@@ -428,13 +428,28 @@ describe('POST /api/admin/quotations/[id]/convert-to-invoice', () => {
 
   // --- Email notifications ---
 
-  it('sends invoice emails after successful conversion', async () => {
+  it('sends the standard invoice email (not the business one) for a non-RFQ conversion', async () => {
     vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
       fn(makeTransactionClient()),
     )
     await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
+    // from_rfq is false on FINAL_QUOTATION → regular customer invoice email only.
+    // Sending both would double-email the customer (the bug this guards against).
     expect(sendInvoiceFinalizedEmail).toHaveBeenCalled()
+    expect(sendBusinessInvoiceGeneratedEmail).not.toHaveBeenCalled()
+  })
+
+  it('sends the business invoice email (not the standard one) for an RFQ-sourced conversion', async () => {
+    vi.mocked(queryOne).mockReset()
+    vi.mocked(queryOne)
+      .mockResolvedValueOnce({ ...FINAL_QUOTATION, from_rfq: true } as any)
+      .mockResolvedValue({ view_token: 'tok-123' } as any)
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) =>
+      fn(makeTransactionClient()),
+    )
+    await POST(postReq({ paymentMode: 'cash' }), { params: Promise.resolve({ id: QUOT_ID }) })
     expect(sendBusinessInvoiceGeneratedEmail).toHaveBeenCalled()
+    expect(sendInvoiceFinalizedEmail).not.toHaveBeenCalled()
   })
 
   it('does not send emails when customerEmail is null', async () => {

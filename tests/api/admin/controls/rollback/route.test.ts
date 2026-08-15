@@ -153,6 +153,42 @@ describe('POST /api/admin/controls/rollback', () => {
     expect(res.status).toBe(200)
   })
 
+  it('rolls back an object-shape snapshot with variantUnits (both null-before delete and non-null re-insert)', async () => {
+    vi.mocked(query).mockResolvedValue({
+      rows: [{ ...GOOD_LOG, operation: 'set_selling_unit', snapshot: {
+        products: [], variants: [], subs: [],
+        variantUnits: [
+          { variant_id: 'v1', product_id: 'p1', before: { unit: 'box', factor: 12, dimension: 'count', display_label: 'Box', min_qty: 1, max_qty: null, qty_step: 1, variant_unit: 'box' } },
+          { variant_id: 'v2', product_id: 'p1', before: null }, // no base unit before → delete branch
+        ],
+      } }]
+    } as any)
+    const res = await POST(makePost({ log_id: 'log-1' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).restored).toBe(2)
+  })
+
+  it('skips a product snapshot row whose before has no fields', async () => {
+    vi.mocked(query).mockResolvedValue({
+      rows: [{ ...GOOD_LOG, operation: 'inflate_price', snapshot: [{ id: 'p1', before: {} }] }]
+    } as any)
+    const res = await POST(makePost({ log_id: 'log-1' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).restored).toBe(0)
+  })
+
+  it('rolls back set_images (restores the snapshotted slot row)', async () => {
+    vi.mocked(query).mockResolvedValue({
+      rows: [{ ...GOOD_LOG, operation: 'set_images', snapshot: {
+        products: [], variants: [], subs: [], variantUnits: [],
+        productImages: [{ product_id: 'p1', rows: [{ id: 'img1', product_id: 'p1', image_url: 'u', thumbnail_url: 't', s3_bucket: 'b', s3_key: 'k', s3_thumbnail_key: 'tk', file_name: 'old.jpg', file_size: 10, mime_type: 'image/jpeg', width: 100, height: 100, alt_text: null, display_order: 0, is_primary: true }] }],
+      } }]
+    } as any)
+    const res = await POST(makePost({ log_id: 'log-1' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).restored).toBe(1)
+  })
+
   it('returns 500 for unsupported operation', async () => {
     vi.mocked(query).mockResolvedValue({
       rows: [{ ...GOOD_LOG, operation: 'unknown_op' }]

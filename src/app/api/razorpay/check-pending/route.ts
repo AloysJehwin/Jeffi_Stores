@@ -134,6 +134,7 @@ export async function POST(request: NextRequest) {
         ? await commitOrder({
             mode: 'cart', userId: authUser.userId, user, addressId: draft.addressId,
             notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
+            codFeeAmount: draft.codFeeAmount,
             cartItems, subtotal, taxAmount, appliedDiscount,
             businessDiscountAmount: draft.businessDiscountAmount,
             paymentRecord: {
@@ -144,6 +145,7 @@ export async function POST(request: NextRequest) {
         : await commitOrder({
             mode: 'buyNow', userId: authUser.userId, user, addressId: draft.addressId,
             notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
+            codFeeAmount: draft.codFeeAmount,
             item: draft.buyNowItem!, product: buyNowSnapshot!.product,
             variant: buyNowSnapshot!.variant, subVariant: buyNowSnapshot!.subVariant,
             subtotal, taxAmount, appliedDiscount,

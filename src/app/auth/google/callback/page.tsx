@@ -12,9 +12,8 @@ export default function GoogleCallbackPage() {
     const error = params.get('error')
 
     if (window.opener) {
-      // Use '*' as targetOrigin so it works across subdomains (jeffistores.in ↔ business.jeffistores.in).
-      // The message payload contains no secrets — the access_token is already in the hash fragment
-      // which is also visible to the opener's domain via the popup URL.
+      // Normal popup flow — post the token back to the opener and close.
+      // Use '*' as targetOrigin so it works across subdomains.
       window.opener.postMessage(
         {
           source: 'jeffi-google-oauth',
@@ -24,7 +23,27 @@ export default function GoogleCallbackPage() {
         '*'
       )
       setTimeout(() => window.close(), 100)
+      return
     }
+
+    // Popup was blocked and Google opened this as a new tab / redirected the
+    // top-level window. Read the return_to path from the state param (encoded
+    // by openGoogleOAuthPopup) — fall back to /admin/login if absent or invalid.
+    const state = params.get('state') || ''
+    let returnTo = '/admin/login'
+    try {
+      // state may be "randomPart|/return/path" — parse the second segment if present
+      const pipe = state.indexOf('|')
+      if (pipe !== -1) {
+        const candidate = decodeURIComponent(state.slice(pipe + 1))
+        // only allow same-origin paths
+        if (candidate.startsWith('/')) returnTo = candidate
+      }
+    } catch { /* ignore */ }
+
+    // Redirect back to the originating page with the hash so its own
+    // hash-fallback handler can pick up the token and complete sign-in.
+    window.location.replace(`${returnTo}#${hash}`)
   }, [])
 
   return (

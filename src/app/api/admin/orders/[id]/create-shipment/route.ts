@@ -77,11 +77,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         oi.quantity,
         oi.variant_id,
         COALESCE(pv.variant_name, '') AS variant_name,
-        COALESCE(pv.weight_grams, p.weight_grams, 500) AS weight_grams,
-        COALESCE(pv.package_type, p.package_type) AS package_type,
-        COALESCE(pv.length_cm, p.length_cm) AS length_cm,
-        COALESCE(pv.breadth_cm, p.breadth_cm) AS breadth_cm,
-        COALESCE(pv.height_cm, p.height_cm) AS height_cm
+        COALESCE(oi.weight_grams, pv.weight_grams, p.weight_grams, 500) AS weight_grams,
+        COALESCE(oi.package_type, pv.package_type, p.package_type) AS package_type,
+        COALESCE(oi.length_cm, pv.length_cm, p.length_cm) AS length_cm,
+        COALESCE(oi.breadth_cm, pv.breadth_cm, p.breadth_cm) AS breadth_cm,
+        COALESCE(oi.height_cm, pv.height_cm, p.height_cm) AS height_cm
       FROM order_items oi
       LEFT JOIN products p ON p.id = oi.product_id
       LEFT JOIN product_variants pv ON pv.id = oi.variant_id
@@ -201,12 +201,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     await query(
-      // Only overwrite the EDD when the serviceability lookup returned a valid
-      // date. Pre-pickup that lookup usually yields nothing, so COALESCE keeps the
-      // EDD computed at order creation; the real Delhivery EDD lands later via the
-      // status-sync route once the shipment is picked up.
-      `UPDATE orders SET awb_number = $1, status = 'processing', estimated_delivery_date = COALESCE($3::date, estimated_delivery_date), shipment_status = COALESCE(shipment_status, 'created'), updated_at = NOW() WHERE id = $2`,
-      [awb, id, estimatedDeliveryDate]
+      `UPDATE orders SET awb_number = $1, status = 'processing',
+        estimated_delivery_date = COALESCE($3::date, estimated_delivery_date),
+        shipment_status = COALESCE(shipment_status, 'created'),
+        delhivery_quoted_weight_kg = $4,
+        updated_at = NOW()
+       WHERE id = $2`,
+      [awb, id, estimatedDeliveryDate, weightKg]
     )
 
     const smsCustomer = await queryOne<{ phone: string | null; notification_channel: string | null }>(

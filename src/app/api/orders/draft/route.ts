@@ -140,14 +140,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  const shippingAmount = address.postal_code
+  const quote = address.postal_code
     ? await quoteShipping({
         destinationPin: String(address.postal_code),
         items: shippingItems,
         subtotal,
         isCod,
       })
-    : 0
+    : { shipping: 0, codFee: 0 }
+  const shippingAmount = quote.shipping
+  const codFeeAmount = isCod ? quote.codFee : 0
 
   const minOrder = await getMinOrderAmount()
   if (minOrder > 0 && subtotal < minOrder) {
@@ -160,7 +162,7 @@ export async function POST(req: NextRequest) {
     if (result.ok) appliedDiscount = result.appliedDiscount
   }
 
-  const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + shippingAmount)
+  const total = Math.max(0, subtotal - appliedDiscount - businessDiscountAmount + shippingAmount + codFeeAmount)
 
   const draftToken = await signDraftToken({
     userId: authUser.userId,
@@ -168,6 +170,7 @@ export async function POST(req: NextRequest) {
     addressId,
     couponId,
     shippingAmount,
+    codFeeAmount,
     cartHash,
     cartItemIds,
     buyNowItem,
@@ -183,5 +186,6 @@ export async function POST(req: NextRequest) {
     appliedDiscount,
     businessDiscountAmount,
     shippingAmount,
+    codFeeAmount,
   })
 }

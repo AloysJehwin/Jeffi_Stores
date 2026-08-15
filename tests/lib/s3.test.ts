@@ -7,10 +7,11 @@ const { mockSend } = vi.hoisted(() => {
 
 vi.mock('@aws-sdk/client-s3', () => {
   const S3Client = vi.fn().mockImplementation(function () { return { send: mockSend } })
-  const PutObjectCommand = vi.fn().mockImplementation(function (input: unknown) { return { input } })
-  const DeleteObjectCommand = vi.fn().mockImplementation(function (input: unknown) { return { input } })
-  const CopyObjectCommand = vi.fn().mockImplementation(function (input: unknown) { return { input } })
-  return { S3Client, PutObjectCommand, DeleteObjectCommand, CopyObjectCommand }
+  const PutObjectCommand = vi.fn().mockImplementation(function (input: unknown) { return { input, _t: 'Put' } })
+  const DeleteObjectCommand = vi.fn().mockImplementation(function (input: unknown) { return { input, _t: 'Delete' } })
+  const CopyObjectCommand = vi.fn().mockImplementation(function (input: unknown) { return { input, _t: 'Copy' } })
+  const HeadObjectCommand = vi.fn().mockImplementation(function (input: unknown) { return { input, _t: 'Head' } })
+  return { S3Client, PutObjectCommand, DeleteObjectCommand, CopyObjectCommand, HeadObjectCommand }
 })
 
 vi.mock('sharp', () => {
@@ -196,10 +197,10 @@ describe('uploadGalleryImage', () => {
 
 describe('copyGalleryImageToProduct', () => {
   beforeEach(() => {
-    mockSend.mockResolvedValue({})
+    mockSend.mockResolvedValue({}) // Head + Copy both succeed by default (source exists)
   })
 
-  it('copies gallery image to product and returns new keys', async () => {
+  it('copies gallery image to a product-owned key (never a gallery key)', async () => {
     const result = await copyGalleryImageToProduct(
       'gallery/123-img.png',
       'gallery/thumbnails/123-img.png',
@@ -207,53 +208,35 @@ describe('copyGalleryImageToProduct', () => {
     )
     expect(result.s3Key).toContain('products/prod-1/')
     expect(result.s3ThumbnailKey).toContain('products/prod-1/thumbnails/')
+    expect(result.s3Key).not.toContain('gallery/')
+    expect(result.url).toContain('products/prod-1/')
   })
 
-  it('falls back to fallback URLs on NoSuchKey error by name', async () => {
-    const noSuchKeyErr = Object.assign(new Error('NoSuchKey'), { name: 'NoSuchKey' })
-    mockSend.mockRejectedValueOnce(noSuchKeyErr)
-    const result = await copyGalleryImageToProduct(
-      'gallery/missing.png',
-      'gallery/thumbnails/missing.png',
-      'prod-1',
-      'http://fallback.url/img.png',
-      'http://fallback.url/thumb.png'
-    )
-    expect(result.url).toBe('http://fallback.url/img.png')
-    expect(result.thumbnailUrl).toBe('http://fallback.url/thumb.png')
-    expect(result.s3Key).toBe('gallery/missing.png')
-  })
-
-  it('falls back using getS3Url when no fallback URLs provided on NoSuchKey by name', async () => {
-    const noSuchKeyErr = Object.assign(new Error('NoSuchKey'), { name: 'NoSuchKey' })
-    mockSend.mockRejectedValueOnce(noSuchKeyErr)
-    const result = await copyGalleryImageToProduct(
-      'gallery/missing.png',
-      'gallery/thumbnails/missing.png',
-      'prod-1'
-    )
-    expect(result.s3Key).toBe('gallery/missing.png')
-    expect(result.url).toContain('missing.png')
-  })
-
-  it('falls back on NoSuchKey error by Code property', async () => {
-    const noSuchKeyErr = Object.assign(new Error('err'), { Code: 'NoSuchKey' })
-    mockSend.mockRejectedValueOnce(noSuchKeyErr)
-    const result = await copyGalleryImageToProduct(
-      'gallery/img.png',
-      'gallery/thumbnails/img.png',
-      'prod-1'
-    )
-    expect(result.s3Key).toBe('gallery/img.png')
-  })
-
-  it('rethrows non-NoSuchKey errors', async () => {
-    mockSend.mockRejectedValueOnce(new Error('AccessDenied'))
+  it('THROWS when the gallery source is missing — never falls back to a gallery key', async () => {
+    // Every HeadObject rejects → source resolves to null → must throw.
+    mockSend.mockRejectedValue(Object.assign(new Error('Not Found'), { name: 'NotFound' }))
     await expect(copyGalleryImageToProduct(
+      'gallery/missing.png',
+      'gallery/thumbnails/missing.png',
+      'prod-1'
+    )).rejects.toThrow(/not found on S3/i)
+  })
+
+  it('reuses the full image as thumbnail when the gallery thumb is missing (still product-owned)', async () => {
+    // First Head (full) succeeds, Copy succeeds; thumb Head(s) reject.
+    mockSend
+      .mockResolvedValueOnce({})            // Head full → exists
+      .mockResolvedValueOnce({})            // Copy full
+      .mockRejectedValue(Object.assign(new Error('Not Found'), { name: 'NotFound' })) // thumb Heads fail
+    const result = await copyGalleryImageToProduct(
       'gallery/img.png',
       'gallery/thumbnails/img.png',
       'prod-1'
-    )).rejects.toThrow('AccessDenied')
+    )
+    expect(result.s3Key).toContain('products/prod-1/')
+    // thumbnail falls back to the full product key, NOT the gallery key
+    expect(result.s3ThumbnailKey).toBe(result.s3Key)
+    expect(result.thumbnailUrl).not.toContain('gallery/')
   })
 })
 

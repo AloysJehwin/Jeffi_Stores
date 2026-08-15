@@ -2,8 +2,8 @@ services:
   app_green:
     image: ghcr.io/aloysjehwin/jeffi_stores:latest
     container_name: jeffi-app-green
-    env_file: .env.production
     environment:
+      - SM_SECRET_ID=jeffi/production
       - REDIS_URL=redis://redis:6379
       - WEB_CONCURRENCY=2
     volumes:

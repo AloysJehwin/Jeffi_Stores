@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, CopyObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand, CopyObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import sharp from 'sharp'
 
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1'
@@ -142,12 +142,23 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
   }
 }
 
+// Resolve where a gallery object physically lives on S3. Objects predating the
+// S3_KEY_PREFIX convention sit at the bare key; newer ones under `${KEY_PREFIX}`.
+// Try the prefixed path first, then the bare path. Returns the CopySource-ready
+// key (relative to the bucket), or null if the object exists at neither.
+async function resolveSourceKey(canonicalKey: string): Promise<string | null> {
+  const prefixed = `${KEY_PREFIX}${canonicalKey}`
+  try { await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: prefixed })); return prefixed } catch {}
+  if (KEY_PREFIX) {
+    try { await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: canonicalKey })); return canonicalKey } catch {}
+  }
+  return null
+}
+
 export async function copyGalleryImageToProduct(
   galleryS3Key: string,
   galleryS3ThumbnailKey: string,
   productId: string,
-  fallbackUrl?: string,
-  fallbackThumbnailUrl?: string,
 ): Promise<{ s3Key: string; s3ThumbnailKey: string; url: string; thumbnailUrl: string }> {
   const fileName = galleryS3Key.replace(/^gallery\//, '')
   const thumbFileName = galleryS3ThumbnailKey.replace(/^gallery\/thumbnails\//, '')
@@ -155,24 +166,33 @@ export async function copyGalleryImageToProduct(
   const s3Key = `products/${productId}/${fileName}`
   const s3ThumbnailKey = `products/${productId}/thumbnails/${thumbFileName}`
 
-  try {
+  // Resolve the real source location. If the gallery object doesn't exist, THROW —
+  // never fall back to the gallery key, or the product row would point at gallery/…
+  // (the exact bug that left products sharing gallery objects). Callers must handle
+  // the throw (skip that image / surface an error) rather than store a bad path.
+  const srcKey = await resolveSourceKey(galleryS3Key)
+  if (!srcKey) {
+    throw new Error(`Gallery source image not found on S3: ${galleryS3Key} (checked ${KEY_PREFIX}${galleryS3Key} and bare). Cannot copy to product ${productId}.`)
+  }
+
+  await s3Client.send(new CopyObjectCommand({
+    Bucket: BUCKET_NAME,
+    CopySource: `${BUCKET_NAME}/${srcKey}`,
+    Key: `${KEY_PREFIX}${s3Key}`,
+  }))
+
+  // Thumbnail is best-effort: if the gallery thumb is missing, reuse the full image
+  // as the product thumbnail (still a product-owned key, never a gallery key).
+  const srcThumbKey = await resolveSourceKey(galleryS3ThumbnailKey)
+  if (srcThumbKey) {
     await s3Client.send(new CopyObjectCommand({
       Bucket: BUCKET_NAME,
-      CopySource: `${BUCKET_NAME}/${KEY_PREFIX}${galleryS3Key}`,
-      Key: `${KEY_PREFIX}${s3Key}`,
-    }))
-    await s3Client.send(new CopyObjectCommand({
-      Bucket: BUCKET_NAME,
-      CopySource: `${BUCKET_NAME}/${KEY_PREFIX}${galleryS3ThumbnailKey}`,
+      CopySource: `${BUCKET_NAME}/${srcThumbKey}`,
       Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
     }))
     return { s3Key, s3ThumbnailKey, url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3ThumbnailKey) }
-  } catch (err: any) {
-    if (err?.name === 'NoSuchKey' || err?.Code === 'NoSuchKey') {
-      return { s3Key: galleryS3Key, s3ThumbnailKey: galleryS3ThumbnailKey, url: fallbackUrl || getS3Url(galleryS3Key), thumbnailUrl: fallbackThumbnailUrl || getS3Url(galleryS3ThumbnailKey) }
-    }
-    throw err
   }
+  return { s3Key, s3ThumbnailKey: s3Key, url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3Key) }
 }
 
 export async function uploadVariantImage(file: File, variantId: string): Promise<UploadResult> {

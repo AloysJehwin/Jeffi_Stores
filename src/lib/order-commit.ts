@@ -317,12 +317,19 @@ interface ShippingQuoteItem {
   quantity: number
 }
 
+export interface ShippingQuote {
+  /** Transport charge only (excludes COD handling fee). */
+  shipping: number
+  /** COD handling fee — 0 for prepaid orders. Stored separately from shipping. */
+  codFee: number
+}
+
 export async function quoteShipping(input: {
   destinationPin: string
   items: ShippingQuoteItem[]
   subtotal: number
   isCod?: boolean
-}): Promise<number> {
+}): Promise<ShippingQuote> {
   const origin = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
   try {
     const res = await fetch(new URL('/api/shipping/rate', origin).toString(), {
@@ -340,12 +347,16 @@ export async function quoteShipping(input: {
         isCod: !!input.isCod,
       }),
     })
-    if (!res.ok) return 0
+    if (!res.ok) return { shipping: 0, codFee: 0 }
     const data = await res.json()
     const charge = Number(data?.charge)
-    return Number.isFinite(charge) && charge >= 0 ? round2(charge) : 0
+    const codFee = Number(data?.codFee)
+    return {
+      shipping: Number.isFinite(charge) && charge >= 0 ? round2(charge) : 0,
+      codFee: Number.isFinite(codFee) && codFee >= 0 ? round2(codFee) : 0,
+    }
   } catch {
-    return 0
+    return { shipping: 0, codFee: 0 }
   }
 }
 
@@ -366,6 +377,7 @@ export interface CommitInput {
   notes: string | null
   couponId: string | null
   shippingAmount: number
+  codFeeAmount: number
   paymentRecord: { gatewayOrderId: string; paymentId: string; signature: string; amountPaise: number } | null
 }
 
@@ -407,7 +419,7 @@ async function ensureAddressOnOrder(client: PoolClient, userId: string, addressI
 
 export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): Promise<InsertedOrder> {
   const orderNumber = `ORD-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`
-  const total = Math.max(0, input.subtotal - input.appliedDiscount - input.businessDiscountAmount + input.shippingAmount)
+  const total = Math.max(0, input.subtotal - input.appliedDiscount - input.businessDiscountAmount + input.shippingAmount + input.codFeeAmount)
 
   return withTransaction(async (client) => {
     const address = await ensureAddressOnOrder(client, input.userId, input.addressId)
@@ -559,9 +571,9 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         shipping_address_id, billing_address_id, notes,
         taxable_amount, cgst_amount, sgst_amount, igst_amount, is_igst,
         order_type, shipping_address_snapshot, billing_address_snapshot,
-        estimated_delivery_date
+        estimated_delivery_date, cod_fee_amount
       )
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26)
       RETURNING id, order_number, total_amount, status`,
       [
         orderNumber, input.userId, input.user.email, input.user.phone, customerName,
@@ -576,6 +588,7 @@ export async function commitOrder(input: CartCommitInput | BuyNowCommitInput): P
         input.mode === 'buyNow' ? 'direct' : 'cart',
         addressSnapshot, addressSnapshot,
         estimatedDeliveryDate,
+        round2(input.codFeeAmount),
       ]
     )
     const created = orderResult.rows[0]

@@ -203,10 +203,10 @@ describe('getPool – TLS configuration', () => {
 })
 
 // ---------------------------------------------------------------------------
-// Pool error handler writes to _debug_log
+// Pool error handler is a safe no-op (does NOT query the degraded pool)
 // ---------------------------------------------------------------------------
 describe('pool.on("error") handler', () => {
-  it('inserts into _debug_log when a pool-level error occurs', async () => {
+  it('registers an error handler and does NOT issue a query on the pool', async () => {
     const { mod, pg } = await importDb()
     // Trigger pool creation
     await mod.query('SELECT 1')
@@ -214,21 +214,22 @@ describe('pool.on("error") handler', () => {
     const errorHandler = pg.getErrorHandler()
     expect(errorHandler).not.toBeNull()
 
-    // Simulate a pool-level error
-    const fakeErr = Object.assign(new Error('connection lost'), { code: 'ECONNRESET' })
-    errorHandler!(fakeErr)
+    const callsBefore = pg.poolQuery.mock.calls.length
 
-    // handler is async internally; drain microtasks
+    // Simulate a pool-level (idle client) error — pg has already evicted the
+    // bad client, so the handler must NOT run another query on the pool.
+    const fakeErr = Object.assign(new Error('connection lost'), { code: 'ECONNRESET' })
+    expect(() => errorHandler!(fakeErr)).not.toThrow()
+
+    // drain microtasks
     await new Promise(r => setTimeout(r, 10))
 
-    const insertCall = pg.poolQuery.mock.calls.find(
+    // No extra pool query should have been issued by the handler.
+    expect(pg.poolQuery.mock.calls.length).toBe(callsBefore)
+    const debugLogInsert = pg.poolQuery.mock.calls.find(
       (c: any[]) => typeof c[0] === 'string' && (c[0] as string).includes('_debug_log')
     )
-    expect(insertCall).toBeDefined()
-    expect(insertCall![1][0]).toBe('pool.error')
-    const payload = JSON.parse(insertCall![1][1])
-    expect(payload.msg).toBe('connection lost')
-    expect(payload.code).toBe('ECONNRESET')
+    expect(debugLogInsert).toBeUndefined()
   })
 })
 

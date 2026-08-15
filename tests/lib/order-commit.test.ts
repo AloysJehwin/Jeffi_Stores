@@ -575,7 +575,21 @@ describe('quoteShipping', () => {
     vi.unstubAllGlobals()
   })
 
-  it('returns charge from successful response', async () => {
+  it('returns charge and codFee from successful response', async () => {
+    vi.mocked(fetch).mockResolvedValue({
+      ok: true,
+      json: async () => ({ charge: 50, codFee: 25 }),
+    } as Response)
+    const result = await quoteShipping({
+      destinationPin: '492001',
+      items: [{ productId: 'p1', quantity: 1 }],
+      subtotal: 500,
+      isCod: true,
+    })
+    expect(result).toEqual({ shipping: 50, codFee: 25 })
+  })
+
+  it('returns codFee 0 when response omits it', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ charge: 50 }),
@@ -585,45 +599,45 @@ describe('quoteShipping', () => {
       items: [{ productId: 'p1', quantity: 1 }],
       subtotal: 500,
     })
-    expect(result).toBe(50)
+    expect(result).toEqual({ shipping: 50, codFee: 0 })
   })
 
-  it('returns 0 when fetch response is not ok', async () => {
+  it('returns zeros when fetch response is not ok', async () => {
     vi.mocked(fetch).mockResolvedValue({ ok: false } as Response)
     const result = await quoteShipping({
       destinationPin: '492001',
       items: [],
       subtotal: 0,
     })
-    expect(result).toBe(0)
+    expect(result).toEqual({ shipping: 0, codFee: 0 })
   })
 
-  it('returns 0 when fetch throws', async () => {
+  it('returns zeros when fetch throws', async () => {
     vi.mocked(fetch).mockRejectedValue(new Error('network'))
     const result = await quoteShipping({
       destinationPin: '492001',
       items: [],
       subtotal: 0,
     })
-    expect(result).toBe(0)
+    expect(result).toEqual({ shipping: 0, codFee: 0 })
   })
 
-  it('returns 0 when charge is negative', async () => {
+  it('returns 0 shipping when charge is negative', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ charge: -10 }),
     } as Response)
     const result = await quoteShipping({ destinationPin: '492001', items: [], subtotal: 100 })
-    expect(result).toBe(0)
+    expect(result.shipping).toBe(0)
   })
 
-  it('returns 0 when charge is not finite', async () => {
+  it('returns 0 shipping when charge is not finite', async () => {
     vi.mocked(fetch).mockResolvedValue({
       ok: true,
       json: async () => ({ charge: null }),
     } as Response)
     const result = await quoteShipping({ destinationPin: '492001', items: [], subtotal: 100 })
-    expect(result).toBe(0)
+    expect(result.shipping).toBe(0)
   })
 
   it('rounds charge to 2 decimal places', async () => {
@@ -632,7 +646,7 @@ describe('quoteShipping', () => {
       json: async () => ({ charge: 49.999 }),
     } as Response)
     const result = await quoteShipping({ destinationPin: '492001', items: [], subtotal: 100 })
-    expect(result).toBe(50)
+    expect(result.shipping).toBe(50)
   })
 })
 
@@ -672,6 +686,7 @@ describe('commitOrder — cart mode', () => {
       notes: null,
       couponId: null,
       shippingAmount: 0,
+      codFeeAmount: 0,
       paymentRecord: null,
       cartItems: [makeCartLine()],
       subtotal: 200,
@@ -797,6 +812,23 @@ describe('commitOrder — cart mode', () => {
     expect(params[12]).toBe(275)
   })
 
+  it('stores cod_fee_amount separately and adds it to the total', async () => {
+    const client = makeClient()
+    mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
+
+    await commitOrder(makeCartCommitInput({
+      subtotal: 300, appliedDiscount: 50, shippingAmount: 25, codFeeAmount: 40,
+    }))
+
+    const orderInsertCall = client.query.mock.calls[1]
+    const params = orderInsertCall[1] as any[]
+    // cod_fee_amount is appended last, at index 25 (26th positional param)
+    expect(params[25]).toBe(40)
+    // total = 300 - 50 + 25 shipping + 40 cod fee = 315 (shipping_amount at index 11)
+    expect(params[11]).toBe(25)
+    expect(params[12]).toBe(315)
+  })
+
   it('handles cart item with variant and sub_variant for product name', async () => {
     const client = makeClient()
     mockWithTransaction.mockImplementation(async (fn: any) => fn(client))
@@ -833,6 +865,7 @@ describe('commitOrder — buyNow mode', () => {
       notes: 'urgent',
       couponId: null,
       shippingAmount: 50,
+      codFeeAmount: 0,
       paymentRecord: null,
       item: {
         productId: 'prod-1',

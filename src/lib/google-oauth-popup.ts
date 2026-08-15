@@ -3,6 +3,9 @@ interface GoogleOAuthPopupOptions {
   scope?: string
   width?: number
   height?: number
+  /** Path to redirect back to when the popup is blocked and Google falls back
+   *  to a full-page redirect (e.g. '/admin/login'). Defaults to the current path. */
+  returnTo?: string
 }
 
 export interface GoogleOAuthResult {
@@ -15,6 +18,7 @@ export function openGoogleOAuthPopup({
   scope = 'openid email profile',
   width = 500,
   height = 600,
+  returnTo,
 }: GoogleOAuthPopupOptions): Promise<GoogleOAuthResult> {
   return new Promise((resolve) => {
     if (typeof window === 'undefined') {
@@ -27,7 +31,13 @@ export function openGoogleOAuthPopup({
       ? window.location.origin.replace(/^(https?:\/\/)business\./, '$1')
       : window.location.origin
     const redirectUri = `${mainOrigin}/auth/google/callback`
-    const state = Math.random().toString(36).slice(2)
+
+    // Encode a random nonce + the return path in state so the callback page can
+    // redirect back here if the popup was blocked and Google opened a new tab.
+    const nonce = Math.random().toString(36).slice(2)
+    const destination = returnTo || window.location.pathname + window.location.search
+    const state = `${nonce}|${encodeURIComponent(destination)}`
+
     const params = new URLSearchParams({
       client_id: clientId,
       redirect_uri: redirectUri,

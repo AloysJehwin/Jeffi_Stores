@@ -204,7 +204,7 @@ function BusinessSignUpPage() {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
     if (!clientId) { setError('Google sign-in is not configured'); return }
     setGoogleLoading(true)
-    const result = await openGoogleOAuthPopup({ clientId })
+    const result = await openGoogleOAuthPopup({ clientId, returnTo: '/business/signup' })
     if (!result.accessToken) {
       if (result.error && result.error !== 'popup_closed') setError(result.error)
       setGoogleLoading(false)

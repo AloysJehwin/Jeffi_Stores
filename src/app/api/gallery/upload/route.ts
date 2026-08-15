@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 import { uploadGalleryImage } from '@/lib/s3'
 import { queryOne } from '@/lib/db'
 
@@ -23,6 +24,11 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  // The extension token is scoped to products:write; enforce it here so a token/admin
+  // without that scope can't upload.
+  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
 
   try {
     let imageBuffer: Buffer

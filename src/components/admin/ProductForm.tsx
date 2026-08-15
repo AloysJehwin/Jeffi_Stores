@@ -7,6 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { Star, X } from 'lucide-react'
 import ImageUpload from './ImageUpload'
+import GalleryPicker from './GalleryPicker'
 import AdminSelect from './AdminSelect'
 import ProductSupplierList, { SupplierRow } from './ProductSupplierList'
 import Toggle from '@/components/ui/Toggle'
@@ -270,12 +271,6 @@ export default function ProductForm({ categories, brands, action, product, produ
   const variantImageDragIndex = useRef<number | null>(null)
   const variantImageDragOverIndex = useRef<number | null>(null)
   const [variantGalleryOpen, setVariantGalleryOpen] = useState(false)
-  const [variantGalleryImages, setVariantGalleryImages] = useState<any[]>([])
-  const [variantGalleryCategories, setVariantGalleryCategories] = useState<any[]>([])
-  const [variantGallerySearch, setVariantGallerySearch] = useState('')
-  const [variantGalleryCategory, setVariantGalleryCategory] = useState('')
-  const [variantGallerySelected, setVariantGallerySelected] = useState<string[]>([])
-  const [variantGalleryLoading, setVariantGalleryLoading] = useState(false)
   const [subVariantsMap, setSubVariantsMap] = useState<Record<string, any[]>>(() => {
     const init: Record<string, any[]> = {}
     // Sub-variant-leaf supplier rows (sub_variant_id set) come flat on
@@ -305,6 +300,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; discount_pct: string; stock: string; sku: string } | null>(null)
   const [expandedSvUnits, setExpandedSvUnits] = useState<Set<string>>(new Set())
   const [productPackageType, setProductPackageType] = useState<string>(product?.package_type || 'flat_poly_auto')
+  const [weightGrams, setWeightGrams] = useState<string>(product?.weight_grams != null ? String(product.weight_grams) : '')
   const [gstRate, setGstRate] = useState<number>(product?.gst_percentage != null ? parseFloat(product.gst_percentage) : 18)
 
   const [basePrice, setBasePrice] = useState(() => {
@@ -601,6 +597,7 @@ export default function ProductForm({ categories, brands, action, product, produ
         // so a half-filled capture survives a draft save / reload.
         perishable, serialized,
         bsEntries,
+        weightGrams,
       }
       localStorage.setItem(draftKey, JSON.stringify(snapshot))
       setHasDraft(true)
@@ -613,6 +610,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     gstRate, isActive, draftKey,
     perishable, serialized,
     bsEntries,
+    weightGrams,
   ])
 
   // Server autosave — fires 5s after last change, only in draft mode
@@ -768,6 +766,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     condition, isCodAllowed, launchDate, discontinueDate, sortOrderVal,
     // shipping
     handlingDays, shippingClass, isOversized, extraDeliveryDays,
+    weightGrams,
     // digital
     isDigital, downloadUrl, licenseType, fileFormat, platformCompatibility,
     // subscription & bundle
@@ -953,6 +952,7 @@ export default function ProductForm({ categories, brands, action, product, produ
       if (snap.perishable !== undefined) setPerishable(snap.perishable)
       if (snap.serialized !== undefined) setSerialized(snap.serialized)
       if (snap.bsEntries && typeof snap.bsEntries === 'object') setBsEntries(snap.bsEntries)
+      if (snap.weightGrams !== undefined) setWeightGrams(snap.weightGrams)
     } catch {}
   }
 
@@ -1212,35 +1212,14 @@ export default function ProductForm({ categories, brands, action, product, produ
     )
   }
 
-  const openVariantGallery = useCallback(async () => {
-    setVariantGalleryOpen(true)
-    setVariantGallerySelected([])
-    setVariantGallerySearch('')
-    setVariantGalleryCategory('')
-    setVariantGalleryLoading(true)
-    try {
-      const [galleryRes, catRes] = await Promise.all([
-        fetch('/api/gallery?limit=100'),
-        fetch('/api/categories'),
-      ])
-      const galleryData = await galleryRes.json()
-      const catData = await catRes.json()
-      setVariantGalleryImages(galleryData.images || [])
-      setVariantGalleryCategories(catData.categories || [])
-    } catch {
-      setVariantGalleryImages([])
-    } finally {
-      setVariantGalleryLoading(false)
-    }
-  }, [])
+  const openVariantGallery = useCallback(() => { setVariantGalleryOpen(true) }, [])
 
-  async function addVariantImagesFromGallery() {
+  async function addVariantImagesFromGallery(picked: { id: string }[]) {
     if (!productId || !variantPopupId) return
     const currentImages = variantImagesMap[variantPopupId] || []
     const slotsLeft = 5 - currentImages.length
-    const toAdd = variantGallerySelected.slice(0, slotsLeft)
+    const toAdd = picked.map(p => p.id).slice(0, slotsLeft)
     setVariantGalleryOpen(false)
-    setVariantGallerySelected([])
     setVariantImageError(null)
     const vid = variantPopupId
     setVariantImagePendingAdds(m => ({ ...m, [vid]: (m[vid] || 0) + toAdd.length }))
@@ -1377,10 +1356,44 @@ export default function ProductForm({ categories, brands, action, product, produ
       }
     }
 
+    // Weight & packaging validation — enforced on publish only, so a partial
+    // draft can still be saved. Simple products validate the product-level weight
+    // and (for box package types) the stored dims; variant products validate each.
+    if (isPublishIntent) {
+      const failValidation = (msg: string) => {
+        setError(msg)
+        setTimeout(() => topErrorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0)
+      }
+      const STORED_DIMS_TYPES = ['drill_bit_tube', 'drill_bit_set_case', 'corrugated_box', 'long_tube']
+      const blank = (v: string) => v == null || String(v).trim() === ''
+      if (!hasVariants) {
+        if (blank(weightGrams) || !(parseFloat(weightGrams) > 0)) {
+          failValidation('Shipping weight is required and must be greater than 0.'); setIsSubmitting(false); return
+        }
+        if (STORED_DIMS_TYPES.includes(productPackageType)) {
+          const l = (formRef.current?.elements.namedItem('length_cm') as HTMLInputElement | null)?.value
+          const b = (formRef.current?.elements.namedItem('breadth_cm') as HTMLInputElement | null)?.value
+          const h = (formRef.current?.elements.namedItem('height_cm') as HTMLInputElement | null)?.value
+          if (blank(l ?? '') || blank(b ?? '') || blank(h ?? '')) {
+            failValidation('Dimensions required for this package type'); setIsSubmitting(false); return
+          }
+        }
+      } else {
+        for (const v of activeVariants) {
+          if (blank(v.weight_grams) || !(parseFloat(v.weight_grams) > 0)) {
+            failValidation(`Shipping weight is required for variant "${v.variant_name || v.sku || ''}" and must be greater than 0.`); setIsSubmitting(false); return
+          }
+          const pt = v.package_type || 'flat_poly_auto'
+          if (STORED_DIMS_TYPES.includes(pt) && (blank(v.length_cm) || blank(v.breadth_cm) || blank(v.height_cm))) {
+            failValidation(`Dimensions required for this package type (variant "${v.variant_name || v.sku || ''}")`); setIsSubmitting(false); return
+          }
+        }
+      }
+    }
+
     setIsSubmitting(true)
 
-    try {
-      const formData = new FormData(e.currentTarget)
+    try {      const formData = new FormData(e.currentTarget)
 
       // Capture the submitter button's intent — new FormData(form) does not
       // include the clicked submit button's name/value automatically.
@@ -2076,18 +2089,24 @@ export default function ProductForm({ categories, brands, action, product, produ
           {!hasVariants && (
           <div>
             <label htmlFor="weight_grams" className="block text-sm font-medium text-foreground-secondary mb-2">
-              Shipping Weight (g)
+              Shipping Weight (g) *
             </label>
             <input
               type="number"
               id="weight_grams"
               name="weight_grams"
               step="1"
-              min="0"
-              defaultValue={product?.weight_grams ?? ''}
+              min="1"
+              value={weightGrams}
+              onChange={(e) => setWeightGrams(e.target.value)}
               className="w-full field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
               placeholder="e.g., 500"
             />
+            {productPackageType === 'flat_poly_auto' && parseFloat(weightGrams) > 2000 && (
+              <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                Consider using corrugated_box for items over 2 kg for accurate shipping rates.
+              </p>
+            )}
           </div>
           )}
 
@@ -2904,8 +2923,11 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <input type="text" value={variant.isbn} onChange={(e) => updateVariant(index, 'isbn', e.target.value)} className={inputCls} placeholder="For books" />
                               </div>
                               <div>
-                                <label className="block text-xs font-medium text-foreground-secondary mb-1">Shipping Weight (g)</label>
-                                <input type="number" step="1" min="0" value={variant.weight_grams} onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)} className={inputCls} placeholder="e.g. 500" />
+                                <label className="block text-xs font-medium text-foreground-secondary mb-1">Shipping Weight (g) *</label>
+                                <input type="number" step="1" min="1" value={variant.weight_grams} onChange={(e) => updateVariant(index, 'weight_grams', e.target.value)} className={inputCls} placeholder="e.g. 500" />
+                                {(variant.package_type || 'flat_poly_auto') === 'flat_poly_auto' && parseFloat(variant.weight_grams) > 2000 && (
+                                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">Consider using corrugated_box for items over 2 kg for accurate shipping rates.</p>
+                                )}
                               </div>
                               <div>
                                 <label className="block text-xs font-medium text-foreground-secondary mb-1">Package Type</label>
@@ -3509,112 +3531,13 @@ export default function ProductForm({ categories, brands, action, product, produ
                   )}
                 </div>
 
-                {variantGalleryOpen && typeof document !== 'undefined' && createPortal(
-                  <div className="fixed inset-0 z-[60] flex items-center justify-center backdrop-blur-sm bg-black/50 p-4">
-                    <div className="bg-surface-elevated rounded-xl shadow-2xl w-full max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
-                      <div className="flex items-center justify-between px-6 py-4 border-b border-border-default">
-                        <h2 className="text-lg font-semibold text-foreground">Choose from Gallery</h2>
-                        <button
-                          type="button"
-                          onClick={() => { setVariantGalleryOpen(false); setVariantGallerySelected([]) }}
-                          className="text-foreground-muted hover:text-foreground transition-colors text-2xl leading-none"
-                        >
-                          &times;
-                        </button>
-                      </div>
-                      <div className="px-6 py-3 border-b border-border-default flex gap-2 items-center">
-                        <input
-                          type="text"
-                          placeholder="Search by name..."
-                          value={variantGallerySearch}
-                          onChange={e => setVariantGallerySearch(e.target.value)}
-                          className="flex-1 field-normal border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent"
-                        />
-                        <div className="w-48 shrink-0">
-                          <AdminSelect
-                            value={variantGalleryCategory}
-                            onChange={setVariantGalleryCategory}
-                            placeholder="All categories"
-                            options={[
-                              { value: '', label: 'All categories' },
-                              ...variantGalleryCategories.map((c: any) => ({ value: c.id, label: c.name })),
-                            ]}
-                          />
-                        </div>
-                      </div>
-                      <div className="overflow-y-auto flex-1 min-h-0 p-4 pr-3">
-                        {variantGalleryLoading && (
-                          <div className="flex items-center justify-center py-16">
-                            <div className="w-8 h-8 border-4 border-accent-500 border-t-transparent rounded-full animate-spin" />
-                          </div>
-                        )}
-                        {!variantGalleryLoading && variantGalleryImages.length === 0 && (
-                          <p className="text-center text-foreground-secondary py-16">No images in gallery yet.</p>
-                        )}
-                        {!variantGalleryLoading && variantGalleryImages.length > 0 && (() => {
-                          const q = variantGallerySearch.toLowerCase()
-                          const filtered = variantGalleryImages.filter((g: any) => {
-                            const nameMatch = q ? (g.custom_name || '').toLowerCase().includes(q) : true
-                            const catMatch = variantGalleryCategory ? g.category_id === variantGalleryCategory : true
-                            return nameMatch && catMatch
-                          })
-                          return filtered.length === 0 ? (
-                            <p className="text-center text-foreground-secondary py-16">No images match &ldquo;{variantGallerySearch}&rdquo;</p>
-                          ) : (
-                            <div className="grid grid-cols-4 gap-3 w-full">
-                              {filtered.map((gimg: any) => {
-                                const selIdx = variantGallerySelected.indexOf(gimg.id)
-                                const isSelected = selIdx !== -1
-                                return (
-                                  <button
-                                    key={gimg.id}
-                                    type="button"
-                                    onClick={() => setVariantGallerySelected(prev =>
-                                      prev.includes(gimg.id) ? prev.filter((id: string) => id !== gimg.id) : [...prev, gimg.id]
-                                    )}
-                                    className={`relative rounded-lg overflow-hidden border-2 transition-colors text-left ${isSelected ? 'border-accent-500 ring-2 ring-accent-500' : 'border-border-default hover:border-accent-400'}`}
-                                  >
-                                    {isSelected && (
-                                      <div className="absolute top-1 right-1 bg-accent-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center font-bold z-10">
-                                        {selIdx + 1}
-                                      </div>
-                                    )}
-                                    <div className="aspect-square">
-                                      <img src={gimg.thumbnail_url || gimg.image_url} alt={gimg.custom_name || gimg.file_name} className="w-full h-full object-cover" />
-                                    </div>
-                                    <div className="px-1.5 py-1 bg-surface-secondary">
-                                      <p className="text-xs text-foreground-secondary truncate">{gimg.custom_name || gimg.file_name}</p>
-                                      {gimg.category_name && (
-                                        <p className="text-xs text-accent-500 truncate">{gimg.category_name}</p>
-                                      )}
-                                    </div>
-                                  </button>
-                                )
-                              })}
-                            </div>
-                          )
-                        })()}
-                      </div>
-                      <div className="px-6 py-4 border-t border-border-default-default flex justify-end gap-3">
-                        <button
-                          type="button"
-                          onClick={() => { setVariantGalleryOpen(false); setVariantGallerySelected([]) }}
-                          className="px-4 py-2 text-sm font-semibold text-foreground-secondary hover:text-foreground transition-colors"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="button"
-                          onClick={addVariantImagesFromGallery}
-                          disabled={variantGallerySelected.length === 0 || (variantImagePendingAdds[variantPopupId || ''] || 0) > 0}
-                          className="px-4 py-2 bg-accent-500 hover:bg-accent-600 disabled:bg-surface-secondary disabled:text-foreground-muted text-white rounded-lg text-sm font-semibold transition-colors"
-                        >
-                          {variantGallerySelected.length > 0 ? `Add ${variantGallerySelected.length} Image${variantGallerySelected.length > 1 ? 's' : ''}` : 'Add Images'}
-                        </button>
-                      </div>
-                    </div>
-                  </div>,
-                  document.body
+                {variantGalleryOpen && (
+                  <GalleryPicker
+                    mode="multi"
+                    maxSelect={Math.max(0, 5 - (variantImagesMap[variantPopupId || ""]?.length || 0))}
+                    onClose={() => setVariantGalleryOpen(false)}
+                    onConfirm={addVariantImagesFromGallery}
+                  />
                 )}
 
                 {/* Sub-Variants */}

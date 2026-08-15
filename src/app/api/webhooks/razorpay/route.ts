@@ -335,6 +335,7 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
     ? await commitOrder({
         mode: 'cart', userId: intent.user_id, user, addressId: draft.addressId,
         notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
+        codFeeAmount: draft.codFeeAmount,
         cartItems, subtotal, taxAmount, appliedDiscount,
         businessDiscountAmount: draft.businessDiscountAmount,
         paymentRecord: {
@@ -345,6 +346,7 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
     : await commitOrder({
         mode: 'buyNow', userId: intent.user_id, user, addressId: draft.addressId,
         notes: draft.notes, couponId: draft.couponId, shippingAmount: draft.shippingAmount,
+        codFeeAmount: draft.codFeeAmount,
         item: draft.buyNowItem!, product: buyNowSnapshot!.product,
         variant: buyNowSnapshot!.variant, subVariant: buyNowSnapshot!.subVariant,
         subtotal, taxAmount, appliedDiscount,
