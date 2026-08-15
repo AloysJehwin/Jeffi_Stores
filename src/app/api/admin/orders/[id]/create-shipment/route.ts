@@ -201,12 +201,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     await query(
-      // Only overwrite the EDD when the serviceability lookup returned a valid
-      // date. Pre-pickup that lookup usually yields nothing, so COALESCE keeps the
-      // EDD computed at order creation; the real Delhivery EDD lands later via the
-      // status-sync route once the shipment is picked up.
-      `UPDATE orders SET awb_number = $1, status = 'processing', estimated_delivery_date = COALESCE($3::date, estimated_delivery_date), shipment_status = COALESCE(shipment_status, 'created'), updated_at = NOW() WHERE id = $2`,
-      [awb, id, estimatedDeliveryDate]
+      `UPDATE orders SET awb_number = $1, status = 'processing',
+        estimated_delivery_date = COALESCE($3::date, estimated_delivery_date),
+        shipment_status = COALESCE(shipment_status, 'created'),
+        delhivery_quoted_weight_kg = $4,
+        updated_at = NOW()
+       WHERE id = $2`,
+      [awb, id, estimatedDeliveryDate, weightKg]
     )
 
     const smsCustomer = await queryOne<{ phone: string | null; notification_channel: string | null }>(

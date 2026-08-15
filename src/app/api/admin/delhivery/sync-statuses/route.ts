@@ -48,9 +48,12 @@ export async function POST(request: NextRequest) {
     order_number: string; customer_name: string; customer_email: string
     user_id: string | null; payment_mode: string | null
     phone: string | null; notification_channel: string | null
+    shipping_amount: number | null; delhivery_quoted_weight_kg: number | null
+    delhivery_charged_weight_kg: number | null
   }>(
     `SELECT o.id, o.awb_number, o.status, o.shipment_status, o.order_number, o.user_id,
-            o.payment_mode,
+            o.payment_mode, o.shipping_amount, o.delhivery_quoted_weight_kg,
+            o.delhivery_charged_weight_kg,
             COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
             COALESCE(u.email, o.customer_email) AS customer_email,
             u.phone, u.notification_channel
@@ -137,6 +140,23 @@ export async function POST(request: NextRequest) {
           await query(
             `UPDATE orders SET estimated_delivery_date = $2::date, updated_at = NOW() WHERE id = $1`,
             [order.id, delhiveryEdd]
+          ).catch(() => {})
+        }
+
+        // Persist charged weight and extra charge when Delhivery returns ChargedWeight.
+        const chargedWeightKg: number | null = shipment.ChargedWeight != null
+          ? Number(shipment.ChargedWeight) : null
+        if (chargedWeightKg != null && chargedWeightKg !== Number(order.delhivery_charged_weight_kg)) {
+          let extraCharge: number | null = null
+          if (order.delhivery_quoted_weight_kg != null && order.shipping_amount != null) {
+            const quotedKg = Number(order.delhivery_quoted_weight_kg)
+            if (chargedWeightKg > quotedKg && quotedKg > 0) {
+              extraCharge = Math.round(((chargedWeightKg / quotedKg) - 1) * Number(order.shipping_amount) * 100) / 100
+            }
+          }
+          await query(
+            `UPDATE orders SET delhivery_charged_weight_kg = $2, delhivery_extra_charge = $3, updated_at = NOW() WHERE id = $1`,
+            [order.id, chargedWeightKg, extraCharge]
           ).catch(() => {})
         }
 
