@@ -44,11 +44,11 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
   }
 
   return (
-    <div className="w-full max-w-md mx-auto">
-      <div className="rounded-2xl border border-border-default bg-surface-elevated p-6 sm:p-8 shadow-sm">
-        <h1 className="text-2xl font-bold text-foreground">{mode === 'signup' ? 'Create your store account' : 'Sign in'}</h1>
-        <p className="text-sm text-foreground-muted mt-1">
-          {mode === 'signup' ? 'Start selling on your own Jeffi-powered store.' : 'Welcome back to your store dashboard.'}
+    <div className="w-full max-w-sm mx-auto">
+      <div>
+        <h1 className="text-3xl font-extrabold text-foreground">{mode === 'signup' ? 'Create your store account' : 'Welcome back'}</h1>
+        <p className="text-sm text-foreground-muted mt-2">
+          {mode === 'signup' ? 'Start selling on your own Jeffi-powered store.' : 'Sign in to your store dashboard.'}
         </p>
 
         {step === 'email' ? (
