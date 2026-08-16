@@ -14,7 +14,7 @@ export default async function EcomBillingPage() {
   const [tenants, summary] = await Promise.all([listTenants(), tenantSummary()])
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 w-full">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Ecom Store — Billing</h1>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Tenant subscriptions & settlement</p>
 

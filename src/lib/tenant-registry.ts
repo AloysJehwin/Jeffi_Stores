@@ -29,8 +29,22 @@ const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
 let cpPool: Pool | null = null
 function controlPlanePool(): Pool {
   if (cpPool) return cpPool
-  const url = process.env.CONTROL_PLANE_DATABASE_URL || ''
+  let url = process.env.CONTROL_PLANE_DATABASE_URL || ''
   const iam = process.env.CONTROL_PLANE_IAM_AUTH === 'true'
+  // Local-dev fallback: predev regenerates .env.local from Secrets Manager and may not
+  // carry CONTROL_PLANE_DATABASE_URL. In development, derive the local control-plane DB
+  // from the app's own DATABASE_URL (same host/user), swapping the db name to
+  // jeffi_control_plane — so `npm run dev` just works without manual env upkeep.
+  if (!url && !iam && process.env.NODE_ENV !== 'production' && process.env.DATABASE_URL) {
+    try {
+      const u = new URL(process.env.DATABASE_URL)
+      u.pathname = '/jeffi_control_plane'
+      url = u.toString()
+    } catch { /* leave url empty; the guard below throws a clear error */ }
+  }
+  if (!url && !iam) {
+    throw new Error('Control-plane DB not configured: set CONTROL_PLANE_DATABASE_URL (or CONTROL_PLANE_IAM_AUTH=true).')
+  }
   const config: any = { max: 3, idleTimeoutMillis: 30000, connectionTimeoutMillis: 8000, keepAlive: true }
   if (iam) {
     const host = process.env.CONTROL_PLANE_RDS_HOST!
