@@ -193,3 +193,82 @@ export async function tenantSummary(): Promise<{ total: number; active: number; 
   const r = res.rows[0]
   return { total: r.total, active: r.active, mrr: Number(r.mrr) }
 }
+
+// Valid tenant slug: 3-63 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphen.
+const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/
+
+export interface CreateTenantInput {
+  slug: string
+  displayName: string
+  planSlug: string
+  dailyPayout?: boolean
+  warehouse?: {
+    originPincode?: string
+    pickupLocation?: string
+    sellerName?: string
+    sellerAddress?: string
+    sellerPhone?: string
+  }
+}
+
+export type CreateTenantResult =
+  | { ok: true; tenantId: string; slug: string }
+  | { ok: false; error: string }
+
+/**
+ * Create a tenant in the control-plane registry (status='provisioning'). Validates
+ * the slug (format + reserved-word + uniqueness) and the plan. Does NOT provision
+ * any AWS infra — that's the separate provisioning engine; a tenant_infra row is
+ * created empty and filled in when infra is stood up.
+ */
+export async function createTenant(input: CreateTenantInput): Promise<CreateTenantResult> {
+  const slug = (input.slug || '').toLowerCase().trim()
+  if (!SLUG_RE.test(slug)) {
+    return { ok: false, error: 'Slug must be 3-63 chars, lowercase letters/numbers/hyphens, no leading/trailing hyphen.' }
+  }
+  if (RESERVED_LABELS.has(slug)) {
+    return { ok: false, error: `"${slug}" is reserved and cannot be used as a store subdomain.` }
+  }
+  if (!input.displayName?.trim()) return { ok: false, error: 'Store name is required.' }
+
+  const pool = controlPlanePool()
+  const plan = await pool.query(`SELECT id FROM plans WHERE slug = $1 AND is_active = true`, [input.planSlug])
+  if (!plan.rows[0]) return { ok: false, error: `Unknown or inactive plan "${input.planSlug}".` }
+
+  const dup = await pool.query(`SELECT 1 FROM tenants WHERE slug = $1`, [slug])
+  if (dup.rows[0]) return { ok: false, error: `Subdomain "${slug}" is already taken.` }
+
+  const client = await pool.connect()
+  try {
+    await client.query('BEGIN')
+    const t = await client.query(
+      `INSERT INTO tenants (slug, display_name, plan_id, status, daily_payout)
+       VALUES ($1, $2, $3, 'provisioning', $4) RETURNING id`,
+      [slug, input.displayName.trim(), plan.rows[0].id, !!input.dailyPayout]
+    )
+    const tenantId = t.rows[0].id
+    // Empty infra row (rds_endpoint null → resolver returns tenant with null infra →
+    // default pool) until the provisioning engine fills it in.
+    await client.query(
+      `INSERT INTO tenant_infra (tenant_id, s3_bucket) VALUES ($1, $2)`,
+      [tenantId, `jeffi-tenant-${slug}`]
+    )
+    await client.query('COMMIT')
+    clearTenantCache()
+    return { ok: true, tenantId, slug }
+  } catch (e: any) {
+    await client.query('ROLLBACK').catch(() => {})
+    return { ok: false, error: e?.message || 'Failed to create tenant.' }
+  } finally {
+    client.release()
+  }
+}
+
+/** List active plans for the onboarding UI. */
+export async function listPlans(): Promise<Array<{ slug: string; name: string; tier: number; monthly_price_inr: string }>> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT slug, name, tier, monthly_price_inr FROM plans WHERE is_active = true ORDER BY tier`
+  )
+  return res.rows
+}

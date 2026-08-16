@@ -134,6 +134,14 @@ export async function middleware(request: NextRequest) {
     }
   }
 
+  if (hostname.startsWith('ecom.')) {
+    // SaaS control plane: onboarding, plan selection, tenant signup. Public marketing +
+    // signup pages; the create-tenant API lives under /api/ecom. Rewrites to /ecom.
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    const slug = pathname === '/' ? '' : pathname
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/ecom${slug}${request.nextUrl.search}`, request.url)))
+  }
+
   if (hostname.startsWith('forms.')) {
     if (pathname.startsWith('/api/')) {
       return addSecurityHeaders(NextResponse.next())
