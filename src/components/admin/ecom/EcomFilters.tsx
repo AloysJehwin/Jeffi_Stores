@@ -43,7 +43,7 @@ export default function EcomFilters({ showPlan = true }: { showPlan?: boolean })
   ]
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-6 grid grid-cols-1 sm:grid-cols-[minmax(0,200px)_minmax(0,200px)_1fr] gap-3 items-end">
+    <div className="bg-surface-elevated rounded-lg border border-border-default p-4 mb-6 grid grid-cols-1 sm:grid-cols-[minmax(0,200px)_minmax(0,200px)_1fr] gap-3 items-end">
       <AdminSelect
         label="Status"
         value={params.get('status') || ''}
@@ -61,9 +61,9 @@ export default function EcomFilters({ showPlan = true }: { showPlan?: boolean })
         />
       )}
       <div>
-        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Search</label>
+        <label className="block text-xs font-medium text-foreground-muted mb-1 uppercase tracking-wide">Search</label>
         <input
-          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-500"
+          className="w-full rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
           placeholder="Search store name or subdomain…"
           value={q}
           onChange={(e) => setQ(e.target.value)}

@@ -45,7 +45,7 @@ export default function OnboardForm({ plans }: { plans: Plan[] }) {
     }
   }
 
-  const inputCls = 'w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-500'
+  const inputCls = 'w-full rounded-lg border border-border-default bg-surface-elevated px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500'
 
   if (result?.ok) {
     return (
@@ -63,7 +63,7 @@ export default function OnboardForm({ plans }: { plans: Plan[] }) {
     <form onSubmit={submit} className="space-y-6">
       {/* Plan selection */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Choose your plan</label>
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">Choose your plan</label>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
           {plans.map((p) => (
             <button
@@ -73,11 +73,11 @@ export default function OnboardForm({ plans }: { plans: Plan[] }) {
               className={`rounded-xl border p-3 text-left transition-colors ${
                 planSlug === p.slug
                   ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20'
-                  : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800'
+                  : 'border-border-default bg-surface-elevated'
               }`}
             >
-              <div className="font-semibold text-gray-900 dark:text-white">{p.name}</div>
-              <div className="text-sm text-gray-500 dark:text-gray-400">₹{Number(p.monthly_price_inr).toLocaleString('en-IN')}/mo</div>
+              <div className="font-semibold text-foreground">{p.name}</div>
+              <div className="text-sm text-foreground-muted">₹{Number(p.monthly_price_inr).toLocaleString('en-IN')}/mo</div>
             </button>
           ))}
         </div>
@@ -86,11 +86,11 @@ export default function OnboardForm({ plans }: { plans: Plan[] }) {
       {/* Store name + slug */}
       <div className="grid sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Store name</label>
+          <label className="block text-sm font-medium text-foreground-secondary mb-1">Store name</label>
           <input className={inputCls} value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder="Acme Hardware" required />
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subdomain</label>
+          <label className="block text-sm font-medium text-foreground-secondary mb-1">Subdomain</label>
           <div className="flex items-center gap-1">
             <input
               className={inputCls}
@@ -99,14 +99,14 @@ export default function OnboardForm({ plans }: { plans: Plan[] }) {
               placeholder="acme"
               required
             />
-            <span className="text-sm text-gray-400 whitespace-nowrap">.jeffistores.in</span>
+            <span className="text-sm text-foreground-muted whitespace-nowrap">.jeffistores.in</span>
           </div>
         </div>
       </div>
 
       {/* Warehouse (Delhivery pickup) */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Pickup warehouse (for deliveries)</label>
+        <label className="block text-sm font-medium text-foreground-secondary mb-2">Pickup warehouse (for deliveries)</label>
         <div className="grid sm:grid-cols-2 gap-3">
           <input className={inputCls} placeholder="Origin pincode" value={wh.originPincode} onChange={(e) => setWh({ ...wh, originPincode: e.target.value })} />
           <input className={inputCls} placeholder="Pickup location name" value={wh.pickupLocation} onChange={(e) => setWh({ ...wh, pickupLocation: e.target.value })} />
@@ -116,7 +116,7 @@ export default function OnboardForm({ plans }: { plans: Plan[] }) {
         </div>
       </div>
 
-      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
+      <label className="flex items-center gap-2 text-sm text-foreground-secondary">
         <input type="checkbox" checked={dailyPayout} onChange={(e) => setDailyPayout(e.target.checked)} />
         Daily payouts (+5% fee) — otherwise weekly
       </label>

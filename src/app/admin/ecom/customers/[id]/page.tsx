@@ -10,8 +10,8 @@ export const dynamic = 'force-dynamic'
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
     <div>
-      <dt className="text-xs uppercase tracking-wide text-gray-400">{label}</dt>
-      <dd className="text-sm text-gray-900 dark:text-white mt-0.5">{value ?? '—'}</dd>
+      <dt className="text-xs uppercase tracking-wide text-foreground-muted">{label}</dt>
+      <dd className="text-sm text-foreground mt-0.5">{value ?? '—'}</dd>
     </div>
   )
 }
@@ -31,13 +31,13 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
     <div className="p-6 w-full max-w-5xl">
       <Link href="/admin/ecom/customers" className="text-sm text-accent-600 dark:text-accent-400 hover:underline">← Customers</Link>
       <div className="flex items-center gap-3 mt-2 mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">{t.display_name}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{t.display_name}</h1>
         <StatusPill status={t.status} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section className="rounded-xl border border-gray-200 dark:border-gray-700 p-5 bg-white dark:bg-gray-800">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Store</h2>
+        <section className="rounded-xl border border-border-default p-5 bg-surface-elevated">
+          <h2 className="font-semibold text-foreground mb-4">Store</h2>
           <dl className="grid grid-cols-2 gap-4">
             <Field label="Subdomain" value={`${t.slug}.jeffistores.in`} />
             <Field label="Custom domain" value={t.custom_domain} />
@@ -48,8 +48,8 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
           </dl>
         </section>
 
-        <section className="rounded-xl border border-gray-200 dark:border-gray-700 p-5 bg-white dark:bg-gray-800">
-          <h2 className="font-semibold text-gray-900 dark:text-white mb-4">Infrastructure</h2>
+        <section className="rounded-xl border border-border-default p-5 bg-surface-elevated">
+          <h2 className="font-semibold text-foreground mb-4">Infrastructure</h2>
           <dl className="grid grid-cols-2 gap-4">
             <Field label="RDS endpoint" value={<span className="font-mono text-xs break-all">{t.rds_endpoint || <span className="text-amber-500">not provisioned</span>}</span>} />
             <Field label="Database" value={t.rds_db} />
@@ -62,9 +62,9 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
       </div>
 
       {billing && (
-        <section className="rounded-xl border border-gray-200 dark:border-gray-700 p-5 bg-white dark:bg-gray-800 mt-6">
+        <section className="rounded-xl border border-border-default p-5 bg-surface-elevated mt-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-gray-900 dark:text-white">Billing snapshot</h2>
+            <h2 className="font-semibold text-foreground">Billing snapshot</h2>
             <Link href={`/admin/ecom/billing/${t.id}`} className="text-sm text-accent-600 dark:text-accent-400 hover:underline">View full billing →</Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

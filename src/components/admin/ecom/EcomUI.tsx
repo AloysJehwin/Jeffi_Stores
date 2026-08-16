@@ -36,18 +36,18 @@ export function PlanMixChart({ mix }: { mix: { plan: string; count: number }[] }
     basic: 'bg-sky-500', growth: 'bg-emerald-500', pro: 'bg-violet-500', enterprise: 'bg-amber-500',
   }
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 sm:p-6 lg:h-56 flex flex-col">
-      <p className="font-semibold text-gray-900 dark:text-white mb-4">Plan mix</p>
+    <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 lg:h-56 flex flex-col">
+      <p className="font-semibold text-foreground mb-4">Plan mix</p>
       <div className="flex-1 flex flex-col justify-center gap-3">
-        {mix.length === 0 && <p className="text-sm text-gray-400">No tenants yet.</p>}
+        {mix.length === 0 && <p className="text-sm text-foreground-muted">No tenants yet.</p>}
         {mix.map((m) => (
           <div key={m.plan}>
             <div className="flex justify-between text-xs mb-1">
-              <span className="capitalize text-gray-600 dark:text-gray-300">{m.plan}</span>
-              <span className="text-gray-500 dark:text-gray-400">{m.count}</span>
+              <span className="capitalize text-foreground-secondary">{m.plan}</span>
+              <span className="text-foreground-muted">{m.count}</span>
             </div>
-            <div className="h-2.5 rounded-full bg-gray-100 dark:bg-gray-700 overflow-hidden">
-              <div className={`h-full rounded-full ${colors[m.plan] || 'bg-gray-400'}`} style={{ width: `${(m.count / total) * 100}%` }} />
+            <div className="h-2.5 rounded-full bg-surface-secondary overflow-hidden">
+              <div className={`h-full rounded-full ${colors[m.plan] || 'bg-foreground-muted'}`} style={{ width: `${(m.count / total) * 100}%` }} />
             </div>
           </div>
         ))}
@@ -65,7 +65,7 @@ export function StatusPill({ status }: { status: string }) {
     active: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
     provisioning: 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-300',
     suspended: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
-    terminated: 'bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
+    terminated: 'bg-surface-secondary text-foreground-secondary',
     settled: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300',
     captured: 'bg-sky-100 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300',
     split: 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300',

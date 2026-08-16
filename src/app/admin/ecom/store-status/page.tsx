@@ -11,7 +11,7 @@ type SP = { [k: string]: string | string[] | undefined }
 const one = (sp: SP, k: string) => (Array.isArray(sp[k]) ? (sp[k] as string[])[0] : (sp[k] as string | undefined))
 
 const DOT: Record<string, string> = {
-  active: 'bg-green-500', provisioning: 'bg-amber-500', suspended: 'bg-red-500', terminated: 'bg-gray-400',
+  active: 'bg-green-500', provisioning: 'bg-amber-500', suspended: 'bg-red-500', terminated: 'bg-foreground-muted',
 }
 
 export default async function EcomStoreStatusPage({ searchParams }: { searchParams: Promise<SP> }) {
@@ -31,8 +31,8 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
   return (
     <div className="p-6 w-full">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Store Status</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Live status of each tenant store</p>
+        <h1 className="text-2xl font-bold text-foreground">Store Status</h1>
+        <p className="text-sm text-foreground-muted mt-1">Live status of each tenant store</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
@@ -45,27 +45,27 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
             { value: suspended, label: 'Suspended' },
           ]}
         />
-        <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 sm:p-6 lg:h-56 flex items-center justify-center">
-          <p className="text-sm text-gray-400 text-center">Uptime &amp; last-deploy status wire in once the tenant fleet + /api/ready probes are live.</p>
+        <div className="bg-surface-elevated rounded-lg border border-border-default p-4 sm:p-6 lg:h-56 flex items-center justify-center">
+          <p className="text-sm text-foreground-muted text-center">Uptime &amp; last-deploy status wire in once the tenant fleet + /api/ready probes are live.</p>
         </div>
       </div>
 
       <EcomFilters />
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {tenants.length === 0 && <p className="text-gray-400">No tenants match.</p>}
+        {tenants.length === 0 && <p className="text-foreground-muted">No tenants match.</p>}
         {tenants.map((t) => (
           <Link key={t.id} href={`/admin/ecom/customers/${t.id}`}
-            className="rounded-xl border border-gray-200 dark:border-gray-700 p-4 bg-white dark:bg-gray-800 hover:border-accent-400 transition-colors">
+            className="rounded-xl border border-border-default p-4 bg-surface-elevated hover:border-accent-400 transition-colors">
             <div className="flex items-center justify-between">
-              <span className="font-medium text-gray-900 dark:text-white">{t.display_name}</span>
-              <span className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
+              <span className="font-medium text-foreground">{t.display_name}</span>
+              <span className="flex items-center gap-1.5 text-xs text-foreground-muted">
                 <span className={`w-2 h-2 rounded-full ${DOT[t.status] || DOT.terminated}`} />
                 {t.status}
               </span>
             </div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">{t.slug}.jeffistores.in</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400 mt-2 capitalize">Plan: {t.plan || '—'}</div>
+            <div className="text-xs text-foreground-muted mt-1">{t.slug}.jeffistores.in</div>
+            <div className="text-xs text-foreground-muted mt-2 capitalize">Plan: {t.plan || '—'}</div>
           </Link>
         ))}
       </div>
