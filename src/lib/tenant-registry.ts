@@ -311,13 +311,14 @@ export interface TenantDetail extends TenantRow {
   rds_port: number | null
   iam_auth: boolean | null
   cloudfront_id: string | null
+  instance_state: string
 }
 
 /** Full detail for one tenant (object page). */
 export async function getTenant(id: string): Promise<TenantDetail | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at,
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at, t.instance_state,
             p.slug AS plan, p.monthly_price_inr,
             i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.ec2_target, i.region, i.cloudfront_id
      FROM tenants t
