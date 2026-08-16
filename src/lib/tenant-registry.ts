@@ -495,3 +495,44 @@ export async function linkOwnerTenant(ownerId: string, tenantId: string): Promis
     `INSERT INTO owner_tenants (owner_id, tenant_id) VALUES ($1, $2)
      ON CONFLICT (owner_id, tenant_id) DO NOTHING`, [ownerId, tenantId])
 }
+
+// ── Bank accounts (payout verification) ──────────────────────────────────────
+
+export interface BankAccount {
+  id: string; owner_id: string; verification_status: string
+  account_number: string | null; ifsc: string | null; holder_name: string | null
+  upi_id: string | null; verified_name: string | null
+}
+
+/** Upsert + record a verified/failed bank account for an owner. */
+export async function saveBankVerification(args: {
+  ownerId: string
+  accountNumber?: string | null; ifsc?: string | null; holderName?: string | null; upiId?: string | null
+  status: 'verified' | 'failed'; ref?: string | null; verifiedName?: string | null
+}): Promise<BankAccount> {
+  const pool = controlPlanePool()
+  // One active bank record per owner for now: replace prior.
+  await pool.query(`DELETE FROM tenant_bank_accounts WHERE owner_id=$1 AND tenant_id IS NULL`, [args.ownerId])
+  const res = await pool.query(
+    `INSERT INTO tenant_bank_accounts
+       (owner_id, account_number, ifsc, holder_name, upi_id, verification_status, verification_ref, verified_name)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     RETURNING id, owner_id, verification_status, account_number, ifsc, holder_name, upi_id, verified_name`,
+    [args.ownerId, args.accountNumber || null, args.ifsc || null, args.holderName || null, args.upiId || null,
+     args.status, args.ref || null, args.verifiedName || null])
+  return res.rows[0] as BankAccount
+}
+
+/** The owner's current bank account (for gating go-live). */
+export async function getOwnerBankAccount(ownerId: string): Promise<BankAccount | null> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT id, owner_id, verification_status, account_number, ifsc, holder_name, upi_id, verified_name
+     FROM tenant_bank_accounts WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 1`, [ownerId])
+  return (res.rows[0] as BankAccount) || null
+}
+
+export async function hasVerifiedBank(ownerId: string): Promise<boolean> {
+  const b = await getOwnerBankAccount(ownerId)
+  return b?.verification_status === 'verified'
+}
