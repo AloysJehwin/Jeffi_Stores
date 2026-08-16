@@ -180,9 +180,14 @@ export interface TenantRow {
   created_at: string
 }
 
-/** List all tenants (control-plane admin UI). Read-only. */
-export async function listTenants(): Promise<TenantRow[]> {
+/** List tenants (control-plane admin UI). Read-only, optional filters. */
+export async function listTenants(filters?: { status?: string; plan?: string; q?: string }): Promise<TenantRow[]> {
   const pool = controlPlanePool()
+  const where: string[] = []
+  const args: any[] = []
+  if (filters?.status) { args.push(filters.status); where.push(`t.status = $${args.length}`) }
+  if (filters?.plan) { args.push(filters.plan); where.push(`p.slug = $${args.length}`) }
+  if (filters?.q) { args.push(`%${filters.q.toLowerCase()}%`); where.push(`(lower(t.display_name) LIKE $${args.length} OR lower(t.slug) LIKE $${args.length})`) }
   const res = await pool.query(
     `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at,
             p.slug AS plan, p.monthly_price_inr,
@@ -190,7 +195,9 @@ export async function listTenants(): Promise<TenantRow[]> {
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
-     ORDER BY t.created_at DESC`
+     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+     ORDER BY t.created_at DESC`,
+    args
   )
   return res.rows as TenantRow[]
 }
@@ -278,6 +285,18 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
   }
 }
 
+/** Plan distribution across tenants (for the plan-mix chart). */
+export async function planMix(): Promise<{ plan: string; count: number }[]> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT COALESCE(p.slug,'none') AS plan, count(*)::int AS count
+     FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id
+     WHERE t.status <> 'terminated'
+     GROUP BY p.slug ORDER BY count DESC`
+  )
+  return res.rows
+}
+
 /** List active plans for the onboarding UI. */
 export async function listPlans(): Promise<Array<{ slug: string; name: string; tier: number; monthly_price_inr: string }>> {
   const pool = controlPlanePool()
@@ -285,4 +304,77 @@ export async function listPlans(): Promise<Array<{ slug: string; name: string; t
     `SELECT slug, name, tier, monthly_price_inr FROM plans WHERE is_active = true ORDER BY tier`
   )
   return res.rows
+}
+
+export interface TenantDetail extends TenantRow {
+  rds_db: string | null
+  rds_port: number | null
+  iam_auth: boolean | null
+  cloudfront_id: string | null
+}
+
+/** Full detail for one tenant (object page). */
+export async function getTenant(id: string): Promise<TenantDetail | null> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at,
+            p.slug AS plan, p.monthly_price_inr,
+            i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.ec2_target, i.region, i.cloudfront_id
+     FROM tenants t
+     LEFT JOIN plans p ON p.id = t.plan_id
+     LEFT JOIN tenant_infra i ON i.tenant_id = t.id
+     WHERE t.id = $1`,
+    [id]
+  )
+  return (res.rows[0] as TenantDetail) || null
+}
+
+export interface TenantTransaction {
+  id: string; order_ref: string | null; gross_amount: string; tenant_share: string
+  platform_commission: string; gateway_fee: string; is_cod: boolean; gateway: string
+  gateway_txn_id: string | null; status: string; occurred_at: string
+}
+export interface LedgerEntry {
+  id: string; entry_type: string; amount: string; note: string | null; occurred_at: string
+}
+
+/** Per-tenant transactions + settlement ledger + computed balance (billing detail page). */
+export async function getTenantBilling(tenantId: string): Promise<{
+  transactions: TenantTransaction[]
+  ledger: LedgerEntry[]
+  balance: number
+  totals: { gross: number; tenantShare: number; commission: number; fees: number }
+}> {
+  const pool = controlPlanePool()
+  const [txn, led] = await Promise.all([
+    pool.query(`SELECT * FROM tenant_transactions WHERE tenant_id=$1 ORDER BY occurred_at DESC`, [tenantId]),
+    pool.query(`SELECT id, entry_type, amount, note, occurred_at FROM settlement_ledger WHERE tenant_id=$1 ORDER BY occurred_at DESC`, [tenantId]),
+  ])
+  const transactions = txn.rows as TenantTransaction[]
+  const ledger = led.rows as LedgerEntry[]
+  const balance = ledger.reduce((s, e) => s + Number(e.amount), 0)
+  const totals = transactions.reduce(
+    (a, t) => ({
+      gross: a.gross + Number(t.gross_amount),
+      tenantShare: a.tenantShare + Number(t.tenant_share),
+      commission: a.commission + Number(t.platform_commission),
+      fees: a.fees + Number(t.gateway_fee),
+    }),
+    { gross: 0, tenantShare: 0, commission: 0, fees: 0 }
+  )
+  return { transactions, ledger, balance, totals }
+}
+
+/** Platform-wide MRR + commission summary for the billing list hero. */
+export async function billingSummary(): Promise<{ mrr: number; commission30d: number; gmv30d: number; payingTenants: number }> {
+  const pool = controlPlanePool()
+  const res = await pool.query(`
+    SELECT
+      (SELECT COALESCE(SUM(p.monthly_price_inr),0) FROM tenants t JOIN plans p ON p.id=t.plan_id WHERE t.status='active')::numeric AS mrr,
+      (SELECT COUNT(*) FROM tenants WHERE status='active')::int AS paying,
+      (SELECT COALESCE(SUM(platform_commission),0) FROM tenant_transactions WHERE occurred_at > now() - interval '30 days')::numeric AS comm,
+      (SELECT COALESCE(SUM(gross_amount),0) FROM tenant_transactions WHERE occurred_at > now() - interval '30 days')::numeric AS gmv
+  `)
+  const r = res.rows[0]
+  return { mrr: Number(r.mrr), commission30d: Number(r.comm), gmv30d: Number(r.gmv), payingTenants: r.paying }
 }
