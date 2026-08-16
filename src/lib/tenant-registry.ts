@@ -149,3 +149,47 @@ export async function resolveTenantFromHost(hostname: string): Promise<TenantCon
 export function clearTenantCache(): void {
   cache.clear()
 }
+
+export interface TenantRow {
+  id: string
+  slug: string
+  custom_domain: string | null
+  display_name: string
+  status: string
+  plan: string | null
+  monthly_price_inr: string | null
+  daily_payout: boolean
+  rds_endpoint: string | null
+  s3_bucket: string | null
+  ec2_target: string | null
+  region: string | null
+  created_at: string
+}
+
+/** List all tenants (control-plane admin UI). Read-only. */
+export async function listTenants(): Promise<TenantRow[]> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at,
+            p.slug AS plan, p.monthly_price_inr,
+            i.rds_endpoint, i.s3_bucket, i.ec2_target, i.region
+     FROM tenants t
+     LEFT JOIN plans p ON p.id = t.plan_id
+     LEFT JOIN tenant_infra i ON i.tenant_id = t.id
+     ORDER BY t.created_at DESC`
+  )
+  return res.rows as TenantRow[]
+}
+
+/** Summary counts for the control-plane dashboard. */
+export async function tenantSummary(): Promise<{ total: number; active: number; mrr: number }> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT count(*)::int AS total,
+            count(*) FILTER (WHERE t.status='active')::int AS active,
+            COALESCE(SUM(p.monthly_price_inr) FILTER (WHERE t.status='active'), 0)::numeric AS mrr
+     FROM tenants t LEFT JOIN plans p ON p.id = t.plan_id`
+  )
+  const r = res.rows[0]
+  return { total: r.total, active: r.active, mrr: Number(r.mrr) }
+}
