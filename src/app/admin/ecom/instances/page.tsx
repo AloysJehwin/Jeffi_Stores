@@ -14,7 +14,7 @@ export default async function EcomInstancesPage() {
   const tenants = await listTenants()
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
+    <div className="p-6 w-full">
       <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">Ecom Store — Instances</h1>
       <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">Per-tenant infrastructure (RDS / EC2 / S3 / region)</p>
       <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
