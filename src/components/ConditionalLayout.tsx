@@ -24,8 +24,9 @@ export default function ConditionalLayout({ children, initialStoreConfig, isForm
   const isBusinessPage = !isAdminPage && (isBusinessSubdomain || pathname?.startsWith('/business'))
   const isFormsPage = isFormsSubdomain || pathname?.startsWith('/forms')
   const isDocumentPage = isDocumentSubdomain || pathname?.startsWith('/invoice/') || pathname?.startsWith('/quotation/') || pathname?.startsWith('/purchaseorder/')
+  const isEcomPage = pathname?.startsWith('/ecom')
 
-  if (isAdminPage || isFormsPage || isDocumentPage || isBusinessPage) {
+  if (isAdminPage || isFormsPage || isDocumentPage || isBusinessPage || isEcomPage) {
     return (
       <StoreConfigProvider initialConfig={initialStoreConfig}>
         <ThemeProvider>
