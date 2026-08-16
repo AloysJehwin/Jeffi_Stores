@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { CheckMark } from '../Shapes'
 
 interface Plan { slug: string; name: string; tier: number; monthly_price_inr: string }
 
@@ -73,7 +74,8 @@ export default function OnboardWizard({ plans }: { plans: Plan[] }) {
   if (done) {
     return (
       <div className="max-w-2xl mx-auto rounded-2xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-900/20 p-8 text-center">
-        <h2 className="text-xl font-semibold text-green-800 dark:text-green-300">🎉 Your store is being set up</h2>
+        <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-green-600 text-white mx-auto mb-4"><CheckMark className="w-7 h-7" /></span>
+        <h2 className="text-xl font-semibold text-green-800 dark:text-green-300">Your store is being set up</h2>
         <p className="text-sm text-green-700 dark:text-green-400 mt-2">{done.slug}.jeffistores.in — you&apos;ll be notified when it&apos;s live.</p>
         <button onClick={() => { router.push('/dashboard'); router.refresh() }} className="mt-5 px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-sm font-medium">Go to dashboard</button>
       </div>
@@ -88,7 +90,7 @@ export default function OnboardWizard({ plans }: { plans: Plan[] }) {
           <li key={s} className="flex-1 flex items-center">
             <div className={`flex items-center gap-2 ${i <= step ? 'text-accent-600 dark:text-accent-400' : 'text-foreground-muted'}`}>
               <span className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-semibold border ${i < step ? 'bg-accent-600 text-white border-accent-600' : i === step ? 'border-accent-600' : 'border-border-default'}`}>
-                {i < step ? '✓' : i + 1}
+                {i < step ? <CheckMark className="w-3.5 h-3.5" /> : i + 1}
               </span>
               <span className="hidden sm:inline text-sm">{s}</span>
             </div>
@@ -153,7 +155,7 @@ export default function OnboardWizard({ plans }: { plans: Plan[] }) {
             </div>
             <button type="button" onClick={verifyBank} disabled={busy || bankVerified}
               className="px-4 py-2 rounded-lg bg-secondary-500 hover:bg-secondary-600 disabled:opacity-50 text-white text-sm font-medium">
-              {bankVerified ? '✓ Verified' : busy ? 'Verifying…' : 'Verify account'}
+              {bankVerified ? 'Verified' : busy ? 'Verifying…' : 'Verify account'}
             </button>
             {bankMsg && <p className={`text-sm ${bankMsg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{bankMsg.text}</p>}
           </div>
@@ -166,7 +168,7 @@ export default function OnboardWizard({ plans }: { plans: Plan[] }) {
             <Row k="Store" v={displayName} />
             <Row k="Subdomain" v={`${effectiveSlug}.jeffistores.in`} />
             <Row k="Payout" v={dailyPayout ? 'Daily (+5%)' : 'Weekly'} />
-            <Row k="Bank" v={bankVerified ? '✓ Verified' : 'Not verified'} />
+            <Row k="Bank" v={bankVerified ? 'Verified' : 'Not verified'} />
             <label className="flex items-center gap-2 text-sm text-foreground-secondary pt-2">
               <input type="checkbox" checked={dailyPayout} onChange={(e) => setDailyPayout(e.target.checked)} />
               Daily payouts (+5% fee) — otherwise weekly

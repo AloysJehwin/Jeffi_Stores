@@ -1,13 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 
 // Custom top nav for the ecom control-plane surface (ecom.jeffistores.in).
 // Distinct from the storefront + admin nav. Shows Sign in/Get started when
 // logged out; Dashboard + Sign out when an owner is signed in.
+// Self-hides on full-page auth routes (client-reactive so it updates instantly
+// on in-app navigation, not just on hard reload).
+const HIDE_ON = ['/signin', '/signup']
+
 export default function EcomNav({ owner }: { owner: { email: string; name: string | null } | null }) {
   const router = useRouter()
+  const pathname = usePathname()
+  if (HIDE_ON.includes(pathname)) return null
 
   async function signOut() {
     await fetch('/api/ecom/auth/signout', { method: 'POST' }).catch(() => {})

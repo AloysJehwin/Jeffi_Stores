@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { listPlans } from '@/lib/tenant-registry'
 import { BrowserFrame } from './BrowserFrame'
+import { PhoneMock, Gear, Coin, TrendUp, Dots } from './Shapes'
 
 export const dynamic = 'force-dynamic'
 
@@ -75,24 +76,48 @@ export default async function EcomLandingPage() {
         ))}
       </section>
 
-      {/* ── Bento (visual) ── */}
-      <section className="w-full px-6 lg:px-12 py-16 bg-surface-elevated border-y border-border-default">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-7xl mx-auto auto-rows-[minmax(160px,auto)]">
-          <div className="md:col-span-2 md:row-span-2 rounded-3xl border border-border-default bg-surface p-4 flex flex-col">
-            <p className="px-2 pt-2 text-sm font-semibold text-foreground">Mobile-first storefront</p>
-            <div className="mt-3 flex-1"><BrowserFrame alt="Mobile storefront" caption="storefront · mobile" className="h-full" /></div>
+      {/* ── Bento: device mockups + decorative shapes ── */}
+      <section className="relative w-full px-6 lg:px-12 py-20 bg-surface-elevated border-y border-border-default overflow-hidden">
+        {/* decorative background shapes (no emojis — inline SVG) */}
+        <Gear className="hidden md:block absolute -left-6 top-16 w-24 h-24 text-accent-500/10" />
+        <Gear className="hidden md:block absolute left-24 top-40 w-14 h-14 text-accent-500/10" />
+        <Coin className="hidden md:block absolute right-16 top-24 w-16 h-16 text-primary-500/15" />
+        <TrendUp className="hidden md:block absolute right-1/3 bottom-10 w-20 h-20 text-accent-500/10" />
+        <Dots className="hidden md:block absolute right-8 bottom-16 w-28 h-28 text-foreground/10" />
+
+        <div className="relative max-w-3xl mx-auto text-center mb-12">
+          <p className="text-accent-600 dark:text-accent-400 font-semibold text-sm uppercase tracking-widest">Built for mobile commerce</p>
+          <h2 className="text-4xl lg:text-5xl font-extrabold mt-3">Your store, in every pocket</h2>
+        </div>
+
+        <div className="relative grid grid-cols-1 md:grid-cols-3 gap-5 max-w-7xl mx-auto items-stretch">
+          {/* large: phone storefront */}
+          <div className="md:col-span-2 rounded-3xl border border-border-default bg-surface p-8 flex flex-col sm:flex-row items-center gap-8">
+            <PhoneMock variant="store" />
+            <div className="max-w-xs">
+              <h3 className="text-2xl font-bold">A storefront that sells itself</h3>
+              <p className="text-foreground-secondary mt-2">Fast, mobile-first shopping — catalogue, search, cart and checkout tuned for conversion on any device.</p>
+            </div>
           </div>
-          <div className="rounded-3xl bg-gradient-to-br from-accent-600 to-primary-600 text-white p-6 flex flex-col justify-between">
-            <div className="text-5xl font-extrabold leading-none">₹0</div>
-            <p className="text-sm text-white/90">setup cost · go live today</p>
+          {/* accent ₹0 tile with coin shape */}
+          <div className="relative rounded-3xl bg-gradient-to-br from-accent-600 to-primary-600 text-white p-6 flex flex-col justify-between overflow-hidden">
+            <Coin className="absolute -right-4 -bottom-4 w-28 h-28 text-white/15" />
+            <div className="relative text-5xl font-extrabold leading-none">₹0</div>
+            <p className="relative text-sm text-white/90">setup cost · go live today</p>
           </div>
-          <div className="rounded-3xl border border-border-default bg-surface p-4">
-            <p className="px-1 pb-2 text-sm font-semibold">Payments & settlement</p>
-            <BrowserFrame alt="Settlement view" caption="admin · billing" />
+          {/* payments phone */}
+          <div className="rounded-3xl border border-border-default bg-surface p-8 flex flex-col items-center text-center">
+            <PhoneMock variant="card" className="w-[150px]" />
+            <h3 className="text-lg font-bold mt-5">Payments, settled for you</h3>
+            <p className="text-sm text-foreground-secondary mt-1">Online & COD split automatically.</p>
           </div>
-          <div className="md:col-span-2 rounded-3xl border border-border-default bg-surface p-4">
-            <p className="px-1 pb-2 text-sm font-semibold">Inventory & purchase orders</p>
-            <BrowserFrame alt="Inventory" caption="admin · inventory" />
+          {/* analytics phone */}
+          <div className="md:col-span-2 rounded-3xl border border-border-default bg-surface p-8 flex flex-col sm:flex-row-reverse items-center gap-8">
+            <PhoneMock variant="chart" />
+            <div className="max-w-xs">
+              <h3 className="text-2xl font-bold">Insights on the go</h3>
+              <p className="text-foreground-secondary mt-2">Revenue, orders and stock at a glance — manage the whole business from your phone.</p>
+            </div>
           </div>
         </div>
       </section>
