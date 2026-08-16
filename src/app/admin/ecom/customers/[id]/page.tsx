@@ -29,7 +29,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
   const billing = await getTenantBilling(id).catch(() => null)
 
   return (
-    <div className="p-6 w-full max-w-5xl">
+    <div className="p-6 w-full">
       <Link href="/admin/ecom/customers" className="text-sm text-accent-600 dark:text-accent-400 hover:underline">← Customers</Link>
       <div className="flex items-center gap-3 mt-2 mb-6">
         <h1 className="text-2xl font-bold text-foreground">{t.display_name}</h1>
