@@ -128,4 +128,10 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-CMD ["sh", "-c", "node deploy/load-secrets.mjs && node cluster-server.js"]
+# load-secrets.mjs injects Secrets Manager values into process.env, then (with
+# SPAWN_APP=1) spawns cluster-server.js as a child that INHERITS that env. This
+# must be one process chain — the old `load-secrets && cluster-server` ran the
+# server separately, so injected secrets never reached the app (JWT_SECRET etc.
+# were undefined and the container failed health checks on deploy).
+ENV SPAWN_APP=1
+CMD ["node", "deploy/load-secrets.mjs"]

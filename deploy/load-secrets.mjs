@@ -104,3 +104,23 @@ async function loadSecrets() {
 }
 
 await loadSecrets()
+
+// In prod, chain into the app WITHIN the same environment. The old Docker CMD
+// (`node load-secrets.mjs && node cluster-server.js`) ran the server as a SEPARATE
+// process, so the secrets injected into THIS process's env never reached it —
+// the app booted with no JWT_SECRET/RDS_HOST/etc and failed its health check.
+// Spawning the server as a child here means it inherits the now-populated env
+// (and passes it to its forked workers). Only runs when told to via SPAWN_APP=1
+// so `predev` (which just writes .env.local) is unaffected.
+if (process.env.SPAWN_APP === '1') {
+  const { spawn } = await import('child_process')
+  const entry = resolve(REPO_ROOT, 'cluster-server.js')
+  const child = spawn(process.execPath, [entry], { stdio: 'inherit', env: process.env })
+  child.on('exit', (code, signal) => {
+    process.exit(signal ? 1 : (code ?? 0))
+  })
+  // Forward termination signals so container stop/restart is graceful.
+  for (const sig of ['SIGTERM', 'SIGINT']) {
+    process.on(sig, () => child.kill(sig))
+  }
+}
