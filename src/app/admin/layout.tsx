@@ -75,6 +75,11 @@ export default async function AdminLayout({
     { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', superAdminOnly: true },
     { href: '/admin/settings/site-controls', label: 'Site Controls', scope: 'settings:write', group: 'Settings' },
     { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings', exactMatch: true },
+    // Ecom Store — SaaS control plane. superAdminOnly: only the platform operator sees this group.
+    { href: '/admin/ecom/customers', label: 'Customers', scope: 'ecom_customers:read', group: 'Ecom Store', superAdminOnly: true },
+    { href: '/admin/ecom/instances', label: 'Instances', scope: 'ecom_instances:read', group: 'Ecom Store', superAdminOnly: true },
+    { href: '/admin/ecom/store-status', label: 'Store Status', scope: 'ecom_customers:read', group: 'Ecom Store', superAdminOnly: true },
+    { href: '/admin/ecom/billing', label: 'Billing', scope: 'ecom_billing:read', group: 'Ecom Store', superAdminOnly: true },
   ]
 
   const filteredNavLinks = navLinks.filter(link => {

@@ -532,6 +532,44 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/service-accounts'],
     group: 'Settings',
   },
+
+  // Ecom Store (SaaS control plane) — platform-operator only (superAdminOnly nav).
+  // These gate the multi-tenant control-plane admin pages, NOT tenant features.
+  {
+    key: 'ecom_customers:read',
+    label: 'Ecom Customers (Read)',
+    description: 'View SaaS tenant stores, plans and status',
+    routes: ['/admin/ecom/customers'],
+    group: 'Ecom Store',
+  },
+  {
+    key: 'ecom_customers:write',
+    label: 'Ecom Customers (Write)',
+    description: 'Manage SaaS tenants: suspend, resume, terminate, change plan',
+    routes: ['/admin/ecom/customers'],
+    group: 'Ecom Store',
+  },
+  {
+    key: 'ecom_instances:read',
+    label: 'Ecom Instances (Read)',
+    description: 'View per-tenant EC2/RDS/nginx/CDN/cert infrastructure status',
+    routes: ['/admin/ecom/instances'],
+    group: 'Ecom Store',
+  },
+  {
+    key: 'ecom_billing:read',
+    label: 'Ecom Billing (Read)',
+    description: 'View tenant subscriptions, settlement ledger and payouts',
+    routes: ['/admin/ecom/billing'],
+    group: 'Ecom Store',
+  },
+  {
+    key: 'ecom_billing:write',
+    label: 'Ecom Billing (Write)',
+    description: 'Manage tenant subscriptions, adjust settlements and trigger payouts',
+    routes: ['/admin/ecom/billing'],
+    group: 'Ecom Store',
+  },
 ]
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
@@ -588,6 +626,9 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/cron')) return 'audit:read'
   if (pathname.startsWith('/api/admin/replication')) return 'replication:read'
   if (pathname.startsWith('/api/admin/service-accounts')) return 'service_accounts:read'
+  if (pathname.startsWith('/api/admin/ecom/customers')) return 'ecom_customers:read'
+  if (pathname.startsWith('/api/admin/ecom/instances')) return 'ecom_instances:read'
+  if (pathname.startsWith('/api/admin/ecom/billing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/internal/cron-record')) return null
   if (pathname.startsWith('/api/admin/business/customers')) return 'business_customers:read'
   if (pathname.startsWith('/api/admin/business/discounts')) return 'business_customers:read'
