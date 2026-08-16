@@ -162,3 +162,53 @@ ALTER TABLE ONLY public.settlement_ledger ADD CONSTRAINT settlement_ledger_tenan
 
 CREATE INDEX IF NOT EXISTS idx_tenant_transactions_tenant ON public.tenant_transactions USING btree (tenant_id, occurred_at DESC);
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_tenant ON public.settlement_ledger USING btree (tenant_id, occurred_at DESC);
+
+--
+-- instance_state on tenants: tracks RDS running state for the disable toggle.
+-- 'running' (normal) | 'stopped' (RDS stopped to save cost — test tenant only).
+-- Separate from status (active/suspended/…) so a stopped test instance is still
+-- an 'active' tenant, just with its DB powered down.
+--
+ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS instance_state character varying(16) NOT NULL DEFAULT 'running';
+
+--
+-- provisioning_jobs: async state machine that turns a 'provisioning' tenant into
+-- a real, 'active' one. One row per tenant provision attempt; the worker advances
+-- one step per tick. created_resources tracks what's been made for rollback.
+--
+CREATE TABLE IF NOT EXISTS public.provisioning_jobs (
+    id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id          uuid NOT NULL,
+    step               character varying(32) NOT NULL DEFAULT 'create_param_group',
+    status             character varying(16) NOT NULL DEFAULT 'pending', -- pending|running|done|failed
+    attempts           integer NOT NULL DEFAULT 0,
+    last_error         text,
+    created_resources  jsonb NOT NULL DEFAULT '{}'::jsonb,   -- {secretArn, paramGroup, dbInstanceId, bucket}
+    created_at         timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at         timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_migration_runs: per-tenant record of a schema/migration fan-out (Part B).
+-- One row per (tenant, deploy) so a failure on one tenant is visible, not hidden.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_migration_runs (
+    id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id   uuid NOT NULL,
+    git_sha     character varying(64),
+    status      character varying(16) NOT NULL DEFAULT 'pending', -- pending|success|failed
+    applied_sql text,
+    error       text,
+    ran_at      timestamp with time zone NOT NULL DEFAULT now()
+);
+
+ALTER TABLE ONLY public.provisioning_jobs     ADD CONSTRAINT provisioning_jobs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_migration_runs ADD CONSTRAINT tenant_migration_runs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.provisioning_jobs     ADD CONSTRAINT provisioning_jobs_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_migration_runs ADD CONSTRAINT tenant_migration_runs_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_provisioning_jobs_tenant ON public.provisioning_jobs USING btree (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_provisioning_jobs_active ON public.provisioning_jobs USING btree (status) WHERE status IN ('pending','running');
+CREATE INDEX IF NOT EXISTS idx_tenant_migration_runs_tenant ON public.tenant_migration_runs USING btree (tenant_id, ran_at DESC);
