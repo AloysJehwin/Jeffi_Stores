@@ -446,3 +446,52 @@ export async function writeTenantInfra(tenantId: string, infra: { rdsEndpoint: s
     `UPDATE tenant_infra SET rds_endpoint=$1, s3_bucket=$2, iam_auth=true, updated_at=now() WHERE tenant_id=$3`,
     [infra.rdsEndpoint, infra.s3Bucket, tenantId])
 }
+
+// ── Owner accounts (ecom store owners) ───────────────────────────────────────
+
+export interface Owner { id: string; email: string; name: string | null; created_at: string }
+
+/** Upsert an owner by email (used by OTP/Google owner auth — verification already done). */
+export async function findOrCreateOwner(email: string, name: string | null): Promise<Owner> {
+  const pool = controlPlanePool()
+  const existing = await pool.query(`SELECT id, email, name, created_at FROM owners WHERE email=$1`, [email])
+  if (existing.rows[0]) {
+    if (name && !existing.rows[0].name) {
+      await pool.query(`UPDATE owners SET name=$1, updated_at=now() WHERE id=$2`, [name, existing.rows[0].id])
+      existing.rows[0].name = name
+    }
+    return existing.rows[0] as Owner
+  }
+  const res = await pool.query(
+    `INSERT INTO owners (email, name) VALUES ($1, $2) RETURNING id, email, name, created_at`, [email, name])
+  return res.rows[0] as Owner
+}
+
+export async function getOwnerById(id: string): Promise<Owner | null> {
+  const pool = controlPlanePool()
+  const res = await pool.query(`SELECT id, email, name, created_at FROM owners WHERE id=$1`, [id])
+  return (res.rows[0] as Owner) || null
+}
+
+/** Tenants owned by an owner. */
+export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at,
+            p.slug AS plan, p.monthly_price_inr,
+            i.rds_endpoint, i.s3_bucket, i.ec2_target, i.region
+     FROM owner_tenants ot
+     JOIN tenants t ON t.id = ot.tenant_id
+     LEFT JOIN plans p ON p.id = t.plan_id
+     LEFT JOIN tenant_infra i ON i.tenant_id = t.id
+     WHERE ot.owner_id = $1 ORDER BY t.created_at DESC`, [ownerId])
+  return res.rows as TenantRow[]
+}
+
+/** Link an owner to a tenant they created. */
+export async function linkOwnerTenant(ownerId: string, tenantId: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `INSERT INTO owner_tenants (owner_id, tenant_id) VALUES ($1, $2)
+     ON CONFLICT (owner_id, tenant_id) DO NOTHING`, [ownerId, tenantId])
+}

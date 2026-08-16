@@ -8,7 +8,7 @@ import { query, queryOne, queryMany } from './db'
 // token and the row id are DIFFERENT identifiers. resolveSession() is the single source of truth
 // used by BOTH the Node-runtime middleware and the Node authenticate* functions. Node-only (uses pg).
 
-export type PrincipalType = 'admin' | 'customer' | 'business'
+export type PrincipalType = 'admin' | 'customer' | 'business' | 'owner'
 
 export const IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000 // 24h of inactivity ends a session
 const TOUCH_WINDOW_MS = 5 * 60 * 1000               // only bump last_seen_at every 5 min
