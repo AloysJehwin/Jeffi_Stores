@@ -11,7 +11,7 @@ export default function AuthSplit({ mode }: { mode: 'signup' | 'signin' }) {
     'Live in minutes — no servers, no code',
   ]
   return (
-    <div className="min-h-[calc(100vh-3.5rem)] grid lg:grid-cols-2">
+    <div className="min-h-screen grid lg:grid-cols-2">
       {/* Brand / value panel */}
       <div className="relative hidden lg:flex flex-col justify-between overflow-hidden bg-gradient-to-br from-accent-600 to-primary-600 text-white p-12">
         <div aria-hidden className="absolute inset-0 opacity-10 bg-[linear-gradient(to_right,#fff_1px,transparent_1px),linear-gradient(to_bottom,#fff_1px,transparent_1px)] bg-[size:40px_40px]" />
