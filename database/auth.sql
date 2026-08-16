@@ -26,8 +26,17 @@ CREATE TABLE public.auth_sessions (
     ua_platform character varying(32),
     ip_net character varying(64),
     fp_hash character varying(64),
-    token_hash character varying(64)
+    token_hash character varying(64),
+    tenant_id uuid
 );
+
+-- tenant_id (multi-tenant SaaS): the tenant this session belongs to, snapshotted at
+-- login (mirrors role/scopes). Nullable / no default on purpose — the platform's own
+-- flagship store and existing rows stay NULL (single-tenant), so resolveSession() and
+-- the host->tenant mismatch check fail OPEN for them (no mass logout on deploy). The
+-- tenants registry lives in a SEPARATE control-plane DB, so there is intentionally NO
+-- cross-DB FK here; tenant membership is validated in the app layer against a
+-- host-resolved tenant.
 
 -- Device-binding signal snapshot (added for multi-signal session binding).
 -- All nullable / no default on purpose: existing rows stay NULL so resolveSession()
