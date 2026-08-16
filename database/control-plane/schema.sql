@@ -99,3 +99,66 @@ CREATE INDEX IF NOT EXISTS idx_tenants_plan_id ON public.tenants USING btree (pl
 CREATE INDEX IF NOT EXISTS idx_tenants_status ON public.tenants USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_plan_features_plan_id ON public.plan_features USING btree (plan_id);
 -- host->tenant resolver looks up by slug (UNIQUE already indexes it) and custom_domain (UNIQUE too).
+
+--
+-- tenant_transactions: one row per payment on a tenant's store (POBO split).
+-- gross = what the buyer paid; tenant_share = seller's cut; platform_commission =
+-- our cut; gateway_fee = Razorpay/Route fee. is_cod flags cash-on-delivery (settled
+-- separately via COD remittance, not the online gateway).
+--
+CREATE TABLE IF NOT EXISTS public.tenant_transactions (
+    id                  uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id           uuid NOT NULL,
+    order_ref           character varying(64),               -- the tenant order id/number
+    gross_amount        numeric(12,2) NOT NULL,
+    tenant_share        numeric(12,2) NOT NULL,
+    platform_commission numeric(12,2) NOT NULL DEFAULT 0,
+    gateway_fee         numeric(12,2) NOT NULL DEFAULT 0,
+    is_cod              boolean NOT NULL DEFAULT false,
+    gateway             character varying(32) NOT NULL DEFAULT 'razorpay_route',
+    gateway_txn_id      character varying(128),
+    status              character varying(24) NOT NULL DEFAULT 'captured', -- captured|split|settled|refunded|failed
+    occurred_at         timestamp with time zone NOT NULL DEFAULT now(),
+    created_at          timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- settlement_ledger: per-tenant running money movements. The single reconciliation
+-- surface: +order_capture / -commission / -gateway_fee / -subscription_charge /
+-- +cod_remittance / -delhivery_correction / -refund / -payout. Signed amount.
+--
+CREATE TABLE IF NOT EXISTS public.settlement_ledger (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid NOT NULL,
+    entry_type    character varying(32) NOT NULL,  -- order_capture|commission|gateway_fee|subscription_charge|cod_remittance|delhivery_correction|refund|payout|adjustment
+    amount        numeric(12,2) NOT NULL,          -- signed: credits +, debits -
+    txn_id        uuid,                            -- optional link to tenant_transactions
+    note          character varying(255),
+    occurred_at   timestamp with time zone NOT NULL DEFAULT now(),
+    created_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- tenant_metrics_daily: rollup for charts (tenant count, MRR, txn volume by day).
+--
+CREATE TABLE IF NOT EXISTS public.tenant_metrics_daily (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    metric_date   date NOT NULL,
+    active_tenants integer NOT NULL DEFAULT 0,
+    mrr_inr       numeric(14,2) NOT NULL DEFAULT 0,
+    gmv_inr       numeric(14,2) NOT NULL DEFAULT 0,     -- gross merchandise value across tenants that day
+    created_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+ALTER TABLE ONLY public.tenant_transactions  ADD CONSTRAINT tenant_transactions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.settlement_ledger    ADD CONSTRAINT settlement_ledger_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_metrics_daily ADD CONSTRAINT tenant_metrics_daily_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_metrics_daily ADD CONSTRAINT tenant_metrics_daily_date_key UNIQUE (metric_date);
+
+ALTER TABLE ONLY public.tenant_transactions ADD CONSTRAINT tenant_transactions_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.settlement_ledger ADD CONSTRAINT settlement_ledger_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_tenant_transactions_tenant ON public.tenant_transactions USING btree (tenant_id, occurred_at DESC);
+CREATE INDEX IF NOT EXISTS idx_settlement_ledger_tenant ON public.settlement_ledger USING btree (tenant_id, occurred_at DESC);
