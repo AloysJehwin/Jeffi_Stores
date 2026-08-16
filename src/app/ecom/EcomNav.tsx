@@ -24,7 +24,7 @@ export default function EcomNav({ owner }: { owner: { email: string; name: strin
         </Link>
 
         <nav className="flex items-center gap-2 sm:gap-4 text-sm">
-          <Link href="/#pricing" className="hidden sm:inline text-foreground-secondary hover:text-foreground px-2">Pricing</Link>
+          <Link href="/pricing" className="hidden sm:inline text-foreground-secondary hover:text-foreground px-2">Pricing</Link>
           {owner ? (
             <>
               <Link href="/dashboard" className="text-foreground-secondary hover:text-foreground px-2">Dashboard</Link>
