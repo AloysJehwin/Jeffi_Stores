@@ -146,9 +146,9 @@ export default async function EcomLandingPage() {
 
       {/* ── Footer ── */}
       <footer className="border-t border-border-default bg-surface-elevated">
-        <div className="w-full px-6 lg:px-12 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-foreground-muted">
+        <div className="w-full px-6 lg:px-12 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-foreground-muted">
           <div className="flex items-center gap-2 font-bold text-foreground">
-            <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 text-white text-sm">J</span>Jeffi Commerce
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 text-white text-xs">J</span>Jeffi Commerce
           </div>
           <div className="flex gap-6"><Link href="/pricing" className="hover:text-foreground">Pricing</Link><Link href="/signin" className="hover:text-foreground">Sign in</Link><Link href="/signup" className="hover:text-foreground">Get started</Link></div>
           <div>© 2026 Jeffi Stores</div>
