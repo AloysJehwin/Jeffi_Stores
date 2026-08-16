@@ -4,6 +4,7 @@ import { verifyToken, verifyBusinessToken } from './lib/jwt'
 import { getScopeForPath, hasScope } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 import { extractSessionSignals } from './lib/session-signals-request'
+import { resolveTenantFromHost } from './lib/tenant-registry'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -94,6 +95,44 @@ export async function middleware(request: NextRequest) {
   stripped.delete('x-service-account-id')
   stripped.delete('x-service-account-name')
   stripped.delete('x-service-account-scopes')
+  // Tenant forwarding headers are also client-forgeable — strip before we (maybe) set them.
+  stripped.delete('x-tenant-id')
+  stripped.delete('x-tenant-slug')
+
+  // Multi-tenant SaaS: resolve the tenant from the Host header (cached ~60s in-process).
+  // Returns null for the platform's own hosts (jeffistores.in + app subdomains) and unknown
+  // hosts → single-tenant behavior is unchanged. When a tenant IS resolved, forward it as
+  // x-tenant-* so tenant-aware server code (getPool via TenantContext, S3, etc.) can scope.
+  const tenant = await resolveTenantFromHost(hostname)
+  if (tenant) {
+    stripped.set('x-tenant-id', tenant.tenantId)
+    stripped.set('x-tenant-slug', tenant.slug)
+  }
+
+  // Tenant isolation guard: a session is bound (snapshotted) to exactly one tenant.
+  // If the host resolves to tenant A but the caller presents a session minted for
+  // tenant B, reject it — a shared-cookie-domain replay across tenant subdomains
+  // must not grant access. Only fires when BOTH sides are known (host tenant + a
+  // session with a non-null tenant_id); null on either side = platform/legacy →
+  // allowed (fail-open, no mass logout). This is the mismatch-rejection half of the
+  // tenant_id session claim.
+  if (tenant) {
+    const anySid = request.cookies.get('admin_sid')?.value
+      || request.cookies.get('user_sid')?.value
+      || request.cookies.get('business_sid')?.value
+    if (anySid) {
+      const { resolveSession } = await import('./lib/auth-sessions')
+      const sess = await resolveSession(anySid, reqSignals).catch(() => null)
+      if (sess && sess.tenantId && sess.tenantId !== tenant.tenantId) {
+        // Cross-tenant session replay — clear the offending cookies and send to login.
+        const res = NextResponse.redirect(buildRedirectUrl(request, '/'))
+        res.cookies.delete('admin_sid')
+        res.cookies.delete('user_sid')
+        res.cookies.delete('business_sid')
+        return addSecurityHeaders(res)
+      }
+    }
+  }
 
   if (hostname.startsWith('forms.')) {
     if (pathname.startsWith('/api/')) {
