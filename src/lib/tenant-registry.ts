@@ -378,3 +378,70 @@ export async function billingSummary(): Promise<{ mrr: number; commission30d: nu
   const r = res.rows[0]
   return { mrr: Number(r.mrr), commission30d: Number(r.comm), gmv30d: Number(r.gmv), payingTenants: r.paying }
 }
+
+// ── Provisioning data-layer (control-plane) ──────────────────────────────────
+
+export interface ProvisioningJob {
+  id: string; tenant_id: string; step: string; status: string
+  attempts: number; last_error: string | null; created_resources: Record<string, any>
+}
+
+/** Create (or return existing pending) provisioning job for a tenant. */
+export async function enqueueProvisioning(tenantId: string): Promise<ProvisioningJob> {
+  const pool = controlPlanePool()
+  const existing = await pool.query(
+    `SELECT * FROM provisioning_jobs WHERE tenant_id=$1 AND status IN ('pending','running') LIMIT 1`, [tenantId])
+  if (existing.rows[0]) return existing.rows[0] as ProvisioningJob
+  const res = await pool.query(
+    `INSERT INTO provisioning_jobs (tenant_id) VALUES ($1) RETURNING *`, [tenantId])
+  return res.rows[0] as ProvisioningJob
+}
+
+/** Fetch active jobs the worker should advance. */
+export async function activeProvisioningJobs(): Promise<ProvisioningJob[]> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT * FROM provisioning_jobs WHERE status IN ('pending','running') ORDER BY created_at`)
+  return res.rows as ProvisioningJob[]
+}
+
+export async function getProvisioningJob(tenantId: string): Promise<ProvisioningJob | null> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT * FROM provisioning_jobs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 1`, [tenantId])
+  return (res.rows[0] as ProvisioningJob) || null
+}
+
+/** Advance a job's step/status/resources. */
+export async function updateProvisioningJob(
+  id: string,
+  patch: { step?: string; status?: string; last_error?: string | null; created_resources?: Record<string, any>; bumpAttempts?: boolean }
+): Promise<void> {
+  const pool = controlPlanePool()
+  const sets: string[] = ['updated_at = now()']
+  const args: any[] = []
+  if (patch.step !== undefined) { args.push(patch.step); sets.push(`step=$${args.length}`) }
+  if (patch.status !== undefined) { args.push(patch.status); sets.push(`status=$${args.length}`) }
+  if (patch.last_error !== undefined) { args.push(patch.last_error); sets.push(`last_error=$${args.length}`) }
+  if (patch.created_resources !== undefined) { args.push(JSON.stringify(patch.created_resources)); sets.push(`created_resources=$${args.length}::jsonb`) }
+  if (patch.bumpAttempts) sets.push('attempts = attempts + 1')
+  args.push(id)
+  await pool.query(`UPDATE provisioning_jobs SET ${sets.join(', ')} WHERE id=$${args.length}`, args)
+}
+
+/** Set a tenant's status (e.g. provisioning->active) or instance_state (running/stopped). */
+export async function setTenantStatus(tenantId: string, status: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(`UPDATE tenants SET status=$1, updated_at=now() WHERE id=$2`, [status, tenantId])
+}
+export async function setTenantInstanceState(tenantId: string, state: 'running' | 'stopped'): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(`UPDATE tenants SET instance_state=$1, updated_at=now() WHERE id=$2`, [state, tenantId])
+}
+/** Write resolved infra pointers after provisioning. */
+export async function writeTenantInfra(tenantId: string, infra: { rdsEndpoint: string; s3Bucket: string }): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenant_infra SET rds_endpoint=$1, s3_bucket=$2, iam_auth=true, updated_at=now() WHERE tenant_id=$3`,
+    [infra.rdsEndpoint, infra.s3Bucket, tenantId])
+}
