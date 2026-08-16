@@ -153,7 +153,9 @@ export async function middleware(request: NextRequest) {
       }
     }
     const slug = pathname === '/' ? '' : pathname
-    return addSecurityHeaders(NextResponse.rewrite(new URL(`/ecom${slug}${request.nextUrl.search}`, request.url)))
+    // Forward the real path so the ecom layout can hide its nav on auth pages.
+    stripped.set('x-pathname', pathname)
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/ecom${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('forms.')) {
