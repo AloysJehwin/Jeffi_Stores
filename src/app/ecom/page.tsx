@@ -94,6 +94,61 @@ export default async function EcomLandingPage() {
         </div>
       </section>
 
+      {/* ── Bento feature grid ── */}
+      <section className="w-full px-6 lg:px-12 py-20">
+        <div className="max-w-3xl mx-auto text-center mb-12">
+          <p className="text-accent-600 dark:text-accent-400 font-semibold text-sm uppercase tracking-widest">The platform</p>
+          <h2 className="text-4xl lg:text-5xl font-extrabold mt-3">One stack. Every part of your store.</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5 max-w-7xl mx-auto auto-rows-[minmax(180px,auto)]">
+          {/* large tile with screenshot */}
+          <div className="md:col-span-2 md:row-span-2 rounded-3xl border border-border-default bg-surface-elevated p-6 flex flex-col">
+            <div>
+              <h3 className="text-2xl font-bold">Your storefront, live in minutes</h3>
+              <p className="text-foreground-secondary mt-2 max-w-lg">A polished, mobile-first shop on <span className="font-mono text-sm">yourstore.jeffistores.in</span> — catalogue, search, cart, checkout, wishlist. Fully branded, instantly fast.</p>
+            </div>
+            <div className="mt-6 flex-1">
+              <BrowserFrame alt="Storefront preview" caption="yourstore.jeffistores.in" className="h-full" />
+            </div>
+          </div>
+          {/* tall accent tile */}
+          <div className="rounded-3xl bg-gradient-to-br from-accent-600 to-primary-600 text-white p-6 flex flex-col justify-between">
+            <div>
+              <div className="text-5xl font-extrabold leading-none">₹0</div>
+              <div className="text-white/80 mt-1">setup cost</div>
+            </div>
+            <p className="text-sm text-white/90 mt-6">No servers, no upfront fees. Pick a plan and go live today — pay monthly, cancel anytime.</p>
+          </div>
+          {/* small tile */}
+          <div className="rounded-3xl border border-border-default bg-surface-elevated p-6">
+            <FeatureIcon name="card" />
+            <h3 className="font-bold mt-3">Payments, split automatically</h3>
+            <p className="text-sm text-foreground-secondary mt-1">Online + COD. Settled to your bank, minus fees — you never touch reconciliation.</p>
+          </div>
+          {/* wide tile with screenshot */}
+          <div className="md:col-span-2 rounded-3xl border border-border-default bg-surface-elevated p-6 flex flex-col sm:flex-row gap-6 items-center">
+            <div className="flex-1">
+              <FeatureIcon name="truck" />
+              <h3 className="font-bold mt-3">Delivery & GST, done for you</h3>
+              <p className="text-sm text-foreground-secondary mt-1">Delhivery pickups, live tracking and charge reconciliation. Compliant GST invoices on every order.</p>
+            </div>
+            <div className="flex-1 w-full">
+              <BrowserFrame alt="Order tracking" caption="admin · shipment tracking" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Integrations strip ── */}
+      <section className="w-full px-6 lg:px-12 py-12 bg-surface-elevated border-y border-border-default">
+        <p className="text-center text-sm text-foreground-muted uppercase tracking-widest mb-8">Powered by the tools you trust</p>
+        <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 max-w-4xl mx-auto">
+          {['Razorpay', 'Delhivery', 'GST / GSTN', 'Google', 'AWS'].map((name) => (
+            <span key={name} className="text-xl font-bold text-foreground-muted/70">{name}</span>
+          ))}
+        </div>
+      </section>
+
       {/* ── Showcase: half-screenshot bleeding in from the RIGHT ── */}
       <section className="relative overflow-hidden py-20 lg:py-28">
         <div className="w-full px-6 lg:px-12 grid lg:grid-cols-2 gap-10 lg:gap-0 items-center">
@@ -244,6 +299,31 @@ export default async function EcomLandingPage() {
             Compare all features across plans →
           </Link>
         </div>
+      </section>
+
+      {/* ── Metrics band ── */}
+      <section className="w-full px-6 lg:px-12 py-16 bg-gradient-to-br from-accent-600 to-primary-600 text-white">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto text-center">
+          {[['Minutes', 'to go live, not weeks'], ['100%', 'of the storefront on every plan'], ['Online + COD', 'payments handled'], ['GST-ready', 'invoicing built in']].map(([a, b]) => (
+            <div key={a}>
+              <div className="text-4xl lg:text-5xl font-extrabold">{a}</div>
+              <div className="text-white/80 text-sm mt-2">{b}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Testimonial ── */}
+      <section className="w-full px-6 lg:px-12 py-20">
+        <figure className="max-w-3xl mx-auto text-center">
+          <blockquote className="text-2xl lg:text-3xl font-medium text-foreground leading-snug">
+            “We went from a spreadsheet and a phone number to a real online store — storefront, payments,
+            delivery and GST invoices — in an afternoon. Jeffi runs the plumbing so we just sell.”
+          </blockquote>
+          <figcaption className="mt-6 text-foreground-muted">
+            <span className="font-semibold text-foreground">A hardware retailer</span> · early Jeffi Commerce store
+          </figcaption>
+        </figure>
       </section>
 
       {/* ── Final CTA ── */}
