@@ -249,3 +249,30 @@ ALTER TABLE ONLY public.owner_tenants ADD CONSTRAINT owner_tenants_tenant_id_fke
 
 CREATE INDEX IF NOT EXISTS idx_owner_tenants_owner ON public.owner_tenants USING btree (owner_id);
 CREATE INDEX IF NOT EXISTS idx_owner_tenants_tenant ON public.owner_tenants USING btree (tenant_id);
+
+--
+-- tenant_bank_accounts: the payout account for an owner's store, verified via
+-- penny-drop (Razorpay Fund Account Validation) before go-live. verification_status
+-- gates tenant creation (mandatory-before-go-live). linked_account_id = the Route
+-- linked-account id once created.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_bank_accounts (
+    id                  uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    owner_id            uuid NOT NULL,
+    tenant_id           uuid,                                -- set once the tenant is created
+    account_number      character varying(34),
+    ifsc                character varying(16),
+    holder_name         character varying(200),
+    upi_id              character varying(120),
+    verification_status character varying(16) NOT NULL DEFAULT 'pending', -- pending|verified|failed
+    verification_ref    character varying(128),              -- Razorpay validation id
+    verified_name       character varying(200),              -- name returned by the bank (penny-drop)
+    linked_account_id   character varying(64),               -- Razorpay Route linked account
+    created_at          timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at          timestamp with time zone NOT NULL DEFAULT now()
+);
+
+ALTER TABLE ONLY public.tenant_bank_accounts ADD CONSTRAINT tenant_bank_accounts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_bank_accounts ADD CONSTRAINT tenant_bank_accounts_owner_id_fkey
+    FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_tenant_bank_owner ON public.tenant_bank_accounts USING btree (owner_id);
