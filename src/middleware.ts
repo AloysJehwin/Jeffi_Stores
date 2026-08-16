@@ -135,9 +135,23 @@ export async function middleware(request: NextRequest) {
   }
 
   if (hostname.startsWith('ecom.')) {
-    // SaaS control plane: onboarding, plan selection, tenant signup. Public marketing +
-    // signup pages; the create-tenant API lives under /api/ecom. Rewrites to /ecom.
+    // SaaS control plane (ecom.jeffistores.in). Public: marketing (/), /signin, /signup.
+    // Protected (owner session required): /onboard, /dashboard. API under /api/ecom.
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    const OWNER_PROTECTED = ['/onboard', '/dashboard']
+    if (OWNER_PROTECTED.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+      const ownerSid = request.cookies.get('owner_sid')?.value
+      if (!ownerSid) {
+        return addSecurityHeaders(NextResponse.redirect(new URL('/signin', request.url)))
+      }
+      const { resolveOwnerSession } = await import('./lib/owner-session')
+      const owner = await resolveOwnerSession(ownerSid, reqSignals).catch(() => null)
+      if (!owner) {
+        const res = NextResponse.redirect(new URL('/signin', request.url))
+        res.cookies.delete('owner_sid')
+        return addSecurityHeaders(res)
+      }
+    }
     const slug = pathname === '/' ? '' : pathname
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/ecom${slug}${request.nextUrl.search}`, request.url)))
   }
