@@ -1,11 +1,7 @@
-import OwnerAuthForm from '../OwnerAuthForm'
+import AuthSplit from '../AuthSplit'
 
 export const dynamic = 'force-dynamic'
 
 export default function EcomSignUpPage() {
-  return (
-    <div className="py-16 px-4">
-      <OwnerAuthForm mode="signup" />
-    </div>
-  )
+  return <AuthSplit mode="signup" />
 }
