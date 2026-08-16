@@ -65,6 +65,9 @@ function createInMemoryRedis(): any {
       const remaining = Math.floor((entry.expiry - Date.now()) / 1000)
       return remaining > 0 ? remaining : -2
     },
+    async ping(): Promise<'PONG'> {
+      return 'PONG'
+    },
     on: () => {},
   } as any
   return mockRedis
