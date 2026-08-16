@@ -212,3 +212,40 @@ ALTER TABLE ONLY public.tenant_migration_runs ADD CONSTRAINT tenant_migration_ru
 CREATE INDEX IF NOT EXISTS idx_provisioning_jobs_tenant ON public.provisioning_jobs USING btree (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_provisioning_jobs_active ON public.provisioning_jobs USING btree (status) WHERE status IN ('pending','running');
 CREATE INDEX IF NOT EXISTS idx_tenant_migration_runs_tenant ON public.tenant_migration_runs USING btree (tenant_id, ran_at DESC);
+
+--
+-- owners: ecom store OWNERS — the people who sign up at ecom.jeffistores.in to
+-- create/run a store. A NEW principal, distinct from admins (platform staff) and
+-- customers/business (shoppers within a tenant). Auth lives here (bcrypt hash).
+--
+CREATE TABLE IF NOT EXISTS public.owners (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    email         character varying(255) NOT NULL,
+    password_hash character varying(255) NOT NULL,
+    name          character varying(200),
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- owner_tenants: which tenant(s) an owner owns (M:N to allow multi-store owners).
+--
+CREATE TABLE IF NOT EXISTS public.owner_tenants (
+    id         uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    owner_id   uuid NOT NULL,
+    tenant_id  uuid NOT NULL,
+    role       character varying(20) NOT NULL DEFAULT 'owner',  -- owner | member (future)
+    created_at timestamp with time zone NOT NULL DEFAULT now()
+);
+
+ALTER TABLE ONLY public.owners        ADD CONSTRAINT owners_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.owner_tenants ADD CONSTRAINT owner_tenants_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.owners        ADD CONSTRAINT owners_email_key UNIQUE (email);
+ALTER TABLE ONLY public.owner_tenants ADD CONSTRAINT owner_tenants_owner_tenant_key UNIQUE (owner_id, tenant_id);
+ALTER TABLE ONLY public.owner_tenants ADD CONSTRAINT owner_tenants_owner_id_fkey
+    FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.owner_tenants ADD CONSTRAINT owner_tenants_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_owner_tenants_owner ON public.owner_tenants USING btree (owner_id);
+CREATE INDEX IF NOT EXISTS idx_owner_tenants_tenant ON public.owner_tenants USING btree (tenant_id);
