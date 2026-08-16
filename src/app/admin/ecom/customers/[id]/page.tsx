@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { hasScope } from '@/lib/scopes'
 import { getTenant, getTenantBilling } from '@/lib/tenant-registry'
 import { StatusPill } from '@/components/admin/ecom/EcomUI'
+import TenantActions from '@/components/admin/ecom/TenantActions'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,10 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
       <div className="flex items-center gap-3 mt-2 mb-6">
         <h1 className="text-2xl font-bold text-foreground">{t.display_name}</h1>
         <StatusPill status={t.status} />
+      </div>
+
+      <div className="mb-6">
+        <TenantActions tenantId={t.id} slug={t.slug} status={t.status} instanceState={t.instance_state} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
