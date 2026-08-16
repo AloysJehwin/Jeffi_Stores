@@ -23,8 +23,8 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
   return (
     <div className="p-6 w-full">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Customers</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage SaaS tenant stores</p>
+        <h1 className="text-2xl font-bold text-foreground">Customers</h1>
+        <p className="text-sm text-foreground-muted mt-1">Manage SaaS tenant stores</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-6">
@@ -43,9 +43,9 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
 
       <EcomFilters />
 
-      <div className="rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-800">
+      <div className="rounded-xl border border-border-default overflow-hidden bg-surface-elevated">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 dark:bg-gray-900/50 text-gray-500 dark:text-gray-400">
+          <thead className="bg-surface-secondary text-foreground-muted">
             <tr>
               <th className="text-left px-4 py-3 font-medium">Store</th>
               <th className="text-left px-4 py-3 font-medium">Subdomain</th>
@@ -55,20 +55,20 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
               <th className="text-left px-4 py-3 font-medium">Created</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-100 dark:divide-gray-700">
+          <tbody className="divide-y divide-border-default">
             {tenants.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-gray-400">No tenants match.</td></tr>
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-foreground-muted">No tenants match.</td></tr>
             )}
             {tenants.map((t) => (
-              <tr key={t.id} className="hover:bg-gray-50 dark:hover:bg-gray-900/30 cursor-pointer">
-                <td className="px-4 py-3 font-medium text-gray-900 dark:text-white">
+              <tr key={t.id} className="hover:bg-surface-secondary cursor-pointer">
+                <td className="px-4 py-3 font-medium text-foreground">
                   <Link href={`/admin/ecom/customers/${t.id}`} className="hover:text-accent-600">{t.display_name}</Link>
                 </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{t.slug}.jeffistores.in</td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-300 capitalize">{t.plan || '—'}</td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{t.monthly_price_inr ? '₹' + Number(t.monthly_price_inr).toLocaleString('en-IN') : '—'}{t.daily_payout ? ' +daily' : ''}</td>
+                <td className="px-4 py-3 text-foreground-secondary">{t.slug}.jeffistores.in</td>
+                <td className="px-4 py-3 text-foreground-secondary capitalize">{t.plan || '—'}</td>
+                <td className="px-4 py-3 text-foreground-secondary">{t.monthly_price_inr ? '₹' + Number(t.monthly_price_inr).toLocaleString('en-IN') : '—'}{t.daily_payout ? ' +daily' : ''}</td>
                 <td className="px-4 py-3"><StatusPill status={t.status} /></td>
-                <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
+                <td className="px-4 py-3 text-foreground-muted">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
               </tr>
             ))}
           </tbody>
