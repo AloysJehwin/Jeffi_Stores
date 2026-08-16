@@ -216,12 +216,12 @@ CREATE INDEX IF NOT EXISTS idx_tenant_migration_runs_tenant ON public.tenant_mig
 --
 -- owners: ecom store OWNERS — the people who sign up at ecom.jeffistores.in to
 -- create/run a store. A NEW principal, distinct from admins (platform staff) and
--- customers/business (shoppers within a tenant). Auth lives here (bcrypt hash).
+-- customers/business (shoppers within a tenant). Passwordless auth (OTP + Google)
+-- reusing the storefront verification services — no password stored here.
 --
 CREATE TABLE IF NOT EXISTS public.owners (
     id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     email         character varying(255) NOT NULL,
-    password_hash character varying(255) NOT NULL,
     name          character varying(200),
     created_at    timestamp with time zone NOT NULL DEFAULT now(),
     updated_at    timestamp with time zone NOT NULL DEFAULT now()
