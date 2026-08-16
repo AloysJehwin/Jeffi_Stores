@@ -2,9 +2,10 @@
 
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useState, useEffect } from 'react'
+import AdminSelect from '@/components/admin/AdminSelect'
 
-// URL-param filter bar for the ecom list pages. Status + plan dropdowns + a debounced
-// search box. Writes to the query string; server pages read searchParams and filter.
+// URL-param filter bar for the ecom list pages. Status + plan (AdminSelect dropdowns)
+// + a debounced search box. Writes to the query string; server pages read searchParams.
 export default function EcomFilters({ showPlan = true }: { showPlan?: boolean }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -26,35 +27,47 @@ export default function EcomFilters({ showPlan = true }: { showPlan?: boolean })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q])
 
-  const sel = 'rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-500'
+  const STATUS_OPTS = [
+    { value: '', label: 'All statuses' },
+    { value: 'active', label: 'Active' },
+    { value: 'provisioning', label: 'Provisioning' },
+    { value: 'suspended', label: 'Suspended' },
+    { value: 'terminated', label: 'Terminated' },
+  ]
+  const PLAN_OPTS = [
+    { value: '', label: 'All plans' },
+    { value: 'basic', label: 'Basic' },
+    { value: 'growth', label: 'Growth' },
+    { value: 'pro', label: 'Pro' },
+    { value: 'enterprise', label: 'Enterprise' },
+  ]
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-6 grid grid-cols-1 sm:grid-cols-[auto_auto_1fr] gap-3 items-end">
-      <div>
-        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Status</label>
-        <select className={sel} value={params.get('status') || ''} onChange={(e) => setParam('status', e.target.value)}>
-          <option value="">All</option>
-          <option value="active">Active</option>
-          <option value="provisioning">Provisioning</option>
-          <option value="suspended">Suspended</option>
-          <option value="terminated">Terminated</option>
-        </select>
-      </div>
+    <div className="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 mb-6 grid grid-cols-1 sm:grid-cols-[minmax(0,200px)_minmax(0,200px)_1fr] gap-3 items-end">
+      <AdminSelect
+        label="Status"
+        value={params.get('status') || ''}
+        options={STATUS_OPTS}
+        onChange={(v) => setParam('status', v)}
+        sm
+      />
       {showPlan && (
-        <div>
-          <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Plan</label>
-          <select className={sel} value={params.get('plan') || ''} onChange={(e) => setParam('plan', e.target.value)}>
-            <option value="">All</option>
-            <option value="basic">Basic</option>
-            <option value="growth">Growth</option>
-            <option value="pro">Pro</option>
-            <option value="enterprise">Enterprise</option>
-          </select>
-        </div>
+        <AdminSelect
+          label="Plan"
+          value={params.get('plan') || ''}
+          options={PLAN_OPTS}
+          onChange={(v) => setParam('plan', v)}
+          sm
+        />
       )}
       <div>
         <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 uppercase tracking-wide">Search</label>
-        <input className={`${sel} w-full`} placeholder="Search store name or subdomain…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <input
+          className="w-full rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 px-3 py-2 text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-accent-500"
+          placeholder="Search store name or subdomain…"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
       </div>
     </div>
   )
