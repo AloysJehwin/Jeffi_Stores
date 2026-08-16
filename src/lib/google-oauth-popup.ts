@@ -26,10 +26,11 @@ export function openGoogleOAuthPopup({
       return
     }
 
-    // Always use the main domain for the OAuth redirect — business subdomain is not a registered redirect URI
-    const mainOrigin = window.location.hostname.startsWith('business.')
-      ? window.location.origin.replace(/^(https?:\/\/)business\./, '$1')
-      : window.location.origin
+    // Always use the main domain for the OAuth redirect — app subdomains
+    // (business./ecom./admin.) are not registered redirect URIs in Google.
+    const stripAppSubdomain = (origin: string) =>
+      origin.replace(/^(https?:\/\/)(business|ecom|admin)\./, '$1')
+    const mainOrigin = stripAppSubdomain(window.location.origin)
     const redirectUri = `${mainOrigin}/auth/google/callback`
 
     // Encode a random nonce + the return path in state so the callback page can
@@ -82,10 +83,8 @@ export function openGoogleOAuthPopup({
     }, 3 * 60 * 1000)
 
     const onMessage = (event: MessageEvent) => {
-      // Accept postMessage from the main origin (callback page) even when on business subdomain
-      const expectedOrigin = window.location.hostname.startsWith('business.')
-        ? window.location.origin.replace(/^(https?:\/\/)business\./, '$1')
-        : window.location.origin
+      // Accept postMessage from the main origin (callback page) even when on an app subdomain
+      const expectedOrigin = stripAppSubdomain(window.location.origin)
       if (event.origin !== expectedOrigin && event.origin !== window.location.origin) return
       const data = event.data
       if (!data || data.source !== 'jeffi-google-oauth') return

@@ -92,30 +92,31 @@ export default function OwnerAuthForm({ mode }: { mode: 'signup' | 'signin' }) {
   )
 }
 
-// Google sign-in — uses Google Identity Services if the client id is configured.
-// Falls back to a disabled note otherwise (dev without GOOGLE_CLIENT_ID).
+// Google sign-in — uses the same popup OAuth flow as the storefront (returns an
+// access token from Google), then posts it to the ecom owner auth route. This
+// avoids Google Identity Services One Tap, which needs stricter origin config.
 function GoogleButton({ mode, onError }: { mode: 'signup' | 'signin'; onError: (m: string) => void }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
 
-  async function handleCredential(idToken: string) {
+  async function start() {
+    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
+    if (!clientId) { onError('Google sign-in is not configured in this environment.'); return }
     setBusy(true)
     try {
+      const { openGoogleOAuthPopup } = await import('@/lib/google-oauth-popup')
+      const result = await openGoogleOAuthPopup({ clientId })
+      if (!result.accessToken) {
+        if (result.error && result.error !== 'popup_closed') onError(result.error)
+        return
+      }
       const res = await fetch('/api/ecom/auth/google', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }),
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ accessToken: result.accessToken }),
       })
       const data = await res.json()
       if (!res.ok) { onError(data.error || 'Google sign-in failed'); return }
       router.push(mode === 'signup' ? '/onboard' : '/dashboard'); router.refresh()
     } catch { onError('Network error') } finally { setBusy(false) }
-  }
-
-  function start() {
-    const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
-    const g = (window as any).google
-    if (!clientId || !g?.accounts?.id) { onError('Google sign-in is not configured in this environment.'); return }
-    g.accounts.id.initialize({ client_id: clientId, callback: (r: any) => handleCredential(r.credential) })
-    g.accounts.id.prompt()
   }
 
   return (
