@@ -15,13 +15,10 @@ export default async function EcomLayout({ children }: { children: React.ReactNo
   const signals = { userAgent: h.get('user-agent'), acceptLanguage: h.get('accept-language'), uaPlatform: h.get('sec-ch-ua-platform') }
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
 
-  // Auth pages carry their own full-page branding — hide the top nav there.
-  const pathname = h.get('x-pathname') || ''
-  const isAuthPage = pathname === '/signin' || pathname === '/signup'
-
   return (
     <div className="min-h-screen bg-surface-secondary flex flex-col">
-      {!isAuthPage && <EcomNav owner={owner ? { email: owner.email, name: owner.name } : null} />}
+      {/* EcomNav self-hides on /signin + /signup (client-reactive), so it always mounts here. */}
+      <EcomNav owner={owner ? { email: owner.email, name: owner.name } : null} />
       <main className="flex-1">{children}</main>
     </div>
   )

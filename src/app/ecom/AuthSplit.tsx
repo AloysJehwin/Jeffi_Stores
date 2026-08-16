@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import OwnerAuthForm from './OwnerAuthForm'
+import { CheckMark } from './Shapes'
 
 // Full-page split auth layout: branded value panel (left) + form (right).
 // Collapses to a single column on mobile with a compact brand header.
@@ -24,7 +25,7 @@ export default function AuthSplit({ mode }: { mode: 'signup' | 'signin' }) {
           <ul className="mt-8 space-y-3">
             {points.map((p) => (
               <li key={p} className="flex items-center gap-3 text-white/90">
-                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/20 text-xs">✓</span>{p}
+                <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-white/20"><CheckMark className="w-3 h-3 text-white" /></span>{p}
               </li>
             ))}
           </ul>
