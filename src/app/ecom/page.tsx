@@ -152,6 +152,56 @@ export default async function EcomLandingPage() {
         </div>
       </section>
 
+      {/* ── Capabilities deep-dive ── */}
+      <section className="w-full px-6 lg:px-12 py-20 border-t border-border-default">
+        <div className="max-w-3xl mx-auto text-center">
+          <h2 className="text-4xl lg:text-5xl font-extrabold">A complete commerce operating system</h2>
+          <p className="text-foreground-secondary mt-3 text-lg">Not just a storefront — every tool to sell, fulfil and grow, in one place.</p>
+        </div>
+        <div className="grid lg:grid-cols-3 gap-8 mt-14 max-w-7xl mx-auto">
+          {[
+            {
+              h: 'Sell', items: [
+                ['Branded storefront', 'Catalogue with variants, images, search, categories and brands on your own subdomain.'],
+                ['Cart & checkout', 'Fast checkout with online payments and cash on delivery, wishlist and product compare.'],
+                ['Quotations & cash sale', 'Send B2B quotations, convert to invoices, and record in-store cash sales.'],
+                ['Coupons & reviews', 'Run discount coupons and collect moderated product reviews.'],
+              ],
+            },
+            {
+              h: 'Fulfil', items: [
+                ['Order management', 'Track every order end-to-end, update status, handle returns and replacements.'],
+                ['Delhivery delivery', 'Schedule pickups from your warehouse, live tracking, automatic charge reconciliation.'],
+                ['Packing & labels', 'Generate packing slips and shipping labels with QR codes and barcodes.'],
+                ['Inventory & POs', 'Stock levels, purchase orders, suppliers, and warehouse shelving locations.'],
+              ],
+            },
+            {
+              h: 'Grow', items: [
+                ['GST compliance', 'Compliant GST invoices on every order plus GSTR reporting tools.'],
+                ['Marketing', 'Email campaigns, mailer audiences, and storefront traffic analytics.'],
+                ['AI assistant', 'An AI admin agent to answer questions and take actions across your store.'],
+                ['B2B portal', 'Approve business partners, manage discounts and respond to RFQs.'],
+              ],
+            },
+          ].map((col) => (
+            <div key={col.h} className="rounded-2xl border border-border-default bg-surface-elevated p-6">
+              <h3 className="text-2xl font-extrabold text-accent-600 dark:text-accent-400">{col.h}</h3>
+              <ul className="mt-5 space-y-4">
+                {col.items.map(([t, d]) => (
+                  <li key={t}>
+                    <div className="font-semibold text-foreground flex items-center gap-2">
+                      <span className="text-accent-600 dark:text-accent-400">✓</span>{t}
+                    </div>
+                    <p className="text-sm text-foreground-secondary mt-0.5 pl-6">{d}</p>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </section>
+
       {/* ── How it works ── */}
       <section className="w-full px-6 lg:px-12 py-20 bg-surface-elevated border-y border-border-default">
         <h2 className="text-4xl lg:text-5xl font-extrabold text-center">Live in four steps</h2>
@@ -189,6 +239,11 @@ export default async function EcomLandingPage() {
           })}
         </div>
         <p className="text-center text-xs text-foreground-muted mt-6">Custom domain available as an add-on · Daily payouts optional (+5%)</p>
+        <div className="text-center mt-6">
+          <Link href="/pricing" className="inline-flex items-center gap-1 text-accent-600 dark:text-accent-400 font-semibold hover:underline">
+            Compare all features across plans →
+          </Link>
+        </div>
       </section>
 
       {/* ── Final CTA ── */}

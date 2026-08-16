@@ -536,3 +536,47 @@ export async function hasVerifiedBank(ownerId: string): Promise<boolean> {
   const b = await getOwnerBankAccount(ownerId)
   return b?.verification_status === 'verified'
 }
+
+// ── Plan comparison (data-driven from plan_features) ─────────────────────────
+
+// Human-readable comparison rows: each maps to a representative scope key. A plan
+// "has" the feature if its plan_features includes that key (checked live).
+export const COMPARISON_ROWS: { group: string; label: string; scopeKey: string | null }[] = [
+  { group: 'Storefront', label: 'Full storefront (catalogue, cart, checkout)', scopeKey: null }, // null = all plans
+  { group: 'Storefront', label: 'Wishlist & product compare', scopeKey: null },
+  { group: 'Storefront', label: 'Cash on delivery', scopeKey: null },
+  { group: 'Catalogue', label: 'Products & categories', scopeKey: 'products:read' },
+  { group: 'Catalogue', label: 'Brands', scopeKey: 'brands:read' },
+  { group: 'Catalogue', label: 'AI catalogue enrichment', scopeKey: 'catalog_enrichment:read' },
+  { group: 'Catalogue', label: 'Google/Amazon channel sync', scopeKey: 'merchant_sync:read' },
+  { group: 'Sales', label: 'Orders & fulfilment', scopeKey: 'orders:read' },
+  { group: 'Sales', label: 'Invoices & cash sale', scopeKey: 'invoices:read' },
+  { group: 'Sales', label: 'Quotations', scopeKey: 'quotations:read' },
+  { group: 'Sales', label: 'Returns & replacements', scopeKey: 'returns:read' },
+  { group: 'Sales', label: 'CRM & tasks', scopeKey: 'crm:read' },
+  { group: 'Fulfilment', label: 'Packing slips & labels', scopeKey: 'packing_slips:read' },
+  { group: 'Fulfilment', label: 'Delhivery pickup scheduling', scopeKey: 'delhivery:read' },
+  { group: 'Fulfilment', label: 'QuickScan (mobile)', scopeKey: 'quick_scan:read' },
+  { group: 'Finance', label: 'Inventory & purchase orders', scopeKey: 'inventory:read' },
+  { group: 'Finance', label: 'Warehouse shelving', scopeKey: 'shelving:read' },
+  { group: 'Finance', label: 'GST compliance & filing', scopeKey: 'gst:read' },
+  { group: 'Finance', label: 'Financial reports & payouts', scopeKey: 'financial:read' },
+  { group: 'Marketing', label: 'Coupons & reviews', scopeKey: 'coupons:read' },
+  { group: 'Marketing', label: 'Email mailer & campaigns', scopeKey: 'mailer:read' },
+  { group: 'Marketing', label: 'Traffic analytics', scopeKey: 'traffic:read' },
+  { group: 'AI & B2B', label: 'AI admin assistant', scopeKey: 'agent:read' },
+  { group: 'AI & B2B', label: 'B2B partner portal & RFQs', scopeKey: 'business_customers:read' },
+  { group: 'Platform', label: 'Audit log & service accounts', scopeKey: 'audit:read' },
+]
+
+/** Which scope keys each plan has (for the comparison table). */
+export async function planFeatureMatrix(): Promise<Record<string, Set<string>>> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT p.slug, pf.scope_key FROM plan_features pf JOIN plans p ON p.id = pf.plan_id`)
+  const matrix: Record<string, Set<string>> = {}
+  for (const r of res.rows) {
+    (matrix[r.slug] ||= new Set()).add(r.scope_key)
+  }
+  return matrix
+}
