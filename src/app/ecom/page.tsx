@@ -48,7 +48,7 @@ export default async function EcomLandingPage() {
             <Link href="/pricing" className="w-full sm:w-auto px-7 py-3.5 rounded-lg border border-border-default bg-surface-elevated hover:bg-surface-secondary font-semibold transition-colors">See pricing</Link>
           </div>
           {/* big hero screenshot */}
-          <div className="mt-16 max-w-6xl mx-auto"><BrowserFrame alt="Your storefront" caption="yourstore.jeffistores.in" /></div>
+          <div className="mt-16 w-full"><BrowserFrame alt="Your storefront" caption="yourstore.jeffistores.in" /></div>
         </div>
       </section>
 
@@ -62,7 +62,7 @@ export default async function EcomLandingPage() {
       </section>
 
       {/* ── Screenshot gallery: alternating visual blocks, minimal copy ── */}
-      <section className="w-full px-6 lg:px-12 py-16 max-w-7xl mx-auto space-y-20 lg:space-y-28">
+      <section className="w-full px-6 lg:px-12 py-16 space-y-20 lg:space-y-28">
         {SHOWCASES.map((s) => (
           <div key={s.title} className="grid lg:grid-cols-5 gap-8 items-center">
             <div className={`lg:col-span-2 ${s.side === 'left' ? 'lg:order-2' : ''}`}>
@@ -85,12 +85,12 @@ export default async function EcomLandingPage() {
         <TrendUp className="hidden md:block absolute right-1/3 bottom-10 w-20 h-20 text-accent-500/10" />
         <Dots className="hidden md:block absolute right-8 bottom-16 w-28 h-28 text-foreground/10" />
 
-        <div className="relative max-w-3xl mx-auto text-center mb-12">
+        <div className="relative w-full text-center mb-12">
           <p className="text-accent-600 dark:text-accent-400 font-semibold text-sm uppercase tracking-widest">Built for mobile commerce</p>
           <h2 className="text-4xl lg:text-5xl font-extrabold mt-3">Your store, in every pocket</h2>
         </div>
 
-        <div className="relative grid grid-cols-1 md:grid-cols-3 gap-5 max-w-7xl mx-auto items-stretch">
+        <div className="relative grid grid-cols-1 md:grid-cols-3 gap-5 w-full items-stretch">
           {/* large: phone storefront */}
           <div className="md:col-span-2 rounded-3xl border border-border-default bg-surface p-8 flex flex-col sm:flex-row items-center gap-8">
             <PhoneMock variant="store" />
@@ -125,14 +125,14 @@ export default async function EcomLandingPage() {
       {/* ── Integrations strip ── */}
       <section className="w-full px-6 lg:px-12 py-12">
         <p className="text-center text-sm text-foreground-muted uppercase tracking-widest mb-8">Powered by the tools you trust</p>
-        <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 max-w-4xl mx-auto">
+        <div className="flex flex-wrap items-center justify-center gap-x-12 gap-y-6 w-full">
           {['Razorpay', 'Delhivery', 'GST / GSTN', 'Google', 'AWS'].map((n) => <span key={n} className="text-xl font-bold text-foreground-muted/70">{n}</span>)}
         </div>
       </section>
 
       {/* ── Metrics band ── */}
       <section className="w-full px-6 lg:px-12 py-16 bg-gradient-to-br from-accent-600 to-primary-600 text-white">
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto text-center">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 w-full text-center">
           {[['Minutes', 'to go live'], ['100%', 'storefront on every plan'], ['Online + COD', 'payments handled'], ['GST-ready', 'invoicing']].map(([a, b]) => (
             <div key={a}><div className="text-4xl lg:text-5xl font-extrabold">{a}</div><div className="text-white/80 text-sm mt-2">{b}</div></div>
           ))}
@@ -142,7 +142,7 @@ export default async function EcomLandingPage() {
       {/* ── Pricing ── */}
       <section id="pricing" className="w-full px-6 lg:px-12 py-20">
         <div className="text-center"><h2 className="text-4xl lg:text-5xl font-extrabold">Pricing that scales with you</h2><p className="text-foreground-secondary mt-3 text-lg">Every plan ships the full storefront. Cancel anytime.</p></div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-12 max-w-7xl mx-auto">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-12 w-full">
           {plans.map((p) => {
             const featured = p.slug === 'growth'
             return (

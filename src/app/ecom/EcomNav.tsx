@@ -23,7 +23,7 @@ export default function EcomNav({ owner }: { owner: { email: string; name: strin
 
   return (
     <header className="sticky top-0 z-40 border-b border-border-default bg-surface-elevated/80 backdrop-blur">
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between">
+      <div className="w-full px-6 lg:px-10 h-14 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 font-bold text-foreground">
           <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 text-white text-sm">J</span>
           <span>Jeffi <span className="text-accent-600 dark:text-accent-400">Commerce</span></span>

@@ -27,8 +27,20 @@ export interface ProvisioningProvider {
   /** Run the full desired-state schema + create app_user WITH rds_iam on the fresh DB. */
   loadSchema(endpoint: string, dbName: string): Promise<void>
 
+  /** Snapshot the tenant DB to a gzip'd archive (pure-JS, no pg_dump binary). */
+  backupDb(endpoint: string, dbName: string): Promise<Buffer>
+
+  /** Restore a gzip'd archive into a fresh (schema-loaded) tenant DB. */
+  restoreDb(endpoint: string, dbName: string, archive: Buffer): Promise<void>
+
   /** Create + lock down the tenant bucket (public-access-block on; writes to app IAM only). */
   ensureBucket(bucket: string): Promise<void>
+
+  /** Point the tenant's subdomains at the shared app host (Route53 A-records; idempotent). */
+  ensureDns(hostnames: string[]): Promise<void>
+
+  /** Remove the tenant's subdomain A-records on deprovision (idempotent). */
+  removeDns(hostnames: string[]): Promise<void>
 
   /** Stop the RDS instance (cost saving — test tenant only). */
   stopDbInstance(dbInstanceId: string): Promise<void>

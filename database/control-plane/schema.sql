@@ -16,8 +16,9 @@ CREATE TABLE IF NOT EXISTS public.plans (
     slug           character varying(40) NOT NULL,          -- 'basic' | 'growth' | 'pro' | 'enterprise'
     name           character varying(80) NOT NULL,
     tier           integer NOT NULL,                        -- 1..4, ordering
-    monthly_price_inr numeric(12,2) NOT NULL DEFAULT 0,
-    is_active      boolean NOT NULL DEFAULT true,
+    monthly_price_inr  numeric(12,2) NOT NULL DEFAULT 0,
+    max_custom_domains integer       NOT NULL DEFAULT 0,  -- 0=none, 1=Pro, 3=Enterprise
+    is_active          boolean       NOT NULL DEFAULT true,
     created_at     timestamp with time zone NOT NULL DEFAULT now(),
     updated_at     timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -43,8 +44,16 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     custom_domain  character varying(255),                  -- optional BYO domain (priced add-on)
     display_name   character varying(200) NOT NULL,
     plan_id        uuid,
-    status         character varying(20) NOT NULL DEFAULT 'provisioning', -- provisioning|active|suspended|terminated
-    daily_payout   boolean NOT NULL DEFAULT false,          -- +5% upgrade flag
+    status                   character varying(20) NOT NULL DEFAULT 'provisioning', -- provisioning|active|suspended|terminated
+    razorpay_subscription_id character varying(64),         -- Razorpay sub_xxxx; set after checkout redirect
+    razorpay_checkout_url    text,                           -- Razorpay hosted checkout short_url; shown to owner post-approval
+    razorpay_linked_account_id character varying(64),        -- Razorpay Route acc_xxxx; created on KYC approval for POBO transfers
+    subscription_status      character varying(20) NOT NULL DEFAULT 'created', -- created|authenticated|active|halted|cancelled|completed|expired
+    billing_interval         character varying(8)  NOT NULL DEFAULT 'monthly', -- monthly|yearly
+    -- Generated email addresses — derived from slug, no per-tenant SES identity needed
+    noreply_email  character varying(120) GENERATED ALWAYS AS ('noreply-' || slug || '@jeffistores.in') STORED,
+    campaign_email character varying(120) GENERATED ALWAYS AS ('campaigns-' || slug || '@jeffistores.in') STORED,
+    daily_payout             boolean NOT NULL DEFAULT false, -- +5% upgrade flag
     created_at     timestamp with time zone NOT NULL DEFAULT now(),
     updated_at     timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -83,7 +92,11 @@ ALTER TABLE ONLY public.plan_features  ADD CONSTRAINT plan_features_plan_scope_k
 ALTER TABLE ONLY public.tenant_infra   ADD CONSTRAINT tenant_infra_tenant_id_key UNIQUE (tenant_id);
 
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_status_check
-    CHECK (status IN ('provisioning','active','suspended','terminated'));
+    CHECK (status IN ('provisioning','active','suspended','terminated','pending_approval','rejected'));
+ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_subscription_status_check
+    CHECK (subscription_status IN ('created','authenticated','active','halted','cancelled','completed','expired'));
+ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_billing_interval_check
+    CHECK (billing_interval IN ('monthly','yearly'));
 ALTER TABLE ONLY public.plans          ADD CONSTRAINT plans_tier_check CHECK (tier BETWEEN 1 AND 4);
 
 -- FKs are safe here: all four tables live in the SAME control-plane DB.
@@ -97,6 +110,7 @@ ALTER TABLE ONLY public.tenant_infra   ADD CONSTRAINT tenant_infra_tenant_id_fke
 -- ── Indexes (beyond PK/UNIQUE-backed) ──
 CREATE INDEX IF NOT EXISTS idx_tenants_plan_id ON public.tenants USING btree (plan_id);
 CREATE INDEX IF NOT EXISTS idx_tenants_status ON public.tenants USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_tenants_rzp_sub ON public.tenants USING btree (razorpay_subscription_id) WHERE razorpay_subscription_id IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_plan_features_plan_id ON public.plan_features USING btree (plan_id);
 -- host->tenant resolver looks up by slug (UNIQUE already indexes it) and custom_domain (UNIQUE too).
 
@@ -264,10 +278,18 @@ CREATE TABLE IF NOT EXISTS public.tenant_bank_accounts (
     ifsc                character varying(16),
     holder_name         character varying(200),
     upi_id              character varying(120),
-    verification_status character varying(16) NOT NULL DEFAULT 'pending', -- pending|verified|failed
+    verification_status character varying(16) NOT NULL DEFAULT 'pending', -- pending|initiated|verified|failed
     verification_ref    character varying(128),              -- Razorpay validation id
     verified_name       character varying(200),              -- name returned by the bank (penny-drop)
     linked_account_id   character varying(64),               -- Razorpay Route linked account
+    -- Dual penny-drop UTR verification fields
+    penny_fund_account_id  character varying(64),            -- Razorpay fund_account id
+    penny_payout_id_1      character varying(64),            -- payout id for first ₹1 transfer
+    penny_payout_id_2      character varying(64),            -- payout id for second ₹1 transfer
+    penny_expected_utr_1   character varying(64),            -- UTR we sent (from Razorpay response)
+    penny_expected_utr_2   character varying(64),            -- UTR we sent (from Razorpay response)
+    penny_utr_1            character varying(64),            -- UTR entered by owner
+    penny_utr_2            character varying(64),            -- UTR entered by owner
     created_at          timestamp with time zone NOT NULL DEFAULT now(),
     updated_at          timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -276,3 +298,75 @@ ALTER TABLE ONLY public.tenant_bank_accounts ADD CONSTRAINT tenant_bank_accounts
 ALTER TABLE ONLY public.tenant_bank_accounts ADD CONSTRAINT tenant_bank_accounts_owner_id_fkey
     FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_tenant_bank_owner ON public.tenant_bank_accounts USING btree (owner_id);
+
+-- ── Custom domains (BYO CNAME): Pro=1, Enterprise=3 per plan.max_custom_domains ──
+-- Multi-domain per tenant (supersedes the single tenants.custom_domain column).
+CREATE TABLE IF NOT EXISTS public.tenant_custom_domains (
+    id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id          uuid NOT NULL,
+    domain             character varying(255) NOT NULL,
+    status             character varying(16) NOT NULL DEFAULT 'pending', -- pending|verifying|verified|failed
+    verification_token character varying(64),   -- CNAME/TXT token owner must publish
+    cert_arn           character varying(512),   -- ACM cert once issued
+    cloudfront_id      character varying(64),
+    verified_at        timestamp with time zone,
+    created_at         timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at         timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.tenant_custom_domains ADD CONSTRAINT tenant_custom_domains_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_custom_domains ADD CONSTRAINT tenant_custom_domains_domain_key UNIQUE (domain);
+ALTER TABLE ONLY public.tenant_custom_domains ADD CONSTRAINT tenant_custom_domains_tenant_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_custom_domains ADD CONSTRAINT tenant_custom_domains_status_check
+    CHECK (status IN ('pending','verifying','verified','failed'));
+CREATE INDEX IF NOT EXISTS idx_tcd_tenant ON public.tenant_custom_domains USING btree (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tcd_domain ON public.tenant_custom_domains USING btree (domain) WHERE status='verified';
+
+-- ── Onboarding drafts: persists wizard progress so owners can resume ──────────
+CREATE TABLE IF NOT EXISTS public.onboarding_drafts (
+    id          uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    owner_id    uuid NOT NULL,
+    current_step integer NOT NULL DEFAULT 0,
+    data        jsonb NOT NULL DEFAULT '{}',
+    status      character varying(16) NOT NULL DEFAULT 'draft', -- draft|submitted
+    created_at  timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.onboarding_drafts ADD CONSTRAINT onboarding_drafts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.onboarding_drafts ADD CONSTRAINT onboarding_drafts_owner_id_key UNIQUE (owner_id);
+ALTER TABLE ONLY public.onboarding_drafts ADD CONSTRAINT onboarding_drafts_owner_id_fkey
+    FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.onboarding_drafts ADD CONSTRAINT onboarding_drafts_status_check
+    CHECK (status IN ('draft','submitted'));
+
+-- ── Tenant KYC: GST cert + business details, reviewed by platform admin ───────
+CREATE TABLE IF NOT EXISTS public.tenant_kyc (
+    id              uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id       uuid NOT NULL,
+    owner_id        uuid NOT NULL,
+    gst_number      character varying(20),
+    gst_cert_s3_key character varying(512),   -- S3 key: kyc/{owner_id}/{uuid}-{filename}
+    pan             character varying(16),
+    business_name   character varying(200),
+    business_type   character varying(32),    -- proprietor|partnership|pvt_ltd|llp|other
+    business_address text,
+    product_categories text,                  -- comma-separated or free text
+    status          character varying(16) NOT NULL DEFAULT 'pending', -- pending|approved|rejected
+    reviewer_note   text,
+    reviewed_by     character varying(200),   -- admin email
+    reviewed_at     timestamp with time zone,
+    created_at      timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at      timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_tenant_id_key UNIQUE (tenant_id);
+ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_owner_id_fkey
+    FOREIGN KEY (owner_id) REFERENCES public.owners(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_status_check
+    CHECK (status IN ('pending','approved','rejected'));
+ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_business_type_check
+    CHECK (business_type IN ('proprietor','partnership','pvt_ltd','llp','other'));
+CREATE INDEX IF NOT EXISTS idx_tenant_kyc_status ON public.tenant_kyc USING btree (status);
+CREATE INDEX IF NOT EXISTS idx_tenant_kyc_owner ON public.tenant_kyc USING btree (owner_id);

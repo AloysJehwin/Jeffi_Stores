@@ -6,6 +6,8 @@ import { query, queryOne, withTransaction } from '@/lib/db'
 import BrandForm from '@/components/admin/BrandForm'
 import { ChevronLeft } from 'lucide-react'
 import type { PoolClient } from 'pg'
+import { getAdminSession } from '@/lib/admin-auth'
+import { hasScope } from '@/lib/scopes'
 
 async function getBrand(id: string) {
   const data = await queryOne('SELECT * FROM brands WHERE id = $1', [id])
@@ -113,6 +115,9 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
 
   const brandForForm = draftRow?.fields ? { ...brand, ...draftRow.fields } : brand
 
+  const session = await getAdminSession()
+  const hasReturns = hasScope(session?.role ?? '', session?.scopes ?? [], 'returns:read')
+
   const backUrl = back && back.startsWith('/admin/brands') ? back : '/admin/brands'
 
   return (
@@ -144,7 +149,7 @@ export default async function EditBrandPage({ params, searchParams }: { params: 
         <p className="text-foreground-secondary mt-1">{isDraft ? 'Changes are saved to the draft only' : 'Update brand information'}</p>
       </div>
 
-      <BrandForm brand={brandForForm} action={updateBrand.bind(null, id)} backUrl={backUrl} isDraft={isDraft} />
+      <BrandForm brand={brandForForm} action={updateBrand.bind(null, id)} backUrl={backUrl} isDraft={isDraft} hasReturns={hasReturns} />
     </div>
   )
 }

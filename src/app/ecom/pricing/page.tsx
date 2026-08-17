@@ -1,15 +1,9 @@
-import Link from 'next/link'
 import { Fragment } from 'react'
+import Link from 'next/link'
 import { listPlans, planFeatureMatrix, COMPARISON_ROWS } from '@/lib/tenant-registry'
+import PricingCards from './PricingCards'
 
 export const dynamic = 'force-dynamic'
-
-const PLAN_BLURB: Record<string, string> = {
-  basic: 'Everything to launch — full storefront + core admin.',
-  growth: 'Quotations, CRM, returns, coupons, inventory.',
-  pro: 'Marketing, AI assistant, B2B portal, channel sync.',
-  enterprise: 'Dedicated infra, custom domain, priority support.',
-}
 
 function Check() {
   return <svg className="w-5 h-5 mx-auto text-accent-600 dark:text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.4}><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>
@@ -23,11 +17,10 @@ export default async function PricingPage() {
   const ordered = [...plans].sort((a, b) => a.tier - b.tier)
 
   const has = (planSlug: string, scopeKey: string | null) => {
-    if (scopeKey === null) return true // storefront features — all plans
+    if (scopeKey === null) return true
     return matrix[planSlug]?.has(scopeKey) ?? false
   }
 
-  // group rows for the table
   const groups = Array.from(new Set(COMPARISON_ROWS.map((r) => r.group)))
 
   return (
@@ -39,38 +32,20 @@ export default async function PricingPage() {
           <h1 className="text-4xl lg:text-6xl font-extrabold tracking-tight">Pricing</h1>
           <p className="mt-4 text-lg text-foreground-secondary max-w-2xl mx-auto">
             Every plan includes the complete storefront. As you grow, unlock more of the admin
-            platform. Transparent monthly pricing — cancel anytime.
+            platform. Monthly or yearly — cancel anytime.
           </p>
         </div>
       </section>
 
-      {/* Plan cards */}
+      {/* Interactive plan cards with monthly/yearly toggle */}
       <section className="w-full px-6 lg:px-12 pb-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 max-w-7xl mx-auto">
-          {ordered.map((p) => {
-            const featured = p.slug === 'growth'
-            return (
-              <div key={p.slug} className={`relative rounded-2xl border p-6 flex flex-col ${featured ? 'border-accent-500 bg-surface-elevated shadow-xl lg:scale-[1.03]' : 'border-border-default bg-surface-elevated'}`}>
-                {featured && <span className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full bg-accent-600 text-white text-xs font-semibold">Most popular</span>}
-                <div className="text-xl font-bold">{p.name}</div>
-                <div className="text-3xl font-extrabold mt-1">₹{Number(p.monthly_price_inr).toLocaleString('en-IN')}<span className="text-sm text-foreground-muted font-normal">/mo</span></div>
-                <p className="text-sm text-foreground-secondary mt-3 min-h-[2.75rem]">{PLAN_BLURB[p.slug]}</p>
-                <div className="text-xs text-foreground-muted mt-3">
-                  {Array.from(matrix[p.slug] || []).length} admin features included
-                </div>
-                <Link href="/signup" className={`mt-6 text-center px-4 py-2.5 rounded-lg text-sm font-semibold transition-colors ${featured ? 'bg-accent-600 hover:bg-accent-700 text-white' : 'border border-border-default hover:bg-surface-secondary'}`}>
-                  Choose {p.name}
-                </Link>
-              </div>
-            )
-          })}
-        </div>
+        <PricingCards plans={plans} />
       </section>
 
-      {/* Detailed comparison */}
+      {/* Detailed comparison table */}
       <section className="w-full px-6 lg:px-12 pb-24">
         <h2 className="text-3xl lg:text-4xl font-extrabold text-center mb-10">Compare every feature</h2>
-        <div className="max-w-7xl mx-auto overflow-x-auto rounded-2xl border border-border-default bg-surface-elevated">
+        <div className="w-full overflow-x-auto rounded-2xl border border-border-default bg-surface-elevated">
           <table className="w-full text-sm min-w-[720px]">
             <thead className="sticky top-0">
               <tr className="bg-surface-secondary">
@@ -99,7 +74,6 @@ export default async function PricingPage() {
                   ))}
                 </Fragment>
               ))}
-              {/* add-ons row */}
               <tr className="bg-surface-secondary/50">
                 <td colSpan={ordered.length + 1} className="px-5 py-2 text-xs font-semibold uppercase tracking-widest text-foreground-muted">Add-ons</td>
               </tr>
@@ -131,9 +105,10 @@ export default async function PricingPage() {
         <div className="max-w-3xl mx-auto space-y-4">
           {[
             ['Is the storefront limited on cheaper plans?', 'No. Every plan — including Basic — ships with the complete storefront: full catalogue, cart, checkout, wishlist, compare and COD. Plans differ only in how much of the admin platform you unlock.'],
+            ['Monthly vs yearly — what\'s the difference?', 'Yearly billing charges 10× the monthly price up front (effectively 2 months free). You can switch between monthly and yearly anytime from your billing dashboard — a downgrade takes effect at the next renewal, an upgrade is applied immediately with a prorated credit.'],
             ['How do payouts work?', 'Payments from your customers are split at checkout and settled to your verified bank account, minus platform + gateway fees. Weekly by default, or daily for +5%.'],
             ['Can I use my own domain?', 'Yes — a custom domain is an add-on on all plans and included on Enterprise. We handle the certificate and DNS.'],
-            ['Can I upgrade later?', 'Anytime. Upgrading unlocks more admin features instantly; your storefront and data stay exactly as they are.'],
+            ['Can I upgrade or downgrade later?', 'Anytime. Upgrading is immediate — you\'re charged the difference with a prorated credit. Downgrading takes effect at your next renewal so you keep your current features until then.'],
             ['What about GST?', 'Compliant GST invoices are generated automatically on every order, quotation and cash sale.'],
           ].map(([q, a]) => (
             <details key={q} className="group rounded-xl border border-border-default bg-surface p-5">

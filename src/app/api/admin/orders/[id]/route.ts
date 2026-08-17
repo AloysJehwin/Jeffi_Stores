@@ -90,6 +90,18 @@ export async function PATCH(
     if (!parsed.ok) return parsed.response
 
     const d = parsed.data
+
+    // Plan-gated status transition validation.
+    // Returns module (returns:read) is Growth+ — Basic plan cannot manually set return statuses.
+    // Delhivery (delhivery:read) is available on all plans — delivery flow is always supported.
+    if (d.status !== undefined) {
+      const needsReturns = ['returned', 'return_received', 'return_in_transit'].includes(d.status)
+      if (needsReturns && !hasScope(admin.role, admin.scopes, 'returns:read')) {
+        return NextResponse.json({
+          error: `Setting status "${d.status}" requires the Returns module (Growth plan and above).`,
+        }, { status: 403 })
+      }
+    }
     if (d.estimated_delivery_date !== undefined) {
       const current = await queryOne<any>(`SELECT status FROM orders WHERE id = $1`, [id])
       if (current?.status === 'delivered') {
@@ -119,7 +131,11 @@ export async function PATCH(
     await queryOne(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${values.length}`, values)
 
     if (d.status === 'returned' || d.status === 'return_received') {
-      restoreOrderStock(id).catch(() => {})
+      // Only restore stock if the tenant's plan includes inventory management.
+      // Basic plan tenants don't have inventory:read — skip the deduction reversal.
+      if (hasScope(admin.role, admin.scopes, 'inventory:read')) {
+        restoreOrderStock(id).catch(() => {})
+      }
     }
 
     if (d.estimated_delivery_date !== undefined) {

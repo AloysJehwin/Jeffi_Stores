@@ -270,7 +270,17 @@ function LoginPage() {
     }
   }
 
-  const channelOptions = [
+  const [smsEnabled, setSmsEnabled] = useState(process.env.NEXT_PUBLIC_SMS_DISABLED !== 'true')
+  const [whatsappEnabled, setWhatsappEnabled] = useState(process.env.NEXT_PUBLIC_WHATSAPP_DISABLED !== 'true')
+
+  useEffect(() => {
+    fetch('/api/feature-flags').then(r => r.json()).then(f => {
+      setSmsEnabled(f.smsEnabled ?? true)
+      setWhatsappEnabled(f.whatsappEnabled ?? true)
+    }).catch(() => {})
+  }, [])
+
+  const allChannelOptions = [
     {
       id: 'email' as const,
       icon: (
@@ -279,6 +289,7 @@ function LoginPage() {
         </svg>
       ),
       label: 'Email',
+      enabled: true,
     },
     {
       id: 'sms' as const,
@@ -288,6 +299,7 @@ function LoginPage() {
         </svg>
       ),
       label: 'SMS',
+      enabled: smsEnabled,
     },
     {
       id: 'whatsapp' as const,
@@ -297,8 +309,10 @@ function LoginPage() {
         </svg>
       ),
       label: 'WhatsApp',
+      enabled: whatsappEnabled,
     },
-  ] as const
+  ]
+  const channelOptions = allChannelOptions.filter(o => o.enabled)
 
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">

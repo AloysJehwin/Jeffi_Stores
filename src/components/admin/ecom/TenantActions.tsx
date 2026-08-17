@@ -68,6 +68,20 @@ export default function TenantActions({
         <span className="text-xs text-amber-600 dark:text-amber-400">Instance stopped — DB powered down (auto-restarts after 7 days)</span>
       )}
 
+      {status === 'active' && (
+        <button
+          onClick={() => {
+            if (!confirm(`Deprovision "${slug}"? The store goes offline immediately, its database is backed up to S3, then the RDS instance and bucket are DELETED. This is destructive.`)) return
+            call(`/api/admin/ecom/customers/${tenantId}/deprovision`, { confirm: true }, 'deprovision')
+          }}
+          disabled={busy !== null}
+          className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white text-sm font-medium transition-colors"
+          title="Take store down, back up its DB to S3, then delete RDS + bucket"
+        >
+          {busy === 'deprovision' ? 'Deprovisioning…' : 'Deprovision & back up'}
+        </button>
+      )}
+
       {msg && (
         <span className={`text-sm ${msg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{msg.text}</span>
       )}

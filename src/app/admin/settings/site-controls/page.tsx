@@ -64,6 +64,7 @@ export default async function SiteControlsPage() {
   const c = await getSiteControls()
   const inv = await loadInvoiceKeys()
   const delivery = await getDeliverySettings()
+  const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
   const hero = await loadHeroData()
 
   return (
@@ -102,6 +103,15 @@ export default async function SiteControlsPage() {
             <NumberControl settingKey="order_auto_cancel_minutes" label="Auto-cancel unpaid orders after" suffix="min" min={1} initial={c.values.orderAutoCancelMinutes} />
           </SectionCard>
         </div>
+
+        {hasCrm && (
+        <div>
+          <SectionCard title="Notifications" description="SMS and WhatsApp channels for customer OTP, order updates and marketing. Growth plan and above." columns>
+            <FullSpan><ToggleControl settingKey="feature_sms_enabled" label="SMS notifications" hint="When off, SMS channel is hidden from signin/signup and no SMS messages are sent." initial={c.flags.smsEnabled} /></FullSpan>
+            <FullSpan><ToggleControl settingKey="feature_whatsapp_enabled" label="WhatsApp notifications" hint="When off, WhatsApp channel is hidden from signin/signup and no WhatsApp messages are sent." initial={c.flags.whatsappEnabled} /></FullSpan>
+          </SectionCard>
+        </div>
+        )}
 
         <div>
           <SectionCard title="On-device AI" description="Experimental browser-based AI features. Per-platform switches control where the in-browser model runs; when it's off (or unsupported) on a platform, that device falls back to server-generated AI instead." columns>
