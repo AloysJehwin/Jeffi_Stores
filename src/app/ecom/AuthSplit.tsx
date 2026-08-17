@@ -1,10 +1,20 @@
 import Link from 'next/link'
+import { cookies, headers } from 'next/headers'
+import { redirect } from 'next/navigation'
+import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import OwnerAuthForm from './OwnerAuthForm'
 import { CheckMark } from './Shapes'
 
 // Full-page split auth layout: branded value panel (left) + form (right).
 // Collapses to a single column on mobile with a compact brand header.
-export default function AuthSplit({ mode }: { mode: 'signup' | 'signin' }) {
+// Server-guarded: an already-signed-in owner is bounced to the dashboard so the
+// auth form is never shown to an authenticated session.
+export default async function AuthSplit({ mode }: { mode: 'signup' | 'signin' }) {
+  const sid = (await cookies()).get(OWNER_COOKIE)?.value
+  const h = await headers()
+  const signals = { userAgent: h.get('user-agent'), acceptLanguage: h.get('accept-language'), uaPlatform: h.get('sec-ch-ua-platform') }
+  const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
+  if (owner) redirect('/dashboard')
   const points = [
     'Your own branded storefront + admin',
     'Online & COD payments, settled for you',

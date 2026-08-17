@@ -73,6 +73,7 @@ export default async function AdminLayout({
     // Ecom Store — SaaS control plane. superAdminOnly: only the platform operator sees this group.
     // Placed above Settings per nav ordering.
     { href: '/admin/ecom/customers', label: 'Customers', scope: 'ecom_customers:read', group: 'Ecom Store', superAdminOnly: true },
+    { href: '/admin/ecom/kyc', label: 'KYC Review', scope: 'ecom_customers:read', group: 'Ecom Store', superAdminOnly: true },
     { href: '/admin/ecom/instances', label: 'Instances', scope: 'ecom_instances:read', group: 'Ecom Store', superAdminOnly: true },
     { href: '/admin/ecom/store-status', label: 'Store Status', scope: 'ecom_customers:read', group: 'Ecom Store', superAdminOnly: true },
     { href: '/admin/ecom/billing', label: 'Billing', scope: 'ecom_billing:read', group: 'Ecom Store', superAdminOnly: true },

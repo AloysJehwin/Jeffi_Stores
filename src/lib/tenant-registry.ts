@@ -26,9 +26,13 @@ export const RESERVED_LABELS = new Set([
 
 const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
 
-let cpPool: Pool | null = null
-function controlPlanePool(): Pool {
-  if (cpPool) return cpPool
+// Cache the control-plane pool on globalThis so Next.js dev / Turbopack hot-reloads
+// (which re-import this module) reuse the SAME pg.Pool instead of spawning a fresh
+// one each reload — otherwise the orphaned pools accumulate open connections and
+// local Postgres hits "sorry, too many clients already".
+const cpGlobal = globalThis as unknown as { __cpPool?: Pool }
+export function controlPlanePool(): Pool {
+  if (cpGlobal.__cpPool) return cpGlobal.__cpPool
   let url = process.env.CONTROL_PLANE_DATABASE_URL || ''
   const iam = process.env.CONTROL_PLANE_IAM_AUTH === 'true'
   // Local-dev fallback: predev regenerates .env.local from Secrets Manager and may not
@@ -68,9 +72,10 @@ function controlPlanePool(): Pool {
       if (fs.existsSync(certPath)) config.ssl = { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
     }
   }
-  cpPool = new Pool(config)
-  cpPool.on('error', () => { /* idle-client error — pool self-heals */ })
-  return cpPool
+  const p = new Pool(config)
+  p.on('error', () => { /* idle-client error — pool self-heals */ })
+  cpGlobal.__cpPool = p
+  return p
 }
 
 // In-process cache: host -> { ctx, expires }. Short TTL so tenant/plan changes
@@ -105,13 +110,23 @@ export function slugFromHost(hostname: string): { slug: string | null; isCustomD
 
 async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Promise<TenantContext | null> {
   const pool = controlPlanePool()
+  // For custom_domain, resolve via the tenant_custom_domains table (verified only),
+  // falling back to the legacy tenants.custom_domain column for backward compat.
+  const whereClause = where === 'custom_domain'
+    ? `t.id = (
+         SELECT tenant_id FROM tenant_custom_domains WHERE domain = $1 AND status = 'verified'
+         UNION ALL
+         SELECT id FROM tenants WHERE custom_domain = $1
+         LIMIT 1
+       )`
+    : `t.${where} = $1`
   const res = await pool.query(
     `SELECT t.id, t.slug, t.status, p.slug AS plan,
             i.rds_endpoint, i.rds_db, i.rds_port, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
-     WHERE t.${where} = $1
+     WHERE ${whereClause}
      LIMIT 1`,
     [value]
   )
@@ -164,6 +179,27 @@ export function clearTenantCache(): void {
   cache.clear()
 }
 
+/**
+ * Resolve a full TenantContext (incl. infra) from a tenant slug. Used by the DB layer
+ * to establish per-request tenant context from the x-tenant-slug header middleware sets
+ * (Edge middleware's AsyncLocalStorage does NOT propagate to Node handlers, so the pool
+ * selector must re-resolve inside the request). Cached like resolveTenantFromHost.
+ */
+export async function lookupTenantContextBySlug(slug: string): Promise<TenantContext | null> {
+  const key = `slug:${slug}`
+  const now = Date.now()
+  const cached = cache.get(key)
+  if (cached && cached.expires > now) return cached.ctx
+  let ctx: TenantContext | null = null
+  try {
+    ctx = await lookupTenant('slug', slug)
+  } catch {
+    ctx = null
+  }
+  cache.set(key, { ctx, expires: now + CACHE_TTL_MS })
+  return ctx
+}
+
 export interface TenantRow {
   id: string
   slug: string
@@ -172,7 +208,15 @@ export interface TenantRow {
   status: string
   plan: string | null
   monthly_price_inr: string | null
+  max_custom_domains: number
   daily_payout: boolean
+  billing_interval: string
+  razorpay_subscription_id: string | null
+  razorpay_checkout_url: string | null
+  razorpay_linked_account_id: string | null
+  subscription_status: string
+  noreply_email: string
+  campaign_email: string
   rds_endpoint: string | null
   s3_bucket: string | null
   ec2_target: string | null
@@ -215,14 +259,22 @@ export async function tenantSummary(): Promise<{ total: number; active: number; 
   return { total: r.total, active: r.active, mrr: Number(r.mrr) }
 }
 
+/** Count of active tenants — the sole input to pool auto-scaling (see pool-autoscale.ts). */
+export async function activeTenantCount(): Promise<number> {
+  const pool = controlPlanePool()
+  const res = await pool.query(`SELECT count(*)::int AS n FROM tenants WHERE status='active'`)
+  return res.rows[0].n
+}
+
 // Valid tenant slug: 3-63 chars, lowercase alphanumeric + hyphens, no leading/trailing hyphen.
 const SLUG_RE = /^[a-z0-9](?:[a-z0-9-]{1,61}[a-z0-9])?$/
-
 export interface CreateTenantInput {
   slug: string
   displayName: string
   planSlug: string
+  billingInterval?: string
   dailyPayout?: boolean
+  status?: string
   warehouse?: {
     originPincode?: string
     pickupLocation?: string
@@ -263,9 +315,10 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
   try {
     await client.query('BEGIN')
     const t = await client.query(
-      `INSERT INTO tenants (slug, display_name, plan_id, status, daily_payout)
-       VALUES ($1, $2, $3, 'provisioning', $4) RETURNING id`,
-      [slug, input.displayName.trim(), plan.rows[0].id, !!input.dailyPayout]
+      `INSERT INTO tenants (slug, display_name, plan_id, status, billing_interval, daily_payout)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      [slug, input.displayName.trim(), plan.rows[0].id,
+       input.status ?? 'provisioning', input.billingInterval ?? 'monthly', !!input.dailyPayout]
     )
     const tenantId = t.rows[0].id
     // Empty infra row (rds_endpoint null → resolver returns tenant with null infra →
@@ -319,6 +372,7 @@ export async function getTenant(id: string): Promise<TenantDetail | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at, t.instance_state,
+            t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             p.slug AS plan, p.monthly_price_inr,
             i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.ec2_target, i.region, i.cloudfront_id
      FROM tenants t
@@ -388,13 +442,15 @@ export interface ProvisioningJob {
 }
 
 /** Create (or return existing pending) provisioning job for a tenant. */
-export async function enqueueProvisioning(tenantId: string): Promise<ProvisioningJob> {
+export async function enqueueProvisioning(tenantId: string, opts?: { restoreFromKey?: string }): Promise<ProvisioningJob> {
   const pool = controlPlanePool()
   const existing = await pool.query(
     `SELECT * FROM provisioning_jobs WHERE tenant_id=$1 AND status IN ('pending','running') LIMIT 1`, [tenantId])
   if (existing.rows[0]) return existing.rows[0] as ProvisioningJob
+  const created = opts?.restoreFromKey ? { restoreFromKey: opts.restoreFromKey } : {}
   const res = await pool.query(
-    `INSERT INTO provisioning_jobs (tenant_id) VALUES ($1) RETURNING *`, [tenantId])
+    `INSERT INTO provisioning_jobs (tenant_id, created_resources) VALUES ($1, $2::jsonb) RETURNING *`,
+    [tenantId, JSON.stringify(created)])
   return res.rows[0] as ProvisioningJob
 }
 
@@ -435,6 +491,66 @@ export async function setTenantStatus(tenantId: string, status: string): Promise
   const pool = controlPlanePool()
   await pool.query(`UPDATE tenants SET status=$1, updated_at=now() WHERE id=$2`, [status, tenantId])
 }
+export async function saveLinkedAccountId(tenantId: string, linkedAccountId: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenants SET razorpay_linked_account_id=$1, updated_at=now() WHERE id=$2`,
+    [linkedAccountId, tenantId],
+  )
+}
+
+export async function saveSubscriptionId(tenantId: string, subscriptionId: string, billingInterval?: string, checkoutUrl?: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenants SET razorpay_subscription_id=$1, subscription_status='created',
+      billing_interval=COALESCE($3, billing_interval),
+      razorpay_checkout_url=COALESCE($4, razorpay_checkout_url),
+      updated_at=now() WHERE id=$2`,
+    [subscriptionId, tenantId, billingInterval ?? null, checkoutUrl ?? null],
+  )
+}
+
+export async function setSubscriptionStatus(tenantId: string, subscriptionStatus: string, tenantStatus?: string): Promise<void> {
+  const pool = controlPlanePool()
+  if (tenantStatus) {
+    await pool.query(
+      `UPDATE tenants SET subscription_status=$1, status=$2, updated_at=now() WHERE id=$3`,
+      [subscriptionStatus, tenantStatus, tenantId],
+    )
+  } else {
+    await pool.query(
+      `UPDATE tenants SET subscription_status=$1, updated_at=now() WHERE id=$2`,
+      [subscriptionStatus, tenantId],
+    )
+  }
+}
+
+export async function getTenantBySubscriptionId(subscriptionId: string): Promise<{ id: string; slug: string; status: string } | null> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `SELECT id, slug, status FROM tenants WHERE razorpay_subscription_id=$1`,
+    [subscriptionId],
+  )
+  return r.rows[0] ?? null
+}
+
+export async function updateTenantPlan(tenantId: string, opts: {
+  planSlug: string
+  billingInterval: string
+  newSubscriptionId?: string
+}): Promise<void> {
+  const pool = controlPlanePool()
+  const planRow = await pool.query(`SELECT id FROM plans WHERE slug=$1`, [opts.planSlug])
+  const planId = planRow.rows[0]?.id ?? null
+  await pool.query(
+    `UPDATE tenants SET plan_id=$1, billing_interval=$2,
+      razorpay_subscription_id=COALESCE($3, razorpay_subscription_id),
+      subscription_status=CASE WHEN $3 IS NOT NULL THEN 'created' ELSE subscription_status END,
+      updated_at=now() WHERE id=$4`,
+    [planId, opts.billingInterval, opts.newSubscriptionId ?? null, tenantId],
+  )
+}
+
 export async function setTenantInstanceState(tenantId: string, state: 'running' | 'stopped'): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(`UPDATE tenants SET instance_state=$1, updated_at=now() WHERE id=$2`, [state, tenantId])
@@ -445,6 +561,15 @@ export async function writeTenantInfra(tenantId: string, infra: { rdsEndpoint: s
   await pool.query(
     `UPDATE tenant_infra SET rds_endpoint=$1, s3_bucket=$2, iam_auth=true, updated_at=now() WHERE tenant_id=$3`,
     [infra.rdsEndpoint, infra.s3Bucket, tenantId])
+}
+
+/** Null the infra pointers after deprovisioning (resources deleted). */
+export async function clearTenantInfra(tenantId: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenant_infra SET rds_endpoint=NULL, updated_at=now() WHERE tenant_id=$1`,
+    [tenantId])
+  clearTenantCache()
 }
 
 // ── Owner accounts (ecom store owners) ───────────────────────────────────────
@@ -478,7 +603,9 @@ export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
     `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at,
-            p.slug AS plan, p.monthly_price_inr,
+            t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
+            t.razorpay_linked_account_id, t.noreply_email, t.campaign_email,
+            p.slug AS plan, p.monthly_price_inr, COALESCE(p.max_custom_domains, 0) AS max_custom_domains,
             i.rds_endpoint, i.s3_bucket, i.ec2_target, i.region
      FROM owner_tenants ot
      JOIN tenants t ON t.id = ot.tenant_id
@@ -508,15 +635,21 @@ export interface BankAccount {
 export async function saveBankVerification(args: {
   ownerId: string
   accountNumber?: string | null; ifsc?: string | null; holderName?: string | null; upiId?: string | null
-  status: 'verified' | 'failed'; ref?: string | null; verifiedName?: string | null
+  status: 'pending' | 'initiated' | 'verified' | 'failed'; ref?: string | null; verifiedName?: string | null
 }): Promise<BankAccount> {
   const pool = controlPlanePool()
-  // One active bank record per owner for now: replace prior.
-  await pool.query(`DELETE FROM tenant_bank_accounts WHERE owner_id=$1 AND tenant_id IS NULL`, [args.ownerId])
+  // Upsert: one active bank record per owner (no tenant_id yet during onboarding).
   const res = await pool.query(
     `INSERT INTO tenant_bank_accounts
        (owner_id, account_number, ifsc, holder_name, upi_id, verification_status, verification_ref, verified_name)
      VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+     ON CONFLICT (owner_id) DO UPDATE SET
+       account_number=EXCLUDED.account_number, ifsc=EXCLUDED.ifsc,
+       holder_name=EXCLUDED.holder_name, upi_id=EXCLUDED.upi_id,
+       verification_status=EXCLUDED.verification_status,
+       verification_ref=COALESCE(EXCLUDED.verification_ref, tenant_bank_accounts.verification_ref),
+       verified_name=COALESCE(EXCLUDED.verified_name, tenant_bank_accounts.verified_name),
+       updated_at=now()
      RETURNING id, owner_id, verification_status, account_number, ifsc, holder_name, upi_id, verified_name`,
     [args.ownerId, args.accountNumber || null, args.ifsc || null, args.holderName || null, args.upiId || null,
      args.status, args.ref || null, args.verifiedName || null])
@@ -579,4 +712,198 @@ export async function planFeatureMatrix(): Promise<Record<string, Set<string>>> 
     (matrix[r.slug] ||= new Set()).add(r.scope_key)
   }
   return matrix
+}
+
+// ── Onboarding drafts ─────────────────────────────────────────────────────────
+
+export interface OnboardingDraft {
+  id: string
+  owner_id: string
+  current_step: number
+  data: Record<string, any>
+  status: string
+  updated_at: string
+}
+
+export async function saveDraft(ownerId: string, step: number, data: Record<string, any>): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `INSERT INTO onboarding_drafts (owner_id, current_step, data)
+     VALUES ($1, $2, $3)
+     ON CONFLICT (owner_id) DO UPDATE
+       SET current_step = $2, data = $3, updated_at = now()
+     WHERE onboarding_drafts.status = 'draft'`,
+    [ownerId, step, JSON.stringify(data)],
+  )
+}
+
+export async function getDraft(ownerId: string): Promise<OnboardingDraft | null> {
+  const pool = controlPlanePool()
+  const r = await pool.query(`SELECT * FROM onboarding_drafts WHERE owner_id=$1`, [ownerId])
+  return r.rows[0] ?? null
+}
+
+export async function markDraftSubmitted(ownerId: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(`UPDATE onboarding_drafts SET status='submitted', updated_at=now() WHERE owner_id=$1`, [ownerId])
+}
+
+// ── Tenant KYC ────────────────────────────────────────────────────────────────
+
+export interface TenantKyc {
+  id: string
+  tenant_id: string
+  owner_id: string
+  gst_number: string | null
+  gst_cert_s3_key: string | null
+  pan: string | null
+  business_name: string | null
+  business_type: string | null
+  business_address: string | null
+  product_categories: string | null
+  status: string
+  reviewer_note: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  created_at: string
+}
+
+export async function saveKyc(tenantId: string, ownerId: string, kyc: Partial<Omit<TenantKyc, 'id' | 'tenant_id' | 'owner_id' | 'status' | 'created_at'>>): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `INSERT INTO tenant_kyc (tenant_id, owner_id, gst_number, gst_cert_s3_key, pan, business_name, business_type, business_address, product_categories)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     ON CONFLICT (tenant_id) DO UPDATE SET
+       gst_number=EXCLUDED.gst_number, gst_cert_s3_key=COALESCE(EXCLUDED.gst_cert_s3_key, tenant_kyc.gst_cert_s3_key),
+       pan=EXCLUDED.pan, business_name=EXCLUDED.business_name, business_type=EXCLUDED.business_type,
+       business_address=EXCLUDED.business_address, product_categories=EXCLUDED.product_categories,
+       updated_at=now()`,
+    [tenantId, ownerId, kyc.gst_number ?? null, kyc.gst_cert_s3_key ?? null, kyc.pan ?? null,
+     kyc.business_name ?? null, kyc.business_type ?? null, kyc.business_address ?? null, kyc.product_categories ?? null],
+  )
+}
+
+export async function getKyc(tenantId: string): Promise<TenantKyc | null> {
+  const pool = controlPlanePool()
+  const r = await pool.query(`SELECT * FROM tenant_kyc WHERE tenant_id=$1`, [tenantId])
+  return r.rows[0] ?? null
+}
+
+export async function getPendingKycList(): Promise<Array<TenantKyc & { display_name: string; owner_email: string; slug: string }>> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `SELECT k.*, t.display_name, t.slug, o.email AS owner_email
+     FROM tenant_kyc k
+     JOIN tenants t ON t.id = k.tenant_id
+     JOIN owners o ON o.id = k.owner_id
+     WHERE k.status = 'pending'
+     ORDER BY k.created_at ASC`,
+  )
+  return r.rows
+}
+
+export async function approveKyc(tenantId: string, reviewerEmail: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenant_kyc SET status='approved', reviewed_by=$2, reviewed_at=now(), updated_at=now() WHERE tenant_id=$1`,
+    [tenantId, reviewerEmail],
+  )
+  await pool.query(
+    `UPDATE tenants SET status='provisioning', updated_at=now() WHERE id=$1`,
+    [tenantId],
+  )
+}
+
+export async function rejectKyc(tenantId: string, reviewerEmail: string, note: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenant_kyc SET status='rejected', reviewed_by=$2, reviewed_at=now(), reviewer_note=$3, updated_at=now() WHERE tenant_id=$1`,
+    [tenantId, reviewerEmail, note],
+  )
+  await pool.query(
+    `UPDATE tenants SET status='rejected', updated_at=now() WHERE id=$1`,
+    [tenantId],
+  )
+}
+
+// ── Custom domains (BYO CNAME) ────────────────────────────────────────────────
+
+export interface CustomDomain {
+  id: string
+  tenant_id: string
+  domain: string
+  status: string
+  verification_token: string | null
+  cert_arn: string | null
+  verified_at: string | null
+  created_at: string
+}
+
+export async function listCustomDomains(tenantId: string): Promise<CustomDomain[]> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT id, tenant_id, domain, status, verification_token, cert_arn, verified_at, created_at
+     FROM tenant_custom_domains WHERE tenant_id=$1 ORDER BY created_at ASC`, [tenantId])
+  return res.rows
+}
+
+/** Add a custom domain — enforces the plan's max_custom_domains quota. */
+export async function addCustomDomain(tenantId: string, domain: string): Promise<{ ok: true; domain: CustomDomain } | { ok: false; error: string }> {
+  const pool = controlPlanePool()
+  const clean = domain.toLowerCase().trim().replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+  if (!/^([a-z0-9-]+\.)+[a-z]{2,}$/.test(clean)) return { ok: false, error: 'Invalid domain format' }
+  if (clean.endsWith('.jeffistores.in')) return { ok: false, error: 'Cannot use a jeffistores.in subdomain as a custom domain' }
+
+  // Quota check
+  const quotaRes = await pool.query(
+    `SELECT COALESCE(p.max_custom_domains, 0) AS max, COUNT(cd.id) AS used
+     FROM tenants t
+     LEFT JOIN plans p ON p.id = t.plan_id
+     LEFT JOIN tenant_custom_domains cd ON cd.tenant_id = t.id
+     WHERE t.id = $1
+     GROUP BY p.max_custom_domains`, [tenantId])
+  const q = quotaRes.rows[0]
+  const max = Number(q?.max ?? 0)
+  const used = Number(q?.used ?? 0)
+  if (max === 0) return { ok: false, error: 'Custom domains are available on Pro plan and above' }
+  if (used >= max) return { ok: false, error: `Domain limit reached (${max} for your plan)` }
+
+  // Uniqueness
+  const dup = await pool.query(`SELECT 1 FROM tenant_custom_domains WHERE domain=$1`, [clean])
+  if (dup.rows[0]) return { ok: false, error: 'This domain is already registered' }
+
+  const token = 'jeffi-verify-' + Math.random().toString(36).slice(2, 14)
+  const res = await pool.query(
+    `INSERT INTO tenant_custom_domains (tenant_id, domain, status, verification_token)
+     VALUES ($1, $2, 'pending', $3)
+     RETURNING id, tenant_id, domain, status, verification_token, cert_arn, verified_at, created_at`,
+    [tenantId, clean, token])
+  clearTenantCache()
+  return { ok: true, domain: res.rows[0] }
+}
+
+/** Mark a custom domain verified (called after DNS CNAME check passes). */
+export async function setCustomDomainStatus(id: string, status: string, certArn?: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenant_custom_domains
+     SET status=$1, cert_arn=COALESCE($2, cert_arn),
+         verified_at=CASE WHEN $1='verified' THEN now() ELSE verified_at END,
+         updated_at=now()
+     WHERE id=$3`, [status, certArn ?? null, id])
+  clearTenantCache()
+}
+
+export async function getCustomDomain(id: string): Promise<CustomDomain | null> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT id, tenant_id, domain, status, verification_token, cert_arn, verified_at, created_at
+     FROM tenant_custom_domains WHERE id=$1`, [id])
+  return res.rows[0] ?? null
+}
+
+export async function deleteCustomDomain(id: string, tenantId: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(`DELETE FROM tenant_custom_domains WHERE id=$1 AND tenant_id=$2`, [id, tenantId])
+  clearTenantCache()
 }

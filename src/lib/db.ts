@@ -3,15 +3,19 @@ import path from 'path'
 import fs from 'fs'
 import { Signer } from '@aws-sdk/rds-signer'
 import { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext } from './audit-context'
-import { getCurrentTenant, getCurrentTenantId, runWithTenantContext } from './tenant-context'
+import { getCurrentTenant, getCurrentTenantId, runWithTenantContext, setTenantContext } from './tenant-context'
 
 // DEFAULT pool = the env-configured DB (the platform's own store, dev, jobs).
 // Per-tenant pools live in `tenantPools`, keyed by tenant id, built lazily from
 // the tenant's infra (TenantContext). When no tenant is in context, callers use
 // the DEFAULT pool exactly as before — single-tenant behavior is unchanged.
 const DEFAULT_KEY = '__default__'
-let pool: Pool | null = null
-const tenantPools = new Map<string, Pool>()
+// Cache pools on globalThis so Next.js dev / Turbopack hot-reloads (which re-import
+// this module) reuse the SAME pools instead of leaking a fresh pg.Pool per reload,
+// which otherwise exhausts local Postgres ("too many clients already").
+const dbGlobal = globalThis as unknown as { __appPool?: Pool | null; __tenantPools?: Map<string, Pool> }
+let pool: Pool | null = dbGlobal.__appPool ?? null
+const tenantPools: Map<string, Pool> = dbGlobal.__tenantPools ?? (dbGlobal.__tenantPools = new Map<string, Pool>())
 
 export { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext }
 export { getCurrentTenant, getCurrentTenantId, runWithTenantContext }
@@ -125,7 +129,7 @@ function getPool(): Pool {
   const tenant = getCurrentTenant()
   // No tenant in context OR tenant without dedicated infra → DEFAULT pool (unchanged).
   if (!tenant || !tenant.infra || !tenant.infra.rdsEndpoint) {
-    if (!pool) pool = buildDefaultPool()
+    if (!pool) { pool = buildDefaultPool(); dbGlobal.__appPool = pool }
     return pool
   }
   // Per-tenant pool, lazily built + cached by tenant id.
@@ -135,6 +139,33 @@ function getPool(): Pool {
     tenantPools.set(tenant.tenantId, tp)
   }
   return tp
+}
+
+/**
+ * Establish the per-request tenant context from the x-tenant-slug header (set by
+ * middleware) when the AsyncLocalStorage store is empty. This is REQUIRED because Next.js
+ * Edge middleware runs in a separate context from Node route handlers, so the ALS tenant
+ * context set in middleware does NOT reach getPool() here — without this bridge every
+ * request falls back to the DEFAULT pool (the platform DB), leaking one tenant's traffic
+ * onto the main store's data. Resolves the tenant's infra from the control-plane and enters
+ * it into ALS so getPool() (and all downstream queries in this request) scope correctly.
+ * No-op when ALS already has a tenant (background jobs via runWithTenantContext) or when
+ * the header is absent (platform's own hosts).
+ */
+async function ensureTenantContext(): Promise<void> {
+  if (getCurrentTenant()) return
+  let slug: string | null = null
+  try {
+    const { headers } = await import('next/headers')
+    const h = await headers()
+    slug = h.get('x-tenant-slug')
+  } catch {
+    return // outside a request scope (jobs) — leave default
+  }
+  if (!slug) return
+  const { lookupTenantContextBySlug } = await import('./tenant-registry')
+  const ctx = await lookupTenantContextBySlug(slug)
+  if (ctx) setTenantContext(ctx)
 }
 
 function isMutation(text: string): boolean {
@@ -160,6 +191,7 @@ async function getRequestAdminId(): Promise<string | null> {
 }
 
 export async function query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
+  await ensureTenantContext()
   const p = getPool()
   if (isMutation(text)) {
     const adminId = await getRequestAdminId()
@@ -198,6 +230,7 @@ export async function queryCount(text: string, params?: any[]): Promise<number> 
 }
 
 export async function getClient(): Promise<PoolClient> {
+  await ensureTenantContext()
   const client = await getPool().connect()
   const adminId = await getRequestAdminId()
   if (adminId) {

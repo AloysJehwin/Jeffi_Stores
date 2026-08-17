@@ -9,6 +9,8 @@ import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
 import { round2 } from '@/lib/gst'
+import { getAdminSession } from '@/lib/admin-auth'
+import { hasScope } from '@/lib/scopes'
 
 function triggerEnrichment(productId: string) {
   const OLLAMA_URL = (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
@@ -828,6 +830,10 @@ export default async function EditProductPage({ params, searchParams }: { params
     : null
   const serializedStockTotal = serialCountRow?.total ?? 0
 
+  const session = await getAdminSession()
+  const hasInventory = hasScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
+  const hasReturns = hasScope(session?.role ?? '', session?.scopes ?? [], 'returns:read')
+
   const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown>; variants: Record<string, unknown>[] }>(
     `SELECT product_id, fields, variants FROM product_drafts WHERE product_id = $1`,
     [id]
@@ -919,6 +925,8 @@ export default async function EditProductPage({ params, searchParams }: { params
         isDraft={isDraft}
         liveStockGrains={liveStockGrains}
         initialBsEntries={(draftRow?.fields as any)?._bsEntries ?? null}
+        hasInventory={hasInventory}
+        hasReturns={hasReturns}
       />
     </div>
   )

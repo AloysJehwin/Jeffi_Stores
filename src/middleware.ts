@@ -262,6 +262,13 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAdminSubdomain) {
+    // Ecom control-plane pages are ONLY available on admin.jeffistores.in (platform admin).
+    // Tenant admin subdomains (admin-{slug}.jeffistores.in) must never expose these routes.
+    const isTenantAdminSubdomain = /^admin-[^.]+\./.test(hostname)
+    if (isTenantAdminSubdomain && (pathname.startsWith('/ecom') || pathname.startsWith('/api/admin/ecom'))) {
+      return new NextResponse('Not found', { status: 404 })
+    }
+
     if (isAdminApiPath) {
       // Admin API auth is handled below — fall through
     } else if (pathname.startsWith('/api/')) {

@@ -2,12 +2,29 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import {
-  getTenant, enqueueProvisioning, getProvisioningJob,
+  getTenant, enqueueProvisioning, getProvisioningJob, controlPlanePool, getDraft,
 } from '@/lib/tenant-registry'
 import { advanceProvisioningJob } from '@/lib/provisioning/steps'
 import { getProvisioningProvider } from '@/lib/provisioning'
+import { findLatestBackup } from '@/lib/tenant-backup-store'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Resolve a restore-from-backup key IF the owner opted into "restore my previous store
+ * data" during onboarding AND a backup actually exists (by owner id or the new slug).
+ */
+async function resolveRestoreKey(tenantId: string, slug: string): Promise<string | undefined> {
+  const ownerRow = await controlPlanePool().query(
+    `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId],
+  ).catch(() => null)
+  const ownerId = ownerRow?.rows[0]?.owner_id
+  if (!ownerId) return undefined
+  const draft = await getDraft(ownerId).catch(() => null)
+  if (!draft?.data?.restorePreviousData) return undefined
+  const backup = await findLatestBackup({ ownerId, slug }).catch(() => null)
+  return backup?.key
+}
 
 // Operator-triggered provisioning for a tenant. Enqueues the job and drives it
 // to completion. With the STUB provider this finishes synchronously; when the
@@ -25,7 +42,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
 
   const provider = getProvisioningProvider()
-  await enqueueProvisioning(id)
+  const restoreFromKey = await resolveRestoreKey(id, tenant.slug)
+  await enqueueProvisioning(id, restoreFromKey ? { restoreFromKey } : undefined)
 
   // Drive to completion (stub is instant; real provider = enqueue-only + cron).
   const usingStub = process.env.PROVISIONING_PROVIDER !== 'aws'

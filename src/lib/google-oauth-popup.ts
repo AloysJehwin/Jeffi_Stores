@@ -26,10 +26,18 @@ export function openGoogleOAuthPopup({
       return
     }
 
-    // Always use the main domain for the OAuth redirect — app subdomains
-    // (business./ecom./admin.) are not registered redirect URIs in Google.
-    const stripAppSubdomain = (origin: string) =>
-      origin.replace(/^(https?:\/\/)(business|ecom|admin)\./, '$1')
+    // Always use the ROOT domain for the OAuth redirect. Only jeffistores.in
+    // (+ localhost) is a registered redirect URI in Google Console — app subdomains
+    // (business./ecom./admin.) AND tenant storefronts ({slug}.jeffistores.in) are not.
+    // Collapse any subdomain of jeffistores.in down to the bare root so the callback
+    // always lands on the registered URI, then postMessage's the token back up.
+    const stripAppSubdomain = (origin: string) => {
+      // e.g. https://acme.jeffistores.in → https://jeffistores.in
+      //      https://admin-acme.jeffistores.in → https://jeffistores.in
+      //      https://ecom.jeffistores.in → https://jeffistores.in
+      return origin.replace(/^(https?:\/\/)([a-z0-9-]+\.)+(jeffistores\.in)/i, '$1$3')
+        .replace(/^(https?:\/\/)(business|ecom|admin)\./, '$1')  // legacy fallback for non-jeffistores hosts
+    }
     const mainOrigin = stripAppSubdomain(window.location.origin)
     const redirectUri = `${mainOrigin}/auth/google/callback`
 

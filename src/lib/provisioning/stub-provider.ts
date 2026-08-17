@@ -10,6 +10,9 @@ export class StubProvisioningProvider implements ProvisioningProvider {
   private stopped = new Set<string>()
   private buckets = new Set<string>()
   private paramGroups = new Set<string>()
+  private backups = new Map<string, Buffer>()   // endpoint -> last dumped archive
+  private restored = new Map<string, Buffer>()   // endpoint -> last restored archive
+  private dns = new Set<string>()                 // tenant hostnames pointed at the app
   // How many getDbEndpoint polls before "available" (small so tests are fast).
   constructor(private availableAfterPolls = 2) {}
 
@@ -40,7 +43,21 @@ export class StubProvisioningProvider implements ProvisioningProvider {
 
   async loadSchema(_endpoint: string, _dbName: string): Promise<void> { /* no-op in stub */ }
 
+  async backupDb(endpoint: string, _dbName: string): Promise<Buffer> {
+    // Deterministic fake archive so callers get real bytes to round-trip through S3.
+    const buf = Buffer.from(JSON.stringify({ stub: true, endpoint }), 'utf8')
+    this.backups.set(endpoint, buf)
+    return buf
+  }
+
+  async restoreDb(endpoint: string, _dbName: string, archive: Buffer): Promise<void> {
+    this.restored.set(endpoint, archive)
+  }
+
   async ensureBucket(bucket: string): Promise<void> { this.buckets.add(bucket) }
+
+  async ensureDns(hostnames: string[]): Promise<void> { hostnames.forEach((h) => this.dns.add(h)) }
+  async removeDns(hostnames: string[]): Promise<void> { hostnames.forEach((h) => this.dns.delete(h)) }
 
   async stopDbInstance(dbInstanceId: string): Promise<void> { this.stopped.add(dbInstanceId) }
   async startDbInstance(dbInstanceId: string): Promise<void> { this.stopped.delete(dbInstanceId) }
@@ -53,4 +70,7 @@ export class StubProvisioningProvider implements ProvisioningProvider {
   // test helpers
   isStopped(id: string) { return this.stopped.has(id) }
   hasBucket(b: string) { return this.buckets.has(b) }
+  wasBackedUp(endpoint: string) { return this.backups.has(endpoint) }
+  wasRestored(endpoint: string) { return this.restored.has(endpoint) }
+  hasDns(host: string) { return this.dns.has(host) }
 }
