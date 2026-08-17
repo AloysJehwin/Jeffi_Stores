@@ -80,6 +80,9 @@ graphify-out/20*/
 # Playwright MCP artifacts
 .playwright-mcp/
 
+# MCP server config — contains credentials, keep local only
+.mcp.json
+
 # On-device model training data (regenerated via scripts/gen-onboarding-dataset.mjs)
 data/onboarding/
 
