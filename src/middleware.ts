@@ -163,25 +163,25 @@ export async function middleware(request: NextRequest) {
       return addSecurityHeaders(NextResponse.next())
     }
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/forms${slug}${request.nextUrl.search}`, request.url))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/forms${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('quotation.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('invoice.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('purchaseorder.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('business.')) {
@@ -305,15 +305,19 @@ export async function middleware(request: NextRequest) {
           const parentPath = adminWritePathParent(`/admin${slug}`)
           return NextResponse.redirect(buildRedirectUrl(request, `${parentPath}?desktop_required=1`))
         }
-        const response = NextResponse.rewrite(rewriteUrl)
-        response.headers.set('x-pathname', `/admin${slug}`)
-        response.headers.set('x-user-id', payload.adminId)
-        response.headers.set('x-username', payload.displayName || `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || 'Admin')
-        response.headers.set('x-user-role', payload.role)
-        response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
+        // Set forwarded identity on the REQUEST headers (stripped) so both server
+        // components AND getPool()'s x-tenant-slug bridge see them. stripped already
+        // carries x-tenant-slug/x-tenant-id from above; forwarding it here is what
+        // routes a tenant admin's queries to the tenant's own RDS.
+        stripped.set('x-pathname', `/admin${slug}`)
+        stripped.set('x-user-id', payload.adminId)
+        stripped.set('x-username', payload.displayName || `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || 'Admin')
+        stripped.set('x-user-role', payload.role)
+        stripped.set('x-user-scopes', JSON.stringify(payload.scopes || []))
+        const response = NextResponse.rewrite(rewriteUrl, { request: { headers: stripped } })
         return addSecurityHeaders(response)
       }
-      return addSecurityHeaders(NextResponse.rewrite(new URL(`/admin${slug}${search}`, request.url)))
+      return addSecurityHeaders(NextResponse.rewrite(new URL(`/admin${slug}${search}`, request.url), { request: { headers: stripped } }))
     }
   }
 
@@ -431,7 +435,11 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(response)
   }
 
-  return addSecurityHeaders(NextResponse.next())
+  // Storefront catch-all ({slug}.jeffistores.in and the platform's own store). Forward
+  // the mutated request headers (incl. x-tenant-slug set above) so getPool() can route
+  // to the tenant's own RDS. Without { request: { headers: stripped } } the header is
+  // dropped and every tenant request silently falls back to the main platform DB.
+  return addSecurityHeaders(NextResponse.next({ request: { headers: stripped } }))
 }
 
 export const config = {
