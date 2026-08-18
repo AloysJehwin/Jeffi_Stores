@@ -25,6 +25,7 @@ const STEPS = [
   'wait_db_available',
   'load_schema',
   'restore_data',
+  'seed_data',
   'create_bucket',
   'write_infra',
   'configure_dns',
@@ -104,8 +105,16 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
       }
 
       case 'wait_db_available': {
+        // Bound the wait: a db.t4g.micro is normally available in ~9 min. If it never
+        // reaches available (stuck in creating/incompatible-parameters, wrong id), fail
+        // after the deadline instead of polling forever — the catch triggers rollback.
+        if (!res.dbWaitStartedAt) res.dbWaitStartedAt = Date.now()
+        const DB_WAIT_DEADLINE_MS = 25 * 60 * 1000 // 25 min
         const endpoint = await provider.getDbEndpoint(res.dbInstanceId)
         if (!endpoint) {
+          if (Date.now() - res.dbWaitStartedAt > DB_WAIT_DEADLINE_MS) {
+            throw new Error(`wait_db_available: ${res.dbInstanceId} did not become available within ${Math.round(DB_WAIT_DEADLINE_MS / 60000)} min`)
+          }
           // Still provisioning — stay on this step, worker will poll again next tick.
           await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
           return 'pending'
@@ -115,18 +124,35 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
       }
 
       case 'load_schema':
+        // Loads the desired-state SCHEMA ONLY (0 rows) into the tenant's own DB. A fresh
+        // tenant store is intentionally EMPTY — the owner adds their own catalog. Starter
+        // data, if ever wanted, goes through the optional seed_data step below (not here).
         await provider.loadSchema(res.endpoint, 'jeffi_stores')
         return await next(job.id, 'restore_data', res)
 
       case 'restore_data': {
         // Only restores when the job was enqueued with a backup key (re-onboarding a
-        // churned owner). No key → fresh store → skip straight to bucket creation.
+        // churned owner). No key → fresh store → fall through to optional seeding.
         const key = res.restoreFromKey as string | undefined
         if (key) {
           const { getTenantBackup } = await import('../tenant-backup-store')
           const archive = await getTenantBackup(key)
           await provider.restoreDb(res.endpoint, 'jeffi_stores', archive)
           res.restored = true
+        }
+        return await next(job.id, 'seed_data', res)
+      }
+
+      case 'seed_data': {
+        // Optional starter-catalog seed. No-op unless the job carries a `seedProfile`
+        // (mirrors restore_data's opt-in shape). Deliberately separate from load_schema so
+        // "empty store" stays the default and seeding never runs by accident. Skipped
+        // entirely when the store was restored from a backup.
+        const profile = res.seedProfile as string | undefined
+        if (profile && !res.restored) {
+          const { seedTenantData } = await import('./seed')
+          await seedTenantData(res.endpoint, 'jeffi_stores', profile)
+          res.seeded = profile
         }
         return await next(job.id, 'create_bucket', res)
       }
