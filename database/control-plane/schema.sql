@@ -193,9 +193,10 @@ ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS instance_state character var
 CREATE TABLE IF NOT EXISTS public.provisioning_jobs (
     id                 uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     tenant_id          uuid NOT NULL,
-    step               character varying(32) NOT NULL DEFAULT 'create_param_group',
+    step               character varying(32) NOT NULL DEFAULT 'preflight',
     status             character varying(16) NOT NULL DEFAULT 'pending', -- pending|running|done|failed
     attempts           integer NOT NULL DEFAULT 0,
+    next_attempt_at    timestamp with time zone,             -- set on retryable failure (exp backoff); worker skips until due
     last_error         text,
     created_resources  jsonb NOT NULL DEFAULT '{}'::jsonb,   -- {secretArn, paramGroup, dbInstanceId, bucket}
     created_at         timestamp with time zone NOT NULL DEFAULT now(),

@@ -67,9 +67,15 @@ export class StubProvisioningProvider implements ProvisioningProvider {
   }
   async deleteBucket(bucket: string): Promise<void> { this.buckets.delete(bucket) }
 
+  async isDbInstanceGone(dbInstanceId: string): Promise<boolean> {
+    return !this.endpoints.has(dbInstanceId) && !this.pending.has(dbInstanceId)
+  }
+  async deleteParamGroup(paramGroup: string): Promise<void> { this.paramGroups.delete(paramGroup) }
+
   // test helpers
   isStopped(id: string) { return this.stopped.has(id) }
   hasBucket(b: string) { return this.buckets.has(b) }
+  hasParamGroup(pg: string) { return this.paramGroups.has(pg) }
   wasBackedUp(endpoint: string) { return this.backups.has(endpoint) }
   wasRestored(endpoint: string) { return this.restored.has(endpoint) }
   hasDns(host: string) { return this.dns.has(host) }

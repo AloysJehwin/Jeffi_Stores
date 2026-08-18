@@ -439,6 +439,7 @@ export async function billingSummary(): Promise<{ mrr: number; commission30d: nu
 export interface ProvisioningJob {
   id: string; tenant_id: string; step: string; status: string
   attempts: number; last_error: string | null; created_resources: Record<string, any>
+  next_attempt_at?: string | null
 }
 
 /** Create (or return existing pending) provisioning job for a tenant. */
@@ -454,11 +455,14 @@ export async function enqueueProvisioning(tenantId: string, opts?: { restoreFrom
   return res.rows[0] as ProvisioningJob
 }
 
-/** Fetch active jobs the worker should advance. */
+/** Fetch active jobs the worker should advance (skips jobs backing off until next_attempt_at). */
 export async function activeProvisioningJobs(): Promise<ProvisioningJob[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT * FROM provisioning_jobs WHERE status IN ('pending','running') ORDER BY created_at`)
+    `SELECT * FROM provisioning_jobs
+     WHERE status IN ('pending','running')
+       AND (next_attempt_at IS NULL OR next_attempt_at <= now())
+     ORDER BY created_at`)
   return res.rows as ProvisioningJob[]
 }
 
@@ -472,7 +476,7 @@ export async function getProvisioningJob(tenantId: string): Promise<Provisioning
 /** Advance a job's step/status/resources. */
 export async function updateProvisioningJob(
   id: string,
-  patch: { step?: string; status?: string; last_error?: string | null; created_resources?: Record<string, any>; bumpAttempts?: boolean }
+  patch: { step?: string; status?: string; last_error?: string | null; created_resources?: Record<string, any>; bumpAttempts?: boolean; nextAttemptAt?: Date | null; clearNextAttempt?: boolean }
 ): Promise<void> {
   const pool = controlPlanePool()
   const sets: string[] = ['updated_at = now()']
@@ -482,6 +486,8 @@ export async function updateProvisioningJob(
   if (patch.last_error !== undefined) { args.push(patch.last_error); sets.push(`last_error=$${args.length}`) }
   if (patch.created_resources !== undefined) { args.push(JSON.stringify(patch.created_resources)); sets.push(`created_resources=$${args.length}::jsonb`) }
   if (patch.bumpAttempts) sets.push('attempts = attempts + 1')
+  if (patch.nextAttemptAt !== undefined && patch.nextAttemptAt !== null) { args.push(patch.nextAttemptAt.toISOString()); sets.push(`next_attempt_at=$${args.length}`) }
+  if (patch.clearNextAttempt) sets.push('next_attempt_at = NULL')
   args.push(id)
   await pool.query(`UPDATE provisioning_jobs SET ${sets.join(', ')} WHERE id=$${args.length}`, args)
 }
