@@ -60,6 +60,22 @@ function makeNextRequest(
   return req
 }
 
+/**
+ * Read an identity header that middleware forwarded onto the REWRITTEN REQUEST.
+ *
+ * Middleware sets identity via `NextResponse.rewrite(url, { request: { headers } })`
+ * rather than on the response, so that server components AND getPool()'s
+ * x-tenant-slug bridge both observe it — that forwarding is what routes a tenant
+ * admin's queries to the tenant's own RDS instead of the platform DB.
+ *
+ * Next encodes those forwarded request headers onto the response as
+ * `x-middleware-request-<name>`. Falls back to the plain response header for the
+ * routes that still set identity on the response directly.
+ */
+function forwardedRequestHeader(res: Response, name: string): string | null {
+  return res.headers.get(`x-middleware-request-${name}`) ?? res.headers.get(name)
+}
+
 /** Opaque-session model: the cookie value is a bare session id and middleware calls the
  *  (mocked) verifyBusinessToken to resolve it. This sets the mock's return for the given
  *  claims and hands back a dummy opaque cookie value to put in the request. */
@@ -151,7 +167,7 @@ describe('middleware', () => {
       // Rewrite response is not a redirect
       expect(res.status).not.toBe(307)
       expect(res.status).not.toBe(401)
-      expect(res.headers.get('x-user-id')).toBe('admin-001')
+      expect(forwardedRequestHeader(res, 'x-user-id')).toBe('admin-001')
     })
 
     it('passes through /login without calling verifyToken', async () => {
@@ -413,7 +429,7 @@ describe('middleware', () => {
       const res = await middleware(req)
       expect(res.status).not.toBe(307)
       expect(res.status).not.toBe(403)
-      expect(res.headers.get('x-user-id')).toBe('admin-001')
+      expect(forwardedRequestHeader(res, 'x-user-id')).toBe('admin-001')
     })
 
     it('returns 403 on /admin/* from a non-admin, non-localhost host', async () => {
@@ -697,7 +713,7 @@ describe('middleware', () => {
         cookies: { admin_sid: 'valid-token' },
       })
       const res = await middleware(req)
-      expect(res.headers.get('x-user-id')).toBe('admin-001')
+      expect(forwardedRequestHeader(res, 'x-user-id')).toBe('admin-001')
     })
 
     it('redirects to /login and clears cookie when admin token is invalid on subdomain', async () => {

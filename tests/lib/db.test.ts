@@ -76,6 +76,14 @@ async function importDb(opts: {
 } = {}) {
   vi.resetModules()
 
+  // db.ts caches pools on globalThis (`__appPool` / `__tenantPools`) so Next.js
+  // dev/Turbopack hot-reloads reuse the same pg.Pool instead of leaking one per
+  // reload. That cache SURVIVES vi.resetModules(), so without clearing it here a
+  // re-imported module would rehydrate the previous pool and never call
+  // `new Pool()` again — every construction assertion below would see 0 calls.
+  delete (globalThis as any).__appPool
+  delete (globalThis as any).__tenantPools
+
   const pg = makePgMock()
 
   vi.doMock('pg', () => ({ Pool: pg.PoolSpy, default: { Pool: pg.PoolSpy } }))
@@ -273,6 +281,12 @@ describe('query() – mutation wrapping', () => {
 
   it('rolls back and re-throws when client query fails inside mutation transaction', async () => {
     vi.resetModules()
+
+    // Same globalThis pool-cache reset as importDb() — this test builds its mocks
+    // inline, so without it the module rehydrates the PREVIOUS test's pool and the
+    // rejection queued below is never reached (the query resolves instead).
+    delete (globalThis as any).__appPool
+    delete (globalThis as any).__tenantPools
 
     const pg = makePgMock()
 
