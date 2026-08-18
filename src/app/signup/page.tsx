@@ -19,7 +19,7 @@ export default function SignupPageWrapper() {
 
 type Channel = 'email' | 'sms' | 'whatsapp'
 
-const channelOptions: { id: Channel; label: string; icon: React.ReactNode }[] = [
+const ALL_CHANNEL_OPTIONS: { id: Channel; label: string; icon: React.ReactNode }[] = [
   {
     id: 'email',
     label: 'Email',
@@ -55,6 +55,22 @@ function SignupPage() {
   const fromLogin = searchParams.get('from') === 'login'
   const prefillEmail = searchParams.get('email') || ''
   const rawRedirectTo = searchParams.get('redirect') || '/'
+
+  const [smsEnabled, setSmsEnabled] = useState(process.env.NEXT_PUBLIC_SMS_DISABLED !== 'true')
+  const [whatsappEnabled, setWhatsappEnabled] = useState(process.env.NEXT_PUBLIC_WHATSAPP_DISABLED !== 'true')
+
+  useEffect(() => {
+    fetch('/api/feature-flags').then(r => r.json()).then(f => {
+      setSmsEnabled(f.smsEnabled ?? true)
+      setWhatsappEnabled(f.whatsappEnabled ?? true)
+    }).catch(() => {})
+  }, [])
+
+  const channelOptions = ALL_CHANNEL_OPTIONS.filter(o =>
+    o.id === 'email' ||
+    (o.id === 'sms' && smsEnabled) ||
+    (o.id === 'whatsapp' && whatsappEnabled)
+  )
   const redirectTo = ['/login', '/signup'].some(p => rawRedirectTo.startsWith(p)) ? '/' : rawRedirectTo
 
   const { signup, googleLoginWithAccessToken } = useAuth()

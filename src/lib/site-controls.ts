@@ -19,6 +19,14 @@ export interface StoreIdentity {
 export interface FeatureFlags {
   razorpayEnabled: boolean
   gstEnabled: boolean
+  // When false, confirmed→processing order status change skips inventory validation.
+  // Basic plan tenants have no inventory module so this defaults to false for them.
+  // Can be toggled per-tenant from the site settings page.
+  inventoryValidationEnabled: boolean
+  // SMS and WhatsApp notification channels — Growth+ only.
+  // When off, these channels are hidden from the storefront signin/signup page.
+  smsEnabled: boolean
+  whatsappEnabled: boolean
   // Master on/off for each on-device AI feature.
   ondeviceSummaryEnabled: boolean
   ondeviceFinetuneEnabled: boolean
@@ -79,6 +87,9 @@ const DEFAULTS: SiteControls = {
     // Preserve current env-driven behavior when the DB key is unset.
     razorpayEnabled: envBool(process.env.ENABLE_RAZORPAY),
     gstEnabled: envBool(process.env.ENABLE_GST),
+    inventoryValidationEnabled: true,
+    smsEnabled: process.env.SMS_DISABLED !== 'true',
+    whatsappEnabled: process.env.WHATSAPP_DISABLED !== 'true',
     ondeviceSummaryEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
     ondeviceFinetuneEnabled: envBool(process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE) || process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
     // Desktop mirrors the master default; mobile is off by default (server fallback).
@@ -111,7 +122,8 @@ const DEFAULTS: SiteControls = {
 
 const KEYS = [
   'business_name', 'business_email', 'business_phone', 'business_web', 'business_logo_url',
-  'feature_razorpay_enabled', 'feature_gst_enabled',
+  'feature_razorpay_enabled', 'feature_gst_enabled', 'feature_inventory_validation_enabled',
+  'feature_sms_enabled', 'feature_whatsapp_enabled',
   'feature_ondevice_summary_enabled', 'feature_ondevice_finetune_enabled',
   'feature_ondevice_summary_mobile_enabled', 'feature_ondevice_summary_desktop_enabled',
   'feature_ondevice_finetune_mobile_enabled', 'feature_ondevice_finetune_desktop_enabled',
@@ -164,6 +176,9 @@ export async function getSiteControls(): Promise<SiteControls> {
       flags: {
         razorpayEnabled: bool('feature_razorpay_enabled', d.flags.razorpayEnabled),
         gstEnabled: bool('feature_gst_enabled', d.flags.gstEnabled),
+        inventoryValidationEnabled: bool('feature_inventory_validation_enabled', d.flags.inventoryValidationEnabled),
+        smsEnabled: bool('feature_sms_enabled', d.flags.smsEnabled),
+        whatsappEnabled: bool('feature_whatsapp_enabled', d.flags.whatsappEnabled),
         ondeviceSummaryEnabled: bool('feature_ondevice_summary_enabled', d.flags.ondeviceSummaryEnabled),
         ondeviceFinetuneEnabled: bool('feature_ondevice_finetune_enabled', d.flags.ondeviceFinetuneEnabled),
         ondeviceSummaryMobileEnabled: bool('feature_ondevice_summary_mobile_enabled', d.flags.ondeviceSummaryMobileEnabled),

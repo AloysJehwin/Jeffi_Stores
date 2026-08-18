@@ -4,6 +4,7 @@ import { verifyToken, verifyBusinessToken } from './lib/jwt'
 import { getScopeForPath, hasScope } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 import { extractSessionSignals } from './lib/session-signals-request'
+import { resolveTenantFromHost } from './lib/tenant-registry'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -94,31 +95,93 @@ export async function middleware(request: NextRequest) {
   stripped.delete('x-service-account-id')
   stripped.delete('x-service-account-name')
   stripped.delete('x-service-account-scopes')
+  // Tenant forwarding headers are also client-forgeable — strip before we (maybe) set them.
+  stripped.delete('x-tenant-id')
+  stripped.delete('x-tenant-slug')
+
+  // Multi-tenant SaaS: resolve the tenant from the Host header (cached ~60s in-process).
+  // Returns null for the platform's own hosts (jeffistores.in + app subdomains) and unknown
+  // hosts → single-tenant behavior is unchanged. When a tenant IS resolved, forward it as
+  // x-tenant-* so tenant-aware server code (getPool via TenantContext, S3, etc.) can scope.
+  const tenant = await resolveTenantFromHost(hostname)
+  if (tenant) {
+    stripped.set('x-tenant-id', tenant.tenantId)
+    stripped.set('x-tenant-slug', tenant.slug)
+  }
+
+  // Tenant isolation guard: a session is bound (snapshotted) to exactly one tenant.
+  // If the host resolves to tenant A but the caller presents a session minted for
+  // tenant B, reject it — a shared-cookie-domain replay across tenant subdomains
+  // must not grant access. Only fires when BOTH sides are known (host tenant + a
+  // session with a non-null tenant_id); null on either side = platform/legacy →
+  // allowed (fail-open, no mass logout). This is the mismatch-rejection half of the
+  // tenant_id session claim.
+  if (tenant) {
+    const anySid = request.cookies.get('admin_sid')?.value
+      || request.cookies.get('user_sid')?.value
+      || request.cookies.get('business_sid')?.value
+    if (anySid) {
+      const { resolveSession } = await import('./lib/auth-sessions')
+      const sess = await resolveSession(anySid, reqSignals).catch(() => null)
+      if (sess && sess.tenantId && sess.tenantId !== tenant.tenantId) {
+        // Cross-tenant session replay — clear the offending cookies and send to login.
+        const res = NextResponse.redirect(buildRedirectUrl(request, '/'))
+        res.cookies.delete('admin_sid')
+        res.cookies.delete('user_sid')
+        res.cookies.delete('business_sid')
+        return addSecurityHeaders(res)
+      }
+    }
+  }
+
+  if (hostname.startsWith('ecom.')) {
+    // SaaS control plane (ecom.jeffistores.in). Public: marketing (/), /signin, /signup.
+    // Protected (owner session required): /onboard, /dashboard. API under /api/ecom.
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    const OWNER_PROTECTED = ['/onboard', '/dashboard']
+    if (OWNER_PROTECTED.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
+      const ownerSid = request.cookies.get('owner_sid')?.value
+      if (!ownerSid) {
+        return addSecurityHeaders(NextResponse.redirect(new URL('/signin', request.url)))
+      }
+      const { resolveOwnerSession } = await import('./lib/owner-session')
+      const owner = await resolveOwnerSession(ownerSid, reqSignals).catch(() => null)
+      if (!owner) {
+        const res = NextResponse.redirect(new URL('/signin', request.url))
+        res.cookies.delete('owner_sid')
+        return addSecurityHeaders(res)
+      }
+    }
+    const slug = pathname === '/' ? '' : pathname
+    // Forward the real path so the ecom layout can hide its nav on auth pages.
+    stripped.set('x-pathname', pathname)
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/ecom${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
+  }
 
   if (hostname.startsWith('forms.')) {
     if (pathname.startsWith('/api/')) {
       return addSecurityHeaders(NextResponse.next())
     }
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/forms${slug}${request.nextUrl.search}`, request.url))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/forms${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('quotation.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('invoice.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('purchaseorder.')) {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
-    return NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url))
+    return addSecurityHeaders(NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostname.startsWith('business.')) {
@@ -199,6 +262,13 @@ export async function middleware(request: NextRequest) {
   }
 
   if (isAdminSubdomain) {
+    // Ecom control-plane pages are ONLY available on admin.jeffistores.in (platform admin).
+    // Tenant admin subdomains (admin-{slug}.jeffistores.in) must never expose these routes.
+    const isTenantAdminSubdomain = /^admin-[^.]+\./.test(hostname)
+    if (isTenantAdminSubdomain && (pathname.startsWith('/ecom') || pathname.startsWith('/api/admin/ecom'))) {
+      return new NextResponse('Not found', { status: 404 })
+    }
+
     if (isAdminApiPath) {
       // Admin API auth is handled below — fall through
     } else if (pathname.startsWith('/api/')) {
@@ -235,15 +305,19 @@ export async function middleware(request: NextRequest) {
           const parentPath = adminWritePathParent(`/admin${slug}`)
           return NextResponse.redirect(buildRedirectUrl(request, `${parentPath}?desktop_required=1`))
         }
-        const response = NextResponse.rewrite(rewriteUrl)
-        response.headers.set('x-pathname', `/admin${slug}`)
-        response.headers.set('x-user-id', payload.adminId)
-        response.headers.set('x-username', payload.displayName || `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || 'Admin')
-        response.headers.set('x-user-role', payload.role)
-        response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
+        // Set forwarded identity on the REQUEST headers (stripped) so both server
+        // components AND getPool()'s x-tenant-slug bridge see them. stripped already
+        // carries x-tenant-slug/x-tenant-id from above; forwarding it here is what
+        // routes a tenant admin's queries to the tenant's own RDS.
+        stripped.set('x-pathname', `/admin${slug}`)
+        stripped.set('x-user-id', payload.adminId)
+        stripped.set('x-username', payload.displayName || `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || 'Admin')
+        stripped.set('x-user-role', payload.role)
+        stripped.set('x-user-scopes', JSON.stringify(payload.scopes || []))
+        const response = NextResponse.rewrite(rewriteUrl, { request: { headers: stripped } })
         return addSecurityHeaders(response)
       }
-      return addSecurityHeaders(NextResponse.rewrite(new URL(`/admin${slug}${search}`, request.url)))
+      return addSecurityHeaders(NextResponse.rewrite(new URL(`/admin${slug}${search}`, request.url), { request: { headers: stripped } }))
     }
   }
 
@@ -361,7 +435,11 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(response)
   }
 
-  return addSecurityHeaders(NextResponse.next())
+  // Storefront catch-all ({slug}.jeffistores.in and the platform's own store). Forward
+  // the mutated request headers (incl. x-tenant-slug set above) so getPool() can route
+  // to the tenant's own RDS. Without { request: { headers: stripped } } the header is
+  // dropped and every tenant request silently falls back to the main platform DB.
+  return addSecurityHeaders(NextResponse.next({ request: { headers: stripped } }))
 }
 
 export const config = {

@@ -13,9 +13,10 @@ interface BrandFormProps {
   backUrl?: string
   isDraft?: boolean
   submitLabel?: string
+  hasReturns?: boolean  // false = Basic plan, hides return/replacement policy section
 }
 
-export default function BrandForm({ action, brand, backUrl, isDraft = false, submitLabel }: BrandFormProps) {
+export default function BrandForm({ action, brand, backUrl, isDraft = false, submitLabel, hasReturns = true }: BrandFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [brandName, setBrandName] = useState<string>(brand?.name || '')
@@ -189,6 +190,7 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false, sub
         </div>
       </div>
 
+      {hasReturns && (
       <div className="px-4 sm:px-6 py-5 border-t border-border-default">
         <h2 className="text-base font-semibold text-foreground mb-4">Return &amp; Replacement Policy</h2>
         <p className="text-xs text-foreground-muted mb-4">Brand policy takes priority over category policy on the product page.</p>
@@ -241,7 +243,7 @@ export default function BrandForm({ action, brand, backUrl, isDraft = false, sub
           </div>
         </div>
       </div>
-
+      )}
       <div className="px-4 sm:px-6 py-4 bg-surface-secondary border-t border-border-default flex justify-end gap-4">
         <Link
           href={ap('/admin/brands')}

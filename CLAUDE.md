@@ -1,3 +1,8 @@
+## Multi-tenant SaaS status
+
+- **`docs/SAAS_MULTITENANT_STATUS.md` is the authoritative status** for the multi-tenant / provisioning work. Read it before answering anything about tenants, provisioning, or `ecom.jeffistores.in`.
+- The older design docs (`SAAS_MULTITENANT_PLAN.md`, `MULTI_TENANT_PHASES.md`, `PROVISIONING_ENGINE_PLAN.md`, `PROXY_ASG_PLAN.md`) still describe this work as **not started** — that is false and they carry SUPERSEDED banners. Use them for design rationale only.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

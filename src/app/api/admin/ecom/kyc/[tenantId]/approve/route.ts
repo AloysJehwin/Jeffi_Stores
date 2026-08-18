@@ -1,0 +1,90 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { authenticateAdmin } from '@/lib/jwt'
+import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, saveSubscriptionId, saveLinkedAccountId } from '@/lib/tenant-registry'
+import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
+import { createLinkedAccount, mapBusinessType, inferProfileCategory } from '@/lib/razorpay-route'
+import { sendKycApprovedEmail } from '@/lib/ecom-emails'
+
+export const dynamic = 'force-dynamic'
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ tenantId: string }> }) {
+  const admin = await authenticateAdmin(request)
+  if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { tenantId } = await params
+  const tenant = await getTenant(tenantId)
+  if (!tenant) return NextResponse.json({ error: 'Tenant not found' }, { status: 404 })
+
+  const kyc = await getKyc(tenantId)
+  if (!kyc) return NextResponse.json({ error: 'KYC record not found' }, { status: 404 })
+
+  const owner = await getOwnerById(kyc.owner_id)
+  if (!owner) return NextResponse.json({ error: 'Owner not found' }, { status: 404 })
+
+  // Approve KYC — sets tenant status to 'provisioning'
+  await approveKyc(tenantId, admin.email ?? 'admin')
+
+  // 1. Create Razorpay Route linked account for POBO transfers.
+  // Only create if not already exists (idempotent — admin can retry).
+  let linkedAccountId = tenant.razorpay_linked_account_id ?? null
+  if (!linkedAccountId) {
+    try {
+      const { category, subcategory } = inferProfileCategory(kyc.product_categories)
+      const addressParts = (kyc.business_address ?? '').split(',').map(s => s.trim())
+      linkedAccountId = await createLinkedAccount({
+        businessName: kyc.business_name ?? tenant.display_name,
+        businessType: mapBusinessType(kyc.business_type ?? 'other'),
+        legalBusinessName: kyc.business_name ?? tenant.display_name,
+        profileCategory: category,
+        profileSubcategory: subcategory,
+        ownerEmail: owner.email,
+        ownerPhone: owner.name ?? owner.email, // phone sourced from bank acct if needed
+        ownerName: owner.name ?? owner.email,
+        pan: kyc.pan ?? '',
+        gstNumber: kyc.gst_number ?? undefined,
+        streetAddress: addressParts[0] ?? '',
+        city: addressParts[addressParts.length - 3] ?? 'India',
+        state: addressParts[addressParts.length - 2] ?? 'IN',
+        postalCode: addressParts[addressParts.length - 1]?.replace(/\D/g, '') ?? '000000',
+      })
+      await saveLinkedAccountId(tenantId, linkedAccountId)
+    } catch (err: any) {
+      // Non-fatal — log but continue. Transfers will fail until this is fixed,
+      // but subscription + provisioning should proceed.
+      // In production: alert ops team to manually create the linked account.
+      process.stderr.write(`[route] linked account creation failed for ${tenantId}: ${err?.error?.description ?? err?.message}\n`)
+    }
+  }
+
+  // 2. Create Razorpay Subscription and return checkout URL.
+  const plans = await listPlans()
+  const plan = plans.find((p) => p.slug === tenant.plan) ?? plans[0]
+  const baseUrl = process.env.NEXT_PUBLIC_ECOM_URL || 'https://ecom.jeffistores.in'
+
+  try {
+    const { subscriptionId, shortUrl } = await createRazorpaySubscription({
+      planSlug: tenant.plan ?? 'basic',
+      planName: plan?.name ?? 'Basic',
+      interval: (tenant.billing_interval as any) ?? 'monthly',
+      ownerEmail: owner.email,
+      ownerName: owner.name,
+      tenantId,
+      tenantSlug: tenant.slug,
+      callbackUrl: `${baseUrl}/onboard/success?tenant=${tenant.slug}`,
+    })
+    await saveSubscriptionId(tenantId, subscriptionId, tenant.billing_interval ?? 'monthly', shortUrl)
+    sendKycApprovedEmail(
+      { email: owner.email, name: owner.name },
+      { display_name: tenant.display_name, slug: tenant.slug },
+      shortUrl
+    ).catch(() => {})
+    return NextResponse.json({ ok: true, checkoutUrl: shortUrl, linkedAccountId })
+  } catch (err: any) {
+    return NextResponse.json({
+      ok: false,
+      kycApproved: true,
+      linkedAccountId,
+      error: `KYC approved but Razorpay subscription failed: ${err?.message ?? err}`,
+    }, { status: 500 })
+  }
+}

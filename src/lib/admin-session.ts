@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { JWT_MAX_AGE_S } from '@/lib/jwt'
 import { createSession, type SessionSignals } from '@/lib/auth-sessions'
 import { cookieDomainOption } from '@/lib/cookie-domain'
+import { resolveRequestTenantId } from '@/lib/request-tenant'
 
 export interface AdminSessionAdmin {
   id: string
@@ -31,6 +32,7 @@ export async function issueAdminSession(
     role: admin.role,
     scopes: admin.scopes || [],
     certCN: certCN || null,
+    tenantId: await resolveRequestTenantId(),
     userAgent: signals?.userAgent || null,
     ip: signals?.ip || null,
     acceptLanguage: signals?.acceptLanguage || null,

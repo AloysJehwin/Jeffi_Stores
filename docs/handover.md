@@ -1,98 +1,132 @@
-# Session Handover — 2026-08-05
+# Session Handover — 2026-08-17
 
-## 🔴 CRITICAL: PRODUCTION IS DOWN — read "Recovery" first
-
-**`https://jeffistores.in` returns 000 (down).** The EC2 box (`i-0b2466b2a540d6f23`, public IP `32.196.38.130`, Tailscale `jeffi-ec2` / `100.121.227.128`) is **OOM-locked**: both `jeffi-app-blue` and `jeffi-app-green` auto-restart on a 2 GB t4g.small and exhaust memory, wedging `sshd` (SSH fails with "Connection timed out during banner exchange"). Tailscale ping works (kernel) but no shell path works (SSH, `tailscale ssh`, and SSM all blocked — SSM agent not installed).
-
-### ROOT CAUSE
-The t4g.small has **2 GB RAM and cannot run blue + green simultaneously** (2 × Next.js standalone × `WEB_CONCURRENCY=4` = 8 heavy Node processes + nginx + redis). The blue-green deploy started `app_green` alongside `app_blue` → OOM. Both containers have `restart: unless-stopped`, so every reboot re-creates the deadlock.
-
-### RECOVERY PROCEDURE (do this first, next session)
-There is a **~20–30 s window right after a reboot** where sshd responds before both apps saturate RAM. Catch it and kill green:
-
-```bash
-# 1. Reboot to clear the OOM
-aws ec2 reboot-instances --instance-ids i-0b2466b2a540d6f23 --region us-east-1
-
-# 2. IMMEDIATELY hammer SSH (public IP 32.196.38.130) and kill green the instant you're in.
-#    Start ~30s after reboot, retry every 2-3s. The FIRST successful connect must run:
-ssh -o StrictHostKeyChecking=no -o ConnectTimeout=5 ec2-user@32.196.38.130 \
-  'docker update --restart=no jeffi-app-green; docker rm -f jeffi-app-green'
-#    (Runbook confirms: caught the window once at "Up 22 seconds" — must be faster next time.)
-
-# 3. Once green is gone, blue serves alone and the box stabilizes. Verify:
-ssh ec2-user@32.196.38.130 'free -m; docker ps; curl -s -o /dev/null -w "%{http_code}\n" -H "Host: jeffistores.in" http://localhost/api/health'
-curl -s -o /dev/null -w "%{http_code}\n" https://jeffistores.in/    # expect 200
-```
-
-**If the window can't be caught:** stop the instance, detach/mount the root volume on a helper instance, edit `/opt/jeffi-stores/docker-compose.green.yml` (or `docker` state) so green can't start — or set both slots to `WEB_CONCURRENCY=2` before restart. Simpler: after reboot, if you get in, also `docker update --restart=no jeffi-app-blue` is NOT needed (blue is the one we want serving).
-
-### THE REAL FIX (so this never recurs)
-Blue-green needs both slots running momentarily → **2 GB is not enough.** Options:
-1. **Upgrade EC2 t4g.small → t4g.medium (4 GB)** before using blue-green, OR
-2. **Lower `WEB_CONCURRENCY` to 2** in `docker-compose.blue.yml`/`green.yml` (halves memory per slot), OR
-3. **Abandon blue-green on this box** and revert to the old rolling `docker-compose.prod.yml` (single app service, 2 replicas) which fit in 2 GB fine.
-
-Recommendation: revert to old rolling deploy until the box is upgraded. Blue-green is not viable on 2 GB.
-
----
+> ⚠️ **PARTIALLY OUT OF DATE — corrected 2026-08-18.** Work continued after this was written:
+> everything below was **committed and pushed**, five more commits landed, and the test tenant was
+> torn down. Corrections are inline below, marked **[UPDATE 08-18]**.
+> **Authoritative current status: [`docs/SAAS_MULTITENANT_STATUS.md`](./SAAS_MULTITENANT_STATUS.md).**
 
 ## What Was Being Worked On
-Merged a large `feature-business` PR (#407) to main — product-delete fix, draft-mode enforcement, admin username/password removal, dashboard redesign — then attempted the **first blue-green + cluster deploy**, which OOM-crashed the 2 GB box. Also mid-session: swapped storefront logo to the JS-circle, cleaned repo cruft, updated the super-admin email on live RDS.
+Converting the single-tenant Jeffi Stores e-commerce platform into a multi-tenant SaaS
+(`ecom.jeffistores.in`). This session: Razorpay Route (POBO) payments, per-plan feature
+gating, onboarding emails, store-owner admin provisioning, custom domains, migration
+fan-out, COD settlement, and a real AWS provisioning provider. Next up (NOT started):
+**live AWS provisioning verification + deprovision-with-backup/restore.**
 
-## Systems / Infra
-| Resource | Value |
-|---|---|
-| EC2 instance | `i-0b2466b2a540d6f23`, t4g.small (2 GB), region us-east-1 |
-| Public IP (post-reboot) | `32.196.38.130` |
-| Tailscale | `jeffi-ec2` / `100.121.227.128` (ping OK, sshd wedged) |
-| App dir | `/opt/jeffi-stores` (on `main`) |
-| RDS | `jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com` db `jeffi_stores` user `app_user` (IAM auth) |
-| Local DB | `postgresql://localhost:5432/jeffi_production_ready` |
-| AWS CLI | works locally (used it to reboot) |
-| SSM | NOT available (agent not registered) |
+## Branch & Uncommitted State
+- Branch: `feat/multitenant-foundation` (NEVER merge to main; open PR only, don't merge until user says)
+- ~~**Everything this session is UNCOMMITTED** — ~30 modified files + ~27 new files/dirs~~
+  **[UPDATE 08-18]** All committed and pushed. Working tree is **clean**. Now tracked as **PR #425 (open)**.
+- Typecheck is clean (`npx tsc --noEmit` passes)
 
-## Open PRs
-#409 postcss/next, #408 fast-uri, #406 hono, #405 ip-address, #404 js-yaml, #401 hono-node-server, #398 sharp, #396 body-parser — **all Dependabot, none related to this outage.** PR #410 (network fix) was MERGED.
+## Environment
+- Control-plane DB: `jeffi_control_plane` (local port 5432, user I578432)
+- App DB: `jeffi_production_ready` (local port 5432)
+- **ecom data was CLEARED** at end of session — 0 tenants/owners (fresh start)
+- Razorpay: TEST keys in `.env.local` (`rzp_test_Su5bh0HgD3ySb7`); Route LIVE-approved but Route linked accounts only work with LIVE keys
+- Razorpay plan IDs (test) in `.env.local` + Secrets Manager `jeffi/local`
+- AWS: account `708835965056`, region `us-east-1`, creds working
+- Existing RDS `jeffi-stores-db`: VPC `vpc-04bd02e91e0bc0882`, SG `sg-0e361f0f1b093bd83`, subnet group `default`, pg16, IAM auth ON, class db.t4g.small
+- S3 bucket: `jeffi-stores-bucket`; RDS cert present at `certs/global-bundle.pem`
+
+## COST WARNING
+- LLM proxy DAILY limit €110, at €100.05 (91%) — ~€10 headroom. Monthly €100 only 7% used.
+- Big cost driver = cache-read tokens from this long session's accumulated context.
+- **Recommend /clear before resuming** to drop context; all code is on-disk.
 
 ## What Was Completed This Session
-- **Product delete** (`api/admin/products/[id]/route.ts`): transactional full cascade incl. GRN/PO history + selling units. Merged.
-- **Draft-mode enforcement** (products, brands, categories): edit pages redirect when no draft; `DraftEditButton` + parameterized `DraftConfirmModal`; brands draft POST added. Merged.
-- **Admin username/password removal**: 28 files + migration `database/migrations/2026-08-05_admins_drop_username_password.sql` + entity SQL (users/constraints/functions). Merged. **NOTE: this migration has NOT run on live RDS** (deploy never reached the migrate step — good, no half-applied auth change).
-- **New-admin cert email** (`src/lib/email.ts`): greeting→full name, Email row, slug filename. Merged.
-- **Logo**: `public/images/logo.png` overwritten with 96px JS circle (from `store-logo.png`). Local only — NOT committed.
-- **Repo cleanup**: removed `old-files/`, `check-images.js`, `logo_4k/enhanced/upscaled/original_backup.png`, all `.DS_Store`. Local only — NOT committed.
-- **Sidebar/top-bar**: "Jeffi Stores" + collapse toggle moved to full-width top bar; folder icon. Local only — NOT committed (AdminShell.tsx, AdminSidebarNav.tsx).
-- **Blue-green network fix** (PR #410, MERGED): all compose files pin `networks.internal.name = jeffi_internal`; removed `depends_on: redis` from blue/green.
-- **LIVE RDS super-admin email changed**: `aloysjehwin@gmail.com` → `admin@jeffistores.in`, and `google_id` cleared (re-links on next Google login). DONE + committed to DB. `admin@jeffistores.in` confirmed a real Google account.
-
-## What Is In Progress / Partially Done
-- **BLUE-GREEN CUTOVER — FAILED, box OOM-locked.** `infra.yml` on main still says `driver: bridge` (should be `external: true`); I patched it server-locally during bootstrap but `git reset --hard` in deploy reverts it. The deploy script runs `infra + green` (external wins) so it starts green → OOM.
-- Uncommitted local changes (logo, cleanup, sidebar) still on `feature-business` working tree — not committed/pushed.
+- **Razorpay Route (POBO)**: `src/lib/razorpay-route.ts` — createLinkedAccount, transferToLinkedAccount (3% commission), reverseTransfer, recordCodSettlement
+- **Bank verification**: switched to Razorpay FAV (instant, `src/lib/bank-verify.ts`) — no RazorpayX/UTR
+- **KYC approval** (`src/app/api/admin/ecom/kyc/[tenantId]/approve/route.ts`): creates Route linked account + subscription + approval email
+- **Payment split**: `fireRouteTransfer()` in `src/app/api/razorpay/verify/route.ts`
+- **Store-owner admin**: `src/lib/tenant-admin-provision.ts` — on subscription.charged, creates super_admin + mTLS cert in tenant DB, emails cert
+- **Onboarding emails**: `src/lib/ecom-emails.ts` (KYC submitted/approved/rejected, payment confirmed, store live)
+- **Per-tenant emails**: generated columns `noreply-{slug}@` / `campaigns-{slug}@` on tenants
+- **Plan gating**: `src/lib/plan-gate.ts`. Basic scopes fixed. Product form hides inventory flags; brand form hides returns policy; WhatsApp gated to crm:read; ecom admin section blocked on tenant subdomains; SMS/WhatsApp toggles in site settings (Growth+)
+- **Storefront Google auth**: `src/lib/google-oauth-popup.ts` strips ANY jeffistores.in subdomain (fixes tenant `{slug}.` OAuth)
+- **Migration fan-out**: `src/lib/tenant-migrations.ts` + `tenant-migrations-schema.ts` + `POST /api/admin/ecom/migrations/run`
+- **Custom domains**: `tenant_custom_domains` table, `src/app/api/ecom/domains/*`, `CustomDomains.tsx` UI, DNS CNAME verify
+- **COD settlement**: ledger-based via `recordCodSettlement`, real Delhivery charge correction
+- **AWS provisioning provider**: `src/lib/provisioning/aws-provider.ts` (real @aws-sdk RDS/S3), enabled via `PROVISIONING_PROVIDER=aws`; installed `@aws-sdk/client-rds`
 
 ## What Needs To Be Done Next (ordered)
-1. **RECOVER PRODUCTION** — reboot + race-SSH to kill `jeffi-app-green` (see Recovery above). Get site to 200.
-2. **Decide blue-green viability**: upgrade box to 4 GB, OR set `WEB_CONCURRENCY=2` per slot, OR revert to old rolling `docker-compose.prod.yml`. Until then, DO NOT re-run a blue-green deploy — it will OOM again.
-3. Fix `docker-compose.infra.yml` on main: `internal` network → `external: true` (must be created out-of-band first). Add to a new PR.
-4. Commit the uncommitted local work (logo swap, repo cleanup, sidebar top-bar) — separate clean commits.
-5. When ready to deploy the merged `main` app changes safely: the `admins` username/password migration + entity schema-diff WILL run on live RDS on the next successful deploy → **test Google→MFA login immediately after** (super-admin now logs in as `admin@jeffistores.in`).
 
-## Key Decisions Made
-- Live super-admin email is now `admin@jeffistores.in` (Google-login capable, google_id cleared for re-link).
-- Blue-green network pinned to fixed name `jeffi_internal` across all compose files (PR #410).
-- Product-with-history delete = force full delete (removes GRN/PO line items), per user choice.
-- Draft editing enforced for products/brands/categories; coupons/suppliers/review-forms were already safe.
+> **[UPDATE 08-18]** All four items below are DONE. The *current* next steps are (1) merge PR #425
+> and (2) **schedule the cron worker — it is scheduled nowhere today**, so enqueued jobs never
+> advance. See `docs/SAAS_MULTITENANT_STATUS.md` for the live pending list.
+
+1. **Live AWS provisioning test** — ✅ DONE (2026-08-17). Real `db.t4g.micro` (`jeffi-tenant-test`,
+   pg 16.13, IAM auth, encrypted) provisioned in ~9 min via `AwsProvisioningProvider` from a local
+   driver; param group + RDS create + `available` poll all verified against account 708835965056.
+   Then torn down (`delete-db-instance --skip-final-snapshot`). **KEY FINDING below.**
+2. **Deprovision-with-backup** — ✅ DONE. `deprovisionTenant()` in `provisioning/steps.ts`:
+   status→terminated (+clearTenantCache = store offline) → `backupDb` → `putTenantBackup` (S3
+   dual owner/slug keys) → delete RDS+bucket → `clearTenantInfra`. Auto-fires on
+   `subscription.cancelled`/`completed` in the ecom webhook; manual admin button in `TenantActions`.
+   Backup is **pure-JS** (`src/lib/tenant-db-backup.ts`, no pg_dump binary) — round-trip PROVEN
+   against local PG (FK order via `session_replication_role=replica`, bytea intact).
+3. **Restore-on-re-onboard** — ✅ DONE. `restore_data` step in the state machine (no-op unless the
+   job carries `restoreFromKey`). `findLatestBackup({ownerId,slug})` + `/api/ecom/onboard/restore-available`;
+   OnboardWizard shows a "we found a backup" banner + opt-in; `provision/route.ts` resolves the key.
+4. **Cron worker** — ✅ DONE (`/api/cron/provisioning-worker`, `Bearer $CRON_SECRET`, advances
+   `activeProvisioningJobs()` one tick each). ⚠️ MUST run inside the VPC (see finding).
+
+### ⚠️ CRITICAL FINDING from the live test (blocks real end-to-end)
+The RDS instances are `PubliclyAccessible: false` in VPC `vpc-04bd02e91e0bc0882` — reachable ONLY
+from inside that VPC. So the **data-plane** steps — `loadSchema`, `backupDb`, `restoreDb` — CANNOT
+run from a laptop or any host outside the VPC (they time out). The **control-plane** steps
+(param group, create/delete RDS, S3) work from anywhere. Therefore:
+- The cron worker / provisioning driver MUST be deployed **in-VPC** (app EC2/ECS, a bastion, or an
+  in-VPC Lambda) for `load_schema`/`restore_data` to succeed. This is a deploy/topology decision.
+- To run/verify from a laptop: SSH tunnel through the in-VPC app host. VERIFIED WORKING:
+  `ssh -f -N -L 5434:<tenant-rds-endpoint>:5432 -i ~/.ssh/jeffi-stores-key.pem ec2-user@52.20.193.62`
+  (**[UPDATE 08-18]** IP changed: was `32.196.38.130`, now the stable EIP **`52.20.193.62`**;
+  host `jeffi-stores-app` = `i-0b2466b2a540d6f23`, private `172.31.20.170`; SSM is NOT enabled on it).
+  The one-time schema load over the tunnel uses `RDS_MASTER_PASSWORD` (IAM token can't be signed for 127.0.0.1).
+
+### ✅ aloys-store fully provisioned on dedicated infra (2026-08-17)
+Ran the REAL engine end-to-end (basic plan): RDS `jeffi-tenant-aloys-store`
+(`...cjmaa6acimgm.us-east-1.rds.amazonaws.com`) + S3 `jeffi-tenant-aloys-store`, schema loaded
+(120 tables), `app_user`+`rds_iam` granted, `tenant_infra` written, status `active`. ~~This RDS is
+LIVE and BILLING — deprovision when done testing (admin button, or subscription cancel).~~
+**[UPDATE 08-18] RESOLVED — torn down.** `describe-db-instances` shows only `jeffi-stores-db`;
+`aloys-store.jeffistores.in` no longer resolves. **No stray tenant billing.**
+
+### 🐛 THREE schema-load bugs fixed in `buildTenantSchemaSql()` (would have broken live too)
+`src/lib/tenant-migrations-schema.ts` now: (1) `stripPsqlMetaCommands` drops `\`-prefixed psql
+lines (a stray `\unrestrict` from pg_dump broke the `pg` driver); (2) `hoistForeignKeys` moves all
+`ADD CONSTRAINT … FOREIGN KEY` to the end (FKs in orders.sql referenced PKs defined later in
+constraints.sql → "no unique constraint matching"); (3) dedupes FKs by name + self-guards each
+with `DROP CONSTRAINT IF EXISTS` (constraints.sql redefines some FKs → "already exists" after hoist).
+Verified: 0 early FK adds, 167 deferred, 0 backslash lines. This same builder feeds both the AWS
+`loadSchema` and the migration fan-out, so live is fixed by the same change.
+
+### Minor code note
+`aws-provider.ts` uses extensionless dynamic imports (`await import('../tenant-migrations-schema')`,
+`'../tenant-db-backup'`, `'../tenant-backup-store'`). Fine under Next.js's bundler (how the app runs),
+but they fail under raw Node ESM — the live-test driver had to import schema/backup directly. Consider
+adding `.js`/`.ts` extensions if these ever run outside Next.
+
+## Plan File
+Live-test + deprovision/backup/restore plan: `/Users/I578432/.claude/plans/cheeky-marinating-walrus.md`.
+
+## Key Decisions
+- Bank verify = Razorpay FAV (no RazorpayX in live)
+- COD = ledger settlement (no payment_id), not Route transfer
+- Backups = pg_dump `.sql.gz` in `jeffi-stores-bucket/tenant-backups/{slug}/`
+- Restore = auto-detect on re-onboard
+- Route linked accounts need LIVE keys (fail silently in test — approve route continues)
+- Full per-plan matrix: `docs/PLAN_FEATURE_MATRIX.md` (+ .docx on Desktop) — KEEP UPDATED
 
 ## Important File Paths
-- `deploy/blue-green-deploy.sh` — health-check loop is 30 attempts × 10s sleep = 5 min max.
-- `docker-compose.{infra,blue,green}.yml` — network `jeffi_internal`; blue/green external, infra still `driver: bridge` (BUG).
-- `docs/runbooks/blue-green-setup.md` — one-time bootstrap steps (has the two-paths schema section).
-- `database/migrations/2026-08-05_admins_drop_username_password.sql` — applied LOCAL only; pending on live.
-- `src/lib/admin-identity.ts` — cert-CN now matches `admin_certificates.common_name`, not username.
+- `docs/PLAN_FEATURE_MATRIX.md` — authoritative plan/feature matrix
+- `src/lib/provisioning/{aws-provider,stub-provider,steps,provider,index}.ts`
+- `database/control-plane/schema.sql`
+- `src/lib/{razorpay-route,razorpay-subscriptions,bank-verify,plan-gate,ecom-emails,tenant-admin-provision,tenant-migrations}.ts`
 
 ## Known Issues / Gotchas
-- **2 GB box cannot run blue+green together — this is the outage root cause.** Do not retry blue-green until box is upgraded or WEB_CONCURRENCY lowered.
-- SSH banner-exchange timeout = OOM symptom, not a network issue (Tailscale ping still works).
-- Public IP changed to `32.196.38.130` after reboot (was different before). CloudFront origin is the ALB, not the raw IP, so CF should follow — but verify.
-- Old rolling containers (`jeffi-stores-app-1/2`) were REMOVED during bootstrap — the old setup is not trivially restorable without `docker compose -f docker-compose.prod.yml up -d app`.
-- Uncommitted local changes on `feature-business` will be lost if branch is reset — commit them.
+- Route `accounts.create` fails in TEST mode ("Invalid business type") — LIVE keys only. Code handles gracefully.
+- `provision/route.ts` inline-drives for stub; enqueues-only for AWS → the in-VPC cron worker
+  (`/api/cron/provisioning-worker`) advances it. Data-plane steps only work in-VPC (see finding).
+- Live-test driver was a throwaway under `scripts/` (removed). RDS reachability = VPC-only.
+- graphify graph doesn't index SQL/tenant-registry/middleware — direct reads needed there.
+- Clear ecom data to restart: TRUNCATE owner_tenants/tenant_bank_accounts/provisioning_jobs/tenant_transactions/settlement_ledger/tenant_migration_runs/onboarding_drafts/tenant_kyc CASCADE; DELETE FROM tenants; DELETE FROM owners; + DELETE owner sessions from app DB.
