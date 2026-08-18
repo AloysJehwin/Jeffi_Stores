@@ -51,4 +51,11 @@ export interface ProvisioningProvider {
   /** Rollback: delete resources created by a failed provision (no leaked billing). */
   deleteDbInstance(dbInstanceId: string): Promise<void>
   deleteBucket(bucket: string): Promise<void>
+
+  /** True once the RDS instance no longer exists (teardown ordering before param-group delete). */
+  isDbInstanceGone(dbInstanceId: string): Promise<boolean>
+
+  /** Delete the tenant's custom parameter group (idempotent; NotFound = success). Only
+   * succeeds once no instance references it, so callers must delete the DB first. */
+  deleteParamGroup(paramGroup: string): Promise<void>
 }

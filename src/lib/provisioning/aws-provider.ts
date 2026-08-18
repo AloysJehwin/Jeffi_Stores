@@ -2,6 +2,7 @@ import {
   RDSClient,
   CreateDBParameterGroupCommand,
   ModifyDBParameterGroupCommand,
+  DeleteDBParameterGroupCommand,
   CreateDBInstanceCommand,
   DescribeDBInstancesCommand,
   StopDBInstanceCommand,
@@ -227,5 +228,26 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   async deleteBucket(bucket: string): Promise<void> {
     await this.s3.send(new DeleteBucketCommand({ Bucket: bucket }))
       .catch((err) => { if (!/NoSuchBucket/i.test(err?.name || '')) throw err })
+  }
+
+  async isDbInstanceGone(dbInstanceId: string): Promise<boolean> {
+    try {
+      await this.rds.send(new DescribeDBInstancesCommand({ DBInstanceIdentifier: dbInstanceId }))
+      return false // still exists (any state)
+    } catch (err: any) {
+      if (/DBInstanceNotFound|NotFound/i.test(err?.name || '')) return true
+      throw err
+    }
+  }
+
+  async deleteParamGroup(paramGroup: string): Promise<void> {
+    await this.rds.send(new DeleteDBParameterGroupCommand({ DBParameterGroupName: paramGroup }))
+      .catch((err) => {
+        const name = err?.name || ''
+        // NotFound → already gone (success). InvalidDBParameterGroupState → still attached
+        // to an instance that isn't fully deleted yet; caller retries after DB is gone.
+        if (/DBParameterGroupNotFound|NotFound/i.test(name)) return
+        throw err
+      })
   }
 }

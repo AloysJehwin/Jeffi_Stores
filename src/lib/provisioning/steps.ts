@@ -197,10 +197,23 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         return 'failed'
     }
   } catch (e: any) {
-    await updateProvisioningJob(job.id, { status: 'failed', last_error: e?.message || 'error', created_resources: res })
-    // Auto-rollback: tear down any billable resources created so far so a failed provision
-    // does not leak a running RDS/bucket, and leave the tenant in a safe (non-active) state.
-    // Best-effort — rollback failures are logged into the job but never mask the original error.
+    const msg = e?.message || String(e) || 'error'
+    const attempts = (job.attempts || 0) + 1
+    // Classify: transient errors get retried with backoff; deterministic errors fail now.
+    const terminal = isTerminalError(msg) || attempts >= MAX_PROVISION_ATTEMPTS
+    if (!terminal) {
+      // Retryable — keep the job alive (pending) and back off before the next tick.
+      const delayMs = Math.min(BACKOFF_CAP_MS, BACKOFF_BASE_MS * 2 ** (attempts - 1))
+      const jitter = Math.floor(delayMs * 0.2 * (attempts % 3) / 2) // deterministic small jitter (no Math.random)
+      const nextAttemptAt = new Date(Date.now() + delayMs + jitter)
+      await updateProvisioningJob(job.id, {
+        status: 'pending', last_error: `retryable (attempt ${attempts}): ${msg}`,
+        created_resources: res, bumpAttempts: true, nextAttemptAt,
+      })
+      return 'pending'
+    }
+    // Terminal (or out of attempts) → fail + auto-rollback billable resources.
+    await updateProvisioningJob(job.id, { status: 'failed', last_error: msg, created_resources: res, bumpAttempts: true })
     try {
       await rollbackProvisioning(job.tenant_id, provider)
     } catch { /* rollback failure already recorded; original failure stands */ }
@@ -208,9 +221,38 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
   }
 }
 
+// Retry tuning for the provisioning state machine.
+const MAX_PROVISION_ATTEMPTS = 8
+const BACKOFF_BASE_MS = 15_000   // 15s, doubling
+const BACKOFF_CAP_MS = 600_000   // capped at 10 min
+
+/** Deterministic errors that won't fix themselves on retry → fail fast (no wasted retries). */
+function isTerminalError(msg: string): boolean {
+  return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|InvalidParameterCombination|missing required env/i.test(msg)
+}
+
 async function next(id: string, step: Step, res: Record<string, any>): Promise<string> {
-  await updateProvisioningJob(id, { step, status: 'pending', created_resources: res })
+  // Clear any backoff timer on a successful step transition (prior retries are resolved).
+  await updateProvisioningJob(id, { step, status: 'pending', created_resources: res, clearNextAttempt: true })
   return 'pending'
+}
+
+/** Delete a param group after its DB instance is fully gone (RDS refuses while attached).
+ * Bounded polling — if the DB is still deleting after the budget, skip (a later teardown /
+ * reconciliation sweep retries). Best-effort; never throws. */
+async function deleteParamGroupWhenDbGone(
+  provider: ProvisioningProvider, dbInstanceId: string | undefined, paramGroup: string | undefined,
+): Promise<void> {
+  if (!paramGroup) return
+  try {
+    if (dbInstanceId) {
+      for (let i = 0; i < 20; i++) {
+        if (await provider.isDbInstanceGone(dbInstanceId)) break
+        await new Promise((r) => setTimeout(r, 15_000))
+      }
+    }
+    await provider.deleteParamGroup(paramGroup)
+  } catch { /* still attached / transient — a later teardown or sweep will retry */ }
 }
 
 /** Rollback a failed job's created resources (avoid leaked billing + leave a safe state). */
@@ -225,6 +267,8 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   // Billable resources.
   if (r.bucket) await provider.deleteBucket(r.bucket).catch(() => {})
   if (r.dbInstanceId) await provider.deleteDbInstance(r.dbInstanceId).catch(() => {})
+  // Param group can only be deleted once the DB is gone.
+  await deleteParamGroupWhenDbGone(provider, r.dbInstanceId, r.paramGroup)
   // Null infra pointers so the resolver never routes to deleted infra.
   await clearTenantInfra(tenantId).catch(() => {})
   // Reconcile the tenant row: NEVER leave it 'active'/'provisioning' pointing at torn-down
@@ -294,6 +338,10 @@ export async function deprovisionTenant(
     // 3b. Remove the tenant's DNS records so the subdomains stop resolving.
     const dnsHosts = (created.dnsHosts as string[] | undefined) ?? tenantHostnames(slug, tenant.plan)
     await provider.removeDns(dnsHosts).catch(() => {})
+
+    // 3c. Delete the tenant's param group once the DB instance is fully gone (else RDS
+    // refuses). Best-effort — a still-deleting DB is retried by a later sweep.
+    await deleteParamGroupWhenDbGone(provider, instId, created.paramGroup || paramGroupName(slug))
 
     // 4. Clear infra pointers.
     await clearTenantInfra(tenantId)
