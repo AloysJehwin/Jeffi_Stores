@@ -4,6 +4,7 @@ import fs from 'fs'
 import { Signer } from '@aws-sdk/rds-signer'
 import { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext } from './audit-context'
 import { getCurrentTenant, getCurrentTenantId, runWithTenantContext, setTenantContext } from './tenant-context'
+import type { TenantContext as TenantContextType } from './tenant-context'
 
 // DEFAULT pool = the env-configured DB (the platform's own store, dev, jobs).
 // Per-tenant pools live in `tenantPools`, keyed by tenant id, built lazily from
@@ -125,8 +126,12 @@ function attachErrorHandler(p: Pool): Pool {
   return p
 }
 
-function getPool(): Pool {
-  const tenant = getCurrentTenant()
+function getPool(explicitTenant?: TenantContextType | null): Pool {
+  // Prefer an explicitly-resolved tenant (from ensureTenantContext) over ALS.
+  // enterWith() set inside an async fn does NOT reliably survive the await back
+  // to the caller, so relying on getCurrentTenant() here dropped the tenant and
+  // fell back to the platform DB. Passing ctx explicitly is the robust path.
+  const tenant = explicitTenant ?? getCurrentTenant()
   // No tenant in context OR tenant without dedicated infra → DEFAULT pool (unchanged).
   if (!tenant || !tenant.infra || !tenant.infra.rdsEndpoint) {
     if (!pool) { pool = buildDefaultPool(); dbGlobal.__appPool = pool }
@@ -147,25 +152,27 @@ function getPool(): Pool {
  * Edge middleware runs in a separate context from Node route handlers, so the ALS tenant
  * context set in middleware does NOT reach getPool() here — without this bridge every
  * request falls back to the DEFAULT pool (the platform DB), leaking one tenant's traffic
- * onto the main store's data. Resolves the tenant's infra from the control-plane and enters
- * it into ALS so getPool() (and all downstream queries in this request) scope correctly.
- * No-op when ALS already has a tenant (background jobs via runWithTenantContext) or when
- * the header is absent (platform's own hosts).
+ * onto the main store's data. Resolves the tenant's infra from the control-plane and
+ * RETURNS it so callers pass it straight to getPool() — enterWith() alone does not
+ * survive the await boundary back into query()/getClient(). Returns null when ALS already
+ * has a tenant (jobs), when there's no request scope, or when the header is absent.
  */
-async function ensureTenantContext(): Promise<void> {
-  if (getCurrentTenant()) return
+async function ensureTenantContext(): Promise<TenantContextType | null> {
+  const existing = getCurrentTenant()
+  if (existing) return existing
   let slug: string | null = null
   try {
     const { headers } = await import('next/headers')
     const h = await headers()
     slug = h.get('x-tenant-slug')
   } catch {
-    return // outside a request scope (jobs) — leave default
+    return null // outside a request scope (jobs) — leave default
   }
-  if (!slug) return
+  if (!slug) return null
   const { lookupTenantContextBySlug } = await import('./tenant-registry')
   const ctx = await lookupTenantContextBySlug(slug)
   if (ctx) setTenantContext(ctx)
+  return ctx
 }
 
 function isMutation(text: string): boolean {
@@ -191,8 +198,8 @@ async function getRequestAdminId(): Promise<string | null> {
 }
 
 export async function query<T extends QueryResultRow = any>(text: string, params?: any[]): Promise<QueryResult<T>> {
-  await ensureTenantContext()
-  const p = getPool()
+  const tenant = await ensureTenantContext()
+  const p = getPool(tenant)
   if (isMutation(text)) {
     const adminId = await getRequestAdminId()
     if (adminId) {
@@ -230,8 +237,8 @@ export async function queryCount(text: string, params?: any[]): Promise<number> 
 }
 
 export async function getClient(): Promise<PoolClient> {
-  await ensureTenantContext()
-  const client = await getPool().connect()
+  const tenant = await ensureTenantContext()
+  const client = await getPool(tenant).connect()
   const adminId = await getRequestAdminId()
   if (adminId) {
     await client.query(`SELECT set_config('audit.admin_id', $1, false)`, [adminId]).catch(() => {})

@@ -15,7 +15,6 @@ import {
   PutBucketCorsCommand,
   DeleteBucketCommand,
 } from '@aws-sdk/client-s3'
-import { Signer } from '@aws-sdk/rds-signer'
 import { Pool } from 'pg'
 import fs from 'fs'
 import path from 'path'
@@ -153,16 +152,22 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     }
   }
 
-  /** Build an IAM-auth'd pg pool to a tenant DB as the master user (for DDL + data ops). */
+  /** Build a pg pool to a tenant DB as the MASTER user (for DDL + data ops).
+   * The master user (postgres) authenticates by PASSWORD, not IAM — IAM auth only
+   * works for roles explicitly granted rds_iam (e.g. app_user, which loadSchema creates).
+   * Uses RDS_MASTER_PASSWORD, the same secret passed to CreateDBInstance. */
   private tenantPool(endpoint: string, dbName: string): Pool {
-    const signer = new Signer({ hostname: endpoint, port: 5432, region: REGION, username: RDS_MASTER_USER })
+    const masterPassword = process.env.RDS_MASTER_PASSWORD
+    if (!masterPassword) {
+      throw new Error('RDS_MASTER_PASSWORD is not set — required to connect as the tenant DB master user for schema load / backup / restore')
+    }
     const certPath = path.join(process.cwd(), 'certs', 'global-bundle.pem')
     const ssl = fs.existsSync(certPath)
       ? { rejectUnauthorized: true, ca: fs.readFileSync(certPath).toString() }
       : { rejectUnauthorized: false }
     return new Pool({
       host: endpoint, port: 5432, database: dbName, user: RDS_MASTER_USER,
-      password: () => signer.getAuthToken(), ssl, max: 2, connectionTimeoutMillis: 20000,
+      password: masterPassword, ssl, max: 2, connectionTimeoutMillis: 20000,
     })
   }
 
