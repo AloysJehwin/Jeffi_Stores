@@ -1,5 +1,11 @@
 # Provisioning Engine + Multi-Tenant Deploy Pipeline — Design
 
+> ⚠️ **SUPERSEDED (2026-08-18).** The status line below ("no code / no live AWS yet") is
+> **out of date** — the engine is built (12-step state machine, real AWS provider, live-tested
+> end-to-end) on `feat/multitenant-foundation` (PR #425). Current state:
+> **`docs/SAAS_MULTITENANT_STATUS.md`**. Design rationale below is still valid; the
+> "Build order" and "Open decisions" sections are historical.
+
 > Status: **Design for review. No code / no live AWS yet.** Grounded in live infra IDs + AWS-SDK research (Aug 2026).
 > Locked decisions: **RDS-per-tenant**, **shared app fleet** (not per-tenant instances), **auto-migrate all tenant DBs** on a schema change.
 > Nothing here provisions real infra until you approve and we execute step-by-step.

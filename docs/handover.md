@@ -1,5 +1,10 @@
 # Session Handover — 2026-08-17
 
+> ⚠️ **PARTIALLY OUT OF DATE — corrected 2026-08-18.** Work continued after this was written:
+> everything below was **committed and pushed**, five more commits landed, and the test tenant was
+> torn down. Corrections are inline below, marked **[UPDATE 08-18]**.
+> **Authoritative current status: [`docs/SAAS_MULTITENANT_STATUS.md`](./SAAS_MULTITENANT_STATUS.md).**
+
 ## What Was Being Worked On
 Converting the single-tenant Jeffi Stores e-commerce platform into a multi-tenant SaaS
 (`ecom.jeffistores.in`). This session: Razorpay Route (POBO) payments, per-plan feature
@@ -9,7 +14,8 @@ fan-out, COD settlement, and a real AWS provisioning provider. Next up (NOT star
 
 ## Branch & Uncommitted State
 - Branch: `feat/multitenant-foundation` (NEVER merge to main; open PR only, don't merge until user says)
-- **Everything this session is UNCOMMITTED** — ~30 modified files + ~27 new files/dirs
+- ~~**Everything this session is UNCOMMITTED** — ~30 modified files + ~27 new files/dirs~~
+  **[UPDATE 08-18]** All committed and pushed. Working tree is **clean**. Now tracked as **PR #425 (open)**.
 - Typecheck is clean (`npx tsc --noEmit` passes)
 
 ## Environment
@@ -43,6 +49,11 @@ fan-out, COD settlement, and a real AWS provisioning provider. Next up (NOT star
 - **AWS provisioning provider**: `src/lib/provisioning/aws-provider.ts` (real @aws-sdk RDS/S3), enabled via `PROVISIONING_PROVIDER=aws`; installed `@aws-sdk/client-rds`
 
 ## What Needs To Be Done Next (ordered)
+
+> **[UPDATE 08-18]** All four items below are DONE. The *current* next steps are (1) merge PR #425
+> and (2) **schedule the cron worker — it is scheduled nowhere today**, so enqueued jobs never
+> advance. See `docs/SAAS_MULTITENANT_STATUS.md` for the live pending list.
+
 1. **Live AWS provisioning test** — ✅ DONE (2026-08-17). Real `db.t4g.micro` (`jeffi-tenant-test`,
    pg 16.13, IAM auth, encrypted) provisioned in ~9 min via `AwsProvisioningProvider` from a local
    driver; param group + RDS create + `available` poll all verified against account 708835965056.
@@ -67,15 +78,18 @@ run from a laptop or any host outside the VPC (they time out). The **control-pla
 - The cron worker / provisioning driver MUST be deployed **in-VPC** (app EC2/ECS, a bastion, or an
   in-VPC Lambda) for `load_schema`/`restore_data` to succeed. This is a deploy/topology decision.
 - To run/verify from a laptop: SSH tunnel through the in-VPC app host. VERIFIED WORKING:
-  `ssh -f -N -L 5434:<tenant-rds-endpoint>:5432 -i ~/.ssh/jeffi-stores-key.pem ec2-user@32.196.38.130`
-  (host `jeffi-stores-app` = `i-0b2466b2a540d6f23`, private `172.31.20.170`; SSM is NOT enabled on it).
+  `ssh -f -N -L 5434:<tenant-rds-endpoint>:5432 -i ~/.ssh/jeffi-stores-key.pem ec2-user@52.20.193.62`
+  (**[UPDATE 08-18]** IP changed: was `32.196.38.130`, now the stable EIP **`52.20.193.62`**;
+  host `jeffi-stores-app` = `i-0b2466b2a540d6f23`, private `172.31.20.170`; SSM is NOT enabled on it).
   The one-time schema load over the tunnel uses `RDS_MASTER_PASSWORD` (IAM token can't be signed for 127.0.0.1).
 
 ### ✅ aloys-store fully provisioned on dedicated infra (2026-08-17)
 Ran the REAL engine end-to-end (basic plan): RDS `jeffi-tenant-aloys-store`
 (`...cjmaa6acimgm.us-east-1.rds.amazonaws.com`) + S3 `jeffi-tenant-aloys-store`, schema loaded
-(120 tables), `app_user`+`rds_iam` granted, `tenant_infra` written, status `active`. This RDS is
-LIVE and BILLING — deprovision when done testing (admin button, or subscription cancel).
+(120 tables), `app_user`+`rds_iam` granted, `tenant_infra` written, status `active`. ~~This RDS is
+LIVE and BILLING — deprovision when done testing (admin button, or subscription cancel).~~
+**[UPDATE 08-18] RESOLVED — torn down.** `describe-db-instances` shows only `jeffi-stores-db`;
+`aloys-store.jeffistores.in` no longer resolves. **No stray tenant billing.**
 
 ### 🐛 THREE schema-load bugs fixed in `buildTenantSchemaSql()` (would have broken live too)
 `src/lib/tenant-migrations-schema.ts` now: (1) `stripPsqlMetaCommands` drops `\`-prefixed psql

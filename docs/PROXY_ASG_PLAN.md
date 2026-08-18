@@ -1,5 +1,11 @@
 # RDS Proxy + EC2 Auto Scaling — Implementation Design
 
+> ⚠️ **PARTIALLY SUPERSEDED (2026-08-18).** RDS Proxy + ASG are still **not executed** (that part
+> stands), but the doc's blocking prerequisite — *"`/api/health` returns ok unconditionally"* — is
+> **already fixed**: health is now split into liveness (`/api/health`) and readiness
+> (`/api/ready`, which checks DB + Redis and is what the ALB/blue-green gate should poll).
+> Multi-tenant current state: **`docs/SAAS_MULTITENANT_STATUS.md`**.
+
 > Status: **Design for review. NOT executed.** Grounded in live infra facts (Aug 2026) + AWS-doc research.
 > Hard requirement (owner): **container-level blue/green zero-downtime deploy MUST be preserved.**
 > Execute deliberately, step-by-step, in a fresh session — not tacked onto a long day. Nothing here has been provisioned.
