@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { activeProvisioningJobs, getProvisioningJob } from '@/lib/tenant-registry'
+import { activeProvisioningJobs, getProvisioningJob, reconcileOrphanedTenants } from '@/lib/tenant-registry'
 import { advanceProvisioningJob } from '@/lib/provisioning/steps'
 import { getProvisioningProvider } from '@/lib/provisioning'
 
@@ -29,5 +29,9 @@ export async function GET(request: NextRequest) {
     results.push({ tenantId: job.tenant_id, step: fresh.step, status })
   }
 
-  return NextResponse.json({ success: true, advanced: results.length, results })
+  // Reconciliation sweep: fix any tenant left 'active' with no live infra (e.g. an RDS
+  // deleted out-of-band, or a partial failure) so it stops being served.
+  const reconciled = await reconcileOrphanedTenants().catch(() => [] as string[])
+
+  return NextResponse.json({ success: true, advanced: results.length, results, reconciled })
 }

@@ -497,6 +497,26 @@ export async function setTenantStatus(tenantId: string, status: string): Promise
   const pool = controlPlanePool()
   await pool.query(`UPDATE tenants SET status=$1, updated_at=now() WHERE id=$2`, [status, tenantId])
 }
+
+/**
+ * Reconciliation sweep: find tenants marked 'active' but whose infra is gone (rds_endpoint
+ * NULL) — an inconsistent state where the resolver would route to a non-existent DB (or, if
+ * infra is null, silently fall back to the platform DB). Flip them to 'suspended' so they
+ * stop being served and surface for operator attention. Returns the affected tenant ids.
+ * Safe + idempotent; run periodically from the provisioning cron worker.
+ */
+export async function reconcileOrphanedTenants(): Promise<string[]> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `UPDATE tenants t SET status='suspended', updated_at=now()
+     WHERE t.status='active'
+       AND NOT EXISTS (
+         SELECT 1 FROM tenant_infra i WHERE i.tenant_id = t.id AND i.rds_endpoint IS NOT NULL
+       )
+     RETURNING t.id`)
+  if (res.rowCount && res.rowCount > 0) clearTenantCache()
+  return res.rows.map((r) => r.id as string)
+}
 export async function saveLinkedAccountId(tenantId: string, linkedAccountId: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
