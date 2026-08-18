@@ -3,6 +3,14 @@ _Last updated: 2026-08-18_
 
 Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until instructed)
 
+> **This is the authoritative status doc for the multi-tenant effort.** It SUPERSEDES the
+> earlier design docs, which were written before any code existed and still describe the work
+> as unstarted:
+> `SAAS_MULTITENANT_PLAN.md` ("No code written yet"), `MULTI_TENANT_PHASES.md` (Phases 0–5
+> "not started"), `PROVISIONING_ENGINE_PLAN.md` ("Design for review, no code"),
+> `PROXY_ASG_PLAN.md` (flags `/api/health` debt that is already fixed — readiness now lives at
+> `/api/ready`). Read those for *design rationale only*; trust this file for current state.
+
 ---
 
 ## What Has Been Done
@@ -105,15 +113,28 @@ database/control-plane/schema.sql
 | # | Item | Notes |
 |---|------|-------|
 | 🔴 **1** | **Merge PR #425 → main** | Deploys all code fixes + makes prod pick up `RDS_MASTER_PASSWORD`. This is the real gate. Do NOT merge until you've reviewed. |
-| 🔴 **2** | **Schedule the cron worker** | `GET /api/cron/provisioning-worker`, Bearer `$CRON_SECRET`, every ~1 min. Without this, enqueued provisioning jobs never advance and the reconciliation sweep never runs. |
-| 🔴 **3** | **Rotate the leaked `Authorization` token** | `.mcp.json` was accidentally pushed in commit `9e11c9f4` (since gitignored + untracked). The `Authorization` header value in that commit is still in git history. Rotate the token for whatever service it belongs to. |
+| 🔴 **2** | **Configure the provisioning driver** | **Built + committed** (`c0c8e5b7`): `.github/workflows/provisioning-drive.yml` + `.github/scripts/provisioning-drive.sh` (multi-stage: preflight → drive → verify → report, plus an hourly drift sweep). **Config is DONE (2026-08-18):** repo secret `CRON_SECRET` set from Secrets Manager `jeffi/production` (64 chars, authoritative source), repo var `APP_URL=https://jeffistores.in`. ⚠️ **Still blocked by item 1, for two independent reasons:** (a) preflight returns **404** — `/api/cron/provisioning-worker` is not deployed until PR #425 ships; (b) GitHub refuses `workflow_dispatch` for a workflow *"not found on the default branch"*, so it is not runnable until the workflow reaches `main`. Merging PR #425 clears both at once. |
+| | *Verified 2026-08-18 (local run of the same script)* | `/api/ready` → 200. Sibling cron routes (`compute-health`, `sweep-auto-tasks`) → **401** on a bad token while `provisioning-worker` → **404**, confirming the preflight's deployed-vs-not discrimination is accurate rather than a false alarm. CloudFront `/api/*` uses **Managed-AllViewer** (forwards `Authorization`) + **Managed-CachingDisabled**, so `jeffistores.in` is a safe driver host — a caching or header-stripping policy there would have made the endpoint 401 forever. All six guard clauses (missing/plaintext URL, bad + out-of-range minutes, empty secret, unreachable host) fire correctly. |
+| | *Why a workflow and not an EC2 crontab* | Provisioning is **operator-gated** — the only enqueue path is `POST /api/admin/ecom/customers/[id]/provision` (super_admin); there is no self-serve provisioning route. So a human is already present when a job starts, and a `workflow_dispatch` driver is sufficient — no need for 1440 scheduled runs/day. Deprovision needs no driver at all (the Razorpay webhook and admin button call `deprovisionTenant()` **inline**). The only thing needing a schedule is `reconcileOrphanedTenants()`, which does not need 60-second resolution → hourly. **If provisioning ever becomes self-serve (auto-provision on payment), this must move to a real 1-min scheduler** — a manual driver would no longer be acceptable. |
+| | *Clarification on "in-VPC"* | The VPC constraint applies to **where the code executes, not where the trigger comes from**. The worker is a route on the app, which already runs in-VPC, so its data-plane steps (`load_schema`, `restore_data`, backup) reach the `PubliclyAccessible: false` tenant RDS fine. Any external trigger (GHA, EventBridge, uptime pinger) is therefore viable. Only a driver that runs the provisioning code **itself** outside the VPC (e.g. a standalone runner importing `steps.ts`) would break. |
 
 ### Important but not blocking
 
 | # | Item | Notes |
 |---|------|-------|
-| 🟡 **4** | **Add alerting on failed/stuck provisioning jobs** | Query `provisioning_jobs WHERE status='failed'` or `updated_at < now()-interval '30min' AND status IN ('pending','running')` |
-| 🟡 **5** | **Document the deprovision multi-minute reality** | RDS delete takes several minutes; deprovision returns before the DB is actually gone. Operators should know to wait before re-provisioning the same slug. |
+| 🟡 **3** | **Add alerting on failed/stuck provisioning jobs** | Query `provisioning_jobs WHERE status='failed'` or `updated_at < now()-interval '30min' AND status IN ('pending','running')` |
+| 🟡 **4** | **Document the deprovision multi-minute reality** | RDS delete takes several minutes; deprovision returns before the DB is actually gone. Operators should know to wait before re-provisioning the same slug. |
+| 🟡 **5** | **Wildcard cert renewal is now a fleet-wide SPOF** | Cert expires **2026-11-15**. Every tenant's HTTPS depends on it. Wildcards need DNS-01, so certbot auto-renew must retain working `dns-route53` creds on the box — a silent renewal failure takes down *all* tenants at once. Verify `certbot renew --dry-run` + add an expiry alert. |
+| 🟡 **6** | **Release the idle EIP `32.196.38.130`** | The old (pre-EIP-swap) address is still allocated and **unassociated** — AWS bills idle EIPs (~$3.60/mo). Three other EIPs are attached to non-instance ENIs and are worth an audit at the same time. |
+| 🟡 **7** | **`deploy/aws-infrastructure.yaml` still documents the dead IP** | `32.196.38.130` appears in 4 places incl. `EC2_HOST`. Verified **not consumed by any tooling** (doc-only, so nothing breaks) — but it's the file an operator would trust mid-incident. Update to `52.20.193.62`. |
+| 🟡 **8** | **Never re-enable the EC2/RDS start-stop schedules** | `jeffi-start/stop-ec2` + `jeffi-start/stop-rds` in EventBridge group `jeffi-stores` are currently **DISABLED** (app runs 24/7 — correct for SaaS). Re-enabling them would take **every tenant storefront offline overnight**, and would stall the provisioning worker during the down window. The stale comment in `deploy/sync-cron-setup.sh` ("app is only up 09:00–00:00 IST") predates this and should be corrected. |
+| 🟡 **9** | **Local AWS CLI is authenticated as account ROOT** | The `default` profile holds **root access keys** (`arn:aws:iam::708835965056:root`, `AccountAccessKeysPresent: 1`). Root keys bypass all IAM policy/boundaries/SCPs; root MFA (enabled) does **not** protect them. 5 IAM users already exist. Point `default` at a scoped IAM admin (or Identity Center) and delete the root access keys. Does not affect the app, which correctly uses the `jeffi-tenant-provisioning` role on the EC2 instance profile. |
+
+### Resolved / no action
+
+| Item | Outcome |
+|------|---------|
+| `.mcp.json` `Authorization` header pushed in `9e11c9f4` | **Accepted — no rotation needed.** The credential is the **Razorpay MCP** token (`mcp.razorpay.com`) and is a **test-mode** cred (account is on `rzp_test_*` keys), so it cannot move real money. File is now untracked + gitignored (`edcae0c2`). The value remains readable in git history — if the account is ever switched to LIVE keys, re-check that this token was not promoted alongside them. |
 
 ### Razorpay (separate gate)
 | Item | Notes |
@@ -124,6 +145,10 @@ database/control-plane/schema.sql
 These are nice-to-have improvements beyond what was built:
 - `wait_db_available` stuck-job alert (the 25-min deadline terminates the job, but no notification is sent)
 - Seed catalog profiles in `seed.ts` (currently the seam exists but no profiles are implemented)
+- `aws-provider.ts` uses 5 **extensionless dynamic imports** (`await import('../tenant-migrations-schema')`,
+  `'../tenant-db-backup')`, `'../tenant-dns')`). Fine under Next's bundler (how the app runs), but they
+  fail under raw Node ESM — so the engine can't be driven by a plain `node` script without adding
+  `.js` extensions. Matters if the cron worker is ever moved to a standalone Lambda.
 
 ---
 

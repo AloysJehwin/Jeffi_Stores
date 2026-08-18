@@ -1,4 +1,9 @@
 # Jeffi Stores → Multi-Tenant SaaS: Architecture Plan
+> ⚠️ **SUPERSEDED (2026-08-18) — the "no code written yet" line below is NO LONGER TRUE.**
+> The multi-tenant foundation and provisioning engine are **built and committed** on
+> `feat/multitenant-foundation` (PR #425). For current state, read
+> **`docs/SAAS_MULTITENANT_STATUS.md`**. Keep this file for design rationale and locked
+> decisions only.
 
 > Status: **Design / decisions locked (round 1).** No code written yet. Grounded in a full codebase survey (Aug 2026).
 
