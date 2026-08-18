@@ -19,6 +19,7 @@ import {
 // only does work when the job carries a `restoreFromKey` (churned owner re-onboarding),
 // otherwise it's a no-op passthrough.
 const STEPS = [
+  'preflight',
   'create_param_group',
   'create_db_instance',
   'wait_db_available',
@@ -27,6 +28,7 @@ const STEPS = [
   'create_bucket',
   'write_infra',
   'configure_dns',
+  'verify_serving',
   'activate',
 ] as const
 type Step = (typeof STEPS)[number]
@@ -73,6 +75,21 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     const step = job.step as Step
 
     switch (step) {
+      case 'preflight': {
+        // Fail fast on missing prerequisites BEFORE creating any billable infra, so a
+        // misconfigured environment produces one clear error instead of a cryptic
+        // mid-provision failure (e.g. absent RDS_MASTER_PASSWORD → "Invalid master
+        // password" at create_db_instance; unset TENANT_APP_TARGET_IP → dead DNS).
+        const missing: string[] = []
+        if (!process.env.RDS_MASTER_PASSWORD) missing.push('RDS_MASTER_PASSWORD')
+        const target = process.env.TENANT_APP_TARGET_IP
+        if (!target || !target.trim()) missing.push('TENANT_APP_TARGET_IP')
+        if (missing.length) {
+          throw new Error(`preflight: missing required env: ${missing.join(', ')}`)
+        }
+        return await next(job.id, 'create_param_group', res)
+      }
+
       case 'create_param_group':
         await provider.ensureParamGroup(paramGroupName(slug), MAX_CONNECTIONS)
         res.paramGroup = paramGroupName(slug)
@@ -127,13 +144,53 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         const hosts = tenantHostnames(slug, tenant.plan)
         await provider.ensureDns(hosts)
         res.dnsHosts = hosts
-        return await next(job.id, 'activate', res)
+        return await next(job.id, 'verify_serving', res)
       }
 
-      case 'activate':
+      case 'verify_serving': {
+        // Prove the tenant host actually SERVES before marking the store active. Without
+        // this, activate "lies": it flips status to active with no evidence the app tier
+        // (nginx server_name + TLS + reachable target) answers the new hostname — a real
+        // signup could go live pointing at a host that 404s or times out. DNS/serving can
+        // lag right after configure_dns, so we allow a bounded number of pending retries
+        // (each worker tick) before giving up and failing the job for rollback.
+        const rootDomain = ROOT_DOMAIN
+        const primaryHost = `${slug}.${rootDomain}`
+        const attempts = (res.verifyAttempts || 0) + 1
+        res.verifyAttempts = attempts
+        const MAX_VERIFY_ATTEMPTS = 6
+        let served = false
+        try {
+          const ctrl = new AbortController()
+          const timer = setTimeout(() => ctrl.abort(), 10000)
+          const resp = await fetch(`https://${primaryHost}/`, { redirect: 'manual', signal: ctrl.signal })
+          clearTimeout(timer)
+          // Any HTTP response (2xx/3xx/4xx) proves the app tier is answering this host.
+          // A network failure/timeout (host unreachable, TLS fail, no server_name) throws.
+          served = resp.status > 0
+        } catch {
+          served = false
+        }
+        if (served) return await next(job.id, 'activate', res)
+        if (attempts < MAX_VERIFY_ATTEMPTS) {
+          // Not serving yet — stay on this step; the worker retries next tick (DNS/TLS lag).
+          await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
+          return 'pending'
+        }
+        throw new Error(`verify_serving: ${primaryHost} did not serve after ${attempts} attempts (app tier / DNS / TLS not ready)`)
+      }
+
+      case 'activate': {
+        // Guard the write_infra→activate invariant: never mark a tenant active without a
+        // persisted RDS endpoint (else getPool would silently fall back to the platform DB).
+        const fresh = await getTenant(job.tenant_id)
+        if (!fresh?.rds_endpoint) {
+          throw new Error('activate blocked: tenant_infra.rds_endpoint not persisted')
+        }
         await setTenantStatus(job.tenant_id, 'active')
         await updateProvisioningJob(job.id, { status: 'done', created_resources: res })
         return 'done'
+      }
 
       default:
         await updateProvisioningJob(job.id, { status: 'failed', last_error: `unknown step ${step}` })
@@ -141,6 +198,12 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     }
   } catch (e: any) {
     await updateProvisioningJob(job.id, { status: 'failed', last_error: e?.message || 'error', created_resources: res })
+    // Auto-rollback: tear down any billable resources created so far so a failed provision
+    // does not leak a running RDS/bucket, and leave the tenant in a safe (non-active) state.
+    // Best-effort — rollback failures are logged into the job but never mask the original error.
+    try {
+      await rollbackProvisioning(job.tenant_id, provider)
+    } catch { /* rollback failure already recorded; original failure stands */ }
     return 'failed'
   }
 }
@@ -150,14 +213,24 @@ async function next(id: string, step: Step, res: Record<string, any>): Promise<s
   return 'pending'
 }
 
-/** Rollback a failed job's created resources (avoid leaked billing). */
+/** Rollback a failed job's created resources (avoid leaked billing + leave a safe state). */
 export async function rollbackProvisioning(tenantId: string, provider: ProvisioningProvider): Promise<void> {
   const job = await getProvisioningJob(tenantId)
-  if (!job) return
-  const r = job.created_resources || {}
-  if (r.dbInstanceId) await provider.deleteDbInstance(r.dbInstanceId).catch(() => {})
+  const tenant = await getTenant(tenantId)
+  const r = (job?.created_resources as Record<string, any>) || {}
+  // DNS first (cheap, no dependency) — use recorded hosts, else derive from slug.
+  const hosts = (r.dnsHosts as string[] | undefined)
+    ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : [])
+  if (hosts.length) await provider.removeDns(hosts).catch(() => {})
+  // Billable resources.
   if (r.bucket) await provider.deleteBucket(r.bucket).catch(() => {})
-  await updateProvisioningJob(job.id, { status: 'failed', last_error: 'rolled back' })
+  if (r.dbInstanceId) await provider.deleteDbInstance(r.dbInstanceId).catch(() => {})
+  // Null infra pointers so the resolver never routes to deleted infra.
+  await clearTenantInfra(tenantId).catch(() => {})
+  // Reconcile the tenant row: NEVER leave it 'active'/'provisioning' pointing at torn-down
+  // infra. 'suspended' = not served, distinguishable from a clean 'terminated' deprovision.
+  await setTenantStatus(tenantId, 'suspended').catch(() => {})
+  if (job) await updateProvisioningJob(job.id, { status: 'failed', last_error: 'rolled back', created_resources: { ...r, rolledBack: true } })
 }
 
 export interface DeprovisionResult {
