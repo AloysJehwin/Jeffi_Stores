@@ -73,6 +73,21 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/catalog-enrichment'],
     group: 'Catalogue',
   },
+  // Merchant Sync — previously piggybacked on products:read. Dedicated key for tiering.
+  {
+    key: 'merchant_sync:read',
+    label: 'Merchant Sync (Read)',
+    description: 'View Google/Amazon merchant feed sync status',
+    routes: ['/admin/merchant-sync'],
+    group: 'Catalogue',
+  },
+  {
+    key: 'merchant_sync:write',
+    label: 'Merchant Sync (Write)',
+    description: 'Run and manage Google/Amazon merchant feed synchronization',
+    routes: ['/admin/merchant-sync'],
+    group: 'Catalogue',
+  },
 
   // Sales
   {
@@ -88,6 +103,53 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     description: 'Update orders, create shipments, cancel and manage fulfilment',
     routes: ['/admin/orders'],
     group: 'Sales',
+  },
+  // Returns / Replacements / Delhivery pickup — previously piggybacked on
+  // orders:read. Given dedicated keys so plan tiers can enable them independently.
+  // Still implied by orders:write via hasScope's write⇒read for the same feature? No —
+  // these are distinct features, so they get their own read/write keys. Basic plan
+  // can grant orders:* without returns:* etc.
+  {
+    key: 'returns:read',
+    label: 'Returns (Read)',
+    description: 'View return requests',
+    routes: ['/admin/returns'],
+    group: 'Sales',
+  },
+  {
+    key: 'returns:write',
+    label: 'Returns (Write)',
+    description: 'Approve, reject and process return requests and refunds',
+    routes: ['/admin/returns'],
+    group: 'Sales',
+  },
+  {
+    key: 'replacements:read',
+    label: 'Replacements (Read)',
+    description: 'View replacement requests',
+    routes: ['/admin/replacements'],
+    group: 'Sales',
+  },
+  {
+    key: 'replacements:write',
+    label: 'Replacements (Write)',
+    description: 'Process replacement requests and issue replacement orders',
+    routes: ['/admin/replacements'],
+    group: 'Sales',
+  },
+  {
+    key: 'delhivery:read',
+    label: 'Pickup Requests (Read)',
+    description: 'View Delhivery pickup requests and scheduling',
+    routes: ['/admin/delhivery'],
+    group: 'Fulfilment',
+  },
+  {
+    key: 'delhivery:write',
+    label: 'Pickup Requests (Write)',
+    description: 'Schedule and manage Delhivery pickup requests',
+    routes: ['/admin/delhivery'],
+    group: 'Fulfilment',
   },
   {
     key: 'quotations:read',
@@ -129,6 +191,35 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     label: 'Customers (Write)',
     description: 'Edit customer accounts, add notes, tags and manage CRM tasks',
     routes: ['/admin/customers'],
+    group: 'Sales',
+  },
+  // CRM & Tasks — previously piggybacked on customers:read. Dedicated keys for tiering.
+  {
+    key: 'crm:read',
+    label: 'CRM (Read)',
+    description: 'View the CRM pipeline, deals and customer relationship data',
+    routes: ['/admin/crm'],
+    group: 'Sales',
+  },
+  {
+    key: 'crm:write',
+    label: 'CRM (Write)',
+    description: 'Manage CRM pipeline stages, deals and customer relationships',
+    routes: ['/admin/crm'],
+    group: 'Sales',
+  },
+  {
+    key: 'tasks:read',
+    label: 'Tasks (Read)',
+    description: 'View team tasks and follow-ups',
+    routes: ['/admin/tasks'],
+    group: 'Sales',
+  },
+  {
+    key: 'tasks:write',
+    label: 'Tasks (Write)',
+    description: 'Create, assign and complete team tasks',
+    routes: ['/admin/tasks'],
     group: 'Sales',
   },
 
@@ -233,6 +324,29 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/mailer'],
     group: 'Marketing',
   },
+  // Campaigns — previously piggybacked on mailer:read. Dedicated key for tiering.
+  {
+    key: 'campaigns:read',
+    label: 'Campaigns (Read)',
+    description: 'View marketing campaigns',
+    routes: ['/admin/campaigns'],
+    group: 'Marketing',
+  },
+  {
+    key: 'campaigns:write',
+    label: 'Campaigns (Write)',
+    description: 'Create and manage marketing campaigns',
+    routes: ['/admin/campaigns'],
+    group: 'Marketing',
+  },
+  // Traffic analytics — previously piggybacked on dashboard:read. Dedicated key.
+  {
+    key: 'traffic:read',
+    label: 'Traffic (Read)',
+    description: 'View storefront traffic and visitor analytics',
+    routes: ['/admin/traffic'],
+    group: 'Marketing',
+  },
 
   // Finance
   {
@@ -261,6 +375,21 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     label: 'Inventory (Write)',
     description: 'Manage stock, raise purchase orders and update supplier records',
     routes: ['/admin/inventory'],
+    group: 'Finance',
+  },
+  // Shelving — previously piggybacked on inventory:read. Dedicated key for tiering.
+  {
+    key: 'shelving:read',
+    label: 'Shelving (Read)',
+    description: 'View warehouse shelving and bin locations',
+    routes: ['/admin/shelving'],
+    group: 'Finance',
+  },
+  {
+    key: 'shelving:write',
+    label: 'Shelving (Write)',
+    description: 'Manage warehouse shelving, bins and stock locations',
+    routes: ['/admin/shelving'],
     group: 'Finance',
   },
   {
@@ -353,6 +482,21 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/settings'],
     group: 'Settings',
   },
+  // Site Controls — previously piggybacked on inflation:read. Dedicated key for tiering.
+  {
+    key: 'controls:read',
+    label: 'Site Controls (Read)',
+    description: 'View site controls, feature flags and background job status',
+    routes: ['/admin/controls'],
+    group: 'Settings',
+  },
+  {
+    key: 'controls:write',
+    label: 'Site Controls (Write)',
+    description: 'Toggle feature flags, site controls and run background jobs',
+    routes: ['/admin/controls'],
+    group: 'Settings',
+  },
   {
     key: 'audit:read',
     label: 'Audit Log (Read)',
@@ -388,6 +532,44 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     routes: ['/admin/service-accounts'],
     group: 'Settings',
   },
+
+  // Ecom Store (SaaS control plane) — platform-operator only (superAdminOnly nav).
+  // These gate the multi-tenant control-plane admin pages, NOT tenant features.
+  {
+    key: 'ecom_customers:read',
+    label: 'Ecom Customers (Read)',
+    description: 'View SaaS tenant stores, plans and status',
+    routes: ['/admin/ecom/customers'],
+    group: 'Ecom Store',
+  },
+  {
+    key: 'ecom_customers:write',
+    label: 'Ecom Customers (Write)',
+    description: 'Manage SaaS tenants: suspend, resume, terminate, change plan',
+    routes: ['/admin/ecom/customers'],
+    group: 'Ecom Store',
+  },
+  {
+    key: 'ecom_instances:read',
+    label: 'Ecom Instances (Read)',
+    description: 'View per-tenant EC2/RDS/nginx/CDN/cert infrastructure status',
+    routes: ['/admin/ecom/instances'],
+    group: 'Ecom Store',
+  },
+  {
+    key: 'ecom_billing:read',
+    label: 'Ecom Billing (Read)',
+    description: 'View tenant subscriptions, settlement ledger and payouts',
+    routes: ['/admin/ecom/billing'],
+    group: 'Ecom Store',
+  },
+  {
+    key: 'ecom_billing:write',
+    label: 'Ecom Billing (Write)',
+    description: 'Manage tenant subscriptions, adjust settlements and trigger payouts',
+    routes: ['/admin/ecom/billing'],
+    group: 'Ecom Store',
+  },
 ]
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
@@ -417,9 +599,16 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/packing-slips')) return 'packing_slips:read'
   if (pathname.startsWith('/api/admin/cash-sale')) return 'invoices:read'
   if (pathname.startsWith('/api/admin/inflation')) return 'inflation:read'
+  if (pathname.startsWith('/api/admin/controls')) return 'controls:read'
   if (pathname.startsWith('/api/admin/customers')) return 'customers:read'
+  if (pathname.startsWith('/api/admin/crm')) return 'crm:read'
+  if (pathname.startsWith('/api/admin/tasks')) return 'tasks:read'
   if (pathname.startsWith('/api/admin/suppliers')) return 'inventory:read'
-  if (pathname.startsWith('/api/admin/delhivery')) return 'orders:read'
+  if (pathname.startsWith('/api/admin/shelving')) return 'shelving:read'
+  if (pathname.startsWith('/api/admin/merchant-sync')) return 'merchant_sync:read'
+  if (pathname.startsWith('/api/admin/returns')) return 'returns:read'
+  if (pathname.startsWith('/api/admin/replacements')) return 'replacements:read'
+  if (pathname.startsWith('/api/admin/delhivery')) return 'delhivery:read'
   if (pathname.startsWith('/api/admin/support')) return 'customers:read'
   if (pathname.startsWith('/api/admin/users')) return 'settings:read'
   if (pathname.startsWith('/api/admin/site-controls')) return 'settings:read'
@@ -429,13 +618,17 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/review-forms')) return 'review_forms:read'
   if (pathname.startsWith('/api/admin/mailer')) return 'mailer:read'
   if (pathname.startsWith('/api/admin/suggest')) return null
-  if (pathname.startsWith('/api/admin/traffic')) return 'dashboard:read'
+  if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'
+  if (pathname.startsWith('/api/admin/campaigns')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/agent')) return 'agent:read'
   if (pathname.startsWith('/api/admin/catalog-enrichment')) return 'catalog_enrichment:read'
   if (pathname.startsWith('/api/admin/audit')) return 'audit:read'
   if (pathname.startsWith('/api/admin/cron')) return 'audit:read'
   if (pathname.startsWith('/api/admin/replication')) return 'replication:read'
   if (pathname.startsWith('/api/admin/service-accounts')) return 'service_accounts:read'
+  if (pathname.startsWith('/api/admin/ecom/customers')) return 'ecom_customers:read'
+  if (pathname.startsWith('/api/admin/ecom/instances')) return 'ecom_instances:read'
+  if (pathname.startsWith('/api/admin/ecom/billing')) return 'ecom_billing:read'
   if (pathname.startsWith('/api/internal/cron-record')) return null
   if (pathname.startsWith('/api/admin/business/customers')) return 'business_customers:read'
   if (pathname.startsWith('/api/admin/business/discounts')) return 'business_customers:read'
@@ -446,6 +639,32 @@ export function getScopeForPath(pathname: string): string | null {
   return null
 }
 
+// Newly-split scopes used to piggyback on a parent feature's scope. To avoid
+// locking out existing admins whose stored scopes predate the split, a grant of
+// the legacy parent scope still satisfies the new child scope. Plan-tier gating
+// (which builds fresh scope sets) can still withhold the child independently.
+const LEGACY_SCOPE_PARENTS: Record<string, string> = {
+  'crm:read': 'customers:read',
+  'crm:write': 'customers:write',
+  'tasks:read': 'customers:read',
+  'tasks:write': 'customers:write',
+  'returns:read': 'orders:read',
+  'returns:write': 'orders:write',
+  'replacements:read': 'orders:read',
+  'replacements:write': 'orders:write',
+  'delhivery:read': 'orders:read',
+  'delhivery:write': 'orders:write',
+  'shelving:read': 'inventory:read',
+  'shelving:write': 'inventory:write',
+  'merchant_sync:read': 'products:read',
+  'merchant_sync:write': 'products:write',
+  'campaigns:read': 'mailer:read',
+  'campaigns:write': 'mailer:write',
+  'traffic:read': 'dashboard:read',
+  'controls:read': 'inflation:read',
+  'controls:write': 'inflation:write',
+}
+
 export function hasScope(role: string, scopes: string[], requiredScope: string): boolean {
   if (role === 'super_admin') return true
   if (scopes.includes(requiredScope)) return true
@@ -453,6 +672,12 @@ export function hasScope(role: string, scopes: string[], requiredScope: string):
   if (requiredScope.endsWith(':read')) {
     const writeScope = requiredScope.replace(':read', ':write')
     if (scopes.includes(writeScope)) return true
+  }
+  // Legacy fallback: a grant of the pre-split parent scope satisfies the new child.
+  const parent = LEGACY_SCOPE_PARENTS[requiredScope]
+  if (parent) {
+    if (scopes.includes(parent)) return true
+    if (parent.endsWith(':read') && scopes.includes(parent.replace(':read', ':write'))) return true
   }
   return false
 }

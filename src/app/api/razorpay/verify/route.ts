@@ -22,6 +22,9 @@ import { sendOrderConfirmedSMS } from '@/lib/sms'
 import { getFeatureFlags } from '@/lib/site-controls'
 import { getRazorpayInstance } from '@/lib/razorpay'
 import { settleVariantChangePayment } from '@/lib/variant-change'
+import { getCurrentTenant } from '@/lib/tenant-context'
+import { transferToLinkedAccount } from '@/lib/razorpay-route'
+import { controlPlanePool } from '@/lib/tenant-registry'
 
 const VerifySchema = z.object({
   razorpay_order_id: zNonEmpty,
@@ -99,6 +102,49 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'Payment verification failed' }, { status: 500 })
   }
+}
+
+async function fireRouteTransfer(opts: {
+  paymentId: string
+  totalAmountInr: number
+  orderId: string
+  orderRef: string
+  isCod: boolean
+}) {
+  const tenant = getCurrentTenant()
+  if (!tenant?.tenantId) return  // platform's own store — no Route transfer needed
+
+  // Fetch linked account id from control plane
+  const pool = controlPlanePool()
+  const row = await pool.query(
+    `SELECT razorpay_linked_account_id FROM tenants WHERE id=$1`, [tenant.tenantId]
+  ).catch(() => null)
+  const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
+  if (!linkedAccountId) return  // linked account not yet created — skip silently
+
+  const grossPaise = Math.round(opts.totalAmountInr * 100)
+  const result = await transferToLinkedAccount({
+    paymentId: opts.paymentId,
+    grossAmountPaise: grossPaise,
+    linkedAccountId,
+    isCod: opts.isCod,
+    orderId: opts.orderId,
+    tenantSlug: tenant.slug ?? '',
+  })
+
+  // Record in control-plane tenant_transactions for billing visibility
+  await pool.query(
+    `INSERT INTO tenant_transactions
+       (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, gateway_txn_id, is_cod, status, occurred_at)
+     VALUES ($1,$2,$3,$4,$5,$6,'razorpay_route',$7,$8,'captured',now())
+     ON CONFLICT DO NOTHING`,
+    [tenant.tenantId, opts.orderRef, opts.totalAmountInr,
+     result.amount / 100,
+     Math.round(grossPaise * (parseFloat(process.env.PLATFORM_COMMISSION_PCT || '3') / 100)) / 100,
+     0,  // gateway fee charged to platform, not tenant
+     result.transferId,
+     opts.isCod]
+  ).catch(() => {})  // non-fatal — transfer already succeeded
 }
 
 async function commitDraft(args: {
@@ -235,6 +281,15 @@ async function commitDraft(args: {
     `UPDATE pending_payment_intents SET committed = true WHERE razorpay_order_id = $1 AND committed = false`,
     [args.razorpay_order_id]
   ).catch(() => {})
+
+  // Route transfer — split payment to tenant's linked account (fire-and-forget)
+  fireRouteTransfer({
+    paymentId: args.razorpay_payment_id,
+    totalAmountInr: parseFloat(created.total_amount),
+    orderId: created.id,
+    orderRef: created.order_number,
+    isCod: false,
+  }).catch(() => {})
 
   const orderItems = await queryMany('SELECT * FROM order_items WHERE order_id = $1', [created.id])
   createDraftInvoice(created.id).catch(() => {})
@@ -380,6 +435,15 @@ async function markLegacyOrderPaid(args: {
     }
 
     recordImplicitSignalsForProducts(args.userId, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
+
+    // Route transfer for tenant storefront payments
+    fireRouteTransfer({
+      paymentId: args.razorpay_payment_id,
+      totalAmountInr: parseFloat(order.total_amount),
+      orderId: args.orderId,
+      orderRef: order.order_number,
+      isCod: false,
+    }).catch(() => {})
   }
 
   return NextResponse.json({

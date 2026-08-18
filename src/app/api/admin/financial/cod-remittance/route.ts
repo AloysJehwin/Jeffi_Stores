@@ -3,6 +3,8 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, query } from '@/lib/db'
 import { generateOrderInvoice } from '@/lib/invoice'
+import { getCurrentTenant } from '@/lib/tenant-context'
+import { recordCodSettlement } from '@/lib/razorpay-route'
 
 export const dynamic = 'force-dynamic'
 
@@ -96,6 +98,33 @@ export async function POST(request: NextRequest) {
   // Fire-and-forget so remittance never fails on PDF/S3 errors.
   for (const row of remitted.rows) {
     generateOrderInvoice(row.id).catch(() => {})
+  }
+
+  // For tenant stores (not the platform's own store), record a COD settlement in
+  // the control-plane ledger so the tenant is credited (gross − commission − actual
+  // Delhivery charge). Uses the reconciled delhivery_billed_amount when available.
+  const tenant = getCurrentTenant()
+  if (tenant?.tenantId && remitted.rows.length > 0) {
+    const settledOrders = await queryMany<{
+      order_number: string; total_amount: string
+      delhivery_billed_amount: string | null; shipping_amount: string | null
+    }>(
+      `SELECT order_number, total_amount, delhivery_billed_amount, shipping_amount
+       FROM orders WHERE id = ANY($1::uuid[])`,
+      [remitted.rows.map(r => r.id)]
+    ).catch(() => [])
+    for (const o of settledOrders) {
+      const actualDelhivery = o.delhivery_billed_amount != null
+        ? parseFloat(o.delhivery_billed_amount)
+        : parseFloat(o.shipping_amount ?? '0')
+      recordCodSettlement({
+        tenantId: tenant.tenantId,
+        tenantSlug: tenant.slug ?? '',
+        orderRef: o.order_number,
+        grossAmountInr: parseFloat(o.total_amount),
+        actualDelhiveryChargeInr: actualDelhivery,
+      }).catch(() => {})
+    }
   }
 
   return NextResponse.json({ success: true, marked: remitted.rows.length })

@@ -10,6 +10,7 @@ import { deductOrderStock } from '@/lib/inventory-deduct'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { attributeConversion } from '@/lib/marketing'
+import { getCurrentTenant } from '@/lib/tenant-context'
 import { parseBody } from '@/lib/validate'
 import {
   notifyOrderConfirmed, notifyOrderShipped, notifyOrderDelivered,
@@ -43,6 +44,10 @@ export async function GET(
 
     const orderId = id
     const isBusiness = authUser.isBusiness === true || request.headers.get('x-auth-portal') === 'business'
+
+    // Plan gate: Basic plan has no returns module — hide return/replacement UI.
+    const { currentTenantPlanGate } = await import('@/lib/plan-gate')
+    const returnsEnabled = (await currentTenantPlanGate('returns:read')).allowed
 
     let order: any
     if (isBusiness) {
@@ -192,9 +197,12 @@ export async function GET(
         buyMode: item.buy_mode || 'unit',
         buyUnit: item.buy_unit || null,
         products: item.products,
-        returnAllowed: item.return_allowed === false ? false : !!item.return_allowed,
+        // Returns/replacements are only available on Growth plan and above.
+        // Basic plan tenants don't have the returns module — force false so the
+        // UI never shows Return/Replace buttons regardless of product settings.
+        returnAllowed: returnsEnabled ? (item.return_allowed === false ? false : !!item.return_allowed) : false,
         returnWindowDays: parseInt(item.return_window_days) || 7,
-        replacementAllowed: item.replacement_allowed === false ? false : !!item.replacement_allowed,
+        replacementAllowed: returnsEnabled ? (item.replacement_allowed === false ? false : !!item.replacement_allowed) : false,
         replacementWindowDays: parseInt(item.replacement_window_days) || 7,
       })),
       pendingVariantChange: pendingVcr ? {

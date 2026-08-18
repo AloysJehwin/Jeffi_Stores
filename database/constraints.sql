@@ -2823,7 +2823,7 @@ ALTER TABLE ONLY public.auth_sessions
 --
 
 ALTER TABLE public.auth_sessions
-    ADD CONSTRAINT auth_sessions_principal_type_check CHECK (((principal_type)::text = ANY ((ARRAY['admin'::character varying, 'customer'::character varying, 'business'::character varying])::text[])));
+    ADD CONSTRAINT auth_sessions_principal_type_check CHECK (((principal_type)::text = ANY ((ARRAY['admin'::character varying, 'customer'::character varying, 'business'::character varying, 'owner'::character varying])::text[])));
 
 
 --

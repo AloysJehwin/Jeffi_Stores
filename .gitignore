@@ -38,6 +38,9 @@ next-env.d.ts
 
 # Temporary scripts & guides
 *.sh
+# ...but CI helper scripts MUST be committed — the workflows check them out and
+# run them on the runner, so an ignored script means "No such file" in Actions.
+!.github/scripts/*.sh
 /scripts/
 *.csv
 RDS_SECURITY_GROUP_FIX.md
@@ -79,6 +82,9 @@ graphify-out/20*/
 
 # Playwright MCP artifacts
 .playwright-mcp/
+
+# MCP server config — contains credentials, keep local only
+.mcp.json
 
 # On-device model training data (regenerated via scripts/gen-onboarding-dataset.mjs)
 data/onboarding/

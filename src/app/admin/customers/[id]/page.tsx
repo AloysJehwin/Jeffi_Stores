@@ -99,6 +99,7 @@ export default async function CustomerDetailPage({
   const role = h.get('x-user-role') || ''
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'customers:write')
+  const hasCrm = hasScope(role, scopes, 'crm:read')
 
   const fullName = [customer.first_name, customer.last_name].filter(Boolean).join(' ') || 'Unknown'
   const initials = [customer.first_name?.[0], customer.last_name?.[0]].filter(Boolean).join('').toUpperCase() || '?'
@@ -248,7 +249,8 @@ export default async function CustomerDetailPage({
 
         {/* Left column: Actions + Business details + Contact */}
         <div className="space-y-5">
-          {/* Engagement chips + Health Score */}
+          {/* Engagement chips + Health Score — CRM/WhatsApp requires Growth plan */}
+          {hasCrm && (
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
             <CustomerEngagementChips
               customerId={customer.id}
@@ -258,6 +260,7 @@ export default async function CustomerDetailPage({
             />
             <HealthScoreCard customerId={customer.id} initial={customer.health || null} />
           </div>
+          )}
 
           {/* Account Actions */}
           <div className="bg-surface-elevated rounded-xl border border-border-default p-5">

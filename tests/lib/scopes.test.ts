@@ -166,8 +166,10 @@ describe('getScopeForPath', () => {
     expect(getScopeForPath('/api/admin/cron/history')).toBe('audit:read')
   })
 
-  it('maps /api/admin/traffic/... to dashboard', () => {
-    expect(getScopeForPath('/api/admin/traffic/stats')).toBe('dashboard:read')
+  it('maps /api/admin/traffic/... to its own traffic scope', () => {
+    // Traffic analytics was split out of `dashboard` into a first-class scope so
+    // plan tiers can gate analytics independently of the basic dashboard.
+    expect(getScopeForPath('/api/admin/traffic/stats')).toBe('traffic:read')
   })
 
   it('maps /api/admin/packing-slips/... to packing_slips', () => {
@@ -182,8 +184,10 @@ describe('getScopeForPath', () => {
     expect(getScopeForPath('/api/admin/suppliers/list')).toBe('inventory:read')
   })
 
-  it('maps /api/admin/delhivery/... to orders', () => {
-    expect(getScopeForPath('/api/admin/delhivery/track')).toBe('orders:read')
+  it('maps /api/admin/delhivery/... to its own delhivery scope', () => {
+    // Delhivery was split out of `orders` into a first-class scope so plan tiers
+    // can enable shipping independently of order management.
+    expect(getScopeForPath('/api/admin/delhivery/track')).toBe('delhivery:read')
   })
 
   it('maps /api/admin/support/... to customers', () => {

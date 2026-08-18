@@ -8,7 +8,7 @@ import { query, queryOne, queryMany } from './db'
 // token and the row id are DIFFERENT identifiers. resolveSession() is the single source of truth
 // used by BOTH the Node-runtime middleware and the Node authenticate* functions. Node-only (uses pg).
 
-export type PrincipalType = 'admin' | 'customer' | 'business'
+export type PrincipalType = 'admin' | 'customer' | 'business' | 'owner'
 
 export const IDLE_TIMEOUT_MS = 24 * 60 * 60 * 1000 // 24h of inactivity ends a session
 const TOUCH_WINDOW_MS = 5 * 60 * 1000               // only bump last_seen_at every 5 min
@@ -221,6 +221,7 @@ export interface ResolvedSession {
   scopes: string[]
   certCN: string | null
   approvalStatus: string | null
+  tenantId: string | null
   email: string | null
   displayName: string | null
   expiresAt: string
@@ -241,6 +242,7 @@ export async function createSession(args: {
   scopes?: string[] | null
   certCN?: string | null
   approvalStatus?: string | null
+  tenantId?: string | null
   acceptLanguage?: string | null
   uaPlatform?: string | null
   fpHash?: string | null
@@ -250,14 +252,15 @@ export async function createSession(args: {
   const row = await queryOne<{ id: string }>(
     `INSERT INTO auth_sessions
        (principal_type, principal_id, expires_at, user_agent, ip_address, role, scopes, cert_cn, approval_status,
-        accept_lang, ua_platform, ip_net, fp_hash, token_hash)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+        tenant_id, accept_lang, ua_platform, ip_net, fp_hash, token_hash)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
      RETURNING id`,
     [
       args.principalType, args.principalId, expiresAt,
       args.userAgent || null, args.ip || null,
       args.role || null, JSON.stringify(args.scopes || []),
       args.certCN || null, args.approvalStatus || null,
+      args.tenantId || null,
       langPrimary(args.acceptLanguage), normPlatform(args.uaPlatform), ipNetwork(args.ip),
       args.fpHash || null, hashToken(token),
     ]
@@ -295,12 +298,13 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     principal_type: PrincipalType; principal_id: string
     revoked_at: string | null; expires_at: string; last_seen_at: string
     role: string | null; scopes: any; cert_cn: string | null; approval_status: string | null
+    tenant_id: string | null
     user_agent: string | null; accept_lang: string | null; ua_platform: string | null
     ip_net: string | null; fp_hash: string | null
     email: string | null; first_name: string | null; last_name: string | null
   }>(
     `SELECT s.id, s.principal_type, s.principal_id, s.revoked_at, s.expires_at, s.last_seen_at,
-            s.role, s.scopes, s.cert_cn, s.approval_status, s.user_agent,
+            s.role, s.scopes, s.cert_cn, s.approval_status, s.tenant_id, s.user_agent,
             s.accept_lang, s.ua_platform, s.ip_net, s.fp_hash,
             u.email, u.first_name, u.last_name
      FROM auth_sessions s
@@ -350,6 +354,7 @@ export async function resolveSession(sid: string, current?: string | null | Sess
     scopes: Array.isArray(row.scopes) ? row.scopes : [],
     certCN: row.cert_cn,
     approvalStatus: row.approval_status,
+    tenantId: row.tenant_id,
     email: row.email,
     displayName,
     expiresAt: new Date(row.expires_at).toISOString(),

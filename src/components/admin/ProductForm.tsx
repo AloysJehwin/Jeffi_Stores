@@ -100,6 +100,11 @@ interface ProductFormProps {
   // Bootstrap capture (per-grain lot/expiry/serials) persisted in the draft, so a
   // half-filled "assign existing stock" capture survives a draft save / reload.
   initialBsEntries?: Record<string, BsEntry> | null
+  // Plan gates — passed from the server page so the form hides plan-locked sections.
+  // Basic plan: no inventory module (hide perishable/serialized/inventory_sync flags).
+  // Basic plan: no returns module (hide return/replacement policy fields).
+  hasInventory?: boolean  // default true (Growth+)
+  hasReturns?: boolean    // default true (Growth+)
 }
 
 const UNIT_UNITS = ['pcs', 'pair', 'set', 'box', 'pack', 'roll', 'sheet']
@@ -232,7 +237,7 @@ function UnlockBtn({ onClick, title = 'Unlock to edit this side' }: { onClick: (
   )
 }
 
-export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0, serializedStockTotal = 0, isDraft = false, liveStockGrains, initialBsEntries = null }: ProductFormProps) {
+export default function ProductForm({ categories, brands, action, product, productId, backUrl, perishableBatchTotal = 0, serializedStockTotal = 0, isDraft = false, liveStockGrains, initialBsEntries = null, hasInventory = true, hasReturns = true }: ProductFormProps) {
   const searchParams = useSearchParams()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -2029,8 +2034,8 @@ export default function ProductForm({ categories, brands, action, product, produ
           </div>
           )}
 
-          {/* Inventory sync — auto-derive stock_status from inventory_quantity */}
-          <div>
+          {/* Inventory sync — hidden for Basic plan (no inventory module) */}
+          {hasInventory && <div>
             <Toggle
               id="inventory_sync_toggle"
               checked={inventorySync}
@@ -2060,7 +2065,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 />
               </div>
             )}
-          </div>
+          </div>}
 
           {/* Stock Status — hidden when has variants OR when inventory sync is on */}
           {!hasVariants && !inventorySync && (
@@ -2436,20 +2441,20 @@ export default function ProductForm({ categories, brands, action, product, produ
                         <Toggle id="fragile" checked={fragile} onChange={setFragile} label="Fragile" />
                         <Toggle id="hazardous" checked={hazardous} onChange={setHazardous} label="Hazardous" />
                         <Toggle id="flammable" checked={flammable} onChange={setFlammable} label="Flammable" />
-                        <Toggle id="perishable" checked={perishable} onChange={next => {
+                        {hasInventory && <Toggle id="perishable" checked={perishable} onChange={next => {
                           if (!next && perishableBatchTotal > 0) {
                             setConfirmUnperishable(true)
                             return
                           }
                           setPerishable(next)
-                        }} label="Perishable" />
-                        <Toggle id="serialized" checked={serialized} onChange={next => {
+                        }} label="Perishable" />}
+                        {hasInventory && <Toggle id="serialized" checked={serialized} onChange={next => {
                           if (!next && serializedStockTotal > 0) {
                             setConfirmUnSerialized(true)
                             return
                           }
                           setSerialized(next)
-                        }} label="Serialized" />
+                        }} label="Serialized" />}
                       </div>
 
                       {showBootstrap && (() => {
