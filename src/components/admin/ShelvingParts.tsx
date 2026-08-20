@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { Check, X } from 'lucide-react'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
+import CopySku from '@/components/ui/CopySku'
 
 export interface Warehouse {
   id: string
@@ -293,7 +294,7 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground truncate">{row.product_name}</p>
           {row.variant_name && <p className="text-xs text-foreground-secondary truncate mt-0.5">{row.variant_name}</p>}
-          <p className="text-xs font-mono text-foreground-muted mt-0.5">{row.sku}</p>
+          <p className="text-xs font-mono text-foreground-muted mt-0.5"><span className="inline-flex items-center gap-1">{row.sku}{row.sku && <CopySku sku={row.sku} />}</span></p>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {editing ? (

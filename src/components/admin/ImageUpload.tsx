@@ -41,17 +41,26 @@ export default function ImageUpload({
   const [showGallery, setShowGallery] = useState(false)
   const dragIndex = useRef<number | null>(null)
   const dragOverIndex = useRef<number | null>(null)
+  // Fire the initial onImagesChange exactly once, so the parent's existingImagesToKeep/
+  // imageOrder reflect the real existing images from mount — otherwise a field-only
+  // autosave (before the widget is touched) would report an empty image set.
+  const didInitNotify = useRef(false)
 
   useEffect(() => {
     if (existingImages && existingImages.length > 0) {
-      setImages(existingImages.map(img => ({
+      const seeded = existingImages.map(img => ({
         id: img.id,
         previewUrl: img.thumbnail_url,
         fileName: img.file_name,
         fileSize: img.file_size,
         isPrimary: img.is_primary,
         isExisting: true,
-      })))
+      }))
+      setImages(seeded)
+      if (!didInitNotify.current) {
+        didInitNotify.current = true
+        notifyChange(seeded)
+      }
     }
   }, [existingImages])
 

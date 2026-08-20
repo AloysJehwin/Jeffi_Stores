@@ -58,6 +58,9 @@ export async function POST(
     const buyerState = isBuyerSame ? quotation.consignee_state : (quotation.buyer_state || quotation.consignee_state)
     const buyerGstin = isBuyerSame ? quotation.consignee_gstin : (quotation.buyer_gstin || quotation.consignee_gstin)
     const gstEnabled = (await getFeatureFlags()).gstEnabled
+    // Basic-plan tenants have no inventory module (flag locked off). When off, skip
+    // stock validation + deduction so the conversion is never blocked by unmanaged stock.
+    const { inventoryValidationEnabled } = await getFeatureFlags()
     const sellerStateCode = (await getBusinessValues()).businessStateCode
     const orderIsIgst = gstEnabled && buyerGstin ? isInterState(buyerState || '', sellerStateCode) : false
 
@@ -211,9 +214,10 @@ export async function POST(
       )
       const addressId = addrResult.rows[0].id
 
-      // Check stock for all items first — if any are short, save as draft
+      // Check stock for all items first — if any are short, save as draft.
+      // Skipped entirely on Basic (flag off): no inventory module → never demote to draft.
       const insufficientItems: string[] = []
-      for (const item of processedItems) {
+      for (const item of (inventoryValidationEnabled ? processedItems : [])) {
         if (!item.product_id) continue
         // base_qty already resolved from unitFactorMap in processedItems (handles NULL buy_unit)
         const baseQty = item.base_qty
@@ -328,7 +332,7 @@ export async function POST(
         if (item.id && oir.rows[0]?.id) itemIdMap.set(item.id, oir.rows[0].id)
       }
 
-      if (!saveAsDraft) {
+      if (!saveAsDraft && inventoryValidationEnabled) {
         // Assignments arrive keyed by quotation_item id (the picker preview runs before the
         // order exists); remap onto the freshly-inserted order_item ids so the shared helper
         // — which filters by order_item.id — matches them.

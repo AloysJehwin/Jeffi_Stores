@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { deductOrderStock } from '@/lib/inventory-deduct'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { sendInvoiceFinalizedEmail, sendOrderStatusUpdate } from '@/lib/email'
 import { generateOrderInvoice, assignInvoiceNumber } from '@/lib/invoice'
 
@@ -37,6 +38,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // If already delivered, keep status unchanged; otherwise move online/business→processing, offline→delivered
     const targetStatus = order.status === 'delivered' ? 'delivered' : (isOnlineOrder ? 'processing' : 'delivered')
 
+    // Basic-plan tenants have no inventory module — the flag is locked off for them.
+    // When off, skip stock deduction entirely (nothing to deduct), same as order-create.
+    const { inventoryValidationEnabled } = await getFeatureFlags()
+
     const result = await withTransaction(async (client) => {
       await client.query(`SELECT id FROM orders WHERE id = $1 FOR UPDATE`, [id])
 
@@ -50,10 +55,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         throw new Error('Cannot finalize an invoice with no items')
       }
 
-      // Deduct inventory (plain/perishable/serialized) via the shared helper.
-      // requireSerialAssignments preserves the "serials required for serialized
-      // products" contract; batches auto-pick FEFO when none are supplied.
-      await deductOrderStock(id, { batchAssignments, serialAssignments, requireSerialAssignments: true }, client)
+      if (inventoryValidationEnabled && hasScope(admin.role, admin.scopes, 'inventory:read')) {
+        await deductOrderStock(id, { batchAssignments, serialAssignments, requireSerialAssignments: true }, client)
+      }
 
       // Assign the invoice number (GST-gated, idempotent) via the shared helper,
       // then move the order to its target status. Same effect as the previous

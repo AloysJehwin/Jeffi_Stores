@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import CopySku from '@/components/ui/CopySku'
 
 interface Props {
   po: any
@@ -156,7 +157,7 @@ export default function PurchaseOrderViewClient({ po, items, settings, token, gr
                       <td className="px-4 py-3 text-gray-400 text-xs">{i + 1}</td>
                       <td className="px-4 py-3 text-gray-800 font-medium leading-snug">
                         {label}
-                        {item.sku && <div className="text-xs text-gray-400 font-normal mt-0.5">{item.sku}</div>}
+                        {item.sku && <div className="text-xs text-gray-400 font-normal mt-0.5">{item.sku}<CopySku sku={item.sku} className="ml-1" /></div>}
                       </td>
                       <td className="px-4 py-3 text-right text-gray-700 font-medium">
                         {fmt(purchaseQty, purchaseQty % 1 === 0 ? 0 : 3)}

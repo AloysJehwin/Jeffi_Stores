@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Toggle from '@/components/ui/Toggle'
+import CopySku from '@/components/ui/CopySku'
 
 type Mode = 'category' | 'brand'
 
@@ -415,7 +416,7 @@ export default function BrochureModal({ open, mode, onClose }: Props) {
                       : <div className="w-7 h-7 rounded bg-surface-secondary flex-shrink-0" />}
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-foreground truncate">{p.name}</div>
-                      <div className="text-xs text-foreground-muted truncate">{p.sku}</div>
+                      <div className="text-xs text-foreground-muted truncate"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></div>
                     </div>
                   </label>
                 ))}

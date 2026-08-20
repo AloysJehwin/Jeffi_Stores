@@ -9,6 +9,7 @@ import { round2 } from '@/lib/gst'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
+import CopySku from '@/components/ui/CopySku'
 
 export interface SellUnit {
   unit: string
@@ -700,7 +701,7 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {item.product_sku && <p className="text-xs text-foreground-muted font-mono">{item.product_sku}</p>}
+                        {item.product_sku && <p className="text-xs text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{item.product_sku}<CopySku sku={item.product_sku} /></span></p>}
                         {assignedBatchLabels?.[item.id] ? (
                           <button type="button" onClick={() => onStockBadgeClick?.(item)} className="text-xs font-medium px-1.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                             Batch: {assignedBatchLabels[item.id]}
@@ -1164,7 +1165,7 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
                                   <span className="font-medium text-foreground">{s.name}</span>
                                 )}
                               </td>
-                              <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{s.sku}</td>
+                              <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{s.sku}{s.sku && <CopySku sku={s.sku} />}</span></td>
                               <td className="px-4 py-2.5 text-right text-foreground font-medium">
                                 {s.base_price != null ? `₹${s.base_price}` : '—'}
                               </td>

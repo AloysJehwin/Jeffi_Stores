@@ -11,8 +11,16 @@ import { syncPerishableStock } from '@/lib/shelf'
  *
  * Safe to call multiple times — uses inventory_transactions to find
  * exactly what was deducted; won't double-restore if already done.
+ *
+ * Returns a `skipped` list of grains whose variant/sub-variant no longer exists or
+ * is inactive (e.g. removed by a product edit after the order was placed). Those are
+ * NOT restored — the stock grain is gone — and the caller can surface a warning.
+ * Acceptance of the return itself is the admin's call; this only reports.
  */
-export async function restoreOrderStock(orderId: string): Promise<void> {
+export interface RestoreSkip { product_id: string; variant_id: string | null; sub_variant_id: string | null; reason: string }
+
+export async function restoreOrderStock(orderId: string): Promise<{ skipped: RestoreSkip[] }> {
+  const skipped: RestoreSkip[] = []
   await withTransaction(async (client) => {
     const itemsResult = await client.query(
       `SELECT product_id, variant_id, sub_variant_id, quantity, buy_unit FROM order_items WHERE order_id = $1`,
@@ -84,20 +92,28 @@ export async function restoreOrderStock(orderId: string): Promise<void> {
           })
         }
       } else if (item.sub_variant_id) {
-        const row = await client.query<{ inventory_quantity: string }>(
-          `SELECT inventory_quantity FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
+        const row = await client.query<{ inventory_quantity: string; is_active: boolean }>(
+          `SELECT inventory_quantity, is_active FROM product_sub_variants WHERE id = $1 FOR UPDATE`,
           [item.sub_variant_id]
         )
+        if (!row.rows[0] || row.rows[0].is_active === false) {
+          skipped.push({ product_id: item.product_id, variant_id: item.variant_id || null, sub_variant_id: item.sub_variant_id, reason: row.rows[0] ? 'sub-variant is no longer active' : 'sub-variant no longer exists' })
+          continue
+        }
         stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
         await client.query(
           `UPDATE product_sub_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`,
           [qty, item.sub_variant_id]
         )
       } else if (item.variant_id) {
-        const row = await client.query<{ inventory_quantity: string }>(
-          `SELECT inventory_quantity FROM product_variants WHERE id = $1 FOR UPDATE`,
+        const row = await client.query<{ inventory_quantity: string; is_active: boolean }>(
+          `SELECT inventory_quantity, is_active FROM product_variants WHERE id = $1 FOR UPDATE`,
           [item.variant_id]
         )
+        if (!row.rows[0] || row.rows[0].is_active === false) {
+          skipped.push({ product_id: item.product_id, variant_id: item.variant_id, sub_variant_id: null, reason: row.rows[0] ? 'variant is no longer active' : 'variant no longer exists' })
+          continue
+        }
         stockBefore = parseFloat(row.rows[0]?.inventory_quantity ?? '0') || 0
         await client.query(
           `UPDATE product_variants SET inventory_quantity = inventory_quantity + $1 WHERE id = $2`,
@@ -191,4 +207,5 @@ export async function restoreOrderStock(orderId: string): Promise<void> {
       await recomputeStockStatusForProduct(client, item.product_id)
     }
   })
+  return { skipped }
 }

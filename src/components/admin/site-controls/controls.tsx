@@ -150,13 +150,14 @@ export function NumberControl({
 }
 
 export function ToggleControl({
-  settingKey, label, hint, initial,
-}: { settingKey: string; label: string; hint?: string; initial: boolean }) {
+  settingKey, label, hint, initial, locked, lockedHint,
+}: { settingKey: string; label: string; hint?: string; initial: boolean; locked?: boolean; lockedHint?: string }) {
   const { showToast } = useToast()
   const [checked, setChecked] = useState(initial)
   const [saving, setSaving] = useState(false)
 
   async function onChange(next: boolean) {
+    if (locked) return
     setChecked(next)
     setSaving(true)
     const ok = await patchSetting(settingKey, next)
@@ -166,12 +167,14 @@ export function ToggleControl({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 p-4 bg-surface-secondary rounded-lg border border-border-default">
+    <div className={`flex items-center justify-between gap-3 p-4 bg-surface-secondary rounded-lg border border-border-default ${locked ? 'opacity-60' : ''}`}>
       <div>
         <p className="text-sm font-semibold text-foreground">{label}</p>
-        {hint && <p className="text-xs text-foreground-muted mt-0.5">{hint}</p>}
+        {locked && lockedHint
+          ? <p className="text-xs text-foreground-muted mt-0.5">{lockedHint}</p>
+          : hint && <p className="text-xs text-foreground-muted mt-0.5">{hint}</p>}
       </div>
-      <Toggle checked={checked} onChange={onChange} disabled={saving} />
+      <Toggle checked={checked} onChange={onChange} disabled={saving || !!locked} />
     </div>
   )
 }

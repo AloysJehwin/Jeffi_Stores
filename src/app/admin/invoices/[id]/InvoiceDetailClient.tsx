@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { Check, Pencil, QrCode } from 'lucide-react'
+import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
@@ -497,7 +498,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
                   <td className="px-4 py-3">
                     <div className="font-medium text-foreground">{item.product_name}</div>
                     {item.variant_name && <div className="text-xs text-foreground-secondary">{item.variant_name}</div>}
-                    {item.product_sku && <div className="text-xs text-foreground-muted font-mono">{item.product_sku}</div>}
+                    {item.product_sku && <div className="text-xs text-foreground-muted font-mono inline-flex items-center gap-1">{item.product_sku}<CopySku sku={item.product_sku} /></div>}
                   </td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary font-mono">{item.hsn_code || '—'}</td>
                   <td className="px-4 py-3 text-center text-xs text-foreground-secondary">{item.gst_rate}%</td>

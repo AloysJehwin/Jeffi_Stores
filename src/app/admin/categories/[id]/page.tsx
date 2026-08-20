@@ -5,6 +5,7 @@ import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { queryOne, queryMany } from '@/lib/db'
 import DraftEditButton from '@/components/admin/DraftEditButton'
+import CopySku from '@/components/ui/CopySku'
 
 export const dynamic = 'force-dynamic'
 
@@ -227,7 +228,7 @@ export default async function CategoryViewPage({ params, searchParams }: {
                         <td className="px-4 py-2.5">
                           <Link href={ap(`/admin/products/${p.id}`, host)} className="font-medium text-accent-500 hover:underline">{p.name}</Link>
                         </td>
-                        <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{p.sku}</td>
+                        <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></td>
                         <td className="px-4 py-2.5 font-semibold text-foreground">₹{Number(p.base_price).toLocaleString('en-IN')}</td>
                         <td className="px-4 py-2.5">
                           {p.is_active

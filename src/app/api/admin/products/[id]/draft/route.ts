@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
+import { deleteProductImage } from '@/lib/s3'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,14 +37,21 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
 
     await query(
-      `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units)
+      `INSERT INTO product_drafts (product_id, fields, variants, images, sub_variants, units, variant_images)
        SELECT
          p.id,
          to_jsonb(p) - 'id' - 'created_at' - 'updated_at' - 'search_vector' - 'views_count' - 'sales_count',
-         COALESCE((SELECT json_agg(to_jsonb(v) - 'id') FROM product_variants v WHERE v.product_id = p.id), '[]'),
-         COALESCE((SELECT json_agg(to_jsonb(i) - 'id' ORDER BY i.display_order) FROM product_images i WHERE i.product_id = p.id), '[]'),
-         '[]'::jsonb,
-         COALESCE((SELECT json_agg(to_jsonb(u) - 'id') FROM product_units u WHERE u.product_id = p.id), '[]')
+         COALESCE((SELECT json_agg(to_jsonb(v)) FROM product_variants v WHERE v.product_id = p.id AND v.is_active = true), '[]'),
+         COALESCE((SELECT json_agg(to_jsonb(i) ORDER BY i.display_order) FROM product_images i WHERE i.product_id = p.id), '[]'),
+         COALESCE((SELECT json_agg(to_jsonb(sv) || jsonb_build_object('_seeded', true))
+                   FROM product_sub_variants sv
+                   JOIN product_variants v ON v.id = sv.variant_id
+                   WHERE v.product_id = p.id AND sv.is_active = true), '[]'),
+         COALESCE((SELECT json_agg(to_jsonb(u) - 'id') FROM product_units u WHERE u.product_id = p.id), '[]'),
+         COALESCE((SELECT json_agg(to_jsonb(vi) ORDER BY vi.display_order)
+                   FROM variant_images vi
+                   JOIN product_variants v ON v.id = vi.variant_id
+                   WHERE v.product_id = p.id AND v.is_active = true), '[]')
        FROM products p WHERE p.id = $1`,
       [id]
     )
@@ -82,20 +90,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const existingImagesToKeep: { id: string; is_primary?: boolean }[] = body?.existingImagesToKeep || []
     const keepIds = new Set(existingImagesToKeep.map((img: any) => img.id))
 
-    // Re-snapshot images from DB filtered to kept IDs, then apply order and primary from client
-    const imagesSnapshotSql = keepIds.size > 0
-      ? `SELECT to_jsonb(i) - 'id' || jsonb_build_object(
-           'display_order', idx.ord,
-           'is_primary', idx.is_primary
-         ) AS img
-         FROM product_images i
-         JOIN (
-           SELECT id, ordinality - 1 AS ord,
-                  id = $3 AS is_primary
-           FROM unnest($2::uuid[]) WITH ORDINALITY AS t(id, ordinality)
-         ) idx ON idx.id = i.id
-         WHERE i.product_id = $1`
-      : null
+    // "Image intent" = the client actually enumerated its image widget state. Until
+    // the ImageUpload widget is touched, ProductForm sends BOTH arrays empty — a
+    // field-only autosave. In that case we must NOT rewrite the draft's images column
+    // (doing so would clobber the entry-seeded snapshot). Only rebuild images when the
+    // client sent a real ordering or keep-set.
+    const hasImageIntent = imageOrder.length > 0 || existingImagesToKeep.length > 0
 
     // Determine ordered IDs and primary from imageOrder
     const orderedExistingIds = imageOrder
@@ -106,35 +106,34 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const primaryKey = imageOrder[0] || ''
     const primaryId = primaryKey.startsWith('existing:') ? primaryKey.slice(9) : null
 
-    let imagesJson = '[]'
-    if (orderedExistingIds.length > 0) {
-      const rows = await query<{ img: Record<string, unknown> }>(
-        `SELECT to_jsonb(i) - 'id' AS img, array_position($2::uuid[], i.id) - 1 AS ord,
-                i.id = $3 AS is_primary
-         FROM product_images i
-         WHERE i.product_id = $1 AND i.id = ANY($2::uuid[])
-         ORDER BY array_position($2::uuid[], i.id)`,
-        [id, orderedExistingIds, primaryId]
-      )
-      imagesJson = JSON.stringify(rows.rows.map((r: any) => ({
-        ...r.img,
-        display_order: r.ord,
-        is_primary: r.is_primary,
-      })))
-    } else {
-      // Fall back to current live images
-      const rows = await query(
-        `SELECT json_agg(to_jsonb(i) - 'id' ORDER BY i.display_order) FROM product_images i WHERE i.product_id = $1`,
-        [id]
-      )
-      imagesJson = JSON.stringify(rows.rows[0]?.json_agg || [])
+    let imagesJson: string | null = null // null ⇒ preserve existing draft images
+    if (hasImageIntent) {
+      if (orderedExistingIds.length > 0) {
+        const rows = await query<{ img: Record<string, unknown> }>(
+          `SELECT to_jsonb(i) AS img, array_position($2::uuid[], i.id) - 1 AS ord,
+                  i.id = $3 AS is_primary
+           FROM product_images i
+           WHERE i.product_id = $1 AND i.id = ANY($2::uuid[])
+           ORDER BY array_position($2::uuid[], i.id)`,
+          [id, orderedExistingIds, primaryId]
+        )
+        imagesJson = JSON.stringify(rows.rows.map((r: any) => ({
+          ...r.img,
+          display_order: r.ord,
+          is_primary: r.is_primary,
+        })))
+      } else {
+        // Intent present but no existing images kept (all removed) → empty set.
+        imagesJson = '[]'
+      }
     }
 
     const variantsFromBody = body?.variants
     const variantsJson = Array.isArray(variantsFromBody) ? JSON.stringify(variantsFromBody) : null
 
     await query(
-      `UPDATE product_drafts SET fields = $2::jsonb, images = $3::jsonb,
+      `UPDATE product_drafts SET fields = $2::jsonb,
+       images = COALESCE($3::jsonb, images),
        variants = COALESCE($4::jsonb, variants),
        updated_at = NOW() WHERE product_id = $1`,
       [id, JSON.stringify(fields), imagesJson, variantsJson]
@@ -156,6 +155,18 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
   try {
+    // Clean up S3 files for variant images that were uploaded fresh into this draft
+    // (staged, never applied to live). Live-image rows (real uuid ids) are left alone —
+    // their files still back the live product.
+    const draft = await queryOne<{ variant_images: any[] }>(
+      `SELECT variant_images FROM product_drafts WHERE product_id = $1`, [id]
+    )
+    const stagedVI = Array.isArray(draft?.variant_images) ? draft!.variant_images : []
+    for (const vi of stagedVI) {
+      if (vi?._staged && vi?.s3_key && String(vi.id).startsWith('draft-vi-')) {
+        try { await deleteProductImage(vi.s3_key, vi.s3_thumbnail_key || '') } catch {}
+      }
+    }
     await query(`DELETE FROM product_drafts WHERE product_id = $1`, [id])
     return NextResponse.json({ success: true })
   } catch (err: unknown) {

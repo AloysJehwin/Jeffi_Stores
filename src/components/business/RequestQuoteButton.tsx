@@ -7,6 +7,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
 import CustomSelect from '@/components/visitor/CustomSelect'
 import QuantityInput from '@/components/shared/QuantityInput'
+import CopySku from '@/components/ui/CopySku'
 import { applyDiscount } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
 
@@ -515,7 +516,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                           )}
                         </div>
                         {activeResolved.sku && (
-                          <p className="text-xs font-mono text-foreground-muted mt-1">SKU: {activeResolved.sku}</p>
+                          <p className="text-xs font-mono text-foreground-muted mt-1">SKU: {activeResolved.sku}{activeResolved.sku && <CopySku sku={activeResolved.sku} className="ml-1" />}</p>
                         )}
                         {activeResolved.stockStatus != null && (
                           <span className={`inline-flex items-center gap-1 mt-2 text-xs font-medium ${activeResolved.stockStatus === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
@@ -595,7 +596,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                           <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{activeResolved.description}</p>
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
                             {activeItem.brandName && <span className="text-xs text-foreground-muted">{activeItem.brandName}</span>}
-                            {activeResolved.sku && <span className="text-xs font-mono text-foreground-muted">SKU: {activeResolved.sku}</span>}
+                            {activeResolved.sku && <span className="text-xs font-mono text-foreground-muted">SKU: {activeResolved.sku}<CopySku sku={activeResolved.sku} className="ml-1" /></span>}
                           </div>
                           <div className="flex items-center gap-3 mt-1">
                             {activeResolved.stockStatus != null && (
