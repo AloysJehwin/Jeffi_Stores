@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
@@ -10,8 +10,8 @@ import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/So
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
-import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
+import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import BatchSerialLabelModal from '@/components/admin/BatchSerialLabelModal'
 
@@ -1296,6 +1296,24 @@ function StockTab() {
   const [editLocations, setEditLocations] = useState<{ id: string; display_code: string; is_open_shelf: boolean }[]>([])
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [expandedSerialProducts, setExpandedSerialProducts] = useState<Set<string>>(new Set())
+  const [expandedValProducts, setExpandedValProducts] = useState<Set<string>>(new Set())
+  const [expandedValVariants, setExpandedValVariants] = useState<Set<string>>(new Set())
+
+  function toggleValProduct(id: string) {
+    setExpandedValProducts(prev => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
+
+  function toggleValVariant(id: string) {
+    setExpandedValVariants(prev => {
+      const n = new Set(prev)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
 
   function toggleSerialProduct(key: string) {
     setExpandedSerialProducts(prev => {
@@ -1412,6 +1430,70 @@ function StockTab() {
 
   // Rows are sorted server-side (across all SKUs) via the sort/dir params, so render as-is.
   const sortedValRows = allValRows
+
+  const valTree = useMemo(() => {
+    const num = (v: any) => parseFloat(v || '0') || 0
+    const leafValueEx = (r: any) => num(r.inventory_quantity) * num(r.cost_price)
+    const leafValueIncl = (r: any) => num(r.inventory_quantity) * num(r.selling_price)
+
+    type ValLeaf = any
+    type ValVariant = {
+      variantId: string
+      leaf: ValLeaf | null
+      subVariants: ValLeaf[]
+      stock: number
+      valueEx: number
+      valueIncl: number
+    }
+    type ValProduct = {
+      productId: string
+      head: ValLeaf
+      simpleLeaf: ValLeaf | null
+      variants: ValVariant[]
+      stock: number
+      valueEx: number
+      valueIncl: number
+    }
+
+    const products: ValProduct[] = []
+    const byProduct = new Map<string, ValProduct>()
+
+    for (const r of sortedValRows) {
+      const pid = String(r.id)
+      let prod = byProduct.get(pid)
+      if (!prod) {
+        prod = { productId: pid, head: r, simpleLeaf: null, variants: [], stock: 0, valueEx: 0, valueIncl: 0 }
+        byProduct.set(pid, prod)
+        products.push(prod)
+      }
+      prod.stock += num(r.inventory_quantity)
+      prod.valueEx += leafValueEx(r)
+      prod.valueIncl += leafValueIncl(r)
+
+      if (!r.variant_id) {
+        prod.simpleLeaf = r
+        continue
+      }
+
+      const vid = String(r.variant_id)
+      let variant = prod.variants.find(v => v.variantId === vid)
+      if (!variant) {
+        variant = { variantId: vid, leaf: null, subVariants: [], stock: 0, valueEx: 0, valueIncl: 0 }
+        prod.variants.push(variant)
+      }
+      variant.stock += num(r.inventory_quantity)
+      variant.valueEx += leafValueEx(r)
+      variant.valueIncl += leafValueIncl(r)
+
+      if (r.sub_variant_id) {
+        variant.subVariants.push(r)
+      } else {
+        variant.leaf = r
+      }
+    }
+
+    return products
+  }, [sortedValRows])
 
   function startEdit(p: any) {
     const rowId = p.sub_variant_id || p.variant_id || p.id
@@ -1537,6 +1619,242 @@ function StockTab() {
       })
       .catch(() => {})
   }, [editWarehouseId])
+
+  function renderValLeaf(p: any, firstCell: React.ReactNode, variantCell: React.ReactNode) {
+    const rowId = p.sub_variant_id || p.variant_id || p.id
+    const isEditing = editingId === rowId
+    return (
+      <React.Fragment key={rowId}>
+        <tr className={`hover:bg-surface-secondary/50 transition-colors ${isEditing ? 'bg-secondary-50/50 dark:bg-secondary-900/10' : ''}`}>
+          <td className="px-4 py-3 font-medium text-foreground">{firstCell}</td>
+          <td className="px-4 py-3 text-foreground-secondary hidden sm:table-cell">{variantCell}</td>
+          <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell"><span className="inline-flex items-center gap-1">{p.row_sku || p.sku || '—'}{(p.row_sku || p.sku) && <CopySku sku={p.row_sku || p.sku} />}</span></td>
+          <td className="px-4 py-3 text-right">
+            {isEditing ? (
+              <div className="flex flex-col items-end gap-1">
+                {editUnits.length > 1 && (
+                  <AdminSelect
+                    value={editUnitId}
+                    onChange={v => setEditUnitId(v)}
+                    compact
+                    className="w-28"
+                    options={editUnits.map(u => ({
+                      value: u.id,
+                      label: `${u.display_label || u.unit}${u.factor !== 1 ? ` (×${u.factor})` : ''}`,
+                    }))}
+                  />
+                )}
+                <input
+                  type="number"
+                  min="0"
+                  step="0.001"
+                  autoFocus
+                  value={editQty}
+                  onChange={e => setEditQty(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
+                  className="field-xs w-20 border border-secondary-500 bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500 text-right"
+                />
+                {(() => {
+                  const u = editUnits.find(u => u.id === editUnitId)
+                  if (!u || u.factor === 1 || u.dimension === 'count') return null
+                  const base = Math.round(parseFloat(editQty || '0') * u.factor * 1000) / 1000
+                  return <span className="text-xs text-foreground-muted">= {base} {u.dimension === 'count' ? 'pcs' : 'base units'}</span>
+                })()}
+              </div>
+            ) : (
+              (() => {
+                const displayQty = parseFloat(p.inventory_quantity || '0')
+                return (
+                  <span className={`font-medium ${displayQty === 0 ? 'text-red-600 dark:text-red-400' : displayQty <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
+                    {displayQty}
+                  </span>
+                )
+              })()
+            )}
+          </td>
+          <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium whitespace-nowrap">
+              {p.sell_unit_dimension === 'count'
+                ? <>Pc{(p.sell_unit_label || p.sell_unit) && (p.sell_unit_label || p.sell_unit) !== 'pc' ? <span className="text-foreground-muted font-normal">/ {p.sell_unit_label || p.sell_unit}</span> : null}</>
+                : (p.sell_unit_label || p.sell_unit || 'Pc')}
+              {parseFloat(p.sell_unit_factor || '1') > 1 && p.base_unit_label && (
+                <span className="text-foreground-muted font-normal">({parseFloat(p.sell_unit_factor)} {p.base_unit_label})</span>
+              )}
+            </span>
+          </td>
+          <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
+          <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
+          <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</td>
+          <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'))}</td>
+          <td className="px-4 py-3 text-right">
+            <div className="flex items-center justify-end gap-1">
+              {isEditing ? (
+                <>
+                  <input
+                    type="text"
+                    placeholder="Note (optional)"
+                    value={editNotes}
+                    onChange={e => setEditNotes(e.target.value)}
+                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
+                    className="hidden lg:block field-xs w-32 border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500"
+                  />
+                  {editWarehouses.length > 0 && (
+                    <AdminSelect
+                      value={editWarehouseId}
+                      onChange={setEditWarehouseId}
+                      xs
+                      className="hidden lg:block w-36"
+                      options={[
+                        { value: '', label: '— warehouse —' },
+                        ...editWarehouses.map(w => ({ value: w.id, label: w.name })),
+                      ]}
+                    />
+                  )}
+                  {editWarehouseId && (
+                    <AdminSelect
+                      value={editLocationId}
+                      onChange={setEditLocationId}
+                      xs
+                      className="hidden lg:block w-40"
+                      options={[
+                        { value: '', label: '— open shelf —' },
+                        ...editLocations.filter(l => !l.is_open_shelf).map(l => ({ value: l.id, label: l.display_code })),
+                      ]}
+                    />
+                  )}
+                  <button
+                    onClick={() => saveEdit(p)}
+                    disabled={editSaving || editQty === ''}
+                    title="Save"
+                    className="field-xs font-medium bg-secondary-500 hover:bg-secondary-600 text-white disabled:opacity-50 transition-colors"
+                  >
+                    {editSaving ? '…' : 'Save'}
+                  </button>
+                  <button onClick={cancelEdit} title="Cancel" className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary transition-colors">
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </>
+              ) : (
+                <>
+                  <Link
+                    href={ap(`/admin/products/${p.id}`)}
+                    title="View Product"
+                    className="p-1.5 rounded-lg hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                    </svg>
+                  </Link>
+                  <button
+                    onClick={() => !p.perishable && startEdit(p)}
+                    title={p.perishable ? 'Stock managed via batches — use GRN to receive or Remove to deduct' : 'Adjust stock'}
+                    disabled={!!p.perishable}
+                    className={`p-1.5 rounded-lg transition-colors ${p.perishable ? 'opacity-30 cursor-not-allowed text-foreground-muted' : 'hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500'}`}
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
+                  <button
+                    onClick={() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)}
+                    title="Batch details"
+                    className={`p-1.5 rounded-lg hover:bg-surface-secondary transition-colors ${expandedValRows[rowId] !== undefined ? 'text-secondary-500' : 'text-foreground-secondary hover:text-secondary-500'}`}
+                  >
+                    {loadingBatchRow === rowId
+                      ? <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                      : <svg className={`w-4 h-4 transition-transform ${expandedValRows[rowId] !== undefined ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                    }
+                  </button>
+                </>
+              )}
+            </div>
+          </td>
+        </tr>
+        {expandedValRows[rowId] !== undefined && (
+          <tr className="bg-surface-secondary/30">
+            <td colSpan={10} className="px-4 py-3">
+              {expandedValRows[rowId]!.length === 0 ? (
+                <p className="text-xs text-foreground-muted italic">No batches with remaining stock for this product.</p>
+              ) : (
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="text-foreground-secondary">
+                      <th className="pb-1.5 text-left font-medium pr-4">Lot / Batch</th>
+                      <th className="pb-1.5 text-left font-medium pr-4">Expiry</th>
+                      <th className="pb-1.5 text-left font-medium pr-4 hidden sm:table-cell">Mfg Date</th>
+                      <th className="pb-1.5 text-left font-medium pr-4 hidden md:table-cell">Location</th>
+                      <th className="pb-1.5 text-right font-medium pr-4">Qty Remaining</th>
+                      <th className="pb-1.5 text-right font-medium pr-4">Batch Value</th>
+                      <th className="pb-1.5 w-8"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border-default/50">
+                    {expandedValRows[rowId]!.map((b: any) => {
+                      const d = b.expiry_date ? new Date(b.expiry_date) : null
+                      const diffDays = d ? Math.floor((d.getTime() - Date.now()) / 86400000) : null
+                      const expiryCls = diffDays === null ? 'text-foreground-muted' : diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                      const qty = parseFloat(b.quantity_remaining || '0')
+                      const batchValue = qty * parseFloat(b.unit_cost || '0')
+                      const serials: string[] = Array.isArray(b.serials) ? b.serials : []
+                      return (
+                        <tr key={b.batch_id}>
+                          <td className="py-1.5 pr-4 font-mono text-foreground-secondary">{b.lot_number || '—'}</td>
+                          <td className="py-1.5 pr-4">
+                            {b.expiry_date
+                              ? <span className={`inline-flex px-1.5 py-0.5 rounded font-medium ${expiryCls}`}>{formatDate(b.expiry_date)}</span>
+                              : <span className="text-foreground-muted">—</span>}
+                          </td>
+                          <td className="py-1.5 pr-4 text-foreground-secondary hidden sm:table-cell">{b.manufacture_date ? formatDate(b.manufacture_date) : '—'}</td>
+                          <td className="py-1.5 pr-4 text-foreground-secondary hidden md:table-cell">{b.location || '—'}</td>
+                          <td className="py-1.5 pr-4 text-right font-medium text-foreground">{qty}</td>
+                          <td className="py-1.5 pr-4 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
+                          <td className="py-1.5 text-right">
+                            <button
+                              onClick={async () => {
+                                const ok = await confirm({
+                                  title: 'Remove Batch',
+                                  message: qty > 0
+                                    ? `This batch still has ${qty} units remaining. Are you sure you want to remove it?`
+                                    : 'Remove this batch?',
+                                  confirmLabel: 'Remove',
+                                  variant: 'danger',
+                                })
+                                if (!ok) return
+                                const res = await fetch(`/api/admin/inventory/batches/${b.batch_id}`, { method: 'DELETE' })
+                                const json = await res.json()
+                                if (!res.ok) { showToast(json.error || 'Failed to remove batch', 'error'); return }
+                                showToast('Batch removed', 'success')
+                                toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)
+                                setTimeout(() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null), 100)
+                              }}
+                              className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                              title="Remove batch"
+                            >Remove</button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {!p.perishable && parseFloat(p.inventory_quantity || '0') > 0 && (
+                      <tr key="default-stock" className="border-t border-border-default/50">
+                        <td className="py-1.5 pr-4 text-foreground-muted italic">Default stock</td>
+                        <td className="py-1.5 pr-4 text-foreground-muted">—</td>
+                        <td className="py-1.5 pr-4 text-foreground-muted hidden sm:table-cell">—</td>
+                        <td className="py-1.5 pr-4 text-foreground-muted hidden md:table-cell">—</td>
+                        <td className="py-1.5 pr-4 text-right font-medium text-foreground">{parseFloat(p.inventory_quantity || '0')}</td>
+                        <td className="py-1.5 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </td>
+          </tr>
+        )}
+      </React.Fragment>
+    )
+  }
 
   return (
     <div className="space-y-5">
@@ -1960,281 +2278,153 @@ function StockTab() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border-default">
-                      {sortedValRows.length === 0 && (
+                      {valTree.length === 0 && (
                         <tr><td colSpan={10} className="py-12 text-center text-foreground-secondary text-sm">
                           {valSearch ? `No products match "${valSearch}"` : 'No products in stock'}
                         </td></tr>
                       )}
-                      {sortedValRows.map((p) => {
-                        const rowId = p.sub_variant_id || p.variant_id || p.id
-                        const isEditing = editingId === rowId
-                        return (
-                          <React.Fragment key={rowId}>
-                          <tr className={`hover:bg-surface-secondary/50 transition-colors ${isEditing ? 'bg-secondary-50/50 dark:bg-secondary-900/10' : ''}`}>
-                            <td className="px-4 py-3 font-medium text-foreground">
-                              <HoverCard
-                                trigger={
-                                  <Link href={ap(`/admin/products/${p.id}`)} className="hover:text-accent-500 hover:underline underline-offset-2">
-                                    {p.name}
-                                  </Link>
-                                }
-                                align="left"
-                                side="bottom"
-                                width="260px"
-                              >
-                                <div className="p-3 space-y-2">
-                                  <p className="text-sm font-semibold text-foreground leading-tight">{p.name}</p>
-                                  {p.variant_name && <p className="text-xs text-foreground-secondary">{p.variant_name}{p.sub_variant_name ? ` / ${p.sub_variant_name}` : ''}</p>}
-                                  {(p.row_sku || p.sku) && <p className="text-xs font-mono text-foreground-muted inline-flex items-center gap-1">{p.row_sku || p.sku}<CopySku sku={p.row_sku || p.sku} /></p>}
-                                  <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
-                                    <div className="flex justify-between">
-                                      <span className="text-foreground-secondary">Stock</span>
-                                      <span className="font-semibold text-foreground">{parseFloat(p.inventory_quantity || '0')}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-foreground-secondary">Price ex-GST</span>
-                                      <span className="font-medium text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</span>
-                                    </div>
-                                    <div className="flex justify-between">
-                                      <span className="text-foreground-secondary">Stock Value</span>
-                                      <span className="font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</span>
-                                    </div>
+                      {valTree.map((prod) => {
+                        const productExpanded = expandedValProducts.has(prod.productId)
+                        const chevron = (expanded: boolean) => (
+                          <svg className={`w-4 h-4 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                        )
+
+                        if (prod.simpleLeaf && prod.variants.length === 0) {
+                          const p = prod.simpleLeaf
+                          const firstCell = (
+                            <HoverCard
+                              trigger={
+                                <Link href={ap(`/admin/products/${p.id}`)} className="hover:text-accent-500 hover:underline underline-offset-2">
+                                  {p.name}
+                                </Link>
+                              }
+                              align="left"
+                              side="bottom"
+                              width="260px"
+                            >
+                              <div className="p-3 space-y-2">
+                                <p className="text-sm font-semibold text-foreground leading-tight">{p.name}</p>
+                                {(p.row_sku || p.sku) && <p className="text-xs font-mono text-foreground-muted">{p.row_sku || p.sku}</p>}
+                                <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
+                                  <div className="flex justify-between">
+                                    <span className="text-foreground-secondary">Stock</span>
+                                    <span className="font-semibold text-foreground">{parseFloat(p.inventory_quantity || '0')}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-foreground-secondary">Price ex-GST</span>
+                                    <span className="font-medium text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</span>
+                                  </div>
+                                  <div className="flex justify-between">
+                                    <span className="text-foreground-secondary">Stock Value</span>
+                                    <span className="font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</span>
                                   </div>
                                 </div>
-                              </HoverCard>
-                            </td>
-                            <td className="px-4 py-3 text-foreground-secondary hidden sm:table-cell">
-                              {p.variant_name
-                                ? (p.sub_variant_name ? `${p.variant_name} / ${p.sub_variant_name}` : p.variant_name)
-                                : '—'}
-                            </td>
-                            <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell"><span className="inline-flex items-center gap-1">{p.row_sku || p.sku || '—'}{(p.row_sku || p.sku) && <CopySku sku={p.row_sku || p.sku} />}</span></td>
-                            <td className="px-4 py-3 text-right">
-                              {isEditing ? (
-                                <div className="flex flex-col items-end gap-1">
-                                  {editUnits.length > 1 && (
-                                    <AdminSelect
-                                      value={editUnitId}
-                                      onChange={v => setEditUnitId(v)}
-                                      compact
-                                      className="w-28"
-                                      options={editUnits.map(u => ({
-                                        value: u.id,
-                                        label: `${u.display_label || u.unit}${u.factor !== 1 ? ` (×${u.factor})` : ''}`,
-                                      }))}
-                                    />
-                                  )}
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    step="0.001"
-                                    autoFocus
-                                    value={editQty}
-                                    onChange={e => setEditQty(e.target.value)}
-                                    onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
-                                    className="field-xs w-20 border border-secondary-500 bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500 text-right"
-                                  />
-                                  {(() => {
-                                    const u = editUnits.find(u => u.id === editUnitId)
-                                    if (!u || u.factor === 1 || u.dimension === 'count') return null
-                                    const base = Math.round(parseFloat(editQty || '0') * u.factor * 1000) / 1000
-                                    return <span className="text-xs text-foreground-muted">= {base} {u.dimension === 'count' ? 'pcs' : 'base units'}</span>
-                                  })()}
-                                </div>
-                              ) : (
-                                (() => {
-                                  const displayQty = parseFloat(p.inventory_quantity || '0')
-                                  return (
-                                    <span className={`font-medium ${displayQty === 0 ? 'text-red-600 dark:text-red-400' : displayQty <= 5 ? 'text-orange-600 dark:text-orange-400' : 'text-foreground'}`}>
-                                      {displayQty}
-                                    </span>
-                                  )
-                                })()
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-center text-foreground-secondary text-xs hidden sm:table-cell">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-surface-secondary text-foreground-secondary font-medium whitespace-nowrap">
-                                {p.sell_unit_dimension === 'count'
-                                  ? <>Pc{(p.sell_unit_label || p.sell_unit) && (p.sell_unit_label || p.sell_unit) !== 'pc' ? <span className="text-foreground-muted font-normal">/ {p.sell_unit_label || p.sell_unit}</span> : null}</>
-                                  : (p.sell_unit_label || p.sell_unit || 'Pc')}
-                                {parseFloat(p.sell_unit_factor || '1') > 1 && p.base_unit_label && (
-                                  <span className="text-foreground-muted font-normal">({parseFloat(p.sell_unit_factor)} {p.base_unit_label})</span>
-                                )}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-right text-foreground">{formatINR(parseFloat(p.cost_price || '0'))}</td>
-                            <td className="px-4 py-3 text-right text-foreground-secondary text-sm">{parseFloat(p.gst_percentage || '0')}%</td>
-                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</td>
-                            <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.selling_price || '0'))}</td>
-                            <td className="px-4 py-3 text-right">
-                              <div className="flex items-center justify-end gap-1">
-                                {isEditing ? (
-                                  <>
-                                    <input
-                                      type="text"
-                                      placeholder="Note (optional)"
-                                      value={editNotes}
-                                      onChange={e => setEditNotes(e.target.value)}
-                                      onKeyDown={e => { if (e.key === 'Enter') saveEdit(p); if (e.key === 'Escape') cancelEdit() }}
-                                      className="hidden lg:block field-xs w-32 border border-border-default bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-secondary-500"
-                                    />
-                                    {editWarehouses.length > 0 && (
-                                      <AdminSelect
-                                        value={editWarehouseId}
-                                        onChange={setEditWarehouseId}
-                                        xs
-                                        className="hidden lg:block w-36"
-                                        options={[
-                                          { value: '', label: '— warehouse —' },
-                                          ...editWarehouses.map(w => ({ value: w.id, label: w.name })),
-                                        ]}
-                                      />
-                                    )}
-                                    {editWarehouseId && (
-                                      <AdminSelect
-                                        value={editLocationId}
-                                        onChange={setEditLocationId}
-                                        xs
-                                        className="hidden lg:block w-40"
-                                        options={[
-                                          { value: '', label: '— open shelf —' },
-                                          ...editLocations.filter(l => !l.is_open_shelf).map(l => ({ value: l.id, label: l.display_code })),
-                                        ]}
-                                      />
-                                    )}
-                                    <button
-                                      onClick={() => saveEdit(p)}
-                                      disabled={editSaving || editQty === ''}
-                                      title="Save"
-                                      className="field-xs font-medium bg-secondary-500 hover:bg-secondary-600 text-white disabled:opacity-50 transition-colors"
-                                    >
-                                      {editSaving ? '…' : 'Save'}
-                                    </button>
-                                    <button onClick={cancelEdit} title="Cancel" className="p-1.5 rounded-lg hover:bg-surface-secondary text-foreground-secondary transition-colors">
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                                      </svg>
-                                    </button>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Link
-                                      href={ap(`/admin/products/${p.id}`)}
-                                      title="View Product"
-                                      className="p-1.5 rounded-lg hover:bg-surface-secondary text-accent-500 hover:text-accent-600 transition-colors"
-                                    >
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                      </svg>
-                                    </Link>
-                                    <button
-                                      onClick={() => !p.perishable && startEdit(p)}
-                                      title={p.perishable ? 'Stock managed via batches — use GRN to receive or Remove to deduct' : 'Adjust stock'}
-                                      disabled={!!p.perishable}
-                                      className={`p-1.5 rounded-lg transition-colors ${p.perishable ? 'opacity-30 cursor-not-allowed text-foreground-muted' : 'hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500'}`}
-                                    >
-                                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                                      </svg>
-                                    </button>
-                                    <button
-                                      onClick={() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)}
-                                      title="Batch details"
-                                      className={`p-1.5 rounded-lg hover:bg-surface-secondary transition-colors ${expandedValRows[rowId] !== undefined ? 'text-secondary-500' : 'text-foreground-secondary hover:text-secondary-500'}`}
-                                    >
-                                      {loadingBatchRow === rowId
-                                        ? <svg className="w-4 h-4 animate-spin" viewBox="0 0 24 24" fill="none"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
-                                        : <svg className={`w-4 h-4 transition-transform ${expandedValRows[rowId] !== undefined ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
-                                      }
-                                    </button>
-                                  </>
-                                )}
                               </div>
-                            </td>
-                          </tr>
-                          {expandedValRows[rowId] !== undefined && (
-                            <tr className="bg-surface-secondary/30">
-                              <td colSpan={10} className="px-4 py-3">
-                                {expandedValRows[rowId]!.length === 0 ? (
-                                  <p className="text-xs text-foreground-muted italic">No batches with remaining stock for this product.</p>
-                                ) : (
-                                  <table className="w-full text-xs">
-                                    <thead>
-                                      <tr className="text-foreground-secondary">
-                                        <th className="pb-1.5 text-left font-medium pr-4">Lot / Batch</th>
-                                        <th className="pb-1.5 text-left font-medium pr-4">Expiry</th>
-                                        <th className="pb-1.5 text-left font-medium pr-4 hidden sm:table-cell">Mfg Date</th>
-                                        <th className="pb-1.5 text-left font-medium pr-4 hidden md:table-cell">Location</th>
-                                        <th className="pb-1.5 text-right font-medium pr-4">Qty Remaining</th>
-                                        <th className="pb-1.5 text-right font-medium pr-4">Batch Value</th>
-                                        <th className="pb-1.5 w-8"></th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-border-default/50">
-                                      {expandedValRows[rowId]!.map((b: any) => {
-                                        const d = b.expiry_date ? new Date(b.expiry_date) : null
-                                        const diffDays = d ? Math.floor((d.getTime() - Date.now()) / 86400000) : null
-                                        const expiryCls = diffDays === null ? 'text-foreground-muted' : diffDays < 0 ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' : diffDays <= 30 ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                                        const qty = parseFloat(b.quantity_remaining || '0')
-                                        const batchValue = qty * parseFloat(b.unit_cost || '0')
-                                        const serials: string[] = Array.isArray(b.serials) ? b.serials : []
-                                        return (
-                                          <tr key={b.batch_id}>
-                                            <td className="py-1.5 pr-4 font-mono text-foreground-secondary">{b.lot_number || '—'}</td>
-                                            <td className="py-1.5 pr-4">
-                                              {b.expiry_date
-                                                ? <span className={`inline-flex px-1.5 py-0.5 rounded font-medium ${expiryCls}`}>{formatDate(b.expiry_date)}</span>
-                                                : <span className="text-foreground-muted">—</span>}
-                                            </td>
-                                            <td className="py-1.5 pr-4 text-foreground-secondary hidden sm:table-cell">{b.manufacture_date ? formatDate(b.manufacture_date) : '—'}</td>
-                                            <td className="py-1.5 pr-4 text-foreground-secondary hidden md:table-cell">{b.location || '—'}</td>
-                                            <td className="py-1.5 pr-4 text-right font-medium text-foreground">{qty}</td>
-                                            <td className="py-1.5 pr-4 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
-                                            <td className="py-1.5 text-right">
-                                              <button
-                                                onClick={async () => {
-                                                  const ok = await confirm({
-                                                    title: 'Remove Batch',
-                                                    message: qty > 0
-                                                      ? `This batch still has ${qty} units remaining. Are you sure you want to remove it?`
-                                                      : 'Remove this batch?',
-                                                    confirmLabel: 'Remove',
-                                                    variant: 'danger',
-                                                  })
-                                                  if (!ok) return
-                                                  const res = await fetch(`/api/admin/inventory/batches/${b.batch_id}`, { method: 'DELETE' })
-                                                  const json = await res.json()
-                                                  if (!res.ok) { showToast(json.error || 'Failed to remove batch', 'error'); return }
-                                                  showToast('Batch removed', 'success')
-                                                  toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null)
-                                                  setTimeout(() => toggleValBatch(rowId, p.id, p.variant_id || null, p.sub_variant_id || null), 100)
-                                                }}
-                                                className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                                                title="Remove batch"
-                                              >Remove</button>
-                                            </td>
-                                          </tr>
-                                        )
-                                      })}
-                                      {!p.perishable && parseFloat(p.inventory_quantity || '0') > 0 && (
-                                        <tr key="default-stock" className="border-t border-border-default/50">
-                                          <td className="py-1.5 pr-4 text-foreground-muted italic">Default stock</td>
-                                          <td className="py-1.5 pr-4 text-foreground-muted">—</td>
-                                          <td className="py-1.5 pr-4 text-foreground-muted hidden sm:table-cell">—</td>
-                                          <td className="py-1.5 pr-4 text-foreground-muted hidden md:table-cell">—</td>
-                                          <td className="py-1.5 pr-4 text-right font-medium text-foreground">{parseFloat(p.inventory_quantity || '0')}</td>
-                                          <td className="py-1.5 text-right font-semibold text-foreground">{formatINR(parseFloat(p.inventory_quantity || '0') * parseFloat(p.cost_price || '0'))}</td>
-                                        </tr>
-                                      )}
-                                    </tbody>
-                                  </table>
-                                )}
+                            </HoverCard>
+                          )
+                          return renderValLeaf(p, firstCell, '—')
+                        }
+
+                        return (
+                          <React.Fragment key={prod.productId}>
+                            <tr className="hover:bg-surface-secondary/50 transition-colors">
+                              <td className="px-4 py-3 font-medium text-foreground">
+                                <button
+                                  onClick={() => toggleValProduct(prod.productId)}
+                                  className="flex items-center gap-1.5 text-left hover:text-secondary-500 transition-colors"
+                                >
+                                  {chevron(productExpanded)}
+                                  <HoverCard
+                                    trigger={
+                                      <Link href={ap(`/admin/products/${prod.head.id}`)} onClick={e => e.stopPropagation()} className="hover:text-accent-500 hover:underline underline-offset-2">
+                                        {prod.head.name}
+                                      </Link>
+                                    }
+                                    align="left"
+                                    side="bottom"
+                                    width="260px"
+                                  >
+                                    <div className="p-3 space-y-2">
+                                      <p className="text-sm font-semibold text-foreground leading-tight">{prod.head.name}</p>
+                                      {(prod.head.row_sku || prod.head.sku) && <p className="text-xs font-mono text-foreground-muted">{prod.head.row_sku || prod.head.sku}</p>}
+                                      <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
+                                        <div className="flex justify-between">
+                                          <span className="text-foreground-secondary">Stock</span>
+                                          <span className="font-semibold text-foreground">{prod.stock}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-foreground-secondary">Stock Value</span>
+                                          <span className="font-semibold text-foreground">{formatINR(prod.valueEx)}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </HoverCard>
+                                </button>
                               </td>
+                              <td className="px-4 py-3 text-foreground-secondary hidden sm:table-cell">—</td>
+                              <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell"><span className="inline-flex items-center gap-1">{prod.head.row_sku || prod.head.sku || '—'}{(prod.head.row_sku || prod.head.sku) && <CopySku sku={prod.head.row_sku || prod.head.sku} />}</span></td>
+                              <td className="px-4 py-3 text-right font-medium text-foreground">{prod.stock}</td>
+                              <td className="px-4 py-3 text-center text-foreground-muted text-xs hidden sm:table-cell">—</td>
+                              <td className="px-4 py-3 text-right text-foreground-muted">—</td>
+                              <td className="px-4 py-3 text-right text-foreground-muted text-sm">—</td>
+                              <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(prod.valueEx)}</td>
+                              <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(prod.valueIncl)}</td>
+                              <td className="px-4 py-3 text-right text-foreground-muted">—</td>
                             </tr>
-                          )}
-                        </React.Fragment>
-                      )
-                    })}
+                            {productExpanded && prod.variants.map((variant) => {
+                              const variantExpanded = expandedValVariants.has(variant.variantId)
+                              const hasSubs = variant.subVariants.length > 0
+
+                              if (!hasSubs && variant.leaf) {
+                                const p = variant.leaf
+                                const firstCell = (
+                                  <span className="pl-8 flex items-center gap-1.5">
+                                    <span className="text-foreground-secondary">{p.variant_name || '—'}</span>
+                                  </span>
+                                )
+                                return renderValLeaf(p, firstCell, p.variant_name || '—')
+                              }
+
+                              const vHead = variant.leaf || variant.subVariants[0]
+                              return (
+                                <React.Fragment key={variant.variantId}>
+                                  <tr className="hover:bg-surface-secondary/50 transition-colors">
+                                    <td className="px-4 py-3 font-medium text-foreground">
+                                      <button
+                                        onClick={() => toggleValVariant(variant.variantId)}
+                                        className="pl-8 flex items-center gap-1.5 text-left hover:text-secondary-500 transition-colors"
+                                      >
+                                        {chevron(variantExpanded)}
+                                        <span className="text-foreground-secondary">{vHead.variant_name || '—'}</span>
+                                      </button>
+                                    </td>
+                                    <td className="px-4 py-3 text-foreground-secondary hidden sm:table-cell">{vHead.variant_name || '—'}</td>
+                                    <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell"><span className="inline-flex items-center gap-1">{vHead.row_sku || vHead.sku || '—'}{(vHead.row_sku || vHead.sku) && <CopySku sku={vHead.row_sku || vHead.sku} />}</span></td>
+                                    <td className="px-4 py-3 text-right font-medium text-foreground">{variant.stock}</td>
+                                    <td className="px-4 py-3 text-center text-foreground-muted text-xs hidden sm:table-cell">—</td>
+                                    <td className="px-4 py-3 text-right text-foreground-muted">—</td>
+                                    <td className="px-4 py-3 text-right text-foreground-muted text-sm">—</td>
+                                    <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(variant.valueEx)}</td>
+                                    <td className="px-4 py-3 text-right font-semibold text-foreground">{formatINR(variant.valueIncl)}</td>
+                                    <td className="px-4 py-3 text-right text-foreground-muted">—</td>
+                                  </tr>
+                                  {variantExpanded && variant.subVariants.map((sv) => {
+                                    const firstCell = (
+                                      <span className="pl-12 flex items-center gap-1.5">
+                                        <span className="text-foreground-secondary">{sv.sub_variant_name || '—'}</span>
+                                      </span>
+                                    )
+                                    const variantCell = sv.variant_name
+                                      ? (sv.sub_variant_name ? `${sv.variant_name} / ${sv.sub_variant_name}` : sv.variant_name)
+                                      : (sv.sub_variant_name || '—')
+                                    return renderValLeaf(sv, firstCell, variantCell)
+                                  })}
+                                </React.Fragment>
+                              )
+                            })}
+                          </React.Fragment>
+                        )
+                      })}
                     </tbody>
                   </table>
                 </div>
