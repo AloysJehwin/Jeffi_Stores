@@ -427,6 +427,7 @@ CREATE TABLE public.product_drafts (
     images jsonb DEFAULT '[]'::jsonb NOT NULL,
     sub_variants jsonb DEFAULT '[]'::jsonb NOT NULL,
     units jsonb DEFAULT '[]'::jsonb NOT NULL,
+    variant_images jsonb DEFAULT '[]'::jsonb NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT product_drafts_pkey PRIMARY KEY (product_id)

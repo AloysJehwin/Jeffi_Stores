@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import CopySku from '@/components/ui/CopySku'
 import { headers } from 'next/headers'
 import { getOrder, getReturnRequest } from '@/lib/queries'
 import { ap } from '@/lib/admin-path'
@@ -281,7 +282,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                             </Link>
                           ) : (item.product_name || item.products?.name || 'Product')}
                         </h3>
-                        <p className="text-sm text-foreground-muted mt-1">SKU: {item.product_sku || item.products?.sku}</p>
+                        <p className="text-sm text-foreground-muted mt-1">SKU: {item.product_sku || item.products?.sku}{(item.product_sku || item.products?.sku) && <CopySku sku={item.product_sku || item.products?.sku} className="ml-1" />}</p>
                         {item.variant_name && (
                           <span className="inline-flex items-center mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-accent-50 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300 border border-accent-200 dark:border-accent-700">
                             {item.variant_name}
@@ -393,7 +394,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
                           ) : item.product_name}
                         </p>
                         <p className="text-xs text-foreground-muted mt-0.5">
-                          SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}{' · '}
+                          SKU: {item.sub_variant?.sku || item.variant?.sku || item.product_sku}{(item.sub_variant?.sku || item.variant?.sku || item.product_sku) && <CopySku sku={item.sub_variant?.sku || item.variant?.sku || item.product_sku} className="ml-1" />}{' · '}
                           Ordered: {isCount && unitLabel
                             ? `${orderedQty} ${unitLabel}${factor > 1 ? ` (${deductedQty} pcs)` : ''}`
                             : `${orderedQty}${unitLabel ? ` ${unitLabel}` : ''}`}

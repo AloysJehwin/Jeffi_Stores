@@ -7,6 +7,7 @@ import { bp } from '@/lib/business-path'
 import { applyDiscount } from '@/lib/pricing'
 import { BusinessAccountNavBar } from '@/components/business/AccountSidebar'
 import BusinessAccountMobileHeader from '@/components/business/AccountMobileHeader'
+import CopySku from '@/components/ui/CopySku'
 
 interface RFQItem {
   id: string
@@ -543,6 +544,7 @@ export default function BusinessRFQDetail({ params }: { params: Promise<{ id: st
                               {item.variant_sku && (
                                 <span className="text-[11px] text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded font-mono">
                                   {item.variant_sku}
+                                  <CopySku sku={item.variant_sku} className="ml-1" />
                                 </span>
                               )}
                               {/* Qty badge */}

@@ -7,6 +7,7 @@ import { LabelSpec, LabelSize } from '@/lib/label-sizes'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import BatchSerialLabels from '@/components/admin/BatchSerialLabels'
 import { LabelPreview, fmtPrice, type PreviewProduct } from '@/components/admin/label-preview'
+import CopySku from '@/components/ui/CopySku'
 
 interface Category {
   id: string
@@ -457,7 +458,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                     {p.variant_name && (
                       <div className="text-xs text-foreground-secondary truncate">{p.variant_name}</div>
                     )}
-                    <div className="text-xs text-foreground-muted">{p.sku}{p.brand_name ? ` · ${p.brand_name}` : ''}</div>
+                    <div className="text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span>{p.brand_name ? ` · ${p.brand_name}` : ''}</div>
                   </div>
                   {displayPrice && (
                     <div className="text-xs font-medium text-foreground-secondary shrink-0">{displayPrice}</div>
@@ -496,7 +497,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-foreground truncate leading-tight">{p.name}</div>
                     {p.variant_name && <div className="text-xs text-foreground-secondary">{p.variant_name}</div>}
-                    <div className="text-xs text-foreground-muted">{p.sku}</div>
+                    <div className="text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <span className="text-xs text-foreground-muted mr-0.5">qty</span>

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { BrowserQRCodeReader, IScannerControls } from '@zxing/browser'
+import CopySku from '@/components/ui/CopySku'
 
 interface OrderInfo {
   id: string
@@ -465,7 +466,7 @@ export default function ScanClient() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-700/60 rounded-xl p-3">
                   <p className="text-xs text-gray-400 mb-0.5">SKU</p>
-                  <p className="font-mono text-sm text-white break-all">{product.sku}</p>
+                  <p className="font-mono text-sm text-white break-all inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} className="text-white/70 hover:text-white" />}</p>
                 </div>
                 <div className="bg-gray-700/60 rounded-xl p-3">
                   <p className="text-xs text-gray-400 mb-1">Stock</p>

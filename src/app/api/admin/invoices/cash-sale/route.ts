@@ -173,12 +173,13 @@ export async function POST(request: NextRequest) {
       const rand = Math.random().toString(36).substring(2, 8).toUpperCase()
       const saleNumber = `CS-${ts}-${rand}`
 
-      const isGSTEnabled = (await getFeatureFlags()).gstEnabled
       let invoiceNumber: string | null = null
       let fy: string | null = null
       let seq: number | null = null
 
-      if (isGSTEnabled) {
+      // Number every cash sale regardless of GST — GST-off is just a tax-free invoice,
+      // but it must still be numbered so it shows on the invoice list.
+      {
         const settingsResult = await client.query(`SELECT value FROM site_settings WHERE key = 'invoice_prefix'`)
         const prefix = settingsResult.rows[0]?.value || 'JS'
         fy = getFinancialYear(new Date())
@@ -213,7 +214,7 @@ export async function POST(request: NextRequest) {
       )
       const saleId = saleResult.rows[0].id
 
-      if (isGSTEnabled && invoiceNumber && fy && seq !== null) {
+      if (invoiceNumber && fy && seq !== null) {
         await client.query(
           `INSERT INTO invoices (order_id, sale_id, invoice_number, financial_year, sequence_number) VALUES (NULL, $1, $2, $3, $4)`,
           [saleId, invoiceNumber, fy, seq]

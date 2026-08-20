@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
+import AdminSelect from './AdminSelect'
 
 interface ReturnRequest {
   id: string
@@ -50,6 +51,13 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [refundFailed, setRefundFailed] = useState(false)
+  const [stockWarning, setStockWarning] = useState<string | null>(null)
+  // Replacement variant picker: when the original variant/sub-variant of a
+  // replacement item no longer exists, the process API returns 409 with the list of
+  // items needing a pick (+ the product's active grains). We render dropdowns and
+  // resubmit with the chosen grains.
+  const [variantPick, setVariantPick] = useState<any[] | null>(null)
+  const [pickSelections, setPickSelections] = useState<Record<string, string>>({})
   const router = useRouter()
 
   async function handleCreateRVP() {
@@ -69,7 +77,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
     }
   }
 
-  async function submit(action: string) {
+  async function submit(action: string, replacementVariants?: Record<string, { variant_id: string | null; sub_variant_id: string | null }>) {
     if (action === 'reject' && !adminNotes.trim()) {
       setError('Please provide a reason for rejection.')
       return
@@ -79,6 +87,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
     setError(null)
     setSuccess(null)
     setRefundFailed(false)
+    setStockWarning(null)
 
     try {
       const response = await fetch(`/api/orders/${orderId}/return-review`, {
@@ -89,11 +98,30 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
           adminNotes: adminNotes.trim() || undefined,
           returnTrackingNumber: returnTrackingNumber.trim() || undefined,
           ...(action === 'process' ? { restock: returnRequest.valuation_condition === 'good' } : {}),
+          ...(replacementVariants ? { replacementVariants } : {}),
         }),
       })
 
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Failed')
+      if (!response.ok) {
+        // Replacement item(s) need a variant pick — surface the inline picker.
+        if (response.status === 409 && data.error === 'variant_pick_required' && Array.isArray(data.needsVariantPick)) {
+          setVariantPick(data.needsVariantPick)
+          setError('The original variant for one or more items no longer exists. Choose a replacement variant below.')
+          return
+        }
+        throw new Error(data.error || 'Failed')
+      }
+
+      // Success — clear any picker state.
+      setVariantPick(null)
+      setPickSelections({})
+
+      if (action === 'process' && Array.isArray(data.stockWarnings) && data.stockWarnings.length > 0) {
+        setStockWarning(
+          `Stock was NOT restored for ${data.stockWarnings.length} item(s) — the variant/sub-variant no longer exists or is inactive. The return was still processed.`
+        )
+      }
 
       if (action === 'process' && data.refundFailed) {
         setRefundFailed(true)
@@ -120,6 +148,20 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
 
   const { status, type, reason, description, admin_notes, return_tracking_number } = returnRequest
 
+  // Build the replacementVariants map from picker selections and resubmit process.
+  function confirmVariantPick() {
+    if (!variantPick) return
+    const map: Record<string, { variant_id: string | null; sub_variant_id: string | null }> = {}
+    for (const it of variantPick) {
+      const sel = pickSelections[it.order_item_id]
+      if (!sel) { setError('Please choose a replacement variant for every item.'); return }
+      // Encoded value: "variantId|subVariantId" (subVariantId may be empty).
+      const [vid, svid] = sel.split('|')
+      map[it.order_item_id] = { variant_id: vid || null, sub_variant_id: svid || null }
+    }
+    submit('process', map)
+  }
+
   return (
     <div className="space-y-4">
       {error && (
@@ -130,6 +172,42 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
       {success && (
         <div className={`p-3 border rounded-lg text-sm ${refundFailed ? 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-300' : 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-300'}`}>
           {success}
+        </div>
+      )}
+      {stockWarning && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg text-amber-800 dark:text-amber-300 text-sm">
+          ⚠ {stockWarning}
+        </div>
+      )}
+      {variantPick && variantPick.length > 0 && (
+        <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3">
+          <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Choose replacement variant(s)</p>
+          {variantPick.map((it: any) => (
+            <div key={it.order_item_id} className="space-y-1">
+              <p className="text-xs text-foreground-muted">
+                {it.product_name}{it.variant_name ? ` — original: ${it.variant_name}` : ''} (no longer available)
+              </p>
+              <AdminSelect
+                sm
+                value={pickSelections[it.order_item_id] || ''}
+                onChange={v => setPickSelections(s => ({ ...s, [it.order_item_id]: v }))}
+                placeholder="Select a variant to ship…"
+                className="w-full"
+                options={(it.options || []).map((o: any) => ({
+                  value: `${o.variant_id}|${o.sub_variant_id || ''}`,
+                  label: `${o.label}${o.sku ? ` (${o.sku})` : ''}${o.stock_status ? ` — ${o.stock_status}` : ''}`,
+                }))}
+              />
+            </div>
+          ))}
+          <button
+            type="button"
+            onClick={confirmVariantPick}
+            disabled={isSubmitting}
+            className="px-4 py-2 text-sm font-medium text-white bg-accent-500 hover:bg-accent-600 rounded-lg disabled:opacity-50"
+          >
+            Confirm replacement with selected variant(s)
+          </button>
         </div>
       )}
 

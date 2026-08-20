@@ -1,6 +1,6 @@
 import { query, queryOne, queryMany, getClient } from './db'
 import { PoolClient } from 'pg'
-import { buildProductSearchClause, buildSearchClause } from './search'
+import { buildProductSearchClause, buildProductSearchRank, buildSearchClause } from './search'
 import { round2 } from './gst'
 
 export type TransactionType = 'purchase' | 'sale' | 'return' | 'adjustment'
@@ -330,30 +330,11 @@ export async function getStockValuation(filters: {
   const params: any[] = []
   let i = 1
 
-  if (search) {
-    // Reuse the shared search builder so valuation matches the ledger/main search:
-    // per-word substring + pg_trgm word_similarity fuzzy fallback (tolerates typos).
-    const sc = buildSearchClause(
-      search,
-      ['rows.name', 'rows.sku', 'rows.row_sku', 'rows.variant_name', 'rows.sub_variant_name'],
-      i
-    )
-    havingClauses.push(sc.clause)
-    params.push(...sc.params)
-    i = sc.nextIdx
-  }
-  if (categoryName) { havingClauses.push(`rows.category_name = $${i++}`); params.push(categoryName) }
-  if (brandName)    { havingClauses.push(`rows.brand_name = $${i++}`);    params.push(brandName) }
-  if (stockStatus === 'in_stock')     { havingClauses.push(`rows.inventory_quantity > 0`) }
-  if (stockStatus === 'out_of_stock') { havingClauses.push(`rows.inventory_quantity <= 0`) }
-  if (stockStatus === 'low_stock')    { havingClauses.push(`rows.inventory_quantity > 0 AND rows.inventory_quantity <= 5`) }
-
-  const whereClause = havingClauses.length > 0 ? `WHERE ${havingClauses.join(' AND ')}` : ''
-
   const baseQuery = `
     WITH rows AS (
       SELECT
         p.id, p.name, p.sku, p.sku AS row_sku,
+        p.search_vector AS search_vector,
         COALESCE(p.inventory_quantity, 0) AS inventory_quantity,
         COALESCE(p.gst_percentage, 0) AS gst_percentage,
         COALESCE(p.base_price, 0) AS selling_price,
@@ -394,6 +375,7 @@ export async function getStockValuation(filters: {
       UNION ALL
       SELECT
         p.id, p.name, p.sku, pv.sku AS row_sku,
+        p.search_vector AS search_vector,
         COALESCE(pv.inventory_quantity, 0) AS inventory_quantity,
         COALESCE(p.gst_percentage, 0) AS gst_percentage,
         COALESCE(pv.price, p.base_price, 0) AS selling_price,
@@ -436,6 +418,7 @@ export async function getStockValuation(filters: {
       UNION ALL
       SELECT
         p.id, p.name, p.sku, sv.sku AS row_sku,
+        p.search_vector AS search_vector,
         COALESCE(sv.inventory_quantity, 0) AS inventory_quantity,
         COALESCE(p.gst_percentage, 0) AS gst_percentage,
         COALESCE(sv.price, pv.price, p.base_price, 0) AS selling_price,
@@ -505,6 +488,56 @@ export async function getStockValuation(filters: {
     )
   `
 
+  if (search) {
+    // Product-name search for valuation. Strategy (tuned for precision):
+    //   1. STRICT: every typed word must appear (substring) somewhere in the row's
+    //      name / sku / variant / sub-variant. "Taparia 1/4 Square Drive Sockets"
+    //      then matches only the handful of products that contain ALL those words —
+    //      not the hundreds that merely share "Square"/"Drive"/"Sockets".
+    //   2. FUZZY FALLBACK: only when the strict clause finds almost nothing (< 3
+    //      products, e.g. because of a typo) do we widen to buildProductSearchClause's
+    //      full-text + trigram matching, so a mistyped query still returns something.
+    const words = search.trim().split(/\s+/).map(w => w.replace(/^[^\w/]+|[^\w/]+$/g, '')).filter(Boolean)
+    const cols = ['rows.name', 'rows.row_sku', 'rows.variant_name', 'rows.sub_variant_name']
+
+    // Strict clause with its own 1-based params for the pre-flight count.
+    const strictParams: any[] = []
+    let si = 1
+    const strictPerCol = cols.map(col => {
+      const wordClauses = words.map(w => { strictParams.push(`%${w}%`); return `${col} ILIKE $${si++}` })
+      return `(${wordClauses.join(' AND ')})`
+    })
+    const strictClause = `(${strictPerCol.join(' OR ')})`
+
+    const strictCount = words.length === 0 ? 0 : await queryOne<{ n: number }>(
+      `${baseQuery} SELECT COUNT(DISTINCT rows.id)::int AS n FROM rows WHERE ${strictClause}`,
+      strictParams
+    ).then(r => r?.n || 0).catch(() => 0)
+
+    if (strictCount >= 3) {
+      // Re-emit the strict clause with params offset to the shared counter `i`.
+      const base = i
+      let sj = base
+      const perCol = cols.map(col => `(${words.map(() => `${col} ILIKE $${sj++}`).join(' AND ')})`)
+      havingClauses.push(`(${perCol.join(' OR ')})`)
+      params.push(...strictParams)
+      i = base + strictParams.length
+    } else {
+      const sc = buildProductSearchClause(search, 'rows.name', 'rows.row_sku', 'rows.search_vector', i)
+      const nameIdx = sc.nextIdx
+      havingClauses.push(`(${sc.clause} OR rows.variant_name ILIKE $${nameIdx} OR rows.sub_variant_name ILIKE $${nameIdx})`)
+      params.push(...sc.params, `%${search.trim()}%`)
+      i = nameIdx + 1
+    }
+  }
+  if (categoryName) { havingClauses.push(`rows.category_name = $${i++}`); params.push(categoryName) }
+  if (brandName)    { havingClauses.push(`rows.brand_name = $${i++}`);    params.push(brandName) }
+  if (stockStatus === 'in_stock')     { havingClauses.push(`rows.inventory_quantity > 0`) }
+  if (stockStatus === 'out_of_stock') { havingClauses.push(`rows.inventory_quantity <= 0`) }
+  if (stockStatus === 'low_stock')    { havingClauses.push(`rows.inventory_quantity > 0 AND rows.inventory_quantity <= 5`) }
+
+  const whereClause = havingClauses.length > 0 ? `WHERE ${havingClauses.join(' AND ')}` : ''
+
   // All distinct categories and brands (unfiltered, for dropdown population)
   const filterMeta = await queryMany<{ category_name: string | null; brand_name: string | null }>(
     `${baseQuery} SELECT DISTINCT rows.category_name, rows.brand_name FROM rows ORDER BY rows.category_name, rows.brand_name`,
@@ -515,7 +548,7 @@ export async function getStockValuation(filters: {
 
   // Count filtered rows + site-wide totals (across ALL matching SKUs, not just the page).
   const countRow = await queryOne<{ total: number; total_value: string; total_value_incl: string }>(
-    `${baseQuery} SELECT COUNT(*)::int AS total,
+    `${baseQuery} SELECT COUNT(DISTINCT rows.id)::int AS total,
         SUM(rows.stock_value)::text AS total_value,
         SUM(rows.inventory_quantity * rows.selling_price)::text AS total_value_incl
        FROM rows ${whereClause}`,
@@ -525,7 +558,7 @@ export async function getStockValuation(filters: {
   const totalValue = parseFloat(countRow?.total_value || '0') || 0
   const totalValueInclGst = parseFloat(countRow?.total_value_incl || '0') || 0
   const inStockCount = await queryOne<{ n: number }>(
-    `${baseQuery} SELECT COUNT(*)::int AS n FROM rows ${whereClause}${whereClause ? ' AND' : ' WHERE'} rows.inventory_quantity > 0`,
+    `${baseQuery} SELECT COUNT(DISTINCT rows.id)::int AS n FROM rows ${whereClause}${whereClause ? ' AND' : ' WHERE'} rows.inventory_quantity > 0`,
     params
   ).then(r => r?.n || 0).catch(() => 0)
 
@@ -536,16 +569,37 @@ export async function getStockValuation(filters: {
   }
   const sortCol = (sort && VAL_SORT_COLS[sort]) || null
   const sortDir = dir === 'asc' ? 'ASC' : 'DESC'
-  const orderBy = sortCol
-    ? `ORDER BY ${sortCol} ${sortDir} NULLS LAST, rows.name, rows.variant_name, rows.sub_variant_name`
-    : `ORDER BY rows.name, rows.variant_name, rows.sub_variant_name`
 
-  // Paginated rows
-  const pageParams = [...params, limit, offset]
-  const products = await queryMany<any>(
-    `${baseQuery} SELECT rows.* FROM rows ${whereClause} ${orderBy} LIMIT $${i} OFFSET $${i + 1}`,
+  // Relevance ordering: when the user is searching (and hasn't picked an explicit
+  // sort column), order paginated products by the shared product-search rank — same
+  // as the line-item picker — so the strongest name match lands on page 1 instead of
+  // being buried alphabetically behind loose fuzzy hits.
+  let rankParams: any[] = []
+  let productOrderBy: string
+  if (sortCol) {
+    productOrderBy = `ORDER BY MIN(${sortCol}) ${sortDir} NULLS LAST, MIN(rows.name)`
+  } else if (search) {
+    const rk = buildProductSearchRank(search, 'rows.name', 'rows.search_vector', i)
+    rankParams = rk.params
+    productOrderBy = `ORDER BY MIN(${rk.rank}) ASC, MIN(rows.name)`
+    i = rk.nextIdx
+  } else {
+    productOrderBy = `ORDER BY MIN(rows.name)`
+  }
+
+  // Paginate over distinct product IDs, then fetch all leaves for those products.
+  const pageParams = [...params, ...rankParams, limit, offset]
+  const pagedProductIds = await queryMany<{ id: string }>(
+    `${baseQuery} SELECT rows.id FROM rows ${whereClause} GROUP BY rows.id ${productOrderBy} LIMIT $${i} OFFSET $${i + 1}`,
     pageParams
   )
+  const idList = (pagedProductIds || []).map(r => r.id)
+  const products = idList.length > 0
+    ? await queryMany<any>(
+        `${baseQuery} SELECT rows.* FROM rows WHERE rows.id = ANY($1) ORDER BY rows.name, rows.variant_name, rows.sub_variant_name`,
+        [idList]
+      )
+    : []
 
   return {
     products: products || [],

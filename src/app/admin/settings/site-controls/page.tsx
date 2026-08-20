@@ -65,6 +65,7 @@ export default async function SiteControlsPage() {
   const inv = await loadInvoiceKeys()
   const delivery = await getDeliverySettings()
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
+  const hasInventory = hasScope(admin.role, admin.scopes || [], 'inventory:read')
   const hero = await loadHeroData()
 
   return (
@@ -101,6 +102,14 @@ export default async function SiteControlsPage() {
           <SectionCard title="Orders" description="Order lifecycle rules." columns>
             <NumberControl settingKey="min_order_amount" label="Minimum order amount" hint="Minimum cart subtotal required to checkout. 0 disables." prefix="₹" initial={parseFloat(inv.min_order_amount || '0') || 0} />
             <NumberControl settingKey="order_auto_cancel_minutes" label="Auto-cancel unpaid orders after" suffix="min" min={1} initial={c.values.orderAutoCancelMinutes} />
+            <FullSpan><ToggleControl
+              settingKey="feature_inventory_validation_enabled"
+              label="Stock validation on order creation"
+              hint="When on, orders with insufficient stock are saved as drafts. Requires Growth plan."
+              initial={hasInventory ? c.flags.inventoryValidationEnabled : false}
+              locked={!hasInventory}
+              lockedHint="Requires Growth plan — stock validation is disabled for Basic plan."
+            /></FullSpan>
           </SectionCard>
         </div>
 

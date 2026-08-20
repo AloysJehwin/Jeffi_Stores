@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import AdminSelect from '@/components/admin/AdminSelect'
+import CopySku from '@/components/ui/CopySku'
 
 interface OrderItemLite {
   id: string
@@ -226,7 +227,7 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
                       >
                         <div className="flex justify-between gap-2">
                           <span className="font-medium text-foreground">
-                            {c.kind === 'sub' && c.parent_variant_name ? `${c.parent_variant_name} / ` : ''}{c.name || c.sku}
+                            {c.kind === 'sub' && c.parent_variant_name ? `${c.parent_variant_name} / ` : ''}{c.name || c.sku}{!c.name && c.sku && <CopySku sku={c.sku} />}
                           </span>
                           <span className="text-foreground">₹{Number(c.effectivePrice).toFixed(2)}</span>
                         </div>

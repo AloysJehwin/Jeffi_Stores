@@ -7,6 +7,7 @@ import { createPortal } from 'react-dom'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
+import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import { ap } from '@/lib/admin-path'
 
@@ -475,7 +476,7 @@ export default function NewPOPage() {
                     <div className="flex items-center justify-between gap-2 px-3 py-2 bg-surface-secondary rounded-lg border border-border-default">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{it.product_name}</p>
-                        {it.sku && <p className="text-xs text-foreground-muted mt-0.5 font-mono">{it.sku}</p>}
+                        {it.sku && <p className="text-xs text-foreground-muted mt-0.5 font-mono inline-flex items-center gap-1">{it.sku}<CopySku sku={it.sku} /></p>}
                       </div>
                       <button type="button" onClick={() => clearProduct(it.id)}
                         className="shrink-0 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 transition-colors">
@@ -765,7 +766,7 @@ export default function NewPOPage() {
                               <td className="px-4 py-2.5">
                                 {g.items.length > 1 ? <span className="text-foreground pl-2">{p.variant_name || p.name}</span> : <span className="font-medium text-foreground">{p.name}</span>}
                               </td>
-                              <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{p.sku}</td>
+                              <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></td>
                               <td className="px-4 py-2.5 text-right font-medium text-foreground">{p.base_price != null ? `₹${p.base_price}` : '—'}</td>
                             </tr>
                           ))}

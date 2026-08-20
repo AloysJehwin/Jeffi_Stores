@@ -7,6 +7,7 @@ import { Package, Star } from 'lucide-react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { ap } from '@/lib/admin-path'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import CopySku from '@/components/ui/CopySku'
 
 interface Props {
   product: any | null
@@ -110,7 +111,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
         <div className="flex items-start justify-between p-5 border-b border-border-default">
           <div className="min-w-0 pr-4">
             <h2 className="text-lg font-bold text-foreground leading-tight">{product.name}</h2>
-            <p className="text-xs text-foreground-muted mt-0.5">{product.sku}</p>
+            <p className="text-xs text-foreground-muted mt-0.5"><span className="inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</span></p>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
             <Link
@@ -354,7 +355,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                                 {v.variant_name}
                                 {hasSubs && <span className="ml-1.5 text-[10px] font-normal text-foreground-muted">({subs.length} sub)</span>}
                               </td>
-                              <td className="px-3 py-2 truncate text-foreground-muted" title={v.sku}>{v.sku || '—'}</td>
+                              <td className="px-3 py-2 truncate text-foreground-muted" title={v.sku}><span className="inline-flex items-center gap-1">{v.sku || '—'}{v.sku && <CopySku sku={v.sku} />}</span></td>
                               <td className="px-3 py-2 text-foreground">
                                 {hasSubs ? `From Rs. ${vMinPrice.toLocaleString('en-IN')}` : `Rs. ${Number(v.price || 0).toLocaleString('en-IN')}`}
                               </td>
@@ -369,7 +370,7 @@ export default function ProductDetailModal({ product, onClose }: Props) {
                             {hasSubs && subs.map((sv: any) => (
                               <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 text-xs">
                                 <td className="px-3 py-1.5 pl-6 truncate text-foreground-secondary" title={sv.sub_variant_name}>↳ {sv.sub_variant_name}</td>
-                                <td className="px-3 py-1.5 truncate text-foreground-muted" title={sv.sku}>{sv.sku || '—'}</td>
+                                <td className="px-3 py-1.5 truncate text-foreground-muted" title={sv.sku}><span className="inline-flex items-center gap-1">{sv.sku || '—'}{sv.sku && <CopySku sku={sv.sku} />}</span></td>
                                 <td className="px-3 py-1.5 text-foreground">{sv.price ? `Rs. ${Number(sv.price).toLocaleString('en-IN')}` : '—'}</td>
                                 <td className="px-3 py-1.5 text-foreground font-medium">{sv.inventory_quantity ?? 0}</td>
                                 <td className="px-3 py-1.5 text-foreground-muted">{sv.stock_status || '—'}</td>

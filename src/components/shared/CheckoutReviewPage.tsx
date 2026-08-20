@@ -9,6 +9,7 @@ import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import AddressFormModal from '@/components/visitor/AddressFormModal'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import CopySku from '@/components/ui/CopySku'
 import CouponHintBanner from '@/components/visitor/CouponHintBanner'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
@@ -946,7 +947,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                             {buyNowItem.brandName}
                           </span>
                         )}
-                        {buyNowItem.sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {buyNowItem.sku}</span>}
+                        {buyNowItem.sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {buyNowItem.sku}<CopySku sku={buyNowItem.sku} className="ml-1" /></span>}
                       </div>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {buyNowItem.variantName && (
@@ -1036,7 +1037,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                                 {item.products.brand_name}
                               </span>
                             )}
-                            {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
+                            {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}<CopySku sku={sku} className="ml-1" /></span>}
                             <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
                           </div>
                           <div className="flex flex-wrap gap-1 mt-1">

@@ -10,6 +10,7 @@ import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/So
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
+import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import BatchSerialLabelModal from '@/components/admin/BatchSerialLabelModal'
@@ -720,7 +721,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                   <tr className="hover:bg-surface-secondary/50 transition-colors">
                     <td className="px-4 py-3 text-foreground">
                       <p className="font-medium">{it.product_name}{it.variant_name && <span className="text-foreground-secondary font-normal"> / {it.variant_name}</span>}</p>
-                      {it.sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{it.sku}</p>}
+                      {it.sku && <p className="text-xs text-foreground-muted font-mono mt-0.5 inline-flex items-center gap-1">{it.sku}<CopySku sku={it.sku} /></p>}
                       {it.purchase_unit && factor > 1 && (
                         <p className="text-xs text-foreground-muted mt-0.5">1 {it.purchase_unit} = {factor} {baseLabel}</p>
                       )}
@@ -994,7 +995,7 @@ function POTab({ initialPO }: { initialPO?: string }) {
                         </p>
                       )}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">{it.sku || '—'}</td>
+                    <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell"><span className="inline-flex items-center gap-1">{it.sku || '—'}{it.sku && <CopySku sku={it.sku} />}</span></td>
                     <td className="px-4 py-3 text-right text-foreground-secondary">
                       {qtyInPu}{puLabel && <span className="text-xs text-foreground-muted ml-1">{puLabel}</span>}
                     </td>
@@ -1682,7 +1683,7 @@ function StockTab() {
                                 <div className="p-3 space-y-2">
                                   <p className="text-sm font-semibold text-foreground leading-tight">{tx.product_name}</p>
                                   {tx.variant_name && <p className="text-xs text-foreground-secondary">{tx.variant_name}{tx.sub_variant_name ? ` / ${tx.sub_variant_name}` : ''}</p>}
-                                  {tx.product_sku && <p className="text-xs font-mono text-foreground-muted">{tx.product_sku}</p>}
+                                  {tx.product_sku && <p className="text-xs font-mono text-foreground-muted inline-flex items-center gap-1">{tx.product_sku}<CopySku sku={tx.product_sku} /></p>}
                                   <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
                                     <div className="flex justify-between"><span className="text-foreground-secondary">Type</span><span className={`px-1.5 py-0.5 rounded-full font-medium ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span></div>
                                     <div className="flex justify-between"><span className="text-foreground-secondary">Change</span><span className={`font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>{fmtChange(chg)}</span></div>
@@ -1691,7 +1692,7 @@ function StockTab() {
                                   </div>
                                 </div>
                               </HoverCard>
-                              {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{tx.product_sku}</p>}
+                              {tx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5 inline-flex items-center gap-1">{tx.product_sku}<CopySku sku={tx.product_sku} /></p>}
                             </td>
                             <td className="px-4 py-3"><span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium capitalize ${TYPE_BADGE[tx.transaction_type] || ''}`}>{tx.transaction_type}</span></td>
                             <td className={`px-4 py-3 text-right font-mono font-semibold ${chg > 0 ? 'text-green-600 dark:text-green-400' : chg < 0 ? 'text-red-600 dark:text-red-400' : 'text-foreground-secondary'}`}>
@@ -1768,7 +1769,7 @@ function StockTab() {
                                         <Link href={ap(`/admin/products/${repTx.product_id}`)} className="text-sm font-medium hover:text-accent-500 hover:underline underline-offset-2" onClick={e => e.stopPropagation()}>
                                           {repTx.product_name}{repTx.variant_name && <span className="text-foreground-secondary font-normal"> / {repTx.variant_name}{repTx.sub_variant_name ? ` / ${repTx.sub_variant_name}` : ''}</span>}
                                         </Link>
-                                        {repTx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5">{repTx.product_sku}</p>}
+                                        {repTx.product_sku && <p className="text-xs text-foreground-muted font-mono mt-0.5 inline-flex items-center gap-1">{repTx.product_sku}<CopySku sku={repTx.product_sku} /></p>}
                                         {isSerialPg && <p className="text-xs text-foreground-muted mt-0.5">{pg.txs.length} serials · {serialExpanded ? 'collapse' : 'expand'}</p>}
                                         {isBatchPg && <p className="text-xs text-foreground-muted mt-0.5">{pg.txs.length} batches · {serialExpanded ? 'collapse' : 'expand'}</p>}
                                       </div>
@@ -1867,7 +1868,14 @@ function StockTab() {
                 type="products"
                 value={valSearch}
                 onChange={v => { setValSearch(v); setValPage(1); syncUrl({ val_search: v }) }}
-                onSelect={item => { setValSearch(item.label); setValPage(1); syncUrl({ val_search: item.label }) }}
+                onSelect={item => {
+                  // Prefer the SKU (first part of the sublabel, before " · ₹price") so a
+                  // picked suggestion lands on the exact product/variant — SKU search is
+                  // unique/precise, whereas the name can match many similar products.
+                  const sku = (item.sublabel || '').split(' · ')[0].trim()
+                  const term = sku || item.label
+                  setValSearch(term); setValPage(1); syncUrl({ val_search: term })
+                }}
                 placeholder="Name, SKU, variant..."
                 inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
               />
@@ -1984,7 +1992,7 @@ function StockTab() {
                                 <div className="p-3 space-y-2">
                                   <p className="text-sm font-semibold text-foreground leading-tight">{p.name}</p>
                                   {p.variant_name && <p className="text-xs text-foreground-secondary">{p.variant_name}{p.sub_variant_name ? ` / ${p.sub_variant_name}` : ''}</p>}
-                                  {(p.row_sku || p.sku) && <p className="text-xs font-mono text-foreground-muted">{p.row_sku || p.sku}</p>}
+                                  {(p.row_sku || p.sku) && <p className="text-xs font-mono text-foreground-muted inline-flex items-center gap-1">{p.row_sku || p.sku}<CopySku sku={p.row_sku || p.sku} /></p>}
                                   <div className="border-t border-border-default pt-2 space-y-1.5 text-xs">
                                     <div className="flex justify-between">
                                       <span className="text-foreground-secondary">Stock</span>
@@ -2007,7 +2015,7 @@ function StockTab() {
                                 ? (p.sub_variant_name ? `${p.variant_name} / ${p.sub_variant_name}` : p.variant_name)
                                 : '—'}
                             </td>
-                            <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell">{p.row_sku || p.sku || '—'}</td>
+                            <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden md:table-cell"><span className="inline-flex items-center gap-1">{p.row_sku || p.sku || '—'}{(p.row_sku || p.sku) && <CopySku sku={p.row_sku || p.sku} />}</span></td>
                             <td className="px-4 py-3 text-right">
                               {isEditing ? (
                                 <div className="flex flex-col items-end gap-1">

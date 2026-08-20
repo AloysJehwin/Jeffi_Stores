@@ -6,6 +6,7 @@ import { z } from 'zod'
 import { parseBody, zNonEmpty } from '@/lib/validate'
 import { sendAuditedMail } from '@/lib/mail-audit'
 import { restoreOrderStock } from '@/lib/order-stock'
+import { getFeatureFlags } from '@/lib/site-controls'
 
 export const dynamic = 'force-dynamic'
 
@@ -131,9 +132,11 @@ export async function PATCH(
     await queryOne(`UPDATE orders SET ${setClauses.join(', ')} WHERE id = $${values.length}`, values)
 
     if (d.status === 'returned' || d.status === 'return_received') {
-      // Only restore stock if the tenant's plan includes inventory management.
-      // Basic plan tenants don't have inventory:read — skip the deduction reversal.
-      if (hasScope(admin.role, admin.scopes, 'inventory:read')) {
+      // Only restore stock if the tenant's plan includes inventory management AND the
+      // validation flag is on. Basic plan tenants don't have inventory:read and never
+      // deducted (flag off), so there is nothing to reverse — keep the pair symmetric.
+      const { inventoryValidationEnabled } = await getFeatureFlags()
+      if (inventoryValidationEnabled && hasScope(admin.role, admin.scopes, 'inventory:read')) {
         restoreOrderStock(id).catch(() => {})
       }
     }

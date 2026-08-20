@@ -11,6 +11,7 @@ import { useState } from 'react'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import RequestQuoteButton from '@/components/business/RequestQuoteButton'
+import CopySku from '@/components/ui/CopySku'
 import { mrpDiscountPct, applyDiscount } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
 
@@ -255,7 +256,7 @@ export default function CartPage() {
                             </span>
                           )}
                           {sku && (
-                            <span className="text-xs text-foreground-muted font-mono">SKU: {sku}</span>
+                            <span className="text-xs text-foreground-muted font-mono">SKU: {sku}<CopySku sku={sku} className="ml-1" /></span>
                           )}
                           <ProductWarningBadges fragile={item.products?.fragile} hazardous={item.products?.hazardous} flammable={item.products?.flammable} size="xs" />
                         </div>
@@ -475,7 +476,7 @@ export default function CartPage() {
                                 {item.products.brand_name}
                               </span>
                             )}
-                            {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
+                            {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}<CopySku sku={sku} className="ml-1" /></span>}
                           </div>
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {item.variant && (

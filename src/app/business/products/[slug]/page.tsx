@@ -11,6 +11,7 @@ import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
 import { getFeatureFlags } from '@/lib/site-controls'
 import { bp } from '@/lib/business-path'
 import ProductDetailClient from '@/components/business/ProductDetailClient'
+import CopySku from '@/components/ui/CopySku'
 import ProductReviews from '@/components/visitor/ProductReviews'
 import ProductCard from '@/components/business/ProductCard'
 import TrackRecentlyViewed from '@/components/visitor/TrackRecentlyViewed'
@@ -470,7 +471,7 @@ export default async function ProductDetailPage({
                   {primarySpecs.map(({ label, value }) => (
                     <div key={label}>
                       <p className="text-xs text-foreground-muted mb-0.5">{label}</p>
-                      <p className="font-semibold text-foreground text-sm">{value}</p>
+                      <p className="font-semibold text-foreground text-sm">{value}{label === 'SKU' && value && <CopySku sku={String(value)} className="ml-1" />}</p>
                     </div>
                   ))}
                 </div>

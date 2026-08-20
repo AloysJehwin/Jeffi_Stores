@@ -6,6 +6,7 @@ import { Package, ShoppingBag, User, AlertTriangle, Info, CheckCircle, XCircle, 
 import type { ReactNode } from 'react'
 import { ap } from '@/lib/admin-path'
 import AdminSelect from './AdminSelect'
+import CopySku from '@/components/ui/CopySku'
 
 const INR_FORMATTER = new Intl.NumberFormat('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 
@@ -175,7 +176,7 @@ function renderBlock(b: UiBlock, ctx: { onPickOption?: Props['onPickOption']; pi
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-semibold text-foreground truncate">{p.name}</p>
-                  {p.sku && <p className="text-[10px] text-foreground-muted font-mono">{p.sku}</p>}
+                  {p.sku && <p className="text-[10px] text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{p.sku}<CopySku sku={p.sku} /></span></p>}
                   <div className="flex items-center justify-between mt-1 gap-2">
                     <p className="text-xs font-medium text-foreground tabular-nums">{fmtPriceOrAsk(p.price)}</p>
                     <p className={`text-[10px] tabular-nums ${
@@ -372,7 +373,7 @@ function ProductSearchPicker({ onPick }: { onPick: (p: ManualPickResult) => void
               }
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-foreground truncate">{p.name}</p>
-                {p.sku && <p className="text-[10px] text-foreground-muted font-mono">{p.sku}</p>}
+                {p.sku && <p className="text-[10px] text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{p.sku}<CopySku sku={p.sku} /></span></p>}
               </div>
             </button>
           ))}
@@ -600,7 +601,7 @@ function QuotationResolverBlockUI({
                 }
                 <div className="flex-1 min-w-0">
                   <p className="font-semibold text-foreground truncate">{c.name}</p>
-                  <p className="text-[10px] font-mono text-foreground-muted">{c.sku || '—'} · ₹{c.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
+                  <p className="text-[10px] font-mono text-foreground-muted"><span className="inline-flex items-center gap-1">{c.sku || '—'}{c.sku && <CopySku sku={c.sku} />}</span> · ₹{c.price.toLocaleString('en-IN', { maximumFractionDigits: 2 })}</p>
                 </div>
                 <button
                   type="button"

@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import { LABEL_SIZES, type LabelSize, type LabelSpec } from '@/lib/label-sizes'
 import { BatchSerialPreview } from '@/components/admin/label-preview'
+import CopySku from '@/components/ui/CopySku'
 
 type Mode = 'batch' | 'serial'
 
@@ -366,7 +367,7 @@ export default function BatchSerialLabelPicker({
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border-default hover:bg-surface-secondary text-left transition-colors">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{p.product_name}{p.variant_name ? ` — ${p.variant_name}` : ''}</p>
-                          <p className="text-[11px] text-foreground-muted font-mono">{p.sku}</p>
+                          <p className="text-[11px] text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></p>
                         </div>
                         <span className="text-[11px] text-foreground-muted shrink-0">{p.in_stock_count} in stock</span>
                         <svg className="w-4 h-4 text-foreground-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
