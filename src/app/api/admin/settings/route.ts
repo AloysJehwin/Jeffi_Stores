@@ -49,6 +49,7 @@ const EDITABLE_KEYS = [
   'shipping_min_charge',
   'shipping_max_charge',
   'order_auto_cancel_minutes',
+  'return_standard_charge',
   'delhivery_origin_pincode',
   'default_product_weight_g',
   'delhivery_pickup_location',
