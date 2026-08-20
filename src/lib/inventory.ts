@@ -1,6 +1,6 @@
 import { query, queryOne, queryMany, getClient } from './db'
 import { PoolClient } from 'pg'
-import { buildProductSearchClause, buildProductSearchRank, buildSearchClause } from './search'
+import { buildProductSearchClause, buildProductSearchRank } from './search'
 import { round2 } from './gst'
 
 export type TransactionType = 'purchase' | 'sale' | 'return' | 'adjustment'
@@ -489,46 +489,11 @@ export async function getStockValuation(filters: {
   `
 
   if (search) {
-    // Product-name search for valuation. Strategy (tuned for precision):
-    //   1. STRICT: every typed word must appear (substring) somewhere in the row's
-    //      name / sku / variant / sub-variant. "Taparia 1/4 Square Drive Sockets"
-    //      then matches only the handful of products that contain ALL those words —
-    //      not the hundreds that merely share "Square"/"Drive"/"Sockets".
-    //   2. FUZZY FALLBACK: only when the strict clause finds almost nothing (< 3
-    //      products, e.g. because of a typo) do we widen to buildProductSearchClause's
-    //      full-text + trigram matching, so a mistyped query still returns something.
-    const words = search.trim().split(/\s+/).map(w => w.replace(/^[^\w/]+|[^\w/]+$/g, '')).filter(Boolean)
-    const cols = ['rows.name', 'rows.row_sku', 'rows.variant_name', 'rows.sub_variant_name']
-
-    // Strict clause with its own 1-based params for the pre-flight count.
-    const strictParams: any[] = []
-    let si = 1
-    const strictPerCol = cols.map(col => {
-      const wordClauses = words.map(w => { strictParams.push(`%${w}%`); return `${col} ILIKE $${si++}` })
-      return `(${wordClauses.join(' AND ')})`
-    })
-    const strictClause = `(${strictPerCol.join(' OR ')})`
-
-    const strictCount = words.length === 0 ? 0 : await queryOne<{ n: number }>(
-      `${baseQuery} SELECT COUNT(DISTINCT rows.id)::int AS n FROM rows WHERE ${strictClause}`,
-      strictParams
-    ).then(r => r?.n || 0).catch(() => 0)
-
-    if (strictCount >= 3) {
-      // Re-emit the strict clause with params offset to the shared counter `i`.
-      const base = i
-      let sj = base
-      const perCol = cols.map(col => `(${words.map(() => `${col} ILIKE $${sj++}`).join(' AND ')})`)
-      havingClauses.push(`(${perCol.join(' OR ')})`)
-      params.push(...strictParams)
-      i = base + strictParams.length
-    } else {
-      const sc = buildProductSearchClause(search, 'rows.name', 'rows.row_sku', 'rows.search_vector', i)
-      const nameIdx = sc.nextIdx
-      havingClauses.push(`(${sc.clause} OR rows.variant_name ILIKE $${nameIdx} OR rows.sub_variant_name ILIKE $${nameIdx})`)
-      params.push(...sc.params, `%${search.trim()}%`)
-      i = nameIdx + 1
-    }
+    const sc = buildProductSearchClause(search, 'rows.name', 'rows.row_sku', 'rows.search_vector', i)
+    const nameIdx = sc.nextIdx
+    havingClauses.push(`(${sc.clause} OR rows.variant_name ILIKE $${nameIdx} OR rows.sub_variant_name ILIKE $${nameIdx})`)
+    params.push(...sc.params, `%${search.trim()}%`)
+    i = nameIdx + 1
   }
   if (categoryName) { havingClauses.push(`rows.category_name = $${i++}`); params.push(categoryName) }
   if (brandName)    { havingClauses.push(`rows.brand_name = $${i++}`);    params.push(brandName) }

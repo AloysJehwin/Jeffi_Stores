@@ -102,6 +102,7 @@ export default async function SiteControlsPage() {
           <SectionCard title="Orders" description="Order lifecycle rules." columns>
             <NumberControl settingKey="min_order_amount" label="Minimum order amount" hint="Minimum cart subtotal required to checkout. 0 disables." prefix="₹" initial={parseFloat(inv.min_order_amount || '0') || 0} />
             <NumberControl settingKey="order_auto_cancel_minutes" label="Auto-cancel unpaid orders after" suffix="min" min={1} initial={c.values.orderAutoCancelMinutes} />
+            <NumberControl settingKey="return_standard_charge" label="Return standard charge" hint="Flat fee deducted from a return refund (covers reverse pickup). Net refund = returned value − this, floored at 0." prefix="₹" initial={c.values.returnStandardCharge} />
             <FullSpan><ToggleControl
               settingKey="feature_inventory_validation_enabled"
               label="Stock validation on order creation"

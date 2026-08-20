@@ -7,6 +7,7 @@ import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { logActivity } from '@/lib/activity'
+import { getBusinessValues } from '@/lib/site-controls'
 
 export async function POST(
   request: NextRequest,
@@ -218,6 +219,8 @@ export async function POST(
         ? returnItems.reduce((sum: number, i: any) => sum + parseFloat(i.refund_amount), 0)
         : parseFloat(order.total_amount)
 
+      const netRefundAmount = Math.max(0, Math.round((refundAmount - (await getBusinessValues()).returnStandardCharge) * 100) / 100)
+
       if (returnRequest.type === 'refund') {
         let refundFailed = false
 
@@ -237,7 +240,7 @@ export async function POST(
           if (paymentRecord && paymentRecord.transaction_id) {
             try {
               const razorpay = getRazorpayInstance()
-              const amountInPaise = Math.round(refundAmount * 100)
+              const amountInPaise = Math.round(netRefundAmount * 100)
               const refund = await razorpay.payments.refund(paymentRecord.transaction_id, {
                 amount: amountInPaise,
               })
@@ -272,7 +275,7 @@ export async function POST(
               if (userEmail && userName) {
                 sendPaymentStatusUpdate(
                   userEmail, userName, order.order_number, orderId,
-                  'refunded', refundAmount
+                  'refunded', netRefundAmount
                 ).catch(() => {})
               }
 

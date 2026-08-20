@@ -1868,14 +1868,7 @@ function StockTab() {
                 type="products"
                 value={valSearch}
                 onChange={v => { setValSearch(v); setValPage(1); syncUrl({ val_search: v }) }}
-                onSelect={item => {
-                  // Prefer the SKU (first part of the sublabel, before " · ₹price") so a
-                  // picked suggestion lands on the exact product/variant — SKU search is
-                  // unique/precise, whereas the name can match many similar products.
-                  const sku = (item.sublabel || '').split(' · ')[0].trim()
-                  const term = sku || item.label
-                  setValSearch(term); setValPage(1); syncUrl({ val_search: term })
-                }}
+                onSelect={item => { setValSearch(item.label); setValPage(1); syncUrl({ val_search: item.label }) }}
                 placeholder="Name, SKU, variant..."
                 inputClassName="w-full px-3 py-1.5 pr-9 bg-surface border border-border-secondary rounded-lg text-sm text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors hover:border-border-default placeholder:text-foreground-muted"
               />
