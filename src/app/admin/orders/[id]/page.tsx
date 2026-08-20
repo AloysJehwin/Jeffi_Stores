@@ -3,6 +3,7 @@ import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { headers } from 'next/headers'
 import { getOrder, getReturnRequest } from '@/lib/queries'
+import { computeRefundableAmount } from '@/lib/refund'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { hasScope } from '@/lib/scopes'
@@ -54,6 +55,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
 
   const returnRequest = await getReturnRequest(id).catch(() => null)
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
+  const refundableAmount = await computeRefundableAmount(order, returnRequest).catch(() => Number(order.total_amount))
   const showRetryEmailButton =
     (order.payment_status === 'failed' || order.payment_status === 'unpaid') &&
     (Date.now() - new Date(order.created_at).getTime()) / 3600000 < 24
@@ -505,11 +507,11 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
           </div>
           )}
 
-          {(order.status === 'cancelled' || order.status === 'returned' || order.status === 'cancel_requested') && order.payment_status === 'paid' && returnRequest?.type !== 'replacement' && canWrite && (
+          {(order.status === 'cancelled' || order.status === 'returned' || order.status === 'cancel_requested') && order.payment_status === 'paid' && returnRequest?.type !== 'replacement' && refundableAmount > 0 && canWrite && (
             <InitiateRefundButton
               orderId={order.id}
               orderNumber={order.order_number || order.id.slice(0, 8)}
-              amount={Number(order.total_amount)}
+              amount={refundableAmount}
               isReturn={order.status === 'returned'}
             />
           )}
