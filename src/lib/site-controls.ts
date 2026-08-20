@@ -45,6 +45,7 @@ export interface BusinessValues {
   shippingMinCharge: number
   shippingMaxCharge: number
   orderAutoCancelMinutes: number
+  returnStandardCharge: number
   delhiveryOriginPincode: string
   businessStateCode: string
   defaultProductWeightG: number
@@ -104,6 +105,7 @@ const DEFAULTS: SiteControls = {
     shippingMinCharge: envNum(process.env.SHIPPING_MIN_CHARGE, 0),
     shippingMaxCharge: envNum(process.env.SHIPPING_MAX_CHARGE, 200),
     orderAutoCancelMinutes: 10,
+    returnStandardCharge: envNum(process.env.RETURN_STANDARD_CHARGE, 100),
     delhiveryOriginPincode: process.env.DELHIVERY_ORIGIN_PINCODE || '492001',
     businessStateCode: process.env.BUSINESS_STATE_CODE || '22',
     defaultProductWeightG: 500,
@@ -129,6 +131,7 @@ const KEYS = [
   'feature_ondevice_finetune_mobile_enabled', 'feature_ondevice_finetune_desktop_enabled',
   'cod_surcharge_flat', 'cod_surcharge_pct', 'shipping_min_charge', 'shipping_max_charge',
   'order_auto_cancel_minutes', 'delhivery_origin_pincode', 'business_state_code',
+  'return_standard_charge',
   'default_product_weight_g',
   'delhivery_pickup_location', 'delhivery_seller_name', 'delhivery_seller_address', 'delhivery_seller_phone',
   'storefront_featured_limit', 'storefront_new_arrivals_limit',
@@ -192,6 +195,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         shippingMinCharge: Math.max(0, num('shipping_min_charge', d.values.shippingMinCharge)),
         shippingMaxCharge: Math.max(0, num('shipping_max_charge', d.values.shippingMaxCharge)),
         orderAutoCancelMinutes: Math.max(1, num('order_auto_cancel_minutes', d.values.orderAutoCancelMinutes)),
+        returnStandardCharge: Math.max(0, num('return_standard_charge', d.values.returnStandardCharge)),
         delhiveryOriginPincode: str('delhivery_origin_pincode', d.values.delhiveryOriginPincode),
         businessStateCode: str('business_state_code', d.values.businessStateCode),
         defaultProductWeightG: Math.max(1, num('default_product_weight_g', d.values.defaultProductWeightG)),
