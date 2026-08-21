@@ -59,6 +59,7 @@ interface Props {
   total?: number
   start?: number
   end?: number
+  filterSlot?: React.ReactNode
 }
 
 type ViewMode = 'grid' | 'table'
@@ -210,7 +211,7 @@ function TableRow({ product, gstEnabled, stripe }: { product: ProductItem; gstEn
 // How often to inject a category banner row (every N cards)
 const BANNER_EVERY = 9
 
-export default function ProductGrid({ products, gstEnabled, categoryBanners = [] }: Props) {
+export default function ProductGrid({ products, gstEnabled, categoryBanners = [], filterSlot }: Props) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid')
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -248,6 +249,7 @@ export default function ProductGrid({ products, gstEnabled, categoryBanners = []
     <div>
       {/* Single control bar: group · view mode · sort */}
       <div className="flex items-center gap-2 mb-6 flex-wrap">
+        {filterSlot}
         <button type="button" onClick={toggleGrouped}
           className={`flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium border transition-colors ${grouped ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
           <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinejoin="round">

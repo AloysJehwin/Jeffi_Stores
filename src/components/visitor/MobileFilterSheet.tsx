@@ -228,14 +228,14 @@ export default function MobileFilterSheet({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="lg:hidden flex items-center gap-2 px-4 py-2 bg-surface-elevated border border-border-default rounded-lg text-foreground font-medium shadow-sm hover:bg-surface-secondary transition-all active:scale-95"
+        className="lg:hidden flex items-center gap-1.5 px-3 h-9 rounded-lg text-xs font-medium border transition-colors border-border-default text-foreground-secondary hover:bg-surface-secondary"
       >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h18l-7 8v5l-4 2v-7L3 5z" />
         </svg>
         Filters
         {activeFilterCount > 0 && (
-          <span className="bg-accent-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+          <span className="bg-accent-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
             {activeFilterCount}
           </span>
         )}
