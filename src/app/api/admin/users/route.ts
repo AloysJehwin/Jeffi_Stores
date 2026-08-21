@@ -5,12 +5,12 @@ import { generateClientCertificate } from '@/lib/certificates'
 import { sendAdminCertificateEmail } from '@/lib/email'
 import { query } from '@/lib/db'
 import { NextRequest } from 'next/server'
-import { ALL_SCOPE_KEYS } from '@/lib/scopes'
+import { ALL_SCOPE_KEYS, isPlatformOwner } from '@/lib/scopes'
 
 export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
-    if (!admin || admin.role !== 'super_admin') {
+    if (!admin || !isPlatformOwner(admin.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

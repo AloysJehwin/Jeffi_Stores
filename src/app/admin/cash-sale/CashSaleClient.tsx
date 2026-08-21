@@ -10,7 +10,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import DatePicker from '@/components/ui/DatePicker'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
-import LineItemsSection, { newLineItem, type LineItem } from '@/components/admin/LineItemsSection'
+import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem } from '@/components/admin/LineItemsSection'
 import HoverCard from '@/components/ui/HoverCard'
 import { ap } from '@/lib/admin-path'
 import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
@@ -123,6 +123,19 @@ export default function CashSaleClient() {
   const [paymentMode, setPaymentMode] = useState('cash')
   const [notes, setNotes] = useState('')
   const [items, setItems] = useState<LineItem[]>([newLineItem()])
+
+  useEffect(() => {
+    const pid = searchParams.get('product')
+    if (!pid) return
+    const vid = searchParams.get('variant')
+    let cancelled = false
+    fetchSeedLineItem(pid, vid).then(seed => {
+      if (cancelled || !seed) return
+      setItems(prev => (prev.length === 1 && !prev[0].product_id ? [seed] : [seed, ...prev]))
+    })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [submitting, setSubmitting] = useState(false)
   const [formError, setFormError] = useState('')
   const [receipt, setReceipt] = useState<Receipt | null>(null)

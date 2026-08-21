@@ -2,7 +2,7 @@ import { queryOne, queryMany } from '@/lib/db'
 import TwoFactorCard from '@/components/admin/TwoFactorCard'
 import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
 import { headers } from 'next/headers'
-import { ADMIN_SCOPES } from '@/lib/scopes'
+import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/scopes'
 
 async function getAdminInfo(adminId: string) {
   return queryOne(
@@ -29,7 +29,7 @@ export default async function SettingsPage() {
   const scopeLabels: Record<string, string> = {}
   ADMIN_SCOPES.forEach(s => { scopeLabels[s.key] = s.label })
 
-  const isSuperAdmin = adminInfo?.role === 'super_admin'
+  const isSuperAdmin = isPlatformOwner(adminInfo?.role || '')
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -78,7 +78,7 @@ export default async function SettingsPage() {
               <div className="col-span-2">
                 <p className="text-foreground-muted text-xs mb-1.5">Scopes</p>
                 <div className="flex flex-wrap gap-1.5">
-                  {adminInfo.role === 'super_admin' ? (
+                  {isSuperAdmin ? (
                     <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">All Access</span>
                   ) : (adminInfo.scopes || []).length > 0 ? (
                     (adminInfo.scopes || []).map((scope: string) => (

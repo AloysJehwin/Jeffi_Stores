@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
       `SELECT u.email, u.first_name
        FROM admins a
        JOIN users u ON u.id = a.user_id
-       WHERE a.role = 'super_admin' AND a.is_active = TRUE AND u.email IS NOT NULL`,
+       WHERE a.role IN ('administrator', 'super_admin') AND a.is_active = TRUE AND u.email IS NOT NULL`,
       []
     )
 

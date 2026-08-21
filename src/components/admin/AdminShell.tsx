@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import AdminSidebarNav from './AdminSidebarNav'
 import AdminMobileNav from './AdminMobileNav'
 import AdminAgentTrigger from './AdminAgentTrigger'
+import ScanActionPopup from './ScanActionPopup'
 import ThemeToggle from '@/components/ThemeToggle'
 import SessionGuard from './SessionGuard'
 
@@ -23,6 +24,8 @@ interface Props {
   displayName: string
   usernameInitial: string
   role: string
+  scopes: string[]
+  host: string
   canUseAgent: boolean
   logoutForm: React.ReactNode
   initialCollapsed: boolean
@@ -35,11 +38,18 @@ export default function AdminShell({
   displayName,
   usernameInitial,
   role,
+  scopes,
+  host,
   canUseAgent,
   logoutForm,
   initialCollapsed,
 }: Props) {
   const [collapsed, setCollapsed] = useState(initialCollapsed)
+
+  useEffect(() => {
+    const m = document.cookie.match(/(?:^|; )sidebar_collapsed=([^;]*)/)
+    if (m) setCollapsed(m[1] === 'true')
+  }, [])
 
   function toggle() {
     setCollapsed(c => {
@@ -119,6 +129,7 @@ export default function AdminShell({
       </div>
 
       <SessionGuard />
+      <ScanActionPopup role={role} scopes={scopes} host={host} />
       <div id="dropdown-portal" style={{ position: 'fixed', top: 0, left: 0, zIndex: 9999, pointerEvents: 'none' }} />
     </div>
   )

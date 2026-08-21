@@ -260,12 +260,31 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       href: '/legal/warranty-policy',
       hrefLabel: 'Read Warranty Policy',
     },
+    {
+      icon: (
+        <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+        </svg>
+      ),
+      label: 'Secure Payment',
+      sub: 'Encrypted & protected checkout',
+      detail: 'All payments are processed over an encrypted, PCI-DSS compliant gateway. Your card and bank details are never stored on our servers.',
+      bullets: [
+        '256-bit SSL encrypted checkout',
+        'UPI, Cards, Net Banking & Wallets accepted',
+        isCodAllowed ? 'Cash on Delivery available for eligible orders' : 'Prepaid orders only for this product',
+        'Instant payment confirmation & receipt',
+      ],
+      color: 'bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400',
+      href: '/legal/terms',
+      hrefLabel: 'Read Payment Terms',
+    },
   ]
 
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3 items-stretch">
-        {items.map((item, i) => (
+        {items.slice(0, 4).map((item, i) => (
           <button key={i} type="button" onClick={() => setActivePolicy(item)}
             className="flex items-start gap-2.5 p-3 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group h-full overflow-hidden text-left w-full">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${item.color}`}>
@@ -320,11 +339,11 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
         document.body
       )}
 
-      <Link href="/legal/faq" target="_blank" rel="noopener noreferrer"
-        className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group">
-        <svg className="w-4 h-4 text-green-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-        </svg>
+      <button type="button" onClick={() => setActivePolicy(items[4])}
+        className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-border-default bg-surface hover:bg-surface-secondary hover:border-accent-300 transition-colors group text-left">
+        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${items[4].color}`}>
+          {items[4].icon}
+        </div>
         <span className="text-[11px] font-medium text-foreground-muted group-hover:text-accent-600 transition-colors w-10 leading-tight shrink-0">Secure Payment</span>
         <div className="flex items-center gap-1 flex-wrap ml-2">
           {['UPI', 'Cards', 'Net Banking', 'Wallets'].map(m => (
@@ -338,7 +357,7 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
             </span>
           )}
         </div>
-      </Link>
+      </button>
     </div>
   )
 }

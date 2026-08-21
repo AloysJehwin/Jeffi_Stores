@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { hasScope } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/scopes'
 import { listTenants } from '@/lib/tenant-registry'
 import { EcomFilters } from '@/components/admin/ecom/EcomUI'
 
@@ -13,8 +13,7 @@ const one = (sp: SP, k: string) => (Array.isArray(sp[k]) ? (sp[k] as string[])[0
 export default async function EcomInstancesPage({ searchParams }: { searchParams: Promise<SP> }) {
   const h = await headers()
   const role = h.get('x-user-role') || ''
-  const scopes = (h.get('x-user-scopes') || '').split(',').filter(Boolean)
-  if (role !== 'super_admin' && !hasScope(role, scopes, 'ecom_instances:read')) redirect('/admin')
+  if (!isPlatformAdmin(role)) redirect('/admin')
 
   const sp = await searchParams
   const tenants = await listTenants({ status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q') })

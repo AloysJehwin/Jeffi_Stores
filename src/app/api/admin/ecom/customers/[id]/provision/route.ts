@@ -33,7 +33,7 @@ async function resolveRestoreKey(tenantId: string, slug: string): Promise<string
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (admin.role !== 'super_admin' && !hasScope(admin.role, admin.scopes, 'ecom_customers:write')) {
+  if (!hasScope(admin.role, admin.scopes, 'ecom_customers:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 

@@ -20,6 +20,7 @@ export interface LabelProduct {
   hazardous?: boolean | null
   flammable?: boolean | null
   showPrice?: boolean
+  qrUrl?: string
 }
 
 // Size specs live in the client-safe label-sizes module (no pdfkit); re-export
@@ -207,7 +208,7 @@ async function render40x60(doc: any, p: LabelProduct, x: number, y: number, w: n
   const qrSize = 12 * MM
   const barcodeText = p.sku
 
-  const qrBuf = await makeQRBuffer(p.sku, Math.round(qrSize * 3))
+  const qrBuf = await makeQRBuffer(p.qrUrl || p.sku, Math.round(qrSize * 3))
   const barBuf = await makeBarcodeBuffer(barcodeText, 3.5)
 
   const rightX = x + w - pad - qrSize
@@ -248,7 +249,7 @@ async function render50x50(doc: any, p: LabelProduct, x: number, y: number, w: n
   const qrSize = 14 * MM
   const barcodeText = p.sku
 
-  const qrBuf = await makeQRBuffer(p.sku, Math.round(qrSize * 3))
+  const qrBuf = await makeQRBuffer(p.qrUrl || p.sku, Math.round(qrSize * 3))
   const barBuf = await makeBarcodeBuffer(barcodeText, 4)
 
   const contentH = h - pad * 2 - barcodeH - 7

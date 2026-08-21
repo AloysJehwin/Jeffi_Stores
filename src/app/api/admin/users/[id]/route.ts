@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { query, queryOne } from '@/lib/db'
 import { NextRequest } from 'next/server'
-import { ALL_SCOPE_KEYS } from '@/lib/scopes'
+import { ALL_SCOPE_KEYS, isPlatformOwner } from '@/lib/scopes'
 import { revokeAllForPrincipal } from '@/lib/auth-sessions'
 
 export async function PATCH(
@@ -11,7 +11,7 @@ export async function PATCH(
 ) {
   try {
     const admin = await authenticateAdmin(request)
-    if (!admin || admin.role !== 'super_admin') {
+    if (!admin || !isPlatformOwner(admin.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -89,7 +89,6 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, admin: updated })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
@@ -100,7 +99,7 @@ export async function DELETE(
 ) {
   try {
     const admin = await authenticateAdmin(request)
-    if (!admin || admin.role !== 'super_admin') {
+    if (!admin || !isPlatformOwner(admin.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
@@ -124,7 +123,6 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

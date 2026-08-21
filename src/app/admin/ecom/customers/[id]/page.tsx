@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { hasScope } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/scopes'
 import { getTenant, getTenantBilling, getKyc } from '@/lib/tenant-registry'
 import { StatusPill } from '@/components/admin/ecom/EcomUI'
 import TenantActions from '@/components/admin/ecom/TenantActions'
@@ -21,8 +21,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const h = await headers()
   const role = h.get('x-user-role') || ''
-  const scopes = (h.get('x-user-scopes') || '').split(',').filter(Boolean)
-  if (role !== 'super_admin' && !hasScope(role, scopes, 'ecom_customers:read')) redirect('/admin')
+  if (!isPlatformAdmin(role)) redirect('/admin')
 
   const { id } = await params
   const [t, billing, kyc] = await Promise.all([

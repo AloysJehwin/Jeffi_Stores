@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
-import { ADMIN_SCOPES } from '@/lib/scopes'
+import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/scopes'
 import ScopeGrid from '@/components/admin/ScopeGrid'
 
 interface AdminUser {
@@ -72,7 +72,7 @@ export default function AdminUserActions({
   }
 
   const isSelf = admin.id === currentAdminId
-  const isSuperAdmin = admin.role === 'super_admin'
+  const isSuperAdmin = isPlatformOwner(admin.role)
 
   function openEdit() {
     setScopes(admin.scopes || [])
