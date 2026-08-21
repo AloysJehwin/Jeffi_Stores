@@ -12,7 +12,7 @@ export default function Loading() {
         </div>
         <div className="lg:col-span-3">
           <div className="h-10 w-48 bg-surface-secondary rounded-lg animate-pulse mb-6" />
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-6">
             {Array.from({ length: 9 }).map((_, i) => (
               <div
                 key={i}

@@ -30,7 +30,7 @@ export default function Header() {
 
   return (
     <>
-      <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default fixed top-0 left-0 right-0 z-40 w-full">
+      <header className="bg-surface-elevated shadow-sm dark:shadow-none dark:border-b dark:border-border-default fixed top-0 left-0 right-0 z-40 w-full pt-[env(safe-area-inset-top,0px)]">
         <div className="container mx-auto px-3 sm:px-4 relative">
           <div className="flex items-center justify-between h-16 sm:h-16 lg:h-20 gap-3">
             {/* Logo */}
@@ -90,7 +90,7 @@ export default function Header() {
               </Link>
 
               {/* Cart Icon */}
-              <Link href="/cart" className="p-2.5 min-w-[44px] min-h-[44px] flex items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group">
+              <Link href="/cart" className="hidden min-[400px]:flex p-2.5 min-w-[44px] min-h-[44px] items-center justify-center text-foreground-secondary hover:text-accent-500 transition-all active:scale-95 relative group">
                 <svg className="w-6 h-6 transition-transform group-hover:scale-110" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>

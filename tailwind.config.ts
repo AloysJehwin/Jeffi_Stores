@@ -59,6 +59,18 @@ const config: Config = {
         bebas: ['"Bebas Neue"', 'cursive'],
         inter: ['"Inter"', 'sans-serif'],
       },
+      fontSize: {
+        xs:    ['clamp(0.75rem, 0.74rem + 0.05vw, 0.78rem)',  { lineHeight: '1rem' }],
+        sm:    ['clamp(0.875rem, 0.87rem + 0.05vw, 0.9rem)',  { lineHeight: '1.25rem' }],
+        base:  ['clamp(0.9rem, 0.83rem + 0.31vw, 1rem)',      { lineHeight: '1.5rem' }],
+        lg:    ['clamp(1rem, 0.92rem + 0.36vw, 1.125rem)',    { lineHeight: '1.6' }],
+        xl:    ['clamp(1.1rem, 0.98rem + 0.53vw, 1.25rem)',   { lineHeight: '1.55' }],
+        '2xl': ['clamp(1.3rem, 1.1rem + 0.89vw, 1.5rem)',     { lineHeight: '1.4' }],
+        '3xl': ['clamp(1.55rem, 1.27rem + 1.24vw, 1.875rem)', { lineHeight: '1.3' }],
+        '4xl': ['clamp(1.8rem, 1.4rem + 1.78vw, 2.25rem)',    { lineHeight: '1.2' }],
+        '5xl': ['clamp(2.1rem, 1.5rem + 2.67vw, 3rem)',       { lineHeight: '1.1' }],
+        '6xl': ['clamp(2.4rem, 1.5rem + 4vw, 3.75rem)',       { lineHeight: '1.05' }],
+      },
       keyframes: {
         'cart-pulse': {
           '0%':   { transform: 'scale(1)' },

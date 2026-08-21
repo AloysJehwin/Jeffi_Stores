@@ -67,19 +67,20 @@
 
   body {
     @apply antialiased font-sans bg-surface text-foreground;
-    min-height: 100vh;
+    min-height: 100dvh;
     margin: 0;
     padding: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
   #__next {
     @apply bg-surface;
-    min-height: 100vh;
+    min-height: 100dvh;
   }
 
   body > div:first-of-type {
     @apply bg-surface;
-    min-height: 100vh;
+    min-height: 100dvh;
   }
 
 

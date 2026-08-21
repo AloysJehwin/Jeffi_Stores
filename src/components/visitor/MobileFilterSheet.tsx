@@ -93,6 +93,7 @@ export default function MobileFilterSheet({
   const subCats  = categories.filter(c =>  c.parent_category_id)
 
   const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<'filters' | 'sort'>('filters')
   const [expandedCats, setExpandedCats] = useState<Record<string, boolean>>({})
   const [isPending, startTransition] = useTransition()
 
@@ -123,6 +124,7 @@ export default function MobileFilterSheet({
 
   useEffect(() => {
     if (open) {
+      setTab('filters')
       setPendingCategories(currentCategory ? currentCategory.split(',') : [])
       setPendingBrands(currentBrand ? currentBrand.split(',') : [])
       setPendingSort(currentSort)
@@ -229,7 +231,7 @@ export default function MobileFilterSheet({
         className="lg:hidden flex items-center gap-2 px-4 py-2 bg-surface-elevated border border-border-default rounded-lg text-foreground font-medium shadow-sm hover:bg-surface-secondary transition-all active:scale-95"
       >
         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 010 2H4a1 1 0 01-1-1zm3 6a1 1 0 011-1h10a1 1 0 010 2H7a1 1 0 01-1-1zm4 6a1 1 0 011-1h4a1 1 0 010 2h-4a1 1 0 01-1-1z" />
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5h18l-7 8v5l-4 2v-7L3 5z" />
         </svg>
         Filters
         {activeFilterCount > 0 && (
@@ -244,7 +246,7 @@ export default function MobileFilterSheet({
           <div className="absolute inset-0 bg-black/50 animate-fade-in" onClick={() => setOpen(false)} />
           <div className="relative bg-surface-elevated rounded-t-2xl shadow-2xl flex flex-col max-h-[90vh] animate-slide-up">
             <div className="flex items-center justify-between px-5 py-4 border-b border-border-default shrink-0">
-              <h2 className="font-semibold text-foreground text-base">Filters</h2>
+              <span className="font-semibold text-foreground text-base">{tab === 'sort' ? 'Sort By' : 'Filters'}</span>
               <div className="flex items-center gap-3">
                 {hasAnyPending && (
                   <button onClick={clearAll} className="text-sm text-accent-500 hover:text-accent-600 font-medium">
@@ -260,7 +262,18 @@ export default function MobileFilterSheet({
               </div>
             </div>
 
-            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-6">
+            <div className="flex items-center px-5 pt-2 border-b border-border-default shrink-0">
+              <button type="button" onClick={() => setTab('filters')}
+                className={`flex-1 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'filters' ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-muted hover:text-foreground'}`}>
+                Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
+              </button>
+              <button type="button" onClick={() => setTab('sort')}
+                className={`flex-1 py-3 text-sm font-semibold border-b-2 -mb-px transition-colors ${tab === 'sort' ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-muted hover:text-foreground'}`}>
+                Sort
+              </button>
+            </div>
+
+            <div className={`overflow-y-auto flex-1 px-5 py-4 space-y-6 ${tab === 'filters' ? '' : 'hidden'}`}>
 
               {/* Price Range */}
               <div>
@@ -285,11 +298,11 @@ export default function MobileFilterSheet({
                 <div className="flex items-center gap-2">
                   <input type="number" placeholder="Min ₹" value={pendingMinPrice}
                     onChange={e => setPendingMinPrice(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
-                  <span className="text-foreground-muted text-sm">–</span>
+                    className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+                  <span className="text-foreground-muted text-sm shrink-0">–</span>
                   <input type="number" placeholder="Max ₹" value={pendingMaxPrice}
                     onChange={e => setPendingMaxPrice(e.target.value)}
-                    className="flex-1 px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+                    className="flex-1 min-w-0 px-3 py-2 rounded-xl border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
                 </div>
               </div>
 
@@ -420,23 +433,6 @@ export default function MobileFilterSheet({
                 </div>
               )}
 
-              {/* Sort */}
-              <div>
-                <h3 className="text-sm font-semibold text-foreground mb-3">Sort By</h3>
-                <div className="space-y-2">
-                  {SORT_OPTIONS.map(opt => {
-                    const isSelected = pendingSort === opt.sort && pendingOrder === opt.order
-                    return (
-                      <button key={opt.label} onClick={() => selectSort(opt.sort, opt.order)}
-                        className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}>
-                        {opt.label}
-                        {isSelected && <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>}
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-
               {/* Categories */}
               <div>
                 <h3 className="text-sm font-semibold text-foreground mb-3">Categories</h3>
@@ -511,6 +507,19 @@ export default function MobileFilterSheet({
                 </div>
               </div>
 
+            </div>
+
+            <div className={`overflow-y-auto flex-1 px-5 py-4 space-y-2 ${tab === 'sort' ? '' : 'hidden'}`}>
+              {SORT_OPTIONS.map(opt => {
+                const isSelected = pendingSort === opt.sort && pendingOrder === opt.order
+                return (
+                  <button key={opt.label} onClick={() => selectSort(opt.sort, opt.order)}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-colors ${isSelected ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default bg-surface text-foreground hover:bg-surface-secondary'}`}>
+                    {opt.label}
+                    {isSelected && <svg className="w-4 h-4 text-accent-500 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>}
+                  </button>
+                )
+              })}
             </div>
 
             <div className="px-5 py-4 border-t border-border-default shrink-0">
