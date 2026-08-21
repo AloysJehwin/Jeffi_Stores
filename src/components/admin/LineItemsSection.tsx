@@ -87,6 +87,59 @@ export function newLineItem(): LineItem {
   }
 }
 
+// Build a seed LineItem from a resolved product suggestion. Units are left empty on
+// purpose — LineItemsSection's mount backfill effect hydrates available_units from the
+// product_id. Used for deep-link preseed (scan → quick action) so a scanned product
+// lands as the first line item. Mirrors the internal buildLineItemFromSuggestion.
+export function seedLineItemFromSuggestion(s: {
+  product_id: string; variant_id?: string | null; sub_variant_id?: string | null
+  name: string; variant_name?: string | null; sku: string
+  base_price?: number | null; price_ex_gst?: number | null; mrp?: number | null
+  gst_percentage?: number | null; hsn_code?: string | null
+  inventory_quantity?: number | null; discount_pct?: number | null; serialized?: boolean | null
+}): LineItem {
+  const mrp = Number(s.mrp) || 0
+  const basePrice = Number(s.base_price) || 0
+  const priceExGst = Number(s.price_ex_gst) || 0
+  const gstRate = Number(s.gst_percentage ?? 18)
+  const discount_pct = s.discount_pct != null ? Number(s.discount_pct) : mrpDiscountPct(mrp, basePrice)
+  const unit_price = mrp > 0 ? mrp : round2(basePrice * (1 + gstRate / 100))
+  return {
+    ...newLineItem(),
+    product_id: s.product_id,
+    product_name: s.variant_name ? `${s.name} — ${s.variant_name}` : s.name,
+    product_sku: s.sku,
+    variant_id: s.variant_id ?? null,
+    sub_variant_id: s.sub_variant_id ?? null,
+    variant_name: s.variant_name || '',
+    hsn_code: s.hsn_code || '',
+    gst_rate: String(Math.round(gstRate)),
+    unit_price,
+    price_ex_gst: priceExGst || undefined,
+    discount_pct,
+    mrp,
+    inventory_quantity: s.inventory_quantity ?? null,
+    serialized: s.serialized ?? false,
+  }
+}
+
+// Resolve a product/variant id to a suggestion via the shared scan resolver, then seed
+// a LineItem. Returns null if the product can't be resolved. Reused by deep-link preseed.
+export async function fetchSeedLineItem(productId: string, variantId?: string | null): Promise<LineItem | null> {
+  try {
+    const res = await fetch('/api/admin/scan/resolve', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ code: variantId || productId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    const item = data?.item
+    if (!item || !item.product_id) return null
+    return seedLineItemFromSuggestion(item)
+  } catch {
+    return null
+  }
+}
+
 async function fetchProductUnits(productId: string, variantId?: string | null): Promise<SellUnit[]> {
   const toUnits = (rows: any[]) => rows.map((u: any) => ({
     unit: u.unit,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { isPlatformOwner } from '@/lib/scopes'
 import { embed, runWithHnswTuning, queryManyReplica } from '@/lib/rag'
 
 export const dynamic = 'force-dynamic'
@@ -9,6 +10,7 @@ function vec(arr: number[]) { return '[' + arr.join(',') + ']' }
 export async function GET(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!isPlatformOwner(admin.role)) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { searchParams } = new URL(req.url)
   const q = (searchParams.get('q') || 'dowel pin m10').trim()

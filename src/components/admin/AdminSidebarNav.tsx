@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { usePathname } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 
@@ -344,6 +344,14 @@ export default function AdminSidebarNav({ navLinks, collapsed }: Props) {
 function SidebarGroup({ groupName, links, pathname }: { groupName: string; links: NavLink[]; pathname: string | null }) {
   const isAnyActive = links.some(l => isNavActive(l, pathname))
   const [isOpen, setIsOpen] = useState(isAnyActive)
+  const lastActiveRef = useRef(isAnyActive)
+
+  useEffect(() => {
+    if (isAnyActive !== lastActiveRef.current) {
+      lastActiveRef.current = isAnyActive
+      setIsOpen(isAnyActive)
+    }
+  }, [isAnyActive])
 
   return (
     <div>

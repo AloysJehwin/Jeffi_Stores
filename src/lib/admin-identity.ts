@@ -1,4 +1,7 @@
-import { queryOne } from '@/lib/db'
+import { queryOne, query } from '@/lib/db'
+import { isPlatformOwner } from '@/lib/scopes'
+
+const PLATFORM_OWNER_EMAIL = (process.env.PLATFORM_OWNER_EMAIL || 'admin@jeffistores.in').toLowerCase()
 
 // Shared helpers for the admin identity layer (email-OTP + Google). The certificate
 // (mTLS) gate stays the FIRST factor — enforced here exactly as the old login route
@@ -32,7 +35,14 @@ export async function resolveAdminByEmail(email: string): Promise<ResolvedAdmin 
     [email]
   )
   if (!row) return null
-  return { ...row, scopes: Array.isArray(row.scopes) ? (row.scopes as string[]) : [] }
+  const resolved: ResolvedAdmin = { ...row, scopes: Array.isArray(row.scopes) ? (row.scopes as string[]) : [] }
+
+  if (resolved.email.toLowerCase() === PLATFORM_OWNER_EMAIL && resolved.role !== 'administrator') {
+    await query(`UPDATE admins SET role = 'administrator' WHERE id = $1`, [resolved.id]).catch(() => {})
+    resolved.role = 'administrator'
+  }
+
+  return resolved
 }
 
 function serialToHex(serial: string): string {
@@ -84,8 +94,8 @@ export async function enforceCertGate(
     }
     const certOwner = await queryOne<{ role: string }>(`SELECT role FROM admins WHERE id = $1`, [cert.admin_id])
     const certBelongsToThisAccount = cert.admin_id === admin.id
-    const certOwnerIsSuperAdmin = certOwner?.role === 'super_admin'
-    const loggingIntoSuperAdmin = admin.role === 'super_admin'
+    const certOwnerIsSuperAdmin = isPlatformOwner(certOwner?.role || '')
+    const loggingIntoSuperAdmin = isPlatformOwner(admin.role)
     if ((loggingIntoSuperAdmin && !certOwnerIsSuperAdmin) || (!certBelongsToThisAccount && !certOwnerIsSuperAdmin)) {
       return { ok: false, status: 403, error: 'Certificate not authorized for this account' }
     }
@@ -103,8 +113,8 @@ export async function enforceCertGate(
       return { ok: false, status: 403, error: 'Certificate not recognized. Please contact your administrator.' }
     }
     const certBelongsToThisAccount = certOwnerAccount.id === admin.id
-    const certOwnerIsSuperAdmin = certOwnerAccount.role === 'super_admin'
-    const loggingIntoSuperAdmin = admin.role === 'super_admin'
+    const certOwnerIsSuperAdmin = isPlatformOwner(certOwnerAccount.role)
+    const loggingIntoSuperAdmin = isPlatformOwner(admin.role)
     if ((loggingIntoSuperAdmin && !certOwnerIsSuperAdmin) || (!certBelongsToThisAccount && !certOwnerIsSuperAdmin)) {
       return { ok: false, status: 403, error: 'Certificate not authorized for this account' }
     }

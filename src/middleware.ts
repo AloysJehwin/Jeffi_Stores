@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyToken, verifyBusinessToken } from './lib/jwt'
-import { getScopeForPath, hasScope } from './lib/scopes'
+import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 import { extractSessionSignals } from './lib/session-signals-request'
 import { resolveTenantFromHost } from './lib/tenant-registry'
@@ -300,6 +300,12 @@ export async function middleware(request: NextRequest) {
           return res
         }
         const rewriteUrl = new URL(`/admin${slug}${search}`, request.url)
+        if (`/admin${slug}`.startsWith('/admin/ecom') && !isPlatformAdmin(payload.role)) {
+          return new NextResponse('Insufficient permissions', {
+            status: 403,
+            headers: { 'Content-Type': 'text/plain' },
+          })
+        }
         // Block mobile users from write-action pages (orders exempt)
         if (isMobileUA(request.headers.get('user-agent')) && isAdminWritePath(`/admin${slug}`)) {
           const parentPath = adminWritePathParent(`/admin${slug}`)
@@ -361,6 +367,10 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
+    if (pathname.startsWith('/api/admin/ecom') && !isPlatformAdmin(payload.role)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+    }
+
     return addSecurityHeaders(NextResponse.next())
   }
 
@@ -414,6 +424,13 @@ export async function middleware(request: NextRequest) {
 
     const requiredScope = getScopeForPath(pathname)
     if (requiredScope && !hasScope(payload.role, payload.scopes || [], requiredScope)) {
+      return new NextResponse('Insufficient permissions', {
+        status: 403,
+        headers: { 'Content-Type': 'text/plain' },
+      })
+    }
+
+    if (pathname.startsWith('/admin/ecom') && !isPlatformAdmin(payload.role)) {
       return new NextResponse('Insufficient permissions', {
         status: 403,
         headers: { 'Content-Type': 'text/plain' },

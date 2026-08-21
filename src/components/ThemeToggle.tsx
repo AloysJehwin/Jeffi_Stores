@@ -3,12 +3,12 @@
 import { useTheme } from '@/contexts/ThemeContext'
 
 export default function ThemeToggle({ variant = 'header' }: { variant?: 'header' | 'admin' }) {
-  const { resolvedTheme, toggleTheme } = useTheme()
-  const isDark = resolvedTheme === 'dark'
+  const { resolvedTheme, toggleTheme, mounted } = useTheme()
+  const isDark = mounted && resolvedTheme === 'dark'
 
   const baseClasses = 'inline-flex items-center justify-center rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500'
   const variantClasses = variant === 'admin'
-    ? 'h-9 w-9 text-white bg-white/10 hover:bg-white/20'
+    ? 'h-9 w-9 text-white/70 hover:bg-white/10 hover:text-white'
     : 'p-2.5 min-w-[44px] min-h-[44px] text-foreground-secondary hover:bg-surface-secondary'
 
   return (

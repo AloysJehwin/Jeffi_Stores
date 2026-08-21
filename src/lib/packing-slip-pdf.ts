@@ -330,6 +330,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   doc.text('RATE', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, hdrY1, { width: COL_RATE, align: 'right', lineBreak: false })
   doc.text('DISC', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, hdrY1, { width: COL_DISC, align: 'center', lineBreak: false })
   doc.text('AMOUNT', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, hdrY1, { width: COL_AMT, align: 'right', lineBreak: false })
+  doc.text('(Incl.Tax)', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, hdrY2, { width: COL_AMT, align: 'right', lineBreak: false })
   // row 2
   doc.text('SAC', tblX + COL_IMG + COL_PROD, hdrY2, { width: COL_HSN, align: 'center', lineBreak: false })
   doc.text('%', tblX + COL_IMG + COL_PROD + COL_HSN, hdrY2, { width: COL_GST, align: 'center', lineBreak: false })
@@ -361,7 +362,6 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
     const rateInclTax = item.mrp != null && item.mrp > 0 ? item.mrp : item.unit_price
     const gstStr = item.gst_rate ? `${item.gst_rate}%` : ''
-    const taxable = item.taxable_amount ?? item.total_price
 
     // Thumbnail
     if (imgBuf) {
@@ -389,7 +389,7 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     doc.text(rs(rateInclTax), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, midY, { width: COL_RATE, align: 'right', lineBreak: false })
     doc.text(discStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, midY, { width: COL_DISC, align: 'center', lineBreak: false })
     doc.font('Helvetica-Bold').fontSize(7.5)
-    doc.text(rs(taxable), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, midY, { width: COL_AMT, align: 'right', lineBreak: false })
+    doc.text(rs(item.total_price), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, midY, { width: COL_AMT, align: 'right', lineBreak: false })
 
     iy += rowH
     hRule(doc, tblX, iy, tblX + CW - 16, '#eeeeee', 0.3)

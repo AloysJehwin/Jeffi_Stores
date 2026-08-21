@@ -9,9 +9,25 @@ interface ThemeContextType {
   resolvedTheme: 'light' | 'dark'
   setTheme: (theme: Theme) => void
   toggleTheme: () => void
+  mounted: boolean
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined)
+
+function readStoredTheme(storageKey: string): Theme {
+  if (typeof window === 'undefined') return 'light'
+  try {
+    const stored = (sessionStorage.getItem(storageKey) ?? localStorage.getItem(storageKey)) as Theme | null
+    if (stored && ['light', 'dark', 'system'].includes(stored)) return stored
+  } catch { /* storage unavailable */ }
+  return 'light'
+}
+
+function resolveTheme(theme: Theme): 'light' | 'dark' {
+  if (typeof window === 'undefined') return theme === 'dark' ? 'dark' : 'light'
+  if (theme === 'system') return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+  return theme
+}
 
 export function ThemeProvider({ children, storageKey = 'jeffi-theme' }: { children: ReactNode; storageKey?: string }) {
   const [theme, setThemeState] = useState<Theme>('light')
@@ -19,12 +35,9 @@ export function ThemeProvider({ children, storageKey = 'jeffi-theme' }: { childr
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    const sessionStored = sessionStorage.getItem(storageKey) as Theme | null
-    const localStored = localStorage.getItem(storageKey) as Theme | null
-    const stored = sessionStored ?? localStored
-    if (stored && ['light', 'dark', 'system'].includes(stored)) {
-      setThemeState(stored)
-    }
+    const stored = readStoredTheme(storageKey)
+    setThemeState(stored)
+    setResolvedTheme(resolveTheme(stored))
     setMounted(true)
   }, [storageKey])
 
@@ -70,7 +83,7 @@ export function ThemeProvider({ children, storageKey = 'jeffi-theme' }: { childr
   }
 
   return (
-    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, resolvedTheme, setTheme, toggleTheme, mounted }}>
       {children}
     </ThemeContext.Provider>
   )

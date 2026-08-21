@@ -397,6 +397,101 @@ async function suggestLabelProducts(q: string): Promise<SuggestItem[]> {
   })
 }
 
+async function suggestScopedLabelProducts(q: string, flagCol: 'serialized' | 'perishable'): Promise<SuggestItem[]> {
+  let idx = 1
+  const params: unknown[] = []
+  const sc = buildProductSearchClause(q, 'p.name', 'p.sku', 'p.search_vector', idx)
+  params.push(...sc.params); idx = sc.nextIdx
+  const sc2 = buildProductSearchClause(q, 'p.name', 'pv.sku', 'p.search_vector', idx)
+  params.push(...sc2.params); idx = sc2.nextIdx
+  const sc3 = buildProductSearchClause(q, 'p.name', 'ps.sku', 'p.search_vector', idx)
+  params.push(...sc3.params); idx = sc3.nextIdx
+  const svNameIdx = idx++
+  params.push(`%${q}%`)
+  const svVarIdx = idx++
+  params.push(`%${q}%`)
+  const searchWhereSv = `(${sc3.clause} OR ps.sub_variant_name ILIKE $${svNameIdx} OR pv.variant_name ILIKE $${svVarIdx})`
+  const rk = buildProductSearchRank(q, 'name', 'search_vector', idx)
+  params.push(...rk.params); idx = rk.nextIdx
+  params.push(12)
+
+  const flag = flagCol === 'serialized' ? 'p.serialized = true' : 'p.perishable = true'
+
+  const rows = await queryMany<{
+    id: string; name: string; variant_name: string | null; sku: string; slug: string
+    mrp: number | null; price_ex_gst: number | null; base_price: number | null
+    gst_percentage: number; brand_name: string | null; gtin: string | null
+    inventory_quantity: number | null; product_id: string; sell_unit_id: string | null
+    parent_variant_id: string | null
+  }>(
+    `SELECT id, name, variant_name, sku, slug, mrp, price_ex_gst, base_price, gst_percentage, brand_name, gtin, inventory_quantity, product_id, sell_unit_id, parent_variant_id, search_vector FROM (
+       SELECT 'product:' || p.id AS id, p.name, NULL AS variant_name, p.sku, p.slug,
+              COALESCE(p.mrp,0)::numeric AS mrp, p.price_ex_gst, p.base_price,
+              COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
+              b.name AS brand_name, p.gtin, COALESCE(p.inventory_quantity,0) AS inventory_quantity,
+              p.id AS product_id, p.sell_unit_id, NULL::uuid AS parent_variant_id, p.search_vector
+       FROM products p LEFT JOIN brands b ON b.id = p.brand_id
+       WHERE p.is_active = true AND p.has_variants = false AND ${flag} AND ${sc.clause}
+       UNION ALL
+       SELECT 'variant:' || pv.id AS id, p.name, pv.variant_name, pv.sku, p.slug,
+              COALESCE(pv.mrp,0)::numeric AS mrp, pv.price_ex_gst,
+              COALESCE(pv.price, p.base_price) AS base_price,
+              COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
+              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(pv.inventory_quantity,0) AS inventory_quantity,
+              p.id AS product_id, COALESCE(pv.sell_unit_id, p.sell_unit_id) AS sell_unit_id, NULL::uuid AS parent_variant_id, p.search_vector
+       FROM product_variants pv
+       JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id
+       WHERE pv.is_active = true AND p.is_active = true AND ${flag} AND ${sc2.clause}
+         AND NOT EXISTS (SELECT 1 FROM product_sub_variants WHERE variant_id = pv.id AND is_active = true)
+       UNION ALL
+       SELECT 'subvariant:' || ps.id AS id, p.name,
+              ps.sub_variant_name || ' (' || pv.variant_name || ')' AS variant_name,
+              ps.sku, p.slug,
+              COALESCE(ps.mrp,0)::numeric AS mrp, ps.price_ex_gst,
+              COALESCE(ps.price,0) AS base_price,
+              COALESCE(p.gst_percentage,0)::numeric AS gst_percentage,
+              b.name AS brand_name, COALESCE(pv.gtin, p.gtin) AS gtin, COALESCE(ps.inventory_quantity,0) AS inventory_quantity,
+              p.id AS product_id, COALESCE(pv.sell_unit_id, p.sell_unit_id) AS sell_unit_id, pv.id AS parent_variant_id, p.search_vector
+       FROM product_sub_variants ps
+       JOIN product_variants pv ON pv.id = ps.variant_id
+       JOIN products p ON p.id = pv.product_id LEFT JOIN brands b ON b.id = p.brand_id
+       WHERE ps.is_active = true AND pv.is_active = true AND p.is_active = true AND ${flag} AND ${searchWhereSv}
+     ) r
+     ORDER BY ${rk.rank}, name ASC, variant_name ASC NULLS FIRST
+     LIMIT $${idx}`,
+    params
+  )
+  return (rows || []).map(r => {
+    const displayName = r.variant_name ? `${r.name} — ${r.variant_name}` : r.name
+    const encoded = [
+      r.id,
+      r.name,
+      r.variant_name ?? '',
+      r.sku,
+      r.slug,
+      r.mrp != null ? String(r.mrp) : '0',
+      r.price_ex_gst != null ? String(r.price_ex_gst) : '',
+      r.base_price != null ? String(r.base_price) : '0',
+      String(r.gst_percentage),
+      r.brand_name ?? '',
+      r.gtin ?? '',
+      r.inventory_quantity != null ? String(r.inventory_quantity) : '0',
+      r.product_id ?? '',
+      r.sell_unit_id ?? '',
+      r.parent_variant_id ?? '',
+    ].join('\x1f')
+    return { id: encoded, label: displayName, sublabel: r.sku + (r.brand_name ? ` · ${r.brand_name}` : '') }
+  })
+}
+
+async function suggestSerialProducts(q: string): Promise<SuggestItem[]> {
+  return suggestScopedLabelProducts(q, 'serialized')
+}
+
+async function suggestBatchProducts(q: string): Promise<SuggestItem[]> {
+  return suggestScopedLabelProducts(q, 'perishable')
+}
+
 async function suggestPayables(q: string): Promise<SuggestItem[]> {
   const sc = buildSearchClause(q, ['e.supplier_name', 'e.expense_number'], 1)
   const rows = await queryMany<{ id: string; supplier_name: string; expense_number: string; total_amount: string }>(
@@ -425,6 +520,8 @@ const handlers: Record<string, (q: string) => Promise<SuggestItem[]>> = {
   payables: suggestPayables,
   review_forms: suggestReviewForms,
   label_products: suggestLabelProducts,
+  serial_products: suggestSerialProducts,
+  batch_products: suggestBatchProducts,
 }
 
 export async function GET(request: NextRequest) {
@@ -442,7 +539,6 @@ export async function GET(request: NextRequest) {
     const items = await handlers[type](q)
     return NextResponse.json({ items })
   } catch (err) {
-    console.error('[route]', err)
     return NextResponse.json({ items: [] }, { status: 500 })
   }
 }

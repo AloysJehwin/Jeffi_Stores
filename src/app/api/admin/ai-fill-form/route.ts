@@ -2,6 +2,7 @@ export const maxDuration = 120
 
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { hasScope } from '@/lib/scopes'
 
 const OLLAMA_URL = () =>
   (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
@@ -22,6 +23,9 @@ Rules:
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
+    return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  }
 
   let body: { scenario?: string; fields?: { name: string; type: string; label: string }[] }
   try {

@@ -2,11 +2,14 @@ export const dynamic = 'force-dynamic'
 
 import { cookies, headers } from 'next/headers'
 import { logoutAction } from './logout-action'
-import { hasScope } from '@/lib/scopes'
+import { hasScope, isPlatformAdmin, isPlatformOwner } from '@/lib/scopes'
 import { getAdminSession } from '@/lib/admin-auth'
 import AdminShell from '@/components/admin/AdminShell'
+import AdminShortcutHandler from '@/components/admin/AdminShortcutHandler'
 import { AdminMobileProvider } from '@/contexts/AdminMobileProvider'
 import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
+import { getSiteControls } from '@/lib/site-controls'
+import { getHost } from '@/lib/get-host'
 import { LogOut } from 'lucide-react'
 
 export const metadata = {
@@ -72,20 +75,21 @@ export default async function AdminLayout({
     { href: '/admin/business/rfqs', label: 'Business RFQs', scope: 'business_rfqs:read', group: 'Business' },
     // Ecom Store — SaaS control plane. superAdminOnly: only the platform operator sees this group.
     // Placed above Settings per nav ordering.
-    { href: '/admin/ecom/customers', label: 'Customers', scope: 'ecom_customers:read', group: 'Ecom Store', superAdminOnly: true },
-    { href: '/admin/ecom/kyc', label: 'KYC Review', scope: 'ecom_customers:read', group: 'Ecom Store', superAdminOnly: true },
-    { href: '/admin/ecom/instances', label: 'Instances', scope: 'ecom_instances:read', group: 'Ecom Store', superAdminOnly: true },
-    { href: '/admin/ecom/store-status', label: 'Store Status', scope: 'ecom_customers:read', group: 'Ecom Store', superAdminOnly: true },
-    { href: '/admin/ecom/billing', label: 'Billing', scope: 'ecom_billing:read', group: 'Ecom Store', superAdminOnly: true },
+    { href: '/admin/ecom/customers', label: 'Customers', scope: 'ecom_customers:read', group: 'Ecom Store', platformAdminOnly: true },
+    { href: '/admin/ecom/kyc', label: 'KYC Review', scope: 'ecom_customers:read', group: 'Ecom Store', platformAdminOnly: true },
+    { href: '/admin/ecom/instances', label: 'Instances', scope: 'ecom_instances:read', group: 'Ecom Store', platformAdminOnly: true },
+    { href: '/admin/ecom/store-status', label: 'Store Status', scope: 'ecom_customers:read', group: 'Ecom Store', platformAdminOnly: true },
+    { href: '/admin/ecom/billing', label: 'Billing', scope: 'ecom_billing:read', group: 'Ecom Store', platformAdminOnly: true },
     { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings' },
     { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings' },
-    { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', superAdminOnly: true },
+    { href: '/admin/team', label: 'Team Members', scope: 'settings:read', group: 'Settings', ownerOnly: true },
     { href: '/admin/settings/site-controls', label: 'Site Controls', scope: 'settings:write', group: 'Settings' },
     { href: '/admin/settings', label: 'Settings', scope: 'settings:read', group: 'Settings', exactMatch: true },
   ]
 
   const filteredNavLinks = navLinks.filter(link => {
-    if ('superAdminOnly' in link && link.superAdminOnly && role !== 'super_admin') return false
+    if ('platformAdminOnly' in link && link.platformAdminOnly && !isPlatformAdmin(role)) return false
+    if ('ownerOnly' in link && link.ownerOnly && !isPlatformOwner(role)) return false
     return hasScope(role, scopes, link.scope)
   })
   const desktopNavLinks = filteredNavLinks.filter(link => !('mobileOnly' in link && link.mobileOnly))
@@ -99,7 +103,7 @@ export default async function AdminLayout({
     <form action={logoutAction}>
       <button
         type="submit"
-        className="h-9 inline-flex items-center gap-2 bg-white/10 hover:bg-red-600 text-white px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
+        className="h-9 inline-flex items-center gap-2 text-white/70 hover:bg-white/10 hover:text-white px-3 rounded-lg text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-accent-500"
         title="Log out"
       >
         <LogOut className="w-5 h-5" />
@@ -109,16 +113,20 @@ export default async function AdminLayout({
   )
 
   const sidebarCollapsed = cookieStore.get('sidebar_collapsed')?.value === 'true'
+  const [controls, host] = await Promise.all([getSiteControls(), getHost()])
 
   return (
     <AdminMobileProvider isMobile={isMobile}>
+      <AdminShortcutHandler shortcuts={controls.shortcuts} host={host} />
       <AdminShell
         desktopNavLinks={desktopNavLinks}
         allNavLinks={filteredNavLinks}
         displayName={displayName}
         usernameInitial={usernameInitial}
         role={role}
-        canUseAgent={hasScope(role, scopes, 'agent:read')}
+        scopes={scopes}
+        host={host}
+        canUseAgent={hasScope(role, scopes, 'agent:write')}
         logoutForm={logoutForm}
         initialCollapsed={sidebarCollapsed}
       >

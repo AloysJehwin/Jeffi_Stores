@@ -4,7 +4,7 @@ import { cookies, headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { verifyToken } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { hasScope, isPlatformOwner } from '@/lib/scopes'
 import { getFilteredProducts, getAllCategories, getAllBrands, getProductBreakdowns } from '@/lib/queries'
 import { queryOne, queryMany } from '@/lib/db'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
@@ -335,7 +335,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   if (token) {
     try {
       const payload = await verifyToken(token.value) as any
-      isSuperAdmin = payload?.role === 'super_admin'
+      isSuperAdmin = isPlatformOwner(payload?.role || '')
     } catch {}
   }
 

@@ -9,7 +9,7 @@ import { useConfirm } from '@/contexts/ConfirmContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
-import LineItemsSection, { LineItem, newLineItem } from '@/components/admin/LineItemsSection'
+import LineItemsSection, { LineItem, newLineItem, fetchSeedLineItem } from '@/components/admin/LineItemsSection'
 import BatchPickerModal, { type BatchPickerItem, type BatchAssignment, type BatchOption, initSelections, expiryColor } from '@/components/admin/BatchPickerModal'
 import SerialEntryModal, { type SerialItem, type SerialAssignment, SerialPicker } from '@/components/admin/SerialEntryModal'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
@@ -194,6 +194,24 @@ export default function QuotationsClient({ canWrite = false }: { canWrite?: bool
   const [bEmail, setBEmail] = useState('')
 
   const [items, setItems] = useState<LineItem[]>([newLineItem()])
+
+  // Deep-link preseed (scan → New Quotation): ?product=<id> with no ?edit seeds the
+  // first line of a fresh editor. Best-effort; skips when editing an existing quotation.
+  const seededProductRef = useRef(false)
+  useEffect(() => {
+    if (seededProductRef.current) return
+    const pid = searchParams.get('product')
+    if (!pid || searchParams.get('edit')) return
+    seededProductRef.current = true
+    const vid = searchParams.get('variant')
+    let cancelled = false
+    fetchSeedLineItem(pid, vid).then(seed => {
+      if (cancelled || !seed) return
+      setItems(prev => (prev.length === 1 && !prev[0].product_id ? [seed] : [seed, ...prev]))
+    })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const [custSearch, setCustSearch] = useState('')
   const [custResults, setCustResults] = useState<any[]>([])

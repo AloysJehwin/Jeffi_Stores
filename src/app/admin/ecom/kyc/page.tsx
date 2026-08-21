@@ -1,10 +1,17 @@
+import { headers } from 'next/headers'
+import { redirect } from 'next/navigation'
 import Link from 'next/link'
+import { isPlatformAdmin } from '@/lib/scopes'
 import { getPendingKycList } from '@/lib/tenant-registry'
 import KycActionButtons from './KycActionButtons'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminKycPage() {
+  const h = await headers()
+  const role = h.get('x-user-role') || ''
+  if (!isPlatformAdmin(role)) redirect('/admin')
+
   const pending = await getPendingKycList()
 
   return (
