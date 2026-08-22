@@ -19,6 +19,8 @@ function clearLwaEnv() {
   delete process.env.AMAZON_LWA_CLIENT_ID
   delete process.env.AMAZON_LWA_CLIENT_SECRET
   delete process.env.AMAZON_LWA_REFRESH_TOKEN
+  delete process.env.AMAZON_SELLER_ID
+  delete process.env.AMAZON_MARKETPLACE_ID
 }
 
 function tokenResponse(token = 'access-tok', expires = 3600) {
@@ -49,11 +51,12 @@ describe('amazon/client', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.resetModules()
+    clearLwaEnv()
     setLwaEnv()
   })
 
   describe('exports', () => {
-    it('exposes expected functions and constants', async () => {
+    it('exposes expected functions', async () => {
       const mod = await import('@/lib/amazon/client')
       expect(typeof mod.getAccessToken).toBe('function')
       expect(typeof mod.spApiRequest).toBe('function')
@@ -66,7 +69,17 @@ describe('amazon/client', () => {
       expect(typeof mod.searchCatalogItems).toBe('function')
       expect(typeof mod.matchAsin).toBe('function')
       expect(typeof mod.getListingsRestrictions).toBe('function')
-      expect(typeof mod.MARKETPLACE_ID).toBe('string')
+      // MARKETPLACE_ID/SELLER_ID are no longer static exports — they resolve per-tenant
+      // at call time via getMarketplaceId()/getSellerId().
+      expect(typeof mod.getMarketplaceId).toBe('function')
+      expect(typeof mod.getSellerId).toBe('function')
+    })
+
+    it('getMarketplaceId/getSellerId resolve from env creds when no tenant context', async () => {
+      process.env.AMAZON_SELLER_ID = 'SELLER-XYZ'
+      const { getMarketplaceId, getSellerId } = await import('@/lib/amazon/client')
+      expect(await getMarketplaceId()).toBe('A21TJRUUN4KGV')
+      expect(await getSellerId()).toBe('SELLER-XYZ')
     })
   })
 

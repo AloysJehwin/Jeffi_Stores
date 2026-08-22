@@ -104,4 +104,10 @@ export async function register() {
     callCron('provisioning_reconcile', '/api/internal/provisioning/reconcile', 'POST', ONE_HOUR - 60_000)
     setInterval(() => callCron('provisioning_reconcile', '/api/internal/provisioning/reconcile', 'POST', ONE_HOUR - 60_000), ONE_HOUR)
   }, 210_000)
+
+  // Social auto-posting — publishes due scheduled_social_posts (FB Page / IG feed / Reels).
+  setTimeout(() => {
+    callCron('publish_social_posts', '/api/cron/publish-social-posts', 'GET', ONE_MIN - 5_000)
+    setInterval(() => callCron('publish_social_posts', '/api/cron/publish-social-posts', 'GET', ONE_MIN - 5_000), ONE_MIN)
+  }, 240_000)
 }

@@ -371,3 +371,89 @@ ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_business_type_check
     CHECK (business_type IN ('proprietor','partnership','pvt_ltd','llp','other'));
 CREATE INDEX IF NOT EXISTS idx_tenant_kyc_status ON public.tenant_kyc USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_tenant_kyc_owner ON public.tenant_kyc USING btree (owner_id);
+
+--
+-- tenant_social_accounts: a tenant's connected Meta accounts (one row per platform).
+-- access_token_enc is AES-256-GCM encrypted (src/lib/crypto/token-cipher.ts) — NEVER plaintext.
+-- Jeffi's OWN platform accounts do NOT live here (their token comes from env / Secrets Manager).
+--
+CREATE TABLE IF NOT EXISTS public.tenant_social_accounts (
+    id                uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id         uuid NOT NULL,
+    provider          character varying(16) NOT NULL,          -- 'facebook' | 'instagram'
+    page_id           character varying(64),                   -- FB Page id
+    page_name         character varying(200),
+    ig_user_id        character varying(64),                   -- IG Business account id (when provider=instagram)
+    access_token_enc  text NOT NULL,                           -- encrypted long-lived Page token
+    token_expiry      timestamp with time zone,
+    status            character varying(16) NOT NULL DEFAULT 'connected', -- connected|expired|revoked
+    connected_at      timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at        timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_tenant_provider_key UNIQUE (tenant_id, provider);
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_provider_check
+    CHECK (provider IN ('facebook','instagram'));
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_status_check
+    CHECK (status IN ('connected','expired','revoked'));
+CREATE INDEX IF NOT EXISTS idx_tenant_social_tenant ON public.tenant_social_accounts USING btree (tenant_id);
+
+--
+-- scheduled_social_posts: the auto-posting queue. tenant_id NULL = Jeffi's own platform post.
+-- The publisher (src/lib/social/publisher.ts) is driven by the publish-social-posts cron tick.
+--
+CREATE TABLE IF NOT EXISTS public.scheduled_social_posts (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid,                                    -- NULL = Jeffi platform account
+    product_id    uuid,                                    -- source product (in the tenant's app DB)
+    platform      character varying(16) NOT NULL,          -- 'fb' | 'ig' | 'ig_reel'
+    caption       text,
+    hashtags      text,                                    -- space-joined '#tag' string
+    image_url     text,                                    -- public URL handed to Meta (card/product)
+    video_url     text,                                    -- for ig_reel
+    scheduled_at  timestamp with time zone NOT NULL DEFAULT now(),
+    status        character varying(16) NOT NULL DEFAULT 'pending', -- pending|publishing|posted|failed
+    posted_id     character varying(64),                   -- Meta post/media id on success
+    last_error    text,
+    attempts      integer NOT NULL DEFAULT 0,
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_platform_check
+    CHECK (platform IN ('fb','ig','ig_reel'));
+ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_status_check
+    CHECK (status IN ('pending','publishing','posted','failed'));
+CREATE INDEX IF NOT EXISTS idx_scheduled_social_due ON public.scheduled_social_posts USING btree (scheduled_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_scheduled_social_tenant ON public.scheduled_social_posts USING btree (tenant_id);
+
+--
+-- tenant_integration_credentials: a tenant's per-provider integration creds (Google Merchant,
+-- Amazon Seller, and future providers). config_enc is AES-256-GCM of a JSON blob holding the
+-- whole provider-specific credential set (never plaintext). meta holds NON-secret display
+-- fields (merchant id, seller id, marketplace, connected email). Meta/FB/IG creds live in
+-- tenant_social_accounts, not here.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_integration_credentials (
+    id           uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id    uuid NOT NULL,
+    provider     character varying(32) NOT NULL,           -- 'google_merchant' | 'amazon_seller' | ...
+    label        character varying(120),
+    config_enc   text NOT NULL,                             -- encrypted JSON credential blob
+    meta         jsonb NOT NULL DEFAULT '{}'::jsonb,        -- non-secret display fields
+    status       character varying(16) NOT NULL DEFAULT 'connected', -- connected|error|revoked
+    expires_at   timestamp with time zone,
+    created_at   timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at   timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_tenant_provider_key UNIQUE (tenant_id, provider);
+ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_status_check
+    CHECK (status IN ('connected','error','revoked'));
+CREATE INDEX IF NOT EXISTS idx_tenant_integration_tenant ON public.tenant_integration_credentials USING btree (tenant_id);

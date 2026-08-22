@@ -2,16 +2,22 @@
 // Env-driven so flipping sandbox -> production is purely an env-var swap (host + LWA creds),
 // with no code change. Modern SP-API for Listings/Feeds/Catalog needs ONLY the 3 LWA values;
 // no AWS SigV4/IAM signing is required.
+import { resolveAmazonCreds } from '@/lib/integrations/resolve'
 
 // SP-API host is environment-driven; defaults to the EU sandbox.
 const SP_API_HOST = process.env.AMAZON_SP_API_HOST || 'https://sandbox.sellingpartnerapi-eu.amazon.com'
-// Marketplace defaults to amazon.in.
-export const MARKETPLACE_ID = process.env.AMAZON_MARKETPLACE_ID || 'A21TJRUUN4KGV'
-// Seller (merchant) id — path param for the Listings Items API.
-export const SELLER_ID = process.env.AMAZON_SELLER_ID || ''
 // When true (set on local dev), pushes to Amazon are refused so local never writes to a
 // real Amazon account (mirrors GMC_PUSH_DISABLED).
 export const AMAZON_PUSH_DISABLED = process.env.AMAZON_PUSH_DISABLED === 'true'
+
+// Marketplace and seller ids are resolved per-tenant at call time (tenant's own account when
+// in a tenant context, else Jeffi's env fallback). Callers that need the raw values await these.
+export async function getMarketplaceId(): Promise<string> {
+  return (await resolveAmazonCreds()).marketplaceId
+}
+export async function getSellerId(): Promise<string> {
+  return (await resolveAmazonCreds()).sellerId
+}
 
 // LWA token endpoint is global (not region-specific).
 const LWA_TOKEN_URL = 'https://api.amazon.com/auth/o2/token'
@@ -19,30 +25,21 @@ const LISTINGS_BASE = '/listings/2021-08-01/items'
 const CATALOG_BASE = '/catalog/2022-04-01/items'
 const RESTRICTIONS_BASE = '/listings/2021-08-01/restrictions'
 
-interface LwaCreds {
-  clientId: string
-  clientSecret: string
-  refreshToken: string
-}
-
-let cachedToken: { token: string; expiresAt: number } | null = null
-
-function loadCredentials(): LwaCreds {
-  return {
-    clientId: process.env.AMAZON_LWA_CLIENT_ID || '',
-    clientSecret: process.env.AMAZON_LWA_CLIENT_SECRET || '',
-    refreshToken: process.env.AMAZON_LWA_REFRESH_TOKEN || '',
-  }
-}
+// Token cache is keyed by a fingerprint of the resolved creds (refreshToken+clientId), never a
+// single global — otherwise one tenant's token would be served to another. With no tenant in
+// context the env creds produce one stable key, so Jeffi's behavior is unchanged.
+const tokenCache = new Map<string, { token: string; expiresAt: number }>()
 
 export async function getAccessToken(): Promise<string> {
-  if (cachedToken && Date.now() < cachedToken.expiresAt - 60000) {
-    return cachedToken.token
-  }
-
-  const creds = loadCredentials()
+  const creds = await resolveAmazonCreds()
   if (!creds.clientId || !creds.clientSecret || !creds.refreshToken) {
     throw new Error('Amazon LWA credentials missing (AMAZON_LWA_CLIENT_ID/SECRET/REFRESH_TOKEN)')
+  }
+
+  const cacheKey = `${creds.refreshToken}|${creds.clientId}`
+  const cached = tokenCache.get(cacheKey)
+  if (cached && Date.now() < cached.expiresAt - 60000) {
+    return cached.token
   }
 
   const body = new URLSearchParams({
@@ -63,7 +60,7 @@ export async function getAccessToken(): Promise<string> {
     throw new Error('Amazon LWA auth failed: ' + JSON.stringify(data))
   }
 
-  cachedToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 }
+  tokenCache.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 })
   return data.access_token
 }
 
@@ -109,14 +106,15 @@ export async function spApiRequest(method: string, path: string, opts: SpApiOpti
 
 // --- Listings Items API operation wrappers ---
 
-function itemPath(sku: string): string {
-  return `${LISTINGS_BASE}/${encodeURIComponent(SELLER_ID)}/${encodeURIComponent(sku)}`
+function itemPath(sellerId: string, sku: string): string {
+  return `${LISTINGS_BASE}/${encodeURIComponent(sellerId)}/${encodeURIComponent(sku)}`
 }
 
 // Create/replace a listing for one SKU. `listing` is { productType, requirements, attributes }.
 export async function putListingsItem(sku: string, listing: unknown): Promise<any> {
-  return spApiRequest('PUT', itemPath(sku), {
-    query: { marketplaceIds: MARKETPLACE_ID },
+  const creds = await resolveAmazonCreds()
+  return spApiRequest('PUT', itemPath(creds.sellerId, sku), {
+    query: { marketplaceIds: creds.marketplaceId },
     body: listing,
   })
 }
@@ -129,8 +127,9 @@ export async function patchListingsItem(
   productType: string,
   patches: Array<{ op: 'add' | 'replace' | 'delete' | 'merge'; path: string; value?: unknown }>,
 ): Promise<any> {
-  return spApiRequest('PATCH', itemPath(sku), {
-    query: { marketplaceIds: MARKETPLACE_ID },
+  const creds = await resolveAmazonCreds()
+  return spApiRequest('PATCH', itemPath(creds.sellerId, sku), {
+    query: { marketplaceIds: creds.marketplaceId },
     body: { productType, patches },
   })
 }
@@ -138,16 +137,18 @@ export async function patchListingsItem(
 // Validate a listing against Amazon's productType schema WITHOUT publishing it. Returns the
 // same shape as a real PUT (status + issues[]), so we can preview mapper correctness safely.
 export async function validateListingsItem(sku: string, listing: unknown): Promise<any> {
-  return spApiRequest('PUT', itemPath(sku), {
-    query: { marketplaceIds: MARKETPLACE_ID, mode: 'VALIDATION_PREVIEW' },
+  const creds = await resolveAmazonCreds()
+  return spApiRequest('PUT', itemPath(creds.sellerId, sku), {
+    query: { marketplaceIds: creds.marketplaceId, mode: 'VALIDATION_PREVIEW' },
     body: listing,
   })
 }
 
 // Delete a listing for one SKU. Tolerates 404 (already absent), like GMC deleteProduct.
 export async function deleteListingsItem(sku: string): Promise<void> {
+  const creds = await resolveAmazonCreds()
   try {
-    await spApiRequest('DELETE', itemPath(sku), { query: { marketplaceIds: MARKETPLACE_ID } })
+    await spApiRequest('DELETE', itemPath(creds.sellerId, sku), { query: { marketplaceIds: creds.marketplaceId } })
   } catch (err: any) {
     if (err?.status !== 404) throw err
   }
@@ -155,16 +156,18 @@ export async function deleteListingsItem(sku: string): Promise<void> {
 
 // Read a single listing with its status summaries + issues.
 export async function getListingsItem(sku: string): Promise<any> {
-  return spApiRequest('GET', itemPath(sku), {
-    query: { marketplaceIds: MARKETPLACE_ID, includedData: 'summaries,issues,attributes' },
+  const creds = await resolveAmazonCreds()
+  return spApiRequest('GET', itemPath(creds.sellerId, sku), {
+    query: { marketplaceIds: creds.marketplaceId, includedData: 'summaries,issues,attributes' },
   })
 }
 
 // Paginated read of our own listings (analog of GMC listProductStatuses).
 export async function searchListingsItems(pageToken?: string): Promise<{ items?: any[]; pagination?: { nextToken?: string } }> {
-  return spApiRequest('GET', `${LISTINGS_BASE}/${encodeURIComponent(SELLER_ID)}`, {
+  const creds = await resolveAmazonCreds()
+  return spApiRequest('GET', `${LISTINGS_BASE}/${encodeURIComponent(creds.sellerId)}`, {
     query: {
-      marketplaceIds: MARKETPLACE_ID,
+      marketplaceIds: creds.marketplaceId,
       includedData: 'summaries,issues',
       pageSize: '20',
       pageToken,
@@ -188,9 +191,10 @@ export async function searchCatalogItems(params: {
   brandNames?: string
   pageSize?: number
 }): Promise<{ items?: any[]; numberOfResults?: number }> {
+  const marketplaceId = await getMarketplaceId()
   return spApiRequest('GET', CATALOG_BASE, {
     query: {
-      marketplaceIds: MARKETPLACE_ID,
+      marketplaceIds: marketplaceId,
       includedData: 'identifiers,summaries',
       keywords: params.keywords,
       identifiers: params.identifiers,
@@ -201,8 +205,8 @@ export async function searchCatalogItems(params: {
   })
 }
 
-function toCatalogMatch(item: any): CatalogMatch {
-  const s = (item?.summaries || []).find((x: any) => x.marketplaceId === MARKETPLACE_ID) || item?.summaries?.[0]
+function toCatalogMatch(item: any, marketplaceId: string): CatalogMatch {
+  const s = (item?.summaries || []).find((x: any) => x.marketplaceId === marketplaceId) || item?.summaries?.[0]
   return { asin: item?.asin, title: s?.itemName, brand: s?.brand || s?.brandName }
 }
 
@@ -270,12 +274,13 @@ export async function matchAsin(input: {
   mpn?: string
   name: string
 }): Promise<CatalogMatch | null> {
+  const marketplaceId = await getMarketplaceId()
   const rawGtin = String(input.gtin || '').replace(/\D/g, '')
   if (rawGtin.length >= 12) {
     const type = rawGtin.length === 12 ? 'UPC' : 'EAN'
     const res = await searchCatalogItems({ identifiers: rawGtin, identifiersType: type })
     const hit = res.items?.[0]
-    if (hit?.asin) return { ...toCatalogMatch(hit), matchType: 'gtin' }
+    if (hit?.asin) return { ...toCatalogMatch(hit, marketplaceId), matchType: 'gtin' }
   }
 
   const kw = [input.mpn, input.name].filter(Boolean).join(' ').slice(0, 200)
@@ -286,7 +291,7 @@ export async function matchAsin(input: {
   let best: CatalogMatch | null = null
   let bestScore = 0 // require a strictly positive score → at least one spec token agreed
   for (const item of res.items || []) {
-    const m = toCatalogMatch(item)
+    const m = toCatalogMatch(item, marketplaceId)
     if (!m.asin) continue
     if (brandLc && (m.brand || '').toLowerCase().trim() !== brandLc) continue
     const score = scoreCandidate(input.name, m.title || '')
@@ -298,12 +303,13 @@ export async function matchAsin(input: {
 // Brand-gate check: whether we're allowed to create an offer on an ASIN. Empty restrictions
 // array => listable now; entries => approval required (with a reasonCode / approval link).
 export async function getListingsRestrictions(asin: string, conditionType = 'new_new'): Promise<{ restrictions?: any[] }> {
+  const creds = await resolveAmazonCreds()
   return spApiRequest('GET', RESTRICTIONS_BASE, {
     query: {
       asin,
       conditionType,
-      sellerId: SELLER_ID,
-      marketplaceIds: MARKETPLACE_ID,
+      sellerId: creds.sellerId,
+      marketplaceIds: creds.marketplaceId,
     },
   })
 }
