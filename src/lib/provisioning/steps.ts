@@ -180,6 +180,13 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // signup could go live pointing at a host that 404s or times out. DNS/serving can
         // lag right after configure_dns, so we allow a bounded number of pending retries
         // (each worker tick) before giving up and failing the job for rollback.
+        //
+        // Under the STUB provider (local dev / tests) there is no real infra or DNS, so the
+        // probe can never succeed — skip it and advance. The guard stays fully active for the
+        // real AWS provider, which is the only place a host actually serves.
+        if (process.env.PROVISIONING_PROVIDER !== 'aws') {
+          return await next(job.id, 'activate', res)
+        }
         const rootDomain = ROOT_DOMAIN
         const primaryHost = `${slug}.${rootDomain}`
         const attempts = (res.verifyAttempts || 0) + 1

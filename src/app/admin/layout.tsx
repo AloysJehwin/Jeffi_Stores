@@ -45,6 +45,7 @@ export default async function AdminLayout({
     { href: '/admin/brands', label: 'Brands', scope: 'brands:read', group: 'Catalogue' },
     { href: '/admin/catalog-enrichment', label: 'AI Enrichment', scope: 'catalog_enrichment:read', group: 'Catalogue' },
     { href: '/admin/merchant-sync', label: 'Merchant Sync', scope: 'products:read', group: 'Catalogue' },
+    { href: '/admin/social-posts', label: 'Social Posts', scope: 'products:read', group: 'Catalogue' },
     { href: '/admin/orders', label: 'Orders', scope: 'orders:read', group: 'Sales' },
     { href: '/admin/quotations', label: 'Quotations', scope: 'quotations:read', group: 'Sales' },
     { href: '/admin/invoices', label: 'Invoices', scope: 'invoices:read', group: 'Sales' },
@@ -76,7 +77,6 @@ export default async function AdminLayout({
     // Ecom Store — SaaS control plane. superAdminOnly: only the platform operator sees this group.
     // Placed above Settings per nav ordering.
     { href: '/admin/ecom/customers', label: 'Customers', scope: 'ecom_customers:read', group: 'Ecom Store', platformAdminOnly: true },
-    { href: '/admin/ecom/kyc', label: 'KYC Review', scope: 'ecom_customers:read', group: 'Ecom Store', platformAdminOnly: true },
     { href: '/admin/ecom/instances', label: 'Instances', scope: 'ecom_instances:read', group: 'Ecom Store', platformAdminOnly: true },
     { href: '/admin/ecom/store-status', label: 'Store Status', scope: 'ecom_customers:read', group: 'Ecom Store', platformAdminOnly: true },
     { href: '/admin/ecom/billing', label: 'Billing', scope: 'ecom_billing:read', group: 'Ecom Store', platformAdminOnly: true },
