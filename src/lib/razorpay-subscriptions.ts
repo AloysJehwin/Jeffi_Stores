@@ -196,6 +196,27 @@ export async function downgradeSubscription(opts: {
 }
 
 /**
+ * Cancel a Razorpay subscription. By default cancels at the end of the current billing
+ * cycle so the owner keeps their store for the period they already paid for; the resulting
+ * `subscription.cancelled`/`completed` webhook is what actually deprovisions the tenant.
+ * Pass { cancelAtCycleEnd: false } to cancel immediately.
+ */
+export async function cancelSubscription(
+  subscriptionId: string,
+  opts?: { cancelAtCycleEnd?: boolean },
+): Promise<{ status: string; endsAt: number | null }> {
+  const rz = getRazorpayInstance()
+  const cancelAtCycleEnd = opts?.cancelAtCycleEnd !== false
+  const sub = await (rz.subscriptions as any).cancel(subscriptionId, {
+    cancel_at_cycle_end: cancelAtCycleEnd ? 1 : 0,
+  })
+  return {
+    status: (sub?.status ?? 'cancelled') as string,
+    endsAt: (sub?.current_end ?? sub?.ended_at ?? null) as number | null,
+  }
+}
+
+/**
  * Fetch a Razorpay subscription by id — used to read current_end, status, etc.
  */
 export async function getSubscription(subscriptionId: string): Promise<any> {

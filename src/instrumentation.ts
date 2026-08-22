@@ -14,6 +14,7 @@ export async function register() {
   const TEN_MIN    = 10 * 60 * 1000
   const ONE_MIN    =      60 * 1000
   const THIRTY_MIN = 30 * 60 * 1000
+  const ONE_HOUR   = 60 * 60 * 1000
   const ONE_DAY    = 24 * 60 * 60 * 1000
 
   const recordRun = async (jobId: string, ok: boolean, errorMsg?: string, detail?: unknown) => {
@@ -94,4 +95,13 @@ export async function register() {
     callCron('daily_briefing', '/api/cron/daily-briefing', 'GET', ONE_DAY - 60_000)
     setInterval(() => callCron('daily_briefing', '/api/cron/daily-briefing', 'GET', ONE_DAY - 60_000), ONE_DAY)
   }, 180_000)
+
+  // Provisioning drift sweep — flips any tenant left active with no live infra to suspended.
+  // Replaces the deleted GH-Actions/cron provisioning-worker schedule. Provisioning ITSELF is
+  // event-driven (owner portal / payment webhook → self-advancing loop), so the only thing
+  // that still needs a schedule is this reconciliation, which does not need fine resolution.
+  setTimeout(() => {
+    callCron('provisioning_reconcile', '/api/internal/provisioning/reconcile', 'POST', ONE_HOUR - 60_000)
+    setInterval(() => callCron('provisioning_reconcile', '/api/internal/provisioning/reconcile', 'POST', ONE_HOUR - 60_000), ONE_HOUR)
+  }, 210_000)
 }

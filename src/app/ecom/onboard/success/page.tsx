@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { getOwnerTenants, setSubscriptionStatus } from '@/lib/tenant-registry'
 import { getSubscription } from '@/lib/razorpay-subscriptions'
-import { sendPaymentConfirmedEmail } from '@/lib/ecom-emails'
+import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
 import { CheckMark } from '../../Shapes'
 
 export const dynamic = 'force-dynamic'
@@ -32,6 +32,19 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
     const paid = sub && ['active', 'authenticated', 'charged'].includes(sub.status)
     if (paid) {
       await setSubscriptionStatus(tenant.id, 'active', 'active')
+      // Kick the provisioning engine. This is the reliable path for local dev (no webhook)
+      // and a fallback when the webhook is delayed; triggerProvisioning + enqueueProvisioning
+      // are idempotent, so a duplicate with the webhook is harmless.
+      const restoreFromKey = await resolveRestoreKey(tenant.id, tenant.slug)
+      triggerProvisioning({
+        action: 'provision',
+        tenantId: tenant.id,
+        slug: tenant.slug,
+        plan: tenant.plan,
+        ownerId: owner.id,
+        restoreFromKey,
+        reason: 'first_payment',
+      }).catch(() => {})
     }
   }
 

@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyWebhookSignature } from '@/lib/razorpay-subscriptions'
-import { getTenantBySubscriptionId, setSubscriptionStatus, getOwnerById, controlPlanePool } from '@/lib/tenant-registry'
-import { sendPaymentConfirmedEmail, sendStoreLiveEmail } from '@/lib/ecom-emails'
-import { provisionTenantOwnerAdmin } from '@/lib/tenant-admin-provision'
-import { getProvisioningProvider } from '@/lib/provisioning'
-import { deprovisionTenant } from '@/lib/provisioning/steps'
+import { getTenantBySubscriptionId, setSubscriptionStatus, controlPlanePool } from '@/lib/tenant-registry'
+import { sendStoreLiveEmail } from '@/lib/ecom-emails'
+import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,13 +11,14 @@ export const dynamic = 'force-dynamic'
  * then delete RDS + bucket. Fire-and-forget from the webhook so Razorpay still gets its
  * 200 promptly; the real AWS provider's backup+delete can take a while.
  */
-async function autoDeprovision(tenantId: string): Promise<void> {
+async function autoDeprovision(tenantId: string, slug: string): Promise<void> {
   const ownerRow = await controlPlanePool().query(
     `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId],
   ).catch(() => null)
   const ownerId = ownerRow?.rows[0]?.owner_id ?? null
-  const provider = getProvisioningProvider()
-  await deprovisionTenant(tenantId, provider, { ownerId }).catch(() => {})
+  await triggerProvisioning({
+    action: 'deprovision', tenantId, slug, plan: null, ownerId, reason: 'missed_payment',
+  }).catch(() => {})
 }
 
 // Razorpay sends the raw body for HMAC — we must NOT use request.json() here.
@@ -64,9 +63,11 @@ export async function POST(request: NextRequest) {
     case 'subscription.charged':
       // First (or recurring) charge succeeded → tenant goes live.
       await setSubscriptionStatus(tenant.id, 'active', 'active')
-      // Notify owner on first charge (tenant was provisioning → now active)
+      // On the FIRST charge (tenant was provisioning): notify the owner + kick the
+      // provisioning engine to actually stand up the tenant's infra. The owner super_admin
+      // + mTLS cert is created later, when the provisioning job reaches 'done' (the tenant
+      // DB doesn't exist until then) — see the internal advance route.
       if (tenant.status !== 'active') {
-        const { controlPlanePool } = await import('@/lib/tenant-registry')
         const pool = controlPlanePool()
         const ownerRow = await pool.query(
           `SELECT o.id, o.email, o.name, t.display_name, t.slug, t.billing_interval,
@@ -83,12 +84,17 @@ export async function POST(request: NextRequest) {
             { email: row.email, name: row.name },
             { display_name: row.display_name, slug: row.slug, plan: row.plan }
           ).catch(() => {})
-          // Provision super_admin + mTLS cert in tenant DB (fire-and-forget)
-          provisionTenantOwnerAdmin({
+          const restoreFromKey = await resolveRestoreKey(tenant.id, row.slug)
+          // Fire-and-forget so Razorpay gets a fast 200; the engine self-advances (AWS) or
+          // runs inline (stub).
+          triggerProvisioning({
+            action: 'provision',
             tenantId: tenant.id,
-            tenantSlug: tenant.slug,
-            ownerEmail: row.email,
-            ownerName: row.name,
+            slug: row.slug,
+            plan: row.plan,
+            ownerId: row.id,
+            restoreFromKey,
+            reason: 'first_payment',
           }).catch(() => {})
         }
       }
@@ -102,12 +108,12 @@ export async function POST(request: NextRequest) {
 
     case 'subscription.cancelled':
       await setSubscriptionStatus(tenant.id, 'cancelled', 'terminated')
-      autoDeprovision(tenant.id).catch(() => {})
+      autoDeprovision(tenant.id, tenant.slug).catch(() => {})
       break
 
     case 'subscription.completed':
       await setSubscriptionStatus(tenant.id, 'completed', 'terminated')
-      autoDeprovision(tenant.id).catch(() => {})
+      autoDeprovision(tenant.id, tenant.slug).catch(() => {})
       break
 
     case 'subscription.expired':

@@ -1,5 +1,5 @@
 # SaaS Multi-Tenant Foundation — Status Summary
-_Last updated: 2026-08-18_
+_Last updated: 2026-08-22_
 
 Branch: `feat/multitenant-foundation` → **PR #425** (open, do NOT merge until instructed)
 
@@ -88,7 +88,8 @@ All applied directly to the live environment.
 ### 5. Key Files
 ```
 src/lib/provisioning/
-  steps.ts          — 12-step state machine (preflight→activate)
+  steps.ts          — 12-step state machine (preflight→activate) + reprovisionDns (DNS-only plan change)
+  trigger.ts        — single entry point for all 4 flows (triggerProvisioning + kickAdvance)
   aws-provider.ts   — real @aws-sdk RDS/S3/Route53 impl
   stub-provider.ts  — in-memory test stub
   provider.ts       — provider interface
@@ -99,7 +100,10 @@ src/lib/tenant-dns.ts            — Route53 UPSERT/DELETE (value-agnostic teard
 src/lib/tenant-registry.ts       — control-plane pool, lookupTenant, reconcileOrphanedTenants
 src/lib/db.ts                    — tenant-aware DB pool, ensureTenantContext
 src/middleware.ts                 — host→tenant resolver, x-tenant-slug forwarding
-src/app/api/cron/provisioning-worker/route.ts — in-VPC cron driver
+src/app/api/ecom/provisioning/route.ts        — canonical owner-portal trigger (owner-session gated)
+src/app/api/internal/provisioning/advance/route.ts   — self-advancing driver (replaces cron worker)
+src/app/api/internal/provisioning/reconcile/route.ts — hourly drift sweep (from instrumentation.ts)
+src/instrumentation.ts            — in-app scheduler; hourly provisioning reconcile
 deploy/nginx-servers.conf        — nginx including tenant wildcard server_name blocks
 database/control-plane/schema.sql
 ```
@@ -113,10 +117,9 @@ database/control-plane/schema.sql
 | # | Item | Notes |
 |---|------|-------|
 | 🔴 **1** | **Merge PR #425 → main** | Deploys all code fixes + makes prod pick up `RDS_MASTER_PASSWORD`. This is the real gate. Do NOT merge until you've reviewed. |
-| 🔴 **2** | **Configure the provisioning driver** | **Built + committed** (`c0c8e5b7`): `.github/workflows/provisioning-drive.yml` + `.github/scripts/provisioning-drive.sh` (multi-stage: preflight → drive → verify → report, plus an hourly drift sweep). **Config is DONE (2026-08-18):** repo secret `CRON_SECRET` set from Secrets Manager `jeffi/production` (64 chars, authoritative source), repo var `APP_URL=https://jeffistores.in`. ⚠️ **Still blocked by item 1, for two independent reasons:** (a) preflight returns **404** — `/api/cron/provisioning-worker` is not deployed until PR #425 ships; (b) GitHub refuses `workflow_dispatch` for a workflow *"not found on the default branch"*, so it is not runnable until the workflow reaches `main`. Merging PR #425 clears both at once. |
-| | *Verified 2026-08-18 (local run of the same script)* | `/api/ready` → 200. Sibling cron routes (`compute-health`, `sweep-auto-tasks`) → **401** on a bad token while `provisioning-worker` → **404**, confirming the preflight's deployed-vs-not discrimination is accurate rather than a false alarm. CloudFront `/api/*` uses **Managed-AllViewer** (forwards `Authorization`) + **Managed-CachingDisabled**, so `jeffistores.in` is a safe driver host — a caching or header-stripping policy there would have made the endpoint 401 forever. All six guard clauses (missing/plaintext URL, bad + out-of-range minutes, empty secret, unreachable host) fire correctly. |
-| | *Why a workflow and not an EC2 crontab* | Provisioning is **operator-gated** — the only enqueue path is `POST /api/admin/ecom/customers/[id]/provision` (super_admin); there is no self-serve provisioning route. So a human is already present when a job starts, and a `workflow_dispatch` driver is sufficient — no need for 1440 scheduled runs/day. Deprovision needs no driver at all (the Razorpay webhook and admin button call `deprovisionTenant()` **inline**). The only thing needing a schedule is `reconcileOrphanedTenants()`, which does not need 60-second resolution → hourly. **If provisioning ever becomes self-serve (auto-provision on payment), this must move to a real 1-min scheduler** — a manual driver would no longer be acceptable. |
-| | *Clarification on "in-VPC"* | The VPC constraint applies to **where the code executes, not where the trigger comes from**. The worker is a route on the app, which already runs in-VPC, so its data-plane steps (`load_schema`, `restore_data`, backup) reach the `PubliclyAccessible: false` tenant RDS fine. Any external trigger (GHA, EventBridge, uptime pinger) is therefore viable. Only a driver that runs the provisioning code **itself** outside the VPC (e.g. a standalone runner importing `steps.ts`) would break. |
+| 🔴 **2** | **Provisioning is now EVENT-DRIVEN (no cron)** | **Reworked 2026-08-22.** Provisioning is triggered by exactly four flows, all from the ecom owner portal, each handing a full self-contained payload to `triggerProvisioning()` (`src/lib/provisioning/trigger.ts`): (1) first provision — `subscription.charged` webhook + onboard success page; (2) plan upgrade/downgrade — `change-plan` route → `reprovisionDns` (DNS-only, never recreates infra); (3) deprovision on missed payment — `subscription.cancelled`/`completed` webhook; (4) owner cancel — `POST /api/ecom/provisioning {action:'deprovision'}` cancels the Razorpay sub, and the webhook then deprovisions. There is **no more cron worker**: the engine advances itself via an HTTP self re-invoke loop (`POST /api/internal/provisioning/advance`, Bearer `CRON_SECRET`) — one step per tick, each tick reschedules the next until the job is done/failed. The **GitHub Actions driver + `/api/cron/provisioning-worker` are deleted** (the GH workflow was also disabled in the Actions tab). The `provisionTenantOwnerAdmin` super_admin/cert now fires when the job reaches `done` (after the tenant RDS exists), not at payment time. Admin operator routes (`/api/admin/ecom/customers/[id]/provision`+`/deprovision`) are kept as a manual override and now route through the same shared trigger. |
+| | *Only remaining schedule* | `reconcileOrphanedTenants()` (drift sweep) — relocated to `src/instrumentation.ts`, self-invoked **hourly** against `/api/internal/provisioning/reconcile`. Does not need 60-second resolution. |
+| | *Clarification on "in-VPC"* | Unchanged and now moot for triggering: the advance/reconcile routes run **on the app**, which is already in-VPC, so their data-plane steps (`load_schema`, `restore_data`, backup) reach the `PubliclyAccessible: false` tenant RDS fine. The self re-invoke `fetch` targets `APP_URL` (`https://jeffistores.in`) with `Authorization: Bearer $CRON_SECRET`; CloudFront `/api/*` forwards `Authorization` (Managed-AllViewer) + disables caching, so it is a safe self-call host. |
 
 ### Important but not blocking
 
