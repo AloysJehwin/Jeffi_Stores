@@ -303,6 +303,58 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   if (job) await updateProvisioningJob(job.id, { status: 'failed', last_error: 'rolled back', created_resources: { ...r, rolledBack: true } })
 }
 
+export interface ReprovisionResult {
+  ok: boolean
+  added: string[]
+  removed: string[]
+  error?: string
+}
+
+/**
+ * Re-apply a tenant's DNS to match its CURRENT plan tier — used on plan
+ * upgrade/downgrade. This is DNS-ONLY: it never touches RDS/S3 and never enqueues a
+ * provisioning job (which would re-run create_db_instance and destroy live infra).
+ *
+ * The plan must already be updated in the registry (updateTenantPlan) before calling.
+ * `tenantHostnames(slug, plan)` yields more subdomains for higher tiers; a downgrade
+ * therefore REMOVES the higher-tier subdomains, an upgrade ADDS them. The set of hosts
+ * actually applied is tracked in the provisioning job's created_resources.dnsHosts so the
+ * add/remove delta is exact and this stays idempotent across repeated calls.
+ */
+export async function reprovisionDns(tenantId: string, provider: ProvisioningProvider): Promise<ReprovisionResult> {
+  const tenant = await getTenant(tenantId)
+  if (!tenant) return { ok: false, added: [], removed: [], error: 'tenant not found' }
+  if (tenant.status !== 'active' || !tenant.rds_endpoint) {
+    // Only meaningful for a live tenant; a provisioning/suspended one gets DNS from the
+    // engine's configure_dns step instead.
+    return { ok: false, added: [], removed: [], error: 'tenant not active / no infra' }
+  }
+
+  const desired = tenantHostnames(tenant.slug, tenant.plan)
+  const job = await getProvisioningJob(tenantId)
+  const prev = ((job?.created_resources as Record<string, any>)?.dnsHosts as string[] | undefined) ?? desired
+
+  const desiredSet = new Set(desired)
+  const prevSet = new Set(prev)
+  const added = desired.filter((h) => !prevSet.has(h))
+  const removed = prev.filter((h) => !desiredSet.has(h))
+
+  try {
+    if (added.length) await provider.ensureDns(added)
+    if (removed.length) await provider.removeDns(removed)
+    // Record the now-authoritative host set so the next change diffs correctly and a later
+    // deprovision tears down exactly these.
+    if (job) {
+      await updateProvisioningJob(job.id, {
+        created_resources: { ...(job.created_resources || {}), dnsHosts: desired },
+      })
+    }
+    return { ok: true, added, removed }
+  } catch (e: any) {
+    return { ok: false, added, removed, error: e?.message || 'reprovision failed' }
+  }
+}
+
 export interface DeprovisionResult {
   ok: boolean
   backupKey: string | null
@@ -391,4 +443,4 @@ export async function deprovisionTenant(
   }
 }
 
-export { STEPS, MAX_CONNECTIONS, dbInstanceId }
+export { STEPS, MAX_CONNECTIONS, dbInstanceId, tenantHostnames }

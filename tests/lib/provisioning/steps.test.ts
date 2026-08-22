@@ -410,6 +410,77 @@ describe('provisioning state machine', () => {
   })
 
   // -------------------------------------------------------------------------
+  describe('reprovisionDns — DNS-only plan-change re-apply (never recreates infra)', () => {
+    const ACTIVE = { ...TENANT, status: 'active', rds_endpoint: 'ep-1.rds.amazonaws.com' }
+
+    it('refuses when the tenant is not active / has no infra', async () => {
+      reg.getTenant.mockResolvedValue({ ...TENANT, status: 'provisioning', rds_endpoint: null })
+      const { reprovisionDns } = await import('@/lib/provisioning/steps')
+      const out = await reprovisionDns('t-1', provider)
+      expect(out.ok).toBe(false)
+      expect(provider.hasDns('acme.jeffistores.in')).toBe(false)
+    })
+
+    it('UPGRADE adds only the new tier hostnames (basic → growth)', async () => {
+      reg.getTenant.mockResolvedValue({ ...ACTIVE, plan: 'growth' })
+      // Previously applied = basic hostnames.
+      reg.getProvisioningJob.mockResolvedValue(job({
+        status: 'done',
+        created_resources: { dnsHosts: ['acme.jeffistores.in', 'admin-acme.jeffistores.in', 'invoice-acme.jeffistores.in'] },
+      }))
+      const ensure = vi.spyOn(provider, 'ensureDns')
+      const remove = vi.spyOn(provider, 'removeDns')
+      const { reprovisionDns } = await import('@/lib/provisioning/steps')
+      const out = await reprovisionDns('t-1', provider)
+      expect(out.ok).toBe(true)
+      expect(out.added).toEqual(['quotation-acme.jeffistores.in', 'purchaseorder-acme.jeffistores.in'])
+      expect(out.removed).toEqual([])
+      expect(ensure).toHaveBeenCalledWith(['quotation-acme.jeffistores.in', 'purchaseorder-acme.jeffistores.in'])
+      expect(remove).not.toHaveBeenCalled()
+      // Persists the now-authoritative host set.
+      expect(lastPatch().created_resources.dnsHosts).toContain('quotation-acme.jeffistores.in')
+    })
+
+    it('DOWNGRADE removes the dropped higher-tier hostnames (pro → basic)', async () => {
+      reg.getTenant.mockResolvedValue({ ...ACTIVE, plan: 'basic' })
+      reg.getProvisioningJob.mockResolvedValue(job({
+        status: 'done',
+        created_resources: { dnsHosts: [
+          'acme.jeffistores.in', 'admin-acme.jeffistores.in', 'invoice-acme.jeffistores.in',
+          'quotation-acme.jeffistores.in', 'purchaseorder-acme.jeffistores.in',
+          'forms-acme.jeffistores.in', 'acme.business.jeffistores.in',
+        ] },
+      }))
+      const remove = vi.spyOn(provider, 'removeDns')
+      const { reprovisionDns } = await import('@/lib/provisioning/steps')
+      const out = await reprovisionDns('t-1', provider)
+      expect(out.ok).toBe(true)
+      expect(out.added).toEqual([])
+      expect(out.removed).toEqual(expect.arrayContaining([
+        'quotation-acme.jeffistores.in', 'purchaseorder-acme.jeffistores.in',
+        'forms-acme.jeffistores.in', 'acme.business.jeffistores.in',
+      ]))
+      expect(remove).toHaveBeenCalled()
+    })
+
+    it('is a no-op when the tier is unchanged', async () => {
+      reg.getTenant.mockResolvedValue({ ...ACTIVE, plan: 'basic' })
+      reg.getProvisioningJob.mockResolvedValue(job({
+        status: 'done',
+        created_resources: { dnsHosts: ['acme.jeffistores.in', 'admin-acme.jeffistores.in', 'invoice-acme.jeffistores.in'] },
+      }))
+      const ensure = vi.spyOn(provider, 'ensureDns')
+      const remove = vi.spyOn(provider, 'removeDns')
+      const { reprovisionDns } = await import('@/lib/provisioning/steps')
+      const out = await reprovisionDns('t-1', provider)
+      expect(out.added).toEqual([])
+      expect(out.removed).toEqual([])
+      expect(ensure).not.toHaveBeenCalled()
+      expect(remove).not.toHaveBeenCalled()
+    })
+  })
+
+  // -------------------------------------------------------------------------
   describe('deprovisionTenant — backup-first teardown', () => {
     it('returns an error for an unknown tenant', async () => {
       reg.getTenant.mockResolvedValue(null)

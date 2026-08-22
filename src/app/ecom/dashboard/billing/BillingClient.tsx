@@ -27,6 +27,9 @@ export default function BillingClient({ tenant, plans, renewalDate }: {
   const [interval, setInterval] = useState<Interval>((tenant.billing_interval as Interval) ?? 'monthly')
   const [busy, setBusy] = useState(false)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
+  const [cancelBusy, setCancelBusy] = useState(false)
+  const [confirmCancel, setConfirmCancel] = useState(false)
+  const [cancelMsg, setCancelMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   const currentTier = plans.find((p) => p.slug === tenant.plan)?.tier ?? 1
   const newTier = plans.find((p) => p.slug === selectedPlan)?.tier ?? 1
@@ -58,6 +61,24 @@ export default function BillingClient({ tenant, plans, renewalDate }: {
   }
 
   const subStatusInfo = SUB_STATUS_LABEL[tenant.subscription_status] ?? { label: tenant.subscription_status, color: 'bg-surface-secondary text-foreground-muted' }
+
+  async function cancelSubscription() {
+    setCancelBusy(true); setCancelMsg(null)
+    try {
+      const res = await fetch('/api/ecom/provisioning', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deprovision', tenantId: tenant.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setCancelMsg({ ok: false, text: data.error || 'Failed to cancel' }); return }
+      setCancelMsg({ ok: true, text: 'Subscription cancelled — your store stays live until the end of the current billing cycle, then closes.' })
+      setConfirmCancel(false)
+      router.refresh()
+    } catch { setCancelMsg({ ok: false, text: 'Network error' }) } finally { setCancelBusy(false) }
+  }
+
+  const canCancel = !!tenant.razorpay_subscription_id && !['cancelled', 'completed', 'expired'].includes(tenant.subscription_status)
 
   return (
     <div className="space-y-8">
@@ -142,6 +163,35 @@ export default function BillingClient({ tenant, plans, renewalDate }: {
           {busy ? 'Updating…' : isUpgrade ? 'Upgrade now' : 'Schedule change'}
         </button>
       </div>
+
+      {/* Cancel subscription */}
+      {canCancel && (
+        <div className="rounded-2xl border border-red-200 dark:border-red-900/40 bg-surface-elevated p-6">
+          <h2 className="text-sm font-semibold text-red-700 dark:text-red-400 uppercase tracking-widest mb-2">Cancel subscription</h2>
+          <p className="text-sm text-foreground-muted mb-4">
+            Cancelling stops future billing. Your store stays live until the end of the current billing cycle, then it is closed and its data is backed up.
+          </p>
+          {cancelMsg && <p className={`text-sm mb-3 ${cancelMsg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{cancelMsg.text}</p>}
+          {!confirmCancel ? (
+            <button onClick={() => { setConfirmCancel(true); setCancelMsg(null) }}
+              className="px-5 py-2.5 rounded-lg border border-red-300 dark:border-red-800 text-red-700 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm font-semibold transition-colors">
+              Cancel subscription
+            </button>
+          ) : (
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="text-sm text-foreground">Are you sure? This closes your store at cycle end.</span>
+              <button onClick={cancelSubscription} disabled={cancelBusy}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-40 text-white text-sm font-semibold transition-colors">
+                {cancelBusy ? 'Cancelling…' : 'Yes, cancel'}
+              </button>
+              <button onClick={() => setConfirmCancel(false)} disabled={cancelBusy}
+                className="px-4 py-2 rounded-lg border border-border-default text-foreground-muted hover:bg-surface-secondary text-sm font-medium transition-colors">
+                Keep subscription
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }
