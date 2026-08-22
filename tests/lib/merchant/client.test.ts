@@ -1,13 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 
-vi.mock('fs', () => ({
-  default: {
-    existsSync: vi.fn(),
-    readFileSync: vi.fn(),
-  },
-  existsSync: vi.fn(),
-  readFileSync: vi.fn(),
-}))
 vi.mock('crypto', async (importOriginal) => {
   const actual = await importOriginal<typeof import('crypto')>()
   return {
@@ -26,24 +18,31 @@ vi.mock('crypto', async (importOriginal) => {
   }
 })
 
+// Credential resolution is now the sole seam for account creds (tenant-or-env). Mock it so the
+// auth/url tests exercise the JWT + request plumbing without touching fs/env service accounts.
+const mockResolveGoogleMerchantCreds = vi.fn()
+vi.mock('@/lib/integrations/resolve', () => ({
+  resolveGoogleMerchantCreds: mockResolveGoogleMerchantCreds,
+}))
+
 const mockFetch = vi.fn()
 vi.stubGlobal('fetch', mockFetch)
 
-import * as fs from 'fs'
-
-const mockExistsSync = vi.mocked(fs.existsSync)
-const mockReadFileSync = vi.mocked(fs.readFileSync)
+const CREDS = {
+  clientEmail: 'test@project.iam.gserviceaccount.com',
+  privateKey: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n',
+  merchantId: '12345',
+}
 
 describe('merchant/client', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    delete process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-    delete process.env.GMC_MERCHANT_ID
+    vi.resetModules()
+    mockResolveGoogleMerchantCreds.mockResolvedValue({ ...CREDS })
   })
 
   describe('module structure', () => {
     it('exports expected functions', async () => {
-      // Dynamic import to pick up mocks
       const mod = await import('@/lib/merchant/client')
       expect(typeof mod.getAccessToken).toBe('function')
       expect(typeof mod.gmcRequest).toBe('function')
@@ -54,72 +53,52 @@ describe('merchant/client', () => {
       expect(typeof mod.customBatchUpsert).toBe('function')
     })
 
-    it('exports MERCHANT_ID constant', async () => {
-      const mod = await import('@/lib/merchant/client')
-      expect(typeof mod.MERCHANT_ID).toBe('string')
+    it('getMerchantId resolves the merchant id from the resolver', async () => {
+      const { getMerchantId } = await import('@/lib/merchant/client')
+      expect(await getMerchantId()).toBe('12345')
     })
   })
 
   describe('getAccessToken', () => {
-    it('returns token using env var JSON credentials', async () => {
-      const fakeCredentials = {
-        client_email: 'test@project.iam.gserviceaccount.com',
-        private_key: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n',
-        token_uri: 'https://oauth2.googleapis.com/token',
-      }
-      process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify(fakeCredentials)
-
+    it('returns a token using the resolved service-account credentials', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ access_token: 'test-token-123', expires_in: 3600 }),
       })
 
-      // Re-import to avoid cached token from other tests
-      vi.resetModules()
       const { getAccessToken } = await import('@/lib/merchant/client')
       const token = await getAccessToken()
-      expect(typeof token).toBe('string')
+      expect(token).toBe('test-token-123')
+      // JWT bearer grant is posted to Google's token endpoint.
+      const [url, opts] = mockFetch.mock.calls[0]
+      expect(url).toBe('https://oauth2.googleapis.com/token')
+      expect(opts.body).toContain('grant-type:jwt-bearer')
     })
 
-    it('falls back to file when no env var', async () => {
-      mockExistsSync.mockReturnValueOnce(true)
-      mockReadFileSync.mockReturnValueOnce(
-        JSON.stringify({
-          client_email: 'svc@project.iam.gserviceaccount.com',
-          private_key: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n',
-          token_uri: 'https://oauth2.googleapis.com/token',
-        })
-      )
-
+    it('caches the token per resolved account (second call does not re-fetch)', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ access_token: 'file-token-456', expires_in: 3600 }),
+        json: async () => ({ access_token: 'cached-tok', expires_in: 3600 }),
       })
-
-      vi.resetModules()
       const { getAccessToken } = await import('@/lib/merchant/client')
-      const token = await getAccessToken().catch(() => null)
-      // Either succeeds or throws if file path doesn't exist — both valid
-      expect(token === null || typeof token === 'string').toBe(true)
+      const t1 = await getAccessToken()
+      const t2 = await getAccessToken()
+      expect(t1).toBe(t2)
+      expect(mockFetch).toHaveBeenCalledTimes(1)
     })
 
-    it('throws when no credentials available', async () => {
-      mockExistsSync.mockReturnValue(false)
-
-      vi.resetModules()
+    it('throws when the auth response has no access_token', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ error: 'invalid_grant' }),
+      })
       const { getAccessToken } = await import('@/lib/merchant/client')
-      await expect(getAccessToken()).rejects.toThrow()
+      await expect(getAccessToken()).rejects.toThrow(/GMC auth failed/)
     })
   })
 
   describe('gmcRequest', () => {
-    it('makes authenticated request to GMC API', async () => {
-      process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({
-        client_email: 'test@project.iam.gserviceaccount.com',
-        private_key: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n',
-        token_uri: 'https://oauth2.googleapis.com/token',
-      })
-
+    it('makes an authenticated request scoped to the resolved merchant id', async () => {
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -130,22 +109,19 @@ describe('merchant/client', () => {
           json: async () => ({ kind: 'content#productsListResponse', resources: [] }),
         })
 
-      vi.resetModules()
       const { gmcRequest } = await import('@/lib/merchant/client')
-      const result = await gmcRequest('GET', '/products').catch(() => null)
-      expect(result === null || typeof result === 'object').toBe(true)
+      const result = await gmcRequest('GET', '/products')
+      expect(typeof result).toBe('object')
+      // Second call = the GMC API request; URL embeds the resolved merchant id.
+      const [url, opts] = mockFetch.mock.calls[1]
+      expect(url).toContain('/12345/products')
+      expect(opts.headers.Authorization).toBe('Bearer bearer-token')
     })
   })
 
   describe('upsertProduct', () => {
     it('calls GMC API to insert product', async () => {
       const fakeProduct = { offerId: 'SKU-001', title: 'Test Product', price: { value: '100', currency: 'INR' } }
-
-      process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({
-        client_email: 'test@project.iam.gserviceaccount.com',
-        private_key: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n',
-        token_uri: 'https://oauth2.googleapis.com/token',
-      })
 
       mockFetch
         .mockResolvedValueOnce({
@@ -157,7 +133,6 @@ describe('merchant/client', () => {
           json: async () => ({ offerId: 'SKU-001', kind: 'content#product' }),
         })
 
-      vi.resetModules()
       const { upsertProduct } = await import('@/lib/merchant/client')
       const result = await upsertProduct(fakeProduct as any).catch(() => null)
       expect(result === null || typeof result === 'object').toBe(true)
@@ -170,12 +145,6 @@ describe('merchant/client', () => {
         { batchId: 0, merchantId: '12345', method: 'insert', product: { offerId: 'SKU-001' } },
       ]
 
-      process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({
-        client_email: 'test@project.iam.gserviceaccount.com',
-        private_key: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n',
-        token_uri: 'https://oauth2.googleapis.com/token',
-      })
-
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -186,7 +155,6 @@ describe('merchant/client', () => {
           json: async () => ({ entries: [{ batchId: 0, product: { offerId: 'SKU-001' } }] }),
         })
 
-      vi.resetModules()
       const { customBatchUpsert } = await import('@/lib/merchant/client')
       const result = await customBatchUpsert(entries as any).catch(() => null)
       expect(result === null || typeof result === 'object').toBe(true)
@@ -195,12 +163,6 @@ describe('merchant/client', () => {
 
   describe('deleteProductByOfferId', () => {
     it('calls delete endpoint', async () => {
-      process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({
-        client_email: 'test@project.iam.gserviceaccount.com',
-        private_key: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n',
-        token_uri: 'https://oauth2.googleapis.com/token',
-      })
-
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -211,7 +173,6 @@ describe('merchant/client', () => {
           json: async () => ({}),
         })
 
-      vi.resetModules()
       const { deleteProductByOfferId } = await import('@/lib/merchant/client')
       await expect(deleteProductByOfferId('SKU-001').catch(() => {})).resolves.not.toThrow()
     })
@@ -219,12 +180,6 @@ describe('merchant/client', () => {
 
   describe('listProducts', () => {
     it('returns product list', async () => {
-      process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({
-        client_email: 'test@project.iam.gserviceaccount.com',
-        private_key: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n',
-        token_uri: 'https://oauth2.googleapis.com/token',
-      })
-
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -235,19 +190,12 @@ describe('merchant/client', () => {
           json: async () => ({ resources: [{ offerId: 'SKU-001' }], nextPageToken: null }),
         })
 
-      vi.resetModules()
       const { listProducts } = await import('@/lib/merchant/client')
       const result = await listProducts().catch(() => null)
       expect(result === null || typeof result === 'object').toBe(true)
     })
 
     it('accepts pageToken for pagination', async () => {
-      process.env.GOOGLE_SERVICE_ACCOUNT_JSON = JSON.stringify({
-        client_email: 'test@project.iam.gserviceaccount.com',
-        private_key: '-----BEGIN RSA PRIVATE KEY-----\nfake\n-----END RSA PRIVATE KEY-----\n',
-        token_uri: 'https://oauth2.googleapis.com/token',
-      })
-
       mockFetch
         .mockResolvedValueOnce({
           ok: true,
@@ -258,7 +206,6 @@ describe('merchant/client', () => {
           json: async () => ({ resources: [], nextPageToken: null }),
         })
 
-      vi.resetModules()
       const { listProducts } = await import('@/lib/merchant/client')
       const result = await listProducts('page-token-abc').catch(() => null)
       expect(result === null || typeof result === 'object').toBe(true)
