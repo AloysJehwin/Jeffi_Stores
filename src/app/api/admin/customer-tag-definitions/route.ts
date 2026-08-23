@@ -19,7 +19,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (admin.role !== 'super_admin') return NextResponse.json({ error: 'Super admin only' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { tag, color } = await req.json()
   const trimmed = String(tag || '').trim().toLowerCase().replace(/\s+/g, '-').slice(0, 60)
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   const admin = await authenticateAdmin(req)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (admin.role !== 'super_admin') return NextResponse.json({ error: 'Super admin only' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'customers:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const id = req.nextUrl.searchParams.get('id')
   if (!id) return NextResponse.json({ error: 'id required' }, { status: 400 })

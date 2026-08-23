@@ -3,11 +3,12 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction } from '@/lib/db'
 import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear, round2 } from '@/lib/gst'
-import { lineItemFromMrpIncl } from '@/lib/pricing'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/shelf'
 import { deleteBatchIfEmpty } from '@/lib/inventory-deduct'
+import { getFeatureFlags } from '@/lib/site-controls'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +43,11 @@ export async function PATCH(
     const sellerStateCode = process.env.BUSINESS_STATE_CODE || '33'
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
 
+    // GST + inventory flags read once. When GST is off, invoice lines carry NO tax
+    // (gst_rate 0, zero CGST/SGST/IGST) and are charged at the ex-GST equivalent —
+    // same rule as cash-sale / orders-create.
+    const { gstEnabled, inventoryValidationEnabled } = await getFeatureFlags()
+
     let subtotal = 0
     let totalTaxable = 0
     let totalCgst = 0
@@ -55,6 +61,38 @@ export async function PATCH(
       const baseQty = qty * factor
       const discPct = parseFloat(item.discount_pct || '0') || 0
       const gstRate = parseFloat(item.gst_rate || '18')
+
+      if (!gstEnabled) {
+        // GST off ⇒ strip tax from the incl-GST price, apply discount, write zero tax.
+        const exUnit = gstRate > 0 ? unitPrice / (1 + gstRate / 100) : unitPrice
+        const lineTotal = round2(lineItemExGst(baseQty, exUnit, discPct))
+        subtotal += lineTotal
+        return {
+          product_id: item.product_id || null,
+          product_name: item.product_name,
+          product_sku: item.product_sku || '',
+          variant_id: item.variant_id || null,
+          sub_variant_id: item.sub_variant_id || null,
+          variant_name: item.variant_name || null,
+          hsn_code: item.hsn_code || null,
+          gst_rate: 0,
+          quantity: qty,
+          buy_unit: item.buy_unit || null,
+          sold_unit_factor: factor > 1 ? factor : null,
+          base_quantity: factor > 1 ? baseQty : null,
+          unit_price: unitPrice,
+          mrp: unitPrice,
+          discount_pct: discPct,
+          discount_amount: discPct > 0 ? round2(baseQty * exUnit * (discPct / 100)) : 0,
+          total_price: lineTotal,
+          taxable_amount: 0,
+          cgst_amount: 0,
+          sgst_amount: 0,
+          igst_amount: 0,
+          tax_amount: 0,
+        }
+      }
+
       const lineTotal = round2(lineItemFromMrpIncl(baseQty, unitPrice, discPct, gstRate))
       const gst = calculateGST(lineTotal, gstRate, orderIsIgst)
 
@@ -109,7 +147,7 @@ export async function PATCH(
 
       const insufficientItems: string[] = []
 
-      for (const item of processedItems) {
+      for (const item of (inventoryValidationEnabled ? processedItems : [])) {
         if (!item.product_id) continue
         const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`
         const previousQty = existingQtyMap.get(key) ?? 0
@@ -231,7 +269,7 @@ export async function PATCH(
         savedItemIds.push({ product_id: item.product_id, variant_id: item.variant_id ?? null, order_item_id: inserted.rows[0].id })
       }
 
-      if (!moveToDraft) {
+      if (!moveToDraft && inventoryValidationEnabled) {
         for (const item of processedItems) {
           if (!item.product_id) continue
           const key = `${item.product_id}::${item.variant_id ?? ''}::${item.sub_variant_id ?? ''}`

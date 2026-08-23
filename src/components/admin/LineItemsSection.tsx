@@ -9,6 +9,7 @@ import { round2 } from '@/lib/gst'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
+import CopySku from '@/components/ui/CopySku'
 
 export interface SellUnit {
   unit: string
@@ -83,6 +84,59 @@ export function newLineItem(): LineItem {
     buy_unit: null, buy_mode: null, sell_unit_factor: 1, sell_unit_dimension: null,
     available_units: [], selected_unit_key: '',
     unit_price: 0, discount_pct: 0, mrp: 0, inventory_quantity: null,
+  }
+}
+
+// Build a seed LineItem from a resolved product suggestion. Units are left empty on
+// purpose — LineItemsSection's mount backfill effect hydrates available_units from the
+// product_id. Used for deep-link preseed (scan → quick action) so a scanned product
+// lands as the first line item. Mirrors the internal buildLineItemFromSuggestion.
+export function seedLineItemFromSuggestion(s: {
+  product_id: string; variant_id?: string | null; sub_variant_id?: string | null
+  name: string; variant_name?: string | null; sku: string
+  base_price?: number | null; price_ex_gst?: number | null; mrp?: number | null
+  gst_percentage?: number | null; hsn_code?: string | null
+  inventory_quantity?: number | null; discount_pct?: number | null; serialized?: boolean | null
+}): LineItem {
+  const mrp = Number(s.mrp) || 0
+  const basePrice = Number(s.base_price) || 0
+  const priceExGst = Number(s.price_ex_gst) || 0
+  const gstRate = Number(s.gst_percentage ?? 18)
+  const discount_pct = s.discount_pct != null ? Number(s.discount_pct) : mrpDiscountPct(mrp, basePrice)
+  const unit_price = mrp > 0 ? mrp : round2(basePrice * (1 + gstRate / 100))
+  return {
+    ...newLineItem(),
+    product_id: s.product_id,
+    product_name: s.variant_name ? `${s.name} — ${s.variant_name}` : s.name,
+    product_sku: s.sku,
+    variant_id: s.variant_id ?? null,
+    sub_variant_id: s.sub_variant_id ?? null,
+    variant_name: s.variant_name || '',
+    hsn_code: s.hsn_code || '',
+    gst_rate: String(Math.round(gstRate)),
+    unit_price,
+    price_ex_gst: priceExGst || undefined,
+    discount_pct,
+    mrp,
+    inventory_quantity: s.inventory_quantity ?? null,
+    serialized: s.serialized ?? false,
+  }
+}
+
+// Resolve a product/variant id to a suggestion via the shared scan resolver, then seed
+// a LineItem. Returns null if the product can't be resolved. Reused by deep-link preseed.
+export async function fetchSeedLineItem(productId: string, variantId?: string | null): Promise<LineItem | null> {
+  try {
+    const res = await fetch('/api/admin/scan/resolve', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+      body: JSON.stringify({ code: variantId || productId }),
+    })
+    const data = await res.json().catch(() => ({}))
+    const item = data?.item
+    if (!item || !item.product_id) return null
+    return seedLineItemFromSuggestion(item)
+  } catch {
+    return null
   }
 }
 
@@ -700,7 +754,7 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-foreground truncate">{item.product_name}</p>
                       <div className="flex items-center gap-2 mt-0.5">
-                        {item.product_sku && <p className="text-xs text-foreground-muted font-mono">{item.product_sku}</p>}
+                        {item.product_sku && <p className="text-xs text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{item.product_sku}<CopySku sku={item.product_sku} /></span></p>}
                         {assignedBatchLabels?.[item.id] ? (
                           <button type="button" onClick={() => onStockBadgeClick?.(item)} className="text-xs font-medium px-1.5 py-0.5 rounded-full cursor-pointer hover:opacity-80 transition-opacity bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400">
                             Batch: {assignedBatchLabels[item.id]}
@@ -1164,7 +1218,7 @@ export default function LineItemsSection({ items, onChange, onStockBadgeClick, a
                                   <span className="font-medium text-foreground">{s.name}</span>
                                 )}
                               </td>
-                              <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{s.sku}</td>
+                              <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{s.sku}{s.sku && <CopySku sku={s.sku} />}</span></td>
                               <td className="px-4 py-2.5 text-right text-foreground font-medium">
                                 {s.base_price != null ? `₹${s.base_price}` : '—'}
                               </td>

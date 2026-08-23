@@ -4,7 +4,7 @@ import { getHost } from '@/lib/get-host'
 import { revalidatePath } from 'next/cache'
 import { getAllCategories, getAllBrands, getProduct } from '@/lib/queries'
 import { query, queryOne, queryMany } from '@/lib/db'
-import { publishProductDraft } from '@/lib/product-draft'
+import { publishProductDraft, openOrdersForProduct } from '@/lib/product-draft'
 import { generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
@@ -172,6 +172,15 @@ async function updateProduct(productId: string, formData: FormData) {
     if (errors.length > 0) {
       throw new Error(errors[0])
     }
+
+    // Block publish while open (pending/confirmed) orders reference this product —
+    // publishing could remove variants / rename SKUs and break their committed stock.
+    const blockingOrders = await openOrdersForProduct(productId)
+    if (blockingOrders.length > 0) {
+      throw new Error(
+        `Cannot publish: ${blockingOrders.length} open order(s) (${blockingOrders.join(', ')}) are pending/confirmed. Move them past 'confirmed' or cancel them before publishing.`
+      )
+    }
   }
   const imageCount = parseInt(formData.get('image_count') as string || '0')
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
@@ -308,7 +317,7 @@ async function updateProduct(productId: string, formData: FormData) {
          ON CONFLICT (product_id) DO UPDATE SET
            fields = EXCLUDED.fields,
            variants = COALESCE(EXCLUDED.variants, product_drafts.variants),
-           images = EXCLUDED.images,
+           images = product_drafts.images,
            sub_variants = product_drafts.sub_variants,
            units = product_drafts.units,
            updated_at = NOW()`,
@@ -834,8 +843,8 @@ export default async function EditProductPage({ params, searchParams }: { params
   const hasInventory = hasScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
   const hasReturns = hasScope(session?.role ?? '', session?.scopes ?? [], 'returns:read')
 
-  const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown>; variants: Record<string, unknown>[] }>(
-    `SELECT product_id, fields, variants FROM product_drafts WHERE product_id = $1`,
+  const draftRow = await queryOne<{ product_id: string; fields: Record<string, unknown>; variants: Record<string, unknown>[]; sub_variants: Record<string, unknown>[]; images: Record<string, unknown>[] }>(
+    `SELECT product_id, fields, variants, sub_variants, images FROM product_drafts WHERE product_id = $1`,
     [id]
   )
   const isDraft = !!draftRow
@@ -856,8 +865,46 @@ export default async function EditProductPage({ params, searchParams }: { params
     draftRow!.variants.some((v: any) => v.sku && v.id)
     ? draftRow!.variants
     : null
+
+  // Distribute draft sub_variants onto their parent variant so the form's initial
+  // render reflects DRAFT sub-variant edits (add/remove/rename), not just live. The
+  // draft column is a complete per-variant snapshot (seeded at draft-entry), so for
+  // any variant present in the draft sub_variants we replace its `.sub_variants`;
+  // variants absent from the draft keep their live sub-variants. Cleared sentinels
+  // and internal markers are stripped.
+  const draftSubVariants = isDraft && Array.isArray(draftRow?.sub_variants) ? draftRow!.sub_variants : []
+  function withDraftSubVariants(variantList: any[]): any[] {
+    if (draftSubVariants.length === 0) return variantList
+    const byVariant = new Map<string, any[]>()
+    for (const sv of draftSubVariants as any[]) {
+      if (sv._cleared || !sv.variant_id || !sv.sub_variant_name) continue
+      const list = byVariant.get(sv.variant_id) || []
+      const { _seeded, _edited, ...clean } = sv
+      list.push(clean)
+      byVariant.set(sv.variant_id, list)
+    }
+    return (variantList || []).map((v: any) =>
+      byVariant.has(v.id) ? { ...v, sub_variants: byVariant.get(v.id) } : v
+    )
+  }
+
+  const mergedVariants = draftVariants
+    ? withDraftSubVariants(draftVariants as any[])
+    : withDraftSubVariants((product as any)?.product_variants || [])
+
+  // Feed DRAFT images to the form so removals/reorders/primary changes persist across
+  // reopen. The draft images carry their real `id` (kept at draft-entry + autosave),
+  // which the ImageUpload widget needs for keep/remove. Fall back to live images only
+  // if the draft somehow has none (older drafts created before ids were kept).
+  const draftImages = isDraft && Array.isArray(draftRow?.images) ? draftRow!.images : []
+  const draftImagesUsable = draftImages.length > 0 && draftImages.every((img: any) => img && img.id)
   const productForForm = isDraft && draftRow?.fields
-    ? { ...product, ...draftRow.fields, ...(draftVariants ? { product_variants: draftVariants } : {}) }
+    ? {
+        ...product,
+        ...draftRow.fields,
+        product_variants: mergedVariants,
+        ...(draftImagesUsable ? { product_images: draftImages } : {}),
+      }
     : product
 
   // On-hand stock grains for the "assign existing stock" bootstrap. These MUST be

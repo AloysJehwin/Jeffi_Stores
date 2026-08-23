@@ -29,6 +29,7 @@ vi.mock('@/lib/gst', () => ({
 
 vi.mock('@/lib/pricing', () => ({
   lineItemFromMrpIncl: vi.fn(),
+  lineItemExGst: vi.fn(),
 }))
 
 vi.mock('@/lib/inventory', () => ({
@@ -53,6 +54,10 @@ vi.mock('@/lib/inventory-deduct', () => ({
   deleteBatchIfEmpty: vi.fn().mockResolvedValue(undefined),
 }))
 
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: vi.fn().mockResolvedValue({}),
+}))
+
 // ---------------------------------------------------------------------------
 // Import handlers AFTER mocks
 // ---------------------------------------------------------------------------
@@ -63,10 +68,11 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, withTransaction } from '@/lib/db'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { isInterState, calculateGST, generateInvoiceNumber, getNextInvoiceSequence, getFinancialYear } from '@/lib/gst'
-import { lineItemFromMrpIncl } from '@/lib/pricing'
+import { lineItemFromMrpIncl, lineItemExGst } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
 import { syncPerishableStock, decrementNonPerishableShelfStock } from '@/lib/shelf'
 import { deleteBatchIfEmpty } from '@/lib/inventory-deduct'
+import { getFeatureFlags } from '@/lib/site-controls'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -151,6 +157,8 @@ describe('PATCH /api/admin/invoices/[id]', () => {
     vi.mocked(getNextInvoiceSequence).mockResolvedValue(1 as any)
     vi.mocked(getFinancialYear).mockReturnValue('24-25')
     vi.mocked(lineItemFromMrpIncl).mockReturnValue(100)
+    vi.mocked(lineItemExGst).mockReturnValue(100)
+    vi.mocked(getFeatureFlags).mockResolvedValue({ gstEnabled: true, inventoryValidationEnabled: true } as any)
     vi.mocked(logStockMovement).mockResolvedValue(undefined)
     vi.mocked(sendInvoiceFinalizedEmail).mockResolvedValue(undefined as any)
     vi.mocked(syncPerishableStock).mockResolvedValue(undefined as any)

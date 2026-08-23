@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { getHost } from '@/lib/get-host'
+import { ap } from '@/lib/admin-path'
 import { queryMany } from '@/lib/db'
 import { generateLabelPDF, generateLabelSheetPDF, LABEL_SIZES, LabelProduct, LabelSize } from '@/lib/label-pdf'
 
@@ -10,7 +12,7 @@ export async function POST(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'labels:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    const { product_ids, size, copies, sheet, showPrice } = await request.json()
+    const { product_ids, size, copies, sheet, showPrice, qrAction } = await request.json()
 
     if (!Array.isArray(product_ids) || product_ids.length === 0) {
       return NextResponse.json({ error: 'product_ids required' }, { status: 400 })
@@ -107,7 +109,18 @@ export async function POST(request: NextRequest) {
       .map(id => results.find(r => r.id === id))
       .filter(Boolean) as LabelProduct[]
 
-    const orderedWithPrice = ordered.map(p => ({ ...p, showPrice: showPrice === true }))
+    const host = await getHost()
+    const orderedWithPrice = ordered.map(p => {
+      const item: LabelProduct = { ...p, showPrice: showPrice === true }
+      if (qrAction === true && p.product_id) {
+        const params = new URLSearchParams({ scan_pid: p.product_id })
+        if (p.variant_id) params.set('scan_vid', String(p.variant_id))
+        if (p.sku) params.set('scan_sku', p.sku)
+        const proto = process.env.NODE_ENV === 'production' ? 'https' : 'http'
+        item.qrUrl = `${proto}://${host}${ap(`/admin/dashboard?${params.toString()}`, host)}`
+      }
+      return item
+    })
 
     const pdfBuffer = sheet
       ? await generateLabelSheetPDF(orderedWithPrice, size as LabelSize, copiesNum)

@@ -123,11 +123,11 @@ describe('GET /api/admin/gst/gstr1', () => {
     expect(res.status).toBe(400)
   })
 
-  it('returns 401 when user is not super_admin', async () => {
+  it('returns 403 when authenticated but missing gst:read scope', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(REGULAR_ADMIN as any)
 
     const res = await GET(makeReq('http://localhost/api/admin/gst/gstr1?from=2024-04-01&to=2024-04-30'))
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(403)
   })
 
   it('returns 401 when unauthenticated', async () => {

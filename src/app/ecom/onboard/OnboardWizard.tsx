@@ -15,10 +15,11 @@ const STEPS = [
   { id: 3, label: 'GST',        icon: 'gst',      desc: 'Certificate & number' },
   { id: 4, label: 'Warehouse',  icon: 'warehouse', desc: 'Pickup address' },
   { id: 5, label: 'Bank',       icon: 'bank',     desc: 'Payout account' },
-  { id: 6, label: 'Review',     icon: 'review',   desc: 'Submit for approval' },
+  { id: 6, label: 'Branding',   icon: 'branding', desc: 'Logo, seal & consent' },
+  { id: 7, label: 'Review',     icon: 'review',   desc: 'Submit for approval' },
 ] as const
 
-type StepIdx = 0 | 1 | 2 | 3 | 4 | 5 | 6
+type StepIdx = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7
 
 const PRODUCT_CATEGORIES = [
   'Electronics & Gadgets', 'Fashion & Apparel', 'Home & Kitchen',
@@ -53,6 +54,7 @@ function StepIcon({ icon, className }: { icon: string; className?: string }) {
     warehouse: <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 21v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21m0 0h4.5V3.545M12.75 21h7.5V10.75M2.25 21h1.5m18 0h-18M2.25 9l4.5-1.636M18.75 3l-1.5.545m0 6.205 3 1m1.5.5-1.5-.5M6.75 7.364V3h-3v18m3-13.636 10.5-3.819" /></svg>,
     bank:      <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0 0 12 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75Z" /></svg>,
     review:    <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" /></svg>,
+    branding:  <svg className={cls} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="m2.25 15.75 5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M18 6h.008v.008H18V6ZM3.75 4.5h16.5a1.5 1.5 0 0 1 1.5 1.5v12a1.5 1.5 0 0 1-1.5 1.5H3.75a1.5 1.5 0 0 1-1.5-1.5V6a1.5 1.5 0 0 1 1.5-1.5Z" /></svg>,
   }
   return icons[icon] ?? null
 }
@@ -102,6 +104,16 @@ export default function OnboardWizard({ plans, initialDraft }: {
   const [bankVerified, setBankVerified] = useState(init.bankVerified ?? false)
   const [bankMsg, setBankMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
+  // Step 6 — Branding & Legals
+  const [mobile, setMobile] = useState(init.mobile ?? '')
+  const [logoS3Key, setLogoS3Key] = useState(init.logoS3Key ?? '')
+  const [logoUrl, setLogoUrl] = useState(init.logoUrl ?? '')
+  const [sealS3Key, setSealS3Key] = useState(init.sealS3Key ?? '')
+  const [sealUrl, setSealUrl] = useState(init.sealUrl ?? '')
+  const [uploadingBrand, setUploadingBrand] = useState<'logo' | 'seal' | null>(null)
+  const [brandErr, setBrandErr] = useState<string | null>(null)
+  const [legalsAccepted, setLegalsAccepted] = useState(init.legalsAccepted ?? false)
+
   // Restore-on-re-onboard — detect a backup from a previously deprovisioned store.
   const [restoreBackup, setRestoreBackup] = useState<{ capturedAt: string } | null>(null)
   const [restoreOptIn, setRestoreOptIn] = useState<boolean>(init.restorePreviousData ?? false)
@@ -123,14 +135,14 @@ export default function OnboardWizard({ plans, initialDraft }: {
   // ── Auto-save draft ──────────────────────────────────────────────────────────
   const autosave = useCallback(async (nextStep: StepIdx) => {
     setSaving(true)
-    const data = { planSlug, interval, displayName, slug: effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, wh, bank, bankVerified, restorePreviousData: restoreBackup ? restoreOptIn : false }
+    const data = { planSlug, interval, displayName, slug: effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, wh, bank, bankVerified, mobile, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restorePreviousData: restoreBackup ? restoreOptIn : false }
     await fetch('/api/ecom/onboard/draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ step: nextStep, data }),
     }).catch(() => {})
     setSaving(false)
-  }, [planSlug, interval, displayName, effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, wh, bank, bankVerified, restoreBackup, restoreOptIn])
+  }, [planSlug, interval, displayName, effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, wh, bank, bankVerified, mobile, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restoreBackup, restoreOptIn])
 
   async function goTo(next: StepIdx) {
     await autosave(next)
@@ -150,6 +162,21 @@ export default function OnboardWizard({ plans, initialDraft }: {
       setGstS3Key(data.s3Key)
       setGstFilename(file.name)
     } catch { setGstErr('Network error') } finally { setUploadingGst(false) }
+  }
+
+  // ── Logo / seal upload (owner-scoped branding assets, public) ────────────────
+  async function uploadBrand(kind: 'logo' | 'seal', file: File) {
+    setUploadingBrand(kind); setBrandErr(null)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('kind', kind)
+      const res = await fetch('/api/ecom/onboard/brand-upload', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (!res.ok) { setBrandErr(data.error || 'Upload failed'); return }
+      if (kind === 'logo') { setLogoS3Key(data.s3Key); setLogoUrl(data.url) }
+      else { setSealS3Key(data.s3Key); setSealUrl(data.url) }
+    } catch { setBrandErr('Network error') } finally { setUploadingBrand(null) }
   }
 
   // ── Bank verify — Razorpay FAV (instant, no UTR entry needed) ───────────────
@@ -182,12 +209,17 @@ export default function OnboardWizard({ plans, initialDraft }: {
           businessName: bizName, businessType: bizType, pan, businessAddress: bizAddress,
           gstNumber, gstCertS3Key: gstS3Key || undefined,
           dailyPayout, warehouse: wh,
+          mobile: mobile || undefined,
+          logoS3Key: logoS3Key || undefined, sealS3Key: sealS3Key || undefined,
+          legalsAccepted,
           restorePreviousData: restoreBackup ? restoreOptIn : undefined,
         }),
       })
       const data = await res.json()
       if (!res.ok) { setErr(data.error || 'Submission failed'); return }
-      router.push('/dashboard')
+      // Application submitted → tenant is pending_approval (NOT paid/live). Stay in the onboard
+      // flow, which shows the 'under review' → payment states. Only a live store goes to /dashboard.
+      router.push('/onboard')
       router.refresh()
     } catch { setErr('Network error') } finally { setBusy(false) }
   }
@@ -200,10 +232,11 @@ export default function OnboardWizard({ plans, initialDraft }: {
     if (step === 3) return gstNumber.trim().length === 15
     if (step === 4) return true
     if (step === 5) return bankVerified
+    if (step === 6) return /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '').slice(-10)) && !!logoS3Key && legalsAccepted
     return true
   }
 
-  const isLast = step === 6
+  const isLast = step === 7
 
   return (
     <div className="flex min-h-[calc(100vh-56px)] bg-surface-secondary">
@@ -492,6 +525,44 @@ export default function OnboardWizard({ plans, initialDraft }: {
           {/* ── Step 6: Review ── */}
           {step === 6 && (
             <div className="w-full max-w-xl">
+              <h1 className="text-3xl font-bold text-foreground mb-1">Branding & legals</h1>
+              <p className="text-foreground-muted mb-8">Your logo and seal appear on your storefront and legal documents.</p>
+
+              <div className="mb-6">
+                <label className={lbl}>Mobile number</label>
+                <input className={inp} inputMode="numeric" placeholder="10-digit mobile"
+                  value={mobile} onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))} />
+                <p className="text-xs text-foreground-muted mt-1">Used for account + payout notifications.</p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 mb-6">
+                {([['logo', 'Store logo', logoS3Key, logoUrl], ['seal', 'Store seal', sealS3Key, sealUrl]] as const).map(([kind, label, key, url]) => (
+                  <div key={kind}>
+                    <label className={lbl}>{label}{kind === 'logo' ? ' *' : ' (optional)'}</label>
+                    <label className="flex flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border-default bg-surface p-4 cursor-pointer hover:border-accent-500 transition-colors min-h-[112px]">
+                      {url
+                        ? <img src={url} alt={label} className="max-h-16 object-contain" />
+                        : <span className="text-xs text-foreground-muted text-center">{uploadingBrand === kind ? 'Uploading…' : `Upload ${label.toLowerCase()}`}</span>}
+                      <input type="file" accept=".png,.jpg,.jpeg,.webp" className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadBrand(kind, f) }} />
+                    </label>
+                    {key && <p className="text-[10px] text-green-600 dark:text-green-400 mt-1">✓ uploaded</p>}
+                  </div>
+                ))}
+              </div>
+              {brandErr && <p className="text-sm text-red-600 dark:text-red-400 mb-4">{brandErr}</p>}
+
+              <label className="flex items-start gap-3 rounded-xl border border-border-default bg-surface p-4 cursor-pointer">
+                <input type="checkbox" className="mt-0.5" checked={legalsAccepted} onChange={(e) => setLegalsAccepted(e.target.checked)} />
+                <span className="text-sm text-foreground-secondary">
+                  I agree to the <a href="/legal/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline">Terms</a> and <a href="/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline">Privacy Policy</a>, and authorize generation of my store&apos;s legal pages from these details.
+                </span>
+              </label>
+            </div>
+          )}
+
+          {step === 7 && (
+            <div className="w-full max-w-xl">
               <h1 className="text-3xl font-bold text-foreground mb-1">Review & submit</h1>
               <p className="text-foreground-muted mb-8">We&apos;ll review your GST certificate and notify you when your store is approved.</p>
               <div className="rounded-2xl border border-border-default bg-surface-elevated divide-y divide-border-default/60 overflow-hidden mb-6">
@@ -505,6 +576,10 @@ export default function OnboardWizard({ plans, initialDraft }: {
                   ['GST cert', gstFilename || 'Not uploaded'],
                   ['Bank', bankVerified ? `${bank.holderName} · ${bank.accountNumber}` : 'Not verified'],
                   ['Payouts', dailyPayout ? 'Daily (+5%)' : 'Weekly'],
+                  ['Mobile', mobile || '—'],
+                  ['Logo', logoS3Key ? 'Uploaded' : 'Not uploaded'],
+                  ['Seal', sealS3Key ? 'Uploaded' : 'Not uploaded'],
+                  ['Legal terms', legalsAccepted ? 'Accepted' : 'Not accepted'],
                   ...(restoreBackup ? [['Restore data', restoreOptIn ? `Yes — from ${new Date(restoreBackup.capturedAt).toLocaleDateString('en-IN')}` : 'No — start fresh'] as [string, string]] : []),
                 ].map(([k, v]) => (
                   <div key={k} className="flex items-start justify-between px-5 py-3 text-sm gap-4">
@@ -561,7 +636,7 @@ export default function OnboardWizard({ plans, initialDraft }: {
           )}
           {isLast && step > 0 && (
             <div className="mt-6 w-full max-w-xl">
-              <button type="button" onClick={() => goTo(5 as StepIdx)}
+              <button type="button" onClick={() => goTo(6 as StepIdx)}
                 className="px-5 py-2.5 rounded-xl text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
                 ← Back
               </button>

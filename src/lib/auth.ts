@@ -51,6 +51,7 @@ export function hasAdminRole(session: any, requiredRole: string = 'admin') {
   if (!session?.admin) return false
 
   const roleHierarchy: Record<string, number> = {
+    administrator: 4,
     super_admin: 3,
     admin: 2,
     moderator: 1,

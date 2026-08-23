@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { hasScope } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/scopes'
 import { listTenants, tenantSummary } from '@/lib/tenant-registry'
 import { EcomHero, EcomFilters } from '@/components/admin/ecom/EcomUI'
 
@@ -17,8 +17,7 @@ const DOT: Record<string, string> = {
 export default async function EcomStoreStatusPage({ searchParams }: { searchParams: Promise<SP> }) {
   const h = await headers()
   const role = h.get('x-user-role') || ''
-  const scopes = (h.get('x-user-scopes') || '').split(',').filter(Boolean)
-  if (role !== 'super_admin' && !hasScope(role, scopes, 'ecom_customers:read')) redirect('/admin')
+  if (!isPlatformAdmin(role)) redirect('/admin')
 
   const sp = await searchParams
   const [tenants, summary] = await Promise.all([

@@ -8,6 +8,7 @@ import { pickUnitPrice } from '@/lib/pricing'
 import type { Metadata } from 'next'
 import CompareChangeButton from '@/components/visitor/CompareChangeButton'
 import CompareAddButton from '@/components/visitor/CompareAddButton'
+import CopySku from '@/components/ui/CopySku'
 
 export const dynamic = 'force-dynamic'
 export const metadata: Metadata = { title: 'Compare Products | Jeffi Stores' }
@@ -245,6 +246,7 @@ export default async function ComparePage({
                           className={`p-4 text-sm text-foreground align-top ${isDiff ? 'bg-amber-50 dark:bg-amber-900/10' : ''}`}
                         >
                           {val ?? <span className="text-foreground-muted">—</span>}
+                          {label === 'SKU' && val && <CopySku sku={String(val)} className="ml-1" />}
                         </td>
                       )
                     })}

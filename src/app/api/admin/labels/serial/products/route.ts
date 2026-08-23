@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { buildProductSearchClause, buildProductSearchRank } from '@/lib/search'
 import { queryMany } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
@@ -18,10 +19,17 @@ export async function GET(request: NextRequest) {
 
     const q = (request.nextUrl.searchParams.get('q') || '').trim()
     const params: any[] = []
-    let where = `ps.status = 'in_stock'`
+    let searchClause = 'TRUE'
+    let rank = 'p.name'
     if (q) {
+      const sc = buildProductSearchClause(q, 'p.name', 'p.sku', 'p.search_vector', 1)
+      params.push(...sc.params)
+      const varIdx = sc.nextIdx
       params.push(`%${q}%`)
-      where += ` AND (p.name ILIKE $${params.length} OR p.sku ILIKE $${params.length} OR pv.variant_name ILIKE $${params.length})`
+      searchClause = `(${sc.clause} OR pv.variant_name ILIKE $${varIdx})`
+      const rk = buildProductSearchRank(q, 'p.name', 'p.search_vector', varIdx + 1)
+      params.push(...rk.params)
+      rank = rk.rank
     }
 
     const products = await queryMany<any>(
@@ -31,9 +39,9 @@ export async function GET(request: NextRequest) {
        FROM product_serials ps
        JOIN products p ON p.id = ps.product_id
        LEFT JOIN product_variants pv ON pv.id = ps.variant_id
-       WHERE ${where}
-       GROUP BY ps.product_id, ps.variant_id, p.name, p.sku, pv.variant_name
-       ORDER BY p.name ASC, pv.variant_name ASC NULLS FIRST
+       WHERE ps.status = 'in_stock' AND p.serialized = true AND ${searchClause}
+       GROUP BY ps.product_id, ps.variant_id, p.name, p.sku, pv.variant_name, p.search_vector
+       ORDER BY ${q ? `MIN(${rank}) ASC,` : ''} p.name ASC, pv.variant_name ASC NULLS FIRST
        LIMIT 100`,
       params
     )

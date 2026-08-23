@@ -29,6 +29,7 @@ vi.mock('@/lib/site-controls', () => ({
   getFeatureFlags: vi.fn(async () => ({
     razorpayEnabled: false,
     gstEnabled: process.env.ENABLE_GST === 'true',
+    inventoryValidationEnabled: true,
     ondeviceSummaryEnabled: false,
     ondeviceFinetuneEnabled: false,
   })),
@@ -62,6 +63,7 @@ import { lineItemFromMrpIncl } from '@/lib/pricing'
 import { logStockMovement } from '@/lib/inventory'
 import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { parseBody } from '@/lib/validate'
+import { getFeatureFlags, getBusinessValues } from '@/lib/site-controls'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
@@ -159,6 +161,15 @@ describe('POST /api/admin/orders/create', () => {
     vi.resetAllMocks()
     mockLogStock.mockResolvedValue(undefined as any)
     mockSendInvoice.mockResolvedValue(undefined as any)
+    // resetAllMocks wipes factory implementations — re-establish site-controls
+    vi.mocked(getFeatureFlags).mockImplementation(async () => ({
+      razorpayEnabled: false,
+      gstEnabled: process.env.ENABLE_GST === 'true',
+      inventoryValidationEnabled: true,
+      ondeviceSummaryEnabled: false,
+      ondeviceFinetuneEnabled: false,
+    }) as any)
+    vi.mocked(getBusinessValues).mockResolvedValue({ businessStateCode: '22' } as any)
   })
 
   it('returns 401 when unauthenticated', async () => {
@@ -310,7 +321,7 @@ describe('POST /api/admin/orders/create', () => {
     delete process.env.ENABLE_GST
   })
 
-  it('does not generate invoice when GST is disabled', async () => {
+  it('still numbers the order when GST is disabled (tax-free invoice)', async () => {
     delete process.env.ENABLE_GST
     mockAuth.mockResolvedValue(admin as any)
     mockHasScope.mockReturnValue(true)
@@ -323,8 +334,8 @@ describe('POST /api/admin/orders/create', () => {
     const res = await POST(makePost(validOrderBody))
     expect(res.status).toBe(200)
     const data = await res.json()
-    expect(data.invoiceNumber).toBeNull()
-    expect(data.invoiceUrl).toBeNull()
+    expect(data.invoiceNumber).toBe('JS/2024-25/0001')
+    expect(data.invoiceUrl).toBeTruthy()
   })
 
   it('sends invoice email when email provided and order not draft', async () => {

@@ -11,6 +11,7 @@ import { restoreOrderStock } from '@/lib/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { attributeConversion } from '@/lib/marketing'
 import { getCurrentTenant } from '@/lib/tenant-context'
+import { getFeatureFlags } from '@/lib/site-controls'
 import { parseBody } from '@/lib/validate'
 import {
   notifyOrderConfirmed, notifyOrderShipped, notifyOrderDelivered,
@@ -302,7 +303,12 @@ export async function PATCH(
     const statusChanged = status && status !== currentOrder.status
     const paymentStatusChanged = payment_status && payment_status !== currentOrder.payment_status
 
-    if (statusChanged && status === 'processing') {
+    // Basic-plan tenants have no inventory module (flag locked off). When off, skip
+    // ALL stock validation/deduction/restore so a conversion is never blocked by
+    // stock they can't manage — matching the order-create bypass.
+    const { inventoryValidationEnabled } = await getFeatureFlags()
+
+    if (statusChanged && status === 'processing' && inventoryValidationEnabled) {
       const items = await queryMany<any>(
         `SELECT oi.product_id, oi.variant_id, oi.sub_variant_id, oi.quantity, oi.buy_unit, oi.product_name, oi.variant_name,
           CASE
@@ -378,7 +384,7 @@ export async function PATCH(
     // restoreOrderStock resets serials to in_stock, reverses batches, and syncs
     // shelf/central qty; it is idempotent (guards on an existing 'return' row).
     // Orders cancelled before processing never deducted, so this is a no-op.
-    if (statusChanged && status === 'cancelled') {
+    if (statusChanged && status === 'cancelled' && inventoryValidationEnabled) {
       const sale = await queryOne(
         `SELECT 1 FROM inventory_transactions WHERE reference_type = 'order' AND reference_id = $1 AND transaction_type = 'sale' LIMIT 1`,
         [orderId]
@@ -476,15 +482,18 @@ export async function PATCH(
       // selections are respected; requireSerialAssignments preserves the picker
       // contract for serialized items. Idempotent on re-transition.
       await withTransaction(async (client) => {
-        await deductOrderStock(
-          orderId,
-          {
-            batchAssignments: batch_assignments ?? undefined,
-            serialAssignments: serial_assignments ?? undefined,
-            requireSerialAssignments: true,
-          },
-          client
-        )
+        // Skip deduction on Basic (flag off) — no inventory module, nothing to deduct.
+        if (inventoryValidationEnabled) {
+          await deductOrderStock(
+            orderId,
+            {
+              batchAssignments: batch_assignments ?? undefined,
+              serialAssignments: serial_assignments ?? undefined,
+              requireSerialAssignments: true,
+            },
+            client
+          )
+        }
         // Assign the invoice number/document at processing for ALL orders,
         // including COD (never payment_status='paid' until remittance). The PDF is
         // still rendered later by generateOrderInvoice once the order is paid.

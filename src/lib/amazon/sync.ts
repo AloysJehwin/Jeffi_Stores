@@ -1,7 +1,7 @@
 import { queryOne, query } from '@/lib/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
 import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
-import { putListingsItem, patchListingsItem, validateListingsItem, deleteListingsItem, matchAsin, AMAZON_PUSH_DISABLED, SELLER_ID } from './client'
+import { putListingsItem, patchListingsItem, validateListingsItem, deleteListingsItem, matchAsin, AMAZON_PUSH_DISABLED, getSellerId, getMarketplaceId } from './client'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
 // Unlike GMC (which has a /products/batch), SP-API Listings Items is one PUT per SKU, so we
@@ -102,7 +102,7 @@ export async function syncAllProductsToAmazon(): Promise<SyncResult> {
       startedAt: now, finishedAt: now,
     }
   }
-  if (!SELLER_ID) {
+  if (!(await getSellerId())) {
     const now = new Date().toISOString()
     return {
       synced: 0, deleted: 0,
@@ -155,6 +155,7 @@ function trustedAsin(row: any): string | null {
 
 async function resolveListingsForProduct(product: any): Promise<AmazonListing[]> {
   const brand = product.brands?.name || ''
+  const marketplaceId = await getMarketplaceId()
   const hasVariants = product.has_variants && product.product_variants?.length > 0
 
   if (hasVariants) {
@@ -166,10 +167,10 @@ async function resolveListingsForProduct(product: any): Promise<AmazonListing[]>
         gtin: v.gtin || product.gtin, brand, mpn: v.mpn || product.mpn,
         name: `${brand} ${product.name} ${v.variant_name || ''}`.trim(),
       }))?.asin
-      if (asin) out.push(productToAmazonOfferListing(product, asin, v))
+      if (asin) out.push(productToAmazonOfferListing(product, asin, marketplaceId, v))
     }
     if (out.length) return out
-    return productToAmazonListings(product)
+    return productToAmazonListings(product, marketplaceId)
   }
 
   const stored = trustedAsin(product)
@@ -177,8 +178,8 @@ async function resolveListingsForProduct(product: any): Promise<AmazonListing[]>
     gtin: product.gtin, brand, mpn: product.mpn,
     name: `${brand} ${product.name}`.trim(),
   }))?.asin
-  if (asin) return [productToAmazonOfferListing(product, asin)]
-  return productToAmazonListings(product)
+  if (asin) return [productToAmazonOfferListing(product, asin, marketplaceId)]
+  return productToAmazonListings(product, marketplaceId)
 }
 
 async function runFullSync(): Promise<SyncResult> {
@@ -216,7 +217,7 @@ async function runFullSync(): Promise<SyncResult> {
 }
 
 export async function syncProductToAmazon(productId: string): Promise<void> {
-  if (AMAZON_PUSH_DISABLED || !SELLER_ID) return
+  if (AMAZON_PUSH_DISABLED || !(await getSellerId())) return
   const product = await fetchProduct(productId)
   if (!product) return
 
@@ -227,7 +228,7 @@ export async function syncProductToAmazon(productId: string): Promise<void> {
 }
 
 export async function deleteProductFromAmazon(sku: string): Promise<void> {
-  if (AMAZON_PUSH_DISABLED || !SELLER_ID) return
+  if (AMAZON_PUSH_DISABLED || !(await getSellerId())) return
   await deleteListingsItem(sku)
 }
 
@@ -237,7 +238,7 @@ export async function deleteProductFromAmazon(sku: string): Promise<void> {
 export async function validateProductForAmazon(
   productId: string
 ): Promise<Array<{ sku: string; productType: string; requirements?: string; status?: string; issues: any[]; error?: string }>> {
-  if (!SELLER_ID) return [{ sku: '__config__', productType: '', issues: [], error: 'AMAZON_SELLER_ID is not set' }]
+  if (!(await getSellerId())) return [{ sku: '__config__', productType: '', issues: [], error: 'AMAZON_SELLER_ID is not set' }]
   const product = await fetchProduct(productId)
   if (!product) return [{ sku: '__notfound__', productType: '', issues: [], error: 'Product not found' }]
 

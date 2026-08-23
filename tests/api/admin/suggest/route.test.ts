@@ -660,4 +660,143 @@ describe('GET /api/admin/suggest', () => {
     expect(res.status).toBe(200)
     expect((await res.json()).items).toEqual([])
   })
+
+  // ── serial_products / batch_products (suggestScopedLabelProducts) ─────────────
+
+  it('returns serial product suggestions for type=serial_products', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      {
+        id: 'product:p1', name: 'Serial Bolt', variant_name: null, sku: 'SB-1', slug: 'serial-bolt',
+        mrp: 100, price_ex_gst: 85, base_price: 90, gst_percentage: 18,
+        brand_name: 'Unbrako', gtin: '890123', inventory_quantity: 12,
+        product_id: 'p1', sell_unit_id: 'su1', parent_variant_id: null,
+      },
+    ])
+    const res = await GET(makeGet({ q: 'bolt', type: 'serial_products' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items).toHaveLength(1)
+    expect(data.items[0].label).toBe('Serial Bolt')
+    expect(data.items[0].sublabel).toContain('Unbrako')
+    // encoded id uses \x1f separator
+    const parts = data.items[0].id.split('\x1f')
+    expect(parts[0]).toBe('product:p1')
+    expect(parts[2]).toBe('') // variant_name null -> ''
+  })
+
+  it('serial_products: encodes variant name in label when present', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      {
+        id: 'variant:v1', name: 'Bolt', variant_name: 'M8', sku: 'B-M8', slug: 'bolt',
+        mrp: 50, price_ex_gst: 42, base_price: 45, gst_percentage: 18,
+        brand_name: null, gtin: null, inventory_quantity: 5,
+        product_id: 'p1', sell_unit_id: null, parent_variant_id: null,
+      },
+    ])
+    const res = await GET(makeGet({ q: 'bolt', type: 'serial_products' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items[0].label).toBe('Bolt — M8')
+    // no brand → sublabel is just sku
+    expect(data.items[0].sublabel).toBe('B-M8')
+  })
+
+  it('serial_products: encodes empty strings for null numeric/text fields', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      {
+        id: 'subvariant:s1', name: 'Bolt', variant_name: 'M8 (Set)', sku: 'B-S', slug: 'bolt',
+        mrp: null, price_ex_gst: null, base_price: null, gst_percentage: 18,
+        brand_name: null, gtin: null, inventory_quantity: null,
+        product_id: 'p1', sell_unit_id: null, parent_variant_id: 'v1',
+      },
+    ])
+    const res = await GET(makeGet({ q: 'bolt', type: 'serial_products' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    const parts = data.items[0].id.split('\x1f')
+    expect(parts[5]).toBe('0')   // mrp null -> '0'
+    expect(parts[6]).toBe('')    // price_ex_gst null -> ''
+    expect(parts[7]).toBe('0')   // base_price null -> '0'
+    expect(parts[9]).toBe('')    // brand_name null -> ''
+    expect(parts[10]).toBe('')   // gtin null -> ''
+    expect(parts[11]).toBe('0')  // inventory_quantity null -> '0'
+    expect(parts[14]).toBe('v1') // parent_variant_id present
+  })
+
+  it('serial_products: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'bolt', type: 'serial_products' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  it('returns batch product suggestions for type=batch_products', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      {
+        id: 'product:p9', name: 'Perishable Item', variant_name: null, sku: 'PI-1', slug: 'perishable',
+        mrp: 200, price_ex_gst: 170, base_price: 180, gst_percentage: 12,
+        brand_name: 'FreshCo', gtin: null, inventory_quantity: 30,
+        product_id: 'p9', sell_unit_id: null, parent_variant_id: null,
+      },
+    ])
+    const res = await GET(makeGet({ q: 'item', type: 'batch_products' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items[0].label).toBe('Perishable Item')
+    expect(data.items[0].sublabel).toContain('FreshCo')
+  })
+
+  it('batch_products: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'item', type: 'batch_products' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  // ── label_products null-field encoding branches ───────────────────────────────
+
+  it('label_products: encodes empty strings for null numeric/text fields', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue([
+      {
+        id: 'variant:v2', name: 'Nut', variant_name: 'M6', sku: 'N-M6', slug: 'nut',
+        mrp: null, price_ex_gst: null, base_price: null, gst_percentage: 18,
+        brand_name: null, gtin: null, inventory_quantity: null,
+        product_id: 'p3', sell_unit_id: null, parent_variant_id: null,
+      },
+    ])
+    const res = await GET(makeGet({ q: 'nut', type: 'label_products' }))
+    expect(res.status).toBe(200)
+    const data = await res.json()
+    expect(data.items[0].label).toBe('Nut — M6')
+    const parts = data.items[0].id.split('\x1f')
+    expect(parts[5]).toBe('0')   // mrp null -> '0'
+    expect(parts[6]).toBe('')    // price_ex_gst null -> ''
+    expect(parts[7]).toBe('0')   // base_price null -> '0'
+    expect(parts[11]).toBe('0')  // inventory_quantity null -> '0'
+  })
+
+  it('label_products: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'bolt', type: 'label_products' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
+
+  // ── payables label/sublabel + null fallback ───────────────────────────────────
+
+  it('payables: handles null queryMany result', async () => {
+    mockAuth.mockResolvedValue(admin as any)
+    mockQueryMany.mockResolvedValue(null as any)
+    const res = await GET(makeGet({ q: 'acme', type: 'payables' }))
+    expect(res.status).toBe(200)
+    expect((await res.json()).items).toEqual([])
+  })
 })

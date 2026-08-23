@@ -1,6 +1,40 @@
 import { queryOne, queryMany, withTransaction } from '@/lib/db'
 import { recomputeStockStatusForProduct } from '@/lib/inventory'
 
+/**
+ * Returns the order numbers of any OPEN orders (status pending/confirmed) that
+ * reference this product. Publishing a draft can remove variants/sub-variants or
+ * rename SKUs, which forks variant rows and diverges an open order's committed
+ * stock (deduction/restore resolve by FK id, publish merges by SKU). We therefore
+ * block publish while such orders exist. `confirmed` has not yet deducted stock,
+ * `pending` is pre-confirmation — both are still fully mutable and must be safe.
+ */
+export async function openOrdersForProduct(productId: string): Promise<string[]> {
+  const rows = await queryMany<{ order_number: string }>(
+    `SELECT DISTINCT o.order_number
+       FROM order_items oi
+       JOIN orders o ON o.id = oi.order_id
+      WHERE oi.product_id = $1
+        AND o.status IN ('pending', 'confirmed')
+      ORDER BY o.order_number`,
+    [productId]
+  )
+  return rows.map(r => r.order_number)
+}
+
+/** Thrown by publishProductDraft when open orders block the publish. */
+export class OpenOrdersBlockError extends Error {
+  orderNumbers: string[]
+  constructor(orderNumbers: string[]) {
+    super(
+      `Cannot publish: this product has ${orderNumbers.length} open order(s) (${orderNumbers.join(', ')}) in pending/confirmed status. ` +
+      `Publishing could change variants/SKUs and break those orders' stock. Move them past 'confirmed' (or cancel) first.`
+    )
+    this.name = 'OpenOrdersBlockError'
+    this.orderNumbers = orderNumbers
+  }
+}
+
 interface ProductDraft {
   product_id: string
   fields: Record<string, unknown>
@@ -8,6 +42,7 @@ interface ProductDraft {
   images: Record<string, unknown>[]
   sub_variants: Record<string, unknown>[]
   units: Record<string, unknown>[]
+  variant_images: Record<string, unknown>[]
 }
 
 /**
@@ -22,6 +57,11 @@ export async function publishProductDraft(productId: string): Promise<void> {
     [productId]
   )
   if (!draft) throw new Error('Draft not found')
+
+  // Hard gate: never publish while the product has open (pending/confirmed) orders.
+  // This is the last line of defence — callers surface a friendlier message first.
+  const blockingOrders = await openOrdersForProduct(productId)
+  if (blockingOrders.length > 0) throw new OpenOrdersBlockError(blockingOrders)
 
   // Capture the LIVE tracking flags before publishing so we can detect a toggle
   // from ON→OFF and clean up the now-orphaned batch/serial/shelf records below.
@@ -254,6 +294,75 @@ export async function publishProductDraft(productId: string): Promise<void> {
     }
     }
 
+    // ── Reconcile staged variant images → live variant_images ─────────────────
+    // Draft-staged variant images live in product_drafts.variant_images (flat array,
+    // each row tagged variant_id). Rows with a real uuid id are KEPT live rows; rows
+    // with a draft-vi- id are freshly-uploaded S3 files to INSERT. For every variant
+    // present in the stage we reconcile: delete live rows not in the keep-set, insert
+    // new staged rows, then apply display_order + a single is_primary. Runs after the
+    // variant upsert so variant ids are stable. Only variants that appear in the stage
+    // are touched (draft-entry seeds all active variants' images, so the admin clearing
+    // a variant's images shows up as that variant having zero staged rows → cleared).
+    const stagedVI = Array.isArray(draft.variant_images) ? (draft.variant_images as any[]) : []
+    if (stagedVI.length > 0 || validVariants.length > 0) {
+      const byVariant = new Map<string, any[]>()
+      for (const vi of stagedVI) {
+        if (!vi.variant_id) continue
+        const list = byVariant.get(vi.variant_id) || []
+        list.push(vi)
+        byVariant.set(vi.variant_id, list)
+      }
+      // Reconcile each variant that (a) has staged rows, or (b) is an active variant in
+      // this publish (so a cleared-to-zero variant also gets its live images removed).
+      const activeVariantIds = await client.query<{ id: string }>(
+        `SELECT id FROM product_variants WHERE product_id = $1 AND is_active = true`, [productId]
+      )
+      const variantIds = new Set<string>([...byVariant.keys(), ...activeVariantIds.rows.map(r => r.id)])
+      for (const vid of variantIds) {
+        const rows = (byVariant.get(vid) || []).slice().sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0))
+        const keepIds = rows.map(r => r.id).filter((id: any) => id && !String(id).startsWith('draft-vi-'))
+        // Remove live rows no longer kept.
+        await client.query(
+          `DELETE FROM variant_images WHERE variant_id = $1 AND id <> ALL($2::uuid[])`,
+          [vid, keepIds]
+        )
+        // Insert freshly-staged uploads (draft-vi- ids).
+        for (const r of rows) {
+          if (r.id && !String(r.id).startsWith('draft-vi-')) continue // existing live row
+          await client.query(
+            `INSERT INTO variant_images
+               (variant_id, image_url, thumbnail_url, s3_bucket, s3_key, s3_thumbnail_key,
+                file_name, file_size, mime_type, width, height, display_order, is_primary)
+             VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
+            [
+              vid, r.image_url, r.thumbnail_url,
+              r.s3_bucket || (process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'),
+              r.s3_key || null, r.s3_thumbnail_key || null,
+              r.file_name || null, r.file_size ?? null, r.mime_type || null,
+              r.width ?? null, r.height ?? null, r.display_order ?? 0, !!r.is_primary,
+            ]
+          )
+        }
+        // Apply display_order + is_primary for kept (existing) live rows.
+        for (const r of rows) {
+          if (!r.id || String(r.id).startsWith('draft-vi-')) continue
+          await client.query(
+            `UPDATE variant_images SET display_order = $2, is_primary = $3 WHERE id = $1 AND variant_id = $4`,
+            [r.id, r.display_order ?? 0, !!r.is_primary, vid]
+          )
+        }
+        // Guarantee exactly one primary when the variant has any images.
+        const hasPrimary = rows.some(r => r.is_primary)
+        if (!hasPrimary) {
+          await client.query(
+            `UPDATE variant_images SET is_primary = TRUE
+             WHERE id = (SELECT id FROM variant_images WHERE variant_id = $1 ORDER BY display_order ASC, created_at ASC LIMIT 1)`,
+            [vid]
+          )
+        }
+      }
+    }
+
     await client.query(`DELETE FROM product_images WHERE product_id = $1`, [productId])
     await client.query(
       `INSERT INTO product_images (
@@ -275,53 +384,78 @@ export async function publishProductDraft(productId: string): Promise<void> {
     // changes in draft mode. Detected by any of: a _cleared sentinel (deletion), a
     // draft-sv- prefixed id (new row), or a _seeded/_edited marker (the draft now
     // holds the variant's COMPLETE snapshot because an edit/add/delete touched it).
+    // Draft-entry now seeds every sub-variant (with its real id, no marker), so an
+    // untouched product carries them here WITHOUT triggering this block.
     const hasSubVariantChanges = (subVariants as any[]).some(
       (sv: any) => sv._cleared || sv._seeded || sv._edited || (sv.id && String(sv.id).startsWith('draft-sv-'))
     )
     if (hasSubVariantChanges) {
-      const stagedSubVariants = (subVariants as any[]).filter((sv: any) => !sv._cleared && sv.sub_variant_name && sv.variant_id)
+      const num = (x: any): number | null => {
+        if (x == null || x === '') return null
+        const n = Number(x)
+        return Number.isFinite(n) ? n : null
+      }
+      const staged = (subVariants as any[]).filter((sv: any) => !sv._cleared && sv.sub_variant_name && sv.variant_id)
       const clearedVariantIds = new Set(
         (subVariants as any[]).filter((sv: any) => sv._cleared).map((sv: any) => sv.variant_id)
       )
-      const stagedVariantIds = new Set([
-        ...stagedSubVariants.map((sv: any) => sv.variant_id),
+      const touchedVariantIds = new Set<string>([
+        ...staged.map((sv: any) => sv.variant_id),
         ...Array.from(clearedVariantIds),
       ])
-      for (const vid of stagedVariantIds) {
-        const refs = await client.query(
-          `SELECT COUNT(*) FROM order_items WHERE sub_variant_id IN (SELECT id FROM product_sub_variants WHERE variant_id = $1)`,
-          [vid]
+
+      // id-preserving UPSERT per touched variant. A real UUID id → UPDATE in place
+      // (keeps FKs from order_items intact, no churn); a draft-sv- id (or missing) →
+      // INSERT a fresh row. Sub-variants of a touched variant that are absent from
+      // the staged set are SOFT-deactivated (never hard-deleted — order_items FK is
+      // SET NULL and we must preserve order provenance). inventory_quantity is
+      // preserved on UPDATE (managed out-of-band; the draft snapshot drops it), and
+      // the variant/product rollup below recomputes from the active children.
+      for (const vid of touchedVariantIds) {
+        const svsForVariant = staged.filter((sv: any) => sv.variant_id === vid)
+        const keepIds = svsForVariant
+          .map((sv: any) => sv.id)
+          .filter((id: any) => id && !String(id).startsWith('draft-sv-'))
+
+        // Soft-deactivate sub-variants of this variant that the draft dropped.
+        await client.query(
+          `UPDATE product_sub_variants SET is_active = false, updated_at = NOW()
+           WHERE variant_id = $1 AND id <> ALL($2::uuid[])`,
+          [vid, keepIds]
         )
-        if (parseInt(refs.rows[0].count) === 0) {
-          await client.query(`DELETE FROM product_sub_variants WHERE variant_id = $1`, [vid])
-        }
-        const svsForVariant = stagedSubVariants.filter((sv: any) => sv.variant_id === vid)
+
         for (const sv of svsForVariant) {
-          // Coerce empty-string / non-numeric form values to null (numeric columns
-          // reject ""). Draft sub-variants often arrive with price/mrp = "".
-          const num = (x: any): number | null => {
-            if (x == null || x === '') return null
-            const n = Number(x)
-            return Number.isFinite(n) ? n : null
+          const isNew = !sv.id || String(sv.id).startsWith('draft-sv-')
+          if (isNew) {
+            await client.query(
+              `INSERT INTO product_sub_variants (variant_id, product_id, sku, sub_variant_name, price, mrp,
+                 price_ex_gst, mrp_ex_gst, attributes, is_active, inventory_quantity, discount_pct, stock_status,
+                 created_at, updated_at)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
+              [
+                vid, productId, sv.sku || null, sv.sub_variant_name,
+                num(sv.price), num(sv.mrp), num(sv.price_ex_gst), num(sv.mrp_ex_gst),
+                sv.attributes || null, sv.is_active != null ? sv.is_active : true,
+                num(sv.inventory_quantity) ?? 0, num(sv.discount_pct) ?? 0,
+                sv.stock_status || 'In Stock',
+              ]
+            )
+          } else {
+            // UPDATE by id — preserve inventory_quantity (out-of-band source of truth).
+            await client.query(
+              `UPDATE product_sub_variants SET
+                 sku = $3, sub_variant_name = $4, price = $5, mrp = $6,
+                 price_ex_gst = $7, mrp_ex_gst = $8, attributes = COALESCE($9, attributes),
+                 is_active = $10, discount_pct = $11, stock_status = $12, updated_at = NOW()
+               WHERE id = $1 AND product_id = $2`,
+              [
+                sv.id, productId, sv.sku || null, sv.sub_variant_name,
+                num(sv.price), num(sv.mrp), num(sv.price_ex_gst), num(sv.mrp_ex_gst),
+                sv.attributes || null, sv.is_active != null ? sv.is_active : true,
+                num(sv.discount_pct) ?? 0, sv.stock_status || 'In Stock',
+              ]
+            )
           }
-          await client.query(
-            `INSERT INTO product_sub_variants (variant_id, product_id, sku, sub_variant_name, price, mrp,
-               price_ex_gst, mrp_ex_gst, attributes, is_active, inventory_quantity, discount_pct, stock_status,
-               created_at, updated_at)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, NOW(), NOW())`,
-            [
-              vid, productId, sv.sku || null, sv.sub_variant_name,
-              num(sv.price),
-              num(sv.mrp),
-              num(sv.price_ex_gst),
-              num(sv.mrp_ex_gst),
-              sv.attributes || null,
-              sv.is_active != null ? sv.is_active : true,
-              num(sv.inventory_quantity) ?? 0,
-              num(sv.discount_pct) ?? 0,
-              sv.stock_status || 'In Stock',
-            ]
-          )
         }
       }
     }

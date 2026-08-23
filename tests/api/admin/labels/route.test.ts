@@ -22,6 +22,14 @@ vi.mock('@/lib/label-pdf', () => ({
   LABEL_SIZES: [{ size: '40x25' }, { size: '60x40' }],
 }))
 
+vi.mock('@/lib/get-host', () => ({
+  getHost: vi.fn().mockResolvedValue('localhost'),
+}))
+
+vi.mock('@/lib/admin-path', () => ({
+  ap: vi.fn((path: string) => path),
+}))
+
 import { POST } from '@/app/api/admin/labels/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'

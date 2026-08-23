@@ -63,7 +63,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
       <head>
         <script
           dangerouslySetInnerHTML={{
-            __html: `(function(){try{var t=sessionStorage.getItem('jeffi-theme')||localStorage.getItem('jeffi-theme')||sessionStorage.getItem('jeffi-admin-theme')||localStorage.getItem('jeffi-admin-theme');if(t==='dark'){document.documentElement.classList.add('dark')}else if(t==='light'){document.documentElement.classList.remove('dark')}}catch(e){}})()` }}
+            __html: `(function(){try{var k='jeffi-theme';var t=sessionStorage.getItem(k)||localStorage.getItem(k);var d=t==='dark'||(t==='system'&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.classList.toggle('dark',d);}catch(e){}})()` }}
         />
       </head>
       <body className="antialiased bg-surface text-foreground m-0 p-0">

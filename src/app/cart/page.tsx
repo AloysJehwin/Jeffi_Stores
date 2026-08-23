@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
+import CopySku from '@/components/ui/CopySku'
 import CartInsightPanel from '@/components/on-device/CartInsightPanel'
 
 interface AppliedCoupon {
@@ -249,7 +250,7 @@ export default function CartPage() {
                             </span>
                           )}
                           {sku && (
-                            <span className="text-xs text-foreground-muted font-mono">SKU: {sku}</span>
+                            <span className="text-xs text-foreground-muted font-mono">SKU: {sku}<CopySku sku={sku} className="ml-1" /></span>
                           )}
                           {isInactive && (
                             <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300">
@@ -471,7 +472,7 @@ export default function CartPage() {
                                 {item.products.brand_name}
                               </span>
                             )}
-                            {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
+                            {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}<CopySku sku={sku} className="ml-1" /></span>}
                           </div>
                           <div className="flex flex-wrap gap-1 mt-0.5">
                             {item.variant && (

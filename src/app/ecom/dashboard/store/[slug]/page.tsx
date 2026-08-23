@@ -22,8 +22,10 @@ export default async function StoreDashboardPage({ params }: { params: Promise<{
   const tenants = await getOwnerTenants(owner.id)
   const tenant = tenants.find((t) => t.slug === slug)
   if (!tenant) redirect('/dashboard')
-  // Not active yet — send back to onboard status screen
-  if (tenant.status !== 'active') redirect('/onboard')
+  // Allow active + provisioning + suspended + awaiting_payment stores through (they render with
+  // a status card / checkout prompt). Only a terminated store is bounced — and to /dashboard,
+  // never /onboard (which would re-show the payment step and risk a double charge).
+  if (!['active', 'provisioning', 'suspended', 'awaiting_payment'].includes(tenant.status)) redirect('/dashboard')
 
   const [billing, rzpSub] = await Promise.all([
     getTenantBilling(tenant.id),

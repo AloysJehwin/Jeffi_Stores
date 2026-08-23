@@ -1,19 +1,74 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
-import { queryOne, queryMany } from '@/lib/db'
-import { getSiteControls } from '@/lib/site-controls'
+import { queryOne, queryMany, query } from '@/lib/db'
+import { getSiteControls, SITE_CONTROLS_DEFAULTS, invalidateSiteControlsCache } from '@/lib/site-controls'
 import { getDeliverySettings } from '@/lib/delivery-settings'
-import { hasScope } from '@/lib/scopes'
+import { hasScope, isPlatformOwner } from '@/lib/scopes'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
-import { SectionCard, TextControl, TextAreaControl, NumberControl, ToggleControl, FullSpan } from '@/components/admin/site-controls/controls'
+import { SectionCard, TextControl, TextAreaControl, NumberControl, ToggleControl, FullSpan, KeyboardShortcutControl } from '@/components/admin/site-controls/controls'
 import LogoUploader from '@/components/admin/site-controls/LogoUploader'
+import CustomShortcutsCard, { CustomShortcut } from '@/components/admin/site-controls/CustomShortcutsCard'
 import HeroSlideManager from '@/components/admin/HeroSlideManager'
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
+
+const BUILTIN_SHORTCUT_KEYS: Record<string, string> = {
+  shortcut_new_product:   SITE_CONTROLS_DEFAULTS.shortcuts.newProduct,
+  shortcut_cash_sale:     SITE_CONTROLS_DEFAULTS.shortcuts.cashSale,
+  shortcut_quotation:     SITE_CONTROLS_DEFAULTS.shortcuts.quotation,
+  shortcut_new_po:        SITE_CONTROLS_DEFAULTS.shortcuts.newPo,
+  shortcut_orders:        SITE_CONTROLS_DEFAULTS.shortcuts.orders,
+  shortcut_packing_slips: SITE_CONTROLS_DEFAULTS.shortcuts.packingSlips,
+  shortcut_returns:       SITE_CONTROLS_DEFAULTS.shortcuts.returns,
+  shortcut_gst:           SITE_CONTROLS_DEFAULTS.shortcuts.gst,
+  shortcut_labels:        SITE_CONTROLS_DEFAULTS.shortcuts.labels,
+  shortcut_inventory:     SITE_CONTROLS_DEFAULTS.shortcuts.inventory,
+  shortcut_coupons:       SITE_CONTROLS_DEFAULTS.shortcuts.coupons,
+  shortcut_campaign:      SITE_CONTROLS_DEFAULTS.shortcuts.campaign,
+  shortcut_financial:     SITE_CONTROLS_DEFAULTS.shortcuts.financial,
+  shortcut_customers:     SITE_CONTROLS_DEFAULTS.shortcuts.customers,
+  shortcut_crm:           SITE_CONTROLS_DEFAULTS.shortcuts.crm,
+  shortcut_reviews:       SITE_CONTROLS_DEFAULTS.shortcuts.reviews,
+  shortcut_ai_agent:      SITE_CONTROLS_DEFAULTS.shortcuts.aiAgent,
+}
+
+async function seedBuiltinShortcuts() {
+  const rows = await queryMany<{ key: string; value: string }>(
+    `SELECT key, value FROM site_settings WHERE key = ANY($1::text[])`,
+    [Object.keys(BUILTIN_SHORTCUT_KEYS)]
+  )
+  const existing = new Map(rows.map(r => [r.key, r.value]))
+  let changed = false
+
+  for (const [k, def] of Object.entries(BUILTIN_SHORTCUT_KEYS)) {
+    const current = existing.get(k)
+    // Insert if missing.
+    if (current === undefined) {
+      await query(
+        `INSERT INTO site_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+         ON CONFLICT (key) DO NOTHING`,
+        [k, def]
+      )
+      changed = true
+      continue
+    }
+    // Migrate rows still on the superseded plain "mod+<letter>" default to the
+    // new "mod+shift+<letter>" default (Chrome reserves plain Ctrl/⌘ combos).
+    if (def.startsWith('mod+shift+') && current === def.replace('mod+shift+', 'mod+')) {
+      await query(
+        `UPDATE site_settings SET value = $2, updated_at = NOW() WHERE key = $1`,
+        [k, def]
+      )
+      changed = true
+    }
+  }
+
+  if (changed) invalidateSiteControlsCache()
+}
 
 async function loadInvoiceKeys(): Promise<Record<string, string>> {
   const rows = await queryMany<{ key: string; value: string }>(
@@ -61,11 +116,18 @@ export default async function SiteControlsPage() {
     redirect(ap('/admin/settings', host))
   }
 
+  await seedBuiltinShortcuts()
   const c = await getSiteControls()
   const inv = await loadInvoiceKeys()
   const delivery = await getDeliverySettings()
   const hasCrm = hasScope(admin.role, admin.scopes || [], 'crm:read')
+  const hasInventory = hasScope(admin.role, admin.scopes || [], 'inventory:read')
   const hero = await loadHeroData()
+
+  let customShortcuts: CustomShortcut[] = []
+  try { customShortcuts = JSON.parse(c.shortcuts.customShortcuts || '[]') } catch { /* ignore */ }
+  const uaHeader = headersList.get('user-agent') || ''
+  const isMac = /mac/i.test(uaHeader) && !/iphone|ipad/i.test(uaHeader)
 
   return (
     <div className="p-4 sm:p-6 space-y-6">
@@ -101,6 +163,15 @@ export default async function SiteControlsPage() {
           <SectionCard title="Orders" description="Order lifecycle rules." columns>
             <NumberControl settingKey="min_order_amount" label="Minimum order amount" hint="Minimum cart subtotal required to checkout. 0 disables." prefix="₹" initial={parseFloat(inv.min_order_amount || '0') || 0} />
             <NumberControl settingKey="order_auto_cancel_minutes" label="Auto-cancel unpaid orders after" suffix="min" min={1} initial={c.values.orderAutoCancelMinutes} />
+            <NumberControl settingKey="return_standard_charge" label="Return standard charge" hint="Flat fee deducted from a return refund (covers reverse pickup). Net refund = returned value − this, floored at 0." prefix="₹" initial={c.values.returnStandardCharge} />
+            <FullSpan><ToggleControl
+              settingKey="feature_inventory_validation_enabled"
+              label="Stock validation on order creation"
+              hint="When on, orders with insufficient stock are saved as drafts. Requires Growth plan."
+              initial={hasInventory ? c.flags.inventoryValidationEnabled : false}
+              locked={!hasInventory}
+              lockedHint="Requires Growth plan — stock validation is disabled for Basic plan."
+            /></FullSpan>
           </SectionCard>
         </div>
 
@@ -184,7 +255,35 @@ export default async function SiteControlsPage() {
         </div>
 
         <div>
-          <CustomerTagDefinitionsCard isSuperAdmin={admin.role === 'super_admin'} />
+          <CustomerTagDefinitionsCard isSuperAdmin={isPlatformOwner(admin.role)} />
+        </div>
+
+        <div>
+          <SectionCard title="Keyboard Shortcuts" description="Assign a shortcut to each quick action. Choose a modifier (⌘/Ctrl, ⌘/Ctrl+Shift, or a standalone F-key), then click the key box and press any letter or number to record it." columns>
+            <KeyboardShortcutControl settingKey="shortcut_new_product"   label="New Product"   initial={c.shortcuts.newProduct} />
+            <KeyboardShortcutControl settingKey="shortcut_cash_sale"     label="Cash Sale"     initial={c.shortcuts.cashSale} />
+            <KeyboardShortcutControl settingKey="shortcut_quotation"     label="Quotation"     initial={c.shortcuts.quotation} />
+            <KeyboardShortcutControl settingKey="shortcut_new_po"        label="New PO"        initial={c.shortcuts.newPo} />
+            <KeyboardShortcutControl settingKey="shortcut_orders"        label="Orders"        initial={c.shortcuts.orders} />
+            <KeyboardShortcutControl settingKey="shortcut_packing_slips" label="Packing Slips" initial={c.shortcuts.packingSlips} />
+            <KeyboardShortcutControl settingKey="shortcut_returns"       label="Returns"       initial={c.shortcuts.returns} />
+            <KeyboardShortcutControl settingKey="shortcut_gst"           label="GST"           initial={c.shortcuts.gst} />
+            <KeyboardShortcutControl settingKey="shortcut_labels"        label="Labels"        initial={c.shortcuts.labels} />
+            <KeyboardShortcutControl settingKey="shortcut_inventory"     label="Inventory"     initial={c.shortcuts.inventory} />
+            <KeyboardShortcutControl settingKey="shortcut_coupons"       label="Coupons"       initial={c.shortcuts.coupons} />
+            <KeyboardShortcutControl settingKey="shortcut_campaign"      label="Campaign"      initial={c.shortcuts.campaign} />
+            <KeyboardShortcutControl settingKey="shortcut_financial"     label="Financial"     initial={c.shortcuts.financial} />
+            <KeyboardShortcutControl settingKey="shortcut_customers"     label="Customers"     initial={c.shortcuts.customers} />
+            <KeyboardShortcutControl settingKey="shortcut_crm"           label="CRM"           initial={c.shortcuts.crm} />
+            <KeyboardShortcutControl settingKey="shortcut_reviews"       label="Reviews"       initial={c.shortcuts.reviews} />
+            <FullSpan><KeyboardShortcutControl settingKey="shortcut_ai_agent" label="AI Agent" initial={c.shortcuts.aiAgent} /></FullSpan>
+            <FullSpan>
+              <div className="pt-2 border-t border-border-default">
+                <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-2">Custom Shortcuts</p>
+                <CustomShortcutsCard initial={customShortcuts} isMac={isMac} />
+              </div>
+            </FullSpan>
+          </SectionCard>
         </div>
       </div>
     </div>

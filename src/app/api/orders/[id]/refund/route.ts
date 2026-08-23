@@ -4,6 +4,8 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { sendPaymentStatusUpdate } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
+import { getReturnRequest } from '@/lib/queries'
+import { computeRefundableAmount } from '@/lib/refund'
 
 export async function POST(
   request: NextRequest,
@@ -59,14 +61,28 @@ export async function POST(
       return NextResponse.json({ error: 'No Razorpay payment record found for this order.' }, { status: 400 })
     }
 
+    const returnRequest = order.status === 'returned' ? await getReturnRequest(orderId).catch(() => null) : null
+    const capturedTotal = refundable.reduce((s: number, p: any) => s + (parseFloat(p.amount) || 0), 0)
+    const targetRefund = Math.min(capturedTotal, await computeRefundableAmount(order, returnRequest))
+
+    if (!(targetRefund > 0)) {
+      return NextResponse.json({ error: 'Nothing to refund after the return standard charge.' }, { status: 400 })
+    }
+
     const razorpay = getRazorpayInstance()
     const refundIds: string[] = []
     let totalRefunded = 0
+    let remaining = targetRefund
     for (const paymentRecord of refundable) {
-      const amountInPaise = Math.round(parseFloat(paymentRecord.amount) * 100)
+      if (remaining <= 0) break
+      const captured = parseFloat(paymentRecord.amount) || 0
+      const thisRefund = Math.min(captured, remaining)
+      if (!(thisRefund > 0)) continue
+      const amountInPaise = Math.round(thisRefund * 100)
       const refund = await razorpay.payments.refund(paymentRecord.transaction_id, { amount: amountInPaise })
       refundIds.push(refund.id)
-      totalRefunded += Number(paymentRecord.amount)
+      totalRefunded += thisRefund
+      remaining = Math.round((remaining - thisRefund) * 100) / 100
 
       const existingResponse = typeof paymentRecord.gateway_response === 'string'
         ? JSON.parse(paymentRecord.gateway_response)
@@ -90,7 +106,7 @@ export async function POST(
     if (userEmail && userName) {
       sendPaymentStatusUpdate(
         userEmail, userName, order.order_number, orderId,
-        'refunded', parseFloat(order.total_amount)
+        'refunded', totalRefunded
       ).catch(() => {})
     }
 

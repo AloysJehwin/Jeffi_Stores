@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import { ap } from '@/lib/admin-path'
+import CopySku from '@/components/ui/CopySku'
 
 const METRO_PINS_3 = new Set([
   '110','111','112','400','401','402','403','410','421',
@@ -242,7 +243,7 @@ export default function OrderDetailModal({ order, onClose }: Props) {
                           )}
                           <ProductWarningBadges fragile={item.fragile} hazardous={item.hazardous} flammable={item.flammable} size="xs" />
                         </td>
-                        <td className="px-3 py-2 text-xs text-foreground-muted truncate">{item.product_sku || '—'}</td>
+                        <td className="px-3 py-2 text-xs text-foreground-muted truncate"><span className="inline-flex items-center gap-1">{item.product_sku || '—'}{item.product_sku && <CopySku sku={item.product_sku} />}</span></td>
                         <td className="px-3 py-2 text-right text-foreground">{item.quantity}</td>
                         <td className="px-3 py-2 text-right text-foreground">₹{Number(item.unit_price).toLocaleString('en-IN')}</td>
                         <td className="px-3 py-2 text-right font-semibold text-foreground">₹{Number(item.total_price).toLocaleString('en-IN')}</td>

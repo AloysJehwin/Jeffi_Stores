@@ -5,6 +5,7 @@ import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import { getOwnerTenants, listPlans, updateTenantPlan } from '@/lib/tenant-registry'
 import { upgradeSubscription, downgradeSubscription, type BillingInterval } from '@/lib/razorpay-subscriptions'
+import { triggerProvisioning } from '@/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,6 +70,13 @@ export async function POST(request: NextRequest) {
       newSubscriptionId: result.subscriptionId,
     })
 
+    // Re-apply DNS to match the new (higher) tier — adds the tier's extra subdomains.
+    // DNS-only; never recreates infra. Non-fatal if it fails (drift sweep would catch it).
+    await triggerProvisioning({
+      action: 'reprovision', tenantId, slug: tenant.slug, plan: planSlug,
+      ownerId: owner.id, reason: 'plan_change',
+    }).catch(() => {})
+
     return NextResponse.json({
       status: 'upgrade',
       checkoutUrl: result.shortUrl,
@@ -85,6 +93,13 @@ export async function POST(request: NextRequest) {
     })
 
     await updateTenantPlan(tenantId, { planSlug, billingInterval })
+
+    // Re-apply DNS to match the new (lower) tier — removes the higher-tier subdomains now
+    // (D1: immediate, single path for up- and downgrades). DNS-only; never touches infra.
+    await triggerProvisioning({
+      action: 'reprovision', tenantId, slug: tenant.slug, plan: planSlug,
+      ownerId: owner.id, reason: 'plan_change',
+    }).catch(() => {})
 
     return NextResponse.json({
       status: 'downgrade_scheduled',

@@ -10,6 +10,7 @@ import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
 import UnitsManager from '@/components/admin/UnitsManager'
 import BatchSerialLabelModal from '@/components/admin/BatchSerialLabelModal'
+import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 
 function formatINR(n: number) {
@@ -441,7 +442,7 @@ function SupplierDetailsCard({ productId }: { productId: string }) {
                               <td className="py-1.5 pr-3 text-foreground">{row.supplier_name}</td>
                               <td className="py-1.5 pr-3 text-foreground-muted">
                                 {row.sku
-                                  ? <span className="font-mono text-xs text-foreground">{row.sku}</span>
+                                  ? <span className="inline-flex items-center gap-1 font-mono text-xs text-foreground">{row.sku}<CopySku sku={row.sku} /></span>
                                   : row.sub_variant_name
                                     ? <span>{row.variant_name ? `${row.variant_name} — ` : ''}{row.sub_variant_name}</span>
                                     : row.variant_name || '—'}
@@ -645,7 +646,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
           </Link>
           <div>
             <h1 className="text-xl font-bold text-foreground">{p.name}</h1>
-            <p className="text-xs text-foreground-muted font-mono mt-0.5">{p.sku}</p>
+            <p className="text-xs text-foreground-muted font-mono mt-0.5 inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -1053,7 +1054,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
                                       <div className="flex items-center justify-between gap-3 text-xs">
                                         <div className="flex flex-col min-w-0">
                                           <span className="font-medium text-foreground truncate">{sv.sub_variant_name}</span>
-                                          {sv.sku && <span className="font-mono text-foreground-muted text-[10px]">{sv.sku}</span>}
+                                          {sv.sku && <span className="inline-flex items-center gap-1 font-mono text-foreground-muted text-[10px]">{sv.sku}<CopySku sku={sv.sku} /></span>}
                                         </div>
                                         <div className="flex items-center gap-3 text-right shrink-0">
                                           <span className="text-foreground-secondary">{sv.price ? formatINR(Number(sv.price)) : '—'}</span>
@@ -1086,7 +1087,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
                           v.variant_name
                         )}
                       </td>
-                      <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell">{v.sku || '—'}</td>
+                      <td className="px-4 py-3 font-mono text-xs text-foreground-secondary hidden sm:table-cell"><span className="inline-flex items-center gap-1">{v.sku || '—'}{v.sku && <CopySku sku={v.sku} />}</span></td>
                       <td className="px-4 py-3 font-mono text-xs text-foreground-muted hidden lg:table-cell">
                         {v.asin ? (
                           <span title={v.asin_match ? `matched via ${v.asin_match}` : undefined}>{v.asin}</span>
@@ -1120,7 +1121,7 @@ export default function ProductDetailClient({ id }: { id: string }) {
                       return (
                         <tr key={sv.id} className="bg-surface-secondary/30 hover:bg-surface-secondary/50 transition-colors">
                           <td className="px-4 py-2 pl-10 text-sm text-foreground-secondary">↳ {sv.sub_variant_name}</td>
-                          <td className="px-4 py-2 font-mono text-xs text-foreground-muted hidden sm:table-cell">{sv.sku || '—'}</td>
+                          <td className="px-4 py-2 font-mono text-xs text-foreground-muted hidden sm:table-cell"><span className="inline-flex items-center gap-1">{sv.sku || '—'}{sv.sku && <CopySku sku={sv.sku} />}</span></td>
                           <td className="px-4 py-2 hidden lg:table-cell" />
                           <td className="px-4 py-2 hidden xl:table-cell" />
                           <td className="px-4 py-2 text-right text-sm text-foreground">{sv.price ? formatINR(Number(sv.price)) : '—'}</td>

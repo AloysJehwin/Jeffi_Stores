@@ -13,6 +13,7 @@ import ProductDetailModal from '@/components/admin/ProductDetailModal'
 import ProductLabelModal from '@/components/admin/ProductLabelModal'
 import DraftConfirmModal from '@/components/admin/DraftConfirmModal'
 import HoverCard from '@/components/ui/HoverCard'
+import CopySku from '@/components/ui/CopySku'
 import { useConfirm } from '@/contexts/ConfirmContext'
 
 interface Props {
@@ -111,7 +112,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                           )}
                           <div className="min-w-0">
                             <p className="text-sm font-semibold text-foreground leading-tight">{product.name}</p>
-                            <p className="text-xs text-foreground-muted mt-0.5">{product.sku}</p>
+                            <p className="text-xs text-foreground-muted mt-0.5"><span className="inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</span></p>
                             <div className="flex gap-1 mt-1 flex-wrap">
                               <span className={`px-1.5 py-0.5 text-xs rounded-full font-medium ${product.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300' : 'bg-surface-secondary text-foreground-muted'}`}>
                                 {product.is_active ? 'Active' : 'Inactive'}
@@ -207,7 +208,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                 </div>
               </td>
               <td className="px-4 py-3 text-sm text-foreground truncate overflow-hidden max-w-0">
-                {product.sku}
+                <span className="inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</span>
               </td>
               <td className="px-4 py-3 text-sm text-foreground truncate overflow-hidden max-w-0">
                 {product.categories?.name || 'N/A'}

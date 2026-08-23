@@ -105,7 +105,7 @@ export default function HeroCarousel({ slides }: Props) {
   if (!count) return null
 
   return (
-    <div className="bg-surface px-3 sm:px-6 md:px-8 pt-3 pb-0 md:pt-6 h-[calc(100svh-4rem-392px)] sm:h-[calc(100svh-4rem-360px)] lg:h-[calc(100svh-5rem-300px)]">
+    <div className="bg-surface px-3 sm:px-6 md:px-8 pt-3 pb-0 md:pt-6 h-[clamp(20rem,60svh,32rem)] sm:h-[clamp(22rem,58svh,34rem)] lg:h-[clamp(24rem,56svh,38rem)]">
       <div
         className="relative w-full rounded-2xl overflow-hidden shadow-2xl h-full select-none"
         onTouchStart={onTouchStart}
@@ -128,14 +128,14 @@ export default function HeroCarousel({ slides }: Props) {
                   <img
                     src={s.mobileImg}
                     alt=""
-                    className="absolute right-0 top-0 h-full w-[70%] sm:w-[65%] object-cover object-center"
+                    className="absolute right-0 top-0 h-full w-[62%] sm:w-[60%] object-cover object-center"
                   />
                 </picture>
                 <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] from-35% via-[#0d0d0d]/80 via-60% to-transparent" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-transparent to-black/30" />
               </div>
 
-              <div className="relative z-10 h-full flex flex-col justify-start pt-10 sm:pt-12 md:pt-14 px-6 sm:px-12 md:px-16 pb-16 max-w-[58%] sm:max-w-[52%] pointer-events-none">
+              <div className="relative z-10 h-full flex flex-col justify-start pt-10 sm:pt-12 md:pt-14 px-6 sm:px-12 md:px-16 pb-16 max-w-[55%] sm:max-w-[50%] pointer-events-none">
                 {s.badge && (
                   <span className={`inline-block self-start ${s.badgeColor} text-white text-[10px] sm:text-xs font-black uppercase tracking-[0.15em] px-3 py-1.5 rounded mb-4 sm:mb-5`}>
                     {s.badge}

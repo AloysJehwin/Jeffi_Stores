@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
+import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 
 interface AnalyticsData {
@@ -164,7 +165,7 @@ export default function ProductAnalyticsClient({ productId, initial }: { product
           <div className="min-w-0 flex-1">
             <h1 className="text-xl font-bold truncate">{data.product.name}</h1>
             <div className="flex items-center gap-3 mt-1 text-xs text-zinc-400 flex-wrap">
-              <span className="font-mono">SKU: {data.product.sku}</span>
+              <span className="font-mono">SKU: {data.product.sku}{data.product.sku && <CopySku sku={data.product.sku} className="ml-1" />}</span>
               {data.product.brandName && <span>Brand: {data.product.brandName}</span>}
               <span>Stock: <span className={data.product.stock === 0 ? 'text-red-400' : data.product.stock < 10 ? 'text-orange-400' : 'text-green-400'}>{data.product.stock}</span></span>
             </div>

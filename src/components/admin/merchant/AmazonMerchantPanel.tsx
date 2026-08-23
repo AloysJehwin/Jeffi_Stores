@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import CopySku from '@/components/ui/CopySku'
 
 interface Summary {
   last_refreshed_at: string | null
@@ -209,7 +210,7 @@ export default function AmazonMerchantPanel() {
                 </td></tr>
               ) : rows.map(r => (
                 <tr key={r.sku} className="border-t border-border-default">
-                  <td className="px-3 py-2 font-mono text-xs text-foreground">{r.sku}</td>
+                  <td className="px-3 py-2 font-mono text-xs text-foreground"><span className="inline-flex items-center gap-1">{r.sku}{r.sku && <CopySku sku={r.sku} />}</span></td>
                   <td className="px-3 py-2 text-foreground max-w-md truncate">{r.title || '—'}</td>
                   <td className="px-3 py-2"><StatusBadge status={r.status} /></td>
                   <td className="px-3 py-2 text-xs text-foreground-secondary max-w-xs truncate">

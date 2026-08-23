@@ -7,6 +7,7 @@ import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { logActivity } from '@/lib/activity'
+import { getBusinessValues } from '@/lib/site-controls'
 
 export async function POST(
   request: NextRequest,
@@ -21,7 +22,13 @@ export async function POST(
 
     const orderId = id
     const body = await request.json()
-    const { action, adminNotes, returnTrackingNumber, restock } = body
+    const { action, adminNotes, returnTrackingNumber, restock, replacementVariants } = body
+    // replacementVariants: optional map { [order_item_id]: { variant_id, sub_variant_id } }
+    // the admin picks when the original variant/sub-variant of a replacement item no
+    // longer exists (removed/deactivated by a later product edit). Used only for
+    // action === 'process' on a replacement.
+    const rvMap: Record<string, { variant_id: string | null; sub_variant_id: string | null }> =
+      replacementVariants && typeof replacementVariants === 'object' ? replacementVariants : {}
 
     const VALID_ACTIONS = ['approve', 'reject', 'mark_received', 'process']
     if (!action || !VALID_ACTIONS.includes(action)) {
@@ -212,6 +219,8 @@ export async function POST(
         ? returnItems.reduce((sum: number, i: any) => sum + parseFloat(i.refund_amount), 0)
         : parseFloat(order.total_amount)
 
+      const netRefundAmount = Math.max(0, Math.round((refundAmount - (await getBusinessValues()).returnStandardCharge) * 100) / 100)
+
       if (returnRequest.type === 'refund') {
         let refundFailed = false
 
@@ -231,7 +240,7 @@ export async function POST(
           if (paymentRecord && paymentRecord.transaction_id) {
             try {
               const razorpay = getRazorpayInstance()
-              const amountInPaise = Math.round(refundAmount * 100)
+              const amountInPaise = Math.round(netRefundAmount * 100)
               const refund = await razorpay.payments.refund(paymentRecord.transaction_id, {
                 amount: amountInPaise,
               })
@@ -257,12 +266,16 @@ export async function POST(
                 )
               })
 
-              if (restock !== false) restoreOrderStock(orderId).catch(() => {})
+              let stockWarnings: string[] = []
+              if (restock !== false) {
+                const r = await restoreOrderStock(orderId).catch(() => ({ skipped: [] as any[] }))
+                stockWarnings = (r?.skipped || []).map((s: any) => s.reason)
+              }
 
               if (userEmail && userName) {
                 sendPaymentStatusUpdate(
                   userEmail, userName, order.order_number, orderId,
-                  'refunded', refundAmount
+                  'refunded', netRefundAmount
                 ).catch(() => {})
               }
 
@@ -280,7 +293,7 @@ export async function POST(
                 }).catch(() => {})
               }
 
-              return NextResponse.json({ success: true, newStatus: 'returned', refundFailed: false })
+              return NextResponse.json({ success: true, newStatus: 'returned', refundFailed: false, stockWarnings })
             } catch {
               refundFailed = true
             }
@@ -298,7 +311,11 @@ export async function POST(
           )
         })
 
-        if (restock !== false) restoreOrderStock(orderId).catch(() => {})
+        let stockWarnings: string[] = []
+        if (restock !== false) {
+          const r = await restoreOrderStock(orderId).catch(() => ({ skipped: [] as any[] }))
+          stockWarnings = (r?.skipped || []).map((s: any) => s.reason)
+        }
 
         completeAutoTask('inspect_refund', orderId, { actorAdminId: admin.adminId }).catch(() => {})
 
@@ -316,7 +333,7 @@ export async function POST(
           }).catch(() => {})
         }
 
-        return NextResponse.json({ success: true, newStatus: 'returned', refundFailed })
+        return NextResponse.json({ success: true, newStatus: 'returned', refundFailed, stockWarnings })
       }
 
       if (returnRequest.type === 'replacement') {
@@ -346,6 +363,80 @@ export async function POST(
           ? refundAmount
           : parseFloat(order.total_amount)
 
+        // Resolve the effective grain to ship for each replacement item. If the
+        // original variant/sub-variant is gone/inactive, the admin must supply an
+        // override via replacementVariants (keyed by order_item_id); we validate the
+        // override resolves to an ACTIVE grain of the SAME product. Missing overrides
+        // for gone grains → 409 with the list, so the UI can prompt a variant picker.
+        const isActiveVariant = async (vid: string | null): Promise<boolean> => {
+          if (!vid) return true
+          const r = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM product_variants WHERE id = $1`, [vid])
+          return !!r && r.is_active !== false
+        }
+        const isActiveSubVariant = async (svid: string | null): Promise<boolean> => {
+          if (!svid) return true
+          const r = await queryOne<{ is_active: boolean }>(`SELECT is_active FROM product_sub_variants WHERE id = $1`, [svid])
+          return !!r && r.is_active !== false
+        }
+
+        const needsPick: { order_item_id: string; product_id: string; product_name: string; variant_name: string | null; options: any[] }[] = []
+        const resolvedItems: any[] = []
+        for (const item of replacementItems) {
+          const oiId = item.order_item_id || item.id // return_request_items use order_item_id; legacy order_items use id
+          const override = rvMap[oiId]
+          let variantId: string | null = item.variant_id || null
+          let subVariantId: string | null = item.sub_variant_id || null
+          let variantName: string | null = item.variant_name || null
+
+          if (override && (override.variant_id || override.sub_variant_id)) {
+            // Admin-picked grain — validate it belongs to this product and is active,
+            // and adopt its CURRENT name so the replacement line shows the chosen
+            // variant (not the original, now-deleted one).
+            variantId = override.variant_id || null
+            subVariantId = override.sub_variant_id || null
+            const chosen = await queryOne<{ ok: boolean; vname: string | null; svname: string | null }>(
+              `SELECT (($2::uuid IS NULL OR pv.id IS NOT NULL) AND ($3::uuid IS NULL OR psv.id IS NOT NULL)) AS ok,
+                      pv.variant_name AS vname, psv.sub_variant_name AS svname
+                 FROM (SELECT 1) x
+                 LEFT JOIN product_variants pv ON pv.id = $2::uuid AND pv.product_id = $1 AND pv.is_active = true
+                 LEFT JOIN product_sub_variants psv ON psv.id = $3::uuid AND psv.product_id = $1 AND psv.is_active = true`,
+              [item.product_id, variantId, subVariantId]
+            )
+            if (!chosen?.ok) {
+              return NextResponse.json({ error: 'Selected replacement variant is invalid or inactive.' }, { status: 400 })
+            }
+            variantName = chosen.svname || chosen.vname || variantName
+          } else if (!(await isActiveVariant(item.variant_id || null)) || !(await isActiveSubVariant(item.sub_variant_id || null))) {
+            // Original grain gone/inactive and no override supplied → ask the admin.
+            // Attach the product's active grains so the UI can render a picker inline.
+            const opts = await queryMany<{ variant_id: string; sub_variant_id: string | null; label: string; sku: string | null; stock_status: string | null }>(
+              `SELECT pv.id AS variant_id, NULL::uuid AS sub_variant_id,
+                      pv.variant_name AS label, pv.sku, pv.stock_status
+                 FROM product_variants pv
+                WHERE pv.product_id = $1 AND pv.is_active = true
+                  AND NOT EXISTS (SELECT 1 FROM product_sub_variants sv WHERE sv.variant_id = pv.id AND sv.is_active = true)
+               UNION ALL
+               SELECT pv.id AS variant_id, sv.id AS sub_variant_id,
+                      pv.variant_name || ' / ' || sv.sub_variant_name AS label, sv.sku, sv.stock_status
+                 FROM product_sub_variants sv
+                 JOIN product_variants pv ON pv.id = sv.variant_id
+                WHERE sv.product_id = $1 AND sv.is_active = true AND pv.is_active = true
+               ORDER BY label`,
+              [item.product_id]
+            )
+            needsPick.push({ order_item_id: oiId, product_id: item.product_id, product_name: item.product_name, variant_name: item.variant_name || null, options: opts })
+            continue
+          }
+          resolvedItems.push({ ...item, _variantId: variantId, _subVariantId: subVariantId, _variantName: variantName })
+        }
+
+        if (needsPick.length > 0) {
+          return NextResponse.json(
+            { error: 'variant_pick_required', needsVariantPick: needsPick },
+            { status: 409 }
+          )
+        }
+
         let newOrderId: string
         let newOrderNumber: string
 
@@ -373,18 +464,22 @@ export async function POST(
           newOrderId = newOrder.id
           newOrderNumber = newOrder.order_number
 
-          for (const item of replacementItems) {
+          for (const item of resolvedItems) {
             const qty = parseFloat(item.quantity)
             const unitPrice = parseFloat(item.unit_price)
+            const variantId: string | null = item._variantId
+            const subVariantId: string | null = item._subVariantId
+            const variantName: string | null = item._variantName ?? item.variant_name ?? null
             await client.query(
-              `INSERT INTO order_items (order_id, product_id, variant_id, product_name, variant_name, quantity, unit_price, total_price, buy_mode, buy_unit)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+              `INSERT INTO order_items (order_id, product_id, variant_id, sub_variant_id, product_name, variant_name, quantity, unit_price, total_price, buy_mode, buy_unit)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
               [
                 newOrderId,
                 item.product_id,
-                item.variant_id || null,
+                variantId,
+                subVariantId,
                 item.product_name,
-                item.variant_name || null,
+                variantName,
                 qty,
                 unitPrice,
                 parseFloat((qty * unitPrice).toFixed(2)),
@@ -392,10 +487,16 @@ export async function POST(
                 item.buy_unit || null,
               ]
             )
-            if (item.variant_id) {
+            // Deduct at the resolved grain (sub-variant → variant → product).
+            if (subVariantId) {
+              await client.query(
+                'UPDATE product_sub_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
+                [qty, subVariantId]
+              )
+            } else if (variantId) {
               await client.query(
                 'UPDATE product_variants SET inventory_quantity = inventory_quantity - $1 WHERE id = $2',
-                [qty, item.variant_id]
+                [qty, variantId]
               )
             } else {
               await client.query(
@@ -405,7 +506,8 @@ export async function POST(
             }
             await logStockMovement(client, {
               productId: item.product_id,
-              variantId: item.variant_id || null,
+              variantId: variantId,
+              subVariantId: subVariantId,
               transactionType: 'sale',
               quantityChange: -qty,
               referenceType: 'order',

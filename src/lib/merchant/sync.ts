@@ -1,7 +1,7 @@
 import { queryOne, query } from '@/lib/db'
 import { productToGmcItems } from './mapper'
 import { fetchAllActiveProducts, fetchProduct } from './product-fetch'
-import { upsertProduct, deleteProductByOfferId, listProducts, customBatchUpsert, MERCHANT_ID, GMC_PUSH_DISABLED } from './client'
+import { upsertProduct, deleteProductByOfferId, listProducts, customBatchUpsert, getMerchantId, GMC_PUSH_DISABLED } from './client'
 
 const ADMIN_EMAIL = 'jeffistoress@jeffistores.in'
 const BATCH_SIZE = 100
@@ -85,6 +85,7 @@ async function runFullSync(): Promise<SyncResult> {
   let synced = 0
   let deleted = 0
 
+  const merchantId = await getMerchantId()
   const products = await fetchAllActiveProducts()
   const allItems: any[] = []
   const activeOfferIds = new Set<string>()
@@ -105,7 +106,7 @@ async function runFullSync(): Promise<SyncResult> {
     const batch = allItems.slice(i, i + BATCH_SIZE)
     const entries = batch.map((item, idx) => ({
       batchId: i + idx,
-      merchantId: MERCHANT_ID,
+      merchantId,
       method: 'insert',
       product: item,
     }))

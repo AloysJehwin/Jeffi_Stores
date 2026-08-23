@@ -2,18 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { getTenant, controlPlanePool } from '@/lib/tenant-registry'
-import { getProvisioningProvider } from '@/lib/provisioning'
-import { deprovisionTenant } from '@/lib/provisioning/steps'
+import { triggerProvisioning } from '@/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'
 
 // Operator-triggered deprovision-with-backup for a tenant. DESTRUCTIVE — requires an
 // explicit { confirm: true } body. Takes the store offline, snapshots its DB to S3, then
-// deletes the RDS instance + tenant bucket. Mirrors provision/route.ts.
+// deletes the RDS instance + tenant bucket. Routes through the shared trigger (one code path).
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (admin.role !== 'super_admin' && !hasScope(admin.role, admin.scopes, 'ecom_customers:write')) {
+  if (!hasScope(admin.role, admin.scopes, 'ecom_customers:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
@@ -32,14 +31,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   ).catch(() => null)
   const ownerId = ownerRow?.rows[0]?.owner_id ?? null
 
-  const provider = getProvisioningProvider()
-  const result = await deprovisionTenant(id, provider, { ownerId })
+  const result = await triggerProvisioning({
+    action: 'deprovision', tenantId: id, slug: tenant.slug, plan: tenant.plan, ownerId, reason: 'operator',
+  })
 
   if (!result.ok) {
-    return NextResponse.json(
-      { ok: false, backedUp: result.backedUp, backupKey: result.backupKey, error: result.error },
-      { status: 500 },
-    )
+    return NextResponse.json({ ok: false, error: result.error }, { status: 500 })
   }
-  return NextResponse.json({ ok: true, backedUp: result.backedUp, backupKey: result.backupKey })
+  return NextResponse.json({ ok: true })
 }

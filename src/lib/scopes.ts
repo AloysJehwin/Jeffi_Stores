@@ -574,6 +574,16 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
 
+export const SUPER_ROLES = ['administrator', 'super_admin'] as const
+
+export function isPlatformOwner(role: string): boolean {
+  return role === 'administrator' || role === 'super_admin'
+}
+
+export function isPlatformAdmin(role: string): boolean {
+  return role === 'administrator'
+}
+
 export function getScopeForPath(pathname: string): string | null {
   if (pathname === '/admin/login') return null
   if (pathname === '/admin') return 'dashboard:read'
@@ -666,7 +676,7 @@ const LEGACY_SCOPE_PARENTS: Record<string, string> = {
 }
 
 export function hasScope(role: string, scopes: string[], requiredScope: string): boolean {
-  if (role === 'super_admin') return true
+  if (isPlatformOwner(role)) return true
   if (scopes.includes(requiredScope)) return true
   // write implies read for all namespaced scopes (e.g. products:write grants products:read)
   if (requiredScope.endsWith(':read')) {

@@ -45,6 +45,7 @@ export interface BusinessValues {
   shippingMinCharge: number
   shippingMaxCharge: number
   orderAutoCancelMinutes: number
+  returnStandardCharge: number
   delhiveryOriginPincode: string
   businessStateCode: string
   defaultProductWeightG: number
@@ -61,11 +62,33 @@ export interface StorefrontContent {
   aboutCopy: string
 }
 
+export interface KeyboardShortcuts {
+  newProduct: string
+  cashSale: string
+  quotation: string
+  newPo: string
+  orders: string
+  packingSlips: string
+  returns: string
+  gst: string
+  labels: string
+  inventory: string
+  coupons: string
+  campaign: string
+  financial: string
+  customers: string
+  crm: string
+  reviews: string
+  aiAgent: string
+  customShortcuts: string  // JSON: [{id,label,path,combo}]
+}
+
 export interface SiteControls {
   identity: StoreIdentity
   flags: FeatureFlags
   values: BusinessValues
   storefront: StorefrontContent
+  shortcuts: KeyboardShortcuts
 }
 
 // Defaults equal the pre-existing hardcoded / env-var values.
@@ -104,6 +127,7 @@ const DEFAULTS: SiteControls = {
     shippingMinCharge: envNum(process.env.SHIPPING_MIN_CHARGE, 0),
     shippingMaxCharge: envNum(process.env.SHIPPING_MAX_CHARGE, 200),
     orderAutoCancelMinutes: 10,
+    returnStandardCharge: envNum(process.env.RETURN_STANDARD_CHARGE, 100),
     delhiveryOriginPincode: process.env.DELHIVERY_ORIGIN_PINCODE || '492001',
     businessStateCode: process.env.BUSINESS_STATE_CODE || '22',
     defaultProductWeightG: 500,
@@ -118,6 +142,26 @@ const DEFAULTS: SiteControls = {
     statsJson: '',
     aboutCopy: '',
   },
+  shortcuts: {
+    newProduct: 'mod+shift+p',
+    cashSale: 'mod+shift+s',
+    quotation: 'mod+shift+q',
+    newPo: 'mod+shift+o',
+    orders: 'mod+shift+r',
+    packingSlips: 'mod+shift+k',
+    returns: 'mod+shift+u',
+    gst: 'mod+shift+g',
+    labels: 'mod+shift+l',
+    inventory: 'mod+shift+i',
+    coupons: 'mod+shift+c',
+    campaign: 'mod+shift+m',
+    financial: 'mod+shift+f',
+    customers: 'mod+shift+e',
+    crm: 'mod+shift+x',
+    reviews: 'mod+shift+v',
+    aiAgent: 'mod+shift+a',
+    customShortcuts: '[]',
+  },
 }
 
 const KEYS = [
@@ -129,10 +173,16 @@ const KEYS = [
   'feature_ondevice_finetune_mobile_enabled', 'feature_ondevice_finetune_desktop_enabled',
   'cod_surcharge_flat', 'cod_surcharge_pct', 'shipping_min_charge', 'shipping_max_charge',
   'order_auto_cancel_minutes', 'delhivery_origin_pincode', 'business_state_code',
+  'return_standard_charge',
   'default_product_weight_g',
   'delhivery_pickup_location', 'delhivery_seller_name', 'delhivery_seller_address', 'delhivery_seller_phone',
   'storefront_featured_limit', 'storefront_new_arrivals_limit',
   'storefront_stats_json', 'storefront_about_copy',
+  'shortcut_new_product', 'shortcut_cash_sale', 'shortcut_quotation', 'shortcut_new_po',
+  'shortcut_orders', 'shortcut_packing_slips', 'shortcut_returns', 'shortcut_gst',
+  'shortcut_labels', 'shortcut_inventory', 'shortcut_coupons', 'shortcut_campaign',
+  'shortcut_financial', 'shortcut_customers', 'shortcut_crm', 'shortcut_reviews',
+  'shortcut_ai_agent', 'shortcut_custom',
 ]
 
 let cache: { value: SiteControls; expiresAt: number } | null = null
@@ -192,6 +242,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         shippingMinCharge: Math.max(0, num('shipping_min_charge', d.values.shippingMinCharge)),
         shippingMaxCharge: Math.max(0, num('shipping_max_charge', d.values.shippingMaxCharge)),
         orderAutoCancelMinutes: Math.max(1, num('order_auto_cancel_minutes', d.values.orderAutoCancelMinutes)),
+        returnStandardCharge: Math.max(0, num('return_standard_charge', d.values.returnStandardCharge)),
         delhiveryOriginPincode: str('delhivery_origin_pincode', d.values.delhiveryOriginPincode),
         businessStateCode: str('business_state_code', d.values.businessStateCode),
         defaultProductWeightG: Math.max(1, num('default_product_weight_g', d.values.defaultProductWeightG)),
@@ -205,6 +256,26 @@ export async function getSiteControls(): Promise<SiteControls> {
         newArrivalsLimit: Math.max(1, Math.round(num('storefront_new_arrivals_limit', d.storefront.newArrivalsLimit))),
         statsJson: str('storefront_stats_json', d.storefront.statsJson),
         aboutCopy: str('storefront_about_copy', d.storefront.aboutCopy),
+      },
+      shortcuts: {
+        newProduct:   str('shortcut_new_product',   d.shortcuts.newProduct),
+        cashSale:     str('shortcut_cash_sale',     d.shortcuts.cashSale),
+        quotation:    str('shortcut_quotation',     d.shortcuts.quotation),
+        newPo:        str('shortcut_new_po',        d.shortcuts.newPo),
+        orders:       str('shortcut_orders',        d.shortcuts.orders),
+        packingSlips: str('shortcut_packing_slips', d.shortcuts.packingSlips),
+        returns:      str('shortcut_returns',       d.shortcuts.returns),
+        gst:          str('shortcut_gst',           d.shortcuts.gst),
+        labels:       str('shortcut_labels',        d.shortcuts.labels),
+        inventory:    str('shortcut_inventory',     d.shortcuts.inventory),
+        coupons:      str('shortcut_coupons',       d.shortcuts.coupons),
+        campaign:     str('shortcut_campaign',      d.shortcuts.campaign),
+        financial:    str('shortcut_financial',     d.shortcuts.financial),
+        customers:    str('shortcut_customers',     d.shortcuts.customers),
+        crm:          str('shortcut_crm',           d.shortcuts.crm),
+        reviews:      str('shortcut_reviews',       d.shortcuts.reviews),
+        aiAgent:      str('shortcut_ai_agent',      d.shortcuts.aiAgent),
+        customShortcuts: str('shortcut_custom',     d.shortcuts.customShortcuts),
       },
     }
 

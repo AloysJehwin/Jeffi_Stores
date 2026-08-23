@@ -49,6 +49,7 @@ const EDITABLE_KEYS = [
   'shipping_min_charge',
   'shipping_max_charge',
   'order_auto_cancel_minutes',
+  'return_standard_charge',
   'delhivery_origin_pincode',
   'default_product_weight_g',
   'delhivery_pickup_location',
@@ -60,6 +61,12 @@ const EDITABLE_KEYS = [
   'storefront_new_arrivals_limit',
   'storefront_stats_json',
   'storefront_about_copy',
+  // Keyboard shortcuts
+  'shortcut_new_product', 'shortcut_cash_sale', 'shortcut_quotation', 'shortcut_new_po',
+  'shortcut_orders', 'shortcut_packing_slips', 'shortcut_returns', 'shortcut_gst',
+  'shortcut_labels', 'shortcut_inventory', 'shortcut_coupons', 'shortcut_campaign',
+  'shortcut_financial', 'shortcut_customers', 'shortcut_crm', 'shortcut_reviews',
+  'shortcut_ai_agent', 'shortcut_custom',
 ]
 
 const EDITABLE_SET = new Set(EDITABLE_KEYS)

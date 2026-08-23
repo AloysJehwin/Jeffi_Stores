@@ -63,7 +63,8 @@ export default async function OnboardPage() {
     const t = existing[0]
     if (t.status === 'active') redirect('/dashboard')
 
-    if (t.status === 'provisioning' && t.razorpay_subscription_id) {
+    // Approved + awaiting payment → show the payment link (owner completes the subscription here).
+    if (t.status === 'awaiting_payment' && t.razorpay_subscription_id) {
       return (
         <SidebarLayout currentStep={7}>
           <PaymentTrigger
@@ -80,12 +81,29 @@ export default async function OnboardPage() {
       )
     }
 
-    if (t.status === 'provisioning') {
+    // Approved but the Razorpay subscription/checkout link isn't ready yet.
+    if (t.status === 'awaiting_payment') {
       return (
         <SidebarLayout currentStep={7}>
           <div className="max-w-lg w-full rounded-2xl border border-yellow-200 dark:border-yellow-800 bg-yellow-50 dark:bg-yellow-900/20 p-8 text-center">
             <p className="text-sm text-yellow-700 dark:text-yellow-400 font-medium">Payment link is being generated — please refresh in a moment.</p>
             <a href="/onboard" className="inline-block mt-4 px-5 py-2.5 rounded-xl border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">Refresh</a>
+          </div>
+        </SidebarLayout>
+      )
+    }
+
+    // Paid → the engine is actively building infra. Show a setting-up state (no payment link).
+    if (t.status === 'provisioning') {
+      return (
+        <SidebarLayout currentStep={7}>
+          <div className="max-w-lg w-full rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 p-8 text-center">
+            <div className="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+            <h1 className="text-lg font-bold text-blue-800 dark:text-blue-200">Setting up your store</h1>
+            <p className="text-sm text-blue-700 dark:text-blue-400 mt-2">
+              Payment confirmed — we&apos;re provisioning <span className="font-semibold">{t.slug}.jeffistores.in</span>. This takes a few minutes; you&apos;ll be emailed when it&apos;s live.
+            </p>
+            <a href="/dashboard" className="inline-block mt-5 px-5 py-2.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors">Go to dashboard →</a>
           </div>
         </SidebarLayout>
       )

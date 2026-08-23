@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getProduct } from '@/lib/queries'
 import { query, withTransaction } from '@/lib/db'
 import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { hasScope, isPlatformOwner } from '@/lib/scopes'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { parseBody, zNonEmpty, zCurrency, zUuid } from '@/lib/validate'
@@ -64,7 +64,7 @@ export async function DELETE(
     const { id } = await params
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (admin.role !== 'super_admin') return NextResponse.json({ error: 'Only super admins can delete products' }, { status: 403 })
+    if (!isPlatformOwner(admin.role)) return NextResponse.json({ error: 'Only platform owners can delete products' }, { status: 403 })
 
     const product = await query(`SELECT id FROM products WHERE id = $1`, [id])
     if (!product.rowCount) return NextResponse.json({ error: 'Product not found' }, { status: 404 })

@@ -2,7 +2,7 @@ import { queryOne, queryMany } from '@/lib/db'
 import CreateAdminForm from '@/components/admin/CreateAdminForm'
 import AdminUserActions from '@/components/admin/AdminUserActions'
 import { headers } from 'next/headers'
-import { ADMIN_SCOPES } from '@/lib/scopes'
+import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/scopes'
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
@@ -67,7 +67,7 @@ export default async function TeamPage() {
   const adminId = headersList.get('x-user-id') || ''
   const host = await getHost()
   const adminInfo = await getAdminInfo(adminId)
-  if (adminInfo?.role !== 'super_admin') redirect(ap('/admin/settings', host))
+  if (!isPlatformOwner(adminInfo?.role || '')) redirect(ap('/admin/settings', host))
 
   const allAdmins = await getAllAdmins()
 
@@ -134,7 +134,7 @@ export default async function TeamPage() {
                 </div>
 
                 <div className="flex flex-wrap gap-1">
-                  {admin.role === 'super_admin' ? (
+                  {isPlatformOwner(admin.role) ? (
                     <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">All Access</span>
                   ) : scopes.length > 0 ? (
                     <>
@@ -210,7 +210,7 @@ export default async function TeamPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1 flex-nowrap">
-                        {admin.role === 'super_admin' ? (
+                        {isPlatformOwner(admin.role) ? (
                           <span className="px-2 py-0.5 bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 rounded-full text-xs font-medium">All</span>
                         ) : scopes.length > 0 ? (
                           <>

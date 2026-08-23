@@ -79,6 +79,7 @@ export async function GET(request: NextRequest) {
            COALESCE(p.inventory_quantity, 0)::numeric AS inventory_quantity,
            COALESCE(p.discount_pct, 0)::numeric AS discount_pct,
            COALESCE(su.display_label, su.unit) AS sell_unit_label,
+           NULL::uuid AS sub_variant_id,
            p.serialized,
            p.fragile, p.hazardous, p.flammable
          FROM products p
