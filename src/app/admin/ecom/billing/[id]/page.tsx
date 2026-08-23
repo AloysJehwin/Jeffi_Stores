@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { hasScope } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/scopes'
 import { getTenant, getTenantBilling } from '@/lib/tenant-registry'
 import { StatusPill } from '@/components/admin/ecom/EcomUI'
 
@@ -24,8 +24,7 @@ const LEDGER_LABEL: Record<string, string> = {
 export default async function TenantBillingPage({ params }: { params: Promise<{ id: string }> }) {
   const h = await headers()
   const role = h.get('x-user-role') || ''
-  const scopes = (h.get('x-user-scopes') || '').split(',').filter(Boolean)
-  if (role !== 'super_admin' && !hasScope(role, scopes, 'ecom_billing:read')) redirect('/admin')
+  if (!isPlatformAdmin(role)) redirect('/admin')
 
   const { id } = await params
   const t = await getTenant(id)

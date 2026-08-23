@@ -73,6 +73,11 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async createDbInstance(args: CreateDbInstanceArgs): Promise<{ dbInstanceId: string }> {
+    // LOCAL-TEST ONLY: TENANT_RDS_PUBLIC_TEST=true creates the tenant RDS publicly accessible so
+    // a laptop outside the VPC can run load_schema/backup without manually flipping visibility +
+    // SG each run. NEVER set in production — prod tenant DBs must stay PubliclyAccessible:false
+    // (the default when the flag is absent). Pair with a one-time SG rule allowing your IP on 5432.
+    const publicTest = process.env.TENANT_RDS_PUBLIC_TEST === 'true'
     try {
       await this.rds.send(new CreateDBInstanceCommand({
         DBInstanceIdentifier: args.dbInstanceId,
@@ -86,7 +91,7 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
         VpcSecurityGroupIds: [RDS_SG],
         DBSubnetGroupName: RDS_SUBNET_GROUP,
         DBParameterGroupName: args.paramGroup,
-        PubliclyAccessible: false,
+        PubliclyAccessible: publicTest,
         EnableIAMDatabaseAuthentication: true,
         StorageType: 'gp3',
         StorageEncrypted: true,
@@ -199,9 +204,9 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     }))
   }
 
-  async ensureDns(hostnames: string[]): Promise<void> {
+  async ensureDns(hostnames: string[], targetIp?: string): Promise<void> {
     const { upsertTenantDns } = await import('../tenant-dns')
-    await upsertTenantDns(hostnames)
+    await upsertTenantDns(hostnames, targetIp)
   }
 
   async removeDns(hostnames: string[]): Promise<void> {
@@ -249,5 +254,31 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
         if (/DBParameterGroupNotFound|NotFound/i.test(name)) return
         throw err
       })
+  }
+
+  // EC2 app instances (dedicated-tenant or shared pool) via the SigV4 ec2-client (no
+  // @aws-sdk/client-ec2, matching pool-autoscale). userData boots the same app Docker image.
+  async ensureAppInstance(args: { name: string; instanceType: string; userData?: string }): Promise<{ instanceId: string; ip: string }> {
+    const { runInstance, waitForState, getInstanceIp } = await import('../ec2-client')
+    const { instanceId } = await runInstance(args)
+    await waitForState(instanceId, 'running')
+    // Public IP can lag 'running' by a moment — poll briefly.
+    let ip: string | null = null
+    for (let i = 0; i < 10 && !ip; i++) {
+      ip = await getInstanceIp(instanceId)
+      if (!ip) await new Promise((r) => setTimeout(r, 3000))
+    }
+    if (!ip) throw new Error(`EC2 ${instanceId} running but no public IP assigned`)
+    return { instanceId, ip }
+  }
+
+  async deleteAppInstance(instanceId: string): Promise<void> {
+    const { terminateInstance } = await import('../ec2-client')
+    await terminateInstance(instanceId).catch((e: any) => { if (!/NotFound|InvalidInstanceID/i.test(e?.message || '')) throw e })
+  }
+
+  async isInstanceGone(instanceId: string): Promise<boolean> {
+    const { isInstanceGone } = await import('../ec2-client')
+    return isInstanceGone(instanceId)
   }
 }

@@ -317,7 +317,14 @@ describe('AwsProvisioningProvider', () => {
     it('ensureDns delegates to upsertTenantDns', async () => {
       const p = await makeProvider()
       await p.ensureDns(['a.jeffistores.in'])
-      expect(dns.upsertTenantDns).toHaveBeenCalledWith(['a.jeffistores.in'])
+      // ensureDns forwards an optional target IP (undefined here) to upsertTenantDns.
+      expect(dns.upsertTenantDns).toHaveBeenCalledWith(['a.jeffistores.in'], undefined)
+    })
+
+    it('ensureDns forwards the target IP to upsertTenantDns', async () => {
+      const p = await makeProvider()
+      await p.ensureDns(['a.jeffistores.in'], '52.0.0.9')
+      expect(dns.upsertTenantDns).toHaveBeenCalledWith(['a.jeffistores.in'], '52.0.0.9')
     })
 
     it('removeDns delegates to deleteTenantDns', async () => {

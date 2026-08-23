@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { hasScope } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/scopes'
 import { listTenants, tenantSummary, planMix } from '@/lib/tenant-registry'
 import { EcomHero, PlanMixChart, EcomFilters, StatusPill } from '@/components/admin/ecom/EcomUI'
 
@@ -13,8 +13,7 @@ const one = (sp: SP, k: string) => (Array.isArray(sp[k]) ? (sp[k] as string[])[0
 export default async function EcomCustomersPage({ searchParams }: { searchParams: Promise<SP> }) {
   const h = await headers()
   const role = h.get('x-user-role') || ''
-  const scopes = (h.get('x-user-scopes') || '').split(',').filter(Boolean)
-  if (role !== 'super_admin' && !hasScope(role, scopes, 'ecom_customers:read')) redirect('/admin')
+  if (!isPlatformAdmin(role)) redirect('/admin')
 
   const sp = await searchParams
   const filters = { status: one(sp, 'status'), plan: one(sp, 'plan'), q: one(sp, 'q') }

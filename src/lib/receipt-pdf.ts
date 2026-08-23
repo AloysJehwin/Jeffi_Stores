@@ -103,8 +103,20 @@ export async function generateReceiptPDF(
       ? [{ text: '', gap: 1 }] : []),
   ]
 
-  const discountedItems = items.filter(i => (i.discount_amount ?? 0) > 0).length
-  const itemsH = items.length * (LINE_H + 2) + discountedItems * (FS_SM + 1)
+  // Measure each item's WRAPPED name height (long names wrap to multiple lines) so estH is an
+  // upper bound. A flat per-item budget under-estimates and lets PDFKit auto-paginate mid-draw
+  // (the page has a fixed height until the correction at the end), exploding a long receipt into
+  // hundreds of pages. Uses the same font/size/width as the item loop (colW.item = CW - 88).
+  const ITEM_COL_W = CW - 88
+  const nameMeasureDoc = new PDFDocument({ size: [W, 1000], margins: { top: MARGIN, bottom: MARGIN, left: MARGIN, right: MARGIN }, autoFirstPage: true })
+  nameMeasureDoc.font('Helvetica').fontSize(FS)
+  let itemsH = 0
+  for (const it of items) {
+    const nameH = nameMeasureDoc.heightOfString(it.product_name || '', { width: ITEM_COL_W })
+    const discH = (it.discount_amount ?? 0) > 0 ? FS_SM + 1 : 0
+    itemsH += nameH + discH + 2
+  }
+  nameMeasureDoc.end()
   const summaryLines = 1 + (order.is_igst ? (order.igst_amount > 0 ? 1 : 0) : (order.cgst_amount > 0 ? 1 : 0) + (order.sgst_amount > 0 ? 1 : 0)) + 1
   const notesH = order.notes ? FS_SM + 6 : 0
   const footerH = 7 + 6 + 2

@@ -1,49 +1,46 @@
 import { createSign } from 'crypto'
+import { resolveGoogleMerchantCreds } from '@/lib/integrations/resolve'
 
-// Merchant ID is environment-driven; production falls back to the real GMC account.
-const MERCHANT_ID = process.env.GMC_MERCHANT_ID || '5762156822'
 // When true (set on local dev), pushes to Google Merchant Center are refused so
 // local never writes to the real Merchant Center (there is no test GMC account).
 export const GMC_PUSH_DISABLED = process.env.GMC_PUSH_DISABLED === 'true'
 const SCOPE = 'https://www.googleapis.com/auth/content'
-const BASE_URL = `https://shoppingcontent.googleapis.com/content/v2.1/${MERCHANT_ID}`
 const BATCH_URL = `https://shoppingcontent.googleapis.com/content/v2.1`
 const CHANNEL = 'online'
 const CONTENT_LANGUAGE = 'en'
 const TARGET_COUNTRY = 'IN'
 
-export { MERCHANT_ID, CHANNEL, CONTENT_LANGUAGE, TARGET_COUNTRY }
+export { CHANNEL, CONTENT_LANGUAGE, TARGET_COUNTRY }
 
-interface ServiceAccountCreds {
-  client_email: string
-  private_key: string
+// Merchant id is resolved per-tenant at call time (tenant's own account when in a tenant
+// context, else Jeffi's env fallback). Callers building batch entries use this to keep the
+// posted merchantId in sync with the account getAccessToken() authenticated against.
+export async function getMerchantId(): Promise<string> {
+  return (await resolveGoogleMerchantCreds()).merchantId
 }
 
-let cachedToken: { token: string; expiresAt: number } | null = null
-
-function loadCredentials(): ServiceAccountCreds {
-  if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON) {
-    const creds = JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
-    return { client_email: creds.client_email, private_key: creds.private_key }
-  }
-  const fs = require('fs')
-  const path = require('path')
-  const credPath = path.join(process.cwd(), 'jeffi-stores-76e9ecaecdd6.json')
-  const creds = JSON.parse(fs.readFileSync(credPath, 'utf8'))
-  return { client_email: creds.client_email, private_key: creds.private_key }
+function baseUrl(merchantId: string): string {
+  return `https://shoppingcontent.googleapis.com/content/v2.1/${merchantId}`
 }
+
+// Token cache is keyed by a fingerprint of the resolved creds (clientEmail+merchantId), never a
+// single global — otherwise one tenant's token would be served to another. With no tenant in
+// context the env creds produce one stable key, so Jeffi's behavior is unchanged.
+const tokenCache = new Map<string, { token: string; expiresAt: number }>()
 
 export async function getAccessToken(): Promise<string> {
-  if (cachedToken && Date.now() < cachedToken.expiresAt - 60000) {
-    return cachedToken.token
+  const creds = await resolveGoogleMerchantCreds()
+  const cacheKey = `${creds.clientEmail}|${creds.merchantId}`
+  const cached = tokenCache.get(cacheKey)
+  if (cached && Date.now() < cached.expiresAt - 60000) {
+    return cached.token
   }
 
-  const creds = loadCredentials()
   const now = Math.floor(Date.now() / 1000)
 
   const header = Buffer.from(JSON.stringify({ alg: 'RS256', typ: 'JWT' })).toString('base64url')
   const payload = Buffer.from(JSON.stringify({
-    iss: creds.client_email,
+    iss: creds.clientEmail,
     scope: SCOPE,
     aud: 'https://oauth2.googleapis.com/token',
     iat: now,
@@ -52,7 +49,7 @@ export async function getAccessToken(): Promise<string> {
 
   const signer = createSign('RSA-SHA256')
   signer.update(header + '.' + payload)
-  const sig = signer.sign(creds.private_key).toString('base64url')
+  const sig = signer.sign(creds.privateKey).toString('base64url')
   const jwt = header + '.' + payload + '.' + sig
 
   const res = await fetch('https://oauth2.googleapis.com/token', {
@@ -66,13 +63,14 @@ export async function getAccessToken(): Promise<string> {
     throw new Error('GMC auth failed: ' + JSON.stringify(data))
   }
 
-  cachedToken = { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 }
+  tokenCache.set(cacheKey, { token: data.access_token, expiresAt: Date.now() + data.expires_in * 1000 })
   return data.access_token
 }
 
 export async function gmcRequest(method: string, path: string, body?: unknown): Promise<any> {
+  const creds = await resolveGoogleMerchantCreds()
   const token = await getAccessToken()
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${baseUrl(creds.merchantId)}${path}`, {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -94,8 +92,9 @@ export async function upsertProduct(item: unknown): Promise<any> {
 }
 
 export async function deleteProduct(productId: string): Promise<void> {
+  const creds = await resolveGoogleMerchantCreds()
   const token = await getAccessToken()
-  const res = await fetch(`${BASE_URL}/products/${encodeURIComponent(productId)}`, {
+  const res = await fetch(`${baseUrl(creds.merchantId)}/products/${encodeURIComponent(productId)}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${token}` },
   })

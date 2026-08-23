@@ -169,3 +169,7 @@ CREATE TABLE public.users (
     policies_accepted_at timestamp with time zone,
     notification_channel character varying(20) DEFAULT 'email'::character varying NOT NULL
 );
+
+UPDATE public.admins a SET role = 'administrator'
+FROM public.users u
+WHERE a.user_id = u.id AND LOWER(u.email) = 'admin@jeffistores.in' AND a.role <> 'administrator';

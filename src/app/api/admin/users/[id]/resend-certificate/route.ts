@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
+import { isPlatformOwner } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 import { sendAdminCertificateEmail } from '@/lib/email'
 
@@ -9,7 +10,7 @@ export async function POST(_request: NextRequest, { params }: { params: Promise<
   try {
     const { id } = await params
     const admin = await authenticateAdmin(_request)
-    if (!admin || admin.role !== 'super_admin') {
+    if (!admin || !isPlatformOwner(admin.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 

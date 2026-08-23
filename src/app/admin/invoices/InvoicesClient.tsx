@@ -10,7 +10,7 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import HoverCard from '@/components/ui/HoverCard'
-import LineItemsSection, { newLineItem, type LineItem as LILineItem } from '@/components/admin/LineItemsSection'
+import LineItemsSection, { newLineItem, fetchSeedLineItem, type LineItem as LILineItem } from '@/components/admin/LineItemsSection'
 import BatchPickerModal, { type BatchPickerItem } from '@/components/admin/BatchPickerModal'
 import SerialEntryModal, { type SerialItem, type SerialAssignment } from '@/components/admin/SerialEntryModal'
 import SortableHeader, { sortOptions, type SortDir } from '@/components/admin/SortableHeader'
@@ -110,6 +110,24 @@ export default function InvoicesClient({ canWrite = false }: { canWrite?: boolea
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams.toString()])
+
+  // Deep-link preseed (scan → New Invoice): ?product=<id> with no ?edit seeds the
+  // first line item of a fresh editor. Best-effort; skips if editing an existing invoice.
+  const seededProductRef = useRef(false)
+  useEffect(() => {
+    if (seededProductRef.current) return
+    const pid = searchParams.get('product')
+    if (!pid || searchParams.get('edit')) return
+    seededProductRef.current = true
+    const vid = searchParams.get('variant')
+    let cancelled = false
+    fetchSeedLineItem(pid, vid).then(seed => {
+      if (cancelled || !seed) return
+      setItems(prev => (prev.length === 1 && !prev[0].product_id ? [seed] : [seed, ...prev]))
+    })
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   function navigateView(next: View, id?: string) {
     setViewState(next)

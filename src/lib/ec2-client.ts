@@ -65,3 +65,66 @@ export async function waitForState(instanceId: string, want: string, timeoutMs =
   }
   throw new Error(`EC2 ${instanceId} did not reach '${want}' within ${timeoutMs}ms`)
 }
+
+// ── Instance lifecycle: launch / terminate / ip (tenant + pool provisioning) ──────
+
+export interface RunInstanceArgs {
+  instanceType: string
+  name: string
+  userData?: string            // shell/cloud-config; base64-encoded here
+}
+
+/** Launch a new EC2 running the app image. Config (AMI, SG, subnet, key, IAM profile) from env,
+ * mirroring how aws-provider reads RDS config. Returns the new instance id. */
+export async function runInstance(args: RunInstanceArgs): Promise<{ instanceId: string }> {
+  const ami = process.env.TENANT_APP_AMI_ID
+  if (!ami) throw new Error('TENANT_APP_AMI_ID is not set — required to launch a tenant/pool app instance')
+  const sg = process.env.TENANT_APP_SECURITY_GROUP || process.env.TENANT_RDS_SECURITY_GROUP || ''
+  const subnet = process.env.TENANT_APP_SUBNET_ID || ''
+  const iamProfile = process.env.TENANT_APP_IAM_PROFILE || ''
+  const keyName = process.env.TENANT_APP_KEY_NAME || ''
+
+  const params: Record<string, string> = {
+    Action: 'RunInstances',
+    ImageId: ami,
+    InstanceType: args.instanceType,
+    MinCount: '1',
+    MaxCount: '1',
+    'TagSpecification.1.ResourceType': 'instance',
+    'TagSpecification.1.Tag.1.Key': 'Name',
+    'TagSpecification.1.Tag.1.Value': args.name,
+    'TagSpecification.1.Tag.2.Key': 'app',
+    'TagSpecification.1.Tag.2.Value': 'jeffi-tenant',
+  }
+  if (sg) params['SecurityGroupId.1'] = sg
+  if (subnet) params['SubnetId'] = subnet
+  if (keyName) params['KeyName'] = keyName
+  if (iamProfile) params['IamInstanceProfile.Name'] = iamProfile
+  if (args.userData) params['UserData'] = Buffer.from(args.userData, 'utf8').toString('base64')
+
+  const xml = await ec2(params)
+  const instanceId = xmlTag(xml, 'instanceId')
+  if (!instanceId) throw new Error(`RunInstances returned no instanceId: ${xml.slice(0, 300)}`)
+  return { instanceId }
+}
+
+/** Public IP of an instance (once running), or null if not yet assigned. */
+export async function getInstanceIp(instanceId: string): Promise<string | null> {
+  const xml = await ec2({ Action: 'DescribeInstances', 'InstanceId.1': instanceId })
+  return xmlTag(xml, 'ipAddress') // <ipAddress> is the public IP
+}
+
+export async function terminateInstance(instanceId: string): Promise<void> {
+  await ec2({ Action: 'TerminateInstances', 'InstanceId.1': instanceId })
+}
+
+/** True once the instance no longer exists or is terminated (teardown ordering). */
+export async function isInstanceGone(instanceId: string): Promise<boolean> {
+  try {
+    const { state } = await describeInstance(instanceId)
+    return state === 'terminated' || state === ''
+  } catch (e: any) {
+    // NotFound → gone.
+    return /NotFound|InvalidInstanceID/i.test(e?.message || '')
+  }
+}

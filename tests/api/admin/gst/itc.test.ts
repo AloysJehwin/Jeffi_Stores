@@ -68,10 +68,10 @@ describe('GET /api/admin/gst/itc', () => {
     expect(await res.json()).toMatchObject({ error: 'Unauthorized' })
   })
 
-  it('returns 401 when authenticated but not super_admin', async () => {
+  it('returns 403 when authenticated but lacks gst:read scope', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(REGULAR_ADMIN as any)
     const res = await GET(makeGet('?from=2024-01-01&to=2024-01-31'))
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(403)
   })
 
   it('returns 400 when from date missing', async () => {

@@ -1,10 +1,12 @@
 import type { ProvisioningProvider } from './provider'
+import { appBootUserData } from './user-data'
 import {
   getTenant,
   getProvisioningJob,
   updateProvisioningJob,
   setTenantStatus,
   writeTenantInfra,
+  writeTenantEc2,
   clearTenantInfra,
   clearTenantCache,
   type ProvisioningJob,
@@ -28,6 +30,9 @@ const STEPS = [
   'seed_data',
   'create_bucket',
   'write_infra',
+  'generate_legals',
+  'ensure_compute',
+  'setup_delhivery',
   'configure_dns',
   'verify_serving',
   'activate',
@@ -41,6 +46,11 @@ const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
 function bucketName(slug: string) { return `jeffi-tenant-${slug}` }
 function dbInstanceId(slug: string) { return `jeffi-tenant-${slug}` }
 function paramGroupName(slug: string) { return `jeffi-tenant-${slug}-pg16` }
+
+/** Higher plans (growth/pro/enterprise) get a DEDICATED EC2; Basic uses the shared pool. */
+function isDedicatedPlan(plan: string | null): boolean {
+  return !!plan && ['growth', 'pro', 'enterprise'].includes(plan)
+}
 
 /**
  * Hostnames a tenant needs pointed at the shared app host, by plan tier. Mirrors the
@@ -157,6 +167,20 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         return await next(job.id, 'create_bucket', res)
       }
 
+      case 'generate_legals': {
+        // Generate the tenant's own legal pages (terms/privacy/refund/…) templated from their
+        // business details + uploaded logo/seal, into the tenant bucket. Runs AFTER create_bucket
+        // + write_infra so the bucket exists. NON-FATAL — a legals failure must not block go-live.
+        try {
+          const { generateTenantLegals } = await import('../legals/provision')
+          await generateTenantLegals(job.tenant_id, res.endpoint)
+          res.legalsGenerated = true
+        } catch (e: any) {
+          res.legalsError = e?.message || 'legals generation failed'
+        }
+        return await next(job.id, 'ensure_compute', res)
+      }
+
       case 'create_bucket':
         await provider.ensureBucket(bucketName(slug))
         res.bucket = bucketName(slug)
@@ -164,11 +188,78 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
 
       case 'write_infra':
         await writeTenantInfra(job.tenant_id, { rdsEndpoint: res.endpoint, s3Bucket: res.bucket })
+        return await next(job.id, 'generate_legals', res)
+
+      case 'ensure_compute': {
+        // Stand up the app compute that will serve this tenant's storefront + admin, by plan:
+        //   Basic  → shared pool EC2 (create-if-missing); DNS later points at the pool IP.
+        //   higher → a DEDICATED EC2 for this tenant; DNS points at its own IP.
+        // The resolved serving IP is persisted to tenant_infra.ec2_target and used by
+        // configure_dns. Same app image on every instance (Host-routed).
+        //
+        // FALLBACK: if EC2 launch isn't configured (no TENANT_APP_AMI_ID and, for Basic, no
+        // pre-existing POOL_INSTANCE_ID), skip real EC2 and serve from the shared
+        // TENANT_APP_TARGET_IP — the flagship/pool host. This keeps provisioning working before
+        // per-tenant/pool EC2 is set up, and is the sane default rather than a hard failure.
+        const ec2Configured = !!process.env.TENANT_APP_AMI_ID || !!process.env.POOL_INSTANCE_ID
+        if (!ec2Configured) {
+          res.ec2Target = process.env.TENANT_APP_TARGET_IP || ''
+          res.computeMode = 'shared-target'
+        } else if (isDedicatedPlan(tenant.plan)) {
+          if (!res.ec2InstanceId) {
+            const { instanceId, ip } = await provider.ensureAppInstance({
+              name: `jeffi-tenant-${slug}`, instanceType: process.env.TENANT_DEDICATED_EC2_TYPE || 't4g.small',
+              userData: appBootUserData(),
+            })
+            res.ec2InstanceId = instanceId
+            res.ec2Target = ip
+            res.computeMode = 'dedicated'
+          }
+        } else {
+          const { ensurePoolInstance } = await import('../pool-autoscale')
+          const { ip } = await ensurePoolInstance()
+          res.ec2Target = ip
+          res.computeMode = 'pool'
+        }
+        if (res.ec2Target) await writeTenantEc2(job.tenant_id, res.ec2Target)
+        return await next(job.id, 'setup_delhivery', res)
+      }
+
+      case 'setup_delhivery': {
+        // Register the tenant's Delhivery pickup/client-warehouse from their onboarding
+        // warehouse config. NON-FATAL — a pickup-registration failure must not block go-live
+        // (it can be retried/fixed later; shipments just can't be created until then).
+        try {
+          const { getKyc, getDraft, controlPlanePool } = await import('../tenant-registry')
+          const ownerRow = await controlPlanePool().query(
+            `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [job.tenant_id]).catch(() => null)
+          const ownerId = ownerRow?.rows?.[0]?.owner_id
+          const draft = ownerId ? await getDraft(ownerId).catch(() => null) : null
+          const wh = (draft?.data as any)?.wh
+          const kyc = await getKyc(job.tenant_id).catch(() => null)
+          if (wh?.sellerPhone && wh?.originPincode) {
+            const { createDelhiveryPickupLocation } = await import('../delhivery')
+            const r = await createDelhiveryPickupLocation({
+              name: wh.pickupLocation || tenant.slug,
+              phone: wh.sellerPhone,
+              pincode: wh.originPincode,
+              address: wh.sellerAddress || kyc?.business_address || '',
+              registeredName: wh.sellerName || tenant.display_name,
+            })
+            res.delhiveryPickup = r.ok ? 'created' : `error: ${r.error}`
+          } else {
+            res.delhiveryPickup = 'skipped (no warehouse config)'
+          }
+        } catch (e: any) {
+          res.delhiveryPickup = `error: ${e?.message || 'failed'}`
+        }
         return await next(job.id, 'configure_dns', res)
+      }
 
       case 'configure_dns': {
         const hosts = tenantHostnames(slug, tenant.plan)
-        await provider.ensureDns(hosts)
+        // Point at this tenant's serving IP (dedicated instance or pool); falls back to env.
+        await provider.ensureDns(hosts, res.ec2Target)
         res.dnsHosts = hosts
         return await next(job.id, 'verify_serving', res)
       }
@@ -180,6 +271,13 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // signup could go live pointing at a host that 404s or times out. DNS/serving can
         // lag right after configure_dns, so we allow a bounded number of pending retries
         // (each worker tick) before giving up and failing the job for rollback.
+        //
+        // Under the STUB provider (local dev / tests) there is no real infra or DNS, so the
+        // probe can never succeed — skip it and advance. The guard stays fully active for the
+        // real AWS provider, which is the only place a host actually serves.
+        if (process.env.PROVISIONING_PROVIDER !== 'aws') {
+          return await next(job.id, 'activate', res)
+        }
         const rootDomain = ROOT_DOMAIN
         const primaryHost = `${slug}.${rootDomain}`
         const attempts = (res.verifyAttempts || 0) + 1
@@ -290,6 +388,9 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   const hosts = (r.dnsHosts as string[] | undefined)
     ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : [])
   if (hosts.length) await provider.removeDns(hosts).catch(() => {})
+  // Dedicated EC2 (higher plans) — terminate it; a Basic tenant used the shared pool (left alone
+  // here, reclaimed by deletePoolIfEmpty on the final deprovision).
+  if (r.ec2InstanceId) await provider.deleteAppInstance(r.ec2InstanceId).catch(() => {})
   // Billable resources.
   if (r.bucket) await provider.deleteBucket(r.bucket).catch(() => {})
   if (r.dbInstanceId) await provider.deleteDbInstance(r.dbInstanceId).catch(() => {})
@@ -301,6 +402,94 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   // infra. 'suspended' = not served, distinguishable from a clean 'terminated' deprovision.
   await setTenantStatus(tenantId, 'suspended').catch(() => {})
   if (job) await updateProvisioningJob(job.id, { status: 'failed', last_error: 'rolled back', created_resources: { ...r, rolledBack: true } })
+}
+
+export interface ReprovisionResult {
+  ok: boolean
+  added: string[]
+  removed: string[]
+  error?: string
+}
+
+/**
+ * Re-apply a tenant's DNS to match its CURRENT plan tier — used on plan
+ * upgrade/downgrade. This is DNS-ONLY: it never touches RDS/S3 and never enqueues a
+ * provisioning job (which would re-run create_db_instance and destroy live infra).
+ *
+ * The plan must already be updated in the registry (updateTenantPlan) before calling.
+ * `tenantHostnames(slug, plan)` yields more subdomains for higher tiers; a downgrade
+ * therefore REMOVES the higher-tier subdomains, an upgrade ADDS them. The set of hosts
+ * actually applied is tracked in the provisioning job's created_resources.dnsHosts so the
+ * add/remove delta is exact and this stays idempotent across repeated calls.
+ */
+export async function reprovisionDns(tenantId: string, provider: ProvisioningProvider): Promise<ReprovisionResult> {
+  const tenant = await getTenant(tenantId)
+  if (!tenant) return { ok: false, added: [], removed: [], error: 'tenant not found' }
+  if (tenant.status !== 'active' || !tenant.rds_endpoint) {
+    // Only meaningful for a live tenant; a provisioning/suspended one gets DNS from the
+    // engine's configure_dns step instead.
+    return { ok: false, added: [], removed: [], error: 'tenant not active / no infra' }
+  }
+
+  const desired = tenantHostnames(tenant.slug, tenant.plan)
+  const job = await getProvisioningJob(tenantId)
+  const created = (job?.created_resources as Record<string, any>) || {}
+  const prev = (created.dnsHosts as string[] | undefined) ?? desired
+
+  const desiredSet = new Set(desired)
+  const prevSet = new Set(prev)
+  const added = desired.filter((h) => !prevSet.has(h))
+  const removed = prev.filter((h) => !desiredSet.has(h))
+
+  try {
+    // COMPUTE MOVE: if the new plan tier crosses the Basic↔dedicated boundary, the tenant's
+    // serving host changes — stand up / tear down a dedicated EC2 and repoint ALL hosts at the
+    // new target IP. (RDS/S3 are untouched — only compute + DNS move.)
+    const hadDedicated = !!created.ec2InstanceId
+    const wantDedicated = isDedicatedPlan(tenant.plan)
+    let targetIp: string | undefined = created.ec2Target
+    let computeChanged = false
+
+    if (wantDedicated && !hadDedicated) {
+      // Basic → higher: provision a dedicated EC2, move off the pool.
+      const { instanceId, ip } = await provider.ensureAppInstance({
+        name: `jeffi-tenant-${tenant.slug}`, instanceType: process.env.TENANT_DEDICATED_EC2_TYPE || 't4g.small',
+      })
+      created.ec2InstanceId = instanceId
+      targetIp = ip
+      computeChanged = true
+    } else if (!wantDedicated && hadDedicated) {
+      // higher → Basic: fall back to the shared pool, terminate the dedicated instance.
+      const { ensurePoolInstance } = await import('../pool-autoscale')
+      const { ip } = await ensurePoolInstance()
+      const oldInstance = created.ec2InstanceId
+      targetIp = ip
+      delete created.ec2InstanceId
+      computeChanged = true
+      if (oldInstance) await provider.deleteAppInstance(oldInstance).catch(() => {})
+    }
+
+    if (computeChanged && targetIp) {
+      created.ec2Target = targetIp
+      await writeTenantEc2(tenantId, targetIp)
+      // Repoint every desired host at the new target (UPSERT is idempotent).
+      await provider.ensureDns(desired, targetIp)
+    } else {
+      // Same compute tier: DNS delta only, against the existing target.
+      if (added.length) await provider.ensureDns(added, targetIp)
+    }
+    if (removed.length) await provider.removeDns(removed)
+
+    // Record the now-authoritative host set + compute so the next change diffs correctly.
+    if (job) {
+      await updateProvisioningJob(job.id, {
+        created_resources: { ...created, dnsHosts: desired },
+      })
+    }
+    return { ok: true, added: computeChanged ? desired : added, removed }
+  } catch (e: any) {
+    return { ok: false, added, removed, error: e?.message || 'reprovision failed' }
+  }
 }
 
 export interface DeprovisionResult {
@@ -361,6 +550,15 @@ export async function deprovisionTenant(
     await provider.deleteDbInstance(instId)
     await provider.deleteBucket(bucket)
 
+    // 3a. Compute teardown: a dedicated EC2 (higher plans) is terminated; a Basic tenant used
+    // the shared pool — reclaim the pool only when this was the LAST active tenant.
+    if (created.ec2InstanceId) {
+      await provider.deleteAppInstance(created.ec2InstanceId).catch(() => {})
+    } else {
+      const { deletePoolIfEmpty } = await import('../pool-autoscale')
+      await deletePoolIfEmpty().catch(() => {})
+    }
+
     // 3b. Remove the tenant's DNS records so the subdomains stop resolving.
     const dnsHosts = (created.dnsHosts as string[] | undefined) ?? tenantHostnames(slug, tenant.plan)
     await provider.removeDns(dnsHosts).catch(() => {})
@@ -391,4 +589,4 @@ export async function deprovisionTenant(
   }
 }
 
-export { STEPS, MAX_CONNECTIONS, dbInstanceId }
+export { STEPS, MAX_CONNECTIONS, dbInstanceId, tenantHostnames }

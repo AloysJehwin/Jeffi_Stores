@@ -99,9 +99,9 @@ export async function GET(request: NextRequest) {
 // Also denormalizes the price's leaf supplier_id cache. Runs in the PO-create transaction.
 async function syncSupplierPriceFromPO(
   client: import('pg').PoolClient,
-  args: { productId: string; sku: string | null; variantIdFromLine: string | null; subVariantIdFromLine: string | null; supplierId: string; unitCost: number; poNumber: string }
+  args: { productId: string; sku: string | null; variantIdFromLine: string | null; subVariantIdFromLine: string | null; supplierId: string; unitCost: number; poNumber: string; purchaseUnit: string | null; purchaseUnitFactor: number }
 ) {
-  const { productId, sku, variantIdFromLine, subVariantIdFromLine, supplierId, unitCost, poNumber } = args
+  const { productId, sku, variantIdFromLine, subVariantIdFromLine, supplierId, unitCost, poNumber, purchaseUnit, purchaseUnitFactor } = args
   if (!productId || !supplierId) return
   if (!Number.isFinite(unitCost) || unitCost < 0) return
 
@@ -151,13 +151,15 @@ async function syncSupplierPriceFromPO(
   )
   const existing = cur.rows[0]
   const note = `Auto-synced from PO ${poNumber}`
+  const pUnit = purchaseUnit || null
+  const pFactor = Number.isFinite(purchaseUnitFactor) && purchaseUnitFactor > 0 ? purchaseUnitFactor : 1
 
   if (!existing) {
     await client.query(
       `INSERT INTO product_suppliers
-         (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, is_preferred, notes)
-       VALUES ($1, $2, $3, $4, $5, 'INR', false, false, $6)`,
-      [productId, variantId, subVariantId, supplierId, cost, note]
+         (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, is_preferred, notes, purchase_unit, purchase_unit_factor)
+       VALUES ($1, $2, $3, $4, $5, 'INR', false, false, $6, $7, $8)`,
+      [productId, variantId, subVariantId, supplierId, cost, note, pUnit, pFactor]
     )
   } else if (Number(existing.unit_cost) !== cost) {
     // Price changed → deactivate old, insert a new dated row (preserve history).
@@ -167,12 +169,19 @@ async function syncSupplierPriceFromPO(
     )
     await client.query(
       `INSERT INTO product_suppliers
-         (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, is_preferred, notes)
-       VALUES ($1, $2, $3, $4, $5, 'INR', false, false, $6)`,
-      [productId, variantId, subVariantId, supplierId, cost, note]
+         (product_id, variant_id, sub_variant_id, supplier_id, unit_cost, currency, gst_inclusive, is_preferred, notes, purchase_unit, purchase_unit_factor)
+       VALUES ($1, $2, $3, $4, $5, 'INR', false, false, $6, $7, $8)`,
+      [productId, variantId, subVariantId, supplierId, cost, note, pUnit, pFactor]
+    )
+  } else {
+    // Cost unchanged, but keep the remembered purchase unit/factor current so the
+    // next PO for this supplier+product prefills the latest conversion.
+    await client.query(
+      `UPDATE product_suppliers SET purchase_unit = $2, purchase_unit_factor = $3, updated_at = NOW()
+       WHERE id = $1 AND (purchase_unit IS DISTINCT FROM $2 OR purchase_unit_factor IS DISTINCT FROM $3)`,
+      [existing.id, pUnit, pFactor]
     )
   }
-  // else unchanged → no-op
 }
 
 export async function POST(request: NextRequest) {
@@ -294,6 +303,8 @@ export async function POST(request: NextRequest) {
           supplierId: supplier_id,
           unitCost: resolvedUnitCost,
           poNumber,
+          purchaseUnit: item.purchase_unit || null,
+          purchaseUnitFactor: factor,
         })
       }
       return { id: poId }

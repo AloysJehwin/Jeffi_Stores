@@ -12,12 +12,11 @@ export interface SearchClause {
 // long product name, so it tolerates typos that whole-string similarity misses.
 const WORD_SIM_THRESHOLD = 0.5
 
-// Split a raw query into clean, non-empty word tokens (punctuation stripped).
 function searchWords(raw: string): string[] {
   return raw
     .trim()
     .split(/\s+/)
-    .map(w => w.replace(/[^\w]/g, ''))
+    .map(w => w.replace(/^[^\w]+|[^\w]+$/g, ''))
     .filter(Boolean)
 }
 
@@ -25,9 +24,9 @@ function tsQuery(raw: string): string {
   return raw
     .trim()
     .split(/\s+/)
+    .map(w => w.replace(/[^\w]/g, ''))
     .filter(Boolean)
-    .map(w => w.replace(/[^\w]/g, '') + ':*')
-    .filter(Boolean)
+    .map(w => `${w}:*`)
     .join(' & ')
 }
 

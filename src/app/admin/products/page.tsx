@@ -4,7 +4,7 @@ import { cookies, headers } from 'next/headers'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import { verifyToken } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { hasScope, isPlatformOwner } from '@/lib/scopes'
 import { getFilteredProducts, getAllCategories, getAllBrands, getProductBreakdowns } from '@/lib/queries'
 import { queryOne, queryMany } from '@/lib/db'
 import DeactivateProductButton from '@/components/admin/DeactivateProductButton'
@@ -14,6 +14,7 @@ import AdminFilters from '@/components/admin/AdminFilters'
 import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
 import Pagination from '@/components/admin/Pagination'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
+import CopySku from '@/components/ui/CopySku'
 import ProductsTableClient from '@/components/admin/ProductsTableClient'
 import SortableHeader from '@/components/admin/SortableHeader'
 import { sortOptions } from '@/components/admin/sortOptions'
@@ -124,7 +125,7 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-foreground truncate">{product.name}</div>
-                    <div className="text-xs text-foreground-muted">{product.sku}</div>
+                    <div className="text-xs text-foreground-muted inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</div>
                   </div>
                   <span className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
                     product.is_active
@@ -312,7 +313,7 @@ async function ProductsStats() {
                 ) : (
                   <div key={d.product_id} className="px-4 py-2.5 flex items-center gap-2">
                     <p className="text-sm font-medium text-amber-800 dark:text-amber-300 truncate">{d.name}</p>
-                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono">{d.sku}</p>
+                    <p className="text-xs text-amber-600 dark:text-amber-400 font-mono inline-flex items-center gap-1">{d.sku}{d.sku && <CopySku sku={d.sku} />}</p>
                   </div>
                 )
               ))}
@@ -334,7 +335,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
   if (token) {
     try {
       const payload = await verifyToken(token.value) as any
-      isSuperAdmin = payload?.role === 'super_admin'
+      isSuperAdmin = isPlatformOwner(payload?.role || '')
     } catch {}
   }
 

@@ -75,7 +75,7 @@ export async function POST(request: NextRequest) {
 
     const sellerStateCode = (await getBusinessValues()).businessStateCode
     const orderIsIgst = buyerGstin ? isInterState(state || '', sellerStateCode) : false
-    const gstEnabled = (await getFeatureFlags()).gstEnabled
+    const { gstEnabled, inventoryValidationEnabled } = await getFeatureFlags()
 
     let subtotal = 0
     let totalTaxable = 0
@@ -178,6 +178,7 @@ export async function POST(request: NextRequest) {
       const orderNumber = `OFF-${ts}-${rand}`
 
       const insufficientItems: string[] = []
+      if (inventoryValidationEnabled) {
       for (const item of processedItems) {
         if (!item.product_id) continue
         // Resolve unit factor to get base-unit quantity for stock checks
@@ -248,6 +249,7 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+      } // end inventoryValidationEnabled
 
       const saveAsDraft = insufficientItems.length > 0
 
@@ -331,8 +333,9 @@ export async function POST(request: NextRequest) {
           client
         )
 
-        const isGSTEnabled = (await getFeatureFlags()).gstEnabled
-        if (isGSTEnabled) {
+        // Assign an invoice number regardless of GST — GST-off just means a tax-free
+        // invoice, but it must still be numbered so it appears on the invoice list.
+        {
           const settingsResult = await client.query("SELECT value FROM site_settings WHERE key = 'invoice_prefix'")
           const prefix = settingsResult.rows[0]?.value || 'JS'
           const fy = getFinancialYear(new Date())

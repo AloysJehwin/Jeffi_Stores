@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { LABEL_SIZES, LabelSpec, LabelSize } from '@/lib/label-sizes'
 import { round2 } from '@/lib/gst'
+import CopySku from '@/components/ui/CopySku'
 
 interface LabelEntry {
   id: string
@@ -525,7 +526,7 @@ export default function ProductLabelModal({ product, onClose }: Props) {
                           ? <div className="text-sm font-medium text-foreground truncate">{e.variant_name}</div>
                           : <div className="text-sm font-medium text-foreground truncate">{e.name}</div>
                         }
-                        <div className="text-xs text-foreground-muted">{e.sku}</div>
+                        <div className="text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{e.sku}{e.sku && <CopySku sku={e.sku} />}</span></div>
                       </div>
                       <div className="text-xs font-semibold text-primary-500 shrink-0">
                         Rs. {Number(e.base_price).toFixed(2)}

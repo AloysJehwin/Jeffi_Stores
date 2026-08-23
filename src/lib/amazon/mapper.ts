@@ -1,5 +1,4 @@
 import { buildProductHighlights } from '@/lib/google-merchant-helpers'
-import { MARKETPLACE_ID } from './client'
 
 // Amazon SP-API mapper — analog of src/lib/merchant/mapper.ts (Google).
 //
@@ -62,16 +61,16 @@ function resolveProductType(product: any): string {
 }
 
 // SP-API scalar attribute envelope: array of { value, marketplace_id }.
-function attr(value: unknown) {
-  return [{ value, marketplace_id: MARKETPLACE_ID }]
+function attr(value: unknown, marketplaceId: string) {
+  return [{ value, marketplace_id: marketplaceId }]
 }
 
 // --- Measurement & count (Amazon requires units; parent rows are often empty, so we use
 // plausible small-fastener defaults that validate and can be enriched later). ---
 
-function buildItemWeight(product: any) {
+function buildItemWeight(product: any, marketplaceId: string) {
   const kg = Number(product.weight) > 0 ? Number(product.weight) : 0.05
-  return [{ value: Number(kg.toFixed(3)), unit: 'kilograms', marketplace_id: MARKETPLACE_ID }]
+  return [{ value: Number(kg.toFixed(3)), unit: 'kilograms', marketplace_id: marketplaceId }]
 }
 
 // Parse the first two positive numbers from the free-text dimensions/size as length x width (mm).
@@ -80,39 +79,39 @@ function parseDimsMm(dims?: string): { length: number; width: number } {
   return { length: nums[0] ?? 25, width: nums[1] ?? 10 }
 }
 
-function buildItemLengthWidth(product: any) {
+function buildItemLengthWidth(product: any, marketplaceId: string) {
   const { length, width } = parseDimsMm(product.dimensions || product.size)
   return [{
     length: { value: length, unit: 'millimeters' },
     width: { value: width, unit: 'millimeters' },
-    marketplace_id: MARKETPLACE_ID,
+    marketplace_id: marketplaceId,
   }]
 }
 
-function buildUnitCount() {
-  return [{ value: 1, type: { value: 'count', language_tag: 'en_IN' }, marketplace_id: MARKETPLACE_ID }]
+function buildUnitCount(marketplaceId: string) {
+  return [{ value: 1, type: { value: 'count', language_tag: 'en_IN' }, marketplace_id: marketplaceId }]
 }
 
-function buildItemTypeName(product: any) {
+function buildItemTypeName(product: any, marketplaceId: string) {
   const name = product.categories?.name || 'Fastener'
-  return [{ value: String(name), language_tag: 'en_IN', marketplace_id: MARKETPLACE_ID }]
+  return [{ value: String(name), language_tag: 'en_IN', marketplace_id: marketplaceId }]
 }
 
 // --- Identity cluster: EITHER a real barcode OR the GTIN-exemption flag. Never both, never
 // merchant_suggested_asin (we create new listings). ---
-function buildProductIdentity(product: any, variant?: any): Record<string, unknown> {
+function buildProductIdentity(product: any, marketplaceId: string, variant?: any): Record<string, unknown> {
   const gtin = variant?.gtin || product.gtin
   if (gtin) {
     const raw = String(gtin).replace(/\D/g, '')
     const type = raw.length === 12 ? 'upc' : 'ean'
-    return { externally_assigned_product_identifier: [{ type, value: raw, marketplace_id: MARKETPLACE_ID }] }
+    return { externally_assigned_product_identifier: [{ type, value: raw, marketplace_id: marketplaceId }] }
   }
-  return { supplier_declared_has_product_identifier_exemption: [{ value: true, marketplace_id: MARKETPLACE_ID }] }
+  return { supplier_declared_has_product_identifier_exemption: [{ value: true, marketplace_id: marketplaceId }] }
 }
 
-function buildModelNumber(product: any, variant?: any): Record<string, unknown> {
+function buildModelNumber(product: any, marketplaceId: string, variant?: any): Record<string, unknown> {
   const model = variant?.mpn || product.mpn || variant?.sku || product.sku
-  return model ? { model_number: attr(String(model)) } : {}
+  return model ? { model_number: attr(String(model), marketplaceId) } : {}
 }
 
 // India LMPC contact-info blocks. The schema expects `value` as a single free-text string
@@ -122,31 +121,31 @@ const STORE_CONTACT_TEXT =
   "Jeffi Stores, Sanjay Gandhi Chowk, Opposite Arihant Complex, Station Road, Raipur, " +
   "Chhattisgarh 492001, India. Phone: +919685354099. Email: admin@jeffistores.in"
 
-function contactInfoAttr() {
-  return [{ value: STORE_CONTACT_TEXT, language_tag: 'en_IN', marketplace_id: MARKETPLACE_ID }]
+function contactInfoAttr(marketplaceId: string) {
+  return [{ value: STORE_CONTACT_TEXT, language_tag: 'en_IN', marketplace_id: marketplaceId }]
 }
 
 // external_product_information carries the HSN code on the India marketplace.
-function externalProductInfoAttr(product: any) {
+function externalProductInfoAttr(product: any, marketplaceId: string) {
   const hsn = String(product.hsn_code || '').replace(/\D/g, '')
   if (hsn.length < 4) return undefined
-  return [{ entity: 'HSN', value: hsn.slice(0, 8), marketplace_id: MARKETPLACE_ID }]
+  return [{ entity: 'HSN', value: hsn.slice(0, 8), marketplace_id: marketplaceId }]
 }
 
-function buildColorAndComponents(product: any): Record<string, unknown> {
-  const out: Record<string, unknown> = { included_components: attr('Handle') }
-  if (product.color) out.color = attr(product.color)
+function buildColorAndComponents(product: any, marketplaceId: string): Record<string, unknown> {
+  const out: Record<string, unknown> = { included_components: attr('Handle', marketplaceId) }
+  if (product.color) out.color = attr(product.color, marketplaceId)
   return out
 }
 
-function buildImageAttributes(product: any): Record<string, unknown> {
+function buildImageAttributes(product: any, marketplaceId: string): Record<string, unknown> {
   const images = (product.product_images || []).filter((img: any) => img.image_url)
   const primary = images.find((img: any) => img.is_primary) || images[0]
   const others = images.filter((img: any) => img.id !== primary?.id).slice(0, 8)
   const out: Record<string, unknown> = {}
-  if (primary) out.main_product_image_locator = [{ media_location: primary.image_url, marketplace_id: MARKETPLACE_ID }]
+  if (primary) out.main_product_image_locator = [{ media_location: primary.image_url, marketplace_id: marketplaceId }]
   others.forEach((img: any, i: number) => {
-    out[`other_product_image_locator_${i + 1}`] = [{ media_location: img.image_url, marketplace_id: MARKETPLACE_ID }]
+    out[`other_product_image_locator_${i + 1}`] = [{ media_location: img.image_url, marketplace_id: marketplaceId }]
   })
   return out
 }
@@ -154,11 +153,11 @@ function buildImageAttributes(product: any): Record<string, unknown> {
 // purchasable_offer: our_price[].schedule[].value_with_tax (number). On amazon.in the India MRP
 // law requires maximum_retail_price as a sibling of our_price (its absence is the hidden cause
 // of error 90183). MRP must be >= our_price. currency + marketplace_id are selectors.
-function buildPurchasableOffer(listPrice: number, salePrice: number | null) {
+function buildPurchasableOffer(listPrice: number, salePrice: number | null, marketplaceId: string) {
   const price = Number(listPrice.toFixed(2))
   const mrp = Math.max(price, Number(listPrice.toFixed(2))) // MRP >= our_price
   const offer: any = {
-    marketplace_id: MARKETPLACE_ID,
+    marketplace_id: marketplaceId,
     currency: CURRENCY,
     our_price: [{ schedule: [{ value_with_tax: price }] }],
     maximum_retail_price: [{ schedule: [{ value_with_tax: mrp }] }],
@@ -176,58 +175,58 @@ function buildFulfillmentAvailability(inStock: boolean) {
 }
 
 // Variation blocks (Amazon needs an explicit parent listing + parentage_level on children).
-function parentVariationAttrs(): Record<string, unknown> {
+function parentVariationAttrs(marketplaceId: string): Record<string, unknown> {
   return {
-    parentage_level: [{ value: 'parent', marketplace_id: MARKETPLACE_ID }],
-    variation_theme: [{ name: 'SIZE_NAME', marketplace_id: MARKETPLACE_ID }],
+    parentage_level: [{ value: 'parent', marketplace_id: marketplaceId }],
+    variation_theme: [{ name: 'SIZE_NAME', marketplace_id: marketplaceId }],
   }
 }
 
-function childVariationAttrs(parentSku: string): Record<string, unknown> {
+function childVariationAttrs(parentSku: string, marketplaceId: string): Record<string, unknown> {
   return {
-    parentage_level: [{ value: 'child', marketplace_id: MARKETPLACE_ID }],
+    parentage_level: [{ value: 'child', marketplace_id: marketplaceId }],
     child_parent_sku_relationship: [{
       parent_sku: parentSku,
       child_relationship_type: 'variation',
-      marketplace_id: MARKETPLACE_ID,
+      marketplace_id: marketplaceId,
     }],
-    variation_theme: [{ name: 'SIZE_NAME', marketplace_id: MARKETPLACE_ID }],
+    variation_theme: [{ name: 'SIZE_NAME', marketplace_id: marketplaceId }],
   }
 }
 
 // Attributes shared by every SKU (parent + children + simple).
-function buildCommonAttributes(product: any, brandName: string): Record<string, unknown> {
+function buildCommonAttributes(product: any, brandName: string, marketplaceId: string): Record<string, unknown> {
   const description = (product.description || product.name || '').slice(0, 2000)
   const bullets = buildProductHighlights(product).slice(0, 5)
   const common: Record<string, unknown> = {
-    condition_type: attr('new_new'),
-    product_description: attr(description),
-    supplier_declared_dg_hz_regulation: attr('not_applicable'),
-    batteries_required: attr(false),
-    country_of_origin: attr(product.country_of_origin || 'IN'),
-    item_type_name: buildItemTypeName(product),
-    item_weight: buildItemWeight(product),
-    item_length_width: buildItemLengthWidth(product),
-    unit_count: buildUnitCount(),
-    rtip_manufacturer_contact_information: contactInfoAttr(),
-    importer_contact_information: contactInfoAttr(),
-    packer_contact_information: contactInfoAttr(),
-    ...buildColorAndComponents(product),
-    ...buildImageAttributes(product),
+    condition_type: attr('new_new', marketplaceId),
+    product_description: attr(description, marketplaceId),
+    supplier_declared_dg_hz_regulation: attr('not_applicable', marketplaceId),
+    batteries_required: attr(false, marketplaceId),
+    country_of_origin: attr(product.country_of_origin || 'IN', marketplaceId),
+    item_type_name: buildItemTypeName(product, marketplaceId),
+    item_weight: buildItemWeight(product, marketplaceId),
+    item_length_width: buildItemLengthWidth(product, marketplaceId),
+    unit_count: buildUnitCount(marketplaceId),
+    rtip_manufacturer_contact_information: contactInfoAttr(marketplaceId),
+    importer_contact_information: contactInfoAttr(marketplaceId),
+    packer_contact_information: contactInfoAttr(marketplaceId),
+    ...buildColorAndComponents(product, marketplaceId),
+    ...buildImageAttributes(product, marketplaceId),
   }
-  const epi = externalProductInfoAttr(product)
+  const epi = externalProductInfoAttr(product, marketplaceId)
   if (epi) common.external_product_information = epi
-  if (brandName) common.brand = attr(brandName)
-  if (brandName) common.manufacturer = attr(brandName)
-  if (bullets.length) common.bullet_point = bullets.map(b => ({ value: b, marketplace_id: MARKETPLACE_ID }))
-  if (product.material) common.material = attr(product.material)
+  if (brandName) common.brand = attr(brandName, marketplaceId)
+  if (brandName) common.manufacturer = attr(brandName, marketplaceId)
+  if (bullets.length) common.bullet_point = bullets.map(b => ({ value: b, marketplace_id: marketplaceId }))
+  if (product.material) common.material = attr(product.material, marketplaceId)
   return common
 }
 
-export function productToAmazonListings(product: any): AmazonListing[] {
+export function productToAmazonListings(product: any, marketplaceId: string): AmazonListing[] {
   const productType = resolveProductType(product)
   const brandName = product.brands?.name || ''
-  const common = buildCommonAttributes(product, brandName)
+  const common = buildCommonAttributes(product, brandName, marketplaceId)
   const hasVariants = product.has_variants && product.product_variants?.length > 0
   const productActive = product.is_active !== false
   const parentSku = product.sku
@@ -242,10 +241,10 @@ export function productToAmazonListings(product: any): AmazonListing[] {
       requirements: 'LISTING',
       attributes: {
         ...common,
-        ...buildProductIdentity(product),
-        ...buildModelNumber(product),
-        item_name: attr(product.name),
-        ...parentVariationAttrs(),
+        ...buildProductIdentity(product, marketplaceId),
+        ...buildModelNumber(product, marketplaceId),
+        item_name: attr(product.name, marketplaceId),
+        ...parentVariationAttrs(marketplaceId),
       },
     })
 
@@ -264,13 +263,13 @@ export function productToAmazonListings(product: any): AmazonListing[] {
         requirements: 'LISTING',
         attributes: {
           ...common,
-          ...buildProductIdentity(product, v),
-          ...buildModelNumber(product, v),
-          item_name: attr(`${product.name} - ${v.variant_name}`),
-          purchasable_offer: buildPurchasableOffer(listPrice, salePrice),
+          ...buildProductIdentity(product, marketplaceId, v),
+          ...buildModelNumber(product, marketplaceId, v),
+          item_name: attr(`${product.name} - ${v.variant_name}`, marketplaceId),
+          purchasable_offer: buildPurchasableOffer(listPrice, salePrice, marketplaceId),
           fulfillment_availability: buildFulfillmentAvailability(inStock),
-          ...(v.variant_name ? { size: attr(v.variant_name) } : {}),
-          ...childVariationAttrs(parentSku),
+          ...(v.variant_name ? { size: attr(v.variant_name, marketplaceId) } : {}),
+          ...childVariationAttrs(parentSku, marketplaceId),
         },
       })
     }
@@ -291,12 +290,12 @@ export function productToAmazonListings(product: any): AmazonListing[] {
     requirements: 'LISTING',
     attributes: {
       ...common,
-      ...buildProductIdentity(product),
-      ...buildModelNumber(product),
-      item_name: attr(product.name),
-      purchasable_offer: buildPurchasableOffer(listPrice, salePrice),
+      ...buildProductIdentity(product, marketplaceId),
+      ...buildModelNumber(product, marketplaceId),
+      item_name: attr(product.name, marketplaceId),
+      purchasable_offer: buildPurchasableOffer(listPrice, salePrice, marketplaceId),
       fulfillment_availability: buildFulfillmentAvailability(inStock),
-      ...(product.size ? { size: attr(product.size) } : {}),
+      ...(product.size ? { size: attr(product.size, marketplaceId) } : {}),
     },
   }]
 }
@@ -310,6 +309,7 @@ export function productToAmazonListings(product: any): AmazonListing[] {
 export function productToAmazonOfferListing(
   product: any,
   asin: string,
+  marketplaceId: string,
   variant?: any,
 ): AmazonListing {
   const sku = variant?.sku || product.sku
@@ -326,9 +326,9 @@ export function productToAmazonOfferListing(
     productType: 'PRODUCT',
     requirements: 'LISTING_OFFER_ONLY',
     attributes: {
-      merchant_suggested_asin: attr(asin),
-      condition_type: attr('new_new'),
-      purchasable_offer: buildPurchasableOffer(listPrice, salePrice),
+      merchant_suggested_asin: attr(asin, marketplaceId),
+      condition_type: attr('new_new', marketplaceId),
+      purchasable_offer: buildPurchasableOffer(listPrice, salePrice, marketplaceId),
       fulfillment_availability: buildFulfillmentAvailability(inStock),
     },
   }

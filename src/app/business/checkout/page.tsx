@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { useEffect, useState, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
+import CopySku from '@/components/ui/CopySku'
 import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
 import { bp } from '@/lib/business-path'
 
@@ -770,7 +771,7 @@ function CheckoutPage() {
                               {buyNowItem.brandName}
                             </span>
                           )}
-                          {buyNowItem.sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {buyNowItem.sku}</span>}
+                          {buyNowItem.sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {buyNowItem.sku}<CopySku sku={buyNowItem.sku} className="ml-1" /></span>}
                         </div>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {buyNowItem.variantName && (
@@ -857,7 +858,7 @@ function CheckoutPage() {
                                   {item.products.brand_name}
                                 </span>
                               )}
-                              {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}</span>}
+                              {sku && <span className="text-[10px] text-foreground-muted font-mono">SKU: {sku}<CopySku sku={sku} className="ml-1" /></span>}
                             </div>
                             <div className="flex flex-wrap gap-1 mt-1">
                               {item.variant && (

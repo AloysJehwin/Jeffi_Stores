@@ -36,6 +36,11 @@ const Schema = z.object({
   }).optional(),
   // Restore-on-re-onboard — owner opted to restore a prior deprovisioned store's data.
   restorePreviousData: z.boolean().optional(),
+  // Step 6 — Branding & legals
+  mobile: z.string().optional(),
+  logoS3Key: z.string().optional(),
+  sealS3Key: z.string().optional(),
+  legalsAccepted: z.boolean().optional(),
 })
 
 export async function POST(request: NextRequest) {
@@ -58,6 +63,11 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
   const d = parsed.data
+
+  // Legal consent is required to generate the tenant's legal pages.
+  if (!d.legalsAccepted) {
+    return NextResponse.json({ error: 'Please accept the legal terms to continue.' }, { status: 400 })
+  }
 
   // 1. Create tenant with status='pending_approval' (NOT provisioning yet).
   const result = await createTenant({
@@ -83,6 +93,10 @@ export async function POST(request: NextRequest) {
     business_type: d.businessType,
     business_address: d.businessAddress,
     product_categories: d.productCategories ?? null,
+    mobile: d.mobile ?? null,
+    logo_s3_key: d.logoS3Key ?? null,
+    seal_s3_key: d.sealS3Key ?? null,
+    legals_accepted: !!d.legalsAccepted,
   })
 
   // 4. Persist restore intent (if any) into the draft, then mark submitted. The

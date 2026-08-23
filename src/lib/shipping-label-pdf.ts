@@ -188,7 +188,10 @@ async function drawLabelPage(doc: any, input: LabelInput): Promise<void> {
     doc.fillColor('#000')
   }
 
-  const grand = items.length > 0 ? items.reduce((s, it) => s + (Number(it.total) || 0), 0) : (Number(totalAmount) || 0)
+  // Grand total must match the app's order.total_amount (GST + shipping/COD inclusive,
+  // discount-adjusted) — NOT a sum of line total_price (which is pre-GST and omits shipping/COD).
+  // totalAmount already resolves from pkg.total_amount/amount/cod/orderRow.total_amount above.
+  const grand = Number(totalAmount) || (items.length > 0 ? items.reduce((s, it) => s + (Number(it.total) || 0), 0) : 0)
   const totalRowY = footerY - TOTAL_ROW_H
   doc.moveTo(colPrice, totalRowY).lineTo(M + BW - p, totalRowY).lineWidth(0.4).strokeColor('#000').stroke()
   doc.fontSize(8).font('Helvetica-Bold').fillColor('#000')

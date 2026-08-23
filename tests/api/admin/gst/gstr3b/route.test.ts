@@ -59,10 +59,10 @@ describe('GET /api/admin/gst/gstr3b', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 401 when admin is not super_admin', async () => {
+  it('returns 403 when admin lacks gst:read scope', async () => {
     mockAuth.mockResolvedValue(regularAdmin)
     const res = await GET(makeReq({ from: '2024-01-01', to: '2024-01-31' }))
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(403)
   })
 
   it('returns 400 when from param missing', async () => {

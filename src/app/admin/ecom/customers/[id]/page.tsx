@@ -1,7 +1,7 @@
 import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
-import { hasScope } from '@/lib/scopes'
+import { isPlatformAdmin } from '@/lib/scopes'
 import { getTenant, getTenantBilling, getKyc } from '@/lib/tenant-registry'
 import { StatusPill } from '@/components/admin/ecom/EcomUI'
 import TenantActions from '@/components/admin/ecom/TenantActions'
@@ -21,8 +21,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const h = await headers()
   const role = h.get('x-user-role') || ''
-  const scopes = (h.get('x-user-scopes') || '').split(',').filter(Boolean)
-  if (role !== 'super_admin' && !hasScope(role, scopes, 'ecom_customers:read')) redirect('/admin')
+  if (!isPlatformAdmin(role)) redirect('/admin')
 
   const { id } = await params
   const [t, billing, kyc] = await Promise.all([
@@ -47,8 +46,11 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
         )}
       </div>
 
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
         <TenantActions tenantId={t.id} slug={t.slug} status={t.status} instanceState={t.instance_state} />
+        <Link href={`/admin/ecom/customers/${t.id}/provisioning`} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
+          View provisioning logs →
+        </Link>
       </div>
 
       {/* ── KYC Review ── */}

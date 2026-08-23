@@ -1021,7 +1021,32 @@ export default function ProductForm({ categories, brands, action, product, produ
     setVariants(updated)
   }
 
-  // Per-variant supplier rows (variant leaf: variant_id set, sub_variant_id null).
+  // Auto-SKU for a variant leaf — same convention as the product SKU (product SKU +
+  // variant name, upper-cased, non-alnum stripped). Empty until the product has a SKU
+  // and the variant has a name. Reused for seeding + the (auto)/(manual) label.
+  const variantAutoSku = useCallback((v: { variant_name?: string }) => {
+    const base = product?.sku
+    return base && v.variant_name
+      ? `${base}-${v.variant_name.toUpperCase().replace(/[^A-Z0-9]/g, '')}`
+      : ''
+  }, [product])
+
+  // When a variant popup opens, seed the variant's SKU with the auto value if it's
+  // empty — so the prefilled value is actually persisted (into buildFlatSuppliers /
+  // draft save) instead of only being displayed. Only fills when empty, so a manual
+  // SKU (or a restored draft) is never clobbered.
+  useEffect(() => {
+    if (!variantPopupId) return
+    const idx = variants.findIndex(v => v.id === variantPopupId)
+    if (idx === -1) return
+    const v = variants[idx]
+    if (!v.sku) {
+      const auto = variantAutoSku(v)
+      if (auto) updateVariant(idx, 'sku', auto)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [variantPopupId])
+
   function updateVariantSuppliers(index: number, rows: SupplierRow[]) {
     const updated = [...variants]
     updated[index] = { ...updated[index], product_suppliers: rows }
@@ -1089,13 +1114,23 @@ export default function ProductForm({ categories, brands, action, product, produ
     return { suppliers: out, preferredProductSupplierId }
   }
 
+  // Variant images endpoint: in draft mode, route to the draft-staged endpoint (which
+  // stores rows in product_drafts.variant_images and only applies to live on publish);
+  // otherwise the live per-variant endpoint. Draft endpoint takes variant_id as a query
+  // param (it has no [variantId] path segment).
+  function variantImagesUrl(vid: string): string {
+    return isDraft
+      ? `/api/admin/products/${productId}/draft/variant-images?variant_id=${vid}`
+      : `/api/admin/products/${productId}/variants/${vid}/images`
+  }
+
   async function openVariantPopup(variantId: string) {
     setVariantPopupId(variantId)
     setVariantImageError(null)
     const isTemp = variantId.startsWith('temp-')
     if (productId && !isTemp) {
       if (!variantImagesMap[variantId]) {
-        const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`)
+        const res = await fetch(variantImagesUrl(variantId))
         if (res.ok) {
           const data = await res.json()
           setVariantImagesMap(m => ({ ...m, [variantId]: data.images || [] }))
@@ -1148,7 +1183,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const res = await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+      const res = await fetch(variantImagesUrl(variantId), {
         method: 'POST',
         body: fd,
       })
@@ -1170,7 +1205,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     if (!productId) return
     setVariantImageDeleting(m => ({ ...m, [imageId]: true }))
     try {
-      await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+      await fetch(variantImagesUrl(variantId), {
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ imageId }),
@@ -1187,7 +1222,7 @@ export default function ProductForm({ categories, brands, action, product, produ
 
   async function setVariantImagePrimary(variantId: string, imageId: string) {
     if (!productId) return
-    await fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+    await fetch(variantImagesUrl(variantId), {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ imageId, isPrimary: true }),
@@ -1208,7 +1243,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     setVariantImagesMap(m => ({ ...m, [variantId]: next }))
     await Promise.all(
       next.map((img: any, idx: number) =>
-        fetch(`/api/admin/products/${productId}/variants/${variantId}/images`, {
+        fetch(variantImagesUrl(variantId), {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ imageId: img.id, displayOrder: idx }),
@@ -1230,7 +1265,7 @@ export default function ProductForm({ categories, brands, action, product, produ
     setVariantImagePendingAdds(m => ({ ...m, [vid]: (m[vid] || 0) + toAdd.length }))
     for (const galleryImageId of toAdd) {
       try {
-        const res = await fetch(`/api/admin/products/${productId}/variants/${vid}/images`, {
+        const res = await fetch(variantImagesUrl(vid), {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ gallery_image_id: galleryImageId }),
@@ -3031,6 +3066,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                           <thead>
                             <tr className="border-b border-border-secondary bg-surface">
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary text-xs">Name *</th>
+                              <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs hidden lg:table-cell">SKU</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">MRP (Ex. GST) *</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">Disc %</th>
                               <th className="text-left py-2 px-3 font-medium text-foreground-secondary whitespace-nowrap text-xs">MRP (incl)</th>
@@ -3050,6 +3086,15 @@ export default function ProductForm({ categories, brands, action, product, produ
                                 <tr className={`border-b border-border-default ${isExpanded ? 'bg-surface-secondary' : 'hover:bg-surface-secondary/40'}`}>
                                   <td className="py-2 px-3">
                                     <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
+                                  </td>
+                                  <td className="py-2 px-3 hidden lg:table-cell">
+                                    <input
+                                      type="text"
+                                      value={variant.sku || variantAutoSku(variant)}
+                                      onChange={e => updateVariant(index, 'sku', e.target.value.toUpperCase())}
+                                      className="w-36 field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                                      placeholder="Auto"
+                                    />
                                   </td>
                                   {variant.sub_variant_type_on ? (
                                     <td className="py-2 px-3" colSpan={4}>
@@ -3289,6 +3334,10 @@ export default function ProductForm({ categories, brands, action, product, produ
                       <p className="text-xs text-foreground-secondary">Pricing is managed at the sub-variant level for this variant. Use the Sub-variants section below to set prices.</p>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
+                          <label className="block text-xs font-medium text-foreground-secondary mb-1">SKU {popupVariant.sku && popupVariant.sku !== variantAutoSku(popupVariant) ? '(manual)' : '(auto)'}</label>
+                          <input type="text" value={popupVariant.sku || variantAutoSku(popupVariant)} onChange={(e) => updateVariant(popupIndex, 'sku', e.target.value.toUpperCase())} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Auto" />
+                        </div>
+                        <div>
                           <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>
                           <input type="text" value={popupVariant.mpn} onChange={(e) => updateVariant(popupIndex, 'mpn', e.target.value)} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Part No." />
                         </div>
@@ -3349,6 +3398,10 @@ export default function ProductForm({ categories, brands, action, product, produ
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1 whitespace-nowrap">Price (Ex. GST)</label>
                       <input type="number" step="0.01" min="0" value={popupVariant.price_ex_gst} readOnly className="w-full field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed" placeholder="Auto-calculated" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-foreground-secondary mb-1">SKU {popupVariant.sku && popupVariant.sku !== variantAutoSku(popupVariant) ? '(manual)' : '(auto)'}</label>
+                      <input type="text" value={popupVariant.sku || variantAutoSku(popupVariant)} onChange={(e) => updateVariant(popupIndex, 'sku', e.target.value.toUpperCase())} className="w-full field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="Auto" />
                     </div>
                     <div>
                       <label className="block text-xs font-medium text-foreground-secondary mb-1">MPN</label>

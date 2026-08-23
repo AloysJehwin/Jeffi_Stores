@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import { useToast } from '@/contexts/ToastContext'
 import { useRouter } from 'next/navigation'
+import CopySku from '@/components/ui/CopySku'
 import { applyDiscount } from '@/lib/pricing'
 
 interface QuoteItem {
@@ -332,7 +333,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                           )}
                         </div>
                         {activeItem.sku && (
-                          <p className="text-xs font-mono text-foreground-muted mt-1">SKU: {activeItem.sku}</p>
+                          <p className="text-xs font-mono text-foreground-muted mt-1">SKU: {activeItem.sku}<CopySku sku={activeItem.sku} className="ml-1" /></p>
                         )}
                         {activeItem.stockStatus != null && (
                           <span className={`inline-flex items-center gap-1 mt-2 text-xs font-medium ${activeItem.stockStatus === 'in' ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
@@ -375,7 +376,7 @@ export default function RequestQuoteButton({ items, className, label = 'Request 
                           <p className="text-sm font-semibold text-foreground leading-snug line-clamp-2">{activeItem.description}</p>
                           <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 mt-1">
                             {activeItem.brandName && <span className="text-xs text-foreground-muted">{activeItem.brandName}</span>}
-                            {activeItem.sku && <span className="text-xs font-mono text-foreground-muted">SKU: {activeItem.sku}</span>}
+                            {activeItem.sku && <span className="text-xs font-mono text-foreground-muted">SKU: {activeItem.sku}<CopySku sku={activeItem.sku} className="ml-1" /></span>}
                           </div>
                           <div className="flex items-center gap-3 mt-1">
                             {activeItem.stockStatus != null && (

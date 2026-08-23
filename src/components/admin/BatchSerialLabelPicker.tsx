@@ -5,6 +5,8 @@ import { useToast } from '@/contexts/ToastContext'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import { LABEL_SIZES, type LabelSize, type LabelSpec } from '@/lib/label-sizes'
 import { BatchSerialPreview } from '@/components/admin/label-preview'
+import AdminTypeahead from '@/components/admin/AdminTypeahead'
+import CopySku from '@/components/ui/CopySku'
 
 type Mode = 'batch' | 'serial'
 
@@ -259,17 +261,36 @@ export default function BatchSerialLabelPicker({
         {/* Label Size */}
         <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
           <h2 className="text-sm font-semibold text-foreground mb-3">Label Size</h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
             {printableSizes.map(spec => {
-              const sel = selectedSize === spec.size
-              const rw = 44, rh = Math.max(14, Math.round(44 * (spec.heightMm / spec.widthMm)))
+              const isActive = spec.size === selectedSize
+              const maxDim = Math.max(spec.widthMm, spec.heightMm)
+              const rW = Math.round((spec.widthMm / maxDim) * 34)
+              const rH = Math.round((spec.heightMm / maxDim) * 34)
               return (
-                <button key={spec.size} type="button" onClick={() => setSelectedSize(spec.size)}
-                  className={`flex flex-col items-center gap-1.5 p-2.5 rounded-lg border transition-colors ${sel ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : 'border-border-default hover:bg-surface-secondary'}`}>
-                  <span className="flex items-center justify-center" style={{ width: 48, height: 34 }}>
-                    <span className={`block border ${sel ? 'border-accent-500' : 'border-border-strong'}`} style={{ width: rw, height: rh }} />
+                <button
+                  key={spec.size}
+                  type="button"
+                  onClick={() => setSelectedSize(spec.size)}
+                  className={`flex flex-col items-center gap-2 py-3 px-2 rounded-lg border-2 transition-all ${
+                    isActive
+                      ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20'
+                      : 'border-border-default hover:border-orange-300 bg-surface-secondary'
+                  }`}
+                >
+                  <div className="flex items-center justify-center h-9 w-full">
+                    <div
+                      style={{ width: rW, height: rH }}
+                      className={`border-2 rounded-sm transition-colors ${
+                        isActive ? 'border-orange-500 bg-orange-100 dark:bg-orange-800/30' : 'border-border-strong'
+                      }`}
+                    />
+                  </div>
+                  <span className={`text-[11px] font-semibold leading-tight text-center ${
+                    isActive ? 'text-orange-600 dark:text-orange-400' : 'text-foreground-secondary'
+                  }`}>
+                    {spec.label}
                   </span>
-                  <span className={`text-[11px] font-medium ${sel ? 'text-accent-700 dark:text-accent-400' : 'text-foreground-secondary'}`}>{spec.label}</span>
                 </button>
               )
             })}
@@ -281,7 +302,7 @@ export default function BatchSerialLabelPicker({
           <div className="flex items-center gap-2">
             {(['thermal', 'sheet'] as const).map(m => (
               <button key={m} type="button" onClick={() => setOutputMode(m)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
                 {m === 'thermal' ? 'Thermal (1/page)' : 'A4 sheet'}
               </button>
             ))}
@@ -293,7 +314,7 @@ export default function BatchSerialLabelPicker({
               className="w-16 px-2 py-1 rounded-lg border border-border-default bg-surface text-sm" />
           </label>
           <button type="button" onClick={download} disabled={downloading || selectedCount === 0}
-            className="ml-auto px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            className="ml-auto px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {downloading ? 'Generating…' : `Download PDF — ${totalLabels} label${totalLabels === 1 ? '' : 's'}`}
           </button>
         </div>
@@ -303,9 +324,19 @@ export default function BatchSerialLabelPicker({
           <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
             <h2 className="text-sm font-semibold text-foreground mb-3">Select batches</h2>
             {!lockProduct && (
-              <input type="text" value={query} onChange={e => setQuery(e.target.value)}
-                placeholder="Search by lot number, product name or SKU…"
-                className="w-full px-3 py-2 mb-3 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+              <div className="mb-3">
+                <AdminTypeahead
+                  type="batch_products"
+                  value={query}
+                  onChange={setQuery}
+                  onSelect={item => {
+                    const parts = item.id.split('\x1f')
+                    setQuery(parts[3] || parts[1] || '')
+                  }}
+                  placeholder="Search by lot number, product name or SKU…"
+                  inputClassName="w-full px-3 py-1.5 pl-9 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-orange-400"
+                />
+              </div>
             )}
             {loading ? (
               <p className="text-sm text-foreground-muted py-4 text-center">Loading…</p>
@@ -318,9 +349,9 @@ export default function BatchSerialLabelPicker({
                   const cnt = batchCounts[b.id] ?? Math.max(1, Math.round(Number(b.quantity_remaining) || 1))
                   return (
                     <div key={b.id}
-                      className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${sel ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : 'border-border-default'}`}>
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg border transition-colors ${sel ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-border-default'}`}>
                       <button type="button" onClick={() => toggleBatch(b)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${sel ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}>
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${sel ? 'border-orange-500 bg-orange-500' : 'border-border-strong'}`}>
                           {sel && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={2}><path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -351,10 +382,24 @@ export default function BatchSerialLabelPicker({
             {!lockProduct && !chosenProduct ? (
               <>
                 <p className="text-[11px] text-foreground-muted mb-3">Pick a serialized product to print its serial stickers. You can also scan a product/serial with a hardware scanner.</p>
-                <input type="text" value={serialProductQuery}
-                  onChange={e => setSerialProductQuery(e.target.value)}
-                  placeholder="Search serialized products by name or SKU…"
-                  className="w-full px-3 py-2 mb-3 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+                <div className="mb-3">
+                  <AdminTypeahead
+                    type="serial_products"
+                    value={serialProductQuery}
+                    onChange={setSerialProductQuery}
+                    onSelect={item => {
+                      const parts = item.id.split('\x1f')
+                      const rawId = parts[0] ?? ''
+                      const productId = parts[12] || ''
+                      const parentVariantId = parts[14] || ''
+                      const variantId = rawId.startsWith('variant:') ? rawId.slice('variant:'.length) : (parentVariantId || null)
+                      const name = parts[2] ? `${parts[1]} — ${parts[2]}` : (parts[1] ?? '')
+                      if (productId) chooseSerialProduct({ product_id: productId, variant_id: variantId, product_name: parts[1] ?? '', sku: parts[3] ?? '', variant_name: parts[2] || null, in_stock_count: 0 })
+                    }}
+                    placeholder="Search serialized products by name or SKU…"
+                    inputClassName="w-full px-3 py-1.5 pl-9 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-orange-400"
+                  />
+                </div>
                 {serialProductsLoading ? (
                   <p className="text-sm text-foreground-muted py-4 text-center">Loading…</p>
                 ) : serialProducts.length === 0 ? (
@@ -366,7 +411,7 @@ export default function BatchSerialLabelPicker({
                         className="w-full flex items-center gap-3 px-3 py-2 rounded-lg border border-border-default hover:bg-surface-secondary text-left transition-colors">
                         <div className="flex-1 min-w-0">
                           <p className="text-sm font-medium text-foreground truncate">{p.product_name}{p.variant_name ? ` — ${p.variant_name}` : ''}</p>
-                          <p className="text-[11px] text-foreground-muted font-mono">{p.sku}</p>
+                          <p className="text-[11px] text-foreground-muted font-mono"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></p>
                         </div>
                         <span className="text-[11px] text-foreground-muted shrink-0">{p.in_stock_count} in stock</span>
                         <svg className="w-4 h-4 text-foreground-muted shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
@@ -382,14 +427,14 @@ export default function BatchSerialLabelPicker({
                     <p className="text-xs text-foreground-secondary">Product: <span className="font-medium text-foreground">{resolvedProduct.name}</span></p>
                     {!lockProduct && (
                       <button type="button" onClick={() => { setChosenProduct(null); setSerials([]); setSelectedSerials([]); setResolvedProduct(null) }}
-                        className="text-xs text-accent-500 hover:text-accent-600 font-medium">Change product</button>
+                        className="text-xs text-orange-500 hover:text-orange-600 font-medium">Change product</button>
                     )}
                   </div>
                 )}
             {serials.length > 0 && (
               <div className="flex items-center justify-between mb-2">
                 <button type="button" onClick={() => setSelectedSerials(serials.map(s => s.serial_number))}
-                  className="text-xs text-accent-500 hover:text-accent-600 font-medium">Select all ({serials.length})</button>
+                  className="text-xs text-orange-500 hover:text-orange-600 font-medium">Select all ({serials.length})</button>
                 {selectedSerials.length > 0 && <button type="button" onClick={() => setSelectedSerials([])} className="text-xs text-foreground-muted hover:text-foreground">Clear</button>}
               </div>
             )}
@@ -398,8 +443,8 @@ export default function BatchSerialLabelPicker({
                 const sel = selectedSerials.includes(s.serial_number)
                 return (
                   <button key={s.serial_number} type="button" onClick={() => toggleSerial(s.serial_number)}
-                    className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-lg border text-left transition-colors ${sel ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/20' : 'border-border-default hover:bg-surface-secondary'}`}>
-                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${sel ? 'border-accent-500 bg-accent-500' : 'border-border-strong'}`}>
+                    className={`w-full flex items-center gap-3 px-3 py-1.5 rounded-lg border text-left transition-colors ${sel ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20' : 'border-border-default hover:bg-surface-secondary'}`}>
+                    <div className={`w-4 h-4 rounded border-2 flex items-center justify-center shrink-0 ${sel ? 'border-orange-500 bg-orange-500' : 'border-border-strong'}`}>
                       {sel && <svg className="w-2.5 h-2.5 text-white" viewBox="0 0 10 10" fill="none" stroke="currentColor" strokeWidth={2}><path d="M1.5 5L4 7.5 8.5 2.5" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                     </div>
                     <span className="text-sm font-mono text-foreground truncate">{s.serial_number}</span>

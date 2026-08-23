@@ -154,6 +154,8 @@ CREATE TABLE public.product_suppliers (
     effective_date date DEFAULT CURRENT_DATE NOT NULL,
     notes text,
     is_active boolean DEFAULT true NOT NULL,
+    purchase_unit character varying(50),
+    purchase_unit_factor numeric(14,6) DEFAULT 1 NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     updated_at timestamp with time zone DEFAULT now() NOT NULL
 );

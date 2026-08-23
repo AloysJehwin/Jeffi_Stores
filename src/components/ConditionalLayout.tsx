@@ -53,7 +53,7 @@ export default function ConditionalLayout({ children, initialStoreConfig, isForm
             <ToastProvider>
               <ConfirmProvider>
                 <CompareProvider>
-                  <div className="flex flex-col min-h-screen bg-surface">
+                  <div className="flex flex-col min-h-[100dvh] bg-surface">
                     <PageTracker />
                     <Header />
                     <main className="flex-1 bg-surface pt-16 lg:pt-20">

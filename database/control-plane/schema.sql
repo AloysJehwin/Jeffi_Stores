@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     custom_domain  character varying(255),                  -- optional BYO domain (priced add-on)
     display_name   character varying(200) NOT NULL,
     plan_id        uuid,
-    status                   character varying(20) NOT NULL DEFAULT 'provisioning', -- provisioning|active|suspended|terminated
+    status                   character varying(20) NOT NULL DEFAULT 'provisioning', -- pending_approval|awaiting_payment|provisioning|active|suspended|terminated|rejected
     razorpay_subscription_id character varying(64),         -- Razorpay sub_xxxx; set after checkout redirect
     razorpay_checkout_url    text,                           -- Razorpay hosted checkout short_url; shown to owner post-approval
     razorpay_linked_account_id character varying(64),        -- Razorpay Route acc_xxxx; created on KYC approval for POBO transfers
@@ -92,7 +92,7 @@ ALTER TABLE ONLY public.plan_features  ADD CONSTRAINT plan_features_plan_scope_k
 ALTER TABLE ONLY public.tenant_infra   ADD CONSTRAINT tenant_infra_tenant_id_key UNIQUE (tenant_id);
 
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_status_check
-    CHECK (status IN ('provisioning','active','suspended','terminated','pending_approval','rejected'));
+    CHECK (status IN ('provisioning','active','suspended','terminated','pending_approval','awaiting_payment','rejected'));
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_subscription_status_check
     CHECK (subscription_status IN ('created','authenticated','active','halted','cancelled','completed','expired'));
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_billing_interval_check
@@ -352,6 +352,11 @@ CREATE TABLE IF NOT EXISTS public.tenant_kyc (
     business_type   character varying(32),    -- proprietor|partnership|pvt_ltd|llp|other
     business_address text,
     product_categories text,                  -- comma-separated or free text
+    mobile          character varying(20),     -- owner mobile (distinct from warehouse sellerPhone)
+    logo_s3_key     character varying(512),    -- store logo: branding/{owner_id}/logo.*
+    seal_s3_key     character varying(512),    -- store seal (for legal docs): branding/{owner_id}/seal.*
+    legals_accepted_version character varying(20),   -- POLICY_VERSION the owner agreed to at onboarding
+    legals_accepted_at      timestamp with time zone,
     status          character varying(16) NOT NULL DEFAULT 'pending', -- pending|approved|rejected
     reviewer_note   text,
     reviewed_by     character varying(200),   -- admin email
@@ -371,3 +376,101 @@ ALTER TABLE ONLY public.tenant_kyc ADD CONSTRAINT tenant_kyc_business_type_check
     CHECK (business_type IN ('proprietor','partnership','pvt_ltd','llp','other'));
 CREATE INDEX IF NOT EXISTS idx_tenant_kyc_status ON public.tenant_kyc USING btree (status);
 CREATE INDEX IF NOT EXISTS idx_tenant_kyc_owner ON public.tenant_kyc USING btree (owner_id);
+
+--
+-- tenant_social_accounts: a tenant's connected Meta accounts (one row per platform).
+-- access_token_enc is AES-256-GCM encrypted (src/lib/crypto/token-cipher.ts) — NEVER plaintext.
+-- Jeffi's OWN platform accounts do NOT live here (their token comes from env / Secrets Manager).
+--
+CREATE TABLE IF NOT EXISTS public.tenant_social_accounts (
+    id                uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id         uuid NOT NULL,
+    provider          character varying(16) NOT NULL,          -- 'facebook' | 'instagram'
+    page_id           character varying(64),                   -- FB Page id
+    page_name         character varying(200),
+    ig_user_id        character varying(64),                   -- IG Business account id (when provider=instagram)
+    access_token_enc  text NOT NULL,                           -- encrypted long-lived Page token
+    token_expiry      timestamp with time zone,
+    status            character varying(16) NOT NULL DEFAULT 'connected', -- connected|expired|revoked
+    connected_at      timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at        timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_tenant_provider_key UNIQUE (tenant_id, provider);
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_provider_check
+    CHECK (provider IN ('facebook','instagram'));
+ALTER TABLE ONLY public.tenant_social_accounts ADD CONSTRAINT tenant_social_accounts_status_check
+    CHECK (status IN ('connected','expired','revoked'));
+CREATE INDEX IF NOT EXISTS idx_tenant_social_tenant ON public.tenant_social_accounts USING btree (tenant_id);
+
+--
+-- scheduled_social_posts: the auto-posting queue. tenant_id NULL = Jeffi's own platform post.
+-- The publisher (src/lib/social/publisher.ts) is driven by the publish-social-posts cron tick.
+--
+CREATE TABLE IF NOT EXISTS public.scheduled_social_posts (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid,                                    -- NULL = Jeffi platform account
+    product_id    uuid,                                    -- source product (in the tenant's app DB)
+    platform      character varying(16) NOT NULL,          -- 'fb' | 'ig' | 'ig_reel'
+    caption       text,
+    hashtags      text,                                    -- space-joined '#tag' string
+    image_url     text,                                    -- public URL handed to Meta (card/product)
+    video_url     text,                                    -- for ig_reel
+    scheduled_at  timestamp with time zone NOT NULL DEFAULT now(),
+    status        character varying(16) NOT NULL DEFAULT 'pending', -- pending|publishing|posted|failed
+    posted_id     character varying(64),                   -- Meta post/media id on success
+    last_error    text,
+    attempts      integer NOT NULL DEFAULT 0,
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_platform_check
+    CHECK (platform IN ('fb','ig','ig_reel'));
+ALTER TABLE ONLY public.scheduled_social_posts ADD CONSTRAINT scheduled_social_posts_status_check
+    CHECK (status IN ('pending','publishing','posted','failed'));
+CREATE INDEX IF NOT EXISTS idx_scheduled_social_due ON public.scheduled_social_posts USING btree (scheduled_at) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_scheduled_social_tenant ON public.scheduled_social_posts USING btree (tenant_id);
+
+--
+-- tenant_integration_credentials: a tenant's per-provider integration creds (Google Merchant,
+-- Amazon Seller, and future providers). config_enc is AES-256-GCM of a JSON blob holding the
+-- whole provider-specific credential set (never plaintext). meta holds NON-secret display
+-- fields (merchant id, seller id, marketplace, connected email). Meta/FB/IG creds live in
+-- tenant_social_accounts, not here.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_integration_credentials (
+    id           uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id    uuid NOT NULL,
+    provider     character varying(32) NOT NULL,           -- 'google_merchant' | 'amazon_seller' | ...
+    label        character varying(120),
+    config_enc   text NOT NULL,                             -- encrypted JSON credential blob
+    meta         jsonb NOT NULL DEFAULT '{}'::jsonb,        -- non-secret display fields
+    status       character varying(16) NOT NULL DEFAULT 'connected', -- connected|error|revoked
+    expires_at   timestamp with time zone,
+    created_at   timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at   timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_tenant_provider_key UNIQUE (tenant_id, provider);
+ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_status_check
+    CHECK (status IN ('connected','error','revoked'));
+CREATE INDEX IF NOT EXISTS idx_tenant_integration_tenant ON public.tenant_integration_credentials USING btree (tenant_id);
+
+--
+-- platform_infra: singleton-ish key/value for platform-wide infra pointers that aren't tenant
+-- scoped — notably the shared pooled EC2 instance id (so create-if-missing survives restarts,
+-- vs. the read-only POOL_INSTANCE_ID env). One row per key.
+--
+CREATE TABLE IF NOT EXISTS public.platform_infra (
+    key         character varying(64) NOT NULL,   -- e.g. 'pool_instance_id', 'pool_instance_ip'
+    value       text,
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.platform_infra ADD CONSTRAINT platform_infra_pkey PRIMARY KEY (key);

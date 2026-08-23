@@ -296,11 +296,11 @@ export default async function HomePage() {
               { icon: 'M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10', label: '10,000+ products in stock' },
               { icon: 'M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z', label: 'Cash on delivery available' },
             ].map((item, i) => (
-              <div key={i} className="flex items-center gap-3 px-4 py-3 sm:justify-center">
+              <div key={i} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3 sm:justify-center min-w-0">
                 <svg className="w-5 h-5 text-accent-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d={item.icon} />
                 </svg>
-                <span className="text-xs font-semibold text-foreground-secondary">{item.label}</span>
+                <span className="text-xs font-semibold text-foreground-secondary leading-tight min-w-0">{item.label}</span>
               </div>
             ))}
           </div>
@@ -324,15 +324,15 @@ export default async function HomePage() {
               </Link>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 lg:grid-cols-8">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 lg:grid-cols-8">
               {mainCategories.map((category) => (
                 <Link key={category.id} href={`/categories/${category.slug}`} className="group">
-                  <div className="flex flex-col items-center text-center gap-2.5 p-4 rounded-2xl bg-surface-elevated border border-border-default
+                  <div className="flex flex-col items-center text-center gap-2.5 p-3 sm:p-4 rounded-2xl bg-surface-elevated border border-border-default
                                   hover:border-primary-400/60 hover:bg-primary-50 dark:hover:bg-primary-900/10 hover:shadow-lg hover:-translate-y-0.5 transition-all duration-200">
                     <div className="w-12 h-12 bg-primary-100 dark:bg-primary-900/25 rounded-xl flex items-center justify-center group-hover:bg-primary-200 dark:group-hover:bg-primary-800/40 transition-colors shrink-0">
                       <CategoryIcon categoryName={category.name} className="w-6 h-6 text-primary-600 dark:text-primary-400" />
                     </div>
-                    <span className="text-xs font-bold text-foreground group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2 flex items-center justify-center min-h-[2.25rem]">
+                    <span className="text-xs font-bold text-foreground group-hover:text-primary-600 dark:group-hover:text-primary-400 transition-colors leading-tight line-clamp-2 flex items-center justify-center min-h-[2.25rem] min-w-0 px-0.5">
                       {category.name}
                     </span>
                   </div>

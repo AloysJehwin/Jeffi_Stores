@@ -52,9 +52,9 @@ async function route53(method: string, path: string, body?: string): Promise<{ o
   return { ok: res.ok, status: res.status, text }
 }
 
-async function upsert(hostnames: string[]): Promise<void> {
+async function upsert(hostnames: string[], overrideIp?: string): Promise<void> {
   if (hostnames.length === 0) return
-  const ip = targetIp()
+  const ip = overrideIp && overrideIp.trim() ? overrideIp.trim() : targetIp()
   const changes = hostnames.map((h) => `
     <Change>
       <Action>UPSERT</Action>
@@ -108,9 +108,10 @@ async function deleteRecords(hostnames: string[]): Promise<void> {
   }
 }
 
-/** Create/point tenant subdomains at the shared app host (idempotent UPSERT). */
-export async function upsertTenantDns(hostnames: string[]): Promise<void> {
-  await upsert(hostnames)
+/** Create/point tenant subdomains at a serving host (idempotent UPSERT). targetIp overrides the
+ * env default — pass a dedicated instance IP for higher-plan tenants, or omit for the pool. */
+export async function upsertTenantDns(hostnames: string[], targetIp?: string): Promise<void> {
+  await upsert(hostnames, targetIp)
 }
 
 /** Remove tenant subdomains on deprovision (idempotent, value-agnostic). */

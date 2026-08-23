@@ -67,8 +67,11 @@ fan-out, COD settlement, and a real AWS provisioning provider. Next up (NOT star
 3. **Restore-on-re-onboard** — ✅ DONE. `restore_data` step in the state machine (no-op unless the
    job carries `restoreFromKey`). `findLatestBackup({ownerId,slug})` + `/api/ecom/onboard/restore-available`;
    OnboardWizard shows a "we found a backup" banner + opt-in; `provision/route.ts` resolves the key.
-4. **Cron worker** — ✅ DONE (`/api/cron/provisioning-worker`, `Bearer $CRON_SECRET`, advances
-   `activeProvisioningJobs()` one tick each). ⚠️ MUST run inside the VPC (see finding).
+4. **Provisioning driver** — ✅ DONE, now EVENT-DRIVEN (reworked 2026-08-22). No cron worker:
+   `triggerProvisioning()` (`src/lib/provisioning/trigger.ts`) is the single entry for all 4 flows,
+   and for AWS it kicks a self re-invoke loop (`POST /api/internal/provisioning/advance`,
+   `Bearer $CRON_SECRET`) that advances one step per tick until done/failed. Only `reconcileOrphanedTenants()`
+   is scheduled (hourly, from `instrumentation.ts`). ⚠️ MUST run inside the VPC (see finding).
 
 ### ⚠️ CRITICAL FINDING from the live test (blocks real end-to-end)
 The RDS instances are `PubliclyAccessible: false` in VPC `vpc-04bd02e91e0bc0882` — reachable ONLY
@@ -125,8 +128,9 @@ Live-test + deprovision/backup/restore plan: `/Users/I578432/.claude/plans/cheek
 
 ## Known Issues / Gotchas
 - Route `accounts.create` fails in TEST mode ("Invalid business type") — LIVE keys only. Code handles gracefully.
-- `provision/route.ts` inline-drives for stub; enqueues-only for AWS → the in-VPC cron worker
-  (`/api/cron/provisioning-worker`) advances it. Data-plane steps only work in-VPC (see finding).
+- `provision/route.ts` (admin override) + all owner flows route through `triggerProvisioning()`: inline-drives
+  for stub; for AWS enqueues + kicks the self re-invoke loop (`/api/internal/provisioning/advance`) that
+  advances it. Data-plane steps only work in-VPC (see finding).
 - Live-test driver was a throwaway under `scripts/` (removed). RDS reachability = VPC-only.
 - graphify graph doesn't index SQL/tenant-registry/middleware — direct reads needed there.
 - Clear ecom data to restart: TRUNCATE owner_tenants/tenant_bank_accounts/provisioning_jobs/tenant_transactions/settlement_ledger/tenant_migration_runs/onboarding_drafts/tenant_kyc CASCADE; DELETE FROM tenants; DELETE FROM owners; + DELETE owner sessions from app DB.

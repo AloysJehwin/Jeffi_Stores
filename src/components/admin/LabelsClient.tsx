@@ -7,6 +7,29 @@ import { LabelSpec, LabelSize } from '@/lib/label-sizes'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import BatchSerialLabels from '@/components/admin/BatchSerialLabels'
 import { LabelPreview, fmtPrice, type PreviewProduct } from '@/components/admin/label-preview'
+import CopySku from '@/components/ui/CopySku'
+
+function Highlight({ text, query }: { text: string; query: string }) {
+  const trimmed = query.trim()
+  if (!trimmed) return <>{text}</>
+  const words = trimmed.split(/\s+/).filter(Boolean)
+  const pattern = new RegExp(`(${words.map(w => w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')})`, 'gi')
+  const parts = text.split(pattern)
+  if (parts.length === 1) return <>{text}</>
+  return (
+    <>
+      {parts.map((part, i) =>
+        pattern.test(part) ? (
+          <mark key={i} className="bg-orange-100 dark:bg-orange-900/40 text-orange-700 dark:text-orange-300 rounded-sm not-italic font-semibold">
+            {part}
+          </mark>
+        ) : (
+          <span key={i}>{part}</span>
+        )
+      )}
+    </>
+  )
+}
 
 interface Category {
   id: string
@@ -77,6 +100,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
   const [downloading, setDownloading] = useState(false)
   const [error, setError] = useState('')
   const [showPrice, setShowPrice] = useState(false)
+  const [qrAction, setQrAction] = useState(false)
   const debounceRef = useRef<NodeJS.Timeout | null>(null)
 
   const [taItems, setTaItems] = useState<{ id: string; label: string; sublabel?: string }[]>([])
@@ -194,6 +218,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           copies: 1,
           sheet: outputMode === 'sheet',
           showPrice,
+          qrAction,
         }),
       })
       if (!res.ok) {
@@ -232,7 +257,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
           { key: 'serial', label: 'Serial product' },
         ] as const).map(t => (
           <button key={t.key} type="button" onClick={() => changeTab(t.key)}
-            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${labelTab === t.key ? 'border-accent-500 text-accent-600 dark:text-accent-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}>
+            className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${labelTab === t.key ? 'border-orange-500 text-orange-600 dark:text-orange-400' : 'border-transparent text-foreground-secondary hover:text-foreground'}`}>
             {t.label}
           </button>
         ))}
@@ -251,7 +276,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
         <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
           <h2 className="text-sm font-semibold text-foreground mb-3">Label Size</h2>
           <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
-            {labelSizes.map(spec => {
+            {labelSizes.filter(spec => spec.size !== 'shelf-card').map(spec => {
               const isActive = spec.size === selectedSize
               const maxDim = Math.max(spec.widthMm, spec.heightMm)
               const rW = Math.round((spec.widthMm / maxDim) * 34)
@@ -329,6 +354,19 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                 <span className="text-sm text-foreground-secondary">{showPrice ? 'On' : 'Off'}</span>
               </label>
               <p className="text-xs text-foreground-muted mt-1">Print price on label</p>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-sm font-semibold text-foreground mb-2">QR Action</h2>
+              <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
+                <div
+                  onClick={() => setQrAction(v => !v)}
+                  className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${qrAction ? 'bg-orange-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
+                >
+                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${qrAction ? 'translate-x-5 border-orange-300' : 'translate-x-0.5'}`} />
+                </div>
+                <span className="text-sm text-foreground-secondary">{qrAction ? 'On' : 'Off'}</span>
+              </label>
+              <p className="text-xs text-foreground-muted mt-1">QR opens quick actions when scanned</p>
             </div>
           </div>
         </div>
@@ -420,7 +458,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                         idx === taIndex ? 'bg-orange-50 dark:bg-orange-900/20' : 'hover:bg-surface-secondary'
                       } ${isSelected ? 'opacity-60' : ''}`}
                     >
-                      <span className="font-medium text-foreground truncate">{item.label}</span>
+                      <span className="font-medium text-foreground truncate"><Highlight text={item.label} query={query} /></span>
                       {item.sublabel && <span className="text-xs text-foreground-muted truncate">{item.sublabel}</span>}
                     </button>
                   )
@@ -457,7 +495,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                     {p.variant_name && (
                       <div className="text-xs text-foreground-secondary truncate">{p.variant_name}</div>
                     )}
-                    <div className="text-xs text-foreground-muted">{p.sku}{p.brand_name ? ` · ${p.brand_name}` : ''}</div>
+                    <div className="text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span>{p.brand_name ? ` · ${p.brand_name}` : ''}</div>
                   </div>
                   {displayPrice && (
                     <div className="text-xs font-medium text-foreground-secondary shrink-0">{displayPrice}</div>
@@ -496,7 +534,7 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-foreground truncate leading-tight">{p.name}</div>
                     {p.variant_name && <div className="text-xs text-foreground-secondary">{p.variant_name}</div>}
-                    <div className="text-xs text-foreground-muted">{p.sku}</div>
+                    <div className="text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <span className="text-xs text-foreground-muted mr-0.5">qty</span>

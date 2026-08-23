@@ -292,7 +292,6 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   })
 
   const TOTAL_BAR_H = 22
-  const itemsContentH = rowHeights.reduce((a, b) => a + b, 0)
 
   // Summary rows below items
   const isIgst = !!order.is_igst
@@ -307,40 +306,65 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   if (hasShipping) summaryRowCount++
   const SUMMARY_H = summaryRowCount * summaryRowH + TOTAL_BAR_H
 
-  const ITEMS_SECTION_H = HDR_ROW_H + COL_HDR_H + itemsContentH + SUMMARY_H + 4
+  // Bottom limit for flowing content: leave room for the seller/footer/barcode zones.
+  const FOOTER_H = 28
+  const BAR_ZONE_H = 52
+  const SELLER_BLOCK_H = 90   // seller details + handling instructions + rule/padding
+  const CONTENT_BOTTOM = PAGE_H - FOOTER_H - BAR_ZONE_H - SELLER_BLOCK_H
 
-  doc.rect(ML, y, CW, ITEMS_SECTION_H).lineWidth(0.5).strokeColor(RULE_COLOR).stroke()
+  // Two-line column header — repeated at the top of the items table on every page.
+  function drawItemsHeader(atY: number): number {
+    box(doc, ML + 1, atY, CW - 2, COL_HDR_H, '#e8f5c8')
+    doc.font('Helvetica-Bold').fontSize(6.5).fillColor(GREEN_DARK)
+    const hdrY1 = atY + 3
+    const hdrY2 = atY + 12
+    // row 1
+    doc.text('PRODUCT', tblX + COL_IMG, hdrY1, { width: COL_PROD, lineBreak: false })
+    doc.text('HSN/', tblX + COL_IMG + COL_PROD, hdrY1, { width: COL_HSN, align: 'center', lineBreak: false })
+    doc.text('GST', tblX + COL_IMG + COL_PROD + COL_HSN, hdrY1, { width: COL_GST, align: 'center', lineBreak: false })
+    doc.text('QTY', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST, hdrY1, { width: COL_QTY, align: 'center', lineBreak: false })
+    doc.text('RATE', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, hdrY1, { width: COL_RATE, align: 'right', lineBreak: false })
+    doc.text('DISC', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, hdrY1, { width: COL_DISC, align: 'center', lineBreak: false })
+    doc.text('AMOUNT', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, hdrY1, { width: COL_AMT, align: 'right', lineBreak: false })
+    doc.text('(Incl.Tax)', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, hdrY2, { width: COL_AMT, align: 'right', lineBreak: false })
+    // row 2
+    doc.text('SAC', tblX + COL_IMG + COL_PROD, hdrY2, { width: COL_HSN, align: 'center', lineBreak: false })
+    doc.text('%', tblX + COL_IMG + COL_PROD + COL_HSN, hdrY2, { width: COL_GST, align: 'center', lineBreak: false })
+    doc.text('(Incl.Tax)', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, hdrY2, { width: COL_RATE, align: 'right', lineBreak: false })
+    doc.text('%', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, hdrY2, { width: COL_DISC, align: 'center', lineBreak: false })
+    return atY + COL_HDR_H
+  }
+
+  // ── ORDER ITEMS: section title band + first-page column header ────────────────
   box(doc, ML, y, CW, HDR_ROW_H, LIGHT_BG)
-  hRule(doc, ML, y + HDR_ROW_H, ML + CW, RULE_COLOR, 0.4)
+  doc.rect(ML, y, CW, HDR_ROW_H).lineWidth(0.5).strokeColor(RULE_COLOR).stroke()
   doc.font('Helvetica-Bold').fontSize(8).fillColor(GREEN_DARK)
   doc.text('ORDER ITEMS', ML + 8, y + 6, { lineBreak: false })
 
   let iy = y + HDR_ROW_H
+  let segTop = iy            // top of the current page's row segment (for the border box)
+  iy = drawItemsHeader(iy)
 
-  // Column header (two-line)
-  box(doc, ML + 1, iy, CW - 2, COL_HDR_H, '#e8f5c8')
-  doc.font('Helvetica-Bold').fontSize(6.5).fillColor(GREEN_DARK)
-  const hdrY1 = iy + 3
-  const hdrY2 = iy + 12
-  // row 1
-  doc.text('PRODUCT', tblX + COL_IMG, hdrY1, { width: COL_PROD, lineBreak: false })
-  doc.text('HSN/', tblX + COL_IMG + COL_PROD, hdrY1, { width: COL_HSN, align: 'center', lineBreak: false })
-  doc.text('GST', tblX + COL_IMG + COL_PROD + COL_HSN, hdrY1, { width: COL_GST, align: 'center', lineBreak: false })
-  doc.text('QTY', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST, hdrY1, { width: COL_QTY, align: 'center', lineBreak: false })
-  doc.text('RATE', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, hdrY1, { width: COL_RATE, align: 'right', lineBreak: false })
-  doc.text('DISC', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, hdrY1, { width: COL_DISC, align: 'center', lineBreak: false })
-  doc.text('AMOUNT', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, hdrY1, { width: COL_AMT, align: 'right', lineBreak: false })
-  // row 2
-  doc.text('SAC', tblX + COL_IMG + COL_PROD, hdrY2, { width: COL_HSN, align: 'center', lineBreak: false })
-  doc.text('%', tblX + COL_IMG + COL_PROD + COL_HSN, hdrY2, { width: COL_GST, align: 'center', lineBreak: false })
-  doc.text('(Incl.Tax)', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, hdrY2, { width: COL_RATE, align: 'right', lineBreak: false })
-  doc.text('%', tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, hdrY2, { width: COL_DISC, align: 'center', lineBreak: false })
-  iy += COL_HDR_H
+  // Close the current page's table border around [segTop .. iy].
+  function closeItemsSegment() {
+    doc.rect(ML, segTop, CW, iy - segTop).lineWidth(0.5).strokeColor(RULE_COLOR).stroke()
+  }
 
   for (let i = 0; i < order.items.length; i++) {
     const item = order.items[i]
     const rowH = rowHeights[i]
     const imgBuf = imageBufs[i]
+
+    // Page-break BEFORE the row so a row is never split across pages.
+    if (iy + rowH > CONTENT_BOTTOM) {
+      closeItemsSegment()
+      doc.font('Helvetica').fontSize(6).fillColor(TEXT_MUTED)
+      doc.text('Continued on next page…', ML, iy + 2, { width: CW, align: 'center', lineBreak: false })
+      doc.addPage()
+      iy = HEADER_H + 8
+      segTop = iy
+      iy = drawItemsHeader(iy)
+    }
 
     const isWL = item.buy_mode === 'weight' || item.buy_mode === 'length'
     const unitLabel = item.buy_unit ? item.buy_unit.toUpperCase() : 'NOS'
@@ -361,7 +385,6 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
 
     const rateInclTax = item.mrp != null && item.mrp > 0 ? item.mrp : item.unit_price
     const gstStr = item.gst_rate ? `${item.gst_rate}%` : ''
-    const taxable = item.taxable_amount ?? item.total_price
 
     // Thumbnail
     if (imgBuf) {
@@ -389,10 +412,20 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
     doc.text(rs(rateInclTax), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY, midY, { width: COL_RATE, align: 'right', lineBreak: false })
     doc.text(discStr, tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE, midY, { width: COL_DISC, align: 'center', lineBreak: false })
     doc.font('Helvetica-Bold').fontSize(7.5)
-    doc.text(rs(taxable), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, midY, { width: COL_AMT, align: 'right', lineBreak: false })
+    doc.text(rs(item.total_price), tblX + COL_IMG + COL_PROD + COL_HSN + COL_GST + COL_QTY + COL_RATE + COL_DISC, midY, { width: COL_AMT, align: 'right', lineBreak: false })
 
     iy += rowH
     hRule(doc, tblX, iy, tblX + CW - 16, '#eeeeee', 0.3)
+  }
+
+  // Keep the summary + TOTAL bar together: if they won't fit under the last rows,
+  // close this page's table and move the whole block to a fresh page.
+  if (iy + SUMMARY_H > CONTENT_BOTTOM) {
+    closeItemsSegment()
+    doc.addPage()
+    iy = HEADER_H + 8
+    segTop = iy
+    iy = drawItemsHeader(iy)
   }
 
   // ── Summary rows ──────────────────────────────────────────────────────────────
@@ -423,14 +456,18 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   if (hasBizDiscount) summaryRow('Business Discount', `-${rs(order.business_discount_amount!)}`, false, '#166534')
   if (hasShipping) summaryRow('Delivery Charges', rs(order.shipping_amount!))
 
-  // Total bar
-  const totalBarY = y + ITEMS_SECTION_H - TOTAL_BAR_H
+  // Total bar (flows right after the summary rows)
+  const totalBarY = iy
   box(doc, ML + 1, totalBarY, CW - 2, TOTAL_BAR_H, GREEN_MAIN)
   doc.font('Helvetica-Bold').fontSize(9).fillColor('#ffffff')
   doc.text('TOTAL', tblX, totalBarY + 7, { width: CW - 16 - COL_AMT - 4, align: 'right', lineBreak: false })
   doc.text(rs(order.total_amount), summaryAmtX, totalBarY + 7, { width: summaryAmtW, align: 'right', lineBreak: false })
+  iy += TOTAL_BAR_H
 
-  y = y + ITEMS_SECTION_H + 14
+  // Close the final page's table border around all rows + summary on this page.
+  closeItemsSegment()
+
+  y = iy + 14
 
   // ── Seller details + handling instructions ───────────────────────────────────
   hRule(doc, ML, y, ML + CW, GREEN_MID, 1)
@@ -471,8 +508,6 @@ async function renderPage(doc: any, order: PackingSlipOrder, store: StoreSetting
   doc.text('Handle with care. Keep dry.\nDo not bend or compress.', INFO_COL2_X, infoStartY + 11, { width: CW - INFO_COL_W - 16 })
 
   // ── Footer + barcode ─────────────────────────────────────────────────────────
-  const FOOTER_H = 28
-  const BAR_ZONE_H = 52
   const footerY = PAGE_H - FOOTER_H
   const barZoneY = footerY - BAR_ZONE_H
 

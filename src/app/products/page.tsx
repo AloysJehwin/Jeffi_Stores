@@ -304,14 +304,8 @@ export default async function ProductsPage({
           {/* Products area */}
           <div className="lg:col-span-3 py-6">
             {/* Page heading */}
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <h1 className="text-2xl md:text-3xl font-bold text-secondary-500 dark:text-foreground">All Products</h1>
-                <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of hardware and industrial tools</p>
-              </div>
-              <div className="lg:hidden shrink-0">
-                <MobileFilterSheet categories={allCats} brands={brands as any[]} facets={facets} />
-              </div>
+            <div className="mb-4">
+              <h1 className="text-2xl md:text-3xl font-bold text-secondary-500 dark:text-foreground">All Products</h1>
             </div>
             {/* Compare strip */}
             <CompareStripLazy />
@@ -330,7 +324,7 @@ export default async function ProductsPage({
             {/* Products Grid */}
             {products.length > 0 ? (
               <>
-                <ProductGrid products={products as any[]} gstEnabled={gstEnabled} categoryBanners={categoryBanners as any[]} total={total} start={start} end={end} />
+                <ProductGrid products={products as any[]} gstEnabled={gstEnabled} categoryBanners={categoryBanners as any[]} total={total} start={start} end={end} filterSlot={<MobileFilterSheet categories={allCats} brands={brands as any[]} facets={facets} />} />
                 <Pagination
                   page={page}
                   totalPages={totalPages}

@@ -44,6 +44,12 @@ export interface QuotationData {
   buyer_state: string
   buyer_gstin: string | null
   notes: string | null
+  // Stored monetary totals from the quotations row — preferred over recomputation so the
+  // PDF matches the saved quotation exactly. Optional: legacy rows may lack them (fall back).
+  subtotal?: number | string | null
+  cgst_amount?: number | string | null
+  sgst_amount?: number | string | null
+  total_amount?: number | string | null
 }
 
 function numberToWords(num: number): string {
@@ -315,12 +321,20 @@ export function generateQuotationPDF(
     const hdrH  = 26
     const rowH  = 14
 
-    const subtotal = items.reduce((s, i) => s + i.amount, 0)
-    const cgst     = items.reduce((s, i) => s + i.amount * i.gst_rate / 200, 0)
-    const sgst     = cgst
-    const rawTotal = subtotal + cgst + sgst
-    const total    = Math.round(rawTotal)
-    const roundOff = total - rawTotal
+    // Prefer the stored quotation totals (what the app saved) over recomputation, so the PDF
+    // never disagrees with the app. Fall back to line-item recompute for legacy/zero rows.
+    const num = (v: number | string | null | undefined) => { const n = Number(v); return Number.isFinite(n) ? n : 0 }
+    const storedSubtotal = num(data.subtotal)
+    const storedCgst     = num(data.cgst_amount)
+    const storedSgst     = num(data.sgst_amount)
+    const storedTotal    = num(data.total_amount)
+
+    const subtotal = storedSubtotal > 0 ? storedSubtotal : items.reduce((s, i) => s + i.amount, 0)
+    const cgst     = storedTotal > 0 ? storedCgst : items.reduce((s, i) => s + i.amount * i.gst_rate / 200, 0)
+    const sgst     = storedTotal > 0 ? storedSgst : cgst
+    const rawTotal = storedTotal > 0 ? storedTotal : subtotal + cgst + sgst
+    const total    = storedTotal > 0 ? storedTotal : Math.round(rawTotal)
+    const roundOff = total - (subtotal + cgst + sgst)
     const hasRound = Math.abs(roundOff) >= 0.005
 
     const summaryH = rowH + rowH + rowH + rowH + (hasRound ? rowH : 0) + 20  // +1 blank row
@@ -459,45 +473,59 @@ export function generateQuotationPDF(
     hc[hc.length - 1].w += pw - hc.reduce((s, c) => s + c.w, 0)
 
     const hh1 = 11, hh2 = 11
-    let cx = LM
-    doc.font(FB).fontSize(6.5)
 
-    rect(doc, cx, y, hc[0].w, hh1 + hh2)
-    doc.text('HSN/SAC', cx + 2, y + (hh1 + hh2) / 2 - 4, { width: hc[0].w - 4, align: 'left' })
-    cx += hc[0].w
+    // Two-tier HSN/SAC column header — repeated at the top of the table on every page.
+    function drawHsnHeader() {
+      let cx = LM
+      doc.font(FB).fontSize(6.5)
 
-    rect(doc, cx, y, hc[1].w, hh1 + hh2)
-    doc.text('Taxable\nValue', cx + 2, y + 2, { width: hc[1].w - 4, align: 'right' })
-    cx += hc[1].w
+      rect(doc, cx, y, hc[0].w, hh1 + hh2)
+      doc.text('HSN/SAC', cx + 2, y + (hh1 + hh2) / 2 - 4, { width: hc[0].w - 4, align: 'left' })
+      cx += hc[0].w
 
-    const cgstSpan = hc[2].w + hc[3].w
-    rect(doc, cx, y, cgstSpan, hh1)
-    doc.text('CGST', cx + 2, y + 3, { width: cgstSpan - 4, align: 'center' })
+      rect(doc, cx, y, hc[1].w, hh1 + hh2)
+      doc.text('Taxable\nValue', cx + 2, y + 2, { width: hc[1].w - 4, align: 'right' })
+      cx += hc[1].w
 
-    const sgstSpan = hc[4].w + hc[5].w
-    rect(doc, cx + cgstSpan, y, sgstSpan, hh1)
-    doc.text('SGST/UTGST', cx + cgstSpan + 2, y + 3, { width: sgstSpan - 4, align: 'center' })
+      const cgstSpan = hc[2].w + hc[3].w
+      rect(doc, cx, y, cgstSpan, hh1)
+      doc.text('CGST', cx + 2, y + 3, { width: cgstSpan - 4, align: 'center' })
 
-    rect(doc, cx + cgstSpan + sgstSpan, y, hc[6].w, hh1 + hh2)
-    doc.text('Total\nTax Amount', cx + cgstSpan + sgstSpan + 2, y + 2, { width: hc[6].w - 4, align: 'right' })
-    y += hh1
+      const sgstSpan = hc[4].w + hc[5].w
+      rect(doc, cx + cgstSpan, y, sgstSpan, hh1)
+      doc.text('SGST/UTGST', cx + cgstSpan + 2, y + 3, { width: sgstSpan - 4, align: 'center' })
 
-    cx = LM + hc[0].w + hc[1].w
-    for (let i = 2; i <= 5; i++) {
-      rect(doc, cx, y, hc[i].w, hh2)
-      doc.font(FB).fontSize(6.5).text(hDefs[i].align === 'center' ? 'Rate' : 'Amount', cx + 2, y + 3, { width: hc[i].w - 4, align: hc[i].align })
-      cx += hc[i].w
+      rect(doc, cx + cgstSpan + sgstSpan, y, hc[6].w, hh1 + hh2)
+      doc.text('Total\nTax Amount', cx + cgstSpan + sgstSpan + 2, y + 2, { width: hc[6].w - 4, align: 'right' })
+      y += hh1
+
+      cx = LM + hc[0].w + hc[1].w
+      for (let i = 2; i <= 5; i++) {
+        rect(doc, cx, y, hc[i].w, hh2)
+        doc.font(FB).fontSize(6.5).text(hDefs[i].align === 'center' ? 'Rate' : 'Amount', cx + 2, y + 3, { width: hc[i].w - 4, align: hc[i].align })
+        cx += hc[i].w
+      }
+      y += hh2
     }
-    y += hh2
+
+    let hsnSegTop = hsnY
+    drawHsnHeader()
 
     let totTaxable = 0, totCgst = 0, totSgst = 0
     doc.font(F).fontSize(7)
     for (const [key, v] of hsnMap) {
+      // Page-break before the row so a row is never split; redraw the header on the new page.
+      if (y + 13 > pageBottom) {
+        rect(doc, LM, hsnSegTop, pw, y - hsnSegTop)
+        doc.addPage(); y = LM; hsnSegTop = y
+        drawHsnHeader()
+        doc.font(F).fontSize(7)
+      }
       const hsn  = key.split('__')[0]
       const hr   = v.rate / 2
       const tot  = v.cgstAmt + v.sgstAmt
       totTaxable += v.taxable; totCgst += v.cgstAmt; totSgst += v.sgstAmt
-      cx = LM
+      let cx = LM
       const row = [hsn, fmt2(v.taxable), `${hr}%`, fmt2(v.cgstAmt), `${hr}%`, fmt2(v.sgstAmt), fmt2(tot)]
       for (let j = 0; j < hc.length; j++) {
         doc.text(row[j], cx + 2, y + 2, { width: hc[j].w - 4, align: hc[j].align })
@@ -506,8 +534,14 @@ export function generateQuotationPDF(
       y += 13
     }
 
+    // Keep the Total row attached to the segment; page-break with a redrawn header if needed.
+    if (y + 15 > pageBottom) {
+      rect(doc, LM, hsnSegTop, pw, y - hsnSegTop)
+      doc.addPage(); y = LM; hsnSegTop = y
+      drawHsnHeader()
+    }
     hline(doc, LM, R, y); y += 1
-    cx = LM
+    let cx = LM
     doc.font(FB).fontSize(7)
     doc.text('Total', cx + 2, y + 2, { width: hc[0].w - 4, align: 'right' }); cx += hc[0].w
     doc.text(fmt2(totTaxable), cx + 2, y + 2, { width: hc[1].w - 4, align: 'right' }); cx += hc[1].w
@@ -517,7 +551,7 @@ export function generateQuotationPDF(
     doc.text(fmt2(totSgst), cx + 2, y + 2, { width: hc[5].w - 4, align: 'right' }); cx += hc[5].w
     doc.text(fmt2(totCgst + totSgst), cx + 2, y + 2, { width: hc[6].w - 4, align: 'right' })
     y += 14
-    rect(doc, LM, hsnY, pw, y - hsnY)
+    rect(doc, LM, hsnSegTop, pw, y - hsnSegTop)
 
     const twY = y
     const taxWordsText = `INR ${numberToWords(cgst + sgst)} Only`

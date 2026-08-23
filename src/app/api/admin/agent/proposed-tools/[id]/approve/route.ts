@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { hasScope } from '@/lib/scopes'
+import { hasScope, isPlatformOwner } from '@/lib/scopes'
 import { query, queryOne } from '@/lib/db'
 
 export const dynamic = 'force-dynamic'
@@ -12,8 +12,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!hasScope(admin.role, admin.scopes, 'agent:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  if (admin.role !== 'super_admin') {
-    return NextResponse.json({ error: 'Only super_admin can approve dynamic tools' }, { status: 403 })
+  if (!isPlatformOwner(admin.role)) {
+    return NextResponse.json({ error: 'Only platform owners can approve dynamic tools' }, { status: 403 })
   }
 
   const row = await queryOne<{ id: string; name: string; status: string; proposed_by_admin_id: string }>(

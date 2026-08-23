@@ -17,6 +17,20 @@ import { getRazorpayInstance } from './razorpay'
 
 export const PLATFORM_COMMISSION_PCT = parseFloat(process.env.PLATFORM_COMMISSION_PCT || '3') / 100
 
+/**
+ * Normalize an Indian phone number to the 10-digit form Razorpay Route expects. Strips spaces,
+ * punctuation, a leading +91 / 91 country code, and a leading 0. Returns null if the result
+ * isn't a plausible 10-digit mobile (starts 6–9), so callers can fail clearly instead of
+ * sending a value Razorpay rejects with "The phone format is invalid".
+ */
+export function normalizeIndianPhone(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  let d = String(raw).replace(/\D/g, '')
+  if (d.length === 12 && d.startsWith('91')) d = d.slice(2)
+  else if (d.length === 11 && d.startsWith('0')) d = d.slice(1)
+  return /^[6-9]\d{9}$/.test(d) ? d : null
+}
+
 export interface LinkedAccountInput {
   businessName: string
   businessType: 'route_proprietorship' | 'route_partnership' | 'route_private_limited' | 'route_public_limited' | 'route_llp' | 'route_ngo' | 'route_not_yet_registered'
@@ -78,6 +92,70 @@ export async function createLinkedAccount(input: LinkedAccountInput): Promise<st
   })
 
   return account.id as string
+}
+
+/**
+ * Create a stakeholder on a Route linked account (required before the account can
+ * accept the route product / settle payouts). Best-effort idempotent: if Razorpay
+ * reports the stakeholder already exists, fetch and return the existing one.
+ * Returns the stakeholder id (sth_xxxx).
+ */
+export async function createRouteStakeholder(
+  accountId: string,
+  { name, pan }: { name: string; pan?: string }
+): Promise<string> {
+  const rz = getRazorpayInstance()
+
+  try {
+    const stakeholder = await (rz as any).stakeholders.create(accountId, {
+      name,
+      ...(pan ? { kyc: { pan } } : {}),
+    })
+    return stakeholder.id as string
+  } catch (err: any) {
+    const desc = err?.error?.description ?? err?.message ?? ''
+    // Idempotent-ish: if one already exists, fetch and return it.
+    if (/already exists/i.test(desc)) {
+      const list = await (rz as any).stakeholders.all(accountId).catch(() => null)
+      const existing = list?.items?.[0]
+      if (existing?.id) return existing.id as string
+    }
+    throw err
+  }
+}
+
+/**
+ * Enable the 'route' product on a linked account and attach the owner's verified
+ * bank as the settlement destination, so Route balances settle to their account.
+ *
+ * NEVER throws — needs LIVE Razorpay keys to fully succeed; on test keys it may
+ * error, which is fine (non-fatal). Returns { ok, error? }.
+ */
+export async function configureRouteSettlement(
+  accountId: string,
+  { accountNumber, ifsc, beneficiaryName }: { accountNumber: string | null; ifsc: string | null; beneficiaryName: string | null }
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const rz = getRazorpayInstance()
+
+    const config = await (rz as any).products.requestProductConfiguration(accountId, {
+      product_name: 'route',
+      tnc_accepted: true,
+    })
+    const configId = config?.id
+    if (!configId) return { ok: false, error: 'no product configuration id returned' }
+
+    await (rz as any).products.edit(accountId, configId, {
+      settlements: {
+        account_number: accountNumber,
+        ifsc_code: ifsc,
+        beneficiary_name: beneficiaryName,
+      },
+    })
+    return { ok: true }
+  } catch (err: any) {
+    return { ok: false, error: err?.error?.description ?? err?.message ?? String(err) }
+  }
 }
 
 /**

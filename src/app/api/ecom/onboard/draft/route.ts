@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
 }
 
 const Schema = z.object({
-  step: z.number().int().min(0).max(6),
+  step: z.number().int().min(0).max(7),
   data: z.record(z.string(), z.unknown()),
 })
 

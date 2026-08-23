@@ -92,15 +92,17 @@ describe('POST /api/admin/customer-tag-definitions', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 403 when not super_admin', async () => {
+  it('returns 403 when missing customers:write scope', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(false)
     const res = await POST(makePost({ tag: 'vip', color: 'gold' }))
     expect(res.status).toBe(403)
-    expect(await res.json()).toMatchObject({ error: 'Super admin only' })
+    expect(await res.json()).toMatchObject({ error: 'Insufficient permissions' })
   })
 
   it('returns 400 when tag is empty', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(SUPER_ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryMany).mockResolvedValue([{ sort_order: 10 }] as any)
     const res = await POST(makePost({ tag: '  ', color: 'gold' }))
     expect(res.status).toBe(400)
@@ -109,6 +111,7 @@ describe('POST /api/admin/customer-tag-definitions', () => {
 
   it('inserts tag and returns success', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(SUPER_ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryMany).mockResolvedValue([{ sort_order: 20 }] as any)
     vi.mocked(query).mockResolvedValue(undefined as any)
     const res = await POST(makePost({ tag: 'NEW CUSTOMER', color: 'blue' }))
@@ -122,6 +125,7 @@ describe('POST /api/admin/customer-tag-definitions', () => {
 
   it('uses default color accent when color not provided', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(SUPER_ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryMany).mockResolvedValue([])
     vi.mocked(query).mockResolvedValue(undefined as any)
     await POST(makePost({ tag: 'wholesale' }))
@@ -131,6 +135,7 @@ describe('POST /api/admin/customer-tag-definitions', () => {
 
   it('uses sort_order 10 when no existing tags', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(SUPER_ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryMany).mockResolvedValue([])
     vi.mocked(query).mockResolvedValue(undefined as any)
     await POST(makePost({ tag: 'first' }))
@@ -140,6 +145,7 @@ describe('POST /api/admin/customer-tag-definitions', () => {
 
   it('returns 409 on duplicate tag (code 23505)', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(SUPER_ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryMany).mockResolvedValue([])
     const err = Object.assign(new Error('dup'), { code: '23505' })
     vi.mocked(query).mockRejectedValue(err)
@@ -150,6 +156,7 @@ describe('POST /api/admin/customer-tag-definitions', () => {
 
   it('rethrows non-duplicate errors', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(SUPER_ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(queryMany).mockResolvedValue([])
     vi.mocked(query).mockRejectedValue(new Error('db crash'))
     await expect(POST(makePost({ tag: 'vip' }))).rejects.toThrow('db crash')
@@ -167,14 +174,17 @@ describe('DELETE /api/admin/customer-tag-definitions', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 403 when not super_admin', async () => {
+  it('returns 403 when missing customers:write scope', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(false)
     const res = await DELETE(makeDelete('t1'))
     expect(res.status).toBe(403)
+    expect(await res.json()).toMatchObject({ error: 'Insufficient permissions' })
   })
 
   it('returns 400 when id missing', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(SUPER_ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
     const res = await DELETE(makeDelete())
     expect(res.status).toBe(400)
     expect(await res.json()).toMatchObject({ error: 'id required' })
@@ -182,6 +192,7 @@ describe('DELETE /api/admin/customer-tag-definitions', () => {
 
   it('deletes tag and returns success', async () => {
     vi.mocked(authenticateAdmin).mockResolvedValue(SUPER_ADMIN as any)
+    vi.mocked(hasScope).mockReturnValue(true)
     vi.mocked(query).mockResolvedValue(undefined as any)
     const res = await DELETE(makeDelete('t1'))
     expect(res.status).toBe(200)

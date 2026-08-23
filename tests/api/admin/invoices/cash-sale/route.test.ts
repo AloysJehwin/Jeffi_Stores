@@ -222,26 +222,16 @@ describe('POST /api/admin/invoices/cash-sale', () => {
 
   // --- GST disabled ---
 
-  it('skips invoice number generation when GST is disabled', async () => {
+  it('still numbers the cash sale when GST is disabled', async () => {
     process.env.ENABLE_GST = 'false'
 
-    vi.mocked(withTransaction).mockImplementation(async (fn: any) => {
-      const client = {
-        query: vi.fn()
-          // INSERT cash_sales RETURNING
-          .mockResolvedValueOnce({ rows: [{ id: 'sale-uuid-2', sale_number: 'CS-456-XYZ' }] })
-          // INSERT cash_sale_items
-          .mockResolvedValueOnce({ rows: [] }),
-        release: vi.fn(),
-      }
-      return fn(client)
-    })
+    vi.mocked(withTransaction).mockImplementation(async (fn: any) => fn(makeDefaultClient()))
 
     const res = await POST(postReq(VALID_BODY))
     const json = await res.json()
 
     expect(res.status).toBe(200)
-    expect(json.invoiceNumber).toBeNull()
+    expect(json.invoiceNumber).not.toBeNull()
   })
 
   // --- Stock deduction paths ---

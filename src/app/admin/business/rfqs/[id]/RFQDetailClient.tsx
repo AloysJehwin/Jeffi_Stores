@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 
@@ -611,8 +612,8 @@ export default function RFQDetailClient({ id }: { id: string }) {
                             {/* SKU + qty */}
                             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 mt-1.5">
                               {sku && (
-                                <span className="text-[11px] font-mono text-foreground-muted bg-surface px-1.5 py-0.5 rounded border border-border-default">
-                                  SKU: {sku}
+                                <span className="text-[11px] font-mono text-foreground-muted bg-surface px-1.5 py-0.5 rounded border border-border-default inline-flex items-center gap-1">
+                                  SKU: {sku}<CopySku sku={sku} />
                                 </span>
                               )}
                               <span className="text-xs text-foreground-secondary">

@@ -184,10 +184,10 @@ describe('GET /api/admin/gst/gstr3b — table 3.2 inter-state filter', () => {
     mockAuth.mockResolvedValue(SUPER_ADMIN as any)
   })
 
-  it('returns 401 when not super_admin', async () => {
+  it('returns 403 when authenticated but missing gst:read scope', async () => {
     mockAuth.mockResolvedValue({ adminId: 'x', role: 'admin', scopes: [] } as any)
     const res = await GSTR3B_GET(makeReq('http://localhost/api/admin/gst/gstr3b?from=2024-05-01&to=2024-05-31'))
-    expect(res.status).toBe(401)
+    expect(res.status).toBe(403)
   })
 
   it('populates table32 for inter-state supplies to unregistered persons', async () => {

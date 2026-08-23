@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import CopySku from '@/components/ui/CopySku'
 
 interface Props {
   productId: string
@@ -75,7 +76,7 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
         {/* Product info */}
         <div className="bg-surface-secondary rounded-xl border border-border-default px-4 py-3 mb-5">
           <p className="text-sm font-semibold text-foreground leading-tight">{productName || 'Product'}</p>
-          {productSku && <p className="text-xs text-foreground-muted mt-1">SKU: {productSku}</p>}
+          {productSku && <p className="text-xs text-foreground-muted mt-1">SKU: {productSku}{productSku && <CopySku sku={productSku} className="ml-1" />}</p>}
           <div className="flex items-center gap-1.5 mt-2">
             <span className="text-xs text-foreground-muted">A draft copy will be created — the original stays unchanged until you publish.</span>
           </div>

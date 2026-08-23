@@ -34,6 +34,13 @@ vi.mock('@/lib/search', () => ({
     params: [`%${raw}%`],
     nextIdx: startIdx + 1,
   })),
+  // getStockValuation orders search results by the shared product-search rank. Mirror
+  // its contract: a rank SQL expression plus the params it binds, from startIdx.
+  buildProductSearchRank: vi.fn((raw: string, _nameCol: string, _vectorCol: string, startIdx: number = 1) => ({
+    rank: '0',
+    params: [`%${raw}%`],
+    nextIdx: startIdx + 1,
+  })),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────

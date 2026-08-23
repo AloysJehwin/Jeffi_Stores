@@ -598,6 +598,29 @@ export async function clearTenantInfra(tenantId: string): Promise<void> {
   clearTenantCache()
 }
 
+/** Platform-wide infra KV (e.g. the shared pool EC2 instance id/ip). */
+export async function getPlatformInfra(key: string): Promise<string | null> {
+  const pool = controlPlanePool()
+  const r = await pool.query(`SELECT value FROM platform_infra WHERE key=$1`, [key])
+  return r.rows[0]?.value ?? null
+}
+
+export async function setPlatformInfra(key: string, value: string | null): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `INSERT INTO platform_infra (key, value) VALUES ($1, $2)
+     ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value, updated_at=now()`,
+    [key, value])
+}
+
+/** Persist a tenant's serving EC2 target (dedicated instance IP or pool IP) + region. */
+export async function writeTenantEc2(tenantId: string, ec2Target: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenant_infra SET ec2_target=$1, updated_at=now() WHERE tenant_id=$2`,
+    [ec2Target, tenantId])
+}
+
 // ── Owner accounts (ecom store owners) ───────────────────────────────────────
 
 export interface Owner { id: string; email: string; name: string | null; created_at: string }
@@ -787,6 +810,11 @@ export interface TenantKyc {
   business_type: string | null
   business_address: string | null
   product_categories: string | null
+  mobile: string | null
+  logo_s3_key: string | null
+  seal_s3_key: string | null
+  legals_accepted_version: string | null
+  legals_accepted_at: string | null
   status: string
   reviewer_note: string | null
   reviewed_by: string | null
@@ -794,18 +822,31 @@ export interface TenantKyc {
   created_at: string
 }
 
-export async function saveKyc(tenantId: string, ownerId: string, kyc: Partial<Omit<TenantKyc, 'id' | 'tenant_id' | 'owner_id' | 'status' | 'created_at'>>): Promise<void> {
+export async function saveKyc(tenantId: string, ownerId: string, kyc: {
+  gst_number?: string | null; gst_cert_s3_key?: string | null; pan?: string | null
+  business_name?: string | null; business_type?: string | null; business_address?: string | null
+  product_categories?: string | null; mobile?: string | null
+  logo_s3_key?: string | null; seal_s3_key?: string | null; legals_accepted?: boolean
+}): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
-    `INSERT INTO tenant_kyc (tenant_id, owner_id, gst_number, gst_cert_s3_key, pan, business_name, business_type, business_address, product_categories)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+    `INSERT INTO tenant_kyc (tenant_id, owner_id, gst_number, gst_cert_s3_key, pan, business_name, business_type, business_address, product_categories, mobile, logo_s3_key, seal_s3_key, legals_accepted_version, legals_accepted_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
      ON CONFLICT (tenant_id) DO UPDATE SET
        gst_number=EXCLUDED.gst_number, gst_cert_s3_key=COALESCE(EXCLUDED.gst_cert_s3_key, tenant_kyc.gst_cert_s3_key),
        pan=EXCLUDED.pan, business_name=EXCLUDED.business_name, business_type=EXCLUDED.business_type,
        business_address=EXCLUDED.business_address, product_categories=EXCLUDED.product_categories,
+       mobile=COALESCE(EXCLUDED.mobile, tenant_kyc.mobile),
+       logo_s3_key=COALESCE(EXCLUDED.logo_s3_key, tenant_kyc.logo_s3_key),
+       seal_s3_key=COALESCE(EXCLUDED.seal_s3_key, tenant_kyc.seal_s3_key),
+       legals_accepted_version=COALESCE(EXCLUDED.legals_accepted_version, tenant_kyc.legals_accepted_version),
+       legals_accepted_at=COALESCE(EXCLUDED.legals_accepted_at, tenant_kyc.legals_accepted_at),
        updated_at=now()`,
     [tenantId, ownerId, kyc.gst_number ?? null, kyc.gst_cert_s3_key ?? null, kyc.pan ?? null,
-     kyc.business_name ?? null, kyc.business_type ?? null, kyc.business_address ?? null, kyc.product_categories ?? null],
+     kyc.business_name ?? null, kyc.business_type ?? null, kyc.business_address ?? null, kyc.product_categories ?? null,
+     kyc.mobile ?? null, kyc.logo_s3_key ?? null, kyc.seal_s3_key ?? null,
+     kyc.legals_accepted ? (process.env.POLICY_VERSION || '1') : null,
+     kyc.legals_accepted ? new Date().toISOString() : null],
   )
 }
 
@@ -815,27 +856,16 @@ export async function getKyc(tenantId: string): Promise<TenantKyc | null> {
   return r.rows[0] ?? null
 }
 
-export async function getPendingKycList(): Promise<Array<TenantKyc & { display_name: string; owner_email: string; slug: string }>> {
-  const pool = controlPlanePool()
-  const r = await pool.query(
-    `SELECT k.*, t.display_name, t.slug, o.email AS owner_email
-     FROM tenant_kyc k
-     JOIN tenants t ON t.id = k.tenant_id
-     JOIN owners o ON o.id = k.owner_id
-     WHERE k.status = 'pending'
-     ORDER BY k.created_at ASC`,
-  )
-  return r.rows
-}
-
 export async function approveKyc(tenantId: string, reviewerEmail: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
     `UPDATE tenant_kyc SET status='approved', reviewed_by=$2, reviewed_at=now(), updated_at=now() WHERE tenant_id=$1`,
     [tenantId, reviewerEmail],
   )
+  // Approved but NOT paid yet → 'awaiting_payment'. The provisioning ENGINE (and 'provisioning'
+  // status) only starts after subscription.charged — never before payment.
   await pool.query(
-    `UPDATE tenants SET status='provisioning', updated_at=now() WHERE id=$1`,
+    `UPDATE tenants SET status='awaiting_payment', updated_at=now() WHERE id=$1`,
     [tenantId],
   )
 }
@@ -850,6 +880,189 @@ export async function rejectKyc(tenantId: string, reviewerEmail: string, note: s
     `UPDATE tenants SET status='rejected', updated_at=now() WHERE id=$1`,
     [tenantId],
   )
+}
+
+// ── Social accounts + scheduled posts (Meta auto-posting) ─────────────────────
+
+export interface TenantSocialAccount {
+  id: string
+  tenant_id: string
+  provider: 'facebook' | 'instagram'
+  page_id: string | null
+  page_name: string | null
+  ig_user_id: string | null
+  access_token_enc: string
+  token_expiry: string | null
+  status: string
+}
+
+/** Upsert a tenant's connected Meta account (one row per provider). Token is already encrypted. */
+export async function saveTenantSocialAccount(a: {
+  tenantId: string
+  provider: 'facebook' | 'instagram'
+  pageId?: string | null
+  pageName?: string | null
+  igUserId?: string | null
+  accessTokenEnc: string
+  tokenExpiry?: Date | null
+}): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `INSERT INTO tenant_social_accounts
+       (tenant_id, provider, page_id, page_name, ig_user_id, access_token_enc, token_expiry, status)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,'connected')
+     ON CONFLICT (tenant_id, provider) DO UPDATE SET
+       page_id=EXCLUDED.page_id, page_name=EXCLUDED.page_name, ig_user_id=EXCLUDED.ig_user_id,
+       access_token_enc=EXCLUDED.access_token_enc, token_expiry=EXCLUDED.token_expiry,
+       status='connected', updated_at=now()`,
+    [a.tenantId, a.provider, a.pageId ?? null, a.pageName ?? null, a.igUserId ?? null,
+     a.accessTokenEnc, a.tokenExpiry ? a.tokenExpiry.toISOString() : null],
+  )
+}
+
+export async function getTenantSocialAccounts(tenantId: string): Promise<TenantSocialAccount[]> {
+  const pool = controlPlanePool()
+  const r = await pool.query(`SELECT * FROM tenant_social_accounts WHERE tenant_id=$1`, [tenantId])
+  return r.rows as TenantSocialAccount[]
+}
+
+export interface ScheduledSocialPost {
+  id: string
+  tenant_id: string | null
+  product_id: string | null
+  platform: 'fb' | 'ig' | 'ig_reel'
+  caption: string | null
+  hashtags: string | null
+  image_url: string | null
+  video_url: string | null
+  scheduled_at: string
+  status: string
+  posted_id: string | null
+  last_error: string | null
+  attempts: number
+}
+
+/** Queue a post. scheduled_at defaults to now (post-ASAP) when omitted. tenantId null = Jeffi platform. */
+export async function enqueueSocialPost(p: {
+  tenantId: string | null
+  productId?: string | null
+  platform: 'fb' | 'ig' | 'ig_reel'
+  caption?: string | null
+  hashtags?: string | null
+  imageUrl?: string | null
+  videoUrl?: string | null
+  scheduledAt?: Date | null
+}): Promise<ScheduledSocialPost> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `INSERT INTO scheduled_social_posts
+       (tenant_id, product_id, platform, caption, hashtags, image_url, video_url, scheduled_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7, COALESCE($8, now())) RETURNING *`,
+    [p.tenantId, p.productId ?? null, p.platform, p.caption ?? null, p.hashtags ?? null,
+     p.imageUrl ?? null, p.videoUrl ?? null, p.scheduledAt ? p.scheduledAt.toISOString() : null],
+  )
+  return r.rows[0] as ScheduledSocialPost
+}
+
+/** Posts whose scheduled time has arrived and are still pending. */
+export async function dueSocialPosts(limit = 20): Promise<ScheduledSocialPost[]> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `SELECT * FROM scheduled_social_posts
+     WHERE status='pending' AND scheduled_at <= now()
+     ORDER BY scheduled_at ASC LIMIT $1`, [limit],
+  )
+  return r.rows as ScheduledSocialPost[]
+}
+
+/** Jeffi platform posts (tenant_id IS NULL) for the admin Social Posts list. */
+export async function listJeffiSocialPosts(limit = 100): Promise<ScheduledSocialPost[]> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `SELECT * FROM scheduled_social_posts
+     WHERE tenant_id IS NULL
+     ORDER BY scheduled_at DESC LIMIT $1`, [limit],
+  )
+  return r.rows as ScheduledSocialPost[]
+}
+
+/** Load a single scheduled post by id (used by the admin "Post now" action). */
+export async function getSocialPost(id: string): Promise<ScheduledSocialPost | null> {
+  const pool = controlPlanePool()
+  const r = await pool.query(`SELECT * FROM scheduled_social_posts WHERE id=$1`, [id])
+  return (r.rows[0] as ScheduledSocialPost) || null
+}
+
+export async function updateSocialPost(
+  id: string,
+  patch: { status?: string; postedId?: string | null; lastError?: string | null; bumpAttempts?: boolean },
+): Promise<void> {
+  const pool = controlPlanePool()
+  const sets: string[] = ['updated_at = now()']
+  const args: any[] = []
+  if (patch.status !== undefined) { args.push(patch.status); sets.push(`status=$${args.length}`) }
+  if (patch.postedId !== undefined) { args.push(patch.postedId); sets.push(`posted_id=$${args.length}`) }
+  if (patch.lastError !== undefined) { args.push(patch.lastError); sets.push(`last_error=$${args.length}`) }
+  if (patch.bumpAttempts) sets.push('attempts = attempts + 1')
+  args.push(id)
+  await pool.query(`UPDATE scheduled_social_posts SET ${sets.join(', ')} WHERE id=$${args.length}`, args)
+}
+
+// ── Integration credentials (Google Merchant / Amazon Seller / …) ──────────────
+
+export interface IntegrationCredential {
+  id: string
+  tenant_id: string
+  provider: string
+  label: string | null
+  config_enc: string
+  meta: Record<string, any>
+  status: string
+  expires_at: string | null
+}
+
+/** Upsert a tenant's encrypted credential for a provider (one row per provider). */
+export async function saveIntegrationCredential(c: {
+  tenantId: string
+  provider: string
+  label?: string | null
+  configEnc: string
+  meta?: Record<string, any>
+  expiresAt?: Date | null
+}): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `INSERT INTO tenant_integration_credentials
+       (tenant_id, provider, label, config_enc, meta, expires_at, status)
+     VALUES ($1,$2,$3,$4,$5::jsonb,$6,'connected')
+     ON CONFLICT (tenant_id, provider) DO UPDATE SET
+       label=EXCLUDED.label, config_enc=EXCLUDED.config_enc, meta=EXCLUDED.meta,
+       expires_at=EXCLUDED.expires_at, status='connected', updated_at=now()`,
+    [c.tenantId, c.provider, c.label ?? null, c.configEnc,
+     JSON.stringify(c.meta ?? {}), c.expiresAt ? c.expiresAt.toISOString() : null],
+  )
+}
+
+export async function getIntegrationCredential(tenantId: string, provider: string): Promise<IntegrationCredential | null> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `SELECT * FROM tenant_integration_credentials WHERE tenant_id=$1 AND provider=$2`, [tenantId, provider])
+  return (r.rows[0] as IntegrationCredential) ?? null
+}
+
+/** List a tenant's integrations WITHOUT the encrypted secret (safe for API/UI). */
+export async function listIntegrationCredentials(tenantId: string): Promise<Array<Omit<IntegrationCredential, 'config_enc'>>> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `SELECT id, tenant_id, provider, label, meta, status, expires_at
+     FROM tenant_integration_credentials WHERE tenant_id=$1 ORDER BY provider`, [tenantId])
+  return r.rows
+}
+
+export async function deleteIntegrationCredential(tenantId: string, provider: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `DELETE FROM tenant_integration_credentials WHERE tenant_id=$1 AND provider=$2`, [tenantId, provider])
 }
 
 // ── Custom domains (BYO CNAME) ────────────────────────────────────────────────

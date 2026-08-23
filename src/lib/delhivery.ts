@@ -7,6 +7,71 @@ const SELLER_NAME = process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores'
 const SELLER_ADD = process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
 const SELLER_PHONE = process.env.DELHIVERY_SELLER_PHONE || '07713585374'
 
+export async function createDelhiveryPickupLocation(params: {
+  name: string
+  phone: string
+  pincode: string
+  address: string
+  registeredName?: string
+  email?: string
+  city?: string
+  state?: string
+}): Promise<{ ok: boolean; error?: string }> {
+  const token = process.env.DELHIVERY_API_KEY || process.env.DELHIVERY_TOKEN
+  if (!token) return { ok: false, error: 'DELHIVERY_API_KEY not configured' }
+
+  const { name, phone, pincode, address, registeredName, email, city, state } = params
+
+  const body: Record<string, string> = {
+    name,
+    phone,
+    address,
+    country: 'India',
+    pin: pincode,
+    return_address: address,
+    return_pin: pincode,
+    return_country: 'India',
+  }
+  if (registeredName) body.registered_name = registeredName
+  if (email) body.email = email
+  if (city) {
+    body.city = city
+    body.return_city = city
+  }
+  if (state) {
+    body.state = state
+    body.return_state = state
+  }
+
+  try {
+    const res = await fetch('https://track.delhivery.com/api/backend/clientwarehouse/create/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(body),
+      cache: 'no-store',
+    })
+
+    const data = await res.json().catch(() => ({}))
+    const message = JSON.stringify(data).toLowerCase()
+
+    if (res.ok && data && data.success !== false) {
+      return { ok: true }
+    }
+
+    if (message.includes('already exists') || message.includes('duplicate') || message.includes('warehouse name')) {
+      return { ok: true }
+    }
+
+    return { ok: false, error: data.error || data.rmk || `Delhivery warehouse creation failed (${res.status})` }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function cancelDelhiveryShipment(awbNumber: string): Promise<void> {
   const token = process.env.DELHIVERY_API_KEY
   if (!token) throw new Error('DELHIVERY_API_KEY not configured')

@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { createPortal } from 'react-dom'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import DatePicker from '@/components/ui/DatePicker'
+import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import { ap } from '@/lib/admin-path'
 
@@ -99,10 +100,50 @@ function formatINR(n: number) {
 
 export default function NewPOPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [suppliers, setSuppliers] = useState<Supplier[]>([])
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState({ supplier_id: '', order_date: '', expected_date: '', notes: '', status: 'draft' })
   const [lineItems, setLineItems] = useState<POLineItem[]>([newPOLineItem()])
+
+  // Deep-link preseed (scan → New PO): ?product=<id> seeds the first PO line.
+  // Best-effort via the shared scan resolver; silent no-op if it can't resolve.
+  const poSeededRef = useRef(false)
+  useEffect(() => {
+    if (poSeededRef.current) return
+    const pid = searchParams.get('product')
+    if (!pid) return
+    poSeededRef.current = true
+    const vid = searchParams.get('variant')
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch('/api/admin/scan/resolve', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include',
+          body: JSON.stringify({ code: vid || pid }),
+        })
+        const data = await res.json().catch(() => ({}))
+        const it = data?.item
+        if (cancelled || !it || !it.product_id) return
+        const seeded: POLineItem = {
+          ...newPOLineItem(),
+          product_id: it.product_id,
+          variant_id: it.variant_id || '',
+          sub_variant_id: it.sub_variant_id || '',
+          product_name: it.variant_name ? `${it.name} — ${it.variant_name}` : it.name,
+          sku: it.sku || '',
+          tax_rate: it.gst_percentage != null ? String(Math.round(Number(it.gst_percentage))) : '0',
+          hsn_code: it.hsn_code || '',
+          mrp: Number(it.mrp) || 0,
+          sell_unit_label: it.sell_unit_label || '',
+          sell_unit_dimension: it.sell_unit_dimension || '',
+        }
+        setLineItems(prev => (prev.length === 1 && !prev[0].product_id ? [seeded] : [seeded, ...prev]))
+      } catch { /* best-effort */ }
+    })()
+    return () => { cancelled = true }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   const [searchModes, setSearchModes] = useState<Record<string, POSearchMode>>({})
   const [nameInputs, setNameInputs] = useState<Record<string, string>>({})
   const [skuInputs, setSkuInputs] = useState<Record<string, string>>({})
@@ -289,6 +330,7 @@ export default function NewPOPage() {
       setLineItems([...merged, blank])
       setSearchModes(p => ({ ...p, [blank.id]: 'scanner' }))
       setScanInputs(p => { const n = { ...p }; delete n[itemId]; return n })
+      prefillPurchaseUnit(itemId, s.product_id, s.variant_id || '', s.sub_variant_id || '')
       setScanMsg({ text: `✓ ${displayName}`, kind: 'ok' })
     } catch {
       setScanMsg({ text: 'Scan lookup failed', kind: 'err' })
@@ -300,6 +342,37 @@ export default function NewPOPage() {
     const t = setTimeout(() => setScanMsg(null), 2500)
     return () => clearTimeout(t)
   }, [scanMsg])
+
+  // Prefill a line's base unit (from the product's stored sell unit) and its purchase
+  // unit + factor (from the remembered supplier+product conversion). Base unit loads
+  // regardless of supplier; the purchase-unit conversion needs a supplier. Only fills
+  // fields still at their default so a manual entry is never clobbered.
+  async function prefillPurchaseUnit(itemId: string, productId: string, variantId: string, subVariantId: string) {
+    if (!productId) return
+    try {
+      const params = new URLSearchParams({ product_id: productId })
+      if (form.supplier_id) params.set('supplier_id', form.supplier_id)
+      if (variantId) params.set('variant_id', variantId)
+      if (subVariantId) params.set('sub_variant_id', subVariantId)
+      const res = await fetch(`/api/admin/inventory/po/purchase-unit?${params}`, { credentials: 'include' })
+      const data = await res.json().catch(() => ({}))
+      const c = data?.conversion
+      const b = data?.baseUnit
+      setLineItems(items => items.map(r => {
+        if (r.id !== itemId) return r
+        let next = r
+        // base unit: fill when the line hasn't got one yet
+        if (b && b.unit && !r.sell_unit_label) {
+          next = { ...next, sell_unit_label: b.label || b.unit, sell_unit_dimension: b.dimension || 'count' }
+        }
+        // purchase-unit conversion: fill when still at default
+        if (c && c.purchase_unit && !next.purchase_unit && (!next.purchase_unit_factor || next.purchase_unit_factor === '1')) {
+          next = { ...next, purchase_unit: c.purchase_unit, purchase_unit_factor: String(c.purchase_unit_factor) }
+        }
+        return next
+      }))
+    } catch { /* best-effort prefill */ }
+  }
 
   function applyPickerProduct(p: PickerProduct) {
     if (!pickerItemId) return
@@ -319,9 +392,11 @@ export default function NewPOPage() {
       sell_unit_label: p.sell_unit_label || '',
       sell_unit_dimension: p.sell_unit_dimension || '',
     }
+    const targetId = pickerItemId
     setLineItems(mergeOrReplaceLineItem(pickerItemId, populated))
     setPickerOpen(false)
     setPickerItemId(null)
+    prefillPurchaseUnit(targetId, p.product_id, p.variant_id || '', p.sub_variant_id || '')
   }
 
   function clearProduct(itemId: string) {
@@ -449,14 +524,21 @@ export default function NewPOPage() {
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5v14M8 5v14M12 5v14M16 5v14M20 5v14" /></svg>
                 {scanEnabled ? 'Scan: on' : 'Scan: off'}
               </button>
-              <button type="button" onClick={() => setLineItems(items => [...items, newPOLineItem()])}
-                className="flex items-center gap-1 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors">
+              <button type="button" disabled={!form.supplier_id} onClick={() => setLineItems(items => [...items, newPOLineItem()])}
+                className="flex items-center gap-1 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 dark:hover:text-secondary-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                 Add Item
               </button>
             </div>
           </div>
 
+          {!form.supplier_id ? (
+            <div className="rounded-lg border border-dashed border-border-default bg-surface-secondary/50 px-4 py-8 text-center">
+              <p className="text-sm font-medium text-foreground">Select a supplier first</p>
+              <p className="text-xs text-foreground-muted mt-1">Choose a supplier above to add products and their purchase units.</p>
+            </div>
+          ) : (
+          <>
           <div className="space-y-3">
             {lineItems.map((it, idx) => {
               const mode = searchModes[it.id] ?? 'scanner'
@@ -475,7 +557,7 @@ export default function NewPOPage() {
                     <div className="flex items-center justify-between gap-2 px-3 py-2 bg-surface-secondary rounded-lg border border-border-default">
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{it.product_name}</p>
-                        {it.sku && <p className="text-xs text-foreground-muted mt-0.5 font-mono">{it.sku}</p>}
+                        {it.sku && <p className="text-xs text-foreground-muted mt-0.5 font-mono inline-flex items-center gap-1">{it.sku}<CopySku sku={it.sku} /></p>}
                       </div>
                       <button type="button" onClick={() => clearProduct(it.id)}
                         className="shrink-0 text-xs text-secondary-500 dark:text-secondary-300 font-semibold hover:text-secondary-600 transition-colors">
@@ -507,6 +589,7 @@ export default function NewPOPage() {
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
                             const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, sub_variant_id: d.sub_variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label, sell_unit_dimension: d.sell_unit_dimension }
                             setLineItems(mergeOrReplaceLineItem(it.id, populated))
+                            prefillPurchaseUnit(it.id, d.product_id, d.variant_id, d.sub_variant_id)
                           }}
                           inputClassName={inputCls} placeholder="Search by product name..." />
                       )}
@@ -518,6 +601,7 @@ export default function NewPOPage() {
                             const sku = s.sublabel?.split(' · ')[0] ?? ''
                             const populated: POLineItem = { ...it, product_id: d.product_id, product_name: s.label, sku, variant_id: d.variant_id, sub_variant_id: d.sub_variant_id, tax_rate: d.tax_rate, hsn_code: d.hsn_code, sell_unit_label: d.sell_unit_label, sell_unit_dimension: d.sell_unit_dimension }
                             setLineItems(mergeOrReplaceLineItem(it.id, populated))
+                            prefillPurchaseUnit(it.id, d.product_id, d.variant_id, d.sub_variant_id)
                           }}
                           inputClassName={inputCls + ' font-mono'} placeholder="e.g. JFS-1234" />
                       )}
@@ -680,6 +764,8 @@ export default function NewPOPage() {
               Add Item
             </button>
           )}
+          </>
+          )}
 
           {lineItems.some(it => it.line_total_incl_gst) && (
             <div className="border-t border-border-default pt-3 mt-3 flex justify-end">
@@ -765,7 +851,7 @@ export default function NewPOPage() {
                               <td className="px-4 py-2.5">
                                 {g.items.length > 1 ? <span className="text-foreground pl-2">{p.variant_name || p.name}</span> : <span className="font-medium text-foreground">{p.name}</span>}
                               </td>
-                              <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted">{p.sku}</td>
+                              <td className="px-4 py-2.5 font-mono text-xs text-foreground-muted"><span className="inline-flex items-center gap-1">{p.sku}{p.sku && <CopySku sku={p.sku} />}</span></td>
                               <td className="px-4 py-2.5 text-right font-medium text-foreground">{p.base_price != null ? `₹${p.base_price}` : '—'}</td>
                             </tr>
                           ))}

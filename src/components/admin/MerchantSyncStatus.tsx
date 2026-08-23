@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import CopySku from '@/components/ui/CopySku'
 
 interface SyncStatus {
   status: 'success' | 'error' | 'running' | null
@@ -95,7 +96,7 @@ export default function MerchantSyncStatus() {
         <div className="mt-3 max-h-40 overflow-y-auto rounded border border-red-200 bg-white p-2 space-y-1">
           {status.errors.map((e, i) => (
             <p key={i} className="text-xs text-red-700">
-              <span className="font-mono font-medium">{e.sku}</span>: {e.error}
+              <span className="font-mono font-medium inline-flex items-center gap-1">{e.sku}{e.sku && <CopySku sku={e.sku} />}</span>: {e.error}
             </p>
           ))}
         </div>

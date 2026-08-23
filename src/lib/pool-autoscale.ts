@@ -1,5 +1,6 @@
 import { describeInstance, stopInstance, startInstance, modifyInstanceType, waitForState } from './ec2-client'
-import { activeTenantCount } from './tenant-registry'
+import { activeTenantCount, getPlatformInfra, setPlatformInfra } from './tenant-registry'
+import { getProvisioningProvider } from './provisioning'
 
 /**
  * Tenant-pool auto-scale-UP controller. The pool is a SINGLE EC2 whose instance TYPE steps
@@ -73,4 +74,49 @@ export async function runPoolAutoscale(): Promise<AutoscaleResult> {
   await startInstance(poolId)
   await waitForState(poolId, 'running')
   return { ...result, action: 'resized', detail: `${current} → ${want}` }
+}
+
+const POOL_ID_KEY = 'pool_instance_id'
+const POOL_IP_KEY = 'pool_instance_ip'
+
+/** Resolve the shared pool EC2, creating it if none exists. Returns its serving IP. The id/ip are
+ * persisted in platform_infra (survives restarts). A manually-set POOL_INSTANCE_ID env still wins
+ * (pre-existing pool). Used by the ensure_compute provisioning step for Basic-plan tenants. */
+export async function ensurePoolInstance(): Promise<{ instanceId: string; ip: string }> {
+  const envId = process.env.POOL_INSTANCE_ID
+  if (envId) {
+    // Pre-existing pool managed via env — describe for its IP (via provider for stub-friendliness).
+    const ip = (await getPlatformInfra(POOL_IP_KEY)) || process.env.TENANT_APP_TARGET_IP || ''
+    return { instanceId: envId, ip }
+  }
+  const existingId = await getPlatformInfra(POOL_ID_KEY)
+  const provider = getProvisioningProvider()
+  if (existingId && !(await provider.isInstanceGone(existingId))) {
+    const ip = (await getPlatformInfra(POOL_IP_KEY)) || ''
+    if (ip) return { instanceId: existingId, ip }
+  }
+  // Create the pool instance (smallest tier — autoscale grows it later).
+  const { appBootUserData } = await import('./provisioning/user-data')
+  const { instanceId, ip } = await provider.ensureAppInstance({
+    name: 'jeffi-pool', instanceType: POOL_SIZE_TIERS[0].type, userData: appBootUserData(),
+  })
+  await setPlatformInfra(POOL_ID_KEY, instanceId)
+  await setPlatformInfra(POOL_IP_KEY, ip)
+  return { instanceId, ip }
+}
+
+/** Delete the shared pool EC2 IFF no active tenants remain. Never touches the flagship or an
+ * env-managed pool. Called on deprovision of the last Basic tenant. */
+export async function deletePoolIfEmpty(): Promise<{ deleted: boolean; reason?: string }> {
+  if (process.env.POOL_INSTANCE_ID) return { deleted: false, reason: 'env-managed pool' }
+  const count = await activeTenantCount()
+  if (count > 0) return { deleted: false, reason: `${count} active tenants remain` }
+  const id = await getPlatformInfra(POOL_ID_KEY)
+  if (!id) return { deleted: false, reason: 'no pool instance' }
+  if (id === FLAGSHIP_INSTANCE_ID) return { deleted: false, reason: 'refusing to delete flagship' }
+  const provider = getProvisioningProvider()
+  await provider.deleteAppInstance(id)
+  await setPlatformInfra(POOL_ID_KEY, null)
+  await setPlatformInfra(POOL_IP_KEY, null)
+  return { deleted: true }
 }

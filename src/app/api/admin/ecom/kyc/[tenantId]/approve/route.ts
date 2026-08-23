@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, saveSubscriptionId, saveLinkedAccountId } from '@/lib/tenant-registry'
+import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft, saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount } from '@/lib/tenant-registry'
 import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
-import { createLinkedAccount, mapBusinessType, inferProfileCategory } from '@/lib/razorpay-route'
+import { createLinkedAccount, createRouteStakeholder, configureRouteSettlement, mapBusinessType, inferProfileCategory, normalizeIndianPhone } from '@/lib/razorpay-route'
 import { sendKycApprovedEmail } from '@/lib/ecom-emails'
 
 export const dynamic = 'force-dynamic'
@@ -29,6 +29,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   let linkedAccountId = tenant.razorpay_linked_account_id ?? null
   if (!linkedAccountId) {
     try {
+      // The owner phone for the Route account comes from the onboarding warehouse config
+      // (wh.sellerPhone) — the only phone collected during onboarding. Normalize it to the
+      // 10-digit form Razorpay requires; skip linked-account creation (non-fatal) if there's
+      // no valid phone rather than sending a bad value that Razorpay rejects.
+      const draft = await getDraft(kyc.owner_id).catch(() => null)
+      const ownerPhone = normalizeIndianPhone((draft?.data as any)?.wh?.sellerPhone)
+      if (!ownerPhone) {
+        throw new Error('no valid owner phone (wh.sellerPhone) for linked account')
+      }
       const { category, subcategory } = inferProfileCategory(kyc.product_categories)
       const addressParts = (kyc.business_address ?? '').split(',').map(s => s.trim())
       linkedAccountId = await createLinkedAccount({
@@ -38,7 +47,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         profileCategory: category,
         profileSubcategory: subcategory,
         ownerEmail: owner.email,
-        ownerPhone: owner.name ?? owner.email, // phone sourced from bank acct if needed
+        ownerPhone,
         ownerName: owner.name ?? owner.email,
         pan: kyc.pan ?? '',
         gstNumber: kyc.gst_number ?? undefined,
@@ -48,6 +57,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         postalCode: addressParts[addressParts.length - 1]?.replace(/\D/g, '') ?? '000000',
       })
       await saveLinkedAccountId(tenantId, linkedAccountId)
+
+      // Attach a stakeholder + settlement bank so payouts can settle. Both are
+      // non-fatal: needs LIVE Razorpay keys to fully succeed and must not block go-live.
+      try {
+        await createRouteStakeholder(linkedAccountId, {
+          name: kyc.business_name ?? owner.name ?? owner.email,
+          pan: kyc.pan ?? undefined,
+        })
+      } catch (sErr: any) {
+        process.stderr.write(`[route] stakeholder creation failed for ${tenantId}: ${sErr?.error?.description ?? sErr?.message}\n`)
+      }
+      const bank = await getOwnerBankAccount(kyc.owner_id).catch(() => null)
+      if (bank) {
+        const settlement = await configureRouteSettlement(linkedAccountId, {
+          accountNumber: bank.account_number,
+          ifsc: bank.ifsc,
+          beneficiaryName: bank.verified_name ?? bank.holder_name,
+        })
+        if (!settlement.ok) {
+          process.stderr.write(`[route] settlement config failed for ${tenantId}: ${settlement.error}\n`)
+        }
+      } else {
+        process.stderr.write(`[route] no bank account on file for owner ${kyc.owner_id} — settlement not configured\n`)
+      }
     } catch (err: any) {
       // Non-fatal — log but continue. Transfers will fail until this is fixed,
       // but subscription + provisioning should proceed.
