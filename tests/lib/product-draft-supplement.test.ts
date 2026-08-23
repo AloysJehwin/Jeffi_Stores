@@ -77,7 +77,7 @@ describe('publishProductDraft — variant_images reconcile', () => {
 
     await publishProductDraft('prod-1')
 
-    const sqls = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
+    const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
     // DELETE live rows not kept
     expect(sqls.some(s => s.includes('DELETE FROM variant_images WHERE variant_id'))).toBe(true)
     // INSERT the freshly-staged upload
@@ -109,7 +109,7 @@ describe('publishProductDraft — variant_images reconcile', () => {
 
     await publishProductDraft('prod-1')
 
-    const sqls = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
+    const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
     // Fallback: promote first image to primary
     expect(sqls.some(s => s.includes('UPDATE variant_images SET is_primary = TRUE'))).toBe(true)
   })
@@ -134,7 +134,7 @@ describe('publishProductDraft — variant_images reconcile', () => {
 
     await publishProductDraft('prod-1')
 
-    const sqls = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
+    const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
     // The active variant still gets a DELETE with an empty keep-set (keepIds = []).
     expect(sqls.some(s => s.includes('DELETE FROM variant_images WHERE variant_id'))).toBe(true)
   })
@@ -164,7 +164,7 @@ describe('publishProductDraft — sub-variant UPDATE-by-id', () => {
 
     await publishProductDraft('prod-1')
 
-    const sqls = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
+    const sqls: string[] = mockClientQuery.mock.calls.map((c: any[]) => String(c[0]))
     // UPDATE product_sub_variants by id (not INSERT), preserving inventory_quantity.
     expect(sqls.some(s => s.includes('UPDATE product_sub_variants SET') && s.includes('sub_variant_name'))).toBe(true)
   })
