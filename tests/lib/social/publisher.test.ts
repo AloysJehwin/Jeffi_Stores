@@ -128,8 +128,11 @@ describe('social/publisher — publishScheduledPost', () => {
   })
 
   it('fails an IG post when no IG account is connected', async () => {
-    // Only a facebook account, no ig_user_id.
-    reg.getTenantSocialAccounts.mockResolvedValue([account()])
+    // An instagram-provider row exists but carries no ig_user_id, so creds resolve
+    // yet the IG target is missing — the publisher must reject before calling Meta.
+    reg.getTenantSocialAccounts.mockResolvedValue([
+      account({ provider: 'instagram', ig_user_id: null }),
+    ])
     const { publishScheduledPost } = await import('@/lib/social/publisher')
     const r = await publishScheduledPost(post({ platform: 'ig' }))
     expect(r.ok).toBe(false)

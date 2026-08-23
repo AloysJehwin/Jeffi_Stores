@@ -26,6 +26,7 @@ vi.mock('@/lib/email', () => ({
 vi.mock('@/lib/scopes', () => ({
   ALL_SCOPE_KEYS: ['products', 'orders', 'inventory', 'financial', 'customers', 'mailer', 'audit', 'agent'],
   hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────

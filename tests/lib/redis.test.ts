@@ -9,22 +9,24 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 // reset modules between the two scenario groups.
 // ---------------------------------------------------------------------------
 
+// Top-level mock: vitest hoists vi.mock regardless, so declaring it here (rather
+// than inside a beforeEach) reflects its true global execution order.
+vi.mock('ioredis', () => {
+  const MockRedis = vi.fn().mockImplementation(() => ({
+    set: vi.fn().mockResolvedValue('OK'),
+    get: vi.fn().mockResolvedValue('value'),
+    del: vi.fn().mockResolvedValue(1),
+    incr: vi.fn().mockResolvedValue(1),
+    ttl: vi.fn().mockResolvedValue(60),
+    on: vi.fn(),
+  }))
+  return { default: MockRedis }
+})
+
 describe('redis module — with REDIS_URL (ioredis path)', () => {
   beforeEach(async () => {
     vi.resetModules()
     process.env.REDIS_URL = 'redis://localhost:6379'
-
-    vi.mock('ioredis', () => {
-      const MockRedis = vi.fn().mockImplementation(() => ({
-        set: vi.fn().mockResolvedValue('OK'),
-        get: vi.fn().mockResolvedValue('value'),
-        del: vi.fn().mockResolvedValue(1),
-        incr: vi.fn().mockResolvedValue(1),
-        ttl: vi.fn().mockResolvedValue(60),
-        on: vi.fn(),
-      }))
-      return { default: MockRedis }
-    })
   })
 
   afterEach(() => {

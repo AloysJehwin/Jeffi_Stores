@@ -275,6 +275,26 @@ export async function uploadStoreLogo(buffer: Buffer): Promise<{ url: string; s3
   return { url: `${getS3Url(s3Key)}?v=${Date.now()}`, s3Key }
 }
 
+// Per-owner branding asset (logo/seal) captured during onboarding — distinct from the global
+// platform store-logo above. Publicly readable (storefront + legal-doc + social use). Key is
+// owner-scoped so each tenant owner has their own.
+export async function uploadBrandingImage(buffer: Buffer, ownerId: string, kind: 'logo' | 'seal'): Promise<{ url: string; s3Key: string }> {
+  const s3Key = `branding/${ownerId}/${kind}.png`
+  const resized = await sharp(buffer)
+    .rotate()
+    .resize(600, 600, { fit: 'inside', withoutEnlargement: true })
+    .png({ quality: 90 })
+    .toBuffer()
+  await s3Client.send(new PutObjectCommand({
+    Bucket: BUCKET_NAME,
+    Key: `${KEY_PREFIX}${s3Key}`,
+    Body: resized,
+    ContentType: 'image/png',
+    CacheControl: 'public, max-age=60',
+  }))
+  return { url: `${getS3Url(s3Key)}?v=${Date.now()}`, s3Key }
+}
+
 
 export async function deleteGalleryImage(s3Key: string, s3ThumbnailKey: string) {
   await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}` }))

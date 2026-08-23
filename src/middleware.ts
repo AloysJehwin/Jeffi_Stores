@@ -138,6 +138,9 @@ export async function middleware(request: NextRequest) {
     // SaaS control plane (ecom.jeffistores.in). Public: marketing (/), /signin, /signup.
     // Protected (owner session required): /onboard, /dashboard. API under /api/ecom.
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    // Shared platform legal pages (/legal/*) render as-is on the ecom host too — the
+    // onboarding legals-consent links here — so don't rewrite them into /ecom/legal (404).
+    if (pathname === '/legal' || pathname.startsWith('/legal/')) return addSecurityHeaders(NextResponse.next())
     const OWNER_PROTECTED = ['/onboard', '/dashboard']
     if (OWNER_PROTECTED.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
       const ownerSid = request.cookies.get('owner_sid')?.value

@@ -41,6 +41,9 @@ vi.mock('@/lib/auto-tasks', () => ({
 vi.mock('@/lib/marketing', () => ({
   attributeConversion: vi.fn().mockResolvedValue(undefined),
 }))
+vi.mock('@/lib/site-controls', () => ({
+  getFeatureFlags: vi.fn().mockResolvedValue({ inventoryValidationEnabled: true }),
+}))
 vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }

@@ -9,6 +9,7 @@ vi.mock('@/lib/jwt', () => ({
 
 vi.mock('@/lib/scopes', () => ({
   hasScope: vi.fn(),
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
 }))
 
 vi.mock('@/lib/db', () => ({
@@ -82,7 +83,7 @@ describe('POST /api/admin/agent/proposed-tools/[id]/approve', () => {
     const res = await POST(makeRequest(), { params: Promise.resolve({ id: 'tool-1' }) })
     expect(res.status).toBe(403)
     const body = await res.json()
-    expect(body.error).toMatch(/super_admin/i)
+    expect(body.error).toMatch(/platform owner/i)
   })
 
   it('returns 404 when proposed tool not found', async () => {

@@ -21,7 +21,7 @@ vi.mock('@/lib/merchant/client', () => ({
   deleteProduct: vi.fn(),
   listProducts: vi.fn(),
   customBatchUpsert: vi.fn(),
-  MERCHANT_ID: 'test-merchant-123',
+  getMerchantId: vi.fn().mockResolvedValue('test-merchant-123'),
   GMC_PUSH_DISABLED: false,
 }))
 
@@ -55,6 +55,8 @@ describe('merchant/sync', () => {
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     // listProducts is called in getExistingGmcOfferIds — needs a safe default.
     mockListProducts.mockResolvedValue({ resources: [], nextPageToken: undefined } as any)
+    // resetAllMocks wipes the factory's getMerchantId implementation — re-stub it.
+    vi.mocked(client.getMerchantId).mockResolvedValue('test-merchant-123')
   })
 
   describe('getLastSyncStatus', () => {

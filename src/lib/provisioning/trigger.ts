@@ -70,27 +70,6 @@ export async function resolveRestoreKey(tenantId: string, slug: string): Promise
 
 const usingStub = () => process.env.PROVISIONING_PROVIDER !== 'aws'
 
-/**
- * Kick the self-advancing loop for a tenant's provisioning job (AWS only). Fire-and-forget:
- * schedules one POST to the internal advance route, which advances one step and reschedules
- * itself until the job is done/failed. Mirrors the self-call pattern in instrumentation.ts
- * (fetch APP_URL with Bearer CRON_SECRET). No-op under the stub (jobs run inline) or when
- * the self-call prerequisites are missing.
- */
-export function kickAdvance(tenantId: string): void {
-  if (usingStub()) return
-  const cronSecret = process.env.CRON_SECRET
-  const appUrl = process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL
-  if (!cronSecret || !appUrl) return
-  setTimeout(() => {
-    fetch(`${appUrl}/api/internal/provisioning/advance`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cronSecret}` },
-      body: JSON.stringify({ tenantId }),
-    }).catch(() => {})
-  }, 0)
-}
-
 /** Drive a stub job to completion in-request (local dev + tests are synchronous). */
 async function driveStubToCompletion(tenantId: string): Promise<string | undefined> {
   const provider = getProvisioningProvider()
@@ -135,7 +114,26 @@ export async function triggerProvisioning(t: ProvisioningTrigger): Promise<Trigg
     return { ok: status === 'done', jobStatus: status }
   }
 
-  // AWS: enqueue-only + self-advancing loop (RDS create takes ~10 min).
-  kickAdvance(t.tenantId)
-  return { ok: true, jobStatus: job.status }
+  // AWS: drive the job inline as far as it will go WITHOUT blocking on the long RDS wait.
+  // A background setTimeout self-fetch is unreliable here — in the Next server/serverless model
+  // the request scope is torn down after the response, so a post-response timer may never fire
+  // (observed: the loop never started). Instead we AWAIT each step until the job parks on a
+  // pending poll (wait_db_available / verify_serving) or reaches a terminal state. The recurring
+  // provisioning worker (instrumentation.ts → /api/internal/provisioning/worker) then advances
+  // it across the ~10-min RDS wait. Bounded so a fast run can complete inline, but a long poll
+  // hands off to the worker instead of blocking the request.
+  const MAX_INLINE_STEPS = 6
+  let status = job.status
+  let prevStep = job.step
+  for (let i = 0; i < MAX_INLINE_STEPS; i++) {
+    const fresh = await getProvisioningJob(t.tenantId)
+    if (!fresh || fresh.status === 'done' || fresh.status === 'failed') { status = fresh?.status ?? status; break }
+    status = await advanceProvisioningJob(fresh, provider)
+    const after = await getProvisioningJob(t.tenantId)
+    // Parked on a poll step (same step, still pending) → hand off to the recurring worker.
+    if (after && after.step === prevStep && after.status === 'pending') break
+    prevStep = after?.step ?? prevStep
+    if (status === 'done' || status === 'failed') break
+  }
+  return { ok: status !== 'failed', jobStatus: status }
 }

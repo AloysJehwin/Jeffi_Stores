@@ -28,8 +28,15 @@ export default async function OwnerDashboard() {
   // No store yet → send to onboard
   if (!hasStore) redirect('/onboard')
 
-  // Store exists but not active yet → send to onboard status screen
-  if (tenants[0].status !== 'active') redirect('/onboard')
+  // PRE-PAYMENT states (application submitted / approved-awaiting-payment) belong in the onboard
+  // flow — the owner shouldn't reach the dashboard until they've paid. /onboard shows the
+  // 'under review' → payment-link states for these.
+  if (tenants.some((t) => t.status === 'pending_approval' || t.status === 'awaiting_payment')) {
+    redirect('/onboard')
+  }
+
+  // Post-payment (provisioning/suspended) IS shown in the dashboard with a status card — do NOT
+  // redirect those to /onboard (would re-show the payment step and risk a double charge).
 
   return (
     <div className="w-full min-h-screen bg-surface-secondary">

@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     custom_domain  character varying(255),                  -- optional BYO domain (priced add-on)
     display_name   character varying(200) NOT NULL,
     plan_id        uuid,
-    status                   character varying(20) NOT NULL DEFAULT 'provisioning', -- provisioning|active|suspended|terminated
+    status                   character varying(20) NOT NULL DEFAULT 'provisioning', -- pending_approval|awaiting_payment|provisioning|active|suspended|terminated|rejected
     razorpay_subscription_id character varying(64),         -- Razorpay sub_xxxx; set after checkout redirect
     razorpay_checkout_url    text,                           -- Razorpay hosted checkout short_url; shown to owner post-approval
     razorpay_linked_account_id character varying(64),        -- Razorpay Route acc_xxxx; created on KYC approval for POBO transfers
@@ -92,7 +92,7 @@ ALTER TABLE ONLY public.plan_features  ADD CONSTRAINT plan_features_plan_scope_k
 ALTER TABLE ONLY public.tenant_infra   ADD CONSTRAINT tenant_infra_tenant_id_key UNIQUE (tenant_id);
 
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_status_check
-    CHECK (status IN ('provisioning','active','suspended','terminated','pending_approval','rejected'));
+    CHECK (status IN ('provisioning','active','suspended','terminated','pending_approval','awaiting_payment','rejected'));
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_subscription_status_check
     CHECK (subscription_status IN ('created','authenticated','active','halted','cancelled','completed','expired'));
 ALTER TABLE ONLY public.tenants        ADD CONSTRAINT tenants_billing_interval_check
@@ -352,6 +352,11 @@ CREATE TABLE IF NOT EXISTS public.tenant_kyc (
     business_type   character varying(32),    -- proprietor|partnership|pvt_ltd|llp|other
     business_address text,
     product_categories text,                  -- comma-separated or free text
+    mobile          character varying(20),     -- owner mobile (distinct from warehouse sellerPhone)
+    logo_s3_key     character varying(512),    -- store logo: branding/{owner_id}/logo.*
+    seal_s3_key     character varying(512),    -- store seal (for legal docs): branding/{owner_id}/seal.*
+    legals_accepted_version character varying(20),   -- POLICY_VERSION the owner agreed to at onboarding
+    legals_accepted_at      timestamp with time zone,
     status          character varying(16) NOT NULL DEFAULT 'pending', -- pending|approved|rejected
     reviewer_note   text,
     reviewed_by     character varying(200),   -- admin email
@@ -457,3 +462,15 @@ ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_int
 ALTER TABLE ONLY public.tenant_integration_credentials ADD CONSTRAINT tenant_integration_credentials_status_check
     CHECK (status IN ('connected','error','revoked'));
 CREATE INDEX IF NOT EXISTS idx_tenant_integration_tenant ON public.tenant_integration_credentials USING btree (tenant_id);
+
+--
+-- platform_infra: singleton-ish key/value for platform-wide infra pointers that aren't tenant
+-- scoped — notably the shared pooled EC2 instance id (so create-if-missing survives restarts,
+-- vs. the read-only POOL_INSTANCE_ID env). One row per key.
+--
+CREATE TABLE IF NOT EXISTS public.platform_infra (
+    key         character varying(64) NOT NULL,   -- e.g. 'pool_instance_id', 'pool_instance_ip'
+    value       text,
+    updated_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.platform_infra ADD CONSTRAINT platform_infra_pkey PRIMARY KEY (key);
