@@ -628,6 +628,8 @@ describe('POST /api/orders/[id]/return-review', () => {
       .mockResolvedValueOnce({ ...MOCK_ORDER, status: 'return_received' })
       .mockResolvedValueOnce(replacementReturnRequest)
       .mockResolvedValueOnce({ ...MOCK_ORDER, shipping_address_snapshot: { full_name: 'Snap User', address_line1: 'L1' } })
+      // v1 is still an active variant → no variant pick needed
+      .mockResolvedValueOnce({ is_active: true })
     // item-level records → replacementItems = returnItems, loop executes both branches
     vi.mocked(db.queryMany).mockResolvedValueOnce([
       { refund_amount: '200', quantity: '2', unit_price: '100', product_id: 'p1', variant_id: 'v1', product_name: 'Variant Item', variant_name: 'Red', buy_mode: 'unit', buy_unit: null },

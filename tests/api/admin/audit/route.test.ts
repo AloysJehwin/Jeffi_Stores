@@ -79,9 +79,9 @@ describe('GET /api/admin/audit', () => {
     expect(body.error).toMatch(/insufficient/i)
   })
 
-  it('allows super_admin without audit scope', async () => {
+  it('allows super_admin (hasScope grants platform owner)', async () => {
     mockAuth.mockResolvedValue(superAdmin)
-    mockHasScope.mockReturnValue(false)
+    mockHasScope.mockReturnValue(true)
     mockQueryCount.mockResolvedValue(1)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     const res = await GET(makeRequest())
@@ -99,6 +99,7 @@ describe('GET /api/admin/audit', () => {
 
   it('returns paginated events on success', async () => {
     mockAuth.mockResolvedValue(superAdmin)
+    mockHasScope.mockReturnValue(true)
     mockQueryCount.mockResolvedValue(5)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     const res = await GET(makeRequest({ page: '1', pageSize: '10' }))
@@ -112,6 +113,7 @@ describe('GET /api/admin/audit', () => {
 
   it('applies entity_type filter', async () => {
     mockAuth.mockResolvedValue(superAdmin)
+    mockHasScope.mockReturnValue(true)
     mockQueryCount.mockResolvedValue(2)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     await GET(makeRequest({ entity_type: 'product' }))
@@ -121,6 +123,7 @@ describe('GET /api/admin/audit', () => {
 
   it('applies action filter', async () => {
     mockAuth.mockResolvedValue(superAdmin)
+    mockHasScope.mockReturnValue(true)
     mockQueryCount.mockResolvedValue(2)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     await GET(makeRequest({ action: 'create' }))
@@ -130,6 +133,7 @@ describe('GET /api/admin/audit', () => {
 
   it('applies admin_id filter', async () => {
     mockAuth.mockResolvedValue(superAdmin)
+    mockHasScope.mockReturnValue(true)
     mockQueryCount.mockResolvedValue(2)
     mockQueryMany.mockResolvedValue(sampleRows as any)
     await GET(makeRequest({ admin_id: 'some-uuid' }))
@@ -139,6 +143,7 @@ describe('GET /api/admin/audit', () => {
 
   it('clamps page size to valid range', async () => {
     mockAuth.mockResolvedValue(superAdmin)
+    mockHasScope.mockReturnValue(true)
     mockQueryCount.mockResolvedValue(0)
     mockQueryMany.mockResolvedValue([])
     const res = await GET(makeRequest({ page: '0', pageSize: '9999' }))
@@ -150,6 +155,7 @@ describe('GET /api/admin/audit', () => {
 
   it('returns empty events when no records', async () => {
     mockAuth.mockResolvedValue(superAdmin)
+    mockHasScope.mockReturnValue(true)
     mockQueryCount.mockResolvedValue(0)
     mockQueryMany.mockResolvedValue([])
     const res = await GET(makeRequest())

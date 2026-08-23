@@ -14,6 +14,12 @@ export interface CreateDbInstanceArgs {
   maxConnections: number
 }
 
+export interface AppInstanceArgs {
+  name: string              // jeffi-tenant-{slug} / jeffi-pool
+  instanceType: string
+  userData?: string
+}
+
 export interface ProvisioningProvider {
   /** Create (or confirm) a custom parameter group with the given max_connections. */
   ensureParamGroup(paramGroup: string, maxConnections: number): Promise<void>
@@ -36,10 +42,12 @@ export interface ProvisioningProvider {
   /** Create + lock down the tenant bucket (public-access-block on; writes to app IAM only). */
   ensureBucket(bucket: string): Promise<void>
 
-  /** Point the tenant's subdomains at the shared app host (Route53 A-records; idempotent). */
-  ensureDns(hostnames: string[]): Promise<void>
+  /** Point the tenant's subdomains at the given target IP (Route53 A-records; idempotent).
+   * targetIp is the tenant's serving host — a dedicated instance IP or the shared pool IP;
+   * omitted falls back to TENANT_APP_TARGET_IP. */
+  ensureDns(hostnames: string[], targetIp?: string): Promise<void>
 
-  /** Remove the tenant's subdomain A-records on deprovision (idempotent). */
+  /** Remove the tenant's subdomain A-records on deprovision (idempotent, value-agnostic). */
   removeDns(hostnames: string[]): Promise<void>
 
   /** Stop the RDS instance (cost saving — test tenant only). */
@@ -58,4 +66,14 @@ export interface ProvisioningProvider {
   /** Delete the tenant's custom parameter group (idempotent; NotFound = success). Only
    * succeeds once no instance references it, so callers must delete the DB first. */
   deleteParamGroup(paramGroup: string): Promise<void>
+
+  /** Launch an app-serving EC2 (dedicated tenant instance or the shared pool), wait until it
+   * has a public IP, and return it. Idempotent-friendly: caller tracks the instance id. */
+  ensureAppInstance(args: AppInstanceArgs): Promise<{ instanceId: string; ip: string }>
+
+  /** Terminate an app instance (dedicated-tenant teardown / pool delete). Idempotent. */
+  deleteAppInstance(instanceId: string): Promise<void>
+
+  /** True once the instance no longer exists (teardown ordering). */
+  isInstanceGone(instanceId: string): Promise<boolean>
 }

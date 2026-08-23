@@ -25,6 +25,7 @@ const reg = {
   updateProvisioningJob: vi.fn().mockResolvedValue(undefined),
   setTenantStatus: vi.fn().mockResolvedValue(undefined),
   writeTenantInfra: vi.fn().mockResolvedValue(undefined),
+  writeTenantEc2: vi.fn().mockResolvedValue(undefined),
   clearTenantInfra: vi.fn().mockResolvedValue(undefined),
   clearTenantCache: vi.fn(),
 }
@@ -288,6 +289,12 @@ describe('provisioning state machine', () => {
 
   // -------------------------------------------------------------------------
   describe('verify_serving — proves the host answers before going live', () => {
+    // The probe only runs under the real AWS provider; under the stub it is skipped
+    // (there is no real host to reach), so these tests set the provider to 'aws' to
+    // exercise the fetch-based verification path.
+    beforeEach(() => { process.env.PROVISIONING_PROVIDER = 'aws' })
+    afterEach(() => { delete process.env.PROVISIONING_PROVIDER })
+
     it('advances to activate when the host responds', async () => {
       vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ status: 200 }))
       const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
@@ -421,21 +428,29 @@ describe('provisioning state machine', () => {
       expect(provider.hasDns('acme.jeffistores.in')).toBe(false)
     })
 
-    it('UPGRADE adds only the new tier hostnames (basic → growth)', async () => {
+    it('UPGRADE basic → growth crosses into dedicated: stands up EC2 and repoints all hosts', async () => {
       reg.getTenant.mockResolvedValue({ ...ACTIVE, plan: 'growth' })
-      // Previously applied = basic hostnames.
+      // Previously applied = basic hostnames, on the shared pool (no dedicated EC2 yet).
       reg.getProvisioningJob.mockResolvedValue(job({
         status: 'done',
         created_resources: { dnsHosts: ['acme.jeffistores.in', 'admin-acme.jeffistores.in', 'invoice-acme.jeffistores.in'] },
       }))
+      const ensureEc2 = vi.spyOn(provider, 'ensureAppInstance')
       const ensure = vi.spyOn(provider, 'ensureDns')
       const remove = vi.spyOn(provider, 'removeDns')
       const { reprovisionDns } = await import('@/lib/provisioning/steps')
       const out = await reprovisionDns('t-1', provider)
       expect(out.ok).toBe(true)
-      expect(out.added).toEqual(['quotation-acme.jeffistores.in', 'purchaseorder-acme.jeffistores.in'])
+      // growth is a dedicated plan; basic used the pool → a dedicated EC2 is provisioned
+      // and the tenant's serving IP is persisted.
+      expect(ensureEc2).toHaveBeenCalled()
+      expect(reg.writeTenantEc2).toHaveBeenCalledWith('t-1', expect.any(String))
+      // Compute moved → every desired host is repointed at the new target (added = full set).
+      const desired = ['acme.jeffistores.in', 'admin-acme.jeffistores.in', 'invoice-acme.jeffistores.in',
+        'quotation-acme.jeffistores.in', 'purchaseorder-acme.jeffistores.in']
+      expect(out.added).toEqual(desired)
       expect(out.removed).toEqual([])
-      expect(ensure).toHaveBeenCalledWith(['quotation-acme.jeffistores.in', 'purchaseorder-acme.jeffistores.in'])
+      expect(ensure).toHaveBeenCalledWith(desired, expect.any(String))
       expect(remove).not.toHaveBeenCalled()
       // Persists the now-authoritative host set.
       expect(lastPatch().created_resources.dnsHosts).toContain('quotation-acme.jeffistores.in')

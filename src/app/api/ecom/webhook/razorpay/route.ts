@@ -61,13 +61,12 @@ export async function POST(request: NextRequest) {
       break
 
     case 'subscription.charged':
-      // First (or recurring) charge succeeded → tenant goes live.
-      await setSubscriptionStatus(tenant.id, 'active', 'active')
-      // On the FIRST charge (tenant was provisioning): notify the owner + kick the
-      // provisioning engine to actually stand up the tenant's infra. The owner super_admin
-      // + mTLS cert is created later, when the provisioning job reaches 'done' (the tenant
-      // DB doesn't exist until then) — see the internal advance route.
-      if (tenant.status !== 'active') {
+      // First (or recurring) charge succeeded. Mark the SUBSCRIPTION active. On the FIRST charge
+      // (tenant still awaiting_payment / not yet live), flip to 'provisioning' and kick the
+      // engine — this is the ONLY place real provisioning starts. Do NOT set 'active' here;
+      // only the engine's activate step does that, after infra exists + the host verifies.
+      if (tenant.status !== 'active' && tenant.status !== 'provisioning') {
+        await setSubscriptionStatus(tenant.id, 'active', 'provisioning')
         const pool = controlPlanePool()
         const ownerRow = await pool.query(
           `SELECT o.id, o.email, o.name, t.display_name, t.slug, t.billing_interval,
@@ -97,6 +96,9 @@ export async function POST(request: NextRequest) {
             reason: 'first_payment',
           }).catch(() => {})
         }
+      } else {
+        // Recurring charge on an already-live tenant — just keep the subscription active.
+        await setSubscriptionStatus(tenant.id, 'active')
       }
       break
 

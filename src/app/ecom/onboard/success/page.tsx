@@ -26,17 +26,17 @@ export default async function OnboardSuccessPage({ searchParams }: { searchParam
   const tenants = await getOwnerTenants(owner.id)
   const tenant = tenantSlug ? tenants.find((t) => t.slug === tenantSlug) : tenants[0]
 
-  if (tenant && tenant.razorpay_subscription_id && tenant.status !== 'active') {
+  if (tenant && tenant.razorpay_subscription_id && tenant.status !== 'active' && tenant.status !== 'provisioning') {
     const sub = await getSubscription(tenant.razorpay_subscription_id).catch(() => null)
     // Razorpay subscription statuses that mean payment was collected
     const paid = sub && ['active', 'authenticated', 'charged'].includes(sub.status)
     if (paid) {
-      await setSubscriptionStatus(tenant.id, 'active', 'active')
-      // Kick the provisioning engine. This is the reliable path for local dev (no webhook)
-      // and a fallback when the webhook is delayed; triggerProvisioning + enqueueProvisioning
-      // are idempotent, so a duplicate with the webhook is harmless.
+      // Payment confirmed → flip to 'provisioning' and kick the engine (only place provisioning
+      // starts). Do NOT set 'active' — only the engine's activate step does, after infra exists.
+      // Reliable local path (no webhook) + webhook fallback; enqueueProvisioning is idempotent.
+      await setSubscriptionStatus(tenant.id, 'active', 'provisioning')
       const restoreFromKey = await resolveRestoreKey(tenant.id, tenant.slug)
-      triggerProvisioning({
+      await triggerProvisioning({
         action: 'provision',
         tenantId: tenant.id,
         slug: tenant.slug,

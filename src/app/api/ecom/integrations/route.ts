@@ -44,7 +44,7 @@ export async function GET(request: NextRequest) {
 const PostSchema = z.object({
   tenantId: z.string().uuid(),
   provider: z.enum(PROVIDERS),
-  config: z.record(z.any()),
+  config: z.record(z.string(), z.any()),
 })
 
 export async function POST(request: NextRequest) {

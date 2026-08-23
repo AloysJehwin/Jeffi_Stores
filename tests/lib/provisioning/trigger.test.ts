@@ -82,12 +82,16 @@ describe('triggerProvisioning', () => {
     expect(out.ok).toBe(true)
   })
 
-  it('AWS provision is enqueue-only (does not drive inline)', async () => {
+  it('AWS provision drives inline until the job parks on a poll step', async () => {
     process.env.PROVISIONING_PROVIDER = 'aws'
-    reg.enqueueProvisioning.mockResolvedValue({ id: 'j', status: 'pending', created_resources: {} })
+    reg.enqueueProvisioning.mockResolvedValue({ id: 'j', status: 'pending', step: 'preflight', created_resources: {} })
+    // Job stays on the SAME step, still pending → the inline loop hands off to the worker.
+    reg.getProvisioningJob.mockResolvedValue({ id: 'j', status: 'pending', step: 'wait_db_available' })
+    steps.advanceProvisioningJob.mockResolvedValue('pending')
     const { triggerProvisioning } = await import('@/lib/provisioning/trigger')
     const out = await triggerProvisioning({ action: 'provision', tenantId: 't-1', slug: 'acme', plan: 'basic', ownerId: 'o-1' })
-    expect(steps.advanceProvisioningJob).not.toHaveBeenCalled()
+    // AWS now drives inline (bounded) rather than being pure enqueue-only.
+    expect(steps.advanceProvisioningJob).toHaveBeenCalled()
     expect(out).toMatchObject({ ok: true, jobStatus: 'pending' })
   })
 })

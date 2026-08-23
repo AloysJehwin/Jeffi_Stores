@@ -161,13 +161,13 @@ describe('GET /api/admin/audit', () => {
     expect(body.error).toMatch(/insufficient/i)
   })
 
-  it('returns 200 when role is super_admin (bypasses scope check)', async () => {
+  it('returns 200 when role is super_admin (via hasScope grant)', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
-    // hasScope should NOT be called for super_admin
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest()
     const res = await GET(req)
     expect(res.status).toBe(200)
-    expect(mockHasScope).not.toHaveBeenCalled()
+    expect(mockHasScope).toHaveBeenCalledWith('super_admin', superAdminPayload.scopes, 'audit:read')
     const body = await res.json()
     expect(body).toHaveProperty('events')
     expect(body).toHaveProperty('total')
@@ -187,6 +187,7 @@ describe('GET /api/admin/audit', () => {
 
   it('returns 200 with no filters — no WHERE clause in query', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest()
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -198,6 +199,7 @@ describe('GET /api/admin/audit', () => {
 
   it('returns 200 with entity_type filter', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest({ entity_type: 'product' })
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -208,6 +210,7 @@ describe('GET /api/admin/audit', () => {
 
   it('returns 200 with action filter', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest({ action: 'update' })
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -218,6 +221,7 @@ describe('GET /api/admin/audit', () => {
 
   it('returns 200 with admin_id filter', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest({ admin_id: 'admin-1' })
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -228,6 +232,7 @@ describe('GET /api/admin/audit', () => {
 
   it('returns 200 with all three filters applied', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest({ entity_type: 'product', action: 'update', admin_id: 'admin-1' })
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -241,6 +246,7 @@ describe('GET /api/admin/audit', () => {
 
   it('applies pagination params — page=2, pageSize=100', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest({ page: '2', pageSize: '100' })
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -255,6 +261,7 @@ describe('GET /api/admin/audit', () => {
 
   it('clamps pageSize to maximum of 200', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest({ pageSize: '9999' })
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -264,6 +271,7 @@ describe('GET /api/admin/audit', () => {
 
   it('clamps pageSize to minimum of 10', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest({ pageSize: '1' })
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -273,6 +281,7 @@ describe('GET /api/admin/audit', () => {
 
   it('clamps page to minimum of 1', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     const req = makeGetRequest({ page: '-5' })
     const res = await GET(req)
     expect(res.status).toBe(200)
@@ -282,6 +291,7 @@ describe('GET /api/admin/audit', () => {
 
   it('returns total from queryCount', async () => {
     mockAuth.mockResolvedValue(superAdminPayload)
+    mockHasScope.mockReturnValue(true)
     mockQueryCount.mockResolvedValue(42)
     const req = makeGetRequest()
     const res = await GET(req)

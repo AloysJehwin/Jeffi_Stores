@@ -96,10 +96,18 @@ export async function register() {
     setInterval(() => callCron('daily_briefing', '/api/cron/daily-briefing', 'GET', ONE_DAY - 60_000), ONE_DAY)
   }, 180_000)
 
+  // Provisioning worker — advances every active provisioning job one step per tick. The trigger
+  // drives the cheap control-plane steps inline; this worker carries a job across the ~10-min
+  // RDS wait and the remaining steps (a post-response setTimeout self-fetch is unreliable in the
+  // Next server model, so an out-of-band driver is required).
+  const FORTY_FIVE_SEC = 45 * 1000
+  setTimeout(() => {
+    callCron('provisioning_worker', '/api/internal/provisioning/worker', 'GET', FORTY_FIVE_SEC - 5_000)
+    setInterval(() => callCron('provisioning_worker', '/api/internal/provisioning/worker', 'GET', FORTY_FIVE_SEC - 5_000), FORTY_FIVE_SEC)
+  }, 90_000)
+
   // Provisioning drift sweep — flips any tenant left active with no live infra to suspended.
-  // Replaces the deleted GH-Actions/cron provisioning-worker schedule. Provisioning ITSELF is
-  // event-driven (owner portal / payment webhook → self-advancing loop), so the only thing
-  // that still needs a schedule is this reconciliation, which does not need fine resolution.
+  // The only thing needing coarse scheduling beyond the worker above; hourly is fine.
   setTimeout(() => {
     callCron('provisioning_reconcile', '/api/internal/provisioning/reconcile', 'POST', ONE_HOUR - 60_000)
     setInterval(() => callCron('provisioning_reconcile', '/api/internal/provisioning/reconcile', 'POST', ONE_HOUR - 60_000), ONE_HOUR)

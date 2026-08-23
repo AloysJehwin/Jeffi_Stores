@@ -26,14 +26,11 @@ describe('buildProductSearchClause', () => {
     expect(result).toEqual({ clause: 'TRUE', params: [], nextIdx: 1 })
   })
 
-  it('builds clause for special-char-only input (tsQuery still produces ":*")', () => {
-    // '!!!' → each word stripped of non-word chars → '' + ':*' = ':*', which is truthy
-    // '!!!' strips to empty, so searchWords() yields no per-word fuzzy params.
+  it('returns TRUE for special-char-only input (tsQuery strips to empty)', () => {
+    // '!!!' → tsQuery strips all non-word chars per word, filters empties → '' (falsy).
+    // buildProductSearchClause early-returns TRUE when tsq is empty.
     const result = buildProductSearchClause('!!!', NAME, SKU, VEC, 1)
-    expect(result.nextIdx).toBe(4)
-    expect(result.params[0]).toBe(':*')
-    expect(result.params[1]).toBe('!!!')
-    expect(result.params[2]).toBe('!!!%')
+    expect(result).toEqual({ clause: 'TRUE', params: [], nextIdx: 1 })
   })
 
   it('builds clause for a single word at startIdx=1', () => {
@@ -120,11 +117,12 @@ describe('buildProductSearchRank', () => {
     expect(result.rank).toContain('$11')
   })
 
-  it('uses ":*" tsQuery for special-char-only input (never falls back to "\'\'")', () => {
-    // '!!!' → stripped word = '' + ':*' = ':*' (truthy, kept); no per-word params
+  it('uses empty-tsq fallback for special-char-only input (tsq strips to "")', () => {
+    // '!!!' → tsQuery strips per-word non-word chars, filters empties → '' (falsy);
+    // words=[] too. rank params: [stem, substring, tsq||"''", whole-query sim].
     const result = buildProductSearchRank('!!!', NAME, VEC, 1)
-    // params: [stem, substring, tsq, whole-query sim] — tsq at index 2
-    expect(result.params[2]).toBe(':*')
+    // tsq is empty → falls back to "''" at params[2]
+    expect(result.params[2]).toBe("''")
   })
 
   it('builds correct tsQuery for multi-word input', () => {
@@ -223,22 +221,20 @@ describe('buildVectorSearchClause', () => {
     expect(result.clause).toContain('$6')
   })
 
-  it('builds vector clause for special-char-only input (tsq is ":*", not empty)', () => {
-    // '!!!' → tsq = ':*' (truthy), so the vector part IS added
+  it('builds vector clause for special-char-only input (tsq strips to empty, skipped)', () => {
+    // '!!!' → tsq = '' (falsy), so the vector part is NOT added; no other cols → TRUE
     const result = buildVectorSearchClause('!!!', VEC, [], [], 1)
-    expect(result.params).toEqual([':*'])
-    expect(result.nextIdx).toBe(2)
-    expect(result.clause).toContain(`${VEC} @@ to_tsquery('simple', $1)`)
+    expect(result).toEqual({ clause: 'TRUE', params: [], nextIdx: 1 })
   })
 
   it('builds all parts for special-char-only input with trgm/exact cols', () => {
     const result = buildVectorSearchClause('!!!', VEC, ['c.name'], ['c.code'], 1)
-    // tsq=':*', trgm param='!!!', exact param='%!!!%'
-    expect(result.params).toEqual([':*', '!!!', '%!!!%'])
-    expect(result.nextIdx).toBe(4)
-    expect(result.clause).toContain(`${VEC} @@ to_tsquery('simple', $1)`)
-    expect(result.clause).toContain('similarity(c.name, $2::text) > 0.12')
-    expect(result.clause).toContain('c.code ILIKE $3')
+    // tsq='' (skipped), trgm param='!!!', exact param='%!!!%'
+    expect(result.params).toEqual(['!!!', '%!!!%'])
+    expect(result.nextIdx).toBe(3)
+    expect(result.clause).not.toContain('to_tsquery')
+    expect(result.clause).toContain('similarity(c.name, $1::text) > 0.12')
+    expect(result.clause).toContain('c.code ILIKE $2')
   })
 })
 
@@ -385,20 +381,11 @@ describe('buildProductSearchRank – empty tsq fallback', () => {
   const NAME = 'p.name'
   const VEC = 'p.search_vector'
 
-  it("uses \"''\" as tsq when every word strips to empty (pure punctuation word)", () => {
-    // A string that trims to non-empty but whose single word strips all non-word chars
-    // leaving an empty string: tsQuery('') produces '' which is falsy → tsq || "''"
-    // We can achieve this with a string of only non-word chars that isn't caught by the
-    // early `if (!q)` guard.  The word '...' → replace(/[^\w]/g,'') → '' → '' + ':*' = ':*'
-    // Actually that gives ':*' which is truthy.  The only way to get falsy tsq from
-    // buildProductSearchRank is if tsQuery returns ''.  tsQuery returns '' only if
-    // .filter(Boolean) after map removes all words — which happens when all mapped words
-    // are ':*' but the SECOND filter(Boolean) after map keeps ':*' (it's truthy).
-    // So in practice tsq is never '' from buildProductSearchRank with a non-empty q.
-    // Verify the "|| '\''" branch is the fallback for the special-char case.
+  it("uses \"''\" as tsq when a word strips to empty (pure punctuation word)", () => {
+    // '!!!' → tsQuery strips all non-word chars per word then filters empties → ''
+    // (falsy), so the `tsq || "''"` fallback fires and params[2] === "''".
     const result = buildProductSearchRank('!!!', NAME, VEC, 1)
-    // tsq = ':*' (truthy), so fallback branch NOT taken — still works
-    expect(result.params[2]).toBe(':*')
+    expect(result.params[2]).toBe("''")
     expect(result.nextIdx).toBe(5)
   })
 
@@ -417,15 +404,12 @@ describe('buildVectorSearchClause – tsq falsy path', () => {
   const VEC = 'c.search_vector'
 
   it('omits tsq part but still adds trgm parts when tsq is empty', () => {
-    // To get tsq='' we need tsQuery to return ''.
-    // tsQuery joins words that become '' + ':*' = ':*' — that IS truthy in filter(Boolean).
-    // There is no code path that produces tsq='' from non-empty input without modification.
-    // The if (tsq) branch in buildVectorSearchClause IS tested by special chars ('!!!')
-    // producing ':*' (truthy). The ELSE (falsy tsq) path is unreachable in practice.
-    // Confirm '!!!' produces truthy tsq and the vector clause IS included:
+    // '!!!' → tsQuery strips per-word non-word chars, filters empties → '' (falsy),
+    // so the `if (tsq)` vector branch is skipped and only the trgm part is built.
     const result = buildVectorSearchClause('!!!', VEC, ['c.name'], [], 1)
-    expect(result.clause).toContain(`${VEC} @@ to_tsquery`)
-    expect(result.params[0]).toBe(':*')
+    expect(result.clause).not.toContain('to_tsquery')
+    expect(result.clause).toContain('similarity(c.name, $1::text) > 0.12')
+    expect(result.params[0]).toBe('!!!')
   })
 
   it('clause is TRUE when input is whitespace-only (no parts built)', () => {

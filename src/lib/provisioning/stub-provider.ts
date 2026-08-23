@@ -13,6 +13,8 @@ export class StubProvisioningProvider implements ProvisioningProvider {
   private backups = new Map<string, Buffer>()   // endpoint -> last dumped archive
   private restored = new Map<string, Buffer>()   // endpoint -> last restored archive
   private dns = new Set<string>()                 // tenant hostnames pointed at the app
+  private instances = new Map<string, string>()   // instanceId -> public IP (EC2 app instances)
+  private instanceSeq = 0
   // How many getDbEndpoint polls before "available" (small so tests are fast).
   constructor(private availableAfterPolls = 2) {}
 
@@ -56,7 +58,7 @@ export class StubProvisioningProvider implements ProvisioningProvider {
 
   async ensureBucket(bucket: string): Promise<void> { this.buckets.add(bucket) }
 
-  async ensureDns(hostnames: string[]): Promise<void> { hostnames.forEach((h) => this.dns.add(h)) }
+  async ensureDns(hostnames: string[], _targetIp?: string): Promise<void> { hostnames.forEach((h) => this.dns.add(h)) }
   async removeDns(hostnames: string[]): Promise<void> { hostnames.forEach((h) => this.dns.delete(h)) }
 
   async stopDbInstance(dbInstanceId: string): Promise<void> { this.stopped.add(dbInstanceId) }
@@ -72,6 +74,15 @@ export class StubProvisioningProvider implements ProvisioningProvider {
   }
   async deleteParamGroup(paramGroup: string): Promise<void> { this.paramGroups.delete(paramGroup) }
 
+  async ensureAppInstance(args: { name: string; instanceType: string; userData?: string }): Promise<{ instanceId: string; ip: string }> {
+    const instanceId = `i-stub${String(++this.instanceSeq).padStart(6, '0')}`
+    const ip = `52.0.0.${this.instanceSeq}`
+    this.instances.set(instanceId, ip)
+    return { instanceId, ip }
+  }
+  async deleteAppInstance(instanceId: string): Promise<void> { this.instances.delete(instanceId) }
+  async isInstanceGone(instanceId: string): Promise<boolean> { return !this.instances.has(instanceId) }
+
   // test helpers
   isStopped(id: string) { return this.stopped.has(id) }
   hasBucket(b: string) { return this.buckets.has(b) }
@@ -79,4 +90,6 @@ export class StubProvisioningProvider implements ProvisioningProvider {
   wasBackedUp(endpoint: string) { return this.backups.has(endpoint) }
   wasRestored(endpoint: string) { return this.restored.has(endpoint) }
   hasDns(host: string) { return this.dns.has(host) }
+  hasInstance(id: string) { return this.instances.has(id) }
+  instanceCount() { return this.instances.size }
 }

@@ -10,6 +10,7 @@ vi.mock('@/lib/db', () => ({
 }))
 vi.mock('@/lib/scopes', () => ({
   ALL_SCOPE_KEYS: ['orders', 'products', 'invoices', 'inventory', 'mailer', 'customers'],
+  isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
