@@ -996,10 +996,17 @@ export async function sendAdminCertificateEmail(
   p12Password: string,
   serialNumber: string,
   expiresAt: string,
-  role: string
+  role: string,
+  tenant?: { slug: string; storeName: string }
 ) {
-  const from = `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`
-  const subject = 'Your Admin Certificate - Jeffi Stores'
+  // Tenant owners are an ecom communication, so they come from ecommerce@; the platform's
+  // own admin certs keep the existing admin sender.
+  const from = tenant
+    ? `"Jeffi Commerce" <${process.env.ECOM_FROM_EMAIL || 'ecommerce@jeffistores.in'}>`
+    : `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`
+  const subject = tenant
+    ? `Your admin certificate for ${tenant.storeName}`
+    : 'Your Admin Certificate - Jeffi Stores'
   const certFileSlug = (displayName || email).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-|-$/g, '') || 'admin'
   const html = `
       <!DOCTYPE html>

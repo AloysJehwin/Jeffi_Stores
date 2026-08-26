@@ -1,4 +1,5 @@
-import { generateClientCertificate } from './certificates'
+import crypto from 'crypto'
+import { issueTenantAdminCert } from './tenant-ca'
 import { sendAdminCertificateEmail } from './email'
 import { runWithTenantContext } from './tenant-context'
 import { query, queryOne } from './db'
@@ -13,7 +14,7 @@ import type { TenantContext } from './tenant-context'
  * 1. Resolve tenant infra from control plane
  * 2. Run inside TenantContext so getPool() → tenant's RDS
  * 3. Create user + admin row (role='super_admin', all scopes)
- * 4. Generate mTLS client certificate
+ * 4. Issue an mTLS client certificate from the TENANT's own CA
  * 5. Email cert + password to owner
  *
  * Idempotent — skips if super_admin already exists for this email.
@@ -67,16 +68,23 @@ export async function provisionTenantOwnerAdmin(opts: {
       )
       const adminId = adminRow!.id
 
-      // 3. Generate mTLS client certificate
+      // 3. Issue an mTLS client cert from this tenant's OWN CA, so it can never
+      //    authenticate against another tenant's admin panel.
       const certCN = opts.ownerEmail.replace(/[^a-zA-Z0-9._@-]/g, '_')
-      const cert = await generateClientCertificate(certCN, adminId)
+      const cert = await issueTenantAdminCert({
+        tenantId: opts.tenantId,
+        slug: opts.tenantSlug,
+        commonName: certCN,
+        issuedTo: opts.ownerEmail,
+      })
+      const downloadToken = crypto.randomUUID()
 
       await query(
         `INSERT INTO admin_certificates
            (admin_id, serial_number, common_name, expires_at, download_token, p12_data, p12_password)
          VALUES ($1,$2,$3,$4,$5,$6,$7)
          ON CONFLICT DO NOTHING`,
-        [adminId, cert.serialNumber, certCN, cert.expiresAt, cert.downloadToken, cert.p12Buffer, cert.p12Password]
+        [adminId, cert.serial, certCN, cert.expiresAt, downloadToken, cert.p12Buffer, cert.p12Password]
       )
 
       // 4. Email cert to owner
@@ -85,9 +93,10 @@ export async function provisionTenantOwnerAdmin(opts: {
         opts.ownerName ?? opts.ownerEmail,
         cert.p12Buffer,
         cert.p12Password,
-        cert.serialNumber,
+        cert.serial,
         cert.expiresAt.toISOString(),
-        'super_admin'
+        'super_admin',
+        { slug: opts.tenantSlug, storeName: opts.tenantSlug },
       )
     })
 
