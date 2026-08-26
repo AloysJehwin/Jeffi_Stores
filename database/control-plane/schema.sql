@@ -416,7 +416,8 @@ CREATE TABLE IF NOT EXISTS public.scheduled_social_posts (
     platform      character varying(16) NOT NULL,          -- 'fb' | 'ig' | 'ig_reel'
     caption       text,
     hashtags      text,                                    -- space-joined '#tag' string
-    image_url     text,                                    -- public URL handed to Meta (card/product)
+    image_url     text,                                    -- public URL handed to Meta (card/product); first/primary image
+    image_urls    text[],                                  -- additional images for a carousel post (IG) / multi-photo post (FB)
     video_url     text,                                    -- for ig_reel
     scheduled_at  timestamp with time zone NOT NULL DEFAULT now(),
     status        character varying(16) NOT NULL DEFAULT 'pending', -- pending|publishing|posted|failed

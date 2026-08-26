@@ -79,6 +79,7 @@ export default async function AdminLayout({
     { href: '/admin/ecom/customers', label: 'Customers', scope: 'ecom_customers:read', group: 'Ecom Store', platformAdminOnly: true },
     { href: '/admin/ecom/instances', label: 'Instances', scope: 'ecom_instances:read', group: 'Ecom Store', platformAdminOnly: true },
     { href: '/admin/ecom/store-status', label: 'Store Status', scope: 'ecom_customers:read', group: 'Ecom Store', platformAdminOnly: true },
+    { href: '/admin/ecom/provisioning', label: 'Provisioning', scope: 'ecom_instances:read', group: 'Ecom Store', platformAdminOnly: true },
     { href: '/admin/ecom/billing', label: 'Billing', scope: 'ecom_billing:read', group: 'Ecom Store', platformAdminOnly: true },
     { href: '/admin/audit', label: 'Audit Log', scope: 'audit:read', group: 'Settings' },
     { href: '/admin/service-accounts', label: 'Service Accounts', scope: 'service_accounts:read', group: 'Settings' },

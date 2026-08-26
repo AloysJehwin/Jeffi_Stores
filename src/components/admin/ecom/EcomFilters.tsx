@@ -6,7 +6,10 @@ import AdminSelect from '@/components/admin/AdminSelect'
 
 // URL-param filter bar for the ecom list pages. Status + plan (AdminSelect dropdowns)
 // + a debounced search box. Writes to the query string; server pages read searchParams.
-export default function EcomFilters({ showPlan = true }: { showPlan?: boolean }) {
+export default function EcomFilters({ showPlan = true, statusOptions }: {
+  showPlan?: boolean
+  statusOptions?: { value: string; label: string }[]
+}) {
   const router = useRouter()
   const pathname = usePathname()
   const params = useSearchParams()
@@ -27,7 +30,7 @@ export default function EcomFilters({ showPlan = true }: { showPlan?: boolean })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [q])
 
-  const STATUS_OPTS = [
+  const STATUS_OPTS = statusOptions ?? [
     { value: '', label: 'All statuses' },
     { value: 'active', label: 'Active' },
     { value: 'provisioning', label: 'Provisioning' },

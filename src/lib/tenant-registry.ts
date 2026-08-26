@@ -98,14 +98,34 @@ export function slugFromHost(hostname: string): { slug: string | null; isCustomD
   }
   if (host === ROOT_DOMAIN) return { slug: null, isCustomDomain: false } // apex = platform
   const label = host.slice(0, host.length - ROOT_DOMAIN.length - 1) // strip ".jeffistores.in"
-  // App subdomains like admin-{tenant} / invoice-{tenant}: strip the app prefix.
-  const appPrefixed = label.match(/^(admin|invoice|quotation|purchaseorder|www)-(.+)$/)
-  const bare = appPrefixed ? appPrefixed[2] : label
+  // App subdomains like admin-{tenant} / invoice-{tenant}, plus {tenant}.business.
+  const businessScoped = label.match(/^(.+)\.business$/)
+  const appPrefixed = label.match(/^(admin|invoice|quotation|purchaseorder|forms|www)-(.+)$/)
+  const bare = businessScoped ? businessScoped[1] : appPrefixed ? appPrefixed[2] : label
   // Reserved single-label app hosts (admin. / business. / forms. etc.) = platform, not tenant.
   if (RESERVED_LABELS.has(bare)) return { slug: null, isCustomDomain: false }
   // A multi-level label (e.g. "a.b") isn't a valid single tenant slug.
   if (bare.includes('.')) return { slug: null, isCustomDomain: false }
   return { slug: bare, isCustomDomain: false }
+}
+
+export type HostApp = 'admin' | 'invoice' | 'quotation' | 'purchaseorder' | 'forms' | 'business'
+
+const APP_PREFIXES: HostApp[] = ['admin', 'invoice', 'quotation', 'purchaseorder', 'forms', 'business']
+
+/** Which app surface a host addresses: `admin.` (platform) and `admin-{slug}.` (tenant) both → 'admin'. */
+export function appFromHost(hostname: string): HostApp | null {
+  const host = hostname.toLowerCase().split(':')[0].trim()
+  const underRoot = host.endsWith('.' + ROOT_DOMAIN)
+  const label = underRoot ? host.slice(0, host.length - ROOT_DOMAIN.length - 1) : host
+  const parts = label.split('.')
+  if (underRoot && parts.length === 2 && parts[1] === 'business') return 'business'
+  const first = parts[0]
+  for (const p of APP_PREFIXES) {
+    if (first === p) return p
+    if (underRoot && first.startsWith(p + '-')) return p
+  }
+  return null
 }
 
 async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Promise<TenantContext | null> {
@@ -159,15 +179,16 @@ export async function resolveTenantFromHost(hostname: string): Promise<TenantCon
   if (cached && cached.expires > now) return cached.ctx
 
   let ctx: TenantContext | null = null
+  const { slug, isCustomDomain } = slugFromHost(key)
   try {
-    const { slug, isCustomDomain } = slugFromHost(key)
     if (slug) {
       ctx = await lookupTenant('slug', slug)
     } else if (isCustomDomain) {
       ctx = await lookupTenant('custom_domain', key)
     }
-  } catch {
-    // Fail open: on any control-plane error, treat as no tenant (platform default).
+  } catch (err) {
+    // Fail closed on tenant hosts: returning null here would serve the platform DB.
+    if (slug || isCustomDomain) throw err
     ctx = null
   }
   cache.set(key, { ctx, expires: now + CACHE_TTL_MS })
@@ -440,6 +461,7 @@ export interface ProvisioningJob {
   id: string; tenant_id: string; step: string; status: string
   attempts: number; last_error: string | null; created_resources: Record<string, any>
   next_attempt_at?: string | null
+  created_at: string; updated_at: string
 }
 
 /** Create (or return existing pending) provisioning job for a tenant. */
@@ -464,6 +486,56 @@ export async function activeProvisioningJobs(): Promise<ProvisioningJob[]> {
        AND (next_attempt_at IS NULL OR next_attempt_at <= now())
      ORDER BY created_at`)
   return res.rows as ProvisioningJob[]
+}
+
+export interface ProvisioningJobRow extends ProvisioningJob {
+  slug: string
+  display_name: string
+  tenant_status: string
+  plan: string | null
+}
+
+/** Latest provisioning job per tenant, for the provisioning list page. */
+export async function listProvisioningJobs(filters?: { status?: string; q?: string }): Promise<ProvisioningJobRow[]> {
+  const pool = controlPlanePool()
+  const where: string[] = []
+  const args: any[] = []
+  if (filters?.status) { args.push(filters.status); where.push(`j.status = $${args.length}`) }
+  if (filters?.q) { args.push(`%${filters.q.toLowerCase()}%`); where.push(`(lower(t.display_name) LIKE $${args.length} OR lower(t.slug) LIKE $${args.length})`) }
+  const res = await pool.query(
+    `SELECT DISTINCT ON (j.tenant_id) j.*, t.slug, t.display_name, t.status AS tenant_status, p.slug AS plan
+     FROM provisioning_jobs j
+     JOIN tenants t ON t.id = j.tenant_id
+     LEFT JOIN plans p ON p.id = t.plan_id
+     ${where.length ? 'WHERE ' + where.join(' AND ') : ''}
+     ORDER BY j.tenant_id, j.created_at DESC`,
+    args
+  )
+  return (res.rows as ProvisioningJobRow[]).sort(
+    (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+  )
+}
+
+export async function provisioningSummary(): Promise<{ total: number; running: number; failed: number; done: number }> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT count(*)::int AS total,
+            count(*) FILTER (WHERE status IN ('pending','running'))::int AS running,
+            count(*) FILTER (WHERE status='failed')::int AS failed,
+            count(*) FILTER (WHERE status='done')::int AS done
+     FROM (SELECT DISTINCT ON (tenant_id) status FROM provisioning_jobs ORDER BY tenant_id, created_at DESC) s`)
+  return res.rows[0]
+}
+
+export async function getProvisioningJobById(jobId: string): Promise<ProvisioningJobRow | null> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT j.*, t.slug, t.display_name, t.status AS tenant_status, p.slug AS plan
+     FROM provisioning_jobs j
+     JOIN tenants t ON t.id = j.tenant_id
+     LEFT JOIN plans p ON p.id = t.plan_id
+     WHERE j.id = $1`, [jobId])
+  return (res.rows[0] as ProvisioningJobRow) || null
 }
 
 export async function getProvisioningJob(tenantId: string): Promise<ProvisioningJob | null> {
@@ -934,6 +1006,7 @@ export interface ScheduledSocialPost {
   caption: string | null
   hashtags: string | null
   image_url: string | null
+  image_urls: string[] | null
   video_url: string | null
   scheduled_at: string
   status: string
@@ -950,16 +1023,18 @@ export async function enqueueSocialPost(p: {
   caption?: string | null
   hashtags?: string | null
   imageUrl?: string | null
+  imageUrls?: string[] | null
   videoUrl?: string | null
   scheduledAt?: Date | null
 }): Promise<ScheduledSocialPost> {
   const pool = controlPlanePool()
   const r = await pool.query(
     `INSERT INTO scheduled_social_posts
-       (tenant_id, product_id, platform, caption, hashtags, image_url, video_url, scheduled_at)
-     VALUES ($1,$2,$3,$4,$5,$6,$7, COALESCE($8, now())) RETURNING *`,
+       (tenant_id, product_id, platform, caption, hashtags, image_url, image_urls, video_url, scheduled_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8, COALESCE($9, now())) RETURNING *`,
     [p.tenantId, p.productId ?? null, p.platform, p.caption ?? null, p.hashtags ?? null,
-     p.imageUrl ?? null, p.videoUrl ?? null, p.scheduledAt ? p.scheduledAt.toISOString() : null],
+     p.imageUrl ?? null, p.imageUrls?.length ? p.imageUrls : null, p.videoUrl ?? null,
+     p.scheduledAt ? p.scheduledAt.toISOString() : null],
   )
   return r.rows[0] as ScheduledSocialPost
 }
@@ -995,7 +1070,7 @@ export async function getSocialPost(id: string): Promise<ScheduledSocialPost | n
 
 export async function updateSocialPost(
   id: string,
-  patch: { status?: string; postedId?: string | null; lastError?: string | null; bumpAttempts?: boolean },
+  patch: { status?: string; postedId?: string | null; lastError?: string | null; caption?: string; bumpAttempts?: boolean },
 ): Promise<void> {
   const pool = controlPlanePool()
   const sets: string[] = ['updated_at = now()']
@@ -1003,6 +1078,7 @@ export async function updateSocialPost(
   if (patch.status !== undefined) { args.push(patch.status); sets.push(`status=$${args.length}`) }
   if (patch.postedId !== undefined) { args.push(patch.postedId); sets.push(`posted_id=$${args.length}`) }
   if (patch.lastError !== undefined) { args.push(patch.lastError); sets.push(`last_error=$${args.length}`) }
+  if (patch.caption !== undefined) { args.push(patch.caption); sets.push(`caption=$${args.length}`) }
   if (patch.bumpAttempts) sets.push('attempts = attempts + 1')
   args.push(id)
   await pool.query(`UPDATE scheduled_social_posts SET ${sets.join(', ')} WHERE id=$${args.length}`, args)

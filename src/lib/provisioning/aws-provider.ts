@@ -76,8 +76,14 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     // LOCAL-TEST ONLY: TENANT_RDS_PUBLIC_TEST=true creates the tenant RDS publicly accessible so
     // a laptop outside the VPC can run load_schema/backup without manually flipping visibility +
     // SG each run. NEVER set in production — prod tenant DBs must stay PubliclyAccessible:false
-    // (the default when the flag is absent). Pair with a one-time SG rule allowing your IP on 5432.
+    // (the default when the flag is absent).
     const publicTest = process.env.TENANT_RDS_PUBLIC_TEST === 'true'
+    // Public accessibility alone is not enough: the RDS security group must also admit this
+    // machine's IP on 5432, or load_schema/restore/backup hang until the 20s connect timeout.
+    // Under the same flag, self-authorize the current public IP so a local run is turnkey.
+    // Best-effort — a failure here is logged, not fatal: the DB may still be reachable (IP
+    // already allowed, or running in-VPC), and createDbInstance must stay retry-safe.
+    if (publicTest) await this.openLocalRdsAccess()
     try {
       await this.rds.send(new CreateDBInstanceCommand({
         DBInstanceIdentifier: args.dbInstanceId,
@@ -102,6 +108,34 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
       if (!isAlreadyExists(err)) throw err
     }
     return { dbInstanceId: args.dbInstanceId }
+  }
+
+  /**
+   * LOCAL-TEST ONLY. Authorize this machine's public IP on 5432 in the tenant RDS security
+   * group, so a laptop outside the VPC can complete the data-plane steps (load_schema /
+   * restore_data / backup). Only ever called behind TENANT_RDS_PUBLIC_TEST — never in prod.
+   *
+   * Never throws: provisioning must not fail because the SG could not be widened (the caller
+   * may already have access, or be running in-VPC where none of this is needed).
+   */
+  private async openLocalRdsAccess(): Promise<void> {
+    try {
+      const { currentPublicIp, authorizeSgIngress } = await import('../ec2-client')
+      const ip = await currentPublicIp()
+      if (!ip) {
+        process.stderr.write('[provisioning] TENANT_RDS_PUBLIC_TEST: could not detect public IP; skipping SG self-authorize\n')
+        return
+      }
+      await authorizeSgIngress({
+        groupId: RDS_SG,
+        cidr: `${ip}/32`,
+        port: 5432,
+        description: `jeffi-local-test ${new Date().toISOString().slice(0, 10)} (safe to revoke)`,
+      })
+      process.stderr.write(`[provisioning] TENANT_RDS_PUBLIC_TEST: authorized ${ip}/32 on 5432 in ${RDS_SG}\n`)
+    } catch (err: any) {
+      process.stderr.write(`[provisioning] TENANT_RDS_PUBLIC_TEST: SG self-authorize failed (continuing): ${err?.message}\n`)
+    }
   }
 
   async getDbEndpoint(dbInstanceId: string): Promise<string | null> {

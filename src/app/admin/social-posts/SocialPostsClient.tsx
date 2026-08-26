@@ -2,6 +2,20 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import AdminSelect from '@/components/admin/AdminSelect'
+import AdminTypeahead from '@/components/admin/AdminTypeahead'
+import AIEnrichButton from '@/components/admin/AIEnrichButton'
+import DateTimePicker from '@/components/ui/DateTimePicker'
+
+interface SelectedProduct {
+  id: string
+  name: string
+  short_description: string | null
+  description: string | null
+  base_price: number | null
+  stock_status: string | null
+  product_images?: { image_url: string; thumbnail_url?: string; is_primary?: boolean }[]
+}
 
 interface SocialPost {
   id: string
@@ -56,10 +70,32 @@ export default function SocialPostsClient({ canWrite = false }: { canWrite?: boo
   const [platform, setPlatform] = useState<'fb' | 'ig' | 'ig_reel'>('fb')
   const [caption, setCaption] = useState('')
   const [productId, setProductId] = useState('')
+  const [productName, setProductName] = useState('')
+  const [selectedProduct, setSelectedProduct] = useState<SelectedProduct | null>(null)
+  const [productLoading, setProductLoading] = useState(false)
   const [imageUrl, setImageUrl] = useState('')
+  const [useAllImages, setUseAllImages] = useState(false)
   const [videoUrl, setVideoUrl] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
   const [submitting, setSubmitting] = useState(false)
+
+  useEffect(() => {
+    if (!productId) { setSelectedProduct(null); return }
+    let cancelled = false
+    setProductLoading(true)
+    fetch(`/api/admin/products/${productId}`, { credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(p => {
+        if (cancelled || !p || p.error) return
+        setSelectedProduct(p)
+        const primaryImage = (p.product_images || []).find((i: any) => i.is_primary) || (p.product_images || [])[0]
+        if (primaryImage?.image_url) setImageUrl(primaryImage.image_url)
+        setCaption(c => c.trim() ? c : p.name)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setProductLoading(false) })
+    return () => { cancelled = true }
+  }, [productId])
 
   const fetchPosts = useCallback(async () => {
     setLoading(true)
@@ -78,13 +114,18 @@ export default function SocialPostsClient({ canWrite = false }: { canWrite?: boo
   useEffect(() => { fetchPosts() }, [fetchPosts])
 
   function resetComposer() {
-    setPlatform('fb'); setCaption(''); setProductId(''); setImageUrl(''); setVideoUrl(''); setScheduledAt('')
+    setPlatform('fb'); setCaption(''); setProductId(''); setProductName(''); setImageUrl(''); setUseAllImages(false); setVideoUrl(''); setScheduledAt('')
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     try {
+      const allProductImages = (selectedProduct?.product_images || []).map(i => i.image_url).filter(Boolean)
+      const extraImages = useAllImages && allProductImages.length >= 2
+        ? allProductImages.filter(u => u !== imageUrl.trim())
+        : null
+
       const res = await fetch('/api/admin/social-posts', {
         method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -93,6 +134,7 @@ export default function SocialPostsClient({ canWrite = false }: { canWrite?: boo
           caption: caption.trim() || null,
           productId: productId.trim() || null,
           imageUrl: imageUrl.trim() || null,
+          imageUrls: extraImages,
           videoUrl: videoUrl.trim() || null,
           scheduledAt: scheduledAt ? new Date(scheduledAt).toISOString() : null,
         }),
@@ -149,24 +191,76 @@ export default function SocialPostsClient({ canWrite = false }: { canWrite?: boo
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <div>
               <label className={labelCls}>Platform</label>
-              <select value={platform} onChange={e => setPlatform(e.target.value as 'fb' | 'ig' | 'ig_reel')} className={inputCls}>
-                <option value="fb">Facebook</option>
-                <option value="ig">Instagram</option>
-                <option value="ig_reel">Instagram Reel</option>
-              </select>
+              <AdminSelect
+                sm
+                value={platform}
+                onChange={v => setPlatform(v as 'fb' | 'ig' | 'ig_reel')}
+                options={[
+                  { value: 'fb', label: 'Facebook' },
+                  { value: 'ig', label: 'Instagram' },
+                  { value: 'ig_reel', label: 'Instagram Reel' },
+                ]}
+              />
             </div>
             <div>
-              <label className={labelCls}>Product ID (optional)</label>
-              <input type="text" value={productId} onChange={e => setProductId(e.target.value)} className={inputCls + ' font-mono'} placeholder="uuid" />
+              <label className={labelCls}>Product (optional)</label>
+              <AdminTypeahead
+                type="products"
+                value={productName}
+                onChange={v => { setProductName(v); if (!v) setProductId('') }}
+                onSelect={item => { setProductId(item.id); setProductName(item.label) }}
+                placeholder="Search by name or SKU…"
+                inputClassName={inputCls + ' pr-9'}
+              />
             </div>
             <div>
               <label className={labelCls}>Schedule (optional)</label>
-              <input type="datetime-local" value={scheduledAt} onChange={e => setScheduledAt(e.target.value)} className={inputCls} />
+              <DateTimePicker value={scheduledAt} onChange={setScheduledAt} className="w-full [&>button]:py-1.5" placeholder="Select date & time" />
             </div>
           </div>
+
+          {productId && (productLoading || selectedProduct) && (
+            <div className="flex items-center gap-3 p-2.5 rounded-lg border border-border-default bg-surface-secondary">
+              {productLoading ? (
+                <div className="text-xs text-foreground-muted">Loading product…</div>
+              ) : selectedProduct && (
+                <>
+                  {(() => {
+                    const img = (selectedProduct.product_images || []).find(i => i.is_primary) || selectedProduct.product_images?.[0]
+                    return img?.thumbnail_url || img?.image_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={img.thumbnail_url || img.image_url} alt="" className="w-10 h-10 rounded-md object-cover border border-border-default shrink-0" />
+                    ) : null
+                  })()}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-sm font-medium text-foreground truncate">{selectedProduct.name}</div>
+                    <div className="text-xs text-foreground-muted truncate">
+                      {selectedProduct.base_price != null ? `₹${selectedProduct.base_price}` : ''}
+                      {selectedProduct.stock_status ? ` · ${selectedProduct.stock_status}` : ''}
+                    </div>
+                  </div>
+                  {platform !== 'ig_reel' && (selectedProduct.product_images?.length ?? 0) >= 2 && (
+                    <label className="flex items-center gap-1.5 text-xs text-foreground-secondary shrink-0 cursor-pointer">
+                      <input type="checkbox" checked={useAllImages} onChange={e => setUseAllImages(e.target.checked)} className="rounded" />
+                      Use all {selectedProduct.product_images!.length} images (carousel)
+                    </label>
+                  )}
+                </>
+              )}
+            </div>
+          )}
+
           <div>
             <label className={labelCls}>Caption (optional)</label>
-            <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={3} className={inputCls + ' resize-none'} placeholder="Leave blank to auto-generate from the product…" />
+            <AIEnrichButton
+              fieldLabel="Social media caption"
+              value={caption}
+              onChange={setCaption}
+              context={selectedProduct ? `Product: ${selectedProduct.name}${selectedProduct.short_description ? ' — ' + selectedProduct.short_description : ''}. Platform: ${PLATFORM_LABELS[platform]}.` : `Platform: ${PLATFORM_LABELS[platform]}.`}
+              multiline
+            >
+              <textarea value={caption} onChange={e => setCaption(e.target.value)} rows={3} className={inputCls + ' resize-none pr-8'} placeholder="Leave blank to auto-generate from the product…" />
+            </AIEnrichButton>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>

@@ -9,7 +9,6 @@ import HoverCard from '@/components/ui/HoverCard'
 import ProductWarningBadges from '@/components/shared/ProductWarningBadges'
 import ProductStockMovements from '@/components/admin/ProductStockMovements'
 import UnitsManager from '@/components/admin/UnitsManager'
-import BatchSerialLabelModal from '@/components/admin/BatchSerialLabelModal'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 
@@ -517,21 +516,10 @@ export default function ProductDetailClient({ id }: { id: string }) {
   // Surface a stock-assignment failure stashed by the edit form during publish
   // (the publish redirected here, so the error couldn't be shown on the form).
   const [bootstrapStockError, setBootstrapStockError] = useState<string | null>(null)
-  // Batches/serials just created by an OFF→ON perishable/serialized conversion, to
-  // offer label printing (stashed by the edit form, which unmounted on redirect).
-  const [labelModal, setLabelModal] = useState<{ batchIds: string[]; serials: string[] } | null>(null)
   useEffect(() => {
     try {
       const msg = sessionStorage.getItem('bootstrap_stock_error')
       if (msg) { setBootstrapStockError(msg); sessionStorage.removeItem('bootstrap_stock_error') }
-      const raw = sessionStorage.getItem('bootstrap_labels')
-      if (raw) {
-        sessionStorage.removeItem('bootstrap_labels')
-        const parsed = JSON.parse(raw)
-        if (parsed?.product_id === id && (parsed.batch_ids?.length || parsed.serial_numbers?.length)) {
-          setLabelModal({ batchIds: parsed.batch_ids || [], serials: parsed.serial_numbers || [] })
-        }
-      }
     } catch { /* ignore */ }
   }, [id])
 
@@ -620,15 +608,6 @@ export default function ProductDetailClient({ id }: { id: string }) {
             <X className="w-4 h-4" />
           </button>
         </div>
-      )}
-      {labelModal && (
-        <BatchSerialLabelModal
-          preselectedBatchIds={labelModal.batchIds}
-          preselectedSerials={labelModal.serials}
-          initialMode={labelModal.batchIds.length ? 'batch' : 'serial'}
-          title="Print labels for assigned stock"
-          onClose={() => setLabelModal(null)}
-        />
       )}
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm text-foreground-secondary">
