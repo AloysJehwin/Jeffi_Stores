@@ -59,28 +59,23 @@ echo "Schema set: $SCHEMA_SET"
 if [ "$SCHEMA_SET" = "control-plane" ]; then
   SCHEMA_FILES="database/control-plane/schema.sql"
 else
-  SCHEMA_FILES="$(cat <<'FILES'
-database/extensions.sql
-database/users.sql
-database/catalog.sql
-database/inventory.sql
-database/orders.sql
-database/payments.sql
-database/quotations.sql
-database/invoices.sql
-database/marketing.sql
-database/reviews.sql
-database/crm.sql
-database/support.sql
-database/ai.sql
-database/logs.sql
-database/settings.sql
-database/indexes.sql
-database/functions.sql
-database/triggers.sql
-database/constraints.sql
-FILES
-)"
+  # Load EVERY database/*.sql, discovered at runtime. A hardcoded list silently skipped
+  # auth.sql and amazon.sql, so migra saw those tables as absent from the desired state
+  # and never diffed them - auth_sessions among them. Ordering still matters: extensions
+  # first, then topic/table files, then the files that reference tables.
+  TAIL_FILES="indexes.sql functions.sql triggers.sql constraints.sql"
+  SCHEMA_FILES=""
+  [ -f database/extensions.sql ] && SCHEMA_FILES="database/extensions.sql"
+  for f in database/*.sql; do
+    b="$(basename "$f")"
+    case " extensions.sql $TAIL_FILES " in *" $b "*) continue ;; esac
+    SCHEMA_FILES="$SCHEMA_FILES
+$f"
+  done
+  for b in $TAIL_FILES; do
+    [ -f "database/$b" ] && SCHEMA_FILES="$SCHEMA_FILES
+database/$b"
+  done
 fi
 
 for f in $SCHEMA_FILES; do
