@@ -160,9 +160,14 @@ export function LabelPreview({ size, product, scale, showPrice }: {
   if (size.size === '30x20') {
     const nameFs = Math.round(5 * scale)
     const varFs = Math.round(4.5 * scale)
+    const qrSize = Math.round(h * 0.32)
+    const textRight = qrSize + pad + 2
     return (
       <div style={base}>
-        <div style={{ position: 'absolute', top: pad, left: pad, right: pad, bottom: barH + pad, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: pad, right: pad }}>
+          <QRPlaceholder size={qrSize} />
+        </div>
+        <div style={{ position: 'absolute', top: pad, left: pad, right: textRight, bottom: barH + pad, overflow: 'hidden' }}>
           <div style={{ fontSize: nameFs, fontWeight: 700, lineHeight: 1.2, color: '#111', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{name}</div>
           {variantName && (
             <div style={{ fontSize: varFs, color: '#555', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
@@ -184,9 +189,13 @@ export function LabelPreview({ size, product, scale, showPrice }: {
     const priceFs = Math.round(6.5 * scale)
     const exGstFs = Math.round(4.5 * scale)
     const topH = h - barH - pad
+    const qrSize = Math.round(topH * 0.6)
     return (
       <div style={base}>
-        <div style={{ position: 'absolute', top: pad, left: pad, right: pad, height: topH - pad, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ position: 'absolute', top: pad, right: pad }}>
+          <QRPlaceholder size={qrSize} />
+        </div>
+        <div style={{ position: 'absolute', top: pad, left: pad, right: qrSize + pad * 2 + 2, height: topH - pad, overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
           <div style={{ fontSize: nameFs, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>{name}</div>
           {variantName && (
             <div style={{ fontSize: varFs, color: '#555', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1.2 }}>{variantName}</div>
@@ -211,9 +220,14 @@ export function LabelPreview({ size, product, scale, showPrice }: {
   }
 
   if (size.size === '30x50') {
+    const qrSize = Math.round(h * 0.24)
+    const textRight = qrSize + pad + 2
     return (
       <div style={base}>
-        <div style={{ position: 'absolute', top: pad, left: pad, right: pad, bottom: barH + pad + 12, overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', top: pad, right: pad }}>
+          <QRPlaceholder size={qrSize} />
+        </div>
+        <div style={{ position: 'absolute', top: pad, left: pad, right: textRight, bottom: barH + pad + 12, overflow: 'hidden' }}>
           <div style={{ fontSize: nameFontSize, fontWeight: 700, lineHeight: 1.3, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: variantName ? 2 : 3, WebkitBoxOrient: 'vertical' as any }}>{name}</div>
           {variantName && (
             <div style={{ fontSize: smallFontSize, color: '#333', marginTop: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
@@ -288,6 +302,41 @@ export function LabelPreview({ size, product, scale, showPrice }: {
           SKU: {sku}
         </div>
         {/* Barcode */}
+        <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
+          <BarcodePlaceholder width={w - pad * 2} height={barH} text={barcodeText} />
+        </div>
+      </div>
+    )
+  }
+
+  if (size.size === 'shelf-card') {
+    const qrSize = Math.round(w * 0.24)
+    const gapAfterQR = Math.round(pad * 0.7)
+    const rightX = pad + qrSize + gapAfterQR
+    const rightW = w - rightX - pad
+    const contentH = h - barH - pad * 2 - 6
+    const skuRowH = Math.round(smallFontSize * 0.85) + 3
+    const infoH = contentH - skuRowH
+    return (
+      <div style={base}>
+        <div style={{ position: 'absolute', top: pad, left: pad, width: qrSize, height: Math.min(qrSize, infoH), overflow: 'hidden' }}>
+          <QRPlaceholder size={qrSize} />
+        </div>
+        <div style={{ position: 'absolute', top: pad, left: rightX, width: rightW, height: infoH, overflow: 'hidden' }}>
+          <div style={{ fontSize: Math.round(nameFontSize * 1.8), fontWeight: 700, lineHeight: 1.2, color: '#111', overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: variantName ? 1 : 2, WebkitBoxOrient: 'vertical' as any }}>{name}</div>
+          {variantName && (
+            <div style={{ fontSize: Math.round(smallFontSize * 1.6), color: '#333', marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{variantName}</div>
+          )}
+          {brand && (
+            <div style={{ fontSize: Math.round(smallFontSize * 1.3), color: '#888', marginTop: 2, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{brand}</div>
+          )}
+          <div style={{ marginTop: 5 }}>
+            {showPrice && <PriceBlock exGst={exGst} mrp={mrp} gstPct={gstPct} mainSize={Math.round(priceFontSize * 1.8)} subSize={smallFontSize} gap={2} />}
+          </div>
+        </div>
+        <div style={{ position: 'absolute', bottom: barH + pad + 1, left: pad, right: pad, fontSize: Math.round(smallFontSize * 1.3), color: '#666', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>
+          SKU: {sku}
+        </div>
         <div style={{ position: 'absolute', bottom: pad, left: pad, right: pad }}>
           <BarcodePlaceholder width={w - pad * 2} height={barH} text={barcodeText} />
         </div>

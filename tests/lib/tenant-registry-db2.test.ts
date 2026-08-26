@@ -159,11 +159,11 @@ describe('tenant-registry (data layer, extended)', () => {
       expect(String(poolQuery.mock.calls[0][0])).toMatch(/tenant_custom_domains/)
     })
 
-    it('fails open (null) when the control plane errors', async () => {
+    it('fails closed (throws) on a tenant host when the control plane errors', async () => {
       const mod = await importRegistry()
       poolQuery.mockReset()
       poolQuery.mockRejectedValue(new Error('cp down'))
-      await expect(mod.resolveTenantFromHost('err.jeffistores.in')).resolves.toBeNull()
+      await expect(mod.resolveTenantFromHost('err.jeffistores.in')).rejects.toThrow('cp down')
     })
   })
 
@@ -551,7 +551,7 @@ describe('tenant-registry (data layer, extended)', () => {
     queueRows({ rows: [{ id: 'p-1', status: 'pending' }] })
     const out = await mod.enqueueSocialPost({ tenantId: null, platform: 'fb', caption: 'hi' })
     expect(out).toMatchObject({ id: 'p-1' })
-    expect(poolQuery.mock.calls[0][1][7]).toBeNull()
+    expect(poolQuery.mock.calls[0][1][8]).toBeNull()
   })
 
   it('enqueueSocialPost forwards a scheduled time when given', async () => {
@@ -559,7 +559,7 @@ describe('tenant-registry (data layer, extended)', () => {
     queueRows({ rows: [{ id: 'p-2' }] })
     const when = new Date('2031-05-05T10:00:00.000Z')
     await mod.enqueueSocialPost({ tenantId: 't-1', platform: 'ig', scheduledAt: when })
-    expect(poolQuery.mock.calls[0][1][7]).toBe(when.toISOString())
+    expect(poolQuery.mock.calls[0][1][8]).toBe(when.toISOString())
   })
 
   it('dueSocialPosts queries pending posts up to the limit', async () => {

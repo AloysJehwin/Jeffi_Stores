@@ -41,6 +41,13 @@ type Step = (typeof STEPS)[number]
 
 const MAX_CONNECTIONS = 50 // conservative for db.t4g.micro (100 OOM'd a micro previously)
 
+// The flagship app box serves jeffistores.in only — never a tenant.
+const FLAGSHIP_APP_IP = process.env.FLAGSHIP_APP_IP || '52.20.193.62'
+
+function tenantComputeConfigured(): boolean {
+  return !!process.env.TENANT_APP_AMI_ID || !!process.env.POOL_INSTANCE_ID
+}
+
 const ROOT_DOMAIN = process.env.PLATFORM_ROOT_DOMAIN || 'jeffistores.in'
 
 function bucketName(slug: string) { return `jeffi-tenant-${slug}` }
@@ -97,6 +104,12 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         if (!target || !target.trim()) missing.push('TENANT_APP_TARGET_IP')
         if (missing.length) {
           throw new Error(`preflight: missing required env: ${missing.join(', ')}`)
+        }
+        if (!tenantComputeConfigured() && (target || '').trim() === FLAGSHIP_APP_IP) {
+          throw new Error(
+            `preflight: TENANT_APP_TARGET_IP is the flagship app instance (${FLAGSHIP_APP_IP}) and no tenant compute is configured — ` +
+            `set TENANT_APP_AMI_ID (or POOL_INSTANCE_ID) so tenants are served by their own pool instance.`
+          )
         }
         return await next(job.id, 'create_param_group', res)
       }
@@ -201,9 +214,16 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         // pre-existing POOL_INSTANCE_ID), skip real EC2 and serve from the shared
         // TENANT_APP_TARGET_IP — the flagship/pool host. This keeps provisioning working before
         // per-tenant/pool EC2 is set up, and is the sane default rather than a hard failure.
-        const ec2Configured = !!process.env.TENANT_APP_AMI_ID || !!process.env.POOL_INSTANCE_ID
+        const ec2Configured = tenantComputeConfigured()
         if (!ec2Configured) {
-          res.ec2Target = process.env.TENANT_APP_TARGET_IP || ''
+          const target = (process.env.TENANT_APP_TARGET_IP || '').trim()
+          if (!target || target === FLAGSHIP_APP_IP) {
+            throw new Error(
+              `compute blocked: refusing to serve tenant "${slug}" from the flagship app instance (${FLAGSHIP_APP_IP}) — ` +
+              `set TENANT_APP_AMI_ID or POOL_INSTANCE_ID.`
+            )
+          }
+          res.ec2Target = target
           res.computeMode = 'shared-target'
         } else if (isDedicatedPlan(tenant.plan)) {
           if (!res.ec2InstanceId) {
@@ -352,7 +372,7 @@ const BACKOFF_CAP_MS = 600_000   // capped at 10 min
 
 /** Deterministic errors that won't fix themselves on retry → fail fast (no wasted retries). */
 function isTerminalError(msg: string): boolean {
-  return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|InvalidParameterCombination|missing required env/i.test(msg)
+  return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env/i.test(msg)
 }
 
 async function next(id: string, step: Step, res: Record<string, any>): Promise<string> {

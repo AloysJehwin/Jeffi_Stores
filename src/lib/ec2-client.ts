@@ -128,3 +128,61 @@ export async function isInstanceGone(instanceId: string): Promise<boolean> {
     return /NotFound|InvalidInstanceID/i.test(e?.message || '')
   }
 }
+
+// ── Security-group ingress (LOCAL PROVISIONING TEST ONLY) ────────────────────────
+
+/** This machine's current public IP, via AWS's own checkip endpoint. Null on any failure —
+ * callers treat that as "can't self-authorize" and carry on. */
+export async function currentPublicIp(): Promise<string | null> {
+  try {
+    const ctrl = new AbortController()
+    const timer = setTimeout(() => ctrl.abort(), 5000)
+    const res = await fetch('https://checkip.amazonaws.com', { signal: ctrl.signal })
+    clearTimeout(timer)
+    if (!res.ok) return null
+    const ip = (await res.text()).trim()
+    return /^\d{1,3}(\.\d{1,3}){3}$/.test(ip) ? ip : null
+  } catch {
+    return null
+  }
+}
+
+/** Authorize a single CIDR on a TCP port in a security group. Idempotent: an existing
+ * identical rule (InvalidPermission.Duplicate) is treated as success. */
+export async function authorizeSgIngress(args: {
+  groupId: string; cidr: string; port: number; description?: string
+}): Promise<void> {
+  try {
+    await ec2({
+      Action: 'AuthorizeSecurityGroupIngress',
+      GroupId: args.groupId,
+      'IpPermissions.1.IpProtocol': 'tcp',
+      'IpPermissions.1.FromPort': String(args.port),
+      'IpPermissions.1.ToPort': String(args.port),
+      'IpPermissions.1.IpRanges.1.CidrIp': args.cidr,
+      ...(args.description ? { 'IpPermissions.1.IpRanges.1.Description': args.description } : {}),
+    })
+  } catch (err: any) {
+    if (/InvalidPermission\.Duplicate/i.test(err?.message || '')) return
+    throw err
+  }
+}
+
+/** Revoke a previously authorized CIDR/port. Idempotent: NotFound is success. */
+export async function revokeSgIngress(args: {
+  groupId: string; cidr: string; port: number
+}): Promise<void> {
+  try {
+    await ec2({
+      Action: 'RevokeSecurityGroupIngress',
+      GroupId: args.groupId,
+      'IpPermissions.1.IpProtocol': 'tcp',
+      'IpPermissions.1.FromPort': String(args.port),
+      'IpPermissions.1.ToPort': String(args.port),
+      'IpPermissions.1.IpRanges.1.CidrIp': args.cidr,
+    })
+  } catch (err: any) {
+    if (/InvalidPermission\.NotFound|NotFound/i.test(err?.message || '')) return
+    throw err
+  }
+}

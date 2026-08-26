@@ -1604,19 +1604,6 @@ export default function ProductForm({ categories, brands, action, product, produ
               // the product page can surface it after navigation instead of losing it.
               const j = await bsRes.json().catch(() => ({}))
               try { sessionStorage.setItem('bootstrap_stock_error', j?.error || 'Failed to assign existing stock (serial/lot conflict).') } catch { /* ignore */ }
-            } else {
-              // Stash the just-created batches/serials so the destination product page
-              // can offer to print labels (the form unmounts on the redirect below).
-              const j = await bsRes.json().catch(() => ({}))
-              const batchIds: string[] = Array.isArray(j?.batch_ids) ? j.batch_ids : []
-              const serialNumbers: string[] = Array.isArray(j?.serial_numbers) ? j.serial_numbers : []
-              if (batchIds.length || serialNumbers.length) {
-                try {
-                  sessionStorage.setItem('bootstrap_labels', JSON.stringify({
-                    product_id: productId, batch_ids: batchIds, serial_numbers: serialNumbers,
-                  }))
-                } catch { /* ignore */ }
-              }
             }
           } catch {
             // network error assigning stock — product was still saved
