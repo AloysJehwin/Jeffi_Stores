@@ -2832,3 +2832,32 @@ ALTER TABLE public.auth_sessions
 
 \unrestrict n2MZR1KQF5uhv3tv1fqwmrl3OcSH6oTu1KCfjqfg7QlcPyKi0mzm0VDkGwvb9Pv
 
+
+
+--
+-- Name: business_rfqs business_rfqs_status_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.business_rfqs
+    ADD CONSTRAINT business_rfqs_status_check CHECK (((status)::text = ANY ((ARRAY['pending'::character varying, 'reviewed'::character varying, 'negotiating'::character varying, 'offer_accepted'::character varying, 'converted'::character varying, 'rejected'::character varying])::text[])));
+
+--
+-- Name: product_units product_units_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_units
+    ADD CONSTRAINT product_units_check CHECK (((max_qty IS NULL) OR (max_qty >= min_qty)));
+
+--
+-- Name: product_units product_units_min_qty_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_units
+    ADD CONSTRAINT product_units_min_qty_check CHECK ((min_qty > (0)::numeric));
+
+--
+-- Name: product_units product_units_qty_step_check; Type: CHECK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.product_units
+    ADD CONSTRAINT product_units_qty_step_check CHECK ((qty_step > (0)::numeric));
