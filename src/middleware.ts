@@ -117,6 +117,11 @@ export async function middleware(request: NextRequest) {
   // Tenant forwarding headers are also client-forgeable — strip before we (maybe) set them.
   stripped.delete('x-tenant-id')
   stripped.delete('x-tenant-slug')
+  // Client-cert headers are set by nginx from the TLS handshake; a client-supplied one
+  // would otherwise let a caller assert its own mTLS identity.
+  stripped.delete('x-client-cert')
+  stripped.delete('x-client-cert-serial')
+  stripped.delete('x-client-cert-cn')
 
   // Multi-tenant SaaS: resolve the tenant from the Host header (cached ~60s in-process).
   // Returns null for the platform's own hosts (jeffistores.in + app subdomains) and unknown
@@ -300,6 +305,24 @@ export async function middleware(request: NextRequest) {
     const isTenantAdminSubdomain = /^admin-[^.]+\./.test(hostname)
     if (isTenantAdminSubdomain && (pathname.startsWith('/ecom') || pathname.startsWith('/api/admin/ecom'))) {
       return new NextResponse('Not found', { status: 404 })
+    }
+
+    // Tenant admin mTLS. admin.jeffistores.in is gated by nginx against the platform CA;
+    // nginx cannot select a per-tenant CA from a regex server_name, so for admin-{slug} it
+    // passes the cert through (optional_no_ca) and we verify against that tenant's own CA.
+    if (isTenantAdminSubdomain && tenant && process.env.TENANT_MTLS_ENFORCED !== 'false') {
+      const { decodeClientCertHeader, verifyTenantClientCert } = await import('./lib/tenant-mtls')
+      const pem = decodeClientCertHeader(request.headers.get('x-client-cert'))
+      const v = await verifyTenantClientCert(pem, tenant.tenantId)
+        .catch((): Awaited<ReturnType<typeof verifyTenantClientCert>> => ({ ok: false, reason: 'malformed' }))
+      if (!v.ok) {
+        return addSecurityHeaders(new NextResponse(
+          'A client certificate is required to access this admin panel.',
+          { status: 403, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store', 'X-Mtls-Reason': v.reason ?? 'denied' } },
+        ))
+      }
+      stripped.set('x-client-cert-serial', v.serial ?? '')
+      stripped.set('x-client-cert-cn', v.commonName ?? '')
     }
 
     if (isAdminApiPath) {
