@@ -4,7 +4,7 @@ import { verifyToken, verifyBusinessToken } from './lib/jwt'
 import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 import { extractSessionSignals } from './lib/session-signals-request'
-import { resolveTenantFromHost } from './lib/tenant-registry'
+import { resolveTenantFromHost, appFromHost } from './lib/tenant-registry'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -77,7 +77,8 @@ export async function middleware(request: NextRequest) {
   }
 
   const isAdminApiPath = pathname.startsWith('/api/admin')
-  const isAdminSubdomain = hostname.startsWith('admin.')
+  const hostApp = appFromHost(hostname)
+  const isAdminSubdomain = hostApp === 'admin'
   const isAdminPath = pathname.startsWith('/admin')
 
   if (!isAdminApiPath && pathname.startsWith('/api/')) {
@@ -161,7 +162,7 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/ecom${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
-  if (hostname.startsWith('forms.')) {
+  if (hostApp === 'forms') {
     if (pathname.startsWith('/api/')) {
       return addSecurityHeaders(NextResponse.next())
     }
@@ -169,25 +170,25 @@ export async function middleware(request: NextRequest) {
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/forms${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
-  if (hostname.startsWith('quotation.')) {
+  if (hostApp === 'quotation') {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
-  if (hostname.startsWith('invoice.')) {
+  if (hostApp === 'invoice') {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
-  if (hostname.startsWith('purchaseorder.')) {
+  if (hostApp === 'purchaseorder') {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     const slug = pathname === '/' ? '' : pathname
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
-  if (hostname.startsWith('business.')) {
+  if (hostApp === 'business') {
     if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
     // Public pages on the subdomain (paths are /signin, /signup, /pending — no /business/ prefix)
     const PUBLIC_BUSINESS_SUBDOMAIN = ['/signin', '/signup', '/pending']

@@ -69,6 +69,8 @@ export default function BatchSerialLabelPicker({
   const [outputMode, setOutputMode] = useState<'thermal' | 'sheet'>('thermal')
   const [copies, setCopies] = useState(1)
   const [downloading, setDownloading] = useState(false)
+  const [showPrice, setShowPrice] = useState(false)
+  const [qrAction, setQrAction] = useState(false)
 
   // ── Batch mode state ──
   const [query, setQuery] = useState('')
@@ -225,7 +227,7 @@ export default function BatchSerialLabelPicker({
     : null
 
   async function download() {
-    const payload: any = { copies, sheet: outputMode === 'sheet', size: selectedSize }
+    const payload: any = { copies, sheet: outputMode === 'sheet', size: selectedSize, showPrice, qrAction }
     if (mode === 'batch') {
       if (!selectedBatchIds.length) { showToast('Select at least one batch', 'error'); return }
       payload.batches = selectedBatchIds.map(id => ({ id, count: batchCounts[id] ?? 1 }))
@@ -313,6 +315,14 @@ export default function BatchSerialLabelPicker({
               onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
               className="w-16 px-2 py-1 rounded-lg border border-border-default bg-surface text-sm" />
           </label>
+          <button type="button" onClick={() => setShowPrice(v => !v)} title="Print price on label"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+            Print Price: {showPrice ? 'On' : 'Off'}
+          </button>
+          <button type="button" onClick={() => setQrAction(v => !v)} title="QR opens quick actions when scanned"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+            QR Action: {qrAction ? 'On' : 'Off'}
+          </button>
           <button type="button" onClick={download} disabled={downloading || selectedCount === 0}
             className="ml-auto px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             {downloading ? 'Generating…' : `Download PDF — ${totalLabels} label${totalLabels === 1 ? '' : 's'}`}

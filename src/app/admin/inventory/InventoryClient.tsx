@@ -13,7 +13,6 @@ import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/admin-path'
 import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
-import BatchSerialLabelModal from '@/components/admin/BatchSerialLabelModal'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -333,8 +332,6 @@ function POTab({ initialPO }: { initialPO?: string }) {
 
   // Serials that were just received — enables the "Print labels" action post-receive.
   const [lastReceivedSerials, setLastReceivedSerials] = useState<string[]>([])
-  // Just-created batches/serials for the label popup shown right after a receive.
-  const [labelModal, setLabelModal] = useState<{ batchIds: string[]; serials: string[] } | null>(null)
 
   // Fill the next empty serial slot (across serialized items, in order) from a scan.
   // Dedupe: ignore a serial already entered anywhere in this receive.
@@ -612,12 +609,6 @@ function POTab({ initialPO }: { initialPO?: string }) {
       setLastReceivedSerials(receivedSerials)
       setReceiveMode(null)
       load(page)
-      // Open the label popup for the just-created batches/serials (server-returned).
-      const createdBatchIds: string[] = Array.isArray(json.batch_ids) ? json.batch_ids : []
-      const createdSerials: string[] = Array.isArray(json.serial_numbers) ? json.serial_numbers : receivedSerials
-      if (createdBatchIds.length || createdSerials.length) {
-        setLabelModal({ batchIds: createdBatchIds, serials: createdSerials })
-      }
       if (Array.isArray(json.warnings) && json.warnings.length) {
         showToast(json.warnings[0], 'error')
       }
@@ -1234,16 +1225,6 @@ function POTab({ initialPO }: { initialPO?: string }) {
             <ClientPagination page={page} total={total} pageSize={PAGE_SIZE} onChange={p => { setPage(p); setLoading(true) }} />
           </div>
         </div>
-      )}
-
-      {labelModal && (
-        <BatchSerialLabelModal
-          preselectedBatchIds={labelModal.batchIds}
-          preselectedSerials={labelModal.serials}
-          initialMode={labelModal.batchIds.length ? 'batch' : 'serial'}
-          title="Print labels for received stock"
-          onClose={() => setLabelModal(null)}
-        />
       )}
 
     </div>

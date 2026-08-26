@@ -66,7 +66,7 @@ beforeEach(() => {
   legals.generateTenantLegals.mockResolvedValue(undefined)
   delhivery.createDelhiveryPickupLocation.mockResolvedValue({ ok: true })
   process.env.RDS_MASTER_PASSWORD = 'secret'
-  process.env.TENANT_APP_TARGET_IP = '52.20.193.62'
+  process.env.TENANT_APP_TARGET_IP = '203.0.113.10' // NOT the flagship — see flagship interlock
 })
 afterEach(() => {
   delete process.env.RDS_MASTER_PASSWORD
@@ -102,8 +102,17 @@ describe('ensure_compute', () => {
     const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
     await advanceProvisioningJob(job({ step: 'ensure_compute', created_resources: {} }), new StubProvisioningProvider(0))
     const p = patches().find((x) => x.step === 'setup_delhivery')
-    expect(p?.created_resources).toMatchObject({ ec2Target: '52.20.193.62', computeMode: 'shared-target' })
-    expect(reg.writeTenantEc2).toHaveBeenCalledWith('t-1', '52.20.193.62')
+    expect(p?.created_resources).toMatchObject({ ec2Target: '203.0.113.10', computeMode: 'shared-target' })
+    expect(reg.writeTenantEc2).toHaveBeenCalledWith('t-1', '203.0.113.10')
+  })
+
+  it('REFUSES to serve a tenant from the flagship app instance', async () => {
+    process.env.TENANT_APP_TARGET_IP = '52.20.193.62'
+    const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
+    await advanceProvisioningJob(job({ step: 'ensure_compute', created_resources: {} }), new StubProvisioningProvider(0))
+    const failed = patches().find((x) => x.status === 'failed')
+    expect(failed?.last_error).toMatch(/compute blocked/i)
+    expect(patches().find((x) => x.step === 'setup_delhivery')).toBeUndefined()
   })
 
   it('provisions a DEDICATED EC2 for a higher-tier plan when EC2 is configured', async () => {

@@ -79,7 +79,7 @@ describe('provisioning state machine', () => {
     reg.clearTenantInfra.mockResolvedValue(undefined)
     provider = new StubProvisioningProvider(0)
     process.env.RDS_MASTER_PASSWORD = 'secret'
-    process.env.TENANT_APP_TARGET_IP = '52.20.193.62'
+    process.env.TENANT_APP_TARGET_IP = '203.0.113.10' // NOT the flagship — see flagship interlock
   })
 
   afterEach(() => {
@@ -134,6 +134,22 @@ describe('provisioning state machine', () => {
       const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
       await expect(advanceProvisioningJob(job({ step: 'preflight' }), provider)).resolves.toBe('pending')
       expect(patches().some((p) => p.step === 'create_param_group')).toBe(true)
+    })
+
+    it('fails terminally when TENANT_APP_TARGET_IP is the flagship and no tenant compute is configured', async () => {
+      process.env.TENANT_APP_TARGET_IP = '52.20.193.62'
+      const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
+      await expect(advanceProvisioningJob(job({ step: 'preflight' }), provider)).resolves.toBe('failed')
+      expect(lastPatch().last_error ?? '').toMatch(/flagship/i)
+      expect(patches().some((p) => p.step === 'create_param_group')).toBe(false)
+    })
+
+    it('allows the flagship IP once tenant compute IS configured', async () => {
+      process.env.TENANT_APP_TARGET_IP = '52.20.193.62'
+      process.env.TENANT_APP_AMI_ID = 'ami-1'
+      const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
+      await expect(advanceProvisioningJob(job({ step: 'preflight' }), provider)).resolves.toBe('pending')
+      delete process.env.TENANT_APP_AMI_ID
     })
   })
 

@@ -132,10 +132,16 @@ function getPool(explicitTenant?: TenantContextType | null): Pool {
   // to the caller, so relying on getCurrentTenant() here dropped the tenant and
   // fell back to the platform DB. Passing ctx explicitly is the robust path.
   const tenant = explicitTenant ?? getCurrentTenant()
-  // No tenant in context OR tenant without dedicated infra → DEFAULT pool (unchanged).
-  if (!tenant || !tenant.infra || !tenant.infra.rdsEndpoint) {
+  if (!tenant) {
     if (!pool) { pool = buildDefaultPool(); dbGlobal.__appPool = pool }
     return pool
+  }
+  // Fail closed: falling back to the platform DB here leaks flagship data onto a tenant host.
+  if (!tenant.infra || !tenant.infra.rdsEndpoint) {
+    throw new Error(
+      `Tenant "${tenant.slug}" has no RDS endpoint configured (tenant_infra.rds_endpoint is null) — ` +
+      `refusing to fall back to the platform database.`
+    )
   }
   // Per-tenant pool, lazily built + cached by tenant id.
   let tp = tenantPools.get(tenant.tenantId)

@@ -48,7 +48,7 @@ export default async function TenantDetailPage({ params }: { params: Promise<{ i
 
       <div className="mb-6 flex flex-wrap items-center gap-3">
         <TenantActions tenantId={t.id} slug={t.slug} status={t.status} instanceState={t.instance_state} />
-        <Link href={`/admin/ecom/customers/${t.id}/provisioning`} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
+        <Link href={`/admin/ecom/provisioning/${t.id}`} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
           View provisioning logs →
         </Link>
       </div>

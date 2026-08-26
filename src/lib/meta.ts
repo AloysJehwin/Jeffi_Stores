@@ -125,6 +125,28 @@ export async function publishFacebookPost(opts: {
   return { id: r.id }
 }
 
+/** Multi-photo Facebook Page post (2+ images attached to one feed post). */
+export async function publishFacebookCarousel(opts: {
+  pageId: string; message: string; imageUrls: string[]; accessToken: string
+}): Promise<{ id: string }> {
+  if (opts.imageUrls.length < 2) {
+    throw new Error('FB multi-photo post needs at least 2 images')
+  }
+  const mediaIds: string[] = []
+  for (const url of opts.imageUrls) {
+    const p = await graphPost(`${opts.pageId}/photos`, {
+      url, published: 'false', access_token: opts.accessToken,
+    })
+    mediaIds.push(p.id)
+  }
+  const r = await graphPost(`${opts.pageId}/feed`, {
+    message: opts.message,
+    attached_media: JSON.stringify(mediaIds.map(id => ({ media_fbid: id }))),
+    access_token: opts.accessToken,
+  })
+  return { id: r.id }
+}
+
 // ── Instagram publishing (2-step; video/Reels async) ────────────────────────────
 
 async function publishIgContainer(igUserId: string, creationId: string, accessToken: string): Promise<{ id: string }> {
