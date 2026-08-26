@@ -55,7 +55,7 @@ describe('ecom-emails', () => {
       const recipients = sendMail.mock.calls.map((c: any[]) => c[0].to)
       expect(recipients[0]).toBe('owner@example.com')
       expect(recipients[1]).toMatch(/@/) // platform admin
-      expect(sendMail.mock.calls[1][0].subject).toContain('[KYC]')
+      expect(sendMail.mock.calls[1][0].subject).toContain('New merchant application')
     })
 
     it('falls back to "there" when the owner has no name', async () => {
@@ -89,7 +89,7 @@ describe('ecom-emails', () => {
       await sendKycRejectedEmail(OWNER, 'GST certificate unreadable')
       const mail = lastMail()
       expect(mail.html).toContain('GST certificate unreadable')
-      expect(mail.html).toContain('support@jeffistores.in')
+      expect(mail.html).toContain('ecommerce@jeffistores.in')
       expect(mail.subject).toMatch(/action required/i)
     })
   })

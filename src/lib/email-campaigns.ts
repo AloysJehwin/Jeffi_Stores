@@ -112,7 +112,7 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
                     style="background:#e07b3f;color:#fff;border:none;padding:10px 20px;border-radius:6px;font-size:13px;font-weight:600;cursor:pointer;">
                 </div>
                 <div submit-success>
-                  <template type="amp-mustache"><p style="color:#22863a;font-size:14px;font-weight:600;margin:8px 0;">✓ Thanks for your review!</p></template>
+                  <template type="amp-mustache"><p style="color:#22863a;font-size:14px;font-weight:600;margin:8px 0;">Thanks for your review!</p></template>
                 </div>
                 <div submit-error>
                   <template type="amp-mustache">Something went wrong. <a href="${item.productUrl || ampBaseUrl + '/products'}">Open in browser</a></template>

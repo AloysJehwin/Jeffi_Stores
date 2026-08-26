@@ -13,6 +13,21 @@ import {
   getDraft,
 } from '../tenant-registry'
 import { findLatestBackup } from '../tenant-backup-store'
+import { SEED_PROFILES } from './seed-catalog'
+
+/** The tenant's onboarding category doubles as its starter-catalogue profile. */
+async function resolveSeedProfile(tenantId: string): Promise<string | undefined> {
+  try {
+    const r = await controlPlanePool().query(
+      'SELECT product_categories FROM tenant_kyc WHERE tenant_id = $1', [tenantId])
+    const raw = (r.rows[0]?.product_categories ?? '') as string
+    const first = raw.split(',').map((s) => s.trim()).filter(Boolean)[0]
+    if (!first) return undefined
+    return SEED_PROFILES.includes(first) ? first : 'Other'
+  } catch {
+    return undefined // seeding is a nicety; never block provisioning on it
+  }
+}
 
 // Single entry point for every provisioning/deprovisioning trigger. All four flows —
 // first provision (payment webhook + onboard success), plan upgrade/downgrade
@@ -102,10 +117,12 @@ export async function triggerProvisioning(t: ProvisioningTrigger): Promise<Trigg
 
   // action === 'provision'
   const job = await enqueueProvisioning(t.tenantId, t.restoreFromKey ? { restoreFromKey: t.restoreFromKey } : undefined)
-  // Seed optional payload fields the engine reads out of created_resources.
-  if (t.seedProfile) {
+  // Seed optional payload fields the engine reads out of created_resources. A restored
+  // store keeps its own data, so seeding is skipped there.
+  const seedProfile = t.restoreFromKey ? undefined : (t.seedProfile ?? await resolveSeedProfile(t.tenantId))
+  if (seedProfile) {
     await updateProvisioningJob(job.id, {
-      created_resources: { ...(job.created_resources || {}), seedProfile: t.seedProfile },
+      created_resources: { ...(job.created_resources || {}), seedProfile },
     })
   }
 

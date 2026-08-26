@@ -27,7 +27,7 @@ import type { ProvisioningProvider, CreateDbInstanceArgs } from './provider'
 /**
  * Real AWS provisioning provider (Route/RDS/S3).
  *
- * ⚠️ NEEDS LIVE AWS TO VERIFY — cannot be tested locally. Each method maps to a
+ * NEEDS LIVE AWS TO VERIFY — cannot be tested locally. Each method maps to a
  * real @aws-sdk call and treats "already exists / already owned" as success so the
  * state machine can safely retry after crashes.
  *
