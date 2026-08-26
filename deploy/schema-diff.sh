@@ -48,30 +48,47 @@ PGPASSWORD=temp psql -h "$CONTAINER_IP" -p 5432 -U postgres -d desired \
   -c 'CREATE EXTENSION IF NOT EXISTS "uuid-ossp"; CREATE EXTENSION IF NOT EXISTS pg_trgm; CREATE EXTENSION IF NOT EXISTS unaccent;' \
   > /dev/null 2>&1 || true
 
-for f in \
-  database/extensions.sql \
-  database/users.sql \
-  database/catalog.sql \
-  database/inventory.sql \
-  database/orders.sql \
-  database/payments.sql \
-  database/quotations.sql \
-  database/invoices.sql \
-  database/marketing.sql \
-  database/reviews.sql \
-  database/crm.sql \
-  database/support.sql \
-  database/ai.sql \
-  database/logs.sql \
-  database/settings.sql \
-  database/indexes.sql \
-  database/functions.sql \
-  database/triggers.sql \
-  database/constraints.sql; do
+# Which schema set to diff. `platform` = the main store DB (default, unchanged);
+# `control-plane` = the SaaS control plane, which was previously never diffed at all.
+SCHEMA_SET="${SCHEMA_SET:-platform}"
+for arg in "$@"; do
+  case "$arg" in --set=*) SCHEMA_SET="${arg#--set=}" ;; esac
+done
+echo "Schema set: $SCHEMA_SET"
+
+if [ "$SCHEMA_SET" = "control-plane" ]; then
+  SCHEMA_FILES="database/control-plane/schema.sql"
+else
+  SCHEMA_FILES="$(cat <<'FILES'
+database/extensions.sql
+database/users.sql
+database/catalog.sql
+database/inventory.sql
+database/orders.sql
+database/payments.sql
+database/quotations.sql
+database/invoices.sql
+database/marketing.sql
+database/reviews.sql
+database/crm.sql
+database/support.sql
+database/ai.sql
+database/logs.sql
+database/settings.sql
+database/indexes.sql
+database/functions.sql
+database/triggers.sql
+database/constraints.sql
+FILES
+)"
+fi
+
+for f in $SCHEMA_FILES; do
   [ -f "$f" ] || continue
   PGPASSWORD=temp psql -h "$CONTAINER_IP" -p 5432 -U postgres -d desired \
     -v ON_ERROR_STOP=0 -f "$f" > /dev/null 2>&1 || true
 done
+
 
 echo "Desired schema loaded."
 
@@ -118,6 +135,11 @@ while i < len(lines):
         upper.startswith('CREATE SEQUENCE'),
         upper.startswith('ALTER TABLE') and 'ADD CONSTRAINT' in upper and 'PRIMARY KEY' in upper,
         upper.startswith('ALTER TABLE') and 'ADD CONSTRAINT' in upper and 'UNIQUE' in upper,
+        # CHECK constraints are validation rules and carry no data, so they are safe to
+        # add. Without this every CHECK change was silently dropped from the diff - which
+        # is how live ended up missing 'owner' from auth_sessions_principal_type_check and
+        # breaking every ecom owner sign-in.
+        upper.startswith('ALTER TABLE') and 'ADD CONSTRAINT' in upper and 'CHECK' in upper,
     ])
     if safe:
         stmt = [line]
@@ -128,11 +150,29 @@ while i < len(lines):
         output.extend(stmt)
     i += 1
 
-# Make index creation idempotent
+# A CHANGED check constraint makes migra emit DROP + ADD; the DROP is filtered out as
+# unsafe, so the ADD would fail with "already exists" and the constraint would never be
+# updated. Prefix each CHECK add with a DROP IF EXISTS so it is self-healing. Safe because
+# dropping a CHECK removes only a validation rule.
+import re as _re
+_healed = []
+for _stmt in '\n'.join(output).split(';'):
+    _s = _stmt.strip()
+    if not _s:
+        continue
+    _m = _re.match(r'(?is)^\s*alter\s+table\s+(?:only\s+)?(\S+)\s+add\s+constraint\s+(\S+)\s+check\b', _s)
+    if _m:
+        _healed.append(f'ALTER TABLE {_m.group(1)} DROP CONSTRAINT IF EXISTS {_m.group(2)};')
+    _healed.append(_s + ';')
+output = _healed
+
+# Make index creation idempotent. migra emits lowercase DDL, so these rewrites must be
+# case-insensitive - matching only the uppercase form meant they never fired and a re-run
+# failed on indexes that already existed.
 result = '\n'.join(output).strip()
-result = result.replace('CREATE INDEX ', 'CREATE INDEX IF NOT EXISTS ')
-result = result.replace('CREATE UNIQUE INDEX ', 'CREATE UNIQUE INDEX IF NOT EXISTS ')
-result = result.replace('IF NOT EXISTS IF NOT EXISTS', 'IF NOT EXISTS')
+result = _re.sub(r'(?i)\bcreate(\s+unique)?\s+index\s+(?!if\s+not\s+exists)',
+                 lambda m: 'CREATE' + (' UNIQUE' if m.group(1) else '') + ' INDEX IF NOT EXISTS ',
+                 result)
 print(result)
 PYEOF
 
