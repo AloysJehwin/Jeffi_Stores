@@ -17,6 +17,9 @@ import {
   DeleteBucketCommand,
 } from '@aws-sdk/client-s3'
 import { Pool } from 'pg'
+import { buildTenantSchemaSql } from '../tenant-migrations-schema'
+import { dumpTenantDb, restoreTenantDb } from '../tenant-db-backup'
+import { upsertTenantDns, deleteTenantDns } from '../tenant-dns'
 import fs from 'fs'
 import path from 'path'
 import type { ProvisioningProvider, CreateDbInstanceArgs } from './provider'
@@ -151,7 +154,6 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     const pool = this.tenantPool(endpoint, dbName)
     try {
       // 1. Apply desired-state schema (reuse the fan-out builder for identical ordering)
-      const { buildTenantSchemaSql } = await import('../tenant-migrations-schema')
       await pool.query(buildTenantSchemaSql())
 
       // 2. Create the app_user role with rds_iam so the app can connect via IAM token
@@ -173,7 +175,6 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async backupDb(endpoint: string, dbName: string): Promise<Buffer> {
-    const { dumpTenantDb } = await import('../tenant-db-backup')
     const pool = this.tenantPool(endpoint, dbName)
     try {
       return await dumpTenantDb(pool, { database: dbName })
@@ -183,7 +184,6 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async restoreDb(endpoint: string, dbName: string, archive: Buffer): Promise<void> {
-    const { restoreTenantDb } = await import('../tenant-db-backup')
     const pool = this.tenantPool(endpoint, dbName)
     try {
       await restoreTenantDb(pool, archive)
@@ -239,12 +239,10 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async ensureDns(hostnames: string[], targetIp?: string): Promise<void> {
-    const { upsertTenantDns } = await import('../tenant-dns')
     await upsertTenantDns(hostnames, targetIp)
   }
 
   async removeDns(hostnames: string[]): Promise<void> {
-    const { deleteTenantDns } = await import('../tenant-dns')
     await deleteTenantDns(hostnames)
   }
 
