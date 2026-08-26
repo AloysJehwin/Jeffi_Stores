@@ -535,7 +535,7 @@ describe('tenant-registry — extended coverage', () => {
       queueRows({ rows: [{ id: 'sp-1', platform: 'fb' }] })
       const out = await mod.enqueueSocialPost({ tenantId: null, platform: 'fb', caption: 'hi' })
       expect(out).toMatchObject({ id: 'sp-1' })
-      expect(poolQuery.mock.calls[0][1][7]).toBeNull() // scheduledAt → null → COALESCE now()
+      expect(poolQuery.mock.calls[0][1][8]).toBeNull() // scheduledAt → null → COALESCE now()
     })
 
     it('enqueueSocialPost serialises an explicit scheduledAt', async () => {
@@ -543,7 +543,7 @@ describe('tenant-registry — extended coverage', () => {
       queueRows({ rows: [{ id: 'sp-2' }] })
       const when = new Date('2031-05-05T05:05:05.000Z')
       await mod.enqueueSocialPost({ tenantId: 't-1', platform: 'ig', scheduledAt: when })
-      expect(poolQuery.mock.calls[0][1][7]).toBe(when.toISOString())
+      expect(poolQuery.mock.calls[0][1][8]).toBe(when.toISOString())
     })
 
     it('dueSocialPosts applies the limit', async () => {
@@ -745,11 +745,18 @@ describe('tenant-registry — extended coverage', () => {
       expect(String(poolQuery.mock.calls[0][0])).toMatch(/tenant_custom_domains/)
     })
 
-    it('fails open (null) when the control-plane query throws', async () => {
+    it('fails CLOSED (throws) on a tenant host when the control-plane query throws', async () => {
       const mod = await importRegistry()
       poolQuery.mockReset()
       poolQuery.mockRejectedValue(new Error('cp down'))
-      await expect(mod.resolveTenantFromHost('acme.jeffistores.in')).resolves.toBeNull()
+      await expect(mod.resolveTenantFromHost('acme.jeffistores.in')).rejects.toThrow('cp down')
+    })
+
+    it('still fails open (null) on a platform host when the control plane is down', async () => {
+      const mod = await importRegistry()
+      poolQuery.mockReset()
+      poolQuery.mockRejectedValue(new Error('cp down'))
+      await expect(mod.resolveTenantFromHost('jeffistores.in')).resolves.toBeNull()
     })
   })
 

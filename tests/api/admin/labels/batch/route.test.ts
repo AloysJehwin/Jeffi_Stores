@@ -105,7 +105,10 @@ describe('POST /api/admin/labels/batch — serial mode', () => {
       [['s1']]
     )
     expect(mockSerialPdf).toHaveBeenCalledWith(
-      [{ serialNumber: 'SN1', productName: 'Bolt', sku: 'B1', variantName: 'M6', lotNumber: 'L1' }],
+      [{
+        serialNumber: 'SN1', productName: 'Bolt', sku: 'B1', variantName: 'M6', lotNumber: 'L1',
+        showPrice: false, mrp: undefined, priceExGst: undefined, gstPercentage: undefined, qrUrl: undefined,
+      }],
       1, false, undefined
     )
   })

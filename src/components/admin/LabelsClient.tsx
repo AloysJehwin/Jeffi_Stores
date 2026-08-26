@@ -311,64 +311,38 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
         </div>
 
         {/* Output + copies */}
-        <div className="bg-surface-elevated border border-border-default rounded-xl p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <h2 className="text-sm font-semibold text-foreground mb-2">Output Format</h2>
-              <div className="flex gap-2">
-                {(['thermal', 'sheet'] as const).map(m => (
-                  <button
-                    key={m}
-                    onClick={() => setOutputMode(m)}
-                    className={`flex-1 py-2 px-3 rounded-lg border text-sm font-medium transition-colors ${
-                      outputMode === m
-                        ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400'
-                        : 'border-border-default text-foreground-secondary hover:border-orange-300'
-                    }`}
-                  >
-                    {m === 'thermal' ? 'Thermal (per page)' : 'A4 Sheet grid'}
-                  </button>
-                ))}
-              </div>
-              <p className="text-xs text-foreground-muted mt-1.5">
-                {outputMode === 'thermal' ? 'One label per page — for thermal/label printers' : 'Multiple labels per A4 page with cut lines — for desktop printers'}
-              </p>
-            </div>
-            <div className="flex-1">
-              <h2 className="text-sm font-semibold text-foreground mb-2">Copies per item</h2>
-              <input
-                type="number" min={1} max={100} value={copies}
-                onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
-                className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface-secondary text-foreground text-sm"
-              />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-sm font-semibold text-foreground mb-2">Print Price</h2>
-              <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
-                <div
-                  onClick={() => setShowPrice(v => !v)}
-                  className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${showPrice ? 'bg-orange-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${showPrice ? 'translate-x-5 border-orange-300' : 'translate-x-0.5'}`} />
-                </div>
-                <span className="text-sm text-foreground-secondary">{showPrice ? 'On' : 'Off'}</span>
-              </label>
-              <p className="text-xs text-foreground-muted mt-1">Print price on label</p>
-            </div>
-            <div className="flex-1">
-              <h2 className="text-sm font-semibold text-foreground mb-2">QR Action</h2>
-              <label className="flex items-center gap-2 cursor-pointer select-none mt-1">
-                <div
-                  onClick={() => setQrAction(v => !v)}
-                  className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer ${qrAction ? 'bg-orange-500' : 'bg-gray-200 dark:bg-zinc-600'}`}
-                >
-                  <div className={`absolute top-0.5 w-4 h-4 bg-white rounded-full shadow-sm border border-gray-300 dark:border-zinc-500 transition-transform ${qrAction ? 'translate-x-5 border-orange-300' : 'translate-x-0.5'}`} />
-                </div>
-                <span className="text-sm text-foreground-secondary">{qrAction ? 'On' : 'Off'}</span>
-              </label>
-              <p className="text-xs text-foreground-muted mt-1">QR opens quick actions when scanned</p>
-            </div>
+        <div className="bg-surface-elevated border border-border-default rounded-xl p-4 flex flex-wrap items-center gap-4">
+          <div className="flex items-center gap-2">
+            {(['thermal', 'sheet'] as const).map(m => (
+              <button key={m} type="button" onClick={() => setOutputMode(m)}
+                className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${outputMode === m ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+                {m === 'thermal' ? 'Thermal (1/page)' : 'A4 sheet'}
+              </button>
+            ))}
           </div>
+          <label className="flex items-center gap-2 text-sm text-foreground-secondary">
+            Copies
+            <input type="number" min={1} max={100} value={copies}
+              onChange={e => setCopies(Math.max(1, Math.min(100, parseInt(e.target.value) || 1)))}
+              className="w-16 px-2 py-1 rounded-lg border border-border-default bg-surface text-sm" />
+          </label>
+          <button type="button" onClick={() => setShowPrice(v => !v)} title="Print price on label"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${showPrice ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+            Print Price: {showPrice ? 'On' : 'Off'}
+          </button>
+          <button type="button" onClick={() => setQrAction(v => !v)} title="QR opens quick actions when scanned"
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${qrAction ? 'border-orange-500 bg-orange-50 dark:bg-orange-900/20 text-orange-600 dark:text-orange-400' : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'}`}>
+            QR Action: {qrAction ? 'On' : 'Off'}
+          </button>
+          <button type="button" onClick={handleDownload} disabled={selectedProducts.length === 0 || downloading}
+            className="ml-auto px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+            {downloading
+              ? 'Generating…'
+              : selectedProducts.length === 0
+                ? 'Select products to download'
+                : `Download PDF — ${totalLabels} label${totalLabels !== 1 ? 's' : ''}`
+            }
+          </button>
         </div>
 
         {/* Category filter + product search */}
@@ -567,22 +541,6 @@ export default function LabelsClient({ labelSizes, categories }: Props) {
             {error}
           </div>
         )}
-
-        <button
-          onClick={handleDownload}
-          disabled={selectedProducts.length === 0 || downloading}
-          className="w-full flex items-center justify-center gap-2 py-3 px-6 bg-orange-500 hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl transition-colors text-sm"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-          </svg>
-          {downloading
-            ? 'Generating PDF…'
-            : selectedProducts.length === 0
-              ? 'Select products to download'
-              : `Download PDF — ${totalLabels} label${totalLabels !== 1 ? 's' : ''}`
-          }
-        </button>
       </div>
 
       {/* ── Right panel — preview ── */}

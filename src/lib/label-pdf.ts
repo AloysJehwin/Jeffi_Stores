@@ -59,9 +59,16 @@ function fmtShort(price: number | null): string {
   return `Rs. ${Number(price).toFixed(0)}`
 }
 
+interface PriceFields {
+  mrp?: number | null
+  price_ex_gst?: number | null
+  base_price?: number | null
+  gst_percentage?: number | null
+}
+
 function drawPrice(
   doc: any,
-  p: LabelProduct,
+  p: PriceFields,
   px: number,
   py: number,
   availW: number,
@@ -145,21 +152,30 @@ async function render30x20(doc: any, p: LabelProduct, x: number, y: number, w: n
   const pad = 2.5
   const barcodeText = p.sku
   const barH = 7 * MM
+  const qrSize = 7 * MM
+
+  const qrBuf = await makeQRBuffer(p.qrUrl || p.sku, Math.round(qrSize * 3))
+  const rightX = x + w - pad - qrSize
+  const textW = rightX - x - pad - 2
 
   doc.font('Helvetica-Bold').fontSize(5)
-  const line1 = clip(p.name, w - pad * 2, doc, 'Helvetica-Bold', 5)
-  doc.text(line1, x + pad, y + pad, { width: w - pad * 2, lineBreak: false })
+  const line1 = clip(p.name, textW, doc, 'Helvetica-Bold', 5)
+  doc.text(line1, x + pad, y + pad, { width: textW, lineBreak: false })
 
   let cur = y + pad + 6.5
   if (p.variant_name) {
     doc.font('Helvetica').fontSize(4.5).fillColor('#444444')
-    const vline = clip(p.variant_name, w - pad * 2, doc, 'Helvetica', 4.5)
-    doc.text(vline, x + pad, cur, { width: w - pad * 2, lineBreak: false })
+    const vline = clip(p.variant_name, textW, doc, 'Helvetica', 4.5)
+    doc.text(vline, x + pad, cur, { width: textW, lineBreak: false })
     cur += 5.5
     doc.fillColor('#000000')
   }
 
-  if (p.showPrice !== false) drawPrice(doc, p, x + pad, cur, w - pad * 2, 5, 4)
+  if (p.showPrice !== false) drawPrice(doc, p, x + pad, cur, textW, 5, 4)
+
+  if (qrBuf) {
+    doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
+  }
 
   const barBuf = await makeBarcodeBuffer(barcodeText, 3)
   if (barBuf) {
@@ -171,25 +187,34 @@ async function render30x20(doc: any, p: LabelProduct, x: number, y: number, w: n
 async function render30x50(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
   const pad = 3.5
   const barcodeH = 10 * MM
+  const qrSize = 9 * MM
   const barcodeText = p.sku
+
+  const qrBuf = await makeQRBuffer(p.qrUrl || p.sku, Math.round(qrSize * 3))
+  const rightX = x + w - pad - qrSize
+  const textW = rightX - x - pad - 2
 
   doc.font('Helvetica-Bold').fontSize(7)
   const nameAreaH = h - pad * 2 - barcodeH - 10
-  doc.text(p.name, x + pad, y + pad, { width: w - pad * 2, lineBreak: true, height: p.variant_name ? nameAreaH * 0.45 : nameAreaH * 0.55 })
+  doc.text(p.name, x + pad, y + pad, { width: textW, lineBreak: true, height: p.variant_name ? nameAreaH * 0.45 : nameAreaH * 0.55 })
 
   let cursor = y + pad
   doc.font('Helvetica-Bold').fontSize(7)
-  const nameH = Math.min(doc.heightOfString(p.name, { width: w - pad * 2 }), nameAreaH * 0.55)
+  const nameH = Math.min(doc.heightOfString(p.name, { width: textW }), nameAreaH * 0.55)
   cursor += nameH + 2
 
   if (p.variant_name) {
     doc.font('Helvetica').fontSize(6).fillColor('#333333')
-    doc.text(p.variant_name, x + pad, cursor, { width: w - pad * 2, lineBreak: false })
+    doc.text(p.variant_name, x + pad, cursor, { width: textW, lineBreak: false })
     cursor += 9
     doc.fillColor('#000000')
   }
 
-  if (p.showPrice !== false) cursor = drawPrice(doc, p, x + pad, cursor, w - pad * 2, 7, 5.5)
+  if (p.showPrice !== false) cursor = drawPrice(doc, p, x + pad, cursor, textW, 7, 5.5)
+
+  if (qrBuf) {
+    doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
+  }
 
   doc.font('Helvetica').fontSize(5.5).fillColor('#666666')
   doc.text(p.sku, x + pad, y + h - pad - barcodeH - 9, { width: w - pad * 2, lineBreak: false })
@@ -291,15 +316,68 @@ async function render50x50(doc: any, p: LabelProduct, x: number, y: number, w: n
   drawWarningIcons(doc, p, x, y, w, h, 7)
 }
 
+// Shelf card — 100×70mm, much larger than the sticker sizes above. Meant to sit on
+// a shelf edge and be read from a short distance, so text/QR are sized up rather
+// than reusing the tiny 30×20 layout (which wasted most of the card and had no QR).
+async function renderProductShelfCard(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
+  const pad = 6
+  const barcodeH = 14 * MM
+  const qrSize = 24 * MM
+  const barcodeText = p.sku
+
+  const qrBuf = await makeQRBuffer(p.qrUrl || p.sku, Math.round(qrSize * 3))
+  const barBuf = await makeBarcodeBuffer(barcodeText, 6)
+
+  const leftColW = qrSize + 6
+  const rightX = x + pad + leftColW
+  const rightW = w - pad * 2 - leftColW
+
+  if (qrBuf) {
+    doc.image(qrBuf, x + pad, y + pad, { width: qrSize, height: qrSize })
+  }
+
+  doc.font('Helvetica-Bold').fontSize(16)
+  doc.text(p.name, rightX, y + pad, { width: rightW, lineBreak: true, height: p.variant_name ? 36 : 46 })
+
+  let cur = y + pad + (p.variant_name ? 36 : 46) + 2
+
+  if (p.variant_name) {
+    doc.font('Helvetica').fontSize(11).fillColor('#333333')
+    doc.text(p.variant_name, rightX, cur, { width: rightW, lineBreak: false })
+    cur += 15
+    doc.fillColor('#000000')
+  }
+
+  if (p.brand_name) {
+    doc.font('Helvetica').fontSize(9).fillColor('#777777')
+    doc.text(p.brand_name, rightX, cur, { width: rightW, lineBreak: false })
+    cur += 13
+    doc.fillColor('#000000')
+  }
+
+  if (p.showPrice !== false) drawPrice(doc, p, rightX, cur, rightW, 18, 10)
+
+  doc.fillColor('#000000').font('Helvetica').fontSize(9)
+  doc.text(`SKU: ${p.sku}`, x + pad, y + h - pad - barcodeH - 12, { width: w - pad * 2, lineBreak: false })
+
+  if (barBuf) {
+    doc.image(barBuf, x + pad, y + h - pad - barcodeH, { width: w - pad * 2, height: barcodeH })
+  }
+  drawWarningIcons(doc, p, x, y, w, h, 11)
+}
+
 async function render80x20(doc: any, p: LabelProduct, x: number, y: number, w: number, h: number) {
   const pad = 2.5
   const barH = 7 * MM
+  const qrSize = 7 * MM
   const barcodeText = p.sku
-  const topH = h - pad - barH - pad
 
-  const nameColW = w * 0.62
+  const qrBuf = await makeQRBuffer(p.qrUrl || p.sku, Math.round(qrSize * 3))
+  const qrX = x + w - pad - qrSize
+
+  const nameColW = w * 0.55
   const priceX = x + nameColW + 2
-  const priceColW = w - nameColW - pad - 2
+  const priceColW = qrX - 2 - priceX
 
   doc.font('Helvetica-Bold').fontSize(7)
   const nameLine = clip(p.name, nameColW - pad * 2, doc, 'Helvetica-Bold', 7)
@@ -313,6 +391,10 @@ async function render80x20(doc: any, p: LabelProduct, x: number, y: number, w: n
   }
 
   if (p.showPrice !== false) drawPrice(doc, p, priceX, y + pad, priceColW, 7, 4.5)
+
+  if (qrBuf) {
+    doc.image(qrBuf, qrX, y + pad, { width: qrSize, height: qrSize })
+  }
 
   const barBuf = await makeBarcodeBuffer(barcodeText, 3)
   if (barBuf) {
@@ -330,7 +412,7 @@ function getRenderFn(size: LabelSize): RenderFn {
     case '40x60': return render40x60
     case '50x50': return render50x50
     case '80x20': return render80x20
-    case 'shelf-card': return render30x20
+    case 'shelf-card': return renderProductShelfCard
   }
 }
 
@@ -501,6 +583,11 @@ export interface LabelBatch {
   manufactureDate?: string | null
   expiryDate?: string | null
   quantity?: number | null
+  mrp?: number | null
+  priceExGst?: number | null
+  gstPercentage?: number | null
+  showPrice?: boolean
+  qrUrl?: string
 }
 
 export interface LabelSerial {
@@ -509,6 +596,11 @@ export interface LabelSerial {
   variantName?: string | null
   sku: string
   lotNumber?: string | null
+  mrp?: number | null
+  priceExGst?: number | null
+  gstPercentage?: number | null
+  showPrice?: boolean
+  qrUrl?: string
 }
 
 // Compact 40×25 mm label spec used for both batch and serial labels.
@@ -517,8 +609,9 @@ const BATCH_SPEC: LabelSpec = { size: '30x50', widthMm: 50, heightMm: 30, widthP
 async function renderBatchLabel(doc: any, b: LabelBatch, x: number, y: number, w: number, h: number) {
   const pad = 3.5
   const qrSize = 13 * MM
-  // QR encodes a machine-readable batch reference; barcode carries the lot number.
-  const qrText = `BATCH:${b.batchId}`
+  // QR encodes a machine-readable batch reference by default, or a quick-action deep
+  // link (qrUrl) when QR Action is enabled; barcode carries the lot number.
+  const qrText = b.qrUrl || `BATCH:${b.batchId}`
   const barText = b.lotNumber || b.sku
   const qrBuf = await makeQRBuffer(qrText, Math.round(qrSize * 3))
   const barBuf = await makeBarcodeBuffer(barText, 3)
@@ -545,15 +638,18 @@ async function renderBatchLabel(doc: any, b: LabelBatch, x: number, y: number, w
   if (b.lotNumber) row('LOT', b.lotNumber)
   if (b.expiryDate) row('EXP', b.expiryDate)
   if (b.quantity != null) row('QTY', String(b.quantity))
+  if (b.showPrice && midY <= maxY) {
+    midY = drawPrice(doc, { mrp: b.mrp, price_ex_gst: b.priceExGst, gst_percentage: b.gstPercentage }, x + pad, midY, textW, 7, 5.5)
+  }
 
   if (qrBuf) doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
-  if (barBuf) doc.image(barBuf, x + pad, barTop, { width: w - pad * 2 - qrSize - 2, height: 6 * MM })
+  if (barBuf) doc.image(barBuf, x + pad, barTop, { width: w - pad * 2, height: 6 * MM })
 }
 
 async function renderSerialLabel(doc: any, s: LabelSerial, x: number, y: number, w: number, h: number) {
   const pad = 3.5
   const qrSize = 13 * MM
-  const qrBuf = await makeQRBuffer(s.serialNumber, Math.round(qrSize * 3))
+  const qrBuf = await makeQRBuffer(s.qrUrl || s.serialNumber, Math.round(qrSize * 3))
   const barBuf = await makeBarcodeBuffer(s.serialNumber, 3)
 
   const rightX = x + w - pad - qrSize
@@ -577,9 +673,12 @@ async function renderSerialLabel(doc: any, s: LabelSerial, x: number, y: number,
   row('SKU', s.sku)
   if (s.lotNumber) row('LOT', s.lotNumber)
   row('S/N', s.serialNumber, true)
+  if (s.showPrice && midY <= maxY) {
+    midY = drawPrice(doc, { mrp: s.mrp, price_ex_gst: s.priceExGst, gst_percentage: s.gstPercentage }, x + pad, midY, textW, 7, 5.5)
+  }
 
   if (qrBuf) doc.image(qrBuf, rightX, y + pad, { width: qrSize, height: qrSize })
-  if (barBuf) doc.image(barBuf, x + pad, barTop, { width: w - pad * 2 - qrSize - 2, height: 6 * MM })
+  if (barBuf) doc.image(barBuf, x + pad, barTop, { width: w - pad * 2, height: 6 * MM })
 }
 
 function makeGenerator<T>(renderOne: (doc: any, item: T, x: number, y: number, w: number, h: number) => Promise<void>) {

@@ -598,3 +598,30 @@ describe('query() – runWithAuditContext takes precedence over cookie', () => {
     expect(calls).toContain('COMMIT')
   })
 })
+
+describe('getPool – tenant isolation (fail closed)', () => {
+  beforeEach(() => { vi.resetModules() })
+
+  it('throws instead of serving the platform DB when a tenant has no rds_endpoint', async () => {
+    const { mod, pg } = await importDb({})
+    const ctx = { tenantId: 't-1', slug: 'acme', plan: 'basic', infra: null }
+    await expect(
+      mod.runWithTenantContext(ctx as any, () => mod.query('SELECT 1'))
+    ).rejects.toThrow(/no RDS endpoint/i)
+    expect(pg.PoolSpy).not.toHaveBeenCalled()
+  })
+
+  it('names the offending tenant in the error', async () => {
+    const { mod } = await importDb({})
+    const ctx = { tenantId: 't-2', slug: 'bolts', plan: 'basic', infra: { rdsEndpoint: '' } }
+    await expect(
+      mod.runWithTenantContext(ctx as any, () => mod.query('SELECT 1'))
+    ).rejects.toThrow(/bolts/)
+  })
+
+  it('still uses the DEFAULT pool when no tenant is in context', async () => {
+    const { mod, pg } = await importDb({})
+    await mod.query('SELECT 1')
+    expect(pg.PoolSpy).toHaveBeenCalledTimes(1)
+  })
+})
