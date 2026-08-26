@@ -155,6 +155,7 @@ jobs:
       - name: Next.js build
         run: npm run build
         env:
+          NODE_OPTIONS: --max-old-space-size=6144
           DATABASE_URL: postgresql://localhost:5432/dummy
           JWT_SECRET: ci-test-secret
           NEXT_PUBLIC_APP_URL: http://localhost:3000
