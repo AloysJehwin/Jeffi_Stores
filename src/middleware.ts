@@ -4,7 +4,7 @@ import { verifyToken, verifyBusinessToken } from './lib/jwt'
 import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 import { extractSessionSignals } from './lib/session-signals-request'
-import { resolveTenantFromHost, appFromHost } from './lib/tenant-registry'
+import { resolveTenantFromHost, appFromHost, slugFromHost } from './lib/tenant-registry'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -47,6 +47,24 @@ function buildRedirectUrl(request: NextRequest, path: string): URL {
   return new URL(path, `${proto}://${host}`)
 }
 
+// x-forwarded-host selects the tenant, so a forged one would target another tenant's DB.
+// nginx overwrites it on every proxy block; this is the second layer for anything that
+// reaches Next directly. Trusted only when the edge secret matches, or (when none is
+// configured) when it agrees with Host on the resolved tenant slug.
+function resolveTrustedHost(request: NextRequest): string {
+  const raw = request.headers.get('host') || request.nextUrl.hostname || ''
+  const fwd = request.headers.get('x-forwarded-host')
+  if (!fwd) return raw
+  const secret = process.env.EDGE_PROXY_SECRET
+  if (secret) return request.headers.get('x-edge-secret') === secret ? fwd : raw
+  if (!raw) return fwd
+  const a = slugFromHost(fwd)
+  const b = slugFromHost(raw)
+  if (a.slug === b.slug && a.isCustomDomain === b.isCustomDomain) return fwd
+  console.warn(`[middleware] rejecting x-forwarded-host "${fwd}" (Host "${raw}" resolves differently)`)
+  return raw
+}
+
 function isMobileUA(ua: string | null): boolean {
   if (!ua) return false
   return /android|iphone|ipad|ipod|mobile|blackberry|iemobile|opera mini/i.test(ua)
@@ -62,7 +80,7 @@ function adminWritePathParent(pathname: string): string {
 }
 
 export async function middleware(request: NextRequest) {
-  const hostname = request.headers.get('x-forwarded-host') || request.headers.get('host') || request.nextUrl.hostname || ''
+  const hostname = resolveTrustedHost(request)
   const pathname = request.nextUrl.pathname
   // Per-request device-binding signals: resolveSession revokes + rejects a cookie replayed
   // from a clearly different environment (>= 2 STABLE signals differ — see evaluateBinding).
@@ -108,6 +126,17 @@ export async function middleware(request: NextRequest) {
   if (tenant) {
     stripped.set('x-tenant-id', tenant.tenantId)
     stripped.set('x-tenant-slug', tenant.slug)
+  } else {
+    // A tenant-shaped host that resolves to nothing (unknown, suspended, still provisioning)
+    // must not fall through to the platform store — that served flagship data on tenant hosts
+    // and let an unknown slug probe for a login page.
+    const parsed = slugFromHost(hostname)
+    if (parsed.slug || parsed.isCustomDomain) {
+      return addSecurityHeaders(new NextResponse('Not found', {
+        status: 404,
+        headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store' },
+      }))
+    }
   }
 
   // Tenant isolation guard: a session is bound (snapshotted) to exactly one tenant.
