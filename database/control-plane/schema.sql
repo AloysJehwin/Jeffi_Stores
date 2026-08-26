@@ -475,3 +475,47 @@ CREATE TABLE IF NOT EXISTS public.platform_infra (
     updated_at  timestamp with time zone NOT NULL DEFAULT now()
 );
 ALTER TABLE ONLY public.platform_infra ADD CONSTRAINT platform_infra_pkey PRIMARY KEY (key);
+
+--
+-- tenant_ca: per-tenant certificate authority for tenant admin mTLS. Each tenant gets its
+-- OWN CA, so a client certificate issued for one tenant can never authenticate against
+-- another. nginx runs `ssl_verify_client optional_no_ca` on the tenant admin hosts and
+-- forwards the raw client cert; the app verifies it against THIS tenant's CA, which keeps
+-- verification dynamic (no nginx server block or reload per tenant).
+-- ca_key_pem is encrypted at rest (aes-256-gcm, TENANT_CA_ENC_KEY) — it is a signing key.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_ca (
+    tenant_id    uuid NOT NULL,
+    ca_cert_pem  text NOT NULL,                    -- public: used to verify client certs
+    ca_key_pem   text NOT NULL,                    -- ENCRYPTED signing key
+    subject      text NOT NULL,
+    created_at   timestamp with time zone NOT NULL DEFAULT now(),
+    expires_at   timestamp with time zone NOT NULL,
+    rotated_at   timestamp with time zone
+);
+ALTER TABLE ONLY public.tenant_ca ADD CONSTRAINT tenant_ca_pkey PRIMARY KEY (tenant_id);
+ALTER TABLE ONLY public.tenant_ca ADD CONSTRAINT tenant_ca_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+--
+-- tenant_admin_certs: issued client certificates, for revocation and audit. A cert is valid
+-- only if its serial appears here with revoked_at IS NULL — revocation therefore takes effect
+-- immediately, without regenerating a CRL or touching nginx.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_admin_certs (
+    id            uuid NOT NULL DEFAULT uuid_generate_v4(),
+    tenant_id     uuid NOT NULL,
+    serial        character varying(64) NOT NULL,  -- uppercase hex, matches X509 serialNumber
+    common_name   character varying(128) NOT NULL,
+    issued_to     character varying(255) NOT NULL, -- email the p12 was sent to
+    issued_at     timestamp with time zone NOT NULL DEFAULT now(),
+    expires_at    timestamp with time zone NOT NULL,
+    revoked_at    timestamp with time zone,
+    revoked_by    character varying(255)
+);
+ALTER TABLE ONLY public.tenant_admin_certs ADD CONSTRAINT tenant_admin_certs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_admin_certs ADD CONSTRAINT tenant_admin_certs_serial_key UNIQUE (serial);
+ALTER TABLE ONLY public.tenant_admin_certs ADD CONSTRAINT tenant_admin_certs_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_tenant_admin_certs_tenant ON public.tenant_admin_certs USING btree (tenant_id);
+CREATE INDEX IF NOT EXISTS idx_tenant_admin_certs_active ON public.tenant_admin_certs USING btree (serial) WHERE revoked_at IS NULL;

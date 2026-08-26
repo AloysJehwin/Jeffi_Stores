@@ -4,6 +4,10 @@ import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft, saveS
 import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
 import { createLinkedAccount, createRouteStakeholder, configureRouteSettlement, mapBusinessType, inferProfileCategory, normalizeIndianPhone } from '@/lib/razorpay-route'
 import { sendKycApprovedEmail } from '@/lib/ecom-emails'
+// TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
+import { isPaymentBypassed, bypassAuditNote } from '@/lib/ecom-payment-bypass'
+import { setSubscriptionStatus } from '@/lib/tenant-registry'
+import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,6 +92,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       process.stderr.write(`[route] linked account creation failed for ${tenantId}: ${err?.error?.description ?? err?.message}\n`)
     }
   }
+
+  // ── TEMPORARY payment bypass ────────────────────────────────────────────────
+  // Skips Razorpay entirely for an allow-listed owner and starts provisioning
+  // straight away, mirroring what the subscription.charged webhook would do.
+  // Remove this block together with src/lib/ecom-payment-bypass.ts.
+  if (isPaymentBypassed(owner.email)) {
+    process.stderr.write(`[ecom] ${bypassAuditNote(owner.email)} tenant=${tenantId}\n`)
+    await setSubscriptionStatus(tenantId, 'active', 'provisioning')
+    const restoreFromKey = await resolveRestoreKey(tenantId, tenant.slug)
+    triggerProvisioning({
+      action: 'provision',
+      tenantId,
+      slug: tenant.slug,
+      plan: tenant.plan,
+      ownerId: kyc.owner_id,
+      restoreFromKey,
+      reason: 'first_payment',
+    }).catch(() => {})
+    return NextResponse.json({
+      ok: true,
+      paymentBypassed: true,
+      linkedAccountId,
+      message: 'Payment bypassed (internal testing) - provisioning started.',
+    })
+  }
+  // ── end TEMPORARY payment bypass ────────────────────────────────────────────
 
   // 2. Create Razorpay Subscription and return checkout URL.
   const plans = await listPlans()

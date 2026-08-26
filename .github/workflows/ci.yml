@@ -33,7 +33,10 @@ jobs:
       - name: Detect entity SQL file changes
         id: detect
         run: |
-          if git diff --name-only HEAD~1 HEAD | grep -qP '^database/(?!migrations/)[^/]+\.sql'; then
+          # NOTE: the previous pattern was [^/]+ which matched only files DIRECTLY under
+          # database/, so database/control-plane/schema.sql never triggered a diff and the
+          # control plane silently drifted. .+ covers subdirectories.
+          if git diff --name-only HEAD~1 HEAD | grep -qP '^database/(?!migrations/).+\.sql'; then
             echo "schema_changed=true" >> $GITHUB_OUTPUT
             echo "Entity SQL files changed — will schema-diff against live RDS"
           else
@@ -381,10 +384,14 @@ jobs:
             export RDS_HOST=jeffi-stores-db.cjmaa6acimgm.us-east-1.rds.amazonaws.com
             export RDS_PORT=5432
             export RDS_USER=app_user
-            export RDS_DB=jeffi_stores
             export AWS_REGION=us-east-1
 
-            bash deploy/schema-diff.sh
+            # Platform store DB
+            RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=platform
+
+            # SaaS control plane - previously never diffed, which is how it ended up
+            # missing tenant_ca/tenant_admin_certs and provisioning_jobs.next_attempt_at.
+            RDS_DB=jeffi_control_plane bash deploy/schema-diff.sh --set=control-plane
 
   # ────────────────────────────────────────────────────────
   # Stage 5 — Run DB Migrations  (main only, gate: deploy + migrations changed)
