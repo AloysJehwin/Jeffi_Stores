@@ -1,0 +1,137 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "TenantParameterGroups",
+      "Effect": "Allow",
+      "Action": [
+        "rds:CreateDBParameterGroup",
+        "rds:ModifyDBParameterGroup",
+        "rds:DeleteDBParameterGroup"
+      ],
+      "Resource": "arn:aws:rds:us-east-1:708835965056:pg:jeffi-tenant-*"
+    },
+    {
+      "Sid": "TenantDatabases",
+      "Effect": "Allow",
+      "Action": [
+        "rds:CreateDBInstance",
+        "rds:DeleteDBInstance",
+        "rds:StopDBInstance",
+        "rds:StartDBInstance",
+        "rds:ModifyDBInstance",
+        "rds:AddTagsToResource",
+        "rds:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:rds:us-east-1:708835965056:db:jeffi-tenant-*",
+        "arn:aws:rds:us-east-1:708835965056:pg:jeffi-tenant-*",
+        "arn:aws:rds:us-east-1:708835965056:subgrp:*"
+      ]
+    },
+    {
+      "Sid": "RdsReadOnlyDescribesCannotBeResourceScoped",
+      "Effect": "Allow",
+      "Action": [
+        "rds:DescribeDBInstances",
+        "rds:DescribeDBParameterGroups",
+        "rds:DescribeDBSubnetGroups"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "Ec2ReadOnlyDescribesCannotBeResourceScoped",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeImages",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeInstanceStatus"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "LaunchTenantInstancesMustCarryTheTenantTag",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": "arn:aws:ec2:us-east-1:708835965056:instance/*",
+      "Condition": {
+        "StringEquals": { "aws:RequestTag/app": "jeffi-tenant" }
+      }
+    },
+    {
+      "Sid": "LaunchTenantInstancesSupportingResources",
+      "Effect": "Allow",
+      "Action": "ec2:RunInstances",
+      "Resource": [
+        "arn:aws:ec2:us-east-1::image/*",
+        "arn:aws:ec2:us-east-1:708835965056:subnet/subnet-01ed5f7b63fd320c1",
+        "arn:aws:ec2:us-east-1:708835965056:security-group/sg-0f4f1f26371fe723d",
+        "arn:aws:ec2:us-east-1:708835965056:network-interface/*",
+        "arn:aws:ec2:us-east-1:708835965056:volume/*",
+        "arn:aws:ec2:us-east-1:708835965056:key-pair/*"
+      ]
+    },
+    {
+      "Sid": "TagOnlyAtLaunch",
+      "Effect": "Allow",
+      "Action": "ec2:CreateTags",
+      "Resource": "arn:aws:ec2:us-east-1:708835965056:*/*",
+      "Condition": {
+        "StringEquals": { "ec2:CreateAction": "RunInstances" }
+      }
+    },
+    {
+      "Sid": "ManageOnlyTaggedTenantInstances",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:StartInstances",
+        "ec2:StopInstances",
+        "ec2:TerminateInstances",
+        "ec2:ModifyInstanceAttribute"
+      ],
+      "Resource": "arn:aws:ec2:us-east-1:708835965056:instance/*",
+      "Condition": {
+        "StringEquals": { "ec2:ResourceTag/app": "jeffi-tenant" }
+      }
+    },
+    {
+      "Sid": "TenantSecurityGroupIngressOnly",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupIngress"
+      ],
+      "Resource": [
+        "arn:aws:ec2:us-east-1:708835965056:security-group/sg-0f4f1f26371fe723d",
+        "arn:aws:ec2:us-east-1:708835965056:security-group/sg-0e361f0f1b093bd83"
+      ]
+    },
+    {
+      "Sid": "PassInstanceProfileToEc2Only",
+      "Effect": "Allow",
+      "Action": "iam:PassRole",
+      "Resource": "arn:aws:iam::708835965056:role/jeffi-stores-ec2-role",
+      "Condition": {
+        "StringEquals": { "iam:PassedToService": "ec2.amazonaws.com" }
+      }
+    },
+    {
+      "Sid": "TenantDnsRecordsInJeffistoresZoneOnly",
+      "Effect": "Allow",
+      "Action": "route53:ChangeResourceRecordSets",
+      "Resource": "arn:aws:route53:::hostedzone/Z08094881XKVZ9XSGBKG1"
+    },
+    {
+      "Sid": "Route53ReadBack",
+      "Effect": "Allow",
+      "Action": [
+        "route53:GetChange",
+        "route53:ListHostedZones",
+        "route53:ListResourceRecordSets"
+      ],
+      "Resource": "*"
+    }
+  ]
+}

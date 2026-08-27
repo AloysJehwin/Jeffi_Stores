@@ -682,7 +682,7 @@ ALTER TABLE ONLY public.merchant_gmc_refresh_meta
     ADD CONSTRAINT merchant_gmc_refresh_meta_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.merchant_gmc_refresh_meta
-    ADD CONSTRAINT merchant_gmc_refresh_meta_singleton CHECK (id = 1);
+    ADD CONSTRAINT merchant_gmc_refresh_meta_key_key UNIQUE (key);
 
 
 --
