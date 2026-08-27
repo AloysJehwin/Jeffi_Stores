@@ -201,10 +201,29 @@ RDS_TOKEN=$(aws rds generate-db-auth-token \
   --region "${AWS_REGION:-us-east-1}" \
   --username "$RDS_USER")
 
+# psql without ON_ERROR_STOP continues past failures and still exits 0, so a broken
+# statement used to be reported as a successful apply. Capture the output, surface any
+# ERROR lines, and fail the step. This job runs AFTER deploy, so a failure here flags the
+# drift loudly without rolling back a good release.
+APPLY_LOG=$(mktemp /tmp/schema_apply_XXXXXX.log)
 echo "$DIFF" | PGPASSWORD="$RDS_TOKEN" PGSSLMODE=require psql \
   -h "$RDS_HOST" \
   -p "${RDS_PORT:-5432}" \
   -U "$RDS_USER" \
-  -d "$RDS_DB"
+  -d "$RDS_DB" 2>&1 | tee "$APPLY_LOG"
 
-echo "Schema diff applied successfully."
+ERRORS=$(grep -c '^ERROR:' "$APPLY_LOG" || true)
+if [ "${ERRORS:-0}" -gt 0 ]; then
+  echo ""
+  echo "──────────────────────────────────────────────"
+  echo "$ERRORS statement(s) FAILED while applying to $RDS_DB ($SCHEMA_SET):"
+  grep '^ERROR:' "$APPLY_LOG" | sed 's/^/  /'
+  echo "──────────────────────────────────────────────"
+  echo "The schema files and the live database disagree in a way the diff cannot"
+  echo "reconcile automatically - usually a column type that differs between them."
+  rm -f "$APPLY_LOG"
+  exit 1
+fi
+rm -f "$APPLY_LOG"
+
+echo "Schema diff applied successfully ($SCHEMA_SET -> $RDS_DB)."
