@@ -154,7 +154,10 @@ CREATE TABLE public.merchant_gmc_status (
 --
 
 CREATE TABLE public.merchant_gmc_refresh_meta (
-    id integer DEFAULT 1 NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    key character varying NOT NULL,
+    value text,
+    updated_at timestamp with time zone DEFAULT now(),
     last_refreshed_at timestamp with time zone,
     total integer DEFAULT 0 NOT NULL,
     approved integer DEFAULT 0 NOT NULL,
