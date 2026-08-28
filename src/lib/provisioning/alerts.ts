@@ -45,11 +45,16 @@ export async function findStuckJobs(): Promise<StuckJob[]> {
   return res.rows.map((r: any) => ({ ...r, stuck_minutes: Math.round(Number(r.stuck_minutes)) }))
 }
 
-export async function alertProvisioningFailure(tenantSlug: string, step: string, error: string): Promise<void> {
+export async function alertProvisioningFailure(
+  tenantSlug: string, step: string, error: string, tenantId?: string,
+): Promise<void> {
+  const where = tenantId
+    ? `/admin/ecom/tenants/${tenantId}?tab=provisioning`
+    : '/admin/ecom/customers'
   await send(
     `[Jeffi] Provisioning FAILED: ${tenantSlug}`,
     `Tenant : ${tenantSlug}\nStep   : ${step}\nError  : ${error}\n\n` +
-    `The job is terminal and rollback has run. Inspect at /admin/ecom/provisioning.`,
+    `The job is terminal and rollback has run. Inspect at ${where}`,
   )
 }
 
@@ -69,7 +74,7 @@ export async function alertStuckJobs(): Promise<number> {
   )
   await send(
     `[Jeffi] ${jobs.length} provisioning job(s) need attention`,
-    `Failed or stuck for over ${STUCK_AFTER_MIN} minutes:\n\n${lines.join('\n')}\n\n/admin/ecom/provisioning`,
+    `Failed or stuck for over ${STUCK_AFTER_MIN} minutes:\n\n${lines.join('\n')}\n\n/admin/ecom/customers`,
   )
   return jobs.length
 }

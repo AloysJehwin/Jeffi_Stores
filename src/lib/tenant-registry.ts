@@ -803,6 +803,18 @@ export async function getOwnerBankAccount(ownerId: string): Promise<BankAccount 
   return (res.rows[0] as BankAccount) || null
 }
 
+/**
+ * The payout account for a store. Rows carry both owner_id and tenant_id, and the tenant one is
+ * what the operator wants: an owner with several stores can have a different account per store.
+ */
+export async function getTenantBankAccount(tenantId: string): Promise<BankAccount | null> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT id, owner_id, verification_status, account_number, ifsc, holder_name, upi_id, verified_name
+     FROM tenant_bank_accounts WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 1`, [tenantId])
+  return (res.rows[0] as BankAccount) || null
+}
+
 export async function hasVerifiedBank(ownerId: string): Promise<boolean> {
   const b = await getOwnerBankAccount(ownerId)
   return b?.verification_status === 'verified'
