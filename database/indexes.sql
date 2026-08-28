@@ -1863,3 +1863,10 @@ CREATE UNIQUE INDEX IF NOT EXISTS uniq_product_serials_instock ON public.product
 -- Serial numbers must be globally unique among in-stock units (no two in-stock
 -- serials may share a number, even across different products).
 CREATE UNIQUE INDEX IF NOT EXISTS uniq_product_serials_instock_global ON public.product_serials USING btree (serial_number) WHERE status = 'in_stock';
+
+
+--
+-- Name: idx_offer_display_settings_visible; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_offer_display_settings_visible ON public.offer_display_settings USING btree (is_visible, display_order);

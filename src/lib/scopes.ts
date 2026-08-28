@@ -285,15 +285,15 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
   {
     key: 'coupons:read',
     label: 'Coupons (Read)',
-    description: 'View discount coupons',
-    routes: ['/admin/coupons'],
+    description: 'View discount coupons and Razorpay bank offers',
+    routes: ['/admin/coupons', '/admin/offers'],
     group: 'Marketing',
   },
   {
     key: 'coupons:write',
     label: 'Coupons (Write)',
     description: 'Create, edit and delete discount coupons',
-    routes: ['/admin/coupons'],
+    routes: ['/admin/coupons', '/admin/offers'],
     group: 'Marketing',
   },
   {
@@ -625,6 +625,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/certificates')) return 'settings:read'
   if (pathname.startsWith('/api/admin/reviews')) return 'reviews:read'
   if (pathname.startsWith('/api/admin/coupons')) return 'coupons:read'
+  if (pathname.startsWith('/api/admin/offers')) return 'coupons:read'
   if (pathname.startsWith('/api/admin/review-forms')) return 'review_forms:read'
   if (pathname.startsWith('/api/admin/mailer')) return 'mailer:read'
   if (pathname.startsWith('/api/admin/suggest')) return null
