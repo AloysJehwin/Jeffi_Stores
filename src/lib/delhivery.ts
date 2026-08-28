@@ -202,20 +202,78 @@ export interface DelhiveryInvoiceCharges {
   freight: number
   codCharge: number
   oda: number
+  /** Pre-tax amount; total includes GST. */
+  gross: number
+  tax: number
+  chargedWeightG: number
+  zone: string | null
 }
 
-// Pulls the actual billed charges Delhivery raised for a shipment once it's
-// invoiced. Non-fatal by design: the invoice may not be ready right after
-// delivery, so any failure resolves to null rather than throwing.
-export async function fetchDelhiveryInvoiceCharges(
+/**
+ * Chargeable weight in grams for the charges API. Delhivery bills on the weight it measured;
+ * our quoted weight is the fallback, and 500 g is the floor so a missing weight cannot send
+ * cgm=0 (which the API rejects).
+ */
+export function chargeableGrams(chargedKg: unknown, quotedKg: unknown): number {
+  const kg = Number(chargedKg) || Number(quotedKg) || 0
+  return kg > 0 ? Math.round(kg * 1000) : 500
+}
+
+export interface InvoiceChargeQuery {
   awb: string
+  /** Terminal state Delhivery bills on. The API rejects anything else. */
+  settledStatus: 'Delivered' | 'RTO' | 'DTO'
+  /** Chargeable weight in grams. */
+  chargedWeightG: number
+  originPin: string
+  destPin: string
+  /** S = Surface, E = Express. */
+  mode?: 'S' | 'E'
+  paymentType?: 'Pre-paid' | 'COD'
+}
+
+/**
+ * Actual charges Delhivery billed for a shipment.
+ *
+ * The endpoint has five mandatory query params. The previous version sent only `waybill`, so
+ * every call came back 400 ("md is mandatory field...") and the `!res.ok → null` guard turned
+ * that into a silent "no charges yet" — the sync looked healthy and never once worked.
+ *
+ * Field names were wrong too: the response has no freight/cod/oda keys. Freight is `charge_DL`
+ * and COD is `charge_COD`, so even a successful call would have stored zeros.
+ *
+ * Charges exist only once a shipment reaches a billed terminal state (Delivered / RTO / DTO) —
+ * `ss` accepts nothing else — so there is nothing to fetch at "shipped".
+ *
+ * Still resolves to null rather than throwing (the caller treats charges as optional), but now
+ * logs why, because a silent null is what hid this.
+ */
+export async function fetchDelhiveryInvoiceCharges(
+  q: InvoiceChargeQuery
 ): Promise<DelhiveryInvoiceCharges | null> {
   const token = process.env.DELHIVERY_API_KEY
   if (!token) return null
 
+  if (!q.originPin || !q.destPin || !q.chargedWeightG) {
+    console.warn('[delhivery] invoice charges skipped — missing params', {
+      awb: q.awb, originPin: q.originPin, destPin: q.destPin, chargedWeightG: q.chargedWeightG,
+    })
+    return null
+  }
+
+  const params = new URLSearchParams({
+    waybill: q.awb,
+    md: q.mode ?? 'S',
+    ss: q.settledStatus,
+    cgm: String(Math.max(1, Math.round(q.chargedWeightG))),
+    o_pin: q.originPin,
+    d_pin: q.destPin,
+    ...(q.paymentType ? { pt: q.paymentType } : {}),
+  })
+
   try {
     const res = await fetch(
-      `https://track.delhivery.com/api/kinko/v1/invoice/charges/.json?waybill=${encodeURIComponent(awb)}`,
+      `https://track.delhivery.com/api/kinko/v1/invoice/charges/.json?${params}`,
       {
         headers: { Authorization: `Token ${token}` },
         signal: AbortSignal.timeout(10_000),
@@ -223,13 +281,24 @@ export async function fetchDelhiveryInvoiceCharges(
       }
     )
 
-    if (!res.ok) return null
+    const body = await res.text()
+    if (!res.ok) {
+      console.warn(`[delhivery] invoice charges ${res.status} for ${q.awb}: ${body.slice(0, 200)}`)
+      return null
+    }
 
-    const data = await res.json()
-    // Response shape varies across accounts — payload may be a bare object or
-    // wrapped in an array, and field names differ, so probe several aliases.
-    const record = Array.isArray(data) ? data[0] : data
+    let data: unknown
+    try { data = JSON.parse(body) } catch {
+      console.warn(`[delhivery] invoice charges non-JSON for ${q.awb}: ${body.slice(0, 200)}`)
+      return null
+    }
+
+    const record = (Array.isArray(data) ? data[0] : data) as Record<string, any> | undefined
     if (!record || typeof record !== 'object') return null
+    if (record.error) {
+      console.warn(`[delhivery] invoice charges error for ${q.awb}: ${String(record.error).slice(0, 200)}`)
+      return null
+    }
 
     const num = (...vals: unknown[]): number => {
       for (const v of vals) {
@@ -238,13 +307,23 @@ export async function fetchDelhiveryInvoiceCharges(
       return 0
     }
 
+    const tax = record.tax_data && typeof record.tax_data === 'object'
+      ? Object.values(record.tax_data as Record<string, unknown>).reduce<number>((s, v) => s + num(v), 0)
+      : 0
+
     return {
-      total: num(record.total_amount, record.total, record.charged_amount),
-      freight: num(record.freight_charge, record.frt_charge, record.freight),
-      codCharge: num(record.cod_charges, record.cod_charge, record.cod),
-      oda: num(record.oda_charge, record.oda_charges, record.oda),
+      total: num(record.total_amount),
+      gross: num(record.gross_amount),
+      // charge_DL is the delivery/freight leg; RTO and DTO shipments bill on their own legs.
+      freight: num(record.charge_DL, record.charge_RTO, record.charge_DTO),
+      codCharge: num(record.charge_COD, record.charge_CCOD),
+      oda: num(record.charge_ODA, record.charge_ODA),
+      tax,
+      chargedWeightG: num(record.charged_weight),
+      zone: typeof record.zone === 'string' ? record.zone : null,
     }
-  } catch {
+  } catch (err) {
+    console.warn(`[delhivery] invoice charges failed for ${q.awb}:`, err)
     return null
   }
 }
