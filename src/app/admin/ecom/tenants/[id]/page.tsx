@@ -2,7 +2,11 @@ import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { isPlatformAdmin } from '@/lib/scopes'
-import { getTenant, getTenantBilling, getKyc, getProvisioningJob } from '@/lib/tenant-registry'
+import {
+  getTenant, getTenantBilling, getKyc, getProvisioningJob,
+  getTenantOwners, getTenantSocialAccounts, listIntegrationCredentials,
+} from '@/lib/tenant-registry'
+import { listTenantAdminCerts, getTenantCa } from '@/lib/tenant-ca'
 import { StatusPill, TenantTabNav, isTenantTab, type TenantTab } from '@/components/admin/ecom/EcomUI'
 import TenantActions from '@/components/admin/ecom/TenantActions'
 import OverviewTab from '@/components/admin/ecom/tabs/OverviewTab'
@@ -10,6 +14,7 @@ import ProvisioningTab from '@/components/admin/ecom/tabs/ProvisioningTab'
 import InfrastructureTab from '@/components/admin/ecom/tabs/InfrastructureTab'
 import CommerceTab from '@/components/admin/ecom/tabs/CommerceTab'
 import KycTab from '@/components/admin/ecom/tabs/KycTab'
+import AccessTab from '@/components/admin/ecom/tabs/AccessTab'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,8 +42,9 @@ export default async function TenantObjectPage({
   const t = await getTenant(id)
   if (!t) notFound()
 
-  // Both are cheap single-row reads and feed the header or more than one tab: KYC drives the
-  // header badge everywhere, the job feeds Overview's health and Infrastructure's resource ids.
+  // Cheap single-row reads that feed the header or more than one tab: KYC drives the header
+  // badge everywhere, the job feeds Overview's health and Infrastructure's resource ids.
+  // Anything used by exactly one tab is loaded inside that tab's branch instead.
   const [kyc, headerJob] = await Promise.all([
     getKyc(id).catch(() => null),
     getProvisioningJob(id).catch(() => null),
@@ -77,12 +83,26 @@ export default async function TenantObjectPage({
       />
 
       <div className="mt-6">
-        {tab === 'overview' && <OverviewTab tenant={t} job={headerJob} />}
+        {tab === 'overview' && <OverviewTab tenant={t} job={headerJob} owners={await getTenantOwners(id).catch(() => [])} />}
         {tab === 'provisioning' && <ProvisioningTab tenant={t} />}
         {tab === 'infrastructure' && <InfrastructureTab tenant={t} job={headerJob} />}
         {tab === 'commerce' && <CommerceTab tenant={t} billing={await getTenantBilling(id).catch(() => null)} />}
+        {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
         {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} />}
       </div>
     </div>
   )
+}
+
+async function accessData(id: string) {
+  const [certs, ca, social, integrations] = await Promise.all([
+    listTenantAdminCerts(id).catch(() => []),
+    getTenantCa(id).catch(() => null),
+    getTenantSocialAccounts(id).catch(() => []),
+    listIntegrationCredentials(id).catch(() => []),
+  ])
+  // getTenantCa carries caKeyPem — the tenant's CA private key. Only the two display fields
+  // cross into the component, so the key cannot ride along into any future client boundary.
+  const caSummary = ca ? { subject: ca.subject, expiresAt: ca.expiresAt } : null
+  return { certs, ca: caSummary, social, integrations }
 }

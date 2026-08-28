@@ -736,6 +736,23 @@ export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
   return res.rows as TenantRow[]
 }
 
+export interface TenantOwner extends Owner {
+  role: string
+  linked_at: string
+}
+
+/** Owners of a tenant — the reverse of getOwnerTenants, for the admin object page. */
+export async function getTenantOwners(tenantId: string): Promise<TenantOwner[]> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT o.id, o.email, o.name, o.created_at, ot.role, ot.created_at AS linked_at
+     FROM owner_tenants ot
+     JOIN owners o ON o.id = ot.owner_id
+     WHERE ot.tenant_id = $1
+     ORDER BY ot.created_at`, [tenantId])
+  return res.rows as TenantOwner[]
+}
+
 /** Link an owner to a tenant they created. */
 export async function linkOwnerTenant(ownerId: string, tenantId: string): Promise<void> {
   const pool = controlPlanePool()
