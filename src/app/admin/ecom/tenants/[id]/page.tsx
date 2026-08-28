@@ -5,8 +5,10 @@ import { isPlatformAdmin } from '@/lib/scopes'
 import {
   getTenant, getTenantBilling, getKyc, getProvisioningJob,
   getTenantOwners, getTenantSocialAccounts, listIntegrationCredentials,
+  listCustomDomains, getTenantBankAccount,
 } from '@/lib/tenant-registry'
 import { listTenantAdminCerts, getTenantCa } from '@/lib/tenant-ca'
+import { getTenantMigrationRuns } from '@/lib/tenant-migrations'
 import { StatusPill, TenantTabNav, isTenantTab, type TenantTab } from '@/components/admin/ecom/EcomUI'
 import TenantActions from '@/components/admin/ecom/TenantActions'
 import OverviewTab from '@/components/admin/ecom/tabs/OverviewTab'
@@ -85,8 +87,8 @@ export default async function TenantObjectPage({
       <div className="mt-6">
         {tab === 'overview' && <OverviewTab tenant={t} job={headerJob} owners={await getTenantOwners(id).catch(() => [])} />}
         {tab === 'provisioning' && <ProvisioningTab tenant={t} />}
-        {tab === 'infrastructure' && <InfrastructureTab tenant={t} job={headerJob} />}
-        {tab === 'commerce' && <CommerceTab tenant={t} billing={await getTenantBilling(id).catch(() => null)} />}
+        {tab === 'infrastructure' && <InfrastructureTab tenant={t} job={headerJob} {...await infraData(id)} />}
+        {tab === 'commerce' && <CommerceTab tenant={t} {...await commerceData(id)} />}
         {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
         {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} />}
       </div>
@@ -105,4 +107,20 @@ async function accessData(id: string) {
   // cross into the component, so the key cannot ride along into any future client boundary.
   const caSummary = ca ? { subject: ca.subject, expiresAt: ca.expiresAt } : null
   return { certs, ca: caSummary, social, integrations }
+}
+
+async function infraData(id: string) {
+  const [domains, migrations] = await Promise.all([
+    listCustomDomains(id).catch(() => []),
+    getTenantMigrationRuns(id).catch(() => []),
+  ])
+  return { domains, migrations, currentSha: process.env.GIT_SHA || null }
+}
+
+async function commerceData(id: string) {
+  const [billing, bank] = await Promise.all([
+    getTenantBilling(id).catch(() => null),
+    getTenantBankAccount(id).catch(() => null),
+  ])
+  return { billing, bank }
 }
