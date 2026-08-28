@@ -49,7 +49,7 @@ export async function alertProvisioningFailure(
   tenantSlug: string, step: string, error: string, tenantId?: string,
 ): Promise<void> {
   const where = tenantId
-    ? `/admin/ecom/tenants/${tenantId}?tab=provisioning`
+    ? `/admin/ecom/customers/${tenantId}?tab=provisioning`
     : '/admin/ecom/customers'
   await send(
     `[Jeffi] Provisioning FAILED: ${tenantSlug}`,
