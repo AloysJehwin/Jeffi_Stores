@@ -1,6 +1,5 @@
 import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import Link from 'next/link'
 import { isPlatformAdmin } from '@/lib/scopes'
 import {
   getTenant, getTenantBilling, getKyc, getProvisioningJob,
@@ -9,8 +8,8 @@ import {
 } from '@/lib/tenant-registry'
 import { listTenantAdminCerts, getTenantCa } from '@/lib/tenant-ca'
 import { getTenantMigrationRuns } from '@/lib/tenant-migrations'
-import { StatusPill, TenantTabNav, isTenantTab, type TenantTab } from '@/components/admin/ecom/EcomUI'
-import TenantActions from '@/components/admin/ecom/TenantActions'
+import { TenantTabNav, isTenantTab, type TenantTab } from '@/components/admin/ecom/EcomUI'
+import TenantObjectHeader from '@/components/admin/ecom/TenantObjectHeader'
 import OverviewTab from '@/components/admin/ecom/tabs/OverviewTab'
 import ProvisioningTab from '@/components/admin/ecom/tabs/ProvisioningTab'
 import InfrastructureTab from '@/components/admin/ecom/tabs/InfrastructureTab'
@@ -58,28 +57,12 @@ export default async function TenantObjectPage({
 
   return (
     <div className="p-6 w-full max-w-full min-w-0 overflow-x-hidden">
-      <Link href="/admin/ecom/customers" className="text-sm text-accent-600 dark:text-accent-400 hover:underline">
-        ← Stores
-      </Link>
-
-      <div className="mt-3 mb-5 flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <div className="flex items-center gap-3 flex-wrap">
-            <h1 className="text-2xl font-bold text-foreground truncate">{t.display_name}</h1>
-            <StatusPill status={t.status} />
-            {kycPending && (
-              <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-                KYC pending review
-              </span>
-            )}
-          </div>
-          <p className="text-sm text-foreground-muted mt-1 break-all">{t.slug}.jeffistores.in</p>
-        </div>
-
-        <div className="shrink-0">
-          <TenantActions tenantId={t.id} slug={t.slug} status={t.status} instanceState={t.instance_state} />
-        </div>
-      </div>
+      <TenantObjectHeader
+        tenant={t}
+        backHref="/admin/ecom/customers"
+        backLabel="Stores"
+        kycPending={kycPending}
+      />
 
       <TenantTabNav
         tenantId={t.id}
