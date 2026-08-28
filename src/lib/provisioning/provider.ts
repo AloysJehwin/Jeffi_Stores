@@ -69,7 +69,15 @@ export interface ProvisioningProvider {
 
   /** Launch an app-serving EC2 (dedicated tenant instance or the shared pool), wait until it
    * has a public IP, and return it. Idempotent-friendly: caller tracks the instance id. */
-  ensureAppInstance(args: AppInstanceArgs): Promise<{ instanceId: string; ip: string }>
+  /**
+   * Launch an app instance. `onLaunched` fires with the new id BEFORE the readiness wait, so
+   * the caller can persist it — an id that only exists on the call stack becomes an orphaned,
+   * billing instance the moment anything after the launch throws.
+   */
+  ensureAppInstance(
+    args: AppInstanceArgs,
+    onLaunched?: (instanceId: string) => Promise<void>,
+  ): Promise<{ instanceId: string; ip: string }>
 
   /** Terminate an app instance (dedicated-tenant teardown / pool delete). Idempotent. */
   deleteAppInstance(instanceId: string): Promise<void>

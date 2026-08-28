@@ -97,9 +97,12 @@ export async function ensurePoolInstance(): Promise<{ instanceId: string; ip: st
   }
   // Create the pool instance (smallest tier — autoscale grows it later).
   const { appBootUserData } = await import('./provisioning/user-data')
-  const { instanceId, ip } = await provider.ensureAppInstance({
-    name: 'jeffi-pool', instanceType: POOL_SIZE_TIERS[0].type, userData: appBootUserData(),
-  })
+  const { instanceId, ip } = await provider.ensureAppInstance(
+    { name: 'jeffi-pool', instanceType: POOL_SIZE_TIERS[0].type, userData: appBootUserData() },
+    // Persist before the readiness wait: if that throws, the next run finds this instance
+    // instead of launching a second one.
+    (id) => setPlatformInfra(POOL_ID_KEY, id),
+  )
   await setPlatformInfra(POOL_ID_KEY, instanceId)
   await setPlatformInfra(POOL_IP_KEY, ip)
   return { instanceId, ip }
