@@ -134,6 +134,9 @@ export function isTenantTab(v: string | undefined): v is TenantTab {
 /**
  * Tab strip for the tenant object page. Plain links rather than client state so each tab is
  * a real URL — an alert email can point straight at ?tab=provisioning.
+ *
+ * Lives under /admin/ecom/customers/[id] because the sidebar marks a group active with
+ * startsWith(href + '/'), so an object page on its own path would never expand its nav group.
  */
 export function TenantTabNav({ tenantId, active, badges }: {
   tenantId: string; active: TenantTab; badges?: Partial<Record<TenantTab, React.ReactNode>>
@@ -146,7 +149,7 @@ export function TenantTabNav({ tenantId, active, badges }: {
           return (
             <Link
               key={key}
-              href={`/admin/ecom/tenants/${tenantId}?tab=${key}`}
+              href={`/admin/ecom/customers/${tenantId}?tab=${key}`}
               className={`px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
                 on
                   ? 'border-accent-500 text-foreground'
