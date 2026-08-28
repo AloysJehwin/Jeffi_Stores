@@ -14,6 +14,7 @@ import {
 } from '../meta'
 import { queryOne } from '../db'
 import { generateSocialCaption } from './caption'
+import { withProductLink, productUrl } from './product-url'
 
 // Publisher: turn one queued scheduled_social_posts row into a live FB/IG post. Resolves the
 // right credentials (env for Jeffi's own platform posts / decrypted per-tenant token), dispatches
@@ -59,22 +60,30 @@ async function resolveCreds(post: ScheduledSocialPost): Promise<ResolvedCreds | 
 }
 
 /** Minimal product info from the app DB, for AI caption generation. Not the full getProduct() graph. */
-async function getProductForCaption(productId: string): Promise<{ name: string; description: string | null } | null> {
-  return queryOne<{ name: string; description: string | null }>(
-    `SELECT name, COALESCE(short_description, description) AS description FROM products WHERE id = $1`,
+async function getProductForCaption(productId: string): Promise<{ name: string; slug: string; description: string | null } | null> {
+  return queryOne<{ name: string; slug: string; description: string | null }>(
+    `SELECT name, slug, COALESCE(short_description, description) AS description FROM products WHERE id = $1`,
     [productId],
   )
 }
 
-/** If the post has no caption, generate one from its linked product (falls back to '' — never throws). */
-async function ensureCaption(post: ScheduledSocialPost): Promise<string> {
-  if (post.caption?.trim()) return post.caption
-  if (!post.product_id) return ''
-  const product = await getProductForCaption(post.product_id)
+/**
+ * Resolve the caption to publish: the admin's text if set, otherwise one generated from the
+ * linked product. Either way the product link is appended, so a post always sends people to
+ * the product page rather than the bare domain. Falls back to '' — never throws.
+ */
+async function ensureCaption(
+  post: ScheduledSocialPost,
+  product: { name: string; slug: string; description: string | null } | null,
+): Promise<string> {
+  if (post.caption?.trim()) return withProductLink(post.caption, product?.slug)
   if (!product) return ''
+
   const generated = await generateSocialCaption({ productName: product.name, productDescription: product.description })
-  if (generated) await updateSocialPost(post.id, { caption: generated })
-  return generated
+  if (!generated) return ''
+  const linked = withProductLink(generated, product.slug)
+  await updateSocialPost(post.id, { caption: linked })
+  return linked
 }
 
 /**
@@ -88,7 +97,8 @@ export async function publishScheduledPost(post: ScheduledSocialPost): Promise<{
     const creds = await resolveCreds(post)
     if (!creds) throw new Error('no connected social account / credentials for this post')
 
-    const resolvedCaption = await ensureCaption(post)
+    const product = post.product_id ? await getProductForCaption(post.product_id) : null
+    const resolvedCaption = await ensureCaption(post, product)
     const caption = [resolvedCaption, post.hashtags].filter(Boolean).join('\n\n')
     const allImages = [post.image_url, ...(post.image_urls ?? [])].filter((u): u is string => !!u)
 
@@ -97,7 +107,11 @@ export async function publishScheduledPost(post: ScheduledSocialPost): Promise<{
       if (!creds.pageId) throw new Error('no Facebook Page id')
       const r = allImages.length >= 2
         ? await publishFacebookCarousel({ pageId: creds.pageId, message: caption, imageUrls: allImages, accessToken: creds.accessToken })
-        : await publishFacebookPost({ pageId: creds.pageId, message: caption, imageUrl: allImages[0], accessToken: creds.accessToken })
+        : await publishFacebookPost({
+            pageId: creds.pageId, message: caption, imageUrl: allImages[0],
+            link: product ? productUrl(product.slug) : null,
+            accessToken: creds.accessToken,
+          })
       postedId = r.id
     } else if (post.platform === 'ig') {
       if (!creds.igUserId) throw new Error('no Instagram account connected')

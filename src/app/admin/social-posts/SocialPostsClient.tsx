@@ -6,10 +6,13 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import DateTimePicker from '@/components/ui/DateTimePicker'
+import Toggle from '@/components/ui/Toggle'
+import { withProductLink } from '@/lib/social/product-url'
 
 interface SelectedProduct {
   id: string
   name: string
+  slug: string
   short_description: string | null
   description: string | null
   base_price: number | null
@@ -78,6 +81,10 @@ export default function SocialPostsClient({ canWrite = false }: { canWrite?: boo
   const [videoUrl, setVideoUrl] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [useAdCard, setUseAdCard] = useState(true)
+  const [adCardUrl, setAdCardUrl] = useState('')
+  const [adCardLoading, setAdCardLoading] = useState(false)
+  const [rawPrimaryImage, setRawPrimaryImage] = useState('')
 
   useEffect(() => {
     if (!productId) { setSelectedProduct(null); return }
@@ -89,13 +96,41 @@ export default function SocialPostsClient({ canWrite = false }: { canWrite?: boo
         if (cancelled || !p || p.error) return
         setSelectedProduct(p)
         const primaryImage = (p.product_images || []).find((i: any) => i.is_primary) || (p.product_images || [])[0]
+        setRawPrimaryImage(primaryImage?.image_url || '')
         if (primaryImage?.image_url) setImageUrl(primaryImage.image_url)
-        setCaption(c => c.trim() ? c : p.name)
+        setCaption(c => withProductLink(c.trim() ? c : p.name, p.slug))
       })
       .catch(() => {})
       .finally(() => { if (!cancelled) setProductLoading(false) })
     return () => { cancelled = true }
   }, [productId])
+
+  // The ad card is the same artwork the product list offers for download, rendered server-side
+  // and stored in S3 so Meta can fetch it. Regenerated per product so price/discount are current.
+  useEffect(() => {
+    if (!productId || !useAdCard) return
+    let cancelled = false
+    setAdCardLoading(true)
+    fetch(`/api/admin/products/${productId}/ad-image`, { method: 'POST', credentials: 'include' })
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (cancelled || !d?.url) return
+        setAdCardUrl(d.url)
+        setImageUrl(d.url)
+      })
+      .catch(() => {})
+      .finally(() => { if (!cancelled) setAdCardLoading(false) })
+    return () => { cancelled = true }
+  }, [productId, useAdCard])
+
+  function toggleAdCard(on: boolean) {
+    setUseAdCard(on)
+    if (!on) {
+      setImageUrl(rawPrimaryImage)
+    } else if (adCardUrl) {
+      setImageUrl(adCardUrl)
+    }
+  }
 
   const fetchPosts = useCallback(async () => {
     setLoading(true)
@@ -115,14 +150,17 @@ export default function SocialPostsClient({ canWrite = false }: { canWrite?: boo
 
   function resetComposer() {
     setPlatform('fb'); setCaption(''); setProductId(''); setProductName(''); setImageUrl(''); setUseAllImages(false); setVideoUrl(''); setScheduledAt('')
+    setUseAdCard(true); setAdCardUrl(''); setRawPrimaryImage('')
   }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     setSubmitting(true)
     try {
+      // The ad card is the post: mixing raw photos in behind it would bury the card at slide 1
+      // of a carousel, so extras are only sent when posting the raw images.
       const allProductImages = (selectedProduct?.product_images || []).map(i => i.image_url).filter(Boolean)
-      const extraImages = useAllImages && allProductImages.length >= 2
+      const extraImages = !useAdCard && useAllImages && allProductImages.length >= 2
         ? allProductImages.filter(u => u !== imageUrl.trim())
         : null
 
@@ -239,14 +277,37 @@ export default function SocialPostsClient({ canWrite = false }: { canWrite?: boo
                       {selectedProduct.stock_status ? ` · ${selectedProduct.stock_status}` : ''}
                     </div>
                   </div>
-                  {platform !== 'ig_reel' && (selectedProduct.product_images?.length ?? 0) >= 2 && (
-                    <label className="flex items-center gap-1.5 text-xs text-foreground-secondary shrink-0 cursor-pointer">
-                      <input type="checkbox" checked={useAllImages} onChange={e => setUseAllImages(e.target.checked)} className="rounded" />
-                      Use all {selectedProduct.product_images!.length} images (carousel)
-                    </label>
+                  {platform !== 'ig_reel' && !useAdCard && (selectedProduct.product_images?.length ?? 0) >= 2 && (
+                    <div className="shrink-0">
+                      <Toggle
+                        size="sm"
+                        checked={useAllImages}
+                        onChange={setUseAllImages}
+                        label={`Use all ${selectedProduct.product_images!.length} images (carousel)`}
+                      />
+                    </div>
                   )}
                 </>
               )}
+            </div>
+          )}
+
+          {productId && platform !== 'ig_reel' && (
+            <div className="flex items-start gap-3 p-2.5 rounded-lg border border-border-default bg-surface-secondary">
+              {useAdCard && adCardUrl && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={adCardUrl} alt="" className="w-10 h-[71px] rounded-md object-cover border border-border-default shrink-0" />
+              )}
+              <div className="min-w-0 flex-1">
+                <Toggle checked={useAdCard} onChange={toggleAdCard} label="Post the ad card" />
+                <p className="text-xs text-foreground-muted mt-0.5">
+                  {adCardLoading
+                    ? 'Generating ad card…'
+                    : useAdCard
+                      ? 'The same 1080×1920 card the product list generates, with price, discount badge and product link burnt in.'
+                      : 'Posting the raw product photos instead.'}
+                </p>
+              </div>
             </div>
           )}
 
