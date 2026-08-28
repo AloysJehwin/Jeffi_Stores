@@ -31,6 +31,7 @@ export default async function StoreStatusDetailPage({ params }: { params: Promis
         tenant={t}
         backHref="/admin/ecom/store-status"
         backLabel="Store Status"
+        job={job}
         related={[
           { href: `/admin/ecom/customers/${t.id}`, label: 'Store' },
           { href: `/admin/ecom/customers/${t.id}?tab=provisioning`, label: 'Provisioning' },

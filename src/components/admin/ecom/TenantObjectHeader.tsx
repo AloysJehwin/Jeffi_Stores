@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import type { TenantDetail } from '@/lib/tenant-registry'
+import type { TenantDetail, ProvisioningJob } from '@/lib/tenant-registry'
 import { StatusPill } from './EcomUI'
 import TenantActions from './TenantActions'
 
@@ -9,13 +9,14 @@ import TenantActions from './TenantActions'
  * startsWith(href + '/') — an object page off that prefix would never expand its nav group.
  */
 export default function TenantObjectHeader({
-  tenant: t, backHref, backLabel, kycPending, related,
+  tenant: t, backHref, backLabel, kycPending, related, job,
 }: {
   tenant: TenantDetail
   backHref: string
   backLabel: string
   kycPending?: boolean
   related?: { href: string; label: string }[]
+  job?: ProvisioningJob | null
 }) {
   return (
     <>
@@ -38,7 +39,15 @@ export default function TenantObjectHeader({
         </div>
 
         <div className="shrink-0">
-          <TenantActions tenantId={t.id} slug={t.slug} status={t.status} instanceState={t.instance_state} />
+          <TenantActions
+            tenantId={t.id}
+            slug={t.slug}
+            status={t.status}
+            instanceState={t.instance_state}
+            jobStatus={job?.status ?? null}
+            jobStep={job?.step ?? null}
+            rolledBack={(job?.created_resources as Record<string, unknown> | null)?.rolledBack === true}
+          />
         </div>
       </div>
 

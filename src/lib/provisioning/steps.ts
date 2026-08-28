@@ -227,10 +227,17 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           res.computeMode = 'shared-target'
         } else if (isDedicatedPlan(tenant.plan)) {
           if (!res.ec2InstanceId) {
-            const { instanceId, ip } = await provider.ensureAppInstance({
-              name: `jeffi-tenant-${slug}`, instanceType: process.env.TENANT_DEDICATED_EC2_TYPE || 't4g.small',
-              userData: appBootUserData(),
-            })
+            const { instanceId, ip } = await provider.ensureAppInstance(
+              {
+                name: `jeffi-tenant-${slug}`, instanceType: process.env.TENANT_DEDICATED_EC2_TYPE || 't4g.small',
+                userData: appBootUserData(),
+              },
+              // Persist before the readiness wait so rollback can terminate it if that throws.
+              async (id) => {
+                res.ec2InstanceId = id
+                await updateProvisioningJob(job.id, { created_resources: res })
+              },
+            )
             res.ec2InstanceId = instanceId
             res.ec2Target = ip
             res.computeMode = 'dedicated'
@@ -476,9 +483,13 @@ export async function reprovisionDns(tenantId: string, provider: ProvisioningPro
 
     if (wantDedicated && !hadDedicated) {
       // Basic → higher: provision a dedicated EC2, move off the pool.
-      const { instanceId, ip } = await provider.ensureAppInstance({
-        name: `jeffi-tenant-${tenant.slug}`, instanceType: process.env.TENANT_DEDICATED_EC2_TYPE || 't4g.small',
-      })
+      const { instanceId, ip } = await provider.ensureAppInstance(
+        { name: `jeffi-tenant-${tenant.slug}`, instanceType: process.env.TENANT_DEDICATED_EC2_TYPE || 't4g.small' },
+        async (id) => {
+          created.ec2InstanceId = id
+          if (job) await updateProvisioningJob(job.id, { created_resources: created })
+        },
+      )
       created.ec2InstanceId = instanceId
       targetIp = ip
       computeChanged = true

@@ -15,6 +15,8 @@ import {
   PutPublicAccessBlockCommand,
   PutBucketCorsCommand,
   DeleteBucketCommand,
+  ListObjectsV2Command,
+  DeleteObjectsCommand,
 } from '@aws-sdk/client-s3'
 import { Pool } from 'pg'
 import { buildTenantSchemaSql } from '../tenant-migrations-schema'
@@ -263,6 +265,22 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
   }
 
   async deleteBucket(bucket: string): Promise<void> {
+    // S3 refuses to delete a non-empty bucket, and by rollback time the bucket usually holds
+    // at least the generated legal policies — so the delete failed and the caller's catch
+    // swallowed it, leaving the bucket behind. Empty it first.
+    try {
+      for (;;) {
+        const listed = await this.s3.send(new ListObjectsV2Command({ Bucket: bucket, MaxKeys: 1000 }))
+        const keys = (listed.Contents ?? []).map((o) => ({ Key: o.Key! })).filter((o) => o.Key)
+        if (keys.length === 0) break
+        await this.s3.send(new DeleteObjectsCommand({ Bucket: bucket, Delete: { Objects: keys, Quiet: true } }))
+        if (!listed.IsTruncated) break
+      }
+    } catch (err: any) {
+      if (!/NoSuchBucket/i.test(err?.name || '')) throw err
+      return
+    }
+
     await this.s3.send(new DeleteBucketCommand({ Bucket: bucket }))
       .catch((err) => { if (!/NoSuchBucket/i.test(err?.name || '')) throw err })
   }
@@ -290,9 +308,16 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
 
   // EC2 app instances (dedicated-tenant or shared pool) via the SigV4 ec2-client (no
   // @aws-sdk/client-ec2, matching pool-autoscale). userData boots the same app Docker image.
-  async ensureAppInstance(args: { name: string; instanceType: string; userData?: string }): Promise<{ instanceId: string; ip: string }> {
+  async ensureAppInstance(
+    args: { name: string; instanceType: string; userData?: string },
+    onLaunched?: (instanceId: string) => Promise<void>,
+  ): Promise<{ instanceId: string; ip: string }> {
     const { runInstance, waitForState, getInstanceIp } = await import('../ec2-client')
     const { instanceId } = await runInstance(args)
+    // Record the id BEFORE waiting. Everything below can throw, and an id known only to this
+    // stack frame is an instance nothing can find again — it stays running, billing, and
+    // invisible to rollback. This is how i-0540e06e9fb896c2f was orphaned.
+    if (onLaunched) await onLaunched(instanceId).catch(() => {})
     await waitForState(instanceId, 'running')
     // Public IP can lag 'running' by a moment — poll briefly.
     let ip: string | null = null

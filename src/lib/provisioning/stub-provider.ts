@@ -74,10 +74,14 @@ export class StubProvisioningProvider implements ProvisioningProvider {
   }
   async deleteParamGroup(paramGroup: string): Promise<void> { this.paramGroups.delete(paramGroup) }
 
-  async ensureAppInstance(args: { name: string; instanceType: string; userData?: string }): Promise<{ instanceId: string; ip: string }> {
+  async ensureAppInstance(
+    args: { name: string; instanceType: string; userData?: string },
+    onLaunched?: (instanceId: string) => Promise<void>,
+  ): Promise<{ instanceId: string; ip: string }> {
     const instanceId = `i-stub${String(++this.instanceSeq).padStart(6, '0')}`
     const ip = `52.0.0.${this.instanceSeq}`
     this.instances.set(instanceId, ip)
+    if (onLaunched) await onLaunched(instanceId)
     return { instanceId, ip }
   }
   async deleteAppInstance(instanceId: string): Promise<void> { this.instances.delete(instanceId) }
