@@ -28,6 +28,16 @@ vi.mock('@/lib/sms', () => ({
 
 vi.mock('@/lib/delhivery', () => ({
   fetchDelhiveryInvoiceCharges: vi.fn(),
+  // Real helper — the route uses it to build the cgm param; keeping the real maths means the
+  // assertion below pins the actual value sent to Delhivery.
+  chargeableGrams: (c: unknown, q: unknown) => {
+    const kg = Number(c) || Number(q) || 0
+    return kg > 0 ? Math.round(kg * 1000) : 500
+  },
+}))
+
+vi.mock('@/lib/site-controls', () => ({
+  getBusinessValues: vi.fn(async () => ({ delhiveryOriginPincode: '492001' })),
 }))
 
 // ── Imports ───────────────────────────────────────────────────────────────────
@@ -1085,7 +1095,15 @@ describe('POST — EDD, charged weight and delivery billing', () => {
     } as any)
 
     await POST(makeReq())
-    expect(mockInvoiceCharges).toHaveBeenCalledWith('AWB001')
+    // The charges endpoint rejects a bare waybill — md/ss/cgm/o_pin/d_pin are all mandatory,
+    // which is why this sync silently returned nothing in production.
+    expect(mockInvoiceCharges).toHaveBeenCalledWith(expect.objectContaining({
+      awb: 'AWB001',
+      settledStatus: 'Delivered',
+      originPin: '492001',
+    }))
+    const chargeArg = mockInvoiceCharges.mock.calls[0][0] as any
+    expect(chargeArg.chargedWeightG).toBeGreaterThan(0)
     const billUpdate = mockQuery.mock.calls.find(([sql]) =>
       (sql as string).includes('delhivery_billed_amount')
     )

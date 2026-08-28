@@ -33,6 +33,7 @@ export default async function InstanceDetailPage({ params }: { params: Promise<{
         tenant={t}
         backHref="/admin/ecom/instances"
         backLabel="Instances"
+        job={job}
         related={[
           { href: `/admin/ecom/customers/${t.id}`, label: 'Store' },
           { href: `/admin/ecom/customers/${t.id}?tab=provisioning`, label: 'Provisioning' },

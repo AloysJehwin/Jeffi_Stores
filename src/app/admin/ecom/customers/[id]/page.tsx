@@ -62,6 +62,7 @@ export default async function TenantObjectPage({
         backHref="/admin/ecom/customers"
         backLabel="Stores"
         kycPending={kycPending}
+        job={headerJob}
       />
 
       <TenantTabNav
