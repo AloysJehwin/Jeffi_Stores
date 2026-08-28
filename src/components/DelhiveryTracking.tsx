@@ -409,6 +409,7 @@ export default function DelhiveryTracking({
             && tracking.chargedWeightKg > tracking.quotedWeightKg
 
           // Delta chip styling: shortfall (we lost money) = orange, surplus = green, match = neutral.
+          const canReprice = variant === 'admin' && !!tracking.awb
           const deltaTone = diff == null || diff === 0
             ? 'bg-surface-secondary text-foreground-secondary'
             : diff > 0
@@ -448,6 +449,15 @@ export default function DelhiveryTracking({
                   )}
                 </div>
               </div>
+
+              {canReprice && (
+                <RepriceCharge
+                  orderId={orderId}
+                  apiBase={apiBase}
+                  currentKg={tracking.chargedWeightKg ?? null}
+                  onDone={() => loadTracking(true)}
+                />
+              )}
 
               {/* Delta chip */}
               {diff != null && diff !== 0 && (
@@ -574,6 +584,97 @@ export default function DelhiveryTracking({
           </div>
         )
       })()}
+    </div>
+  )
+}
+
+/**
+ * Record Delhivery's revised charged weight.
+ *
+ * Delhivery reprices when the measured weight differs from what was declared, but does not
+ * expose the revised weight to this account — Shipment.ChargedWeight is null on every AWB and
+ * the discrepancy endpoints 404. The operator copies "Updated charged weight" off the Delhivery
+ * shipment page; the cost is then computed from Delhivery's own rate API, not typed in, so the
+ * figure matches their dashboard exactly.
+ */
+function RepriceCharge({
+  orderId, apiBase, currentKg, onDone,
+}: {
+  orderId: string
+  apiBase: string
+  currentKg: number | null
+  onDone: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [kg, setKg] = useState(currentKg != null ? String(currentKg) : '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    const value = Number(kg)
+    if (!Number.isFinite(value) || value <= 0) { setError('Enter the weight in kg, e.g. 2.78'); return }
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch(`${apiBase}/${orderId}/delivery-charge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chargedWeightKg: value }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) { setError(data.error || 'Could not reprice'); return }
+      setOpen(false)
+      onDone()
+    } catch {
+      setError('Network error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="mb-3 text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
+      >
+        {currentKg != null ? 'Update charged weight' : 'Enter Delhivery charged weight'}
+      </button>
+    )
+  }
+
+  return (
+    <div className="mb-3 rounded-lg border border-border-default bg-surface-secondary p-3">
+      <label className="block text-[11px] text-foreground-secondary mb-1.5">
+        Charged weight from Delhivery (kg) — the cost is calculated, not entered
+      </label>
+      <div className="flex items-center gap-2 flex-wrap">
+        <input
+          type="number"
+          step="0.01"
+          min="0"
+          value={kg}
+          onChange={(e) => { setKg(e.target.value); setError(null) }}
+          placeholder="2.78"
+          className="w-28 px-2 py-1.5 text-sm rounded border border-border-default bg-surface text-foreground"
+        />
+        <button
+          type="button"
+          onClick={save}
+          disabled={busy}
+          className="px-3 py-1.5 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white font-medium"
+        >
+          {busy ? 'Pricing…' : 'Save'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setError(null) }}
+          className="px-3 py-1.5 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface"
+        >
+          Cancel
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   )
 }
