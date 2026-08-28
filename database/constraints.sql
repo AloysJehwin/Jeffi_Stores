@@ -2861,3 +2861,11 @@ ALTER TABLE ONLY public.product_units
 
 ALTER TABLE ONLY public.product_units
     ADD CONSTRAINT product_units_qty_step_check CHECK ((qty_step > (0)::numeric));
+
+
+--
+-- Name: offer_display_settings offer_display_settings_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.offer_display_settings
+    ADD CONSTRAINT offer_display_settings_pkey PRIMARY KEY (offer_id);

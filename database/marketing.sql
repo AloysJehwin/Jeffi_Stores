@@ -209,3 +209,22 @@ CREATE TABLE public.scenario_audit_log (
     result jsonb,
     created_at timestamp with time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: offer_display_settings; Type: TABLE; Schema: public; Owner: -
+--
+-- Razorpay offers cannot be created through the API (POST /v1/offers is 405 on this
+-- account) — they are configured in the Razorpay dashboard. This table is the storefront
+-- side only: which of the account's real offers to show, under what wording, in what order.
+-- No row for an offer means "use the default", so an offer appearing in Razorpay shows up
+-- without needing a row here.
+
+CREATE TABLE public.offer_display_settings (
+    offer_id character varying(64) NOT NULL,
+    is_visible boolean DEFAULT true NOT NULL,
+    title_override text,
+    display_order integer DEFAULT 0 NOT NULL,
+    updated_at timestamp with time zone DEFAULT now() NOT NULL,
+    updated_by uuid
+);
