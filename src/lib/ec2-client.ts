@@ -54,16 +54,38 @@ export async function modifyInstanceType(instanceId: string, instanceType: strin
   await ec2({ Action: 'ModifyInstanceAttribute', InstanceId: instanceId, 'InstanceType.Value': instanceType })
 }
 
+/**
+ * EC2 is eventually consistent: an instance RunInstances just returned an id for is not
+ * immediately visible to DescribeInstances, which answers InvalidInstanceID.NotFound for a few
+ * seconds. Treating that as fatal killed provisioning runs whose instance had launched fine.
+ */
+export function isInstanceNotFound(e: unknown): boolean {
+  return /InvalidInstanceID\.NotFound/i.test(e instanceof Error ? e.message : String(e))
+}
+
 /** Poll DescribeInstances until the instance reaches `want` (or times out). */
 export async function waitForState(instanceId: string, want: string, timeoutMs = 240000): Promise<void> {
   const start = Date.now()
+  let everSeen = false
   // Date.now in a route is fine (not a workflow); simple bounded poll.
   while (Date.now() - start < timeoutMs) {
-    const { state } = await describeInstance(instanceId)
-    if (state === want) return
+    try {
+      const { state } = await describeInstance(instanceId)
+      everSeen = true
+      if (state === want) return
+    } catch (e) {
+      // Not-yet-visible is expected right after launch; anything else is a real failure.
+      if (!isInstanceNotFound(e)) throw e
+      // Once the instance HAS been seen, a later NotFound means it went away — stop waiting
+      // for a state it can never reach.
+      if (everSeen) throw e
+    }
     await new Promise((r) => setTimeout(r, 8000))
   }
-  throw new Error(`EC2 ${instanceId} did not reach '${want}' within ${timeoutMs}ms`)
+  throw new Error(
+    `EC2 ${instanceId} did not reach '${want}' within ${timeoutMs}ms` +
+    (everSeen ? '' : ' (never became visible to DescribeInstances)')
+  )
 }
 
 // ── Instance lifecycle: launch / terminate / ip (tenant + pool provisioning) ──────
@@ -110,8 +132,14 @@ export async function runInstance(args: RunInstanceArgs): Promise<{ instanceId: 
 
 /** Public IP of an instance (once running), or null if not yet assigned. */
 export async function getInstanceIp(instanceId: string): Promise<string | null> {
-  const xml = await ec2({ Action: 'DescribeInstances', 'InstanceId.1': instanceId })
-  return xmlTag(xml, 'ipAddress') // <ipAddress> is the public IP
+  try {
+    const xml = await ec2({ Action: 'DescribeInstances', 'InstanceId.1': instanceId })
+    return xmlTag(xml, 'ipAddress') // <ipAddress> is the public IP
+  } catch (e) {
+    // Same eventual-consistency window as waitForState; callers poll, so "not yet" is null.
+    if (isInstanceNotFound(e)) return null
+    throw e
+  }
 }
 
 export async function terminateInstance(instanceId: string): Promise<void> {

@@ -392,6 +392,12 @@ export default function DelhiveryTracking({
         )}
 
         {/* Delivery cost breakdown — actual invoice, weight estimate, or quote only */}
+        {/*
+          Delivery cost is admin-only and stays inside this branch: it shows what Delhivery
+          bills US, the shortfall against what the customer paid, and the freight/COD breakdown.
+          The customer render below must never gain these fields — a shortfall is commercially
+          sensitive, and the customer track API deliberately omits them too.
+        */}
         {(tracking.shippingAmount != null || tracking.chargedWeightKg != null || tracking.billedAmount != null) && (() => {
           const inr = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
           const hasBilled = tracking.billedAmount != null
@@ -409,6 +415,7 @@ export default function DelhiveryTracking({
             && tracking.chargedWeightKg > tracking.quotedWeightKg
 
           // Delta chip styling: shortfall (we lost money) = orange, surplus = green, match = neutral.
+          const canReprice = variant === 'admin' && !!tracking.awb
           const deltaTone = diff == null || diff === 0
             ? 'bg-surface-secondary text-foreground-secondary'
             : diff > 0
@@ -465,6 +472,17 @@ export default function DelhiveryTracking({
                   )}
                 </div>
               )}
+
+              {canReprice && (
+                <RepriceCharge
+                  orderId={orderId}
+                  apiBase={apiBase}
+                  currentKg={tracking.chargedWeightKg ?? null}
+                  currentAmount={tracking.billedAmount ?? null}
+                  onDone={() => loadTracking(true)}
+                />
+              )}
+
 
               {/* Itemized breakdown — only meaningful for the actual invoice */}
               {hasBilled && (
@@ -574,6 +592,129 @@ export default function DelhiveryTracking({
           </div>
         )
       })()}
+    </div>
+  )
+}
+
+/**
+ * Record Delhivery's revised charged weight.
+ *
+ * Delhivery reprices when the measured weight differs from what was declared, but does not
+ * expose the revised weight to this account — Shipment.ChargedWeight is null on every AWB and
+ * the discrepancy endpoints 404. The operator copies "Updated charged weight" off the Delhivery
+ * shipment page; the cost is then computed from Delhivery's own rate API, not typed in, so the
+ * figure matches their dashboard exactly.
+ */
+function RepriceCharge({
+  orderId, apiBase, currentKg, currentAmount, onDone,
+}: {
+  orderId: string
+  apiBase: string
+  currentKg: number | null
+  currentAmount: number | null
+  onDone: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const [kg, setKg] = useState(currentKg != null ? String(currentKg) : '')
+  const [amount, setAmount] = useState(currentAmount != null ? String(currentAmount) : '')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function save() {
+    const kgVal = kg.trim() === '' ? null : Number(kg)
+    const amtVal = amount.trim() === '' ? null : Number(amount)
+    if (kgVal == null && amtVal == null) { setError('Enter the charged weight or the charged amount'); return }
+    if (kgVal != null && (!Number.isFinite(kgVal) || kgVal <= 0)) { setError('Weight must be a number in kg, e.g. 2.78'); return }
+    if (amtVal != null && (!Number.isFinite(amtVal) || amtVal < 0)) { setError('Amount must be a number, e.g. 162.70'); return }
+    setBusy(true); setError(null)
+    try {
+      const res = await fetch(`${apiBase}/${orderId}/delivery-charge`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chargedWeightKg: kgVal, chargedAmount: amtVal }),
+      })
+      const text = await res.text()
+      let data: any = null
+      try { data = JSON.parse(text) } catch { /* not JSON — surfaced below */ }
+
+      if (!res.ok || !data) {
+        // A bare "could not save" hides whether this was a 404 (route not deployed), a 500, or
+        // a real rejection. Show the status and whatever the server actually said.
+        setError(
+          data?.error
+            ?? `HTTP ${res.status} — ${text.slice(0, 120).replace(/<[^>]*>/g, '').trim() || 'no response body'}`
+        )
+        return
+      }
+      setOpen(false)
+      onDone()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        className="block mb-3 text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline text-left"
+      >
+        {currentKg != null || currentAmount != null ? 'Update delivery charge' : 'Enter Delhivery charge'}
+      </button>
+    )
+  }
+
+  return (
+    <div className="mb-3 rounded-lg border border-border-default bg-surface-secondary p-3">
+      <p className="text-[11px] text-foreground-secondary mb-2">
+        From the Delhivery shipment page. Enter the weight and the cost is calculated at
+        Delhivery&apos;s own rates, or enter the amount directly if you have it — the amount wins.
+      </p>
+      <div className="flex items-end gap-2 flex-wrap">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-foreground-muted">Charged weight (kg)</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={kg}
+            onChange={(e) => { setKg(e.target.value); setError(null) }}
+            placeholder="2.78"
+            className="w-28 px-2 py-1.5 text-sm rounded border border-border-default bg-surface text-foreground"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-foreground-muted">Charged amount (₹)</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => { setAmount(e.target.value); setError(null) }}
+            placeholder="162.70"
+            className="w-32 px-2 py-1.5 text-sm rounded border border-border-default bg-surface text-foreground"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={save}
+          disabled={busy}
+          className="px-3 py-1.5 text-sm rounded-lg bg-accent-500 hover:bg-accent-600 disabled:opacity-50 text-white font-medium"
+        >
+          {busy ? 'Pricing…' : 'Save'}
+        </button>
+        <button
+          type="button"
+          onClick={() => { setOpen(false); setError(null) }}
+          className="px-3 py-1.5 text-sm rounded-lg border border-border-default text-foreground hover:bg-surface"
+        >
+          Cancel
+        </button>
+      </div>
+      {error && <p className="mt-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
     </div>
   )
 }

@@ -494,6 +494,46 @@ export async function enqueueProvisioning(tenantId: string, opts?: { restoreFrom
   return res.rows[0] as ProvisioningJob
 }
 
+export type ResumeOutcome =
+  | { ok: true; resumedFrom: string }
+  | { ok: false; reason: 'no_failed_job' | 'rolled_back' | 'already_running'; detail: string }
+
+/**
+ * Put a failed job back in the queue at the step it died on, keeping created_resources so the
+ * worker skips what already succeeded.
+ *
+ * Refuses when rollback has run. Rollback DELETES the RDS instance, bucket and DNS it recorded,
+ * so resuming at (say) ensure_compute would carry on against infrastructure that no longer
+ * exists. Those runs have to start over — enqueueProvisioning already does that by opening a
+ * fresh job.
+ */
+export async function resumeProvisioningJob(tenantId: string): Promise<ResumeOutcome> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT * FROM provisioning_jobs WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 1`, [tenantId])
+  const job = res.rows[0] as ProvisioningJob | undefined
+
+  if (!job) return { ok: false, reason: 'no_failed_job', detail: 'This tenant has no provisioning job.' }
+  if (job.status === 'pending' || job.status === 'running') {
+    return { ok: false, reason: 'already_running', detail: `A job is already ${job.status} at "${job.step}".` }
+  }
+  if (job.status !== 'failed') {
+    return { ok: false, reason: 'no_failed_job', detail: `The last job is "${job.status}", not failed.` }
+  }
+  if ((job.created_resources as Record<string, unknown> | null)?.rolledBack === true) {
+    return {
+      ok: false, reason: 'rolled_back',
+      detail: `This run was rolled back — its database, bucket and DNS were deleted. Resuming at "${job.step}" would build on infrastructure that no longer exists; start a fresh provision instead.`,
+    }
+  }
+
+  await pool.query(
+    `UPDATE provisioning_jobs
+        SET status='pending', last_error=NULL, next_attempt_at=NULL, updated_at=now()
+      WHERE id=$1`, [job.id])
+  return { ok: true, resumedFrom: job.step }
+}
+
 /** Fetch active jobs the worker should advance (skips jobs backing off until next_attempt_at). */
 export async function activeProvisioningJobs(): Promise<ProvisioningJob[]> {
   const pool = controlPlanePool()

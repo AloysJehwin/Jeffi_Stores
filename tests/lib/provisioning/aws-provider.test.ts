@@ -45,6 +45,8 @@ const S3Commands = {
   PutPublicAccessBlockCommand: cmd('PutPublicAccessBlock'),
   PutBucketCorsCommand: cmd('PutBucketCors'),
   DeleteBucketCommand: cmd('DeleteBucket'),
+  ListObjectsV2Command: cmd('ListObjectsV2'),
+  DeleteObjectsCommand: cmd('DeleteObjects'),
 }
 vi.mock('@aws-sdk/client-s3', () => ({
   S3Client: vi.fn().mockImplementation(function (this: any) { this.send = s3Send }),
@@ -374,14 +376,31 @@ describe('AwsProvisioningProvider', () => {
 
     it('treats NoSuchBucket as success when deleting a bucket', async () => {
       const p = await makeProvider()
+      // First send is the ListObjectsV2 sweep.
       s3Send.mockRejectedValueOnce(awsError('NoSuchBucket'))
       await expect(p.deleteBucket('b')).resolves.toBeUndefined()
     })
 
     it('rethrows a real bucket delete failure', async () => {
       const p = await makeProvider()
-      s3Send.mockRejectedValueOnce(awsError('BucketNotEmpty'))
+      s3Send
+        .mockResolvedValueOnce({ Contents: [], IsTruncated: false })  // list: already empty
+        .mockRejectedValueOnce(awsError('BucketNotEmpty'))            // delete bucket
       await expect(p.deleteBucket('b')).rejects.toThrow('BucketNotEmpty')
+    })
+
+    // S3 will not delete a non-empty bucket, and rollbackProvisioning swallows the error — so
+    // a tenant bucket holding its generated legal policies survived every rollback.
+    it('empties the bucket before deleting it', async () => {
+      const p = await makeProvider()
+      s3Send
+        .mockResolvedValueOnce({ Contents: [{ Key: 'legal/policies.json' }], IsTruncated: false })
+        .mockResolvedValueOnce({})   // DeleteObjects
+        .mockResolvedValueOnce({})   // DeleteBucket
+      await expect(p.deleteBucket('b')).resolves.toBeUndefined()
+
+      const names = s3Send.mock.calls.map(([c]: any[]) => c.__type)
+      expect(names).toEqual(['ListObjectsV2', 'DeleteObjects', 'DeleteBucket'])
     })
   })
 

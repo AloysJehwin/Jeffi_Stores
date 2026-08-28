@@ -5,7 +5,8 @@ import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { resolveShipmentStatus, isAdvancement, shipmentStatusToSyncType, rankOf } from '@/lib/shipment-status'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { sendOrderDeliveredSMS, sendOutForDeliverySMS } from '@/lib/sms'
-import { fetchDelhiveryInvoiceCharges } from '@/lib/delhivery'
+import { fetchDelhiveryInvoiceCharges, chargeableGrams } from '@/lib/delhivery'
+import { getBusinessValues } from '@/lib/site-controls'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
     `SELECT o.id, o.awb_number, o.status, o.shipment_status, o.order_number, o.user_id,
             o.payment_mode, o.shipping_amount, o.delhivery_quoted_weight_kg,
             o.delhivery_charged_weight_kg, o.delhivery_billed_at,
+            o.shipping_address_snapshot->>'postal_code' AS dest_pin,
             COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
             COALESCE(u.email, o.customer_email) AS customer_email,
             u.phone, u.notification_channel
@@ -69,6 +71,9 @@ export async function POST(request: NextRequest) {
   if (orders.length === 0) {
     return NextResponse.json({ synced: 0, total: 0 })
   }
+
+  // Origin pincode is the same for every shipment — resolve once, not per order.
+  const originPin = (await getBusinessValues()).delhiveryOriginPincode
 
   const BATCH_SIZE = 25
   const results: { orderId: string; awb: string; syncedTo: string }[] = []
@@ -202,7 +207,14 @@ export async function POST(request: NextRequest) {
 
         // Pull actual Delhivery invoice charges on delivery — only once (idempotent guard).
         if (syncRule.orderStatus === 'delivered' && !order.delhivery_billed_at) {
-          const invoiceCharges = await fetchDelhiveryInvoiceCharges(awb).catch(() => null)
+          const invoiceCharges = await fetchDelhiveryInvoiceCharges({
+            awb,
+            settledStatus: 'Delivered',
+            chargedWeightG: chargeableGrams(order.delhivery_charged_weight_kg, order.delhivery_quoted_weight_kg),
+            originPin,
+            destPin: (order as any).dest_pin ?? '',
+            paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
+          }).catch(() => null)
           if (invoiceCharges) {
             await query(
               `UPDATE orders SET
