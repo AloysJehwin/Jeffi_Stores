@@ -61,7 +61,7 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
             {tenants.map((t) => (
               <tr key={t.id} className="hover:bg-surface-secondary cursor-pointer">
                 <td className="px-4 py-3 font-medium text-foreground">
-                  <Link href={`/admin/ecom/customers/${t.id}`} className="hover:text-accent-600">{t.display_name}</Link>
+                  <Link href={`/admin/ecom/tenants/${t.id}?tab=overview`} className="hover:text-accent-600">{t.display_name}</Link>
                 </td>
                 <td className="px-4 py-3 text-foreground-secondary">{t.slug}.jeffistores.in</td>
                 <td className="px-4 py-3 text-foreground-secondary capitalize">{t.plan || '—'}</td>
