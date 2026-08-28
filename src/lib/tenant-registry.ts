@@ -86,12 +86,29 @@ const cache = new Map<string, CacheEntry>()
 const CACHE_TTL_MS = 60_000
 
 /** Parse a Host header into a tenant slug, or null if it's a platform/app host. */
+/**
+ * Development hosts, which are never a tenant's custom domain.
+ *
+ * `.localhost` is reserved by RFC 6761 and can never resolve publicly, so exempting it cannot
+ * weaken the production guard. Without this, dev subdomains — ecom.localhost, admin.localhost,
+ * admin-{slug}.localhost — looked like custom domains, resolved to no tenant, and the
+ * fail-closed branch in middleware returned 404 before the host could be dispatched.
+ */
+function isLocalHost(host: string): boolean {
+  return host === 'localhost'
+    || host.endsWith('.localhost')
+    || host.endsWith('.local')
+    || host === '127.0.0.1'
+    || host === '::1'
+    || host === '[::1]'
+}
+
 export function slugFromHost(hostname: string): { slug: string | null; isCustomDomain: boolean } {
   const host = hostname.toLowerCase().split(':')[0].trim()
   // Custom domain: not under the platform root at all.
   if (!host.endsWith('.' + ROOT_DOMAIN) && host !== ROOT_DOMAIN) {
     // Could be a tenant's own domain — resolve by custom_domain lookup.
-    if (host && host !== 'localhost' && !host.endsWith('.local')) {
+    if (host && !isLocalHost(host)) {
       return { slug: null, isCustomDomain: true }
     }
     return { slug: null, isCustomDomain: false }
@@ -736,6 +753,23 @@ export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
   return res.rows as TenantRow[]
 }
 
+export interface TenantOwner extends Owner {
+  role: string
+  linked_at: string
+}
+
+/** Owners of a tenant — the reverse of getOwnerTenants, for the admin object page. */
+export async function getTenantOwners(tenantId: string): Promise<TenantOwner[]> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT o.id, o.email, o.name, o.created_at, ot.role, ot.created_at AS linked_at
+     FROM owner_tenants ot
+     JOIN owners o ON o.id = ot.owner_id
+     WHERE ot.tenant_id = $1
+     ORDER BY ot.created_at`, [tenantId])
+  return res.rows as TenantOwner[]
+}
+
 /** Link an owner to a tenant they created. */
 export async function linkOwnerTenant(ownerId: string, tenantId: string): Promise<void> {
   const pool = controlPlanePool()
@@ -783,6 +817,18 @@ export async function getOwnerBankAccount(ownerId: string): Promise<BankAccount 
   const res = await pool.query(
     `SELECT id, owner_id, verification_status, account_number, ifsc, holder_name, upi_id, verified_name
      FROM tenant_bank_accounts WHERE owner_id=$1 ORDER BY created_at DESC LIMIT 1`, [ownerId])
+  return (res.rows[0] as BankAccount) || null
+}
+
+/**
+ * The payout account for a store. Rows carry both owner_id and tenant_id, and the tenant one is
+ * what the operator wants: an owner with several stores can have a different account per store.
+ */
+export async function getTenantBankAccount(tenantId: string): Promise<BankAccount | null> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT id, owner_id, verification_status, account_number, ifsc, holder_name, upi_id, verified_name
+     FROM tenant_bank_accounts WHERE tenant_id=$1 ORDER BY created_at DESC LIMIT 1`, [tenantId])
   return (res.rows[0] as BankAccount) || null
 }
 

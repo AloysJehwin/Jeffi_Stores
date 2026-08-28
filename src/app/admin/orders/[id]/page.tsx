@@ -6,7 +6,7 @@ import { getOrder, getReturnRequest } from '@/lib/queries'
 import { computeRefundableAmount } from '@/lib/refund'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
-import { hasScope } from '@/lib/scopes'
+import { hasScope, isPlatformOwner } from '@/lib/scopes'
 import UpdateOrderStatus from '@/components/admin/UpdateOrderStatus'
 import CancelReview from '@/components/admin/CancelReview'
 import ReturnReview from '@/components/admin/ReturnReview'
@@ -52,6 +52,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
   const role = h.get('x-user-role') || ''
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'orders:write')
+  const canOverrideStatus = isPlatformOwner(role)
 
   const returnRequest = await getReturnRequest(id).catch(() => null)
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
@@ -523,7 +524,7 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
             </div>
             <div className="p-4 sm:p-6">
               {canWrite ? (
-                <UpdateOrderStatus orderId={order.id} currentStatus={order.status} currentPaymentStatus={order.payment_status} />
+                <UpdateOrderStatus orderId={order.id} currentStatus={order.status} currentPaymentStatus={order.payment_status} canOverride={canOverrideStatus} />
               ) : (
                 <p className="text-sm text-foreground-muted">Read-only access — cannot update status.</p>
               )}

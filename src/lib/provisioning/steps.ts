@@ -363,7 +363,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
     } catch { /* rollback failure already recorded; original failure stands */ }
     try {
       const { alertProvisioningFailure } = await import('./alerts')
-      await alertProvisioningFailure(slug, job.step, msg)
+      await alertProvisioningFailure(slug, job.step, msg, job.tenant_id)
     } catch { /* alerting must never mask the failure */ }
     return 'failed'
   }

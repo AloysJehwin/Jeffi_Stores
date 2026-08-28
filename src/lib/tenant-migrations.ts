@@ -119,6 +119,22 @@ export async function runMigrationFanout(gitSha: string): Promise<FanoutResult> 
   return result
 }
 
+export interface TenantMigrationRun {
+  git_sha: string; status: string; error: string | null; ran_at: string
+}
+
+/** Migration history for one tenant, newest first — answers "is this store on current code?". */
+export async function getTenantMigrationRuns(tenantId: string, limit = 10): Promise<TenantMigrationRun[]> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT git_sha, status, error, ran_at
+     FROM tenant_migration_runs WHERE tenant_id = $1
+     ORDER BY ran_at DESC LIMIT $2`,
+    [tenantId, limit]
+  )
+  return res.rows as TenantMigrationRun[]
+}
+
 /** Admin visibility: latest migration run per tenant. */
 export async function getMigrationRuns(limit = 100): Promise<Array<{
   tenant_id: string; slug: string; git_sha: string; status: string; error: string | null; ran_at: string

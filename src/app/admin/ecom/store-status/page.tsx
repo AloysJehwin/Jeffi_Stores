@@ -54,7 +54,7 @@ export default async function EcomStoreStatusPage({ searchParams }: { searchPara
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {tenants.length === 0 && <p className="text-foreground-muted">No tenants match.</p>}
         {tenants.map((t) => (
-          <Link key={t.id} href={`/admin/ecom/store-status/${t.id}`}
+          <Link key={t.id} href={`/admin/ecom/customers/${t.id}?tab=overview`}
             className="rounded-xl border border-border-default p-4 bg-surface-elevated hover:border-accent-400 transition-colors">
             <div className="flex items-center justify-between">
               <span className="font-medium text-foreground">{t.display_name}</span>

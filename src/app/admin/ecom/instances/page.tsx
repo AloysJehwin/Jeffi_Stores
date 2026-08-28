@@ -47,13 +47,13 @@ export default async function EcomInstancesPage({ searchParams }: { searchParams
             {tenants.map((t) => (
               <tr key={t.id} className="hover:bg-surface-secondary">
                 <td className="px-4 py-3 font-medium text-foreground">
-                  <Link href={`/admin/ecom/instances/${t.id}`} className="hover:text-accent-600">{t.display_name}</Link>
+                  <Link href={`/admin/ecom/customers/${t.id}?tab=infrastructure`} className="hover:text-accent-600">{t.display_name}</Link>
                 </td>
                 <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{t.rds_endpoint || <span className="text-amber-500">not provisioned</span>}</td>
                 <td className="px-4 py-3 text-foreground-secondary">{t.ec2_target || 'pool'}</td>
                 <td className="px-4 py-3 font-mono text-xs text-foreground-secondary">{t.s3_bucket || '—'}</td>
                 <td className="px-4 py-3 text-foreground-secondary">{t.region || '—'}</td>
-                <td className="px-4 py-3 text-right"><Link href={`/admin/ecom/instances/${t.id}`} className="text-accent-600 dark:text-accent-400 hover:underline">Detail →</Link></td>
+                <td className="px-4 py-3 text-right"><Link href={`/admin/ecom/customers/${t.id}?tab=infrastructure`} className="text-accent-600 dark:text-accent-400 hover:underline">Detail →</Link></td>
               </tr>
             ))}
           </tbody>

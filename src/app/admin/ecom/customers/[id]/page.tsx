@@ -1,148 +1,112 @@
 import { headers } from 'next/headers'
 import { redirect, notFound } from 'next/navigation'
-import Link from 'next/link'
 import { isPlatformAdmin } from '@/lib/scopes'
-import { getTenant, getTenantBilling, getKyc } from '@/lib/tenant-registry'
-import { StatusPill } from '@/components/admin/ecom/EcomUI'
-import TenantActions from '@/components/admin/ecom/TenantActions'
-import KycActionButtons from '../../kyc/KycActionButtons'
+import {
+  getTenant, getTenantBilling, getKyc, getProvisioningJob,
+  getTenantOwners, getTenantSocialAccounts, listIntegrationCredentials,
+  listCustomDomains, getTenantBankAccount,
+} from '@/lib/tenant-registry'
+import { listTenantAdminCerts, getTenantCa } from '@/lib/tenant-ca'
+import { getTenantMigrationRuns } from '@/lib/tenant-migrations'
+import { TenantTabNav, isTenantTab, type TenantTab } from '@/components/admin/ecom/EcomUI'
+import TenantObjectHeader from '@/components/admin/ecom/TenantObjectHeader'
+import OverviewTab from '@/components/admin/ecom/tabs/OverviewTab'
+import ProvisioningTab from '@/components/admin/ecom/tabs/ProvisioningTab'
+import InfrastructureTab from '@/components/admin/ecom/tabs/InfrastructureTab'
+import CommerceTab from '@/components/admin/ecom/tabs/CommerceTab'
+import KycTab from '@/components/admin/ecom/tabs/KycTab'
+import AccessTab from '@/components/admin/ecom/tabs/AccessTab'
 
 export const dynamic = 'force-dynamic'
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div>
-      <dt className="text-xs uppercase tracking-wide text-foreground-muted">{label}</dt>
-      <dd className="text-sm text-foreground mt-0.5">{value ?? '—'}</dd>
-    </div>
-  )
-}
-
-export default async function TenantDetailPage({ params }: { params: Promise<{ id: string }> }) {
+/**
+ * Single object page for a tenant. Replaces the four pages that each loaded the same
+ * getTenant(id) and cross-linked to one another — instances and store-status now redirect
+ * here with the matching tab, and the provisioning pages are gone.
+ *
+ * It stays on /admin/ecom/customers/[id] rather than a route of its own because the sidebar
+ * marks a group active with startsWith(href + '/'); a separate path would never expand it.
+ *
+ * Only the header data is always fetched; each tab loads its own, so the page does not pay
+ * for sections nobody is looking at.
+ */
+export default async function TenantObjectPage({
+  params, searchParams,
+}: {
+  params: Promise<{ id: string }>
+  searchParams: Promise<{ tab?: string }>
+}) {
   const h = await headers()
   const role = h.get('x-user-role') || ''
   if (!isPlatformAdmin(role)) redirect('/admin')
 
-  const { id } = await params
-  const [t, billing, kyc] = await Promise.all([
-    getTenant(id),
-    getTenantBilling(id).catch(() => null),
-    getKyc(id).catch(() => null),
-  ])
+  const [{ id }, sp] = await Promise.all([params, searchParams])
+  const tab: TenantTab = isTenantTab(sp.tab) ? sp.tab : 'overview'
+
+  const t = await getTenant(id)
   if (!t) notFound()
 
-  const kycPending = kyc && kyc.status === 'pending'
+  // Cheap single-row reads that feed the header or more than one tab: KYC drives the header
+  // badge everywhere, the job feeds Overview's health and Infrastructure's resource ids.
+  // Anything used by exactly one tab is loaded inside that tab's branch instead.
+  const [kyc, headerJob] = await Promise.all([
+    getKyc(id).catch(() => null),
+    getProvisioningJob(id).catch(() => null),
+  ])
+  const kycPending = kyc?.status === 'pending'
 
   return (
-    <div className="p-6 w-full">
-      <Link href="/admin/ecom/customers" className="text-sm text-accent-600 dark:text-accent-400 hover:underline">← Customers</Link>
-      <div className="flex items-center gap-3 mt-2 mb-6">
-        <h1 className="text-2xl font-bold text-foreground">{t.display_name}</h1>
-        <StatusPill status={t.status} />
-        {kycPending && (
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400">
-            KYC pending review
-          </span>
-        )}
+    <div className="p-6 w-full max-w-full min-w-0 overflow-x-hidden">
+      <TenantObjectHeader
+        tenant={t}
+        backHref="/admin/ecom/customers"
+        backLabel="Stores"
+        kycPending={kycPending}
+      />
+
+      <TenantTabNav
+        tenantId={t.id}
+        active={tab}
+        badges={{ kyc: kycPending ? <span className="w-1.5 h-1.5 rounded-full bg-yellow-500 inline-block align-middle" /> : null }}
+      />
+
+      <div className="mt-6">
+        {tab === 'overview' && <OverviewTab tenant={t} job={headerJob} owners={await getTenantOwners(id).catch(() => [])} />}
+        {tab === 'provisioning' && <ProvisioningTab tenant={t} />}
+        {tab === 'infrastructure' && <InfrastructureTab tenant={t} job={headerJob} {...await infraData(id)} />}
+        {tab === 'commerce' && <CommerceTab tenant={t} {...await commerceData(id)} />}
+        {tab === 'access' && <AccessTab tenant={t} {...await accessData(id)} />}
+        {tab === 'kyc' && <KycTab tenant={t} kyc={kyc} />}
       </div>
-
-      <div className="mb-6 flex flex-wrap items-center gap-3">
-        <TenantActions tenantId={t.id} slug={t.slug} status={t.status} instanceState={t.instance_state} />
-        <Link href={`/admin/ecom/provisioning/${t.id}`} className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors">
-          View provisioning logs →
-        </Link>
-      </div>
-
-      {/* ── KYC Review ── */}
-      {kyc && (
-        <section className={`rounded-xl border p-5 bg-surface-elevated mb-6 ${kycPending ? 'border-yellow-300 dark:border-yellow-700' : kyc.status === 'approved' ? 'border-green-300 dark:border-green-700' : 'border-red-300 dark:border-red-700'}`}>
-          <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
-            <div className="flex items-center gap-3">
-              <h2 className="font-semibold text-foreground">KYC / GST Verification</h2>
-              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold capitalize ${
-                kyc.status === 'approved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' :
-                kyc.status === 'rejected' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
-                'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-              }`}>{kyc.status}</span>
-            </div>
-            {kycPending && <KycActionButtons tenantId={t.id} mode="pending" />}
-            {/* Approved but no checkout URL — Razorpay sub creation failed, allow retry */}
-            {kyc.status === 'approved' && t.status === 'provisioning' && !t.razorpay_checkout_url && (
-              <KycActionButtons tenantId={t.id} mode="retry" />
-            )}
-            {kyc.status === 'approved' && t.razorpay_checkout_url && (
-              <div className="text-xs text-foreground-muted">
-                Approved by {kyc.reviewed_by} on {kyc.reviewed_at ? new Date(kyc.reviewed_at).toLocaleDateString('en-IN') : '—'}
-              </div>
-            )}
-            {kyc.status === 'rejected' && (
-              <div className="text-xs text-red-600 dark:text-red-400">
-                Rejected by {kyc.reviewed_by} — {kyc.reviewer_note}
-              </div>
-            )}
-          </div>
-
-          <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-            <Field label="Business name" value={kyc.business_name} />
-            <Field label="Business type" value={kyc.business_type} />
-            <Field label="GSTIN" value={<span className="font-mono text-xs">{kyc.gst_number}</span>} />
-            <Field label="PAN" value={<span className="font-mono text-xs">{kyc.pan}</span>} />
-            <Field label="Products" value={kyc.product_categories} />
-            {kyc.business_address && (
-              <div className="col-span-2">
-                <dt className="text-xs uppercase tracking-wide text-foreground-muted">Business address</dt>
-                <dd className="text-sm text-foreground mt-0.5">{kyc.business_address}</dd>
-              </div>
-            )}
-            <Field label="GST certificate" value={
-              kyc.gst_cert_s3_key
-                ? <a href={`/api/admin/ecom/kyc/${t.id}/cert`} target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline text-xs">View certificate ↗</a>
-                : <span className="text-foreground-muted">Not uploaded</span>
-            } />
-          </dl>
-        </section>
-      )}
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section className="rounded-xl border border-border-default p-5 bg-surface-elevated">
-          <h2 className="font-semibold text-foreground mb-4">Store</h2>
-          <dl className="grid grid-cols-2 gap-4">
-            <Field label="Subdomain" value={`${t.slug}.jeffistores.in`} />
-            <Field label="Custom domain" value={t.custom_domain} />
-            <Field label="Plan" value={<span className="capitalize">{t.plan || '—'}</span>} />
-            <Field label="Monthly" value={t.monthly_price_inr ? `₹${Number(t.monthly_price_inr).toLocaleString('en-IN')}` : '—'} />
-            <Field label="Payout" value={t.daily_payout ? 'Daily (+5%)' : 'Weekly'} />
-            <Field label="Created" value={new Date(t.created_at).toLocaleDateString('en-IN')} />
-          </dl>
-        </section>
-
-        <section className="rounded-xl border border-border-default p-5 bg-surface-elevated">
-          <h2 className="font-semibold text-foreground mb-4">Infrastructure</h2>
-          <dl className="grid grid-cols-2 gap-4">
-            <Field label="RDS endpoint" value={<span className="font-mono text-xs break-all">{t.rds_endpoint || <span className="text-amber-500">not provisioned</span>}</span>} />
-            <Field label="Database" value={t.rds_db} />
-            <Field label="S3 bucket" value={<span className="font-mono text-xs">{t.s3_bucket}</span>} />
-            <Field label="EC2 target" value={t.ec2_target || 'pool'} />
-            <Field label="Region" value={t.region} />
-            <Field label="CloudFront" value={t.cloudfront_id} />
-          </dl>
-        </section>
-      </div>
-
-      {billing && (
-        <section className="rounded-xl border border-border-default p-5 bg-surface-elevated mt-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-semibold text-foreground">Billing snapshot</h2>
-            <Link href={`/admin/ecom/billing/${t.id}`} className="text-sm text-accent-600 dark:text-accent-400 hover:underline">View full billing →</Link>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Field label="Settlement balance" value={<span className={billing.balance >= 0 ? 'text-green-600' : 'text-red-600'}>₹{billing.balance.toLocaleString('en-IN')}</span>} />
-            <Field label="GMV" value={`₹${billing.totals.gross.toLocaleString('en-IN')}`} />
-            <Field label="Your commission" value={`₹${billing.totals.commission.toLocaleString('en-IN')}`} />
-            <Field label="Transactions" value={billing.transactions.length} />
-          </div>
-        </section>
-      )}
     </div>
   )
+}
+
+async function accessData(id: string) {
+  const [certs, ca, social, integrations] = await Promise.all([
+    listTenantAdminCerts(id).catch(() => []),
+    getTenantCa(id).catch(() => null),
+    getTenantSocialAccounts(id).catch(() => []),
+    listIntegrationCredentials(id).catch(() => []),
+  ])
+  // getTenantCa carries caKeyPem — the tenant's CA private key. Only the two display fields
+  // cross into the component, so the key cannot ride along into any future client boundary.
+  const caSummary = ca ? { subject: ca.subject, expiresAt: ca.expiresAt } : null
+  return { certs, ca: caSummary, social, integrations }
+}
+
+async function infraData(id: string) {
+  const [domains, migrations] = await Promise.all([
+    listCustomDomains(id).catch(() => []),
+    getTenantMigrationRuns(id).catch(() => []),
+  ])
+  return { domains, migrations, currentSha: process.env.GIT_SHA || null }
+}
+
+async function commerceData(id: string) {
+  const [billing, bank] = await Promise.all([
+    getTenantBilling(id).catch(() => null),
+    getTenantBankAccount(id).catch(() => null),
+  ])
+  return { billing, bank }
 }

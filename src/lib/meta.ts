@@ -113,7 +113,7 @@ export async function getPageAndIgAccounts(userToken: string): Promise<MetaAccou
 
 /** Post to a Facebook Page — a photo post when imageUrl is given, else a text/link post. */
 export async function publishFacebookPost(opts: {
-  pageId: string; message: string; imageUrl?: string; accessToken: string
+  pageId: string; message: string; imageUrl?: string; accessToken: string; link?: string | null
 }): Promise<{ id: string }> {
   if (opts.imageUrl) {
     const r = await graphPost(`${opts.pageId}/photos`, {
@@ -121,7 +121,13 @@ export async function publishFacebookPost(opts: {
     })
     return { id: r.post_id || r.id }
   }
-  const r = await graphPost(`${opts.pageId}/feed`, { message: opts.message, access_token: opts.accessToken })
+  // With no photo, `link` turns the post into a real link card instead of leaving the URL to be
+  // auto-linked inside the message text.
+  const r = await graphPost(`${opts.pageId}/feed`, {
+    message: opts.message,
+    ...(opts.link ? { link: opts.link } : {}),
+    access_token: opts.accessToken,
+  })
   return { id: r.id }
 }
 
