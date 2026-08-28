@@ -150,6 +150,49 @@ while i < len(lines):
 # updated. Prefix each CHECK add with a DROP IF EXISTS so it is self-healing. Safe because
 # dropping a CHECK removes only a validation rule.
 import re as _re
+
+
+# Same failure shape for PRIMARY KEY, but the ADD cannot simply be prefixed with a DROP:
+# dropping the old constraint also drops the index that "USING INDEX" then needs. Replace
+# the ADD with a block that no-ops when the PK is already right, and otherwise reads the
+# column list out of the existing index before freeing the name.
+def _pk_adopt(_tbl, _con):
+    return f"""DO $jeffi$
+DECLARE v_cols text; v_idx oid; v_con text;
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint c
+               JOIN pg_class t ON t.oid = c.conrelid
+               JOIN pg_namespace n ON n.oid = t.relnamespace
+              WHERE n.nspname = 'public' AND t.relname = '{_tbl}' AND c.contype = 'p') THEN
+    RAISE NOTICE 'primary key already present on public.{_tbl} - skipping';
+    RETURN;
+  END IF;
+  SELECT i.indexrelid INTO v_idx
+    FROM pg_index i
+    JOIN pg_class ic ON ic.oid = i.indexrelid
+    JOIN pg_namespace n ON n.oid = ic.relnamespace
+   WHERE n.nspname = 'public' AND ic.relname = '{_con}';
+  IF v_idx IS NULL THEN
+    RAISE NOTICE 'index {_con} not found - leaving public.{_tbl} alone';
+    RETURN;
+  END IF;
+  SELECT string_agg(quote_ident(a.attname), ', ' ORDER BY k.ord) INTO v_cols
+    FROM pg_index i
+    CROSS JOIN LATERAL unnest(i.indkey) WITH ORDINALITY AS k(attnum, ord)
+    JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = k.attnum
+   WHERE i.indexrelid = v_idx;
+  SELECT c.conname INTO v_con FROM pg_constraint c WHERE c.conindid = v_idx;
+  IF v_con IS NOT NULL THEN
+    EXECUTE format('ALTER TABLE public.%I DROP CONSTRAINT %I', '{_tbl}', v_con);
+  ELSE
+    EXECUTE format('DROP INDEX public.%I', '{_con}');
+  END IF;
+  EXECUTE format('ALTER TABLE public.%I ADD CONSTRAINT %I PRIMARY KEY (%s)', '{_tbl}', '{_con}', v_cols);
+  RAISE NOTICE 'adopted primary key {_con} on public.{_tbl} (%)', v_cols;
+END
+$jeffi$;"""
+
+
 _healed = []
 for _stmt in '\n'.join(output).split(';'):
     _s = _stmt.strip()
@@ -158,6 +201,10 @@ for _stmt in '\n'.join(output).split(';'):
     _m = _re.match(r'(?is)^\s*alter\s+table\s+(?:only\s+)?(\S+)\s+add\s+constraint\s+(\S+)\s+check\b', _s)
     if _m:
         _healed.append(f'ALTER TABLE {_m.group(1)} DROP CONSTRAINT IF EXISTS {_m.group(2)};')
+    _pk = _re.match(r'(?is)^\s*alter\s+table\s+(?:only\s+)?(\S+)\s+add\s+constraint\s+(\S+)\s+primary\s+key\b', _s)
+    if _pk:
+        _healed.append(_pk_adopt(_pk.group(1).split('.')[-1].strip('"'), _pk.group(2).strip('"')))
+        continue
     _healed.append(_s + ';')
 output = _healed
 
