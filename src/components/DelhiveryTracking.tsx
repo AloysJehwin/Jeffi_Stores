@@ -392,6 +392,12 @@ export default function DelhiveryTracking({
         )}
 
         {/* Delivery cost breakdown — actual invoice, weight estimate, or quote only */}
+        {/*
+          Delivery cost is admin-only and stays inside this branch: it shows what Delhivery
+          bills US, the shortfall against what the customer paid, and the freight/COD breakdown.
+          The customer render below must never gain these fields — a shortfall is commercially
+          sensitive, and the customer track API deliberately omits them too.
+        */}
         {(tracking.shippingAmount != null || tracking.chargedWeightKg != null || tracking.billedAmount != null) && (() => {
           const inr = (n: number) => `₹${Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`
           const hasBilled = tracking.billedAmount != null
