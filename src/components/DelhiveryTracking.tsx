@@ -455,6 +455,7 @@ export default function DelhiveryTracking({
                   orderId={orderId}
                   apiBase={apiBase}
                   currentKg={tracking.chargedWeightKg ?? null}
+                  currentAmount={tracking.billedAmount ?? null}
                   onDone={() => loadTracking(true)}
                 />
               )}
@@ -598,27 +599,32 @@ export default function DelhiveryTracking({
  * figure matches their dashboard exactly.
  */
 function RepriceCharge({
-  orderId, apiBase, currentKg, onDone,
+  orderId, apiBase, currentKg, currentAmount, onDone,
 }: {
   orderId: string
   apiBase: string
   currentKg: number | null
+  currentAmount: number | null
   onDone: () => void
 }) {
   const [open, setOpen] = useState(false)
   const [kg, setKg] = useState(currentKg != null ? String(currentKg) : '')
+  const [amount, setAmount] = useState(currentAmount != null ? String(currentAmount) : '')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function save() {
-    const value = Number(kg)
-    if (!Number.isFinite(value) || value <= 0) { setError('Enter the weight in kg, e.g. 2.78'); return }
+    const kgVal = kg.trim() === '' ? null : Number(kg)
+    const amtVal = amount.trim() === '' ? null : Number(amount)
+    if (kgVal == null && amtVal == null) { setError('Enter the charged weight or the charged amount'); return }
+    if (kgVal != null && (!Number.isFinite(kgVal) || kgVal <= 0)) { setError('Weight must be a number in kg, e.g. 2.78'); return }
+    if (amtVal != null && (!Number.isFinite(amtVal) || amtVal < 0)) { setError('Amount must be a number, e.g. 162.70'); return }
     setBusy(true); setError(null)
     try {
       const res = await fetch(`${apiBase}/${orderId}/delivery-charge`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ chargedWeightKg: value }),
+        body: JSON.stringify({ chargedWeightKg: kgVal, chargedAmount: amtVal }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) { setError(data.error || 'Could not reprice'); return }
@@ -645,19 +651,35 @@ function RepriceCharge({
 
   return (
     <div className="mb-3 rounded-lg border border-border-default bg-surface-secondary p-3">
-      <label className="block text-[11px] text-foreground-secondary mb-1.5">
-        Charged weight from Delhivery (kg) — the cost is calculated, not entered
-      </label>
-      <div className="flex items-center gap-2 flex-wrap">
-        <input
-          type="number"
-          step="0.01"
-          min="0"
-          value={kg}
-          onChange={(e) => { setKg(e.target.value); setError(null) }}
-          placeholder="2.78"
-          className="w-28 px-2 py-1.5 text-sm rounded border border-border-default bg-surface text-foreground"
-        />
+      <p className="text-[11px] text-foreground-secondary mb-2">
+        From the Delhivery shipment page. Enter the weight and the cost is calculated at
+        Delhivery&apos;s own rates, or enter the amount directly if you have it — the amount wins.
+      </p>
+      <div className="flex items-end gap-2 flex-wrap">
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-foreground-muted">Charged weight (kg)</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={kg}
+            onChange={(e) => { setKg(e.target.value); setError(null) }}
+            placeholder="2.78"
+            className="w-28 px-2 py-1.5 text-sm rounded border border-border-default bg-surface text-foreground"
+          />
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[10px] uppercase tracking-wide text-foreground-muted">Charged amount (₹)</span>
+          <input
+            type="number"
+            step="0.01"
+            min="0"
+            value={amount}
+            onChange={(e) => { setAmount(e.target.value); setError(null) }}
+            placeholder="162.70"
+            className="w-32 px-2 py-1.5 text-sm rounded border border-border-default bg-surface text-foreground"
+          />
+        </label>
         <button
           type="button"
           onClick={save}

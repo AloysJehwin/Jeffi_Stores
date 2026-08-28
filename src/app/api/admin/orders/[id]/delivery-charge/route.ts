@@ -23,7 +23,10 @@ export const dynamic = 'force-dynamic'
  * arithmetic.
  */
 const Schema = z.object({
-  chargedWeightKg: z.number().positive().max(1000),
+  chargedWeightKg: z.number().positive().max(1000).nullish(),
+  chargedAmount: z.number().nonnegative().max(1_000_000).nullish(),
+}).refine((v) => v.chargedWeightKg != null || v.chargedAmount != null, {
+  message: 'Give the charged weight, the charged amount, or both',
 })
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -36,7 +39,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const parsed = parseBody(Schema, await request.json().catch(() => null))
   if (!parsed.ok) return parsed.response
-  const { chargedWeightKg } = parsed.data
+  const { chargedWeightKg, chargedAmount } = parsed.data
 
   const order = await queryOne<{
     awb_number: string | null
@@ -56,25 +59,32 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (!order.awb_number) return NextResponse.json({ error: 'Order has no AWB' }, { status: 400 })
   if (!order.dest_pin) return NextResponse.json({ error: 'Order has no destination pincode' }, { status: 400 })
 
-  const charges = await fetchDelhiveryInvoiceCharges({
-    awb: order.awb_number,
-    settledStatus: 'Delivered',
-    chargedWeightG: Math.round(chargedWeightKg * 1000),
-    originPin: (await getBusinessValues()).delhiveryOriginPincode,
-    destPin: order.dest_pin,
-    paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
-  })
+  // An amount read straight off Delhivery is the billed figure itself, so it wins over anything
+  // derived. The rate call only runs when we have a weight and no amount to trust.
+  let charges: Awaited<ReturnType<typeof fetchDelhiveryInvoiceCharges>> = null
+  if (chargedAmount == null && chargedWeightKg != null) {
+    charges = await fetchDelhiveryInvoiceCharges({
+      awb: order.awb_number,
+      settledStatus: 'Delivered',
+      chargedWeightG: Math.round(chargedWeightKg * 1000),
+      originPin: (await getBusinessValues()).delhiveryOriginPincode,
+      destPin: order.dest_pin,
+      paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
+    })
 
-  if (!charges) {
-    return NextResponse.json(
-      { error: 'Delhivery did not return a rate for this shipment. Check the server log for the reason.' },
-      { status: 502 }
-    )
+    if (!charges) {
+      return NextResponse.json(
+        { error: 'Delhivery did not return a rate for this weight. Enter the charged amount instead, or check the server log.' },
+        { status: 502 }
+      )
+    }
   }
+
+  const total = chargedAmount ?? charges!.total
 
   await query(
     `UPDATE orders SET
-       delhivery_charged_weight_kg = $2,
+       delhivery_charged_weight_kg = COALESCE($2, delhivery_charged_weight_kg),
        delhivery_billed_amount     = $3,
        delhivery_freight_charge    = $4,
        delhivery_cod_charge        = $5,
@@ -83,7 +93,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        delhivery_extra_charge      = ROUND(($3 - COALESCE(shipping_amount, 0))::numeric, 2),
        updated_at                  = NOW()
      WHERE id = $1`,
-    [id, chargedWeightKg, charges.total, charges.freight, charges.codCharge, charges.oda]
+    [id, chargedWeightKg ?? null, total, charges?.freight ?? null, charges?.codCharge ?? null, charges?.oda ?? null]
   )
 
   const quoted = Number(order.shipping_amount ?? 0)
@@ -92,21 +102,27 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     action: 'update',
     entityType: 'order',
     entityId: id,
-    summary: `Delivery charge repriced at ${chargedWeightKg} kg: ₹${quoted} quoted → ₹${charges.total} charged`,
+    summary: `Delivery charge set to ₹${total} (quoted ₹${quoted})`
+      + (chargedAmount != null ? ' — entered' : ` — calculated at ${chargedWeightKg} kg`),
     diff: {
-      delhivery_charged_weight_kg: { from: order.delhivery_charged_weight_kg, to: chargedWeightKg },
-      delhivery_billed_amount: { from: null, to: charges.total },
+      delhivery_charged_weight_kg: { from: order.delhivery_charged_weight_kg, to: chargedWeightKg ?? order.delhivery_charged_weight_kg },
+      delhivery_billed_amount: { from: null, to: total },
     },
-    metadata: { awb: order.awb_number, zone: charges.zone, freight: charges.freight, tax: charges.tax },
+    metadata: {
+      awb: order.awb_number,
+      source: chargedAmount != null ? 'entered' : 'calculated',
+      zone: charges?.zone ?? null, freight: charges?.freight ?? null, tax: charges?.tax ?? null,
+    },
     request,
   }).catch(() => {})
 
   return NextResponse.json({
     ok: true,
-    chargedWeightKg,
+    chargedWeightKg: chargedWeightKg ?? null,
     quoted,
-    charged: charges.total,
-    difference: Math.round((charges.total - quoted) * 100) / 100,
+    charged: total,
+    source: chargedAmount != null ? 'entered' : 'calculated',
+    difference: Math.round((total - quoted) * 100) / 100,
     breakdown: charges,
   })
 }
