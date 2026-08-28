@@ -81,3 +81,87 @@ export function StatusPill({ status }: { status: string }) {
 export function DetailLink({ href, children }: { href: string; children: React.ReactNode }) {
   return <Link href={href} className="text-accent-600 dark:text-accent-400 hover:underline">{children}</Link>
 }
+
+/** Label/value pair used by every tenant detail section. */
+export function Field({ label, value, wide }: { label: string; value: React.ReactNode; wide?: boolean }) {
+  return (
+    <div className={wide ? 'col-span-2' : undefined}>
+      <dt className="text-xs uppercase tracking-wide text-foreground-muted">{label}</dt>
+      <dd className="text-sm text-foreground mt-0.5 min-w-0 break-words">{value ?? '—'}</dd>
+    </div>
+  )
+}
+
+export function Mono({ children }: { children: React.ReactNode }) {
+  return <span className="font-mono text-xs break-all">{children}</span>
+}
+
+export const NOT_PROVISIONED = <span className="text-amber-500">not provisioned</span>
+
+export function Section({ title, action, children, className = '' }: {
+  title: string; action?: React.ReactNode; children: React.ReactNode; className?: string
+}) {
+  return (
+    <section className={`rounded-xl border border-border-default p-5 bg-surface-elevated min-w-0 ${className}`}>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <h2 className="font-semibold text-foreground">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  )
+}
+
+export function FieldGrid({ children }: { children: React.ReactNode }) {
+  return <dl className="grid grid-cols-2 gap-4 min-w-0">{children}</dl>
+}
+
+export const TENANT_TABS = [
+  { key: 'overview',       label: 'Overview' },
+  { key: 'provisioning',   label: 'Provisioning' },
+  { key: 'infrastructure', label: 'Infrastructure' },
+  { key: 'commerce',       label: 'Commerce' },
+  { key: 'access',         label: 'Access' },
+  { key: 'kyc',            label: 'KYC' },
+] as const
+
+export type TenantTab = typeof TENANT_TABS[number]['key']
+
+export function isTenantTab(v: string | undefined): v is TenantTab {
+  return !!v && TENANT_TABS.some(t => t.key === v)
+}
+
+/**
+ * Tab strip for the tenant object page. Plain links rather than client state so each tab is
+ * a real URL — an alert email can point straight at ?tab=provisioning.
+ *
+ * Lives under /admin/ecom/customers/[id] because the sidebar marks a group active with
+ * startsWith(href + '/'), so an object page on its own path would never expand its nav group.
+ */
+export function TenantTabNav({ tenantId, active, badges }: {
+  tenantId: string; active: TenantTab; badges?: Partial<Record<TenantTab, React.ReactNode>>
+}) {
+  return (
+    <div className="border-b border-border-default -mx-6 px-6 overflow-x-auto">
+      <nav className="flex gap-1 min-w-max">
+        {TENANT_TABS.map(({ key, label }) => {
+          const on = key === active
+          return (
+            <Link
+              key={key}
+              href={`/admin/ecom/customers/${tenantId}?tab=${key}`}
+              className={`px-3.5 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors whitespace-nowrap ${
+                on
+                  ? 'border-accent-500 text-foreground'
+                  : 'border-transparent text-foreground-muted hover:text-foreground hover:border-border-default'
+              }`}
+            >
+              {label}
+              {badges?.[key] ? <span className="ml-1.5">{badges[key]}</span> : null}
+            </Link>
+          )
+        })}
+      </nav>
+    </div>
+  )
+}

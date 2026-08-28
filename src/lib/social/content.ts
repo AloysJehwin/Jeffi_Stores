@@ -1,5 +1,6 @@
 import { aiChat } from '../ai-client'
 import { searchHashtagReach } from '../meta'
+import { withProductLink } from './product-url'
 
 // Post-content generation: caption + hashtags for a product social post. Caption is
 // LLM-composed (reuses the app's aiChat, modelHint 'copy'); hashtags are generated from the
@@ -11,11 +12,14 @@ import { searchHashtagReach } from '../meta'
 
 export interface ProductForPost {
   name: string
+  slug?: string | null
   category?: string | null
   brand?: string | null
   description?: string | null
   attributes?: Record<string, string> | null
 }
+
+export { productUrl, withProductLink } from './product-url'
 
 /** Compose a short marketing caption. Falls back to a deterministic caption if the LLM is down. */
 export async function generateCaption(product: ProductForPost, brandName: string): Promise<string> {
@@ -33,9 +37,9 @@ export async function generateCaption(product: ProductForPost, brandName: string
       ],
     })
     const text = res.content.trim()
-    if (text) return text
+    if (text) return withProductLink(text, product.slug)
   } catch { /* fall through to deterministic caption */ }
-  return `${product.name} — now available at ${brandName}. Shop today!`
+  return withProductLink(`${product.name} — now available at ${brandName}. Shop today!`, product.slug)
 }
 
 export interface HashtagProvider {

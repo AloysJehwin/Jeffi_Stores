@@ -5,7 +5,7 @@
  * hashtags come back as space-joined '#tag' tokens, respect `max`, and are reach-ranked via
  * the IG Hashtag Search API only when an IG account is supplied.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import type { ProductForPost } from '@/lib/social/content'
 
 // aiChat is the LLM seam.
@@ -48,6 +48,70 @@ describe('social/content', () => {
       const { generateCaption } = await import('@/lib/social/content')
       const caption = await generateCaption(PRODUCT, 'Jeffi Stores')
       expect(caption).toContain('now available at Jeffi Stores')
+    })
+
+    it('appends the product link when the product has a slug', async () => {
+      ai.aiChat.mockResolvedValue({ content: 'Grip it and rip it' })
+      const { generateCaption } = await import('@/lib/social/content')
+      const caption = await generateCaption({ ...PRODUCT, slug: 'torque-wrench-pro' }, 'Jeffi Stores')
+      expect(caption).toContain('/products/torque-wrench-pro')
+      expect(caption.startsWith('Grip it and rip it')).toBe(true)
+    })
+  })
+
+  describe('withProductLink', () => {
+    it('appends the full product URL, not the bare domain', async () => {
+      const { withProductLink } = await import('@/lib/social/content')
+      const out = withProductLink('Nice wrench', 'torque-wrench-pro')
+      expect(out).toContain('/products/torque-wrench-pro')
+      expect(out).toBe(`Nice wrench\n\n${out.split('\n\n')[1]}`)
+    })
+
+    it('is idempotent — regenerating never doubles the link', async () => {
+      const { withProductLink } = await import('@/lib/social/content')
+      const once = withProductLink('Nice wrench', 'torque-wrench-pro')
+      expect(withProductLink(once, 'torque-wrench-pro')).toBe(once)
+    })
+
+    it('leaves the caption alone when there is no slug', async () => {
+      const { withProductLink } = await import('@/lib/social/content')
+      expect(withProductLink('Nice wrench', null)).toBe('Nice wrench')
+      expect(withProductLink('Nice wrench', undefined)).toBe('Nice wrench')
+    })
+
+    it('returns just the link when the caption is empty', async () => {
+      const { withProductLink, productUrl } = await import('@/lib/social/content')
+      expect(withProductLink('   ', 'torque-wrench-pro')).toBe(productUrl('torque-wrench-pro'))
+    })
+  })
+
+  describe('productUrl', () => {
+    const ORIGINAL = process.env.NEXT_PUBLIC_SITE_URL
+    afterEach(() => {
+      if (ORIGINAL === undefined) delete process.env.NEXT_PUBLIC_SITE_URL
+      else process.env.NEXT_PUBLIC_SITE_URL = ORIGINAL
+      vi.resetModules()
+    })
+
+    it('always emits an absolute http(s) URL — Facebook only auto-links those', async () => {
+      process.env.NEXT_PUBLIC_SITE_URL = 'jeffistores.in'
+      vi.resetModules()
+      const { productUrl } = await import('@/lib/social/product-url')
+      expect(productUrl('torque-wrench-pro')).toBe('https://jeffistores.in/products/torque-wrench-pro')
+    })
+
+    it('does not double the scheme when one is already set', async () => {
+      process.env.NEXT_PUBLIC_SITE_URL = 'https://jeffistores.in'
+      vi.resetModules()
+      const { productUrl } = await import('@/lib/social/product-url')
+      expect(productUrl('x')).toBe('https://jeffistores.in/products/x')
+    })
+
+    it('strips trailing slashes so the path never doubles up', async () => {
+      process.env.NEXT_PUBLIC_SITE_URL = 'https://jeffistores.in//'
+      vi.resetModules()
+      const { productUrl } = await import('@/lib/social/product-url')
+      expect(productUrl('x')).toBe('https://jeffistores.in/products/x')
     })
   })
 

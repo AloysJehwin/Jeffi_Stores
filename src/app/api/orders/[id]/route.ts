@@ -13,6 +13,8 @@ import { attributeConversion } from '@/lib/marketing'
 import { getCurrentTenant } from '@/lib/tenant-context'
 import { getFeatureFlags } from '@/lib/site-controls'
 import { parseBody } from '@/lib/validate'
+import { isPlatformOwner } from '@/lib/scopes'
+import { logAdminAudit } from '@/lib/admin-audit'
 import {
   notifyOrderConfirmed, notifyOrderShipped, notifyOrderDelivered,
   notifyOrderCancelled, notifyOutForDelivery, notifyPaymentFailed,
@@ -30,7 +32,15 @@ const OrderPatchSchema = z.object({
     order_item_id: z.string().uuid(),
     serial_number: z.string().min(1),
   })).nullish(),
+  override: z.boolean().nullish(),
+  override_reason: z.string().trim().min(10).max(500).nullish(),
 })
+
+const ALL_ORDER_STATUSES = [
+  'pending', 'confirmed', 'processing', 'shipped', 'out_for_delivery', 'delivered',
+  'cancel_requested', 'cancel_rejected', 'cancelled',
+  'return_requested', 'return_approved', 'return_received', 'return_rejected', 'returned',
+]
 
 export async function GET(
   request: NextRequest,
@@ -242,6 +252,20 @@ export async function PATCH(
     const parsed = parseBody(OrderPatchSchema, body)
     if (!parsed.ok) return parsed.response
     const { status, payment_status, batch_assignments, serial_assignments } = parsed.data
+    const wantsOverride = parsed.data.override === true
+    const overrideReason = parsed.data.override_reason?.trim() || ''
+
+    if (wantsOverride) {
+      if (!isPlatformOwner(admin.role)) {
+        return NextResponse.json({ error: 'Only a super admin can override the order status' }, { status: 403 })
+      }
+      if (!overrideReason) {
+        return NextResponse.json({ error: 'override_reason is required when overriding (10-500 characters)' }, { status: 400 })
+      }
+      if (status && !ALL_ORDER_STATUSES.includes(status)) {
+        return NextResponse.json({ error: `Unknown order status: ${status}` }, { status: 400 })
+      }
+    }
 
     const currentOrder = await queryOne(`
       SELECT
@@ -276,13 +300,13 @@ export async function PATCH(
 
     const TERMINAL_STATUSES = ['cancelled', 'cancel_rejected', 'return_rejected', 'returned']
 
-    if (TERMINAL_STATUSES.includes(currentOrder.status)) {
+    if (!wantsOverride && TERMINAL_STATUSES.includes(currentOrder.status)) {
       return NextResponse.json({ error: `Orders with status '${currentOrder.status}' cannot be modified` }, { status: 400 })
     }
 
     const validPaymentStatuses = ['pending', 'unpaid', 'paid', 'failed', 'refunded', 'cod_pending', 'cod_collected']
 
-    if (status && status !== currentOrder.status) {
+    if (!wantsOverride && status && status !== currentOrder.status) {
       const allowed = VALID_TRANSITIONS[currentOrder.status] ?? []
       if (!allowed.includes(status)) {
         return NextResponse.json(
@@ -296,7 +320,7 @@ export async function PATCH(
       return NextResponse.json({ error: `Invalid payment status: ${payment_status}` }, { status: 400 })
     }
 
-    if (currentOrder.payment_status === 'paid' && payment_status === 'pending') {
+    if (!wantsOverride && currentOrder.payment_status === 'paid' && payment_status === 'pending') {
       return NextResponse.json({ error: 'Paid orders cannot revert to pending. Use refunded instead.' }, { status: 400 })
     }
 
@@ -378,6 +402,26 @@ export async function PATCH(
       `UPDATE orders SET ${updates.join(', ')} WHERE id = $${paramIndex}`,
       values
     )
+
+    // An override skips the transition rules, so it must leave a trail that says who did it
+    // and why — otherwise the order history shows a jump no state machine could produce.
+    if (wantsOverride) {
+      const diff: Record<string, { from: unknown; to: unknown }> = {}
+      if (status && status !== currentOrder.status) diff.status = { from: currentOrder.status, to: status }
+      if (payment_status && payment_status !== currentOrder.payment_status) {
+        diff.payment_status = { from: currentOrder.payment_status, to: payment_status }
+      }
+      await logAdminAudit({
+        adminId: admin.adminId,
+        action: 'update',
+        entityType: 'order',
+        entityId: orderId,
+        summary: `Status override on ${currentOrder.order_number}: ${Object.entries(diff).map(([k, v]) => `${k} ${v.from} → ${v.to}`).join(', ') || 'no field change'}`,
+        diff,
+        metadata: { override: true, reason: overrideReason, role: admin.role },
+        request,
+      }).catch(() => {})
+    }
 
     // On cancellation, restore inventory if — and only if — stock was actually
     // deducted (i.e. the order reached 'processing' and has a 'sale' ledger row).
