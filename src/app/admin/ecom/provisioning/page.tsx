@@ -101,7 +101,7 @@ export default async function EcomProvisioningPage({ searchParams }: { searchPar
               return (
                 <tr key={j.id} className="hover:bg-surface-secondary">
                   <td className="px-4 py-3 font-medium text-foreground">
-                    <Link href={`/admin/ecom/provisioning/${j.tenant_id}`} className="hover:text-accent-600">{j.display_name}</Link>
+                    <Link href={`/admin/ecom/tenants/${j.tenant_id}?tab=provisioning`} className="hover:text-accent-600">{j.display_name}</Link>
                     <div className="text-xs text-foreground-muted">{j.slug}</div>
                   </td>
                   <td className="px-4 py-3"><JobPill status={j.status} /></td>
@@ -114,7 +114,7 @@ export default async function EcomProvisioningPage({ searchParams }: { searchPar
                   </td>
                   <td className="px-4 py-3 text-foreground-secondary">{j.attempts}</td>
                   <td className="px-4 py-3 text-foreground-muted">{new Date(j.updated_at).toLocaleString('en-IN')}</td>
-                  <td className="px-4 py-3 text-right"><DetailLink href={`/admin/ecom/provisioning/${j.tenant_id}`}>Logs →</DetailLink></td>
+                  <td className="px-4 py-3 text-right"><DetailLink href={`/admin/ecom/tenants/${j.tenant_id}?tab=provisioning`}>Logs →</DetailLink></td>
                 </tr>
               )
             })}

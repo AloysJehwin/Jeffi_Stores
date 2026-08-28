@@ -539,14 +539,16 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_customers:read',
     label: 'Ecom Customers (Read)',
     description: 'View SaaS tenant stores, plans and status',
-    routes: ['/admin/ecom/customers'],
+    // /admin/ecom/tenants is the consolidated object page the customers, instances,
+    // store-status and provisioning detail pages were folded into.
+    routes: ['/admin/ecom/customers', '/admin/ecom/tenants'],
     group: 'Ecom Store',
   },
   {
     key: 'ecom_customers:write',
     label: 'Ecom Customers (Write)',
     description: 'Manage SaaS tenants: suspend, resume, terminate, change plan',
-    routes: ['/admin/ecom/customers'],
+    routes: ['/admin/ecom/customers', '/admin/ecom/tenants'],
     group: 'Ecom Store',
   },
   {
