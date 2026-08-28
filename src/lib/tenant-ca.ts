@@ -192,9 +192,20 @@ export async function revokeTenantAdminCert(serial: string, revokedBy: string): 
   return (r.rowCount ?? 0) > 0
 }
 
-export async function listTenantAdminCerts(tenantId: string) {
+export interface AdminCertRow {
+  id: string
+  serial: string
+  common_name: string
+  issued_to: string | null
+  issued_at: string
+  expires_at: string
+  revoked_at: string | null
+  revoked_by: string | null
+}
+
+export async function listTenantAdminCerts(tenantId: string): Promise<AdminCertRow[]> {
   const r = await controlPlanePool().query(
     `SELECT id, serial, common_name, issued_to, issued_at, expires_at, revoked_at, revoked_by
      FROM tenant_admin_certs WHERE tenant_id = $1 ORDER BY issued_at DESC`, [tenantId])
-  return r.rows
+  return r.rows as AdminCertRow[]
 }

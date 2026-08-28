@@ -1,4 +1,4 @@
-import type { TenantDetail, ProvisioningJob } from '@/lib/tenant-registry'
+import type { TenantDetail, ProvisioningJob, TenantOwner } from '@/lib/tenant-registry'
 import { Field, FieldGrid, Section, Mono, NOT_PROVISIONED } from '../EcomUI'
 
 const DOT: Record<string, string> = {
@@ -19,7 +19,11 @@ function surfaces(slug: string, plan: string | null): string[] {
   return hosts
 }
 
-export default function OverviewTab({ tenant: t, job }: { tenant: TenantDetail; job: ProvisioningJob | null }) {
+export default function OverviewTab({ tenant: t, job, owners }: {
+  tenant: TenantDetail
+  job: ProvisioningJob | null
+  owners: TenantOwner[]
+}) {
   const serving = t.status === 'active' && !!t.rds_endpoint
 
   return (
@@ -63,6 +67,31 @@ export default function OverviewTab({ tenant: t, job }: { tenant: TenantDetail; 
           </FieldGrid>
         </Section>
       </div>
+
+      <Section title="Owners">
+        {owners.length === 0 ? (
+          <p className="text-sm text-foreground-muted">
+            No owner linked to this store. It cannot be signed into from ecom.jeffistores.in.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {owners.map((o) => (
+              <li key={o.id} className="flex items-start justify-between gap-3 min-w-0">
+                <div className="min-w-0">
+                  <div className="text-sm text-foreground break-all">{o.name || o.email}</div>
+                  {o.name && <div className="text-xs text-foreground-muted break-all">{o.email}</div>}
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="text-xs capitalize text-foreground-secondary">{o.role}</div>
+                  <div className="text-xs text-foreground-muted">
+                    since {new Date(o.linked_at).toLocaleDateString('en-IN')}
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
 
       <Section title="Surfaces">
         <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
