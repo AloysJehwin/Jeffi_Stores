@@ -30,6 +30,27 @@ describe('slugFromHost', () => {
     expect(slugFromHost('acme.business.jeffistores.in')).toEqual({ slug: 'acme', isCustomDomain: false })
   })
 
+  // Dev subdomains are not custom domains. Middleware 404s any host where slug or
+  // isCustomDomain is set, so classifying ecom.localhost as a custom domain made every
+  // dev subdomain 404 before its host branch could run.
+  it('never treats a development host as a custom domain', () => {
+    for (const host of [
+      'localhost', 'localhost:3000',
+      'ecom.localhost:3000', 'admin.localhost:3000', 'admin-acme.localhost:3000',
+      '127.0.0.1:3000', 'jeffi.local',
+    ]) {
+      expect(slugFromHost(host)).toEqual({ slug: null, isCustomDomain: false })
+    }
+  })
+
+  it('still flags real off-platform hosts as custom domains', () => {
+    expect(slugFromHost('shop.acmecorp.com')).toEqual({ slug: null, isCustomDomain: true })
+    expect(slugFromHost('evil.com')).toEqual({ slug: null, isCustomDomain: true })
+    // not a substring escape hatch — only a real .localhost suffix is exempt
+    expect(slugFromHost('notlocalhost.com')).toEqual({ slug: null, isCustomDomain: true })
+    expect(slugFromHost('localhost.evil.com')).toEqual({ slug: null, isCustomDomain: true })
+  })
+
   it('flags a non-platform host as a possible custom domain', () => {
     expect(slugFromHost('shop.acme.com')).toEqual({ slug: null, isCustomDomain: true })
   })

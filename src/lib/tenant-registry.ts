@@ -86,12 +86,29 @@ const cache = new Map<string, CacheEntry>()
 const CACHE_TTL_MS = 60_000
 
 /** Parse a Host header into a tenant slug, or null if it's a platform/app host. */
+/**
+ * Development hosts, which are never a tenant's custom domain.
+ *
+ * `.localhost` is reserved by RFC 6761 and can never resolve publicly, so exempting it cannot
+ * weaken the production guard. Without this, dev subdomains — ecom.localhost, admin.localhost,
+ * admin-{slug}.localhost — looked like custom domains, resolved to no tenant, and the
+ * fail-closed branch in middleware returned 404 before the host could be dispatched.
+ */
+function isLocalHost(host: string): boolean {
+  return host === 'localhost'
+    || host.endsWith('.localhost')
+    || host.endsWith('.local')
+    || host === '127.0.0.1'
+    || host === '::1'
+    || host === '[::1]'
+}
+
 export function slugFromHost(hostname: string): { slug: string | null; isCustomDomain: boolean } {
   const host = hostname.toLowerCase().split(':')[0].trim()
   // Custom domain: not under the platform root at all.
   if (!host.endsWith('.' + ROOT_DOMAIN) && host !== ROOT_DOMAIN) {
     // Could be a tenant's own domain — resolve by custom_domain lookup.
-    if (host && host !== 'localhost' && !host.endsWith('.local')) {
+    if (host && !isLocalHost(host)) {
       return { slug: null, isCustomDomain: true }
     }
     return { slug: null, isCustomDomain: false }
