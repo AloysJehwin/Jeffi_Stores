@@ -29,6 +29,7 @@ function daysLeft(iso: string | null): number | null {
 export default function OffersClient({ canWrite }: { canWrite: boolean }) {
   const { showToast } = useToast()
   const [offers, setOffers] = useState<AdminOffer[]>([])
+  const [problem, setProblem] = useState<{ reason: string; detail: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
@@ -41,6 +42,7 @@ export default function OffersClient({ canWrite }: { canWrite: boolean }) {
       if (!res.ok) throw new Error('failed')
       const d = await res.json()
       setOffers(d.offers || [])
+      setProblem(d.problem ?? null)
     } catch {
       showToast('Could not load offers from Razorpay', 'error')
     } finally {
@@ -80,11 +82,28 @@ export default function OffersClient({ canWrite }: { canWrite: boolean }) {
           product pages, how they read, and in what order.
         </p>
         <p className="text-xs text-foreground-muted mt-2">
-          {loading ? 'Loading…' : `${offers.length} active on the account · ${visibleCount} shown on the storefront`}
+          {loading
+            ? 'Loading…'
+            : problem
+              ? 'Could not read offers from Razorpay — see below.'
+              : `${offers.length} active on the account · ${visibleCount} shown on the storefront`}
         </p>
       </div>
 
-      {!loading && offers.length === 0 && (
+      {!loading && problem && (
+        <div className="rounded-xl border border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 p-4">
+          <p className="text-sm font-semibold text-amber-900 dark:text-amber-200">
+            {problem.reason === 'test_mode'
+              ? 'Offers cannot be listed on test keys'
+              : problem.reason === 'no_keys'
+                ? 'Razorpay keys are not configured'
+                : 'Could not reach Razorpay'}
+          </p>
+          <p className="text-xs text-amber-800/80 dark:text-amber-300/80 mt-1">{problem.detail}</p>
+        </div>
+      )}
+
+      {!loading && !problem && offers.length === 0 && (
         <div className="rounded-xl border border-border-default p-8 text-center">
           <p className="text-sm text-foreground-muted">
             No active offers on this Razorpay account.

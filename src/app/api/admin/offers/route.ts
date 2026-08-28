@@ -15,7 +15,12 @@ export async function GET(request: NextRequest) {
   if (!hasScope(admin.role, admin.scopes, 'coupons:read')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  return NextResponse.json({ offers: await getOffersWithSettings() })
+  const { offers, fetch } = await getOffersWithSettings()
+  return NextResponse.json({
+    offers,
+    ok: fetch.ok,
+    problem: fetch.ok ? null : { reason: fetch.reason, detail: fetch.detail },
+  })
 }
 
 const PatchSchema = z.object({
@@ -38,7 +43,7 @@ export async function PATCH(request: NextRequest) {
 
   // The offer must exist on the account — otherwise a typo silently creates a row that
   // controls nothing and looks like a working setting.
-  const known = await getOffersWithSettings()
+  const { offers: known } = await getOffersWithSettings()
   const target = known.find((o) => o.id === offerId)
   if (!target) return NextResponse.json({ error: 'Unknown offer for this Razorpay account' }, { status: 404 })
 
