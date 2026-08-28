@@ -450,16 +450,6 @@ export default function DelhiveryTracking({
                 </div>
               </div>
 
-              {canReprice && (
-                <RepriceCharge
-                  orderId={orderId}
-                  apiBase={apiBase}
-                  currentKg={tracking.chargedWeightKg ?? null}
-                  currentAmount={tracking.billedAmount ?? null}
-                  onDone={() => loadTracking(true)}
-                />
-              )}
-
               {/* Delta chip */}
               {diff != null && diff !== 0 && (
                 <div className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold mb-3 ${deltaTone}`}>
@@ -476,6 +466,17 @@ export default function DelhiveryTracking({
                   )}
                 </div>
               )}
+
+              {canReprice && (
+                <RepriceCharge
+                  orderId={orderId}
+                  apiBase={apiBase}
+                  currentKg={tracking.chargedWeightKg ?? null}
+                  currentAmount={tracking.billedAmount ?? null}
+                  onDone={() => loadTracking(true)}
+                />
+              )}
+
 
               {/* Itemized breakdown — only meaningful for the actual invoice */}
               {hasBilled && (
@@ -626,12 +627,23 @@ function RepriceCharge({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chargedWeightKg: kgVal, chargedAmount: amtVal }),
       })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) { setError(data.error || 'Could not reprice'); return }
+      const text = await res.text()
+      let data: any = null
+      try { data = JSON.parse(text) } catch { /* not JSON — surfaced below */ }
+
+      if (!res.ok || !data) {
+        // A bare "could not save" hides whether this was a 404 (route not deployed), a 500, or
+        // a real rejection. Show the status and whatever the server actually said.
+        setError(
+          data?.error
+            ?? `HTTP ${res.status} — ${text.slice(0, 120).replace(/<[^>]*>/g, '').trim() || 'no response body'}`
+        )
+        return
+      }
       setOpen(false)
       onDone()
-    } catch {
-      setError('Network error')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Network error')
     } finally {
       setBusy(false)
     }
@@ -642,9 +654,9 @@ function RepriceCharge({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="mb-3 text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline"
+        className="block mb-3 text-xs font-medium text-accent-600 dark:text-accent-400 hover:underline text-left"
       >
-        {currentKg != null ? 'Update charged weight' : 'Enter Delhivery charged weight'}
+        {currentKg != null || currentAmount != null ? 'Update delivery charge' : 'Enter Delhivery charge'}
       </button>
     )
   }
