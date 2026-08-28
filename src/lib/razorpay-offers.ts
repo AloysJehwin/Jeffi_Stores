@@ -86,22 +86,24 @@ export interface OfferSetting {
   updated_at: string
 }
 
-/** Every active offer on the account, merged with the admin's display settings. */
-export async function getOffersWithSettings(): Promise<Array<PublicOffer & {
+export type AdminOffer = PublicOffer & {
   isVisible: boolean
   titleOverride: string | null
   displayOrder: number
   looksInternal: boolean
-}>> {
+}
+
+/** Every active offer on the account, merged with the admin's display settings. */
+export async function getOffersWithSettings(): Promise<{ offers: AdminOffer[]; fetch: OffersFetch }> {
   const { queryMany } = await import('./db')
-  const [offers, rows] = await Promise.all([
-    getAccountOffers(),
+  const [result, rows] = await Promise.all([
+    fetchAccountOffers(),
     queryMany<OfferSetting>('SELECT offer_id, is_visible, title_override, display_order, updated_at FROM offer_display_settings')
       .catch(() => [] as OfferSetting[]),
   ])
   const byId = new Map(rows.map((r) => [r.offer_id, r]))
 
-  return offers
+  const offers = result.offers
     .map((o) => {
       const s = byId.get(o.id)
       const looksInternal = INTERNAL_TITLE_PATTERNS.some((re) => re.test(o.title))
@@ -114,6 +116,8 @@ export async function getOffersWithSettings(): Promise<Array<PublicOffer & {
       }
     })
     .sort((a, b) => a.displayOrder - b.displayOrder || a.title.localeCompare(b.title))
+
+  return { offers, fetch: result }
 }
 
 /**
@@ -122,21 +126,37 @@ export async function getOffersWithSettings(): Promise<Array<PublicOffer & {
  * showing nothing is correct when we cannot confirm an offer is real.
  */
 export async function getPublicOffers(): Promise<PublicOffer[]> {
-  const all = await getOffersWithSettings().catch(() => [])
-  return all
+  const { offers } = await getOffersWithSettings().catch(() => ({ offers: [] as AdminOffer[] }))
+  return offers
     .filter((o) => o.isVisible)
     .map(({ id, title, titleOverride, methods, issuers, endsAt, terms }) => ({
       id, title: titleOverride || title, methods, issuers, endsAt, terms,
     }))
 }
 
-/** Raw active offers from Razorpay, before any admin curation. */
-export async function getAccountOffers(): Promise<PublicOffer[]> {
-  if (cache && Date.now() - cache.at < TTL_MS) return cache.offers
+export type OffersFetch =
+  | { ok: true; offers: PublicOffer[] }
+  | { ok: false; offers: PublicOffer[]; reason: 'no_keys' | 'test_mode' | 'unreachable'; detail: string }
+
+/**
+ * Raw active offers from Razorpay, before any admin curation.
+ *
+ * Reports failure rather than returning [], because "no offers configured" and "could not ask
+ * Razorpay" look identical to a caller and mean opposite things. The offers API is live-only on
+ * this account — a test key gets HTTP 400 on GET /v1/offers even with no query params — so a
+ * dev environment always lands in the failure branch, and saying so beats claiming the account
+ * is empty.
+ */
+export async function fetchAccountOffers(): Promise<OffersFetch> {
+  if (cache && Date.now() - cache.at < TTL_MS) return { ok: true, offers: cache.offers }
 
   const keyId = process.env.RAZORPAY_KEY_ID
   const keySecret = process.env.RAZORPAY_KEY_SECRET
-  if (!keyId || !keySecret) return []
+  if (!keyId || !keySecret) {
+    return { ok: false, offers: [], reason: 'no_keys', detail: 'RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET are not set.' }
+  }
+
+  const testMode = keyId.startsWith('rzp_test_')
 
   try {
     const auth = Buffer.from(`${keyId}:${keySecret}`).toString('base64')
@@ -144,13 +164,32 @@ export async function getAccountOffers(): Promise<PublicOffer[]> {
       headers: { Authorization: `Basic ${auth}` },
       signal: AbortSignal.timeout(8000),
     })
-    if (!res.ok) return cache?.offers ?? []
+
+    if (!res.ok) {
+      return testMode
+        ? {
+            ok: false, offers: cache?.offers ?? [], reason: 'test_mode',
+            detail: `Razorpay's offers API is not available on test keys (HTTP ${res.status}). Offers created in test mode cannot be listed here; this page works against live keys.`,
+          }
+        : {
+            ok: false, offers: cache?.offers ?? [], reason: 'unreachable',
+            detail: `Razorpay returned HTTP ${res.status} for GET /v1/offers.`,
+          }
+    }
 
     const body = await res.json() as { items?: RawOffer[] }
     const offers = (body.items ?? []).map(normalise).filter((o): o is PublicOffer => !!o)
     cache = { at: Date.now(), offers }
-    return offers
-  } catch {
-    return cache?.offers ?? []
+    return { ok: true, offers }
+  } catch (e) {
+    return {
+      ok: false, offers: cache?.offers ?? [], reason: 'unreachable',
+      detail: e instanceof Error ? e.message : 'Could not reach Razorpay.',
+    }
   }
+}
+
+/** Offers only, for callers that cannot act on the failure. */
+export async function getAccountOffers(): Promise<PublicOffer[]> {
+  return (await fetchAccountOffers()).offers
 }
