@@ -4,7 +4,8 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
 import { sendOrderStatusUpdate } from '@/lib/email'
 import { resolveShipmentStatus, isAdvancement, shipmentStatusToSyncType } from '@/lib/shipment-status'
-import { fetchDelhiveryInvoiceCharges } from '@/lib/delhivery'
+import { fetchDelhiveryInvoiceCharges, chargeableGrams } from '@/lib/delhivery'
+import { getBusinessValues } from '@/lib/site-controls'
 
 const TOKEN = process.env.DELHIVERY_API_KEY
 
@@ -48,12 +49,15 @@ export async function GET(
       delhivery_billed_amount: number | null; delhivery_billed_at: string | null
       delhivery_freight_charge: number | null; delhivery_cod_charge: number | null
       delhivery_oda_charge: number | null
+      payment_mode: string | null; dest_pin: string | null
     }>(
       `SELECT o.awb_number, o.status, o.shipment_status, o.order_number,
               o.shipping_amount, o.delhivery_quoted_weight_kg,
               o.delhivery_charged_weight_kg, o.delhivery_extra_charge,
               o.delhivery_billed_amount, o.delhivery_billed_at,
               o.delhivery_freight_charge, o.delhivery_cod_charge, o.delhivery_oda_charge,
+              o.payment_mode,
+              o.shipping_address_snapshot->>'postal_code' AS dest_pin,
               COALESCE(u.first_name || ' ' || u.last_name, o.customer_name) AS customer_name,
               COALESCE(u.email, o.customer_email) AS customer_email
        FROM orders o
@@ -215,7 +219,14 @@ export async function GET(
     let codCharge = order.delhivery_cod_charge ?? null
     let odaCharge = order.delhivery_oda_charge ?? null
     if (newShipmentStatus === 'delivered' && !order.delhivery_billed_at) {
-      const invoiceCharges = await fetchDelhiveryInvoiceCharges(order.awb_number!).catch(() => null)
+      const invoiceCharges = await fetchDelhiveryInvoiceCharges({
+        awb: order.awb_number!,
+        settledStatus: 'Delivered',
+        chargedWeightG: chargeableGrams(order.delhivery_charged_weight_kg, order.delhivery_quoted_weight_kg),
+        originPin: (await getBusinessValues()).delhiveryOriginPincode,
+        destPin: order.dest_pin ?? '',
+        paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
+      }).catch(() => null)
       if (invoiceCharges) {
         await query(
           `UPDATE orders SET
