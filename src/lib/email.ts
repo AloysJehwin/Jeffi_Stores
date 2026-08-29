@@ -1,6 +1,7 @@
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'
+import { customerMailFrom, adminMailFrom, platformBrandName } from './brand'
 
 export const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -14,20 +15,27 @@ export const transporter = nodemailer.createTransport({
 
 async function getAdminNotificationEmails(): Promise<string> {
   try {
+    // 'administrator' is the top role (scopes.ts SUPER_ROLES = ['administrator','super_admin'])
+    // and was missing here, so the actual administrative mailbox — admin@jeffistores.in, whose
+    // role IS 'administrator' — was excluded from every admin notification while a personal
+    // gmail account received them instead.
     const rows = await queryMany<{ email: string }>(
       `SELECT u.email FROM admins a
        JOIN users u ON u.id = a.user_id
-       WHERE a.is_active = TRUE AND a.role IN ('super_admin', 'admin') AND u.email IS NOT NULL
-       ORDER BY a.role = 'super_admin' DESC`,
+       WHERE a.is_active = TRUE
+         AND a.role IN ('administrator', 'super_admin', 'admin')
+         AND u.email IS NOT NULL
+       ORDER BY a.role = 'administrator' DESC, a.role = 'super_admin' DESC`,
       []
     )
     if (rows.length > 0) return rows.map(r => r.email).join(', ')
   } catch { /* fall back to ADMIN_EMAIL below */ }
-  return process.env.ADMIN_EMAIL || 'admin@admin.jeffistores.in'
+  // Default is the administrative mailbox on the platform domain, not a personal address.
+  return process.env.ADMIN_EMAIL || 'admin@jeffistores.in'
 }
 
 export async function sendOTPEmail(email: string, otp: string, name?: string) {
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = 'Your Verification Code - Jeffi Stores'
   const html = `
       <!DOCTYPE html>
@@ -136,7 +144,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
 }
 
 export async function sendWelcomeEmail(email: string, name: string) {
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = 'Welcome to Jeffi Stores!'
   const html = `
       <!DOCTYPE html>
@@ -240,7 +248,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
 }
 
 export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[]) {
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = `Order Received - ${order.order_number}`
   const html = `
       <!DOCTYPE html>
@@ -404,7 +412,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
 export async function sendNewOrderNotification(order: any, orderItems: any[], _user: any) {
   const adminEmail = await getAdminNotificationEmails()
 
-  const from = `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`
+  const from = adminMailFrom()
   const subject = `New Order - ${order.order_number}`
   const html = `
       <!DOCTYPE html>
@@ -603,7 +611,7 @@ export async function sendOrderStatusUpdate(
     color: '#6b7280',
   }
 
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = `${statusInfo.title} - Order ${orderNumber}`
   const html = `
       <!DOCTYPE html>
@@ -808,7 +816,7 @@ export async function sendPaymentStatusUpdate(
     color: '#6b7280',
   }
 
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = `${paymentInfo.title} - Order ${orderNumber}`
   const html = `
       <!DOCTYPE html>
@@ -1003,7 +1011,7 @@ export async function sendAdminCertificateEmail(
   // own admin certs keep the existing admin sender.
   const from = tenant
     ? `"Jeffi Commerce" <${process.env.ECOM_FROM_EMAIL || 'ecommerce@jeffistores.in'}>`
-    : `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`
+    : adminMailFrom()
   const subject = tenant
     ? `Your admin certificate for ${tenant.storeName}`
     : 'Your Admin Certificate - Jeffi Stores'
@@ -1168,7 +1176,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
   const adminEmail = await getAdminNotificationEmails()
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+    from: adminMailFrom(),
     to: adminEmail,
     subject: `New Review Pending Approval - ${product.name}`,
     html: `
@@ -1345,7 +1353,7 @@ export async function sendPaymentFailedAdminNotification(
   const adminEmail = await getAdminNotificationEmails()
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+    from: adminMailFrom(),
     to: adminEmail,
     subject: `[Payment Failed] Order ${order.order_number}`,
     html: `
@@ -1453,7 +1461,7 @@ export async function sendAdminContactEmail(
     ? message
     : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: email,
     subject,
     html: `
@@ -1748,7 +1756,7 @@ export async function sendPaymentRetryEmail(
 
   try {
     await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      from: customerMailFrom(),
       to: customerEmail,
       subject: `Sorry your order didn't go through — Order #${orderNumber}`,
       html,
@@ -1774,7 +1782,7 @@ export async function sendInvoiceFinalizedEmail(
 ) {
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: toEmail,
     subject: `Invoice ${invoiceNumber} from Jeffi Stores`,
     html: `
@@ -1848,7 +1856,7 @@ export async function sendPurchaseOrderEmail(
     </tr>`
   ).join('')
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: toEmail,
     subject: `Purchase Order ${poNumber} from Jeffi Stores`,
     html: `
@@ -1930,7 +1938,7 @@ export async function sendPOReceiveNotificationEmail(
     </tr>`
   ).join('')
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: toEmail,
     subject: `Goods Receipt Confirmation — PO ${poNumber} (${statusLabel})`,
     html: `
@@ -2002,7 +2010,7 @@ export async function sendQuotationFinalizedEmail(
 ) {
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: toEmail,
     subject: `Quotation ${quoteNumber} from Jeffi Stores`,
     html: `
@@ -2074,7 +2082,7 @@ export async function sendOrderAutoCancelledEmail(
     : 'Your order was automatically cancelled because payment was not completed within the 10-minute window. The items have been returned to your cart so you can try again.'
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: customerEmail,
     subject: `Order Cancelled - ${orderNumber}`,
     html: `
@@ -2147,7 +2155,7 @@ export async function sendOrderAutoCancelledAdminNotification(order: any, redire
   const total = parseFloat(order.total_amount || 0)
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+    from: adminMailFrom(),
     to: adminEmail,
     subject: `[Auto-Cancelled] Order ${order.order_number}`,
     html: `
@@ -2244,7 +2252,7 @@ If you have any questions, just reply to this email.
 
   try {
     const info = await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      from: customerMailFrom(),
       to: toEmail,
       subject,
       html,
@@ -2326,7 +2334,7 @@ export async function sendProductAnnouncementEmail(args: {
 
   try {
     const info = await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      from: customerMailFrom(),
       to: toEmail,
       subject,
       html,
@@ -2355,7 +2363,7 @@ export async function sendVariantChangeRequestedEmail(params: {
   settlementType: 'refund' | 'collect' | 'cod_adjust' | 'none'
   newTotal: number
 }): Promise<{ success: boolean; messageId?: string; error?: unknown }> {
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const orderUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${params.orderId}`
   const absDiff = Math.abs(params.priceDiff)
   const diffLine = params.settlementType === 'refund'

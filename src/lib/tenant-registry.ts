@@ -158,7 +158,7 @@ async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Pro
        )`
     : `t.${where} = $1`
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.status, p.slug AS plan,
+    `SELECT t.id, t.slug, t.display_name, t.status, p.slug AS plan,
             i.rds_endpoint, i.rds_db, i.rds_port, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
@@ -173,6 +173,7 @@ async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Pro
   return {
     tenantId: r.id,
     slug: r.slug,
+    displayName: r.display_name ?? null,
     plan: r.plan ?? null,
     infra: r.rds_endpoint
       ? {
