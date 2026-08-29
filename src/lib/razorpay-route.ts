@@ -97,6 +97,17 @@ export interface TransferResult {
  * Called on KYC approval — the tenant's business details from KYC are used.
  * Returns the Razorpay account_id (acc_xxxx).
  */
+/**
+ * Whether this business type has a PAN in its own name.
+ *
+ * The 4th character of an Indian PAN encodes the holder: 'C' company, 'F' firm/LLP, 'P' an
+ * individual. A proprietorship trades on the proprietor's personal PAN, so there is no company
+ * PAN to send; an unregistered business has none either.
+ */
+function hasCompanyPan(businessType: LinkedAccountInput['businessType']): boolean {
+  return businessType !== 'route_proprietorship' && businessType !== 'route_not_yet_registered'
+}
+
 export async function createLinkedAccount(input: LinkedAccountInput): Promise<string> {
   const rz = getRazorpayInstance()
 
@@ -120,9 +131,12 @@ export async function createLinkedAccount(input: LinkedAccountInput): Promise<st
     type: 'route',
     legal_business_name: input.legalBusinessName,
     business_type: input.businessType,
-    // Only include legal_info if PAN is provided — Razorpay validates PAN format
-    // strictly (5th char must match entity type). Can be added later via dashboard.
-    ...(input.pan ? { legal_info: { pan: input.pan } } : {}),
+    // legal_info.pan is the *company* PAN. A proprietorship has no PAN of its own — the
+    // proprietor's individual PAN is used — and an unregistered business has none at all, so
+    // sending one is rejected outright: "The company pan field is invalid for business type:
+    // route_proprietorship". For those two, the PAN travels on the stakeholder's kyc.pan
+    // instead. Can also be added later via the dashboard.
+    ...(input.pan && hasCompanyPan(input.businessType) ? { legal_info: { pan: input.pan } } : {}),
     contact_name: input.ownerName,
   })
 

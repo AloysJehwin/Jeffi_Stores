@@ -125,6 +125,19 @@ ALTER TABLE ONLY public.admins
     ADD CONSTRAINT admins_pkey PRIMARY KEY (id);
 
 
+--
+-- Name: admins admins_user_id_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+-- One admin record per user. The owner-admin provisioning step upserts with
+-- ON CONFLICT (user_id), which needs a matching unique constraint — without it the
+-- step failed with "there is no unique or exclusion constraint matching the ON
+-- CONFLICT specification" and no tenant owner could be issued a certificate.
+--
+
+ALTER TABLE ONLY public.admins
+    ADD CONSTRAINT admins_user_id_key UNIQUE (user_id);
+
+
 
 
 --
