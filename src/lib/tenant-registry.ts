@@ -831,7 +831,7 @@ export interface BankAccount {
 export async function saveBankVerification(args: {
   ownerId: string
   accountNumber?: string | null; ifsc?: string | null; holderName?: string | null; upiId?: string | null
-  status: 'pending' | 'initiated' | 'verified' | 'failed'; ref?: string | null; verifiedName?: string | null
+  status: 'pending' | 'initiated' | 'verified' | 'unverified' | 'failed'; ref?: string | null; verifiedName?: string | null
 }): Promise<BankAccount> {
   const pool = controlPlanePool()
   // Upsert: one active bank record per owner (no tenant_id yet during onboarding).
@@ -873,9 +873,18 @@ export async function getTenantBankAccount(tenantId: string): Promise<BankAccoun
   return (res.rows[0] as BankAccount) || null
 }
 
+/**
+ * Whether the owner has bank details we can settle to.
+ *
+ * 'verified' means a penny-drop confirmed the holder name. 'unverified' means the details are
+ * well-formed but no penny-drop ran — which is the normal case here, because that check needs
+ * RazorpayX and this platform settles through Route. Both pass: Razorpay validates the account
+ * for real when the Route linked account is configured, so gating go-live on a penny-drop we
+ * cannot perform would block every store. 'pending' and 'failed' do not pass.
+ */
 export async function hasVerifiedBank(ownerId: string): Promise<boolean> {
-  const b = await getOwnerBankAccount(ownerId)
-  return b?.verification_status === 'verified'
+  const status = (await getOwnerBankAccount(ownerId))?.verification_status
+  return status === 'verified' || status === 'unverified'
 }
 
 // ── Plan comparison (data-driven from plan_features) ─────────────────────────
