@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useConfirm } from '@/contexts/ConfirmContext'
 
 // Operator actions on a tenant: Provision / Retry / Deprovision + test-tenant-only
 // Disable/Enable instance. Rendered on the tenant object pages.
@@ -24,6 +25,7 @@ export default function TenantActions({
   rolledBack?: boolean
 }) {
   const router = useRouter()
+  const confirm = useConfirm()
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -104,8 +106,14 @@ export default function TenantActions({
 
       {status === 'active' && (
         <button
-          onClick={() => {
-            if (!confirm(`Deprovision "${slug}"? The store goes offline immediately, its database is backed up to S3, then the RDS instance and bucket are DELETED. This is destructive.`)) return
+          onClick={async () => {
+            const ok = await confirm({
+              title: `Deprovision "${slug}"?`,
+              message: 'The store goes offline immediately and its database is backed up to S3, then the RDS instance and bucket are DELETED. This cannot be undone.',
+              variant: 'danger',
+              confirmLabel: 'Deprovision & back up',
+            })
+            if (!ok) return
             call(`/api/admin/ecom/customers/${tenantId}/deprovision`, { confirm: true }, 'deprovision')
           }}
           disabled={busy !== null}
