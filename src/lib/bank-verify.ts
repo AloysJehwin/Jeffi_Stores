@@ -1,15 +1,25 @@
-// Bank account verification via Razorpay Fund Account Validation (FAV).
+// Bank account capture for Razorpay Route settlements.
 //
-// FAV does an instant penny-drop (₹1) against the account and returns the
-// registered holder name from the bank — no UTR entry needed by the owner.
-// Works on the main Razorpay account (no RazorpayX required).
+// The account entered here becomes the settlement destination on the store's Route linked
+// account. Razorpay validates it for real at configureRouteSettlement — that is the check that
+// decides whether the store can be paid.
+//
+// Fund Account Validation (FAV) can additionally confirm the holder's name up front with a ₹1
+// penny-drop, but it debits that ₹1 from a RazorpayX balance and so needs
+// RAZORPAYX_ACCOUNT_NUMBER. This platform uses Route, not RazorpayX. The header here used to
+// claim "no RazorpayX required", which is untrue, and the code threw when the variable was
+// unset — blocking onboarding outright, because hasVerifiedBank() gates it.
+//
+// So FAV is now optional: used when a RazorpayX account is configured, skipped when it is not.
+// Without it the details are format-checked and recorded as 'unverified' — honest about what
+// was and was not confirmed — and onboarding proceeds to the check that actually matters.
 //
 // Flow:
 // 1. POST /api/ecom/bank/verify → calls verifyBankAccount() → returns verified name
 // 2. Owner sees "Verified — <name>" immediately
 
 import { getRazorpayInstance } from './razorpay'
-import { controlPlanePool } from './tenant-registry'
+import { controlPlanePool, saveBankVerification } from './tenant-registry'
 
 export interface BankDetails {
   accountNumber?: string
@@ -19,7 +29,8 @@ export interface BankDetails {
 }
 
 export interface BankVerifyResult {
-  status: 'verified' | 'failed' | 'initiated'
+  /** 'unverified' = format is valid, but no penny-drop ran to confirm the holder name. */
+  status: 'verified' | 'unverified' | 'failed' | 'initiated'
   verifiedName?: string
   ref?: string
   reason?: string
@@ -32,14 +43,29 @@ export interface BankVerifier {
 // ── Real Razorpay FAV verifier ────────────────────────────────────────────────
 
 export async function verifyBankAccountFAV(ownerId: string, details: BankDetails): Promise<BankVerifyResult> {
+  // FAV needs a RazorpayX balance to take the ₹1 from. On a Route-only setup there is none, so
+  // record the details and let Route validate them for real at settlement configuration.
+  const sourceAccount = process.env.RAZORPAYX_ACCOUNT_NUMBER
+  if (!sourceAccount?.trim()) {
+    const fmt = validateBankFormat(details)
+    if (fmt.status === 'failed') return fmt
+    try {
+      await saveBankVerification({
+        ownerId, ...details, status: 'unverified', ref: 'route_pending', verifiedName: details.holderName,
+      })
+    } catch {
+      // This row is the only record that the account was given — unlike the FAV path there is no
+      // Razorpay-side validation to reconcile from. Reporting success would strand the owner at
+      // the go-live gate with nothing to explain it, so surface the failure and let them retry.
+      return { status: 'failed', reason: 'Could not save your bank details. Please try again.' }
+    }
+    return fmt
+  }
+
   const rz = getRazorpayInstance()
   const pool = controlPlanePool()
 
   try {
-    // Get the RazorpayX account number (source account for the ₹1 FAV debit)
-    const sourceAccount = process.env.RAZORPAYX_ACCOUNT_NUMBER
-    if (!sourceAccount) throw new Error('RAZORPAYX_ACCOUNT_NUMBER not configured')
-
     const fav = await (rz as any).api.post({
       url: '/fund_accounts/validations',
       data: {
@@ -75,24 +101,32 @@ export async function verifyBankAccountFAV(ownerId: string, details: BankDetails
       return { status: 'failed', reason: 'Bank account not found or invalid' }
     }
 
-    // Save verified details
-    await pool.query(
-      `INSERT INTO tenant_bank_accounts
-         (owner_id, account_number, ifsc, holder_name, verification_status, verification_ref, verified_name)
-       VALUES ($1,$2,$3,$4,'verified',$5,$6)
-       ON CONFLICT (owner_id) DO UPDATE SET
-         account_number=EXCLUDED.account_number, ifsc=EXCLUDED.ifsc,
-         holder_name=EXCLUDED.holder_name, verification_status='verified',
-         verification_ref=EXCLUDED.verification_ref, verified_name=EXCLUDED.verified_name,
-         updated_at=now()`,
-      [ownerId, details.accountNumber, details.ifsc, details.holderName, fav.id, registeredName]
-    ).catch(() => {})
+    await saveBankVerification({
+      ownerId, ...details, status: 'verified', ref: fav.id, verifiedName: registeredName,
+    }).catch(() => {})
 
     return { status: 'verified', verifiedName: registeredName ?? details.holderName, ref: fav.id }
   } catch (err: any) {
     const reason = err?.error?.description ?? err?.message ?? 'Verification failed'
     return { status: 'failed', reason }
   }
+}
+
+/** Format check used when FAV cannot run. Catches typos, not a wrong-but-well-formed account. */
+export function validateBankFormat(d: BankDetails): BankVerifyResult {
+  if (d.upiId) {
+    return /^[\w.\-]{2,}@[a-z]{2,}$/i.test(d.upiId)
+      ? { status: 'unverified', verifiedName: d.holderName, ref: 'format_ok' }
+      : { status: 'failed', reason: 'That UPI ID does not look valid' }
+  }
+  if (!/^[A-Z]{4}0[A-Z0-9]{6}$/.test((d.ifsc || '').toUpperCase())) {
+    return { status: 'failed', reason: 'That IFSC code does not look valid' }
+  }
+  const acct = (d.accountNumber || '').replace(/\s/g, '')
+  if (acct.length < 9 || acct.length > 18) {
+    return { status: 'failed', reason: 'Account number should be 9-18 digits' }
+  }
+  return { status: 'unverified', verifiedName: d.holderName, ref: 'format_ok' }
 }
 
 // ── Stub verifier (dev without live Razorpay) ──────────────────────────────────
