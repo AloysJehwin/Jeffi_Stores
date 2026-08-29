@@ -8,6 +8,7 @@ import { VARIANT_MIN_PRICE_SQL } from '@/lib/queries'
 import { logActivity } from '@/lib/activity'
 import { logStockMovement } from '@/lib/inventory'
 import type { CampaignKind } from '@/lib/marketing'
+import { sendAuditedMail } from '@/lib/mail-audit'
 
 const APPROVE_ORIGIN = process.env.NEXT_PUBLIC_SITE_URL || `http://localhost:${process.env.PORT || 3000}`
 
@@ -384,7 +385,8 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
       for (const r of recipients) {
         try {
           const personalised = body.replace(/\{firstName\}/g, r.name.split(' ')[0] || 'there')
-          await transporter.sendMail({
+          await sendAuditedMail({
+            kind: 'agent_action',
             from: fromHeader, to: r.email, subject,
             html: personalised,
             text: personalised.replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim(),

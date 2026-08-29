@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
   const ctx: TenantContext = {
     tenantId: tenant.id,
     slug: tenant.slug,
+    displayName: tenant.display_name ?? null,
     plan: tenant.plan,
     infra: tenant.rds_endpoint
       ? {

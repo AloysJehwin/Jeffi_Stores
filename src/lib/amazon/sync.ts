@@ -344,28 +344,17 @@ export async function getLastAmazonSyncStatus(): Promise<any> {
 
 export async function sendAmazonSyncFailureEmail(result: SyncResult): Promise<void> {
   try {
-    const { default: nodemailer } = await import('nodemailer')
-    const transporter = nodemailer.createTransport({
-      host: 'email-smtp.us-east-1.amazonaws.com',
-      port: 465,
-      secure: true,
-      auth: { user: process.env.SES_SMTP_USER, pass: process.env.SES_SMTP_PASSWORD },
-    })
-
-    const errorList = result.errors.slice(0, 20).map(e => `<li><strong>${e.sku}</strong>: ${e.error}</li>`).join('')
-    const more = result.errors.length > 20 ? `<p>...and ${result.errors.length - 20} more errors.</p>` : ''
-
-    await transporter.sendMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
-      to: ADMIN_EMAIL,
-      subject: `[Alert] Amazon Marketplace Sync — ${result.errors.length} error(s)`,
-      html: `
-        <h2>Amazon Marketplace Sync Report</h2>
-        <p><strong>Started:</strong> ${result.startedAt}</p>
-        <p><strong>Finished:</strong> ${result.finishedAt}</p>
-        <p><strong>Synced:</strong> ${result.synced} &nbsp; <strong>Errors:</strong> ${result.errors.length}</p>
-        <h3>Errors</h3><ul>${errorList}</ul>${more}
-      `,
+    // A service should describe what happened; the email service renders and audits it. This
+    // built its own SES transport and sent bare <h2>/<ul> HTML, so it looked nothing like the
+    // rest of the system's mail and never appeared in /admin/audit?tab=mail_log.
+    const { sendOperationalReport } = await import('../email')
+    await sendOperationalReport({
+      title: 'Amazon Marketplace Sync',
+      startedAt: result.startedAt,
+      finishedAt: result.finishedAt,
+      stats: { Synced: result.synced, Errors: result.errors.length },
+      errors: result.errors,
+      kind: 'amazon_sync_report',
     })
   } catch (_) {}
 }

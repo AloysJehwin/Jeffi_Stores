@@ -7,6 +7,8 @@ vi.mock('@/lib/db', () => ({
   queryMany: vi.fn(),
   withTransaction: vi.fn(),
 }))
+vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
+
 vi.mock('@/lib/email', () => ({
   transporter: { sendMail: vi.fn() },
 }))
@@ -20,12 +22,14 @@ vi.mock('@/lib/daily-briefing', () => ({
 import { GET } from '@/app/api/cron/daily-briefing/route'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { transporter } from '@/lib/email'
+import { sendAuditedMail } from '@/lib/mail-audit'
 import { collectBriefingData, narrate, renderBriefingEmail } from '@/lib/daily-briefing'
 
 const mockQuery = vi.mocked(query)
 const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)
-const mockSendMail = vi.mocked(transporter.sendMail)
+// Mail now goes through the audited chokepoint, not the raw transport.
+const mockSendMail = vi.mocked(sendAuditedMail)
 const mockCollect = vi.mocked(collectBriefingData)
 const mockNarrate = vi.mocked(narrate)
 const mockRender = vi.mocked(renderBriefingEmail)

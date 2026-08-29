@@ -519,3 +519,28 @@ ALTER TABLE ONLY public.tenant_admin_certs ADD CONSTRAINT tenant_admin_certs_ten
     FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
 CREATE INDEX IF NOT EXISTS idx_tenant_admin_certs_tenant ON public.tenant_admin_certs USING btree (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tenant_admin_certs_active ON public.tenant_admin_certs USING btree (serial) WHERE revoked_at IS NULL;
+
+--
+-- provisioning_step_events: one row per step attempt, so the admin UI can show what each
+-- stage actually did rather than only the job's current step. provisioning_jobs keeps a
+-- single `step`/`last_error`, which means the moment a job advances, everything the previous
+-- step did is gone — including the error that made it retry.
+--
+CREATE TABLE IF NOT EXISTS public.provisioning_step_events (
+    id          uuid NOT NULL DEFAULT uuid_generate_v4(),
+    job_id      uuid NOT NULL,
+    tenant_id   uuid NOT NULL,
+    step        character varying(64) NOT NULL,
+    status      character varying(16) NOT NULL,   -- ok | error
+    message     text,
+    detail      jsonb NOT NULL DEFAULT '{}'::jsonb,  -- resource keys this step produced
+    duration_ms integer,
+    created_at  timestamp with time zone NOT NULL DEFAULT now()
+);
+ALTER TABLE ONLY public.provisioning_step_events
+    ADD CONSTRAINT provisioning_step_events_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.provisioning_step_events
+    ADD CONSTRAINT provisioning_step_events_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_provisioning_step_events_job
+    ON public.provisioning_step_events USING btree (job_id, created_at);

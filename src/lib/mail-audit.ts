@@ -18,6 +18,7 @@ export interface SendAuditedMailOptions {
   from?: string
   cc?: string | string[]
   bcc?: string | string[]
+  replyTo?: string
   attachments?: any[]
   headers?: Record<string, string>
   // Audit metadata — describe what kind of mail this is so the audit log can
@@ -141,6 +142,7 @@ export async function sendAuditedMail(o: SendAuditedMailOptions): Promise<{ mess
       amp: o.amp,
       cc: o.cc,
       bcc: o.bcc,
+      replyTo: o.replyTo,
       attachments: o.attachments,
       headers: o.headers,
     })

@@ -26,6 +26,8 @@ export interface TenantInfra {
 export interface TenantContext {
   tenantId: string
   slug: string
+  /** Store's own name, for anything customer-facing (mail senders, page titles). */
+  displayName: string | null
   plan: string | null
   infra: TenantInfra | null
 }

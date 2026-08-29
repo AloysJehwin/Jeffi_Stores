@@ -3,6 +3,7 @@ import { queryOne, withTransaction } from '@/lib/db'
 import { uploadGalleryImage } from '@/lib/s3'
 import { PoolClient } from 'pg'
 import nodemailer from 'nodemailer'
+import { sendAuditedMail } from '@/lib/mail-audit'
 
 interface CustomField {
   id: string
@@ -172,7 +173,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   if (coupon) {
     try {
       const { subject, html } = couponEmail(coupon, email)
-      await transporter.sendMail({ from: FROM, to: email, subject, html })
+      await sendAuditedMail({ from: FROM, to: email, subject, html, kind: 'form_submission' })
     } catch (err) {
       console.error('[route]', err)
     }

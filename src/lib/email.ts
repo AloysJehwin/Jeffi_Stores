@@ -1,6 +1,14 @@
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'
+import { customerMailFrom, adminMailFrom, currentBrandName } from './brand'
+
+/**
+ * Store name for email bodies. Synchronous on purpose: templates are built inside string
+ * literals, and currentBrandName reads the tenant from AsyncLocalStorage, so it resolves the
+ * right store without making every template function await a lookup.
+ */
+const storeName = currentBrandName
 
 export const transporter = nodemailer.createTransport({
   host: 'email-smtp.us-east-1.amazonaws.com',
@@ -14,20 +22,27 @@ export const transporter = nodemailer.createTransport({
 
 async function getAdminNotificationEmails(): Promise<string> {
   try {
+    // 'administrator' is the top role (scopes.ts SUPER_ROLES = ['administrator','super_admin'])
+    // and was missing here, so the actual administrative mailbox — admin@jeffistores.in, whose
+    // role IS 'administrator' — was excluded from every admin notification while a personal
+    // gmail account received them instead.
     const rows = await queryMany<{ email: string }>(
       `SELECT u.email FROM admins a
        JOIN users u ON u.id = a.user_id
-       WHERE a.is_active = TRUE AND a.role IN ('super_admin', 'admin') AND u.email IS NOT NULL
-       ORDER BY a.role = 'super_admin' DESC`,
+       WHERE a.is_active = TRUE
+         AND a.role IN ('administrator', 'super_admin', 'admin')
+         AND u.email IS NOT NULL
+       ORDER BY a.role = 'administrator' DESC, a.role = 'super_admin' DESC`,
       []
     )
     if (rows.length > 0) return rows.map(r => r.email).join(', ')
   } catch { /* fall back to ADMIN_EMAIL below */ }
-  return process.env.ADMIN_EMAIL || 'admin@admin.jeffistores.in'
+  // Default is the administrative mailbox on the platform domain, not a personal address.
+  return process.env.ADMIN_EMAIL || 'admin@jeffistores.in'
 }
 
 export async function sendOTPEmail(email: string, otp: string, name?: string) {
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = 'Your Verification Code - Jeffi Stores'
   const html = `
       <!DOCTYPE html>
@@ -89,7 +104,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Your Jeffi Stores OTP is ${otp} — valid for 10 minutes. Do not share.</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
+              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -108,7 +123,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
             <p>If you didn't request this verification code, please ignore this email or contact our support team.</p>
 
             <div class="footer">
-              <p><strong>Jeffi Stores</strong></p>
+              <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
                             <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
@@ -136,7 +151,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
 }
 
 export async function sendWelcomeEmail(email: string, name: string) {
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = 'Welcome to Jeffi Stores!'
   const html = `
       <!DOCTYPE html>
@@ -190,7 +205,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Welcome to Jeffi Stores! Your account is ready — shop industrial tools, hardware and more.</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
+              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -215,7 +230,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
             <p>If you have any questions or need assistance, feel free to reach out to our team.</p>
 
             <div class="footer">
-              <p><strong>Jeffi Stores</strong></p>
+              <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
                                           <p>Phone: +91 96853 54099<br>Email: jeffistoress@gmail.com</p>
             </div>
@@ -240,7 +255,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
 }
 
 export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[]) {
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = `Order Received - ${order.order_number}`
   const html = `
       <!DOCTYPE html>
@@ -312,7 +327,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Order confirmed! We've received your order and will keep you updated on dispatch.</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
+              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -375,7 +390,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
                                         <p>Phone: +91 96853 54099<br>Email: jeffistoress@gmail.com</p>
 
             <div class="footer">
-              <p><strong>Jeffi Stores</strong></p>
+              <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
             </div>
           </div>
@@ -404,7 +419,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
 export async function sendNewOrderNotification(order: any, orderItems: any[], _user: any) {
   const adminEmail = await getAdminNotificationEmails()
 
-  const from = `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`
+  const from = adminMailFrom()
   const subject = `New Order - ${order.order_number}`
   const html = `
       <!DOCTYPE html>
@@ -603,7 +618,7 @@ export async function sendOrderStatusUpdate(
     color: '#6b7280',
   }
 
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = `${statusInfo.title} - Order ${orderNumber}`
   const html = `
       <!DOCTYPE html>
@@ -681,7 +696,7 @@ export async function sendOrderStatusUpdate(
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${statusInfo.title} — Order #${orderNumber}. ${statusInfo.message}</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
+              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -739,7 +754,7 @@ export async function sendOrderStatusUpdate(
             <p>If you have any questions about your order, please feel free to contact us.</p>
 
             <div class="footer">
-              <p><strong>Jeffi Stores</strong></p>
+              <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
                             <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
@@ -808,7 +823,7 @@ export async function sendPaymentStatusUpdate(
     color: '#6b7280',
   }
 
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const subject = `${paymentInfo.title} - Order ${orderNumber}`
   const html = `
       <!DOCTYPE html>
@@ -898,7 +913,7 @@ export async function sendPaymentStatusUpdate(
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${paymentInfo.title} — Order #${orderNumber}. ${paymentInfo.message}</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
+              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -963,7 +978,7 @@ export async function sendPaymentStatusUpdate(
             <p>If you have any questions about this payment update, please contact us.</p>
 
             <div class="footer">
-              <p><strong>Jeffi Stores</strong></p>
+              <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
                             <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
@@ -1003,7 +1018,7 @@ export async function sendAdminCertificateEmail(
   // own admin certs keep the existing admin sender.
   const from = tenant
     ? `"Jeffi Commerce" <${process.env.ECOM_FROM_EMAIL || 'ecommerce@jeffistores.in'}>`
-    : `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`
+    : adminMailFrom()
   const subject = tenant
     ? `Your admin certificate for ${tenant.storeName}`
     : 'Your Admin Certificate - Jeffi Stores'
@@ -1088,7 +1103,7 @@ export async function sendAdminCertificateEmail(
         <body>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
+              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
               <p style="color: #666;">Admin Panel Access</p>
             </div>
 
@@ -1132,7 +1147,7 @@ export async function sendAdminCertificateEmail(
             <p>If you have any questions, contact the super admin.</p>
 
             <div class="footer">
-              <p><strong>Jeffi Stores</strong></p>
+              <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
               <p>Phone: +91 96853 54099 | Email: admin@jeffistores.in</p>
             </div>
@@ -1168,7 +1183,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
   const adminEmail = await getAdminNotificationEmails()
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+    from: adminMailFrom(),
     to: adminEmail,
     subject: `New Review Pending Approval - ${product.name}`,
     html: `
@@ -1345,7 +1360,7 @@ export async function sendPaymentFailedAdminNotification(
   const adminEmail = await getAdminNotificationEmails()
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+    from: adminMailFrom(),
     to: adminEmail,
     subject: `[Payment Failed] Order ${order.order_number}`,
     html: `
@@ -1453,7 +1468,7 @@ export async function sendAdminContactEmail(
     ? message
     : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: email,
     subject,
     html: `
@@ -1472,13 +1487,13 @@ export async function sendAdminContactEmail(
         <body>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
+              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
               <p style="color: #666; margin: 4px 0 0;">Hardware &amp; Tools</p>
             </div>
             <div class="message-box">${messageHtml}</div>
             <div class="footer">
               <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
-              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
               <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
           </div>
@@ -1527,7 +1542,7 @@ export async function sendSupportEscalationEmail(
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
       <body><div class="container">
-        <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
+        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
         <div class="body">
           <p style="font-size:16px;font-weight:bold;color:#1f2937;">New Support Chat Request</p>
           <p>A customer has requested to connect with a support agent.</p>
@@ -1580,7 +1595,7 @@ export async function sendAgentConnectedEmail(
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
       <body><div class="container">
-        <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
+        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
         <div class="body">
           <p style="font-size:16px;font-weight:bold;color:#1f2937;">Hi ${customerName}, your support agent is here!</p>
           <p>A support agent has joined your chat and is ready to help you.</p>
@@ -1680,7 +1695,7 @@ export async function sendReturnStatusEmail(
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
       <body><div class="container">
-        <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
+        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
         <div class="body">
           ${event !== 'requested_admin' ? `<p>Hi ${recipientName},</p>` : ''}
           ${bodies[event]}
@@ -1734,7 +1749,7 @@ export async function sendPaymentRetryEmail(
 </style></head>
 <body>
 <div class="wrap">
-  <div class="hdr"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
+  <div class="hdr"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
   <div class="body">
     <p style="color:#333;font-size:16px;margin:0 0 8px">Hi ${customerName},</p>
     <p style="color:#555;line-height:1.6;margin:0 0 16px">We're sorry your purchase didn't go through. It looks like the payment for order <strong>#${orderNumber}</strong> (${formatted}) could not be processed.</p>
@@ -1748,7 +1763,7 @@ export async function sendPaymentRetryEmail(
 
   try {
     await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      from: customerMailFrom(),
       to: customerEmail,
       subject: `Sorry your order didn't go through — Order #${orderNumber}`,
       html,
@@ -1774,7 +1789,7 @@ export async function sendInvoiceFinalizedEmail(
 ) {
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: toEmail,
     subject: `Invoice ${invoiceNumber} from Jeffi Stores`,
     html: `
@@ -1794,7 +1809,7 @@ export async function sendInvoiceFinalizedEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
             <div class="body">
               <p>Dear ${customerName},</p>
               <p>Thank you for your purchase! Your invoice has been generated.</p>
@@ -1808,7 +1823,7 @@ export async function sendInvoiceFinalizedEmail(
               <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
             <div class="footer">
-              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
             </div>
           </div>
         </body>
@@ -1848,7 +1863,7 @@ export async function sendPurchaseOrderEmail(
     </tr>`
   ).join('')
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: toEmail,
     subject: `Purchase Order ${poNumber} from Jeffi Stores`,
     html: `
@@ -1871,7 +1886,7 @@ export async function sendPurchaseOrderEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
             <div class="body">
               <p>Dear ${contactName || supplierName},</p>
               <p>Please find below our purchase order. Kindly confirm receipt and expected delivery.</p>
@@ -1890,7 +1905,7 @@ export async function sendPurchaseOrderEmail(
               <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
             <div class="footer">
-              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
             </div>
           </div>
         </body>
@@ -1930,7 +1945,7 @@ export async function sendPOReceiveNotificationEmail(
     </tr>`
   ).join('')
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: toEmail,
     subject: `Goods Receipt Confirmation — PO ${poNumber} (${statusLabel})`,
     html: `
@@ -1952,7 +1967,7 @@ export async function sendPOReceiveNotificationEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
             <div class="body">
               <p>Dear ${contactName || supplierName},</p>
               <p>We have recorded receipt of goods against your purchase order.</p>
@@ -1971,7 +1986,7 @@ export async function sendPOReceiveNotificationEmail(
               <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
             <div class="footer">
-              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
             </div>
           </div>
         </body>
@@ -2002,7 +2017,7 @@ export async function sendQuotationFinalizedEmail(
 ) {
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: toEmail,
     subject: `Quotation ${quoteNumber} from Jeffi Stores`,
     html: `
@@ -2022,7 +2037,7 @@ export async function sendQuotationFinalizedEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
             <div class="body">
               <p>Dear ${consigneeName},</p>
               <p>Please find your quotation from Jeffi Stores.</p>
@@ -2035,7 +2050,7 @@ export async function sendQuotationFinalizedEmail(
               <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
             </div>
             <div class="footer">
-              <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
             </div>
           </div>
         </body>
@@ -2074,7 +2089,7 @@ export async function sendOrderAutoCancelledEmail(
     : 'Your order was automatically cancelled because payment was not completed within the 10-minute window. The items have been returned to your cart so you can try again.'
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: customerEmail,
     subject: `Order Cancelled - ${orderNumber}`,
     html: `
@@ -2097,7 +2112,7 @@ export async function sendOrderAutoCancelledEmail(
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">Jeffi Stores</div>
+              <div class="logo">${storeName()}</div>
             </div>
             <p>Dear ${customerName},</p>
             <div class="badge">Order Auto-Cancelled</div>
@@ -2147,7 +2162,7 @@ export async function sendOrderAutoCancelledAdminNotification(order: any, redire
   const total = parseFloat(order.total_amount || 0)
 
   const mailOptions = {
-    from: `"Jeffi Store's" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+    from: adminMailFrom(),
     to: adminEmail,
     subject: `[Auto-Cancelled] Order ${order.order_number}`,
     html: `
@@ -2216,7 +2231,7 @@ export async function sendOrderDelayNotification(args: {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:32px 0;">
     <tr><td align="center">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-        <tr><td style="background:#1a3a4a;padding:20px 28px;color:#ffffff;font-weight:700;font-size:18px;">Jeffi Stores</td></tr>
+        <tr><td style="background:#1a3a4a;padding:20px 28px;color:#ffffff;font-weight:700;font-size:18px;">${storeName()}</td></tr>
         <tr><td style="padding:28px 28px 8px;font-size:16px;line-height:1.5;">
           <p style="margin:0 0 16px;">Hi ${customerName},</p>
           <p style="margin:0 0 16px;">We're writing to let you know that your order <strong>${orderNumber}</strong> will be delayed by approximately <strong>${delayDays} ${dayLabel}</strong>.</p>
@@ -2244,7 +2259,7 @@ If you have any questions, just reply to this email.
 
   try {
     const info = await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      from: customerMailFrom(),
       to: toEmail,
       subject,
       html,
@@ -2308,7 +2323,7 @@ export async function sendProductAnnouncementEmail(args: {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:24px 0;">
     <tr><td align="center">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-        <tr><td style="background:#1a3a4a;padding:18px 24px;color:#ffffff;font-weight:700;font-size:18px;">Jeffi Stores</td></tr>
+        <tr><td style="background:#1a3a4a;padding:18px 24px;color:#ffffff;font-weight:700;font-size:18px;">${storeName()}</td></tr>
         <tr><td style="padding:24px 20px 8px;">
           <p style="margin:0 0 12px;font-size:15px;">Hi ${escapeHtml(customerName || 'there')},</p>
           <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#334155;">${escapeHtml(cleanIntro)}</p>
@@ -2326,7 +2341,7 @@ export async function sendProductAnnouncementEmail(args: {
 
   try {
     const info = await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
+      from: customerMailFrom(),
       to: toEmail,
       subject,
       html,
@@ -2355,7 +2370,7 @@ export async function sendVariantChangeRequestedEmail(params: {
   settlementType: 'refund' | 'collect' | 'cod_adjust' | 'none'
   newTotal: number
 }): Promise<{ success: boolean; messageId?: string; error?: unknown }> {
-  const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+  const from = customerMailFrom()
   const orderUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${params.orderId}`
   const absDiff = Math.abs(params.priceDiff)
   const diffLine = params.settlementType === 'refund'
@@ -2400,4 +2415,66 @@ export async function sendVariantChangeRequestedEmail(params: {
   } catch (error) {
     return { success: false, error }
   }
+}
+
+/**
+ * Operational report for background jobs (marketplace syncs and similar).
+ *
+ * These used to build their own nodemailer transport and send bare <h2>/<ul> HTML, so they
+ * looked nothing like the rest of the system's mail and — because they bypassed the audited
+ * sender — never appeared in /admin/audit?tab=mail_log. Services should not send mail
+ * themselves; they describe what happened and the email service renders and records it.
+ */
+export async function sendOperationalReport(opts: {
+  title: string
+  startedAt?: string
+  finishedAt?: string
+  stats?: Record<string, string | number>
+  errors?: { sku: string; error: string }[]
+  kind?: string
+}): Promise<void> {
+  const { sendAuditedMail } = await import('./mail-audit')
+  const esc = (t: unknown) => String(t ?? '')
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+
+  const errs = opts.errors ?? []
+  const shown = errs.slice(0, 20)
+  const rows = Object.entries(opts.stats ?? {})
+    .map(([k, v]) => `<tr><td style="padding:4px 14px 4px 0;color:#6b7280">${esc(k)}</td>
+        <td style="padding:4px 0;font-weight:bold;color:#111827">${esc(v)}</td></tr>`)
+    .join('')
+
+  const errorBlock = shown.length
+    ? `<h3 style="margin:22px 0 8px;font-size:14px;color:#111827">Errors</h3>
+       <ul style="margin:0;padding-left:18px;color:#374151;font-size:13px;line-height:1.7">
+         ${shown.map(e => `<li><strong>${esc(e.sku)}</strong>: ${esc(e.error)}</li>`).join('')}
+       </ul>
+       ${errs.length > shown.length ? `<p style="color:#6b7280;font-size:12px">…and ${errs.length - shown.length} more.</p>` : ''}`
+    : `<p style="color:#059669;font-size:13px;margin:18px 0 0">No errors.</p>`
+
+  const accent = errs.length ? '#b91c1c' : '#059669'
+
+  await sendAuditedMail({
+    to: (await import('./brand')).platformAdminEmail(),
+    from: adminMailFrom(),
+    subject: `[${storeName()}] ${opts.title}${errs.length ? ` — ${errs.length} error(s)` : ''}`,
+    kind: opts.kind ?? 'operational_report',
+    html: `<!DOCTYPE html><html><body style="margin:0;padding:20px;background:#f5f5f5;font-family:Arial,sans-serif">
+      <div style="max-width:640px;margin:0 auto;background:#fff;border-radius:8px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,.1)">
+        <div style="background:${accent};padding:18px 24px">
+          <div style="font-size:18px;font-weight:bold;color:#ffffff">${esc(opts.title)}</div>
+        </div>
+        <div style="padding:22px 24px">
+          <table style="border-collapse:collapse;font-size:13px">
+            ${opts.startedAt ? `<tr><td style="padding:4px 14px 4px 0;color:#6b7280">Started</td><td style="padding:4px 0;color:#111827">${esc(opts.startedAt)}</td></tr>` : ''}
+            ${opts.finishedAt ? `<tr><td style="padding:4px 14px 4px 0;color:#6b7280">Finished</td><td style="padding:4px 0;color:#111827">${esc(opts.finishedAt)}</td></tr>` : ''}
+            ${rows}
+          </table>
+          ${errorBlock}
+        </div>
+        <div style="padding:14px 24px;border-top:1px solid #e5e7eb;color:#6b7280;font-size:12px">
+          Automated report from ${esc(storeName())}.
+        </div>
+      </div></body></html>`,
+  })
 }

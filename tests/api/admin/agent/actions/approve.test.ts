@@ -13,6 +13,8 @@ vi.mock('@/lib/db', () => ({
   getClient: vi.fn(),
 }))
 vi.mock('@/lib/automation-emails', () => ({ sendTestCampaignEmail: vi.fn() }))
+vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
+
 vi.mock('@/lib/email', () => ({
   sendOrderDelayNotification: vi.fn(),
   sendProductAnnouncementEmail: vi.fn(),
@@ -31,6 +33,7 @@ import { hasScope } from '@/lib/scopes'
 import { query, queryMany, queryOne, withTransaction, getClient } from '@/lib/db'
 import { sendTestCampaignEmail } from '@/lib/automation-emails'
 import * as activity from '@/lib/activity'
+import { sendAuditedMail } from '@/lib/mail-audit'
 import {
   sendOrderDelayNotification,
   sendProductAnnouncementEmail,
@@ -49,7 +52,8 @@ const mockSendTest = vi.mocked(sendTestCampaignEmail)
 const mockDelay = vi.mocked(sendOrderDelayNotification)
 const mockAnnounce = vi.mocked(sendProductAnnouncementEmail)
 const mockQuoteEmail = vi.mocked(sendQuotationFinalizedEmail)
-const mockSendMail = vi.mocked(transporter.sendMail)
+// Mail now goes through the audited chokepoint, not the raw transport.
+const mockSendMail = vi.mocked(sendAuditedMail)
 
 const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: ['agent'] }
 const ACTION_ID = 'action-uuid-1'
