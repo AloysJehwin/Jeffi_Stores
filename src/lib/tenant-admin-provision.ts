@@ -65,12 +65,16 @@ export async function provisionTenantOwnerAdmin(opts: {
 
       // 2. Create super_admin with all scopes
       const adminRow = await queryOne<{ id: string }>(
+        // admins.scopes is jsonb. Passing the JS array directly makes node-postgres send a
+        // Postgres array literal ({a,b,c}), which jsonb rejects with "invalid input syntax for
+        // type json" — so the owner admin was never created and no certificate was issued.
+        // Every other call site that writes this column stringifies it.
         `INSERT INTO admins (user_id, role, scopes, is_active)
-         VALUES ($1, 'super_admin', $2, true)
+         VALUES ($1, 'super_admin', $2::jsonb, true)
          ON CONFLICT (user_id) DO UPDATE
-           SET role='super_admin', scopes=$2, is_active=true
+           SET role='super_admin', scopes=$2::jsonb, is_active=true
          RETURNING id`,
-        [userId, ALL_SCOPE_KEYS]
+        [userId, JSON.stringify(ALL_SCOPE_KEYS)]
       )
       const adminId = adminRow!.id
 

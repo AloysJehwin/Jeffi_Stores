@@ -5,6 +5,7 @@ import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
 import { createLinkedAccount, createRouteStakeholder, configureRouteSettlement, mapBusinessType, inferProfileCategory, normalizeIndianPhone } from '@/lib/razorpay-route'
 import { sendKycApprovedEmail } from '@/lib/ecom-emails'
 // TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
+import { stateFromPincode } from '@/lib/india-pincode-state'
 import { isPaymentBypassed, bypassAuditNote } from '@/lib/ecom-payment-bypass'
 import { setSubscriptionStatus } from '@/lib/tenant-registry'
 import { triggerProvisioning, resolveRestoreKey } from '@/lib/provisioning/trigger'
@@ -60,6 +61,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           'no usable 6-digit postal code — checked the onboarding draft (wh.originPincode) and the KYC business address',
         )
       }
+
+      // Razorpay validates the state name. It used to be taken positionally from the free-text
+      // business address (`addressParts[length - 2]`), which yields 'IN' for an address with no
+      // commas — rejected with "State name entered is incorrect". Derive it from the pincode,
+      // the only structured location we hold, and fail with something actionable when the
+      // prefix is one of the ambiguous ranges rather than guessing.
+      const state = stateFromPincode(postalCode)
+      if (!state) {
+        throw new Error(
+          `cannot determine the state from pincode ${postalCode} — its postal circle spans more than one state, so it must be set on the KYC record`,
+        )
+      }
       linkedAccountId = await createLinkedAccount({
         businessName: kyc.business_name ?? tenant.display_name,
         businessType: mapBusinessType(kyc.business_type ?? 'other'),
@@ -73,7 +86,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         gstNumber: kyc.gst_number ?? undefined,
         streetAddress: addressParts[0] ?? '',
         city: addressParts[addressParts.length - 3] ?? 'India',
-        state: addressParts[addressParts.length - 2] ?? 'IN',
+        state,
         postalCode,
       })
       await saveLinkedAccountId(tenantId, linkedAccountId)
