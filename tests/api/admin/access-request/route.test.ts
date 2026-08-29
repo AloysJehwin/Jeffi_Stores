@@ -11,6 +11,8 @@ vi.mock('@/lib/db', () => ({
   queryMany: vi.fn(),
 }))
 
+vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
+
 vi.mock('@/lib/email', () => ({
   transporter: {
     sendMail: vi.fn(),
@@ -23,10 +25,12 @@ import { POST } from '@/app/api/admin/access-request/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany } from '@/lib/db'
 import { transporter } from '@/lib/email'
+import { sendAuditedMail } from '@/lib/mail-audit'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryMany = vi.mocked(queryMany)
-const mockSendMail = vi.mocked(transporter.sendMail)
+// Mail now goes through the audited chokepoint, not the raw transport.
+const mockSendMail = vi.mocked(sendAuditedMail)
 
 const adminPayload = {
   adminId: 'admin-1',

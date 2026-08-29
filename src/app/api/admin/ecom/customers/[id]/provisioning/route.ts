@@ -27,7 +27,19 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   )
   const job = r.rows[0] ?? null
 
+  // Per-stage history. provisioning_jobs only ever holds the current step, so without these
+  // rows the UI can show which stage a job is on but nothing about what the earlier ones did.
+  const ev = job
+    ? await controlPlanePool().query(
+        `SELECT step, status, message, detail, duration_ms, created_at
+           FROM provisioning_step_events
+          WHERE job_id = $1
+          ORDER BY created_at ASC`, [job.id],
+      ).catch(() => ({ rows: [] }))
+    : { rows: [] }
+
   return NextResponse.json({
+    events: ev.rows,
     tenant: {
       id: tenant.id, slug: tenant.slug, status: tenant.status,
       rds_endpoint: tenant.rds_endpoint, s3_bucket: tenant.s3_bucket, region: tenant.region,

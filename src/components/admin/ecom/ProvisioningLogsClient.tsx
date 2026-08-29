@@ -13,10 +13,19 @@ interface Job {
   created_at: string
   updated_at: string
 }
+interface StepEvent {
+  step: string
+  status: 'ok' | 'error'
+  message: string | null
+  detail: Record<string, unknown> | null
+  duration_ms: number | null
+  created_at: string
+}
 interface Data {
   tenant: { id: string; slug: string; status: string; rds_endpoint: string | null; s3_bucket: string | null; region: string | null }
   steps: string[]
   job: Job | null
+  events?: StepEvent[]
 }
 
 const TERMINAL = ['done', 'failed']
@@ -32,24 +41,103 @@ const PHASES: { label: string; steps: string[] }[] = [
   { label: 'Go live', steps: ['activate'] },
 ]
 
-function StepRow({ name, index, state }: { name: string; index: number; state: StepState }) {
+function fmtDuration(ms: number | null): string {
+  if (ms == null) return ''
+  if (ms < 1000) return `${ms}ms`
+  if (ms < 60_000) return `${(ms / 1000).toFixed(1)}s`
+  return `${Math.floor(ms / 60_000)}m ${Math.round((ms % 60_000) / 1000)}s`
+}
+
+/**
+ * One provisioning stage, expandable to its own history.
+ *
+ * Every attempt at a step is a row in provisioning_step_events, so a stage that retried three
+ * times shows all three with their errors — the job row alone would only ever show the last.
+ */
+function StepStage({
+  name, index, state, events,
+}: {
+  name: string
+  index: number
+  state: StepState
+  events: StepEvent[]
+}) {
+  const [open, setOpen] = useState(state === 'failed')
   const dot = state === 'done' ? 'bg-green-500 border-green-500'
     : state === 'current' ? 'bg-accent-500 border-accent-500'
     : state === 'failed' ? 'bg-red-500 border-red-500'
     : 'bg-surface-elevated border-border-default'
   const text = state === 'pending' ? 'text-foreground-muted' : 'text-foreground'
+
+  const errors = events.filter((e) => e.status === 'error').length
+  const last = events[events.length - 1]
+  const hasDetail = events.length > 0
+
   return (
-    <li className="relative flex items-center gap-3 pl-0">
-      <span className="relative z-10 flex items-center justify-center shrink-0">
-        <span className={`w-3 h-3 rounded-full border-2 ${dot} ${state === 'current' ? 'animate-pulse' : ''}`} />
-      </span>
-      <span className="text-[10px] tabular-nums text-foreground-muted w-4 shrink-0">{index + 1}</span>
-      <span className={`text-sm font-mono truncate ${text}`}>{name}</span>
-      {state === 'current' && (
-        <span className="ml-auto shrink-0 text-[11px] font-medium text-accent-600 dark:text-accent-400">running…</span>
-      )}
-      {state === 'failed' && (
-        <span className="ml-auto shrink-0 text-[11px] font-medium text-red-600 dark:text-red-400">failed</span>
+    <li className="relative">
+      <div
+        className={`flex items-center gap-3 rounded-lg -mx-2 px-2 py-1.5 ${hasDetail ? 'cursor-pointer hover:bg-surface-secondary' : ''}`}
+        onClick={() => hasDetail && setOpen((v) => !v)}
+      >
+        <span className="relative z-10 flex items-center justify-center shrink-0">
+          <span className={`w-3 h-3 rounded-full border-2 ${dot} ${state === 'current' ? 'animate-pulse' : ''}`} />
+        </span>
+        <span className="text-[10px] tabular-nums text-foreground-muted w-4 shrink-0">{index + 1}</span>
+        <span className={`text-sm font-mono truncate ${text}`}>{name}</span>
+
+        {errors > 0 && (
+          <span className="shrink-0 text-[10px] px-1.5 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400">
+            {errors} {errors === 1 ? 'error' : 'errors'}
+          </span>
+        )}
+
+        <span className="ml-auto shrink-0 flex items-center gap-2">
+          {last?.duration_ms != null && state !== 'pending' && (
+            <span className="text-[10px] tabular-nums text-foreground-muted">{fmtDuration(last.duration_ms)}</span>
+          )}
+          {state === 'current' && <span className="text-[11px] font-medium text-accent-600 dark:text-accent-400">running…</span>}
+          {state === 'failed' && <span className="text-[11px] font-medium text-red-600 dark:text-red-400">failed</span>}
+          {hasDetail && (
+            <svg className={`w-3 h-3 text-foreground-muted transition-transform ${open ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+            </svg>
+          )}
+        </span>
+      </div>
+
+      {open && hasDetail && (
+        <div className="ml-[26px] mt-1 mb-2 space-y-1.5 border-l border-border-default pl-3">
+          {events.map((e, i) => (
+            <div key={i} className="text-[11px] min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className={e.status === 'error' ? 'text-red-600 dark:text-red-400 font-medium' : 'text-green-600 dark:text-green-400'}>
+                  {e.status === 'error' ? 'error' : 'ok'}
+                </span>
+                <span className="text-foreground-muted tabular-nums">
+                  {new Date(e.created_at).toLocaleTimeString('en-IN')}
+                </span>
+                {e.duration_ms != null && (
+                  <span className="text-foreground-muted tabular-nums">{fmtDuration(e.duration_ms)}</span>
+                )}
+              </div>
+              {e.message && (
+                <p className="mt-0.5 text-foreground break-words whitespace-pre-wrap">{e.message}</p>
+              )}
+              {e.detail && Object.keys(e.detail).length > 0 && (
+                <dl className="mt-1 space-y-0.5">
+                  {Object.entries(e.detail).map(([k, v]) => (
+                    <div key={k} className="flex gap-2 min-w-0">
+                      <dt className="text-foreground-muted shrink-0">{k}</dt>
+                      <dd className="font-mono text-foreground break-all min-w-0">
+                        {typeof v === 'object' ? JSON.stringify(v) : String(v)}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </div>
+          ))}
+        </div>
       )}
     </li>
   )
@@ -91,6 +179,10 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
   const job = data?.job
   const steps = data?.steps ?? []
   const currentIdx = job ? steps.indexOf(job.step) : -1
+
+  // Group the per-stage history so each step renders only its own attempts.
+  const eventsByStep: Record<string, StepEvent[]> = {}
+  for (const e of data?.events ?? []) (eventsByStep[e.step] ??= []).push(e)
   const res = job?.created_resources ?? {}
   const pct = !job ? 0 : job.status === 'done' ? 100 : currentIdx < 0 ? 0 : Math.round((currentIdx / steps.length) * 100)
 
@@ -195,7 +287,13 @@ export default function ProvisioningLogsClient({ tenantId }: { tenantId: string 
                       </div>
                       <ol className="relative space-y-2.5 before:absolute before:left-[5px] before:top-2 before:bottom-2 before:w-px before:bg-border-default">
                         {rows.map((s) => (
-                          <StepRow key={s} name={s} index={steps.indexOf(s)} state={stateOf(steps.indexOf(s))} />
+                          <StepStage
+                            key={s}
+                            name={s}
+                            index={steps.indexOf(s)}
+                            state={stateOf(steps.indexOf(s))}
+                            events={eventsByStep[s] ?? []}
+                          />
                         ))}
                       </ol>
                     </div>

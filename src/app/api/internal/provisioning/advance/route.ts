@@ -42,12 +42,25 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
   ).catch(() => null)
   const r = row?.rows[0]
   if (!r) return
-  await provisionTenantOwnerAdmin({
+  // Never silently: this is the step that creates the owner's admin account, issues their mTLS
+  // certificate and emails it. A swallowed failure here leaves provisioning reporting "done"
+  // while the owner cannot reach their admin panel at all — which is exactly what happened for
+  // aloys-store. Provisioning itself stays successful (the store is live), but the failure is
+  // recorded and alerted so someone knows to re-run it.
+  const res = await provisionTenantOwnerAdmin({
     tenantId,
     tenantSlug: r.slug,
     ownerEmail: r.email,
     ownerName: r.name,
-  }).catch(() => {})
+  }).catch((e: any) => ({ success: false, error: e?.message ?? String(e) }))
+
+  if (!res.success) {
+    console.error(`[provisionTenantOwnerAdmin] ${r.slug}: ${res.error ?? 'unknown error'}`)
+    try {
+      const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+      await alertProvisioningFailure(r.slug, 'owner_admin_cert', res.error ?? 'unknown error')
+    } catch { /* alerting must never mask the original failure */ }
+  }
 }
 
 export async function POST(request: NextRequest) {

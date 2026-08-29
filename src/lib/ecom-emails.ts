@@ -1,4 +1,6 @@
 import nodemailer from 'nodemailer'
+import { sendAuditedMail } from './mail-audit'
+import { platformAdminEmail, tenantNoReplyAddress, tenantCampaignAddress } from './brand'
 
 // Ecom onboarding transactional email.
 // Platform sender: ecommerce@jeffistores.in — every platform/tenant communication.
@@ -20,15 +22,25 @@ const transporter = nodemailer.createTransport({
 
 const PLATFORM_ADDRESS = process.env.ECOM_FROM_EMAIL || 'ecommerce@jeffistores.in'
 const PLATFORM_FROM = `"Jeffi Commerce" <${PLATFORM_ADDRESS}>`
-const PLATFORM_ADMIN = process.env.ADMIN_EMAIL || 'aloysjehwin@gmail.com'
+// Was a personal gmail hardcoded as the default, so any environment without ADMIN_EMAIL set
+// mailed platform notifications to an individual instead of the administrative mailbox.
+const PLATFORM_ADMIN = platformAdminEmail()
 const SUPPORT_ADDRESS = PLATFORM_ADDRESS
 
-export function tenantNoReplyEmail(slug: string): string {
-  return `"${slug} Store" <noreply-${slug}@jeffistores.in>`
+/**
+ * Sender name is the store's real name when we have it; otherwise the slug with "Store"
+ * appended, since a bare slug ("acme") reads like a mistake in an inbox.
+ */
+function senderName(slug: string, displayName?: string | null): string {
+  return displayName?.trim() || `${slug} Store`
 }
 
-export function tenantCampaignEmail(slug: string): string {
-  return `"${slug} Store" <campaigns-${slug}@jeffistores.in>`
+export function tenantNoReplyEmail(slug: string, displayName?: string | null): string {
+  return `"${senderName(slug, displayName)}" <${tenantNoReplyAddress(slug)}>`
+}
+
+export function tenantCampaignEmail(slug: string, displayName?: string | null): string {
+  return `"${senderName(slug, displayName)}" <${tenantCampaignAddress(slug)}>`
 }
 
 const INK = '#111827'
@@ -107,7 +119,10 @@ function toText(html: string): string {
 }
 
 async function send(to: string, subject: string, html: string) {
-  await transporter.sendMail({
+  // Every outbound mail goes through the audited chokepoint so it is visible in
+  // /admin/audit?tab=mail_log alongside the rest.
+  await sendAuditedMail({
+    kind: 'ecom',
     from: PLATFORM_FROM,
     replyTo: PLATFORM_ADDRESS,
     to,

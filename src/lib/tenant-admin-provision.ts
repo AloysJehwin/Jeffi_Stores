@@ -47,10 +47,16 @@ export async function provisionTenantOwnerAdmin(opts: {
       const lastName = nameParts.slice(1).join(' ') || ''
 
       // 1. Upsert user
+      // ON CONFLICT (email) has no matching constraint — the only unique touching email is
+      // users_email_user_type_key UNIQUE (email, user_type). Postgres rejects the statement
+      // outright ("no unique or exclusion constraint matching the ON CONFLICT specification"),
+      // so this never created an owner admin, never issued a certificate and never sent the
+      // email — while provisioning still reported done, because the caller swallowed the error.
+      // user_type is NOT NULL and must be given explicitly for the conflict target to match.
       const userRow = await queryOne<{ id: string }>(
-        `INSERT INTO users (email, first_name, last_name, is_active)
-         VALUES ($1, $2, $3, true)
-         ON CONFLICT (email) DO UPDATE
+        `INSERT INTO users (email, first_name, last_name, is_active, user_type)
+         VALUES ($1, $2, $3, true, 'customer')
+         ON CONFLICT (email, user_type) DO UPDATE
            SET first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name
          RETURNING id`,
         [opts.ownerEmail, firstName, lastName]
@@ -111,7 +117,7 @@ async function resolveTenantCtx(tenantId: string): Promise<TenantContext | null>
   const { controlPlanePool } = await import('./tenant-registry')
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, p.slug AS plan,
+    `SELECT t.id, t.slug, t.display_name, p.slug AS plan,
             i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.region
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
@@ -123,6 +129,7 @@ async function resolveTenantCtx(tenantId: string): Promise<TenantContext | null>
   return {
     tenantId: r.id,
     slug: r.slug,
+    displayName: r.display_name ?? null,
     plan: r.plan ?? null,
     infra: {
       rdsEndpoint: r.rds_endpoint,
