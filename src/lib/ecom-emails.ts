@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { sendAuditedMail } from './mail-audit'
 import { platformAdminEmail, tenantNoReplyAddress, tenantCampaignAddress } from './brand'
 
 // Ecom onboarding transactional email.
@@ -118,7 +119,10 @@ function toText(html: string): string {
 }
 
 async function send(to: string, subject: string, html: string) {
-  await transporter.sendMail({
+  // Every outbound mail goes through the audited chokepoint so it is visible in
+  // /admin/audit?tab=mail_log alongside the rest.
+  await sendAuditedMail({
+    kind: 'ecom',
     from: PLATFORM_FROM,
     replyTo: PLATFORM_ADDRESS,
     to,

@@ -13,6 +13,8 @@ vi.mock('@/lib/db', () => ({
   getClient: vi.fn(),
 }))
 vi.mock('@/lib/automation-emails', () => ({ sendTestCampaignEmail: vi.fn() }))
+vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
+
 vi.mock('@/lib/email', () => ({
   sendOrderDelayNotification: vi.fn(),
   sendProductAnnouncementEmail: vi.fn(),
@@ -30,6 +32,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany, withTransaction, getClient } from '@/lib/db'
 import { sendProductAnnouncementEmail, transporter } from '@/lib/email'
+import { sendAuditedMail } from '@/lib/mail-audit'
 import { logStockMovement } from '@/lib/inventory'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -239,7 +242,7 @@ describe('POST /api/admin/agent/actions/[id]/approve (part 2)', () => {
       payload: { audience: 'test_only', testEmail: 'a@b.com', subject: 'Hi', body: '<p>Hey</p>', fromName: 'Store' },
       status: 'proposed',
     } as any)
-    vi.mocked(transporter.sendMail).mockRejectedValue(new Error('SMTP error'))
+    vi.mocked(sendAuditedMail).mockRejectedValue(new Error('SMTP error'))
 
     const res = await POST(makeReq(), { params: Promise.resolve({ id: ACTION_ID }) })
     expect(res.status).toBe(500)

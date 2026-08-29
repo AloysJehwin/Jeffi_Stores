@@ -175,28 +175,14 @@ export async function getLastSyncStatus(): Promise<any> {
 
 export async function sendSyncFailureEmail(result: SyncResult): Promise<void> {
   try {
-    const { default: nodemailer } = await import('nodemailer')
-    const transporter = nodemailer.createTransport({
-      host: 'email-smtp.us-east-1.amazonaws.com',
-      port: 465,
-      secure: true,
-      auth: { user: process.env.SES_SMTP_USER, pass: process.env.SES_SMTP_PASSWORD },
-    })
-
-    const errorList = result.errors.slice(0, 20).map(e => `<li><strong>${e.sku}</strong>: ${e.error}</li>`).join('')
-    const more = result.errors.length > 20 ? `<p>...and ${result.errors.length - 20} more errors.</p>` : ''
-
-    await transporter.sendMail({
-      from: `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`,
-      to: ADMIN_EMAIL,
-      subject: `[Alert] Google Merchant Sync — ${result.errors.length} error(s)`,
-      html: `
-        <h2>Merchant Center Sync Report</h2>
-        <p><strong>Started:</strong> ${result.startedAt}</p>
-        <p><strong>Finished:</strong> ${result.finishedAt}</p>
-        <p><strong>Synced:</strong> ${result.synced} &nbsp; <strong>Deleted:</strong> ${result.deleted} &nbsp; <strong>Errors:</strong> ${result.errors.length}</p>
-        <h3>Errors</h3><ul>${errorList}</ul>${more}
-      `,
+    const { sendOperationalReport } = await import('../email')
+    await sendOperationalReport({
+      title: 'Google Merchant Sync',
+      startedAt: result.startedAt,
+      finishedAt: result.finishedAt,
+      stats: { Synced: result.synced, Deleted: result.deleted, Errors: result.errors.length },
+      errors: result.errors,
+      kind: 'merchant_sync_report',
     })
   } catch (err) { console.error("[route]", err) }
 }

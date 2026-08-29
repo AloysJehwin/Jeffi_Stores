@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne, queryMany } from '@/lib/db'
-import { transporter } from '@/lib/email'
+import { sendAuditedMail } from '@/lib/mail-audit'
 import {
   collectBriefingData,
   narrate,
@@ -71,7 +71,7 @@ export async function GET(req: NextRequest) {
   let sent = 0, failed = 0
   for (const to of recipients) {
     try {
-      await transporter.sendMail({ from: BRIEFING_FROM, to, subject, html })
+      await sendAuditedMail({ from: BRIEFING_FROM, to, subject, html, kind: 'daily_briefing' })
       sent++
     } catch (err) {
       console.error('[route]', err)
