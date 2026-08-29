@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Check, Pencil, QrCode } from 'lucide-react'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
+import { useToast } from '@/contexts/ToastContext'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -30,6 +31,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   const [data, setData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [qrLoading, setQrLoading] = useState(false)
+  const { showToast } = useToast()
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null)
   const [qrModalOpen, setQrModalOpen] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
@@ -112,7 +114,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         setQrImageUrl(json.qrImageUrl)
         setQrModalOpen(true)
       }
-      else alert(json.error || 'Failed to generate QR')
+      else showToast(json.error || 'Failed to generate QR', 'error')
     } finally {
       setQrLoading(false)
     }
