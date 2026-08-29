@@ -9,6 +9,7 @@ import {
   writeTenantEc2,
   clearTenantInfra,
   clearTenantCache,
+  controlPlanePool,
   type ProvisioningJob,
 } from '../tenant-registry'
 
@@ -339,6 +340,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           throw new Error('activate blocked: tenant_infra.rds_endpoint not persisted')
         }
         await setTenantStatus(job.tenant_id, 'active')
+        await recordStepEvent(job.id, 'activate', 'ok', 'tenant activated', {})
         await updateProvisioningJob(job.id, { status: 'done', created_resources: res })
         return 'done'
       }
@@ -350,6 +352,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
   } catch (e: any) {
     const msg = e?.message || String(e) || 'error'
     const attempts = (job.attempts || 0) + 1
+    await recordStepEvent(job.id, job.step, 'error', msg, resourcesFor(job.step as Step, res))
     // Classify: transient errors get retried with backoff; deterministic errors fail now.
     const terminal = isTerminalError(msg) || attempts >= MAX_PROVISION_ATTEMPTS
     if (!terminal) {
@@ -386,10 +389,68 @@ function isTerminalError(msg: string): boolean {
   return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env/i.test(msg)
 }
 
+
+/**
+ * Record what a step actually did, so the admin UI can show each stage's history.
+ *
+ * provisioning_jobs holds only the CURRENT step and last_error, so the moment a job advances,
+ * everything the previous step did is lost — including the error that made it retry. These rows
+ * are the per-stage log.
+ *
+ * tenant_id and the duration are derived in SQL from the job row (updated_at was set when the
+ * step went 'running'), so callers need only the job id. Never throws: a missing log line must
+ * not fail a provisioning step.
+ */
+async function recordStepEvent(
+  jobId: string,
+  step: string,
+  status: 'ok' | 'error',
+  message: string | null,
+  detail: Record<string, unknown> = {},
+): Promise<void> {
+  try {
+    await controlPlanePool().query(
+      `INSERT INTO provisioning_step_events (job_id, tenant_id, step, status, message, detail, duration_ms)
+       SELECT j.id, j.tenant_id, $2, $3, $4, $5::jsonb,
+              GREATEST(0, (EXTRACT(EPOCH FROM (now() - j.updated_at)) * 1000)::int)
+         FROM provisioning_jobs j WHERE j.id = $1`,
+      [jobId, step, status, message, JSON.stringify(detail)],
+    )
+  } catch { /* the log is not worth failing a provisioning step over */ }
+}
+
 async function next(id: string, step: Step, res: Record<string, any>): Promise<string> {
+  // `step` is where we are GOING; the one that just succeeded is its predecessor. STEPS is a
+  // linear pipeline, so that is unambiguous and saves threading the completed step through
+  // fifteen call sites.
+  const completed = STEPS[Math.max(0, STEPS.indexOf(step) - 1)]
+  await recordStepEvent(id, completed, 'ok', null, resourcesFor(completed, res))
+
   // Clear any backoff timer on a successful step transition (prior retries are resolved).
   await updateProvisioningJob(id, { step, status: 'pending', created_resources: res, clearNextAttempt: true })
   return 'pending'
+}
+
+/** The created_resources keys a given step is responsible for — its visible output. */
+const STEP_OUTPUTS: Partial<Record<Step, string[]>> = {
+  create_param_group: ['paramGroup'],
+  create_db_instance: ['dbInstanceId'],
+  wait_db_available: ['endpoint', 'dbWaitStartedAt'],
+  seed_data: ['seeded', 'seedProfile'],
+  create_bucket: ['bucket'],
+  generate_legals: ['legalsGenerated'],
+  ensure_compute: ['ec2Target', 'ec2InstanceId', 'computeMode'],
+  setup_delhivery: ['delhiveryPickup'],
+  configure_dns: ['dnsHosts'],
+  verify_serving: ['verifyAttempts'],
+}
+
+function resourcesFor(step: Step, res: Record<string, any>): Record<string, unknown> {
+  const keys = STEP_OUTPUTS[step]
+  if (!keys) return {}
+  const out: Record<string, unknown> = {}
+  for (const k of keys) if (res[k] !== undefined) out[k] = res[k]
+  return out
 }
 
 /** Delete a param group after its DB instance is fully gone (RDS refuses while attached).
