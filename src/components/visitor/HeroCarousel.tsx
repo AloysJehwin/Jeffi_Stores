@@ -122,13 +122,20 @@ export default function HeroCarousel({ slides }: Props) {
               <Link href={s.href} className="absolute inset-0 z-10" aria-label={`Shop ${s.title}`}
                 onClick={(e) => { if (dragging && Math.abs(touchDeltaX.current) > SWIPE_THRESHOLD) e.preventDefault() }} />
 
-              <div className="absolute inset-0">
+              {/* The image covers only the right ~60%, and the gradient below it is not fully
+                  opaque everywhere. Without a solid base the near-white page background
+                  (--color-surface #F9FAFB) bled through on the left as a grey haze, and the
+                  boundary where that met the image read as a faint vertical line. */}
+              <div className="absolute inset-0 bg-[#0d0d0d]">
                 <picture>
                   <source media="(min-width: 1024px)" srcSet={s.desktopImg} />
+                  {/* Fade the image's left edge into the base instead of cutting it off. */}
                   <img
                     src={s.mobileImg}
                     alt=""
-                    className="absolute right-0 top-0 h-full w-[62%] sm:w-[60%] object-cover object-center"
+                    className="absolute right-0 top-0 h-full w-[62%] sm:w-[60%] object-cover object-center
+                               [-webkit-mask-image:linear-gradient(to_right,transparent_0%,#000_35%)]
+                               [mask-image:linear-gradient(to_right,transparent_0%,#000_35%)]"
                   />
                 </picture>
                 <div className="absolute inset-0 bg-gradient-to-r from-[#0d0d0d] from-35% via-[#0d0d0d]/80 via-60% to-transparent" />

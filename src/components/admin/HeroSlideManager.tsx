@@ -78,11 +78,13 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
   const { showToast } = useToast()
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [uploadingMobile, setUploadingMobile] = useState(false)
   const [expanded, setExpanded] = useState(false)
   const [aiPrompt, setAiPrompt] = useState('')
   const [generating, setGenerating] = useState(false)
   const [generatingAll, setGeneratingAll] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const fileMobileRef = useRef<HTMLInputElement>(null)
 
   // Debounced-ish save: persist a field to the server
   const save = useCallback(async (patch: Partial<Record<string, unknown>>) => {
@@ -98,22 +100,36 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
     } catch { showToast('Failed to save', 'error') } finally { setSaving(false) }
   }, [slide.id, showToast])
 
-  async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+  async function onFile(
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: 'image_url' | 'image_url_mobile' = 'image_url',
+  ) {
     const file = e.target.files?.[0]
     if (!file) return
-    setUploading(true)
+    const isMobile = field === 'image_url_mobile'
+    const setBusy = isMobile ? setUploadingMobile : setUploading
+    const inputRef = isMobile ? fileMobileRef : fileRef
+    setBusy(true)
     try {
       const form = new FormData()
       form.append('file', file)
-      form.append('field', 'image_url')
+      form.append('field', field)
       const res = await fetch(`/api/admin/hero-slides/${slide.id}/image`, { method: 'POST', body: form, credentials: 'include' })
       const data = await res.json().catch(() => ({}))
-      if (res.ok && data.url) { onChange({ image_url: data.url }); showToast('Image updated', 'success') }
+      if (res.ok && data.url) {
+        onChange({ [field]: data.url } as Partial<HeroSlideRow>)
+        showToast(isMobile ? 'Mobile image updated' : 'Image updated', 'success')
+      }
       else showToast(data.error || 'Upload failed', 'error')
     } catch { showToast('Upload failed', 'error') } finally {
-      setUploading(false)
-      if (fileRef.current) fileRef.current.value = ''
+      setBusy(false)
+      if (inputRef.current) inputRef.current.value = ''
     }
+  }
+
+  // Clearing falls the slide back to the desktop image on phones.
+  function clearMobileImage() {
+    field({ image_url_mobile: null }, { imageUrlMobile: null })
   }
 
   async function generateImage(promptOverride?: string) {
@@ -217,14 +233,36 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
         <div className="p-4 space-y-4">
           {/* Image — upload or AI generate */}
           <div>
-            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Banner image</label>
+            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Banner image — desktop</label>
             <div className="flex items-center gap-3 mb-2">
-              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={onFile} className="hidden" />
+              <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={e => onFile(e, 'image_url')} className="hidden" />
               <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading || generating}
                 className="px-3 py-1.5 rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50">
                 {uploading ? 'Uploading…' : slide.image_url ? 'Replace image' : 'Upload image'}
               </button>
               {slide.image_url && !uploading && !generating && <span className="text-[11px] text-foreground-muted">Image set</span>}
+            </div>
+
+            {/* The storefront swaps to this below 1024px. Optional — it falls back to the
+                desktop image, which crops badly on a narrow screen. */}
+            <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Banner image — mobile</label>
+            <div className="flex items-center gap-3 mb-2">
+              <input ref={fileMobileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={e => onFile(e, 'image_url_mobile')} className="hidden" />
+              <button type="button" onClick={() => fileMobileRef.current?.click()} disabled={uploadingMobile || generating}
+                className="px-3 py-1.5 rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50">
+                {uploadingMobile ? 'Uploading…' : slide.image_url_mobile ? 'Replace mobile image' : 'Upload mobile image'}
+              </button>
+              {slide.image_url_mobile && !uploadingMobile
+                ? (
+                  <>
+                    <img src={slide.image_url_mobile} alt="" className="w-10 h-10 rounded object-cover border border-border-default" />
+                    <button type="button" onClick={clearMobileImage}
+                      className="text-[11px] text-foreground-muted hover:text-red-500 underline">
+                      Clear
+                    </button>
+                  </>
+                )
+                : <span className="text-[11px] text-foreground-muted">Falls back to the desktop image</span>}
             </div>
             {/* AI generation — one scenario fills every field */}
             <div className="rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/10 p-3">
