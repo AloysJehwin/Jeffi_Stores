@@ -8595,8 +8595,8 @@
     "semantic_hash": ""
   },
   "src/app/api/ecom/onboard/submit/route.ts": {
-    "mtime": 1787763973.5413682,
-    "ast_hash": "dc828ac82072d7ba14a872778902af82",
+    "mtime": 1787987353.7006733,
+    "ast_hash": "73483091993999dbbd7878faa5f4417a",
     "semantic_hash": ""
   },
   "src/app/api/ecom/webhook/razorpay/route.ts": {
@@ -9632,6 +9632,16 @@
   "src/lib/brand.ts": {
     "mtime": 1787983777.4139664,
     "ast_hash": "ec9a7949ec7a21dd8856fc9bcc6a9560",
+    "semantic_hash": ""
+  },
+  "src/lib/onboard-schema.ts": {
+    "mtime": 1787987333.7011802,
+    "ast_hash": "9081cf15bfbf0aed1715bbc9e1940041",
+    "semantic_hash": ""
+  },
+  "tests/lib/onboard-schema.test.ts": {
+    "mtime": 1787987379.2282934,
+    "ast_hash": "c88945ade39db287d03a9e831a7cc989",
     "semantic_hash": ""
   }
 }
