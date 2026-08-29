@@ -1,47 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { z } from 'zod'
 import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import { createTenant, linkOwnerTenant, hasVerifiedBank, saveSubscriptionId,
          listPlans, getOwnerTenants, saveKyc, markDraftSubmitted, getDraft, saveDraft } from '@/lib/tenant-registry'
 import { sendKycSubmittedEmail } from '@/lib/ecom-emails'
+import { OnboardSchema } from '@/lib/onboard-schema'
 
 export const dynamic = 'force-dynamic'
-
-const Schema = z.object({
-  // Step 0 — Plan
-  planSlug: z.enum(['basic', 'growth', 'pro', 'enterprise']),
-  billingInterval: z.enum(['monthly', 'yearly']).default('monthly'),
-  // Step 1 — Store
-  displayName: z.string().min(1).max(200),
-  slug: z.string().min(3).max(63),
-  productCategories: z.string().optional(),
-  // Step 2 — Business
-  businessName: z.string().min(1).max(200),
-  businessType: z.enum(['proprietor', 'partnership', 'pvt_ltd', 'llp', 'other']),
-  pan: z.string().min(10).max(10),
-  businessAddress: z.string().min(5),
-  // Step 3 — GST
-  gstNumber: z.string().min(15).max(15),
-  gstCertS3Key: z.string().optional(),
-  // Step 4 — Warehouse (optional)
-  dailyPayout: z.boolean().optional(),
-  warehouse: z.object({
-    originPincode: z.string().optional(),
-    pickupLocation: z.string().optional(),
-    sellerName: z.string().optional(),
-    sellerAddress: z.string().optional(),
-    sellerPhone: z.string().optional(),
-  }).optional(),
-  // Restore-on-re-onboard — owner opted to restore a prior deprovisioned store's data.
-  restorePreviousData: z.boolean().optional(),
-  // Step 6 — Branding & legals
-  mobile: z.string().optional(),
-  logoS3Key: z.string().optional(),
-  sealS3Key: z.string().optional(),
-  legalsAccepted: z.boolean().optional(),
-})
 
 export async function POST(request: NextRequest) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
@@ -59,7 +25,7 @@ export async function POST(request: NextRequest) {
 
   const raw = await request.json().catch(() => null)
   if (!raw) return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
-  const parsed = Schema.safeParse(raw)
+  const parsed = OnboardSchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
 
   const d = parsed.data
