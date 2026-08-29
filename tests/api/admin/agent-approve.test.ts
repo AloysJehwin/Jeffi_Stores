@@ -13,6 +13,8 @@ vi.mock('@/lib/db', () => ({
   getClient: vi.fn(),
 }))
 vi.mock('@/lib/automation-emails', () => ({ sendTestCampaignEmail: vi.fn() }))
+vi.mock('@/lib/mail-audit', () => ({ sendAuditedMail: vi.fn() }))
+
 vi.mock('@/lib/email', () => ({
   sendOrderDelayNotification: vi.fn(),
   sendProductAnnouncementEmail: vi.fn(),

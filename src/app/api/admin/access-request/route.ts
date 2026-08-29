@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { transporter } from '@/lib/email'
 import { queryMany } from '@/lib/db'
+import { sendAuditedMail } from '@/lib/mail-audit'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
       : admin.email
     const toEmails = superAdmins.map(r => r.email).join(', ')
 
-    await transporter.sendMail({
+    await sendAuditedMail({
+      kind: 'access_request',
       from: `"Jeffi Admin" <${process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
       to: toEmails,
       subject: `Access Request: ${requesterName} needs "${scopeLabel || scopeKey}" scope`,
