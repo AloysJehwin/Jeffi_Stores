@@ -279,7 +279,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_bank_accounts (
     ifsc                character varying(16),
     holder_name         character varying(200),
     upi_id              character varying(120),
-    verification_status character varying(16) NOT NULL DEFAULT 'pending', -- pending|initiated|verified|failed
+    verification_status character varying(16) NOT NULL DEFAULT 'pending', -- pending|initiated|verified|unverified|failed
     verification_ref    character varying(128),              -- Razorpay validation id
     verified_name       character varying(200),              -- name returned by the bank (penny-drop)
     linked_account_id   character varying(64),               -- Razorpay Route linked account

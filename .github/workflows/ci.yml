@@ -227,6 +227,31 @@ jobs:
             require('fs').appendFileSync(process.env.GITHUB_ENV, lines + '\n');
           "
 
+      # NEXT_PUBLIC_* values are inlined at build time, so an empty one ships a broken
+      # image that only fails in the browser. 5b8c0ffa moved these to Secrets Manager but
+      # seeded it from GitHub *secrets*, missing NEXT_PUBLIC_ONDEVICE_MODEL_BASE, which was
+      # a repo *variable* — the on-device flag stayed on while its model URL went empty, so
+      # every visitor 404'd on a 437MB model fetched from the wrong origin.
+      - name: Assert required NEXT_PUBLIC build args are non-empty
+        env:
+          VAR_ENABLE_ONDEVICE_SUMMARY: ${{ vars.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
+          VAR_ONDEVICE_MODEL_BASE: ${{ vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
+        run: |
+          # Mirror the build-arg fallback below: these two live in repo variables, not the
+          # Secrets Manager blob, so check the same resolved value the build will use.
+          : "${NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY:=${VAR_ENABLE_ONDEVICE_SUMMARY}}"
+          : "${NEXT_PUBLIC_ONDEVICE_MODEL_BASE:=${VAR_ONDEVICE_MODEL_BASE}}"
+          fail=0
+          require() {
+            if [ -z "${!1}" ]; then echo "::error::$1 is empty — $2"; fail=1; fi
+          }
+          require NEXT_PUBLIC_BASE_URL "site links and canonical URLs break"
+          require NEXT_PUBLIC_APP_URL "OAuth redirects break"
+          if [ "$NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY" = "true" ] || [ "$NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY" = "1" ]; then
+            require NEXT_PUBLIC_ONDEVICE_MODEL_BASE "on-device summary is enabled but the model would be fetched from this origin, which does not host it"
+          fi
+          [ "$fail" = "0" ] || { echo "Refusing to build an image with missing public config."; exit 1; }
+
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
@@ -248,8 +273,8 @@ jobs:
             NEXT_PUBLIC_ENABLE_GST=${{ env.NEXT_PUBLIC_ENABLE_GST }}
             NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=${{ env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY }}
             NEXT_PUBLIC_BASE_URL=${{ env.NEXT_PUBLIC_BASE_URL }}
-            NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY=${{ env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
-            NEXT_PUBLIC_ONDEVICE_MODEL_BASE=${{ env.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
+            NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY=${{ env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY || vars.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY }}
+            NEXT_PUBLIC_ONDEVICE_MODEL_BASE=${{ env.NEXT_PUBLIC_ONDEVICE_MODEL_BASE || vars.NEXT_PUBLIC_ONDEVICE_MODEL_BASE }}
 
   # ────────────────────────────────────────────────────────
   # Stage 4 — Deploy to EC2  (main only, gate: docker)

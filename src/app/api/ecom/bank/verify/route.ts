@@ -13,8 +13,10 @@ const Schema = z.object({
   holderName: z.string().min(1).max(200),
 })
 
-// Owner submits bank details → Razorpay FAV instant verification → recorded in DB.
-// A verified bank is mandatory before the store can go live.
+// Owner submits bank details → recorded against the owner for Route settlements.
+// Where a RazorpayX balance is configured, FAV penny-drops to confirm the holder name; otherwise
+// the details are format-checked and stored 'unverified'. Both are accepted for go-live —
+// Razorpay validates the account when the Route linked account is configured.
 export async function POST(request: NextRequest) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const owner = await resolveOwnerSession(sid, extractSessionSignals(request))
@@ -37,5 +39,5 @@ export async function POST(request: NextRequest) {
     status: result.status,
     verifiedName: result.verifiedName ?? null,
     reason: result.reason ?? null,
-  }, { status: result.status === 'verified' ? 200 : 400 })
+  }, { status: result.status === 'failed' ? 400 : 200 })
 }

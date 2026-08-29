@@ -140,8 +140,8 @@ async function fireRouteTransfer(opts: {
      ON CONFLICT DO NOTHING`,
     [tenant.tenantId, opts.orderRef, opts.totalAmountInr,
      result.amount / 100,
-     Math.round(grossPaise * (parseFloat(process.env.PLATFORM_COMMISSION_PCT || '3') / 100)) / 100,
-     0,  // gateway fee charged to platform, not tenant
+     result.platformCommissionPaise / 100,
+     (result.gatewayFeePaise + result.transferFeePaise) / 100,
      result.transferId,
      opts.isCod]
   ).catch(() => {})  // non-fatal — transfer already succeeded
