@@ -9,7 +9,8 @@
  *
  * These pin: phone normalization edge cases, the linked-account payload shape,
  * the stakeholder "already exists" idempotency branch, configureRouteSettlement
- * never throwing, transfer math (commission + delhivery), and the COD ledger.
+ * never throwing, transfer math (commission + Razorpay's own fees + delhivery), and the COD
+ * ledger.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -19,6 +20,7 @@ const rz = {
   stakeholders: { create: vi.fn(), all: vi.fn() },
   products: { requestProductConfiguration: vi.fn(), edit: vi.fn() },
   transfers: { reverse: vi.fn() },
+  payments: { fetch: vi.fn() },
   api: { post: vi.fn() },
 }
 vi.mock('@/lib/razorpay', () => ({ getRazorpayInstance: () => rz }))
@@ -213,20 +215,58 @@ describe('configureRouteSettlement', () => {
 })
 
 // ── transferToLinkedAccount — the commission math ───────────────────────────
+// Razorpay debits the platform twice: the gateway fee on the captured payment (read from the
+// payment's `fee`, GST already included) and a transfer fee on the amount moved. Both come out
+// of the tenant's share so the platform keeps its commission whole.
 describe('transferToLinkedAccount', () => {
-  it('transfers gross minus 3% commission (default) minus delhivery, and returns the transfer', async () => {
+  beforeEach(() => {
+    rz.payments.fetch.mockResolvedValue({ fee: 2360, tax: 360 })
+  })
+
+  it('deducts commission, the real gateway fee, the transfer fee and delhivery', async () => {
     rz.api.post.mockResolvedValue({ items: [{ id: 'trf_1', status: 'processed' }] })
     const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
     const out = await transferToLinkedAccount({
       paymentId: 'pay_1', grossAmountPaise: 100000, linkedAccountId: 'acc_1',
       delhiveryChargePaise: 2000, orderId: 'o-1', tenantSlug: 'acme',
     })
-    // 100000 - round(100000*0.03)=3000 - 2000 = 95000
-    expect(out).toEqual({ transferId: 'trf_1', amount: 95000, linkedAccountId: 'acc_1', status: 'processed' })
+    // 100000 - 3000 commission - 2360 gateway - 2000 delhivery = 92640
+    // transfer fee = round(92640 * 0.0025 * 1.18) = 273 → 92367
+    expect(out).toEqual({
+      transferId: 'trf_1', amount: 92367, linkedAccountId: 'acc_1', status: 'processed',
+      gatewayFeePaise: 2360, transferFeePaise: 273, platformCommissionPaise: 3000,
+    })
+    expect(rz.payments.fetch).toHaveBeenCalledWith('pay_1')
     const body = rz.api.post.mock.calls[0][0]
     expect(body.url).toBe('/payments/pay_1/transfers')
-    expect(body.data.transfers[0]).toMatchObject({ account: 'acc_1', amount: 95000, currency: 'INR' })
-    expect(body.data.transfers[0].notes).toMatchObject({ platform_commission: 3000, delhivery_charge: 2000 })
+    expect(body.data.transfers[0]).toMatchObject({ account: 'acc_1', amount: 92367, currency: 'INR' })
+    expect(body.data.transfers[0].notes).toMatchObject({
+      platform_commission: 3000, gateway_fee: 2360, transfer_fee: 273, delhivery_charge: 2000,
+    })
+  })
+
+  // A UPI payment costs far less than a card, so estimating would over-deduct from the tenant.
+  it('uses the payment\'s actual fee rather than a flat rate', async () => {
+    rz.payments.fetch.mockResolvedValue({ fee: 140, tax: 21 })
+    rz.api.post.mockResolvedValue({ items: [{ id: 'trf_u', status: 'processed' }] })
+    const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
+    const out = await transferToLinkedAccount({
+      paymentId: 'pay_upi', grossAmountPaise: 100000, linkedAccountId: 'acc_1',
+    })
+    expect(out.gatewayFeePaise).toBe(140)
+    expect(out.amount).toBe(96574)  // 100000-3000-140 = 96860, less 286 transfer fee
+  })
+
+  // The payment already succeeded; abandoning the transfer would strand the tenant's money.
+  it('falls back to an estimated gateway fee when the payment cannot be read', async () => {
+    rz.payments.fetch.mockRejectedValue(new Error('razorpay down'))
+    rz.api.post.mockResolvedValue({ items: [{ id: 'trf_f', status: 'processed' }] })
+    const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
+    const out = await transferToLinkedAccount({
+      paymentId: 'pay_3', grossAmountPaise: 100000, linkedAccountId: 'acc_1',
+    })
+    expect(out.gatewayFeePaise).toBe(2360)  // 2% + 18% GST
+    expect(out.transferId).toBe('trf_f')
   })
 
   it('never sends a negative amount (clamped at 0) and defaults transfer fields', async () => {
@@ -235,7 +275,7 @@ describe('transferToLinkedAccount', () => {
     const out = await transferToLinkedAccount({
       paymentId: 'pay_2', grossAmountPaise: 1000, linkedAccountId: 'acc_2', delhiveryChargePaise: 5000,
     })
-    expect(out).toEqual({ transferId: '', amount: 0, linkedAccountId: 'acc_2', status: 'created' })
+    expect(out).toMatchObject({ transferId: '', amount: 0, linkedAccountId: 'acc_2', status: 'created' })
     // orderId / tenantSlug default to '' in notes
     expect(rz.api.post.mock.calls[0][0].data.transfers[0].notes.order_id).toBe('')
   })
@@ -244,14 +284,17 @@ describe('transferToLinkedAccount', () => {
     vi.resetModules()
     process.env.PLATFORM_COMMISSION_PCT = '10'
     rz.api.post.mockResolvedValue({ items: [{ id: 'trf_x', status: 'processed' }] })
-    const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
-    const out = await transferToLinkedAccount({ paymentId: 'p', grossAmountPaise: 100000, linkedAccountId: 'a' })
-    // 100000 - 10% = 90000 (no delhivery)
-    expect(out.amount).toBe(90000)
-    // Reset so the leaked env + reset module graph don't bleed into later tests
-    // (PLATFORM_COMMISSION_PCT is captured at module-load time).
-    delete process.env.PLATFORM_COMMISSION_PCT
-    vi.resetModules()
+    try {
+      const { transferToLinkedAccount } = await import('@/lib/razorpay-route')
+      const out = await transferToLinkedAccount({ paymentId: 'p', grossAmountPaise: 100000, linkedAccountId: 'a' })
+      // 100000 - 10000 commission - 2360 gateway = 87640, less 259 transfer fee
+      expect(out.amount).toBe(87381)
+    } finally {
+      // Must run even when the assertion fails: the env and the reset module graph are captured
+      // at import time, so leaking them silently changes the commission in every later test.
+      delete process.env.PLATFORM_COMMISSION_PCT
+      vi.resetModules()
+    }
   })
 })
 
