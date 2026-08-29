@@ -44,6 +44,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
       const { category, subcategory } = inferProfileCategory(kyc.product_categories)
       const addressParts = (kyc.business_address ?? '').split(',').map(s => s.trim())
+      // Razorpay rejects a non-numeric postal code outright, which aborts linked-account
+      // creation — and with it the stakeholder and the settlement bank, so no account number
+      // ever reaches Route. The previous expression took the last comma-separated fragment and
+      // stripped non-digits, then guarded with `??`, which does not catch the empty string that
+      // produces. An address with no digits (or no commas) therefore sent postalCode: "".
+      //
+      // The onboarding draft already carries a real pincode the owner entered and we validated,
+      // so prefer it; otherwise look for a 6-digit PIN anywhere in the address.
+      const draftPin = String((draft?.data as any)?.wh?.originPincode ?? '').replace(/\D/g, '')
+      const addressPin = (kyc.business_address ?? '').match(/\b(\d{6})\b/)?.[1]
+      const postalCode = /^\d{6}$/.test(draftPin) ? draftPin : (addressPin || '')
+      if (!postalCode) {
+        throw new Error(
+          'no usable 6-digit postal code — checked the onboarding draft (wh.originPincode) and the KYC business address',
+        )
+      }
       linkedAccountId = await createLinkedAccount({
         businessName: kyc.business_name ?? tenant.display_name,
         businessType: mapBusinessType(kyc.business_type ?? 'other'),
@@ -58,7 +74,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         streetAddress: addressParts[0] ?? '',
         city: addressParts[addressParts.length - 3] ?? 'India',
         state: addressParts[addressParts.length - 2] ?? 'IN',
-        postalCode: addressParts[addressParts.length - 1]?.replace(/\D/g, '') ?? '000000',
+        postalCode,
       })
       await saveLinkedAccountId(tenantId, linkedAccountId)
 
@@ -86,10 +102,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         process.stderr.write(`[route] no bank account on file for owner ${kyc.owner_id} — settlement not configured\n`)
       }
     } catch (err: any) {
-      // Non-fatal — log but continue. Transfers will fail until this is fixed,
-      // but subscription + provisioning should proceed.
-      // In production: alert ops team to manually create the linked account.
-      process.stderr.write(`[route] linked account creation failed for ${tenantId}: ${err?.error?.description ?? err?.message}\n`)
+      // Non-fatal — subscription + provisioning proceed — but this is the step that makes a
+      // store able to receive money, so it must not fail into a log line nobody reads. That is
+      // how "The postal code must be an integer" sat unnoticed while the store went live with
+      // no linked account, no stakeholder and no settlement bank in Route.
+      const reason = err?.error?.description ?? err?.message ?? 'unknown error'
+      process.stderr.write(`[route] linked account creation failed for ${tenantId}: ${reason}\n`)
+      try {
+        const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+        await alertProvisioningFailure(tenant.slug, 'razorpay_linked_account', reason, tenantId)
+      } catch { /* alerting must never mask the original failure */ }
     }
   }
 
