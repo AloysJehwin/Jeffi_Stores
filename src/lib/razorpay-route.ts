@@ -12,10 +12,41 @@ import { getRazorpayInstance } from './razorpay'
  * Commission structure (platform takes from each order):
  *   - Platform fee: configurable % (default 3%)
  *   - Delhivery charge correction buffer: ₹20 per COD order
- *   - Gateway fee pass-through (Razorpay charges ~2% from platform account)
+ *   - Razorpay's own charges, passed through to the tenant (see below)
+ *
+ * Razorpay debits the platform's balance twice on a Route payment: the gateway fee on the full
+ * captured amount, and a transfer fee on each amount moved to a linked account. Both are
+ * inclusive of GST. Neither used to be deducted from the tenant's share, so the platform paid
+ * them out of its commission — on a ₹1,000 card order that left ₹3.54 of a nominal ₹30, and an
+ * international card (3% + GST) settled at a ₹8.26 loss.
+ *
+ * The gateway fee is read from the captured payment (`fee`, in paise, already including `tax`)
+ * rather than estimated, because the real rate varies by method — UPI bills far less than cards.
  */
 
 export const PLATFORM_COMMISSION_PCT = parseFloat(process.env.PLATFORM_COMMISSION_PCT || '3') / 100
+
+/** Razorpay's fee for moving money to a linked account, charged on the transferred amount. */
+export const ROUTE_TRANSFER_FEE_PCT = parseFloat(process.env.ROUTE_TRANSFER_FEE_PCT || '0.25') / 100
+const GST_MULTIPLIER = 1 + parseFloat(process.env.GST_PCT || '18') / 100
+
+/** Fallback gateway rate used only when the captured payment cannot be read. */
+const FALLBACK_GATEWAY_FEE_PCT = parseFloat(process.env.RAZORPAY_GATEWAY_FEE_PCT || '2') / 100
+
+/**
+ * Razorpay's gateway fee on a captured payment, in paise, GST included.
+ *
+ * Falls back to an estimate if the payment cannot be fetched: under-deducting costs the platform
+ * margin, but throwing here would abandon a transfer for a payment that already succeeded.
+ */
+async function gatewayFeePaise(rz: any, paymentId: string, grossPaise: number): Promise<number> {
+  try {
+    const payment = await rz.payments.fetch(paymentId)
+    const fee = Number(payment?.fee)
+    if (Number.isFinite(fee) && fee >= 0) return Math.round(fee)
+  } catch { /* fall through to the estimate */ }
+  return Math.round(grossPaise * FALLBACK_GATEWAY_FEE_PCT * GST_MULTIPLIER)
+}
 
 /**
  * Normalize an Indian phone number to the 10-digit form Razorpay Route expects. Strips spaces,
@@ -55,6 +86,10 @@ export interface TransferResult {
   amount: number
   linkedAccountId: string
   status: string
+  /** Razorpay's charges deducted from the tenant's share, in paise. */
+  gatewayFeePaise: number
+  transferFeePaise: number
+  platformCommissionPaise: number
 }
 
 /**
@@ -182,7 +217,14 @@ export async function transferToLinkedAccount(opts: {
   const delhivery = opts.delhiveryChargePaise ?? 0
   // NOTE: COD orders are settled via recordCodSettlement() (ledger-based), NOT here —
   // this transfer path is only for online payments that have a Razorpay payment_id.
-  const tenantShare = Math.max(0, opts.grossAmountPaise - platformCommission - delhivery)
+  const gatewayFee = await gatewayFeePaise(rz, opts.paymentId, opts.grossAmountPaise)
+
+  // The transfer fee is charged on the amount actually transferred, so it depends on the figure
+  // it is being subtracted from. Charging it on the pre-fee share overstates it by a fraction of
+  // a paisa — in the tenant's favour, and cheaper than solving the circularity exactly.
+  const beforeTransferFee = Math.max(0, opts.grossAmountPaise - platformCommission - gatewayFee - delhivery)
+  const transferFee = Math.round(beforeTransferFee * ROUTE_TRANSFER_FEE_PCT * GST_MULTIPLIER)
+  const tenantShare = Math.max(0, beforeTransferFee - transferFee)
 
   const transfers = await (rz as any).api.post({
     url: `/payments/${opts.paymentId}/transfers`,
@@ -196,6 +238,8 @@ export async function transferToLinkedAccount(opts: {
           tenant_slug: opts.tenantSlug ?? '',
           gross_amount: opts.grossAmountPaise,
           platform_commission: platformCommission,
+          gateway_fee: gatewayFee,
+          transfer_fee: transferFee,
           delhivery_charge: delhivery,
         },
         linked_account_notes: ['order_id', 'tenant_slug'],
@@ -210,6 +254,9 @@ export async function transferToLinkedAccount(opts: {
     amount: tenantShare,
     linkedAccountId: opts.linkedAccountId,
     status: transfer?.status ?? 'created',
+    gatewayFeePaise: gatewayFee,
+    transferFeePaise: transferFee,
+    platformCommissionPaise: platformCommission,
   }
 }
 

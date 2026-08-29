@@ -102,6 +102,9 @@ export default function OnboardWizard({ plans, initialDraft }: {
   // Step 5 — Bank
   const [bank, setBank] = useState(init.bank ?? { accountNumber: '', ifsc: '', holderName: '' })
   const [bankVerified, setBankVerified] = useState(init.bankVerified ?? false)
+  // True only when a penny-drop actually confirmed the holder name; false when the account was
+  // merely accepted. Keeps the UI from claiming a verification that did not happen.
+  const [bankNameConfirmed, setBankNameConfirmed] = useState(false)
   const [bankMsg, setBankMsg] = useState<{ ok: boolean; text: string } | null>(null)
 
   // Step 6 — Branding & Legals
@@ -179,7 +182,9 @@ export default function OnboardWizard({ plans, initialDraft }: {
     } catch { setBrandErr('Network error') } finally { setUploadingBrand(null) }
   }
 
-  // ── Bank verify — Razorpay FAV (instant, no UTR entry needed) ───────────────
+  // ── Bank details ────────────────────────────────────────────────────────────
+  // Confirmed instantly by penny-drop where available; otherwise accepted on format and checked
+  // by Razorpay when payouts are configured.
   async function verifyBank() {
     setBusy(true); setBankMsg(null)
     try {
@@ -188,9 +193,12 @@ export default function OnboardWizard({ plans, initialDraft }: {
         body: JSON.stringify({ accountNumber: bank.accountNumber, ifsc: bank.ifsc, holderName: bank.holderName }),
       })
       const data = await res.json()
-      if (res.ok && data.status === 'verified') {
+      if (res.ok && (data.status === 'verified' || data.status === 'unverified')) {
         setBankVerified(true)
-        setBankMsg({ ok: true, text: `Verified — ${data.verifiedName}` })
+        setBankNameConfirmed(data.status === 'verified')
+        setBankMsg(data.status === 'verified'
+          ? { ok: true, text: `Verified — ${data.verifiedName}` }
+          : { ok: true, text: 'Account saved. Your bank details are confirmed with Razorpay when payouts are set up.' })
       } else {
         setBankMsg({ ok: false, text: data.reason || data.error || 'Verification failed' })
       }
@@ -488,17 +496,17 @@ export default function OnboardWizard({ plans, initialDraft }: {
                   <div className="col-span-2">
                     <label className={lbl}>Account holder name</label>
                     <input className={inp} placeholder="Aloys Jehwin" value={bank.holderName} disabled={bankVerified}
-                      onChange={(e) => { setBank({ ...bank, holderName: e.target.value }); setBankVerified(false) }} />
+                      onChange={(e) => { setBank({ ...bank, holderName: e.target.value }); setBankVerified(false); setBankNameConfirmed(false) }} />
                   </div>
                   <div>
                     <label className={lbl}>Account number</label>
                     <input className={inp} placeholder="43014146741" value={bank.accountNumber} disabled={bankVerified}
-                      onChange={(e) => { setBank({ ...bank, accountNumber: e.target.value }); setBankVerified(false) }} />
+                      onChange={(e) => { setBank({ ...bank, accountNumber: e.target.value }); setBankVerified(false); setBankNameConfirmed(false) }} />
                   </div>
                   <div>
                     <label className={lbl}>IFSC code</label>
                     <input className={inp} placeholder="SBIN0071256" value={bank.ifsc} disabled={bankVerified}
-                      onChange={(e) => { setBank({ ...bank, ifsc: e.target.value.toUpperCase() }); setBankVerified(false) }} />
+                      onChange={(e) => { setBank({ ...bank, ifsc: e.target.value.toUpperCase() }); setBankVerified(false); setBankNameConfirmed(false) }} />
                   </div>
                 </div>
 
@@ -506,12 +514,12 @@ export default function OnboardWizard({ plans, initialDraft }: {
                   <button type="button" onClick={verifyBank}
                     disabled={busy || !bank.holderName || bank.accountNumber.length < 9 || bank.ifsc.length !== 11}
                     className="px-5 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors">
-                    {busy ? 'Verifying…' : 'Verify account'}
+                    {busy ? 'Saving…' : 'Save account'}
                   </button>
                 ) : (
                   <div className="flex items-center gap-2 text-green-600 dark:text-green-400 text-sm font-semibold">
-                    <CheckMark className="w-4 h-4" /> Account verified
-                    <button type="button" onClick={() => { setBankVerified(false); setBankMsg(null) }}
+                    <CheckMark className="w-4 h-4" /> {bankNameConfirmed ? 'Account verified' : 'Account saved'}
+                    <button type="button" onClick={() => { setBankVerified(false); setBankNameConfirmed(false); setBankMsg(null) }}
                       className="ml-2 text-xs text-foreground-muted hover:text-foreground font-normal">
                       Change
                     </button>
@@ -574,7 +582,7 @@ export default function OnboardWizard({ plans, initialDraft }: {
                   ['PAN', pan],
                   ['GSTIN', gstNumber],
                   ['GST cert', gstFilename || 'Not uploaded'],
-                  ['Bank', bankVerified ? `${bank.holderName} · ${bank.accountNumber}` : 'Not verified'],
+                  ['Bank', bankVerified ? `${bank.holderName} · ${bank.accountNumber}` : 'Not added'],
                   ['Payouts', dailyPayout ? 'Daily (+5%)' : 'Weekly'],
                   ['Mobile', mobile || '—'],
                   ['Logo', logoS3Key ? 'Uploaded' : 'Not uploaded'],

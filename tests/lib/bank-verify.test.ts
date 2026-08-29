@@ -3,7 +3,7 @@
  * plus the dev stub verifier.
  *
  * The Razorpay client and the control-plane pool are mocked. We drive:
- *   - missing RAZORPAYX_ACCOUNT_NUMBER
+ *   - missing RAZORPAYX_ACCOUNT_NUMBER → format-checked 'unverified' fallback
  *   - FAV invalid → 'failed' + UPDATE
  *   - FAV valid → 'verified' + UPSERT (registered_name / fallback name chains)
  *   - thrown Razorpay error (error.description vs message)
@@ -19,7 +19,11 @@ vi.mock('@/lib/razorpay', () => ({ getRazorpayInstance: () => getRazorpayInstanc
 
 const poolQuery = vi.fn()
 const controlPlanePool = vi.fn(() => ({ query: poolQuery }))
-vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => controlPlanePool() }))
+const saveBankVerification = vi.fn()
+vi.mock('@/lib/tenant-registry', () => ({
+  controlPlanePool: () => controlPlanePool(),
+  saveBankVerification: (a: unknown) => saveBankVerification(a),
+}))
 
 const REAL_ENV = { ...process.env }
 
@@ -27,18 +31,50 @@ beforeEach(() => {
   vi.clearAllMocks()
   process.env = { ...REAL_ENV, RAZORPAYX_ACCOUNT_NUMBER: '2323230000000000' }
   poolQuery.mockResolvedValue({ rows: [] })
+  saveBankVerification.mockResolvedValue({ id: 'bank-1' })
 })
 
 // ── verifyBankAccountFAV ────────────────────────────────────────────────────
 
 describe('verifyBankAccountFAV', () => {
-  it('fails when RAZORPAYX_ACCOUNT_NUMBER is not configured', async () => {
+  // Route-only setup: no RazorpayX balance to fund the penny-drop, so the account is
+  // format-checked and stored 'unverified' rather than blocking the owner outright.
+  it('records unverified without calling FAV when RAZORPAYX_ACCOUNT_NUMBER is not configured', async () => {
+    delete process.env.RAZORPAYX_ACCOUNT_NUMBER
+    const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
+    const r = await verifyBankAccountFAV('owner-1', { accountNumber: '001122334455', ifsc: 'HDFC0001234', holderName: 'A' })
+    expect(r).toEqual({ status: 'unverified', verifiedName: 'A', ref: 'format_ok' })
+    expect(rzPost).not.toHaveBeenCalled()
+    expect(saveBankVerification).toHaveBeenCalledWith(expect.objectContaining({
+      ownerId: 'owner-1', status: 'unverified', ref: 'route_pending',
+    }))
+  })
+
+  it('treats an empty RAZORPAYX_ACCOUNT_NUMBER as unconfigured', async () => {
+    process.env.RAZORPAYX_ACCOUNT_NUMBER = '   '
+    const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
+    const r = await verifyBankAccountFAV('owner-1', { accountNumber: '001122334455', ifsc: 'HDFC0001234', holderName: 'A' })
+    expect(r.status).toBe('unverified')
+    expect(rzPost).not.toHaveBeenCalled()
+  })
+
+  it('rejects a malformed account without saving when FAV is unavailable', async () => {
     delete process.env.RAZORPAYX_ACCOUNT_NUMBER
     const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
     const r = await verifyBankAccountFAV('owner-1', { accountNumber: '123', ifsc: 'HDFC0001234', holderName: 'A' })
     expect(r.status).toBe('failed')
-    expect(r.reason).toMatch(/RAZORPAYX_ACCOUNT_NUMBER/)
-    expect(rzPost).not.toHaveBeenCalled()
+    expect(saveBankVerification).not.toHaveBeenCalled()
+  })
+
+  // The stored row is the only evidence the account exists on this path, so a failed write must
+  // not be reported as success — the owner would hit the go-live gate with no explanation.
+  it('reports failure when the unverified record cannot be saved', async () => {
+    delete process.env.RAZORPAYX_ACCOUNT_NUMBER
+    saveBankVerification.mockRejectedValue(new Error('db down'))
+    const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
+    const r = await verifyBankAccountFAV('owner-1', { accountNumber: '001122334455', ifsc: 'HDFC0001234', holderName: 'A' })
+    expect(r.status).toBe('failed')
+    expect(r.reason).toMatch(/try again/i)
   })
 
   it('returns failed and marks status failed when account_status is invalid', async () => {
@@ -56,8 +92,10 @@ describe('verifyBankAccountFAV', () => {
     const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
     const r = await verifyBankAccountFAV('owner-2', { accountNumber: '111', ifsc: 'HDFC0001234', holderName: 'John' })
     expect(r).toEqual({ status: 'verified', verifiedName: 'JOHN DOE', ref: 'fav_2' })
-    expect(poolQuery.mock.calls[0][0]).toMatch(/INSERT INTO tenant_bank_accounts/)
-    expect(poolQuery.mock.calls[0][1]).toEqual(['owner-2', '111', 'HDFC0001234', 'John', 'fav_2', 'JOHN DOE'])
+    expect(saveBankVerification).toHaveBeenCalledWith({
+      ownerId: 'owner-2', accountNumber: '111', ifsc: 'HDFC0001234', holderName: 'John',
+      status: 'verified', ref: 'fav_2', verifiedName: 'JOHN DOE',
+    })
   })
 
   it('falls back to fund_account bank_account name when registered_name absent', async () => {
@@ -111,9 +149,9 @@ describe('verifyBankAccountFAV', () => {
     expect(r).toEqual({ status: 'failed', reason: 'Verification failed' })
   })
 
-  it('still returns verified when the upsert query rejects (swallowed .catch)', async () => {
+  it('still returns verified when the upsert rejects (swallowed .catch)', async () => {
     rzPost.mockResolvedValue({ id: 'fav_9', results: { account_status: 'valid', registered_name: 'Y' } })
-    poolQuery.mockRejectedValue(new Error('db down'))
+    saveBankVerification.mockRejectedValue(new Error('db down'))
     const { verifyBankAccountFAV } = await import('@/lib/bank-verify')
     const r = await verifyBankAccountFAV('owner-9', { accountNumber: '777', ifsc: 'HDFC0001234', holderName: 'A' })
     expect(r).toEqual({ status: 'verified', verifiedName: 'Y', ref: 'fav_9' })
