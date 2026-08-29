@@ -96,7 +96,7 @@ describe('normalizeIndianPhone', () => {
 
 // ── createLinkedAccount ─────────────────────────────────────────────────────
 describe('createLinkedAccount', () => {
-  it('creates the account and returns its id, including legal_info when PAN is present', async () => {
+  it('creates the account and returns its id', async () => {
     rz.accounts.create.mockResolvedValue({ id: 'acc_123' })
     const { createLinkedAccount } = await import('@/lib/razorpay-route')
     const id = await createLinkedAccount(baseInput)
@@ -108,9 +108,32 @@ describe('createLinkedAccount', () => {
       legal_business_name: 'Acme Traders Pvt',
       business_type: 'route_proprietorship',
       contact_name: 'Owner One',
-      legal_info: { pan: 'ABCPD1234E' },
     })
     expect(payload.profile.addresses.registered).toMatchObject({ street1: '1 Main St', country: 'IN' })
+  })
+
+  // legal_info.pan is the company PAN. A proprietorship trades on the proprietor's personal
+  // PAN and has none of its own, so sending it is rejected: "The company pan field is invalid
+  // for business type: route_proprietorship". It goes on the stakeholder's kyc.pan instead.
+  it('omits the company PAN for a proprietorship', async () => {
+    rz.accounts.create.mockResolvedValue({ id: 'acc_p' })
+    const { createLinkedAccount } = await import('@/lib/razorpay-route')
+    await createLinkedAccount({ ...baseInput, businessType: 'route_proprietorship' })
+    expect(rz.accounts.create.mock.calls[0][0]).not.toHaveProperty('legal_info')
+  })
+
+  it('omits the company PAN for an unregistered business', async () => {
+    rz.accounts.create.mockResolvedValue({ id: 'acc_n' })
+    const { createLinkedAccount } = await import('@/lib/razorpay-route')
+    await createLinkedAccount({ ...baseInput, businessType: 'route_not_yet_registered' })
+    expect(rz.accounts.create.mock.calls[0][0]).not.toHaveProperty('legal_info')
+  })
+
+  it('sends the company PAN for an entity that has one', async () => {
+    rz.accounts.create.mockResolvedValue({ id: 'acc_c' })
+    const { createLinkedAccount } = await import('@/lib/razorpay-route')
+    await createLinkedAccount({ ...baseInput, businessType: 'route_private_limited', pan: 'ABCCD1234E' })
+    expect(rz.accounts.create.mock.calls[0][0]).toMatchObject({ legal_info: { pan: 'ABCCD1234E' } })
   })
 
   it('omits legal_info when PAN is blank and defaults street2 to N/A', async () => {
