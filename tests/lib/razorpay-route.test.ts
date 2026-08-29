@@ -112,28 +112,82 @@ describe('createLinkedAccount', () => {
     expect(payload.profile.addresses.registered).toMatchObject({ street1: '1 Main St', country: 'IN' })
   })
 
-  // legal_info.pan is the company PAN. A proprietorship trades on the proprietor's personal
-  // PAN and has none of its own, so sending it is rejected: "The company pan field is invalid
-  // for business type: route_proprietorship". It goes on the stakeholder's kyc.pan instead.
-  it('omits the company PAN for a proprietorship', async () => {
+  // legal_info.pan is the company PAN, and Razorpay checks the PAN's 4th character (the holder
+  // type) against the declared business type: "The company pan field is invalid for business
+  // type: <type>". Both live provisioning failures were an individual PAN ('P') declared as a
+  // proprietorship and then as a partnership.
+  it('omits the company PAN when the holder character disagrees with the business type', async () => {
     rz.accounts.create.mockResolvedValue({ id: 'acc_p' })
     const { createLinkedAccount } = await import('@/lib/razorpay-route')
-    await createLinkedAccount({ ...baseInput, businessType: 'route_proprietorship' })
+    // individual PAN ('P') declared as a partnership — the exact live failure
+    await createLinkedAccount({ ...baseInput, businessType: 'route_partnership', pan: 'ABCPD1234E' })
     expect(rz.accounts.create.mock.calls[0][0]).not.toHaveProperty('legal_info')
   })
 
-  it('omits the company PAN for an unregistered business', async () => {
-    rz.accounts.create.mockResolvedValue({ id: 'acc_n' })
-    const { createLinkedAccount } = await import('@/lib/razorpay-route')
-    await createLinkedAccount({ ...baseInput, businessType: 'route_not_yet_registered' })
-    expect(rz.accounts.create.mock.calls[0][0]).not.toHaveProperty('legal_info')
-  })
-
-  it('sends the company PAN for an entity that has one', async () => {
+  it('sends the company PAN when the holder character agrees', async () => {
     rz.accounts.create.mockResolvedValue({ id: 'acc_c' })
     const { createLinkedAccount } = await import('@/lib/razorpay-route')
     await createLinkedAccount({ ...baseInput, businessType: 'route_private_limited', pan: 'ABCCD1234E' })
     expect(rz.accounts.create.mock.calls[0][0]).toMatchObject({ legal_info: { pan: 'ABCCD1234E' } })
+  })
+
+  it('normalises a lowercase / padded PAN before sending it', async () => {
+    rz.accounts.create.mockResolvedValue({ id: 'acc_l' })
+    const { createLinkedAccount } = await import('@/lib/razorpay-route')
+    await createLinkedAccount({ ...baseInput, businessType: 'route_llp', pan: '  abcfd1234e ' })
+    expect(rz.accounts.create.mock.calls[0][0]).toMatchObject({ legal_info: { pan: 'ABCFD1234E' } })
+  })
+})
+
+// ── isValidCompanyPan — the rule that decides the above ─────────────────────
+describe('isValidCompanyPan', () => {
+  const cases: Array<[string, string, boolean, string]> = [
+    // partnerships and LLPs hold a firm PAN ('F')
+    ['ABCFD1234E', 'route_partnership',        true,  'firm PAN for a partnership'],
+    ['ABCPD1234E', 'route_partnership',        false, 'individual PAN for a partnership (live failure)'],
+    ['ABCCD1234E', 'route_partnership',        false, 'company PAN for a partnership'],
+    ['ABCFD1234E', 'route_llp',                true,  'firm PAN for an LLP'],
+    // companies hold 'C'
+    ['ABCCD1234E', 'route_private_limited',    true,  'company PAN for a pvt ltd'],
+    ['ABCCD1234E', 'route_public_limited',     true,  'company PAN for a public ltd'],
+    ['ABCFD1234E', 'route_private_limited',    false, 'firm PAN for a pvt ltd'],
+    // no entity PAN exists for these
+    ['ABCPD1234E', 'route_proprietorship',     false, 'individual PAN for a proprietorship (live failure)'],
+    ['ABCCD1234E', 'route_proprietorship',     false, 'even a company PAN for a proprietorship'],
+    ['ABCFD1234E', 'route_not_yet_registered', false, 'unregistered business has none'],
+    // NGOs may be a trust, association or body of individuals
+    ['ABCTD1234E', 'route_ngo',                true,  'trust PAN for an NGO'],
+    ['ABCAD1234E', 'route_ngo',                true,  'association PAN for an NGO'],
+    ['ABCPD1234E', 'route_ngo',                false, 'individual PAN for an NGO'],
+  ]
+  it.each(cases)('%s + %s -> %s (%s)', async (pan, type, expected) => {
+    const { isValidCompanyPan } = await import('@/lib/razorpay-route')
+    expect(isValidCompanyPan(pan, type as any)).toBe(expected)
+  })
+
+  // A malformed PAN must never be forwarded — it fails the create just as a mismatch does.
+  it.each([
+    ['', 'empty'], ['   ', 'blank'], ['ABCF1234E', 'too short'], ['ABCFD1234EX', 'too long'],
+    ['12CFD1234E', 'digits in the letter block'], ['ABCFD12X4E', 'letter in the digit block'],
+    ['ABCFD1234', 'missing check letter'],
+  ])('rejects a malformed PAN (%s — %s)', async (pan) => {
+    const { isValidCompanyPan } = await import('@/lib/razorpay-route')
+    expect(isValidCompanyPan(pan, 'route_partnership')).toBe(false)
+  })
+
+  it('rejects null and undefined', async () => {
+    const { isValidCompanyPan } = await import('@/lib/razorpay-route')
+    expect(isValidCompanyPan(null, 'route_partnership')).toBe(false)
+    expect(isValidCompanyPan(undefined, 'route_partnership')).toBe(false)
+  })
+
+  // mapBusinessType() can only ever produce these, so every one must be covered by the table.
+  it('covers every business type mapBusinessType can return', async () => {
+    const { isValidCompanyPan, mapBusinessType } = await import('@/lib/razorpay-route')
+    for (const kycType of ['proprietor', 'partnership', 'pvt_ltd', 'llp', 'other', 'anything-else']) {
+      // must not throw, and must return a boolean rather than undefined
+      expect(typeof isValidCompanyPan('ABCFD1234E', mapBusinessType(kycType))).toBe('boolean')
+    }
   })
 
   it('omits legal_info when PAN is blank and defaults street2 to N/A', async () => {
