@@ -98,14 +98,43 @@ export interface TransferResult {
  * Returns the Razorpay account_id (acc_xxxx).
  */
 /**
- * Whether this business type has a PAN in its own name.
+ * The PAN holder-type characters Razorpay accepts as a *company* PAN for each business type.
  *
- * The 4th character of an Indian PAN encodes the holder: 'C' company, 'F' firm/LLP, 'P' an
- * individual. A proprietorship trades on the proprietor's personal PAN, so there is no company
- * PAN to send; an unregistered business has none either.
+ * The 4th character of an Indian PAN encodes who holds it — 'P' a person, 'F' a firm (including
+ * partnerships and LLPs), 'C' a company, 'T' a trust, 'A' an association, 'B' a body of
+ * individuals. Razorpay checks that character against the declared business type and rejects a
+ * mismatch with "The company pan field is invalid for business type: <type>".
+ *
+ * An empty set means the entity has no PAN of its own: a proprietorship trades on the
+ * proprietor's personal PAN, and an unregistered business has none at all.
  */
-function hasCompanyPan(businessType: LinkedAccountInput['businessType']): boolean {
-  return businessType !== 'route_proprietorship' && businessType !== 'route_not_yet_registered'
+const COMPANY_PAN_CHARS: Record<LinkedAccountInput['businessType'], string[]> = {
+  route_proprietorship:     [],
+  route_not_yet_registered: [],
+  route_partnership:        ['F'],
+  route_llp:                ['F'],
+  route_private_limited:    ['C'],
+  route_public_limited:     ['C'],
+  route_ngo:                ['T', 'A', 'B'],
+}
+
+const PAN_SHAPE = /^[A-Z]{5}[0-9]{4}[A-Z]$/
+
+/**
+ * Whether this PAN can be sent as the linked account's company PAN.
+ *
+ * Sending a mismatched PAN fails the whole provisioning step, so anything we are not sure
+ * about is omitted: Razorpay accepts the account without it and the PAN can be completed from
+ * the dashboard, whereas a rejected create leaves the tenant with no linked account at all.
+ * The individual's PAN still reaches Razorpay on the stakeholder's kyc.pan.
+ */
+export function isValidCompanyPan(
+  pan: string | null | undefined,
+  businessType: LinkedAccountInput['businessType'],
+): boolean {
+  const p = String(pan ?? '').trim().toUpperCase()
+  if (!PAN_SHAPE.test(p)) return false
+  return COMPANY_PAN_CHARS[businessType]?.includes(p[3]) ?? false
 }
 
 export async function createLinkedAccount(input: LinkedAccountInput): Promise<string> {
@@ -131,12 +160,13 @@ export async function createLinkedAccount(input: LinkedAccountInput): Promise<st
     type: 'route',
     legal_business_name: input.legalBusinessName,
     business_type: input.businessType,
-    // legal_info.pan is the *company* PAN. A proprietorship has no PAN of its own — the
-    // proprietor's individual PAN is used — and an unregistered business has none at all, so
-    // sending one is rejected outright: "The company pan field is invalid for business type:
-    // route_proprietorship". For those two, the PAN travels on the stakeholder's kyc.pan
-    // instead. Can also be added later via the dashboard.
-    ...(input.pan && hasCompanyPan(input.businessType) ? { legal_info: { pan: input.pan } } : {}),
+    // legal_info.pan is the *company* PAN, and Razorpay rejects the whole create when it does
+    // not match the declared business type. Sent only when the PAN's holder character agrees;
+    // otherwise omitted so provisioning still completes. The PAN always reaches Razorpay on the
+    // stakeholder's kyc.pan regardless.
+    ...(isValidCompanyPan(input.pan, input.businessType)
+      ? { legal_info: { pan: input.pan.trim().toUpperCase() } }
+      : {}),
     contact_name: input.ownerName,
   })
 
