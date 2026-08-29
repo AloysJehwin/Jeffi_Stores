@@ -2,17 +2,29 @@ import './globals.css'
 import ConditionalLayout from '@/components/ConditionalLayout'
 import Script from 'next/script'
 import { getHost } from '@/lib/get-host'
-import { getStoreIdentity, getSiteControls } from '@/lib/site-controls'
+import { getStoreIdentity, getSiteControls, getStorefrontContent } from '@/lib/site-controls'
 import type { StoreConfig } from '@/contexts/StoreConfigContext'
 
 export async function generateMetadata() {
   const identity = await getStoreIdentity()
+  const content = await getStorefrontContent()
+
+  // Tagline and description described the flagship's trade ("Industrial Hardware & Tools"),
+  // so every tenant store — whatever it sells — inherited a hardware shop's title and meta
+  // description. Both come from the store's own storefront content, with the identity name as
+  // the only guaranteed part.
+  const tagline = content.metaTagline?.trim()
+  const description = content.metaDescription?.trim()
+
+  // A tenant that uploaded a logo should use it as the tab icon; /icon.png is the platform's.
+  const icon = identity.logoUrl?.trim() || '/icon.png'
+
   return {
-    title: `${identity.name} - Industrial Hardware & Tools`,
-    description: `Your trusted hardware partner for industrial machinery parts, tools, and equipment`,
+    title: tagline ? `${identity.name} - ${tagline}` : identity.name,
+    description: description || `Shop online at ${identity.name}.`,
     icons: {
-      icon: '/icon.png',
-      apple: '/apple-icon.png',
+      icon,
+      apple: identity.logoUrl?.trim() || '/apple-icon.png',
     },
   }
 }

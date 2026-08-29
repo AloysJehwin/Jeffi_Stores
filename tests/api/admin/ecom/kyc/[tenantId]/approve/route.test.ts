@@ -94,7 +94,7 @@ const KYC = {
 
 const OWNER = { email: 'owner@acme.com', name: 'Owner Person' }
 
-const DRAFT = { data: { wh: { sellerPhone: '9123456780' } } }
+const DRAFT = { data: { wh: { sellerPhone: '9123456780', originPincode: '600001' } } }
 
 const BANK = {
   account_number: '000111222333',
@@ -314,6 +314,45 @@ describe('POST /api/admin/ecom/kyc/[tenantId]/approve', () => {
     const json = await res.json()
     expect(res.status).toBe(500)
     expect(json.error).toMatch(/plain string failure/)
+  })
+
+  it('refuses to create a linked account without a usable postal code', async () => {
+    // Razorpay rejects a non-numeric postal code and aborts the whole linked-account create —
+    // taking the stakeholder and settlement bank with it. Stripping digits from an address
+    // with none yields '', which `??` does not catch, so "" used to be sent.
+    vi.mocked(getDraft).mockResolvedValue({ data: { wh: { sellerPhone: '9123456780' } } } as any)
+    vi.mocked(getKyc).mockResolvedValue({
+      owner_id: 'own-1', business_name: 'Acme', business_type: 'private_limited',
+      product_categories: null, business_address: 'fgugcijhvb', pan: null, gst_number: null,
+    } as any)
+
+    const res = await POST(postReq(), params)
+    expect(res.status).toBe(200)                       // non-fatal: go-live still proceeds
+    expect(vi.mocked(createLinkedAccount)).not.toHaveBeenCalled()
+  })
+
+  it('takes the postal code from the onboarding draft when the address has none', async () => {
+    vi.mocked(getKyc).mockResolvedValue({
+      owner_id: 'own-1', business_name: 'Acme', business_type: 'private_limited',
+      product_categories: null, business_address: 'no digits here', pan: null, gst_number: null,
+    } as any)
+
+    await POST(postReq(), params)
+    const arg = vi.mocked(createLinkedAccount).mock.calls[0][0] as any
+    expect(arg.postalCode).toBe('600001')
+  })
+
+  it('falls back to a 6-digit PIN found in the address', async () => {
+    vi.mocked(getDraft).mockResolvedValue({ data: { wh: { sellerPhone: '9123456780' } } } as any)
+    vi.mocked(getKyc).mockResolvedValue({
+      owner_id: 'own-1', business_name: 'Acme', business_type: 'private_limited',
+      product_categories: null, business_address: '42 Main Rd, Chennai, TN, 641004',
+      pan: null, gst_number: null,
+    } as any)
+
+    await POST(postReq(), params)
+    const arg = vi.mocked(createLinkedAccount).mock.calls[0][0] as any
+    expect(arg.postalCode).toBe('641004')
   })
 
   // --- Null-field fallbacks (exercises the ?? right-hand branches) ---
