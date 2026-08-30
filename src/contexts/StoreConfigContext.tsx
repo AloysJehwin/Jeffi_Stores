@@ -24,6 +24,8 @@ export interface StoreConfig {
   storefront: {
     featuredLimit: number
     newArrivalsLimit: number
+    /** The store's own trade line, shown under its name. Empty renders nothing. */
+    metaTagline: string
   }
 }
 
@@ -71,6 +73,9 @@ const DEFAULT_CONFIG: StoreConfig = {
   storefront: {
     featuredLimit: 8,
     newArrivalsLimit: 4,
+    // No default trade line: the flagship's ("Hardware & Tools") was being shown
+    // by every tenant whatever they sell. Blank until the store's own value loads.
+    metaTagline: '',
   },
 }
 

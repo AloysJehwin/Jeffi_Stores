@@ -68,6 +68,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
     storefront: {
       featuredLimit: c.storefront.featuredLimit,
       newArrivalsLimit: c.storefront.newArrivalsLimit,
+      metaTagline: c.storefront.metaTagline,
     },
   }
   return (

@@ -20,26 +20,31 @@ jobs:
   # Stage 0 — Detect entity schema changes  (main push only)
   # Watches database/*.sql (not migrations/) — triggers schema-diff job
   # ────────────────────────────────────────────────────────
-  check-schema:
-    name: Check for Schema Changes
+  detect-changes:
+    name: Detect changed paths
     runs-on: ubuntu-latest
+    # One checkout answers both questions. They always ran in parallel and finished in ~8s, so
+    # splitting them bought no wall-clock time and cost a second runner allocation per run.
     outputs:
       schema_changed: ${{ steps.detect.outputs.schema_changed }}
+      migrations_changed: ${{ steps.detect.outputs.migrations_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Detect entity SQL file changes
+      - name: Detect schema and migration file changes
         id: detect
         run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+
           # NOTE: the previous pattern was [^/]+ which matched only files DIRECTLY under
           # database/, so database/control-plane/schema.sql never triggered a diff and the
           # control plane silently drifted. .+ covers subdirectories.
           # schema-diff.sh itself counts too: a fix to the differ must actually run, or it
           # sits dormant until the next unrelated schema edit while the drift it repairs
           # stays live.
-          if git diff --name-only HEAD~1 HEAD | grep -qP '^(database/(?!migrations/).+\.sql|deploy/schema-diff\.sh)'; then
+          if echo "$CHANGED" | grep -qP '^(database/(?!migrations/).+\.sql|deploy/schema-diff\.sh)'; then
             echo "schema_changed=true" >> $GITHUB_OUTPUT
             echo "Entity SQL files changed — will schema-diff against live RDS"
           else
@@ -47,24 +52,7 @@ jobs:
             echo "No entity SQL changes — skipping schema-diff job"
           fi
 
-  # ────────────────────────────────────────────────────────
-  # Stage 0 — Detect migration changes  (main push only)
-  # Watches database/migrations/*.sql — triggers run-migrations job
-  # ────────────────────────────────────────────────────────
-  check-migrations:
-    name: Check for Migration Changes
-    runs-on: ubuntu-latest
-    outputs:
-      migrations_changed: ${{ steps.detect.outputs.migrations_changed }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Detect migration file changes
-        id: detect
-        run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q '^database/migrations/.*\.sql'; then
+          if echo "$CHANGED" | grep -q '^database/migrations/.*\.sql'; then
             echo "migrations_changed=true" >> $GITHUB_OUTPUT
             echo "Migration files changed — will apply to RDS after deploy"
           else
@@ -147,7 +135,10 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [test]
+    # Not [test]: build consumes nothing the test job produces, so this was a gate rather than
+    # a data flow — and it put two ~5m30s jobs end to end. They now run side by side and docker
+    # gates on both, which keeps "never ship failing tests" while taking ~5m30s off every run.
+    needs: [lint, typecheck]
     steps:
       - uses: actions/checkout@v4
 
@@ -179,7 +170,9 @@ jobs:
   docker:
     name: Build & Push Docker Image
     runs-on: ubuntu-24.04-arm
-    needs: [build]
+    # Gates on test as well as build: with those two now running in parallel, this is the point
+    # that enforces a failing test never reaching an image.
+    needs: [build, test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     outputs:
       image-tag: ${{ steps.meta.outputs.version }}
@@ -360,11 +353,20 @@ jobs:
             # takes effect. That silently disabled tenant mTLS for 11 days: the admin-{slug}
             # block's ssl_verify_client never reached nginx, so browsers were never asked for a
             # client certificate. Only recreating the container re-resolves the mount.
+            # The tenant admin block advertises this bundle so browsers can offer the right
+            # client certificate. Rebuilt before the freshness check below, because adding a
+            # tenant changes the bundle without changing nginx-servers.conf.
+            echo "── client CA bundle ──"
+            BUNDLE=/opt/jeffi-stores/certs/client-ca-bundle.pem
+            BUNDLE_BEFORE=$(md5sum "$BUNDLE" 2>/dev/null | awk '{print $1}' || true)
+            sudo -E bash deploy/build-client-ca-bundle.sh "$BUNDLE"
+            BUNDLE_AFTER=$(md5sum "$BUNDLE" 2>/dev/null | awk '{print $1}' || true)
+
             echo "── nginx config ──"
             HOST_MD5=$(md5sum deploy/nginx-servers.conf | awk '{print $1}')
             CONT_MD5=$(docker exec jeffi-nginx md5sum /etc/nginx/conf.d/servers.conf 2>/dev/null | awk '{print $1}' || true)
-            if [ "$HOST_MD5" != "$CONT_MD5" ]; then
-              echo "nginx config changed — validating before restart"
+            if [ "$HOST_MD5" != "$CONT_MD5" ] || [ "$BUNDLE_BEFORE" != "$BUNDLE_AFTER" ]; then
+              echo "nginx config or CA bundle changed — validating before restart"
               NET=$(docker inspect jeffi-nginx --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | awk '{print $1}')
               # Validate in a throwaway container first: restarting into a bad config would take
               # every site on this box down.
@@ -380,6 +382,7 @@ jobs:
             else
               echo "nginx config unchanged"
             fi
+
 
             echo "── Blue-green deploy ──"
             bash deploy/blue-green-deploy.sh
@@ -409,8 +412,8 @@ jobs:
   schema-diff:
     name: Schema Diff & Apply
     runs-on: ubuntu-latest
-    needs: [deploy, check-schema]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-schema.outputs.schema_changed == 'true'
+    needs: [deploy, detect-changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.schema_changed == 'true'
     steps:
       - name: Get EC2 public IP
         id: ec2
@@ -427,11 +430,16 @@ jobs:
 
       - name: Run schema diff and apply via EC2
         uses: appleboy/ssh-action@v1
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
         with:
           host: ${{ steps.ec2.outputs.host }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 10m
+          command_timeout: 15m
+          # ssh-action only forwards variables named here; the fan-out records this SHA per
+          # tenant so a re-run can skip stores that already have it.
+          envs: DEPLOY_SHA
           script: |
             set -e
             cd /opt/jeffi-stores
@@ -448,6 +456,191 @@ jobs:
             # missing tenant_ca/tenant_admin_certs and provisioning_jobs.next_attempt_at.
             RDS_DB=jeffi_control_plane bash deploy/schema-diff.sh --set=control-plane
 
+            # Every tenant's own database. The two diffs above only ever touched the flagship
+            # and the control plane, so a schema change on main never reached a customer store
+            # — their databases silently fell behind the code deployed to serve them.
+            #
+            # Not migra: each tenant gets the same desired-state schema applied idempotently,
+            # which is far cheaper than diffing N databases and is what the provisioning path
+            # already uses. runMigrationFanout skips tenants already recorded at this SHA and
+            # isolates failures per tenant, so one bad store cannot block the rest.
+            echo "── Tenant schema fan-out ──"
+            CRON_SECRET=$(docker exec jeffi-app-$(cat active_slot 2>/dev/null || echo blue) printenv CRON_SECRET 2>/dev/null || true)
+            if [ -z "$CRON_SECRET" ]; then
+              echo "::error::CRON_SECRET unavailable — cannot run the tenant fan-out"
+              exit 1
+            fi
+            CODE=$(curl -s -o /tmp/fanout.json -w '%{http_code}' --max-time 300 \
+              -X POST http://localhost/api/internal/migrations/fanout \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              -H 'Content-Type: application/json' \
+              -H 'Host: jeffistores.in' \
+              -d "{\"gitSha\":\"$DEPLOY_SHA\"}")
+            cat /tmp/fanout.json; echo
+            rm -f /tmp/fanout.json
+            [ "$CODE" = "200" ] || { echo "::error::tenant schema fan-out failed (HTTP $CODE)"; exit 1; }
+
+  # ────────────────────────────────────────────────────────
+  # Stage 4a — Publish the config the tenant fleet fetches
+  # ────────────────────────────────────────────────────────
+  # Split out of the flagship deploy so that deploy and deploy-fleet can run in PARALLEL. While
+  # the publish lived inside the flagship job, the fleet had to wait for the flagship purely to
+  # get its config — and running them side by side without this split would have had pool boxes
+  # fetch the PREVIOUS revision's files.
+  #
+  # The two static files go straight from the runner's checkout. Only the CA bundle needs the
+  # flagship, because just that box can reach the control plane to enumerate tenant_ca — and it
+  # builds it from a script fetched out of S3 rather than from the box's checkout, which the
+  # flagship deploy is concurrently rewriting with `git reset --hard`.
+  fleet-config:
+    name: Publish fleet config
+    runs-on: ubuntu-latest
+    needs: [docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      FLEET: s3://jeffi-stores-mtls-truststore/fleet
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload nginx config and fleet scripts
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+          aws s3 cp deploy/nginx-servers.conf        "$FLEET/nginx-servers.conf"        --only-show-errors
+          aws s3 cp deploy/fleet-apply.sh            "$FLEET/fleet-apply.sh"            --only-show-errors
+          aws s3 cp deploy/build-client-ca-bundle.sh "$FLEET/build-client-ca-bundle.sh" --only-show-errors
+          echo "published nginx config + fleet scripts"
+
+      - name: Get EC2 public IP
+        id: ec2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+          echo "host=$IP" >> $GITHUB_OUTPUT
+
+      - name: Build and publish the client-CA bundle
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ steps.ec2.outputs.host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            FLEET=s3://jeffi-stores-mtls-truststore/fleet
+            aws s3 cp "$FLEET/build-client-ca-bundle.sh" /tmp/build-ca.sh --only-show-errors
+            sudo bash /tmp/build-ca.sh /tmp/client-ca-bundle.pem
+            aws s3 cp /tmp/client-ca-bundle.pem "$FLEET/client-ca-bundle.pem" --only-show-errors
+            # sudo wrote it, so it is root-owned — a plain rm fails and `set -e` would take
+            # the whole step down after the work already succeeded.
+            sudo rm -f /tmp/build-ca.sh /tmp/client-ca-bundle.pem
+            echo "client-CA bundle published"
+
+  # ────────────────────────────────────────────────────────
+  # Stage 4b — Roll the same image onto every tenant-serving box
+  # ────────────────────────────────────────────────────────
+  # The flagship deploy above targets one pinned instance. Tenant stores are served by pool
+  # boxes, which only ever pulled :latest at BOOT — so a change on main reached jeffistores.in
+  # and never reached a customer storefront. They ran whatever image existed the day they
+  # launched.
+  #
+  # Driven over SSM rather than SSH: the pool security group opens 22 to a single fixed IP,
+  # and GitHub runners have rotating addresses, so there is no SSH path from CI that does not
+  # mean opening the box to the internet. SSM needs no inbound port at all.
+  #
+  # Each box runs deploy/fleet-apply.sh, fetched from S3 because a pool box has no deploy token
+  # and cannot pull the repo. That script syncs the nginx config and client-CA bundle the
+  # flagship published, then runs the SAME deploy/blue-green-deploy.sh the flagship uses — so a
+  # box that comes up unhealthy keeps serving its current version instead of going dark.
+  deploy-fleet:
+    name: Deploy to tenant fleet
+    runs-on: ubuntu-latest
+    # Not [deploy]: the flagship and the fleet serve different hosts and share nothing but the
+    # image, so they roll in parallel. Only the published config is a real prerequisite.
+    needs: [docker, fleet-config]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Roll every pool instance
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+
+          # Tag-selected, not a hardcoded list: the pool scales with tenant count, so any
+          # fixed set would silently miss boxes added since it was written.
+          IDS=$(aws ec2 describe-instances \
+            --filters "Name=tag:app,Values=jeffi-tenant" "Name=instance-state-name,Values=running" \
+            --query 'Reservations[].Instances[].InstanceId' --output text)
+
+          if [ -z "$IDS" ]; then
+            echo "No running tenant instances — nothing to roll."
+            exit 0
+          fi
+          echo "Targets: $IDS"
+
+          # An instance whose SSM agent is not registered cannot be reached, and skipping it
+          # silently would leave that box's tenants on stale code with a green pipeline.
+          MANAGED=$(aws ssm describe-instance-information \
+            --query 'InstanceInformationList[?PingStatus==`Online`].InstanceId' --output text)
+          MISSING=""
+          for id in $IDS; do
+            case " $MANAGED " in *" $id "*) : ;; *) MISSING="$MISSING $id" ;; esac
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::not reachable over SSM:$MISSING"
+            exit 1
+          fi
+
+          FAILED=""
+          for id in $IDS; do
+            echo "── $id ──"
+            CMD=$(aws ssm send-command --instance-ids "$id" \
+              --document-name AWS-RunShellScript \
+              --comment "deploy ${GITHUB_SHA:0:7}" \
+              --parameters 'commands=["set -e","aws s3 cp s3://jeffi-stores-mtls-truststore/fleet/fleet-apply.sh /tmp/fleet-apply.sh --only-show-errors","bash /tmp/fleet-apply.sh","rm -f /tmp/fleet-apply.sh"]' \
+              --query 'Command.CommandId' --output text)
+
+            # Poll rather than `aws ssm wait`: the blue-green health check alone allows five
+            # minutes, and the wait command gives up sooner than that.
+            STATUS=InProgress
+            for _ in $(seq 1 60); do
+              sleep 10
+              STATUS=$(aws ssm get-command-invocation --command-id "$CMD" --instance-id "$id" \
+                --query 'Status' --output text 2>/dev/null || echo Pending)
+              case "$STATUS" in Success|Failed|Cancelled|TimedOut) break ;; esac
+            done
+
+            aws ssm get-command-invocation --command-id "$CMD" --instance-id "$id" \
+              --query 'StandardOutputContent' --output text 2>/dev/null | tail -20
+            if [ "$STATUS" != "Success" ]; then
+              echo "::error::$id finished $STATUS"
+              aws ssm get-command-invocation --command-id "$CMD" --instance-id "$id" \
+                --query 'StandardErrorContent' --output text 2>/dev/null | tail -20
+              FAILED="$FAILED $id"
+            else
+              echo "$id updated"
+            fi
+          done
+
+          # Boxes that succeeded are already serving the new image and must not be rolled back
+          # to match the ones that did not — each tenant is pinned to a box by DNS, so a mixed
+          # fleet is safe. Fail loudly and name the stragglers instead.
+          if [ -n "$FAILED" ]; then
+            echo "::error::tenant fleet deploy failed on:$FAILED"
+            exit 1
+          fi
+          echo "Tenant fleet up to date."
+
   # ────────────────────────────────────────────────────────
   # Stage 5 — Run DB Migrations  (main only, gate: deploy + migrations changed)
   # Applies only unapplied files from database/migrations/ via run-migrations.sh.
@@ -456,8 +649,8 @@ jobs:
   migrate:
     name: Run DB Migrations
     runs-on: ubuntu-latest
-    needs: [deploy, check-migrations]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-migrations.outputs.migrations_changed == 'true'
+    needs: [deploy, detect-changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.migrations_changed == 'true'
     steps:
       - name: Get EC2 public IP
         id: ec2
@@ -616,7 +809,7 @@ jobs:
   summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, build, docker, deploy, schema-diff, migrate, smoke-test, invalidate-cdn, finalize-deploy, pr-gate]
+    needs: [lint, typecheck, test, build, docker, deploy, fleet-config, deploy-fleet, schema-diff, migrate, smoke-test, invalidate-cdn, finalize-deploy, pr-gate]
     if: always()
     steps:
       - name: Result
@@ -633,6 +826,7 @@ jobs:
           if [[ "$IS_MAIN" == "true" ]]; then
           echo "║  Docker Push:        ${{ needs.docker.result }}"
           echo "║  Deploy to EC2:      ${{ needs.deploy.result }}"
+          echo "║  Deploy tenant fleet:${{ needs.deploy-fleet.result }}"
           echo "║  Schema Diff:        ${{ needs.schema-diff.result }}"
           echo "║  Run DB Migrations:  ${{ needs.migrate.result }}"
           echo "║  Smoke Test:         ${{ needs.smoke-test.result }}"
@@ -656,6 +850,7 @@ jobs:
           if [[ "$IS_MAIN" == "true" ]]; then
             if [[ "${{ needs.docker.result }}"         == "failure" ||
                   "${{ needs.deploy.result }}"         == "failure" ||
+                  "${{ needs.deploy-fleet.result }}"   == "failure" ||
                   "${{ needs.schema-diff.result }}"    == "failure" ||
                   "${{ needs.migrate.result }}"        == "failure" ||
                   "${{ needs.smoke-test.result }}"     == "failure" ||

@@ -177,7 +177,7 @@ function getPaymentStatusColor(status: string) {
 export default function OrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { user, isLoading: authLoading } = useAuth()
-  const { flags: { razorpayEnabled: isRazorpayEnabled }, orderAutoCancelMinutes } = useStoreConfig()
+  const { flags: { razorpayEnabled: isRazorpayEnabled }, orderAutoCancelMinutes, identity: storeIdentity } = useStoreConfig()
   const avatarUrl = user?.avatarUrl ?? null
   const router = useRouter()
   const pathname = usePathname()
@@ -450,7 +450,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
         amount: rzpData.amount,
         currency: rzpData.currency,
-        name: 'Jeffi Stores',
+        name: storeIdentity.name,
         description: `Order #${order.orderNumber}`,
         order_id: rzpData.razorpayOrderId,
         handler: async function (response: any) {
@@ -518,7 +518,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
           key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
           amount: data.amount,
           currency: data.currency,
-          name: 'Jeffi Stores',
+          name: storeIdentity.name,
           description: `Variant change — Order #${order.orderNumber}`,
           order_id: data.razorpayOrderId,
           handler: async function (response: any) {
@@ -1467,7 +1467,12 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                   <p className="text-blue-800 dark:text-blue-300 text-sm">
-                    Our team will contact you to confirm your order and provide payment details. For queries, call +91 96853 54099 or email jeffistoress@gmail.com.
+                    Our team will contact you to confirm your order and provide payment details.
+                    {(storeIdentity.phone || storeIdentity.email) && ' For queries, '}
+                    {storeIdentity.phone && `call ${storeIdentity.phone}`}
+                    {storeIdentity.phone && storeIdentity.email && ' or '}
+                    {storeIdentity.email && `email ${storeIdentity.email}`}
+                    {(storeIdentity.phone || storeIdentity.email) && '.'}
                   </p>
                 </div>
               </div>
