@@ -8,7 +8,7 @@ import ProductCard from '@/components/visitor/ProductCard'
 import HeroCarousel from '@/components/visitor/HeroCarousel'
 import FeaturedForYou from '@/components/visitor/FeaturedForYou'
 import { getHost } from '@/lib/get-host'
-import { getStorefrontContent, getFeatureFlags } from '@/lib/site-controls'
+import { getStorefrontContent, getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
 import { pickUnitPrice } from '@/lib/pricing'
 
 export const revalidate = 120
@@ -260,8 +260,12 @@ export default async function HomePage() {
       }
     } catch { /* keep defaults */ }
   }
+  // The flagship's own copy now lives in site-controls and is withheld from tenants, so an
+  // unset value here means a tenant that has not written one yet — name it rather than
+  // describing someone else's trade.
+  const identity = await getStoreIdentity()
   const aboutCopy = storefront.aboutCopy.trim() ||
-    'Jeffi Stores is built for industry — offering machinery parts, fasteners, tools, and electrical components for manufacturing, construction, and industrial repairs.'
+    `${identity.name} brings you a curated range of quality products, delivered across India.`
 
   const [featuredProducts, newArrivals, mainCategories, heroSlides, categoryShowcase, bestSellers, topBrands, freeShippingThreshold] = await Promise.all([
     getFeaturedProducts(storefront.featuredLimit, gstEnabled),
@@ -596,7 +600,7 @@ export default async function HomePage() {
             <div className="relative rounded-2xl overflow-hidden shadow-2xl">
               <img
                 src="/images/Working.png"
-                alt="Jeffi Stores team"
+                alt={`${identity.name} team`}
                 className="w-full h-56 sm:h-80 md:h-[440px] object-cover"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-secondary-900/60 via-transparent to-transparent" />

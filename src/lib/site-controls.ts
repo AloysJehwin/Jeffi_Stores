@@ -145,7 +145,9 @@ const DEFAULTS: SiteControls = {
     featuredLimit: 8,
     newArrivalsLimit: 4,
     statsJson: '',
-    aboutCopy: '',
+    // The flagship's own description. Scoped like the tagline below: a tenant selling
+    // something else must not inherit a hardware shop's copy on its homepage.
+    aboutCopy: 'Jeffi Stores is built for industry — offering machinery parts, fasteners, tools, and electrical components for manufacturing, construction, and industrial repairs.',
     // The flagship's trade. A tenant inherits neither — its own values come from its DB, and
     // an unset tagline simply drops from the title rather than advertising someone else's trade.
     metaTagline: 'Industrial Hardware & Tools',
@@ -208,9 +210,34 @@ const KEYS = [
 const cache = new Map<string, { value: SiteControls; expiresAt: number }>()
 const TTL_MS = 30 * 1000
 
-/** Cache key: the tenant whose database this read will actually hit. */
-function cacheKey(): string {
-  return getCurrentTenant()?.tenantId ?? 'platform'
+/**
+ * Cache key: the tenant whose database this read will actually hit.
+ *
+ * Must not rely on the AsyncLocalStorage context alone. That context is established lazily, by
+ * the first database query of the request — and getSiteControls() computes its key BEFORE it
+ * queries, so on a tenant host the key was still 'platform'. Every tenant then shared the
+ * platform's cache entry: a pool box answering one request without a tenant slug cached
+ * "Jeffi Stores" under that key, and every tenant storefront rendered it until the TTL expired.
+ *
+ * The x-tenant-slug header is set by middleware and is available before any query, so it gives
+ * the right key on the first call. Falls back to the ALS context for non-request work (jobs),
+ * where headers() throws.
+ */
+async function cacheKey(): Promise<string> {
+  const t = getCurrentTenant()
+  if (t) return t.tenantId
+  const slug = await tenantSlugFromHeaders()
+  return slug ? `slug:${slug}` : 'platform'
+}
+
+/** The request's tenant slug, or null outside a request scope / on the platform host. */
+async function tenantSlugFromHeaders(): Promise<string | null> {
+  try {
+    const { headers } = await import('next/headers')
+    return (await headers()).get('x-tenant-slug')
+  } catch {
+    return null
+  }
 }
 
 /**
@@ -225,20 +252,24 @@ function cacheKey(): string {
  * invent a support email or phone, and showing the platform's would be worse than showing
  * none, so those stay empty until the owner sets them.
  */
-function identityDefaults(): StoreIdentity {
+async function identityDefaults(): Promise<StoreIdentity> {
   const t = getCurrentTenant()
-  if (!t) return DEFAULTS.identity
+  const slug = t?.slug ?? (await tenantSlugFromHeaders())
+  if (!slug) return DEFAULTS.identity
+  const domain = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
   return {
-    name: t.displayName?.trim() || `${t.slug} Store`,
+    // Falls back to the header slug when the ALS context is not established, so a tenant host
+    // shows its own name rather than the platform's even on a path that never queried.
+    name: t?.displayName?.trim() || `${slug} Store`,
     email: '',
     phone: '',
-    web: `${t.slug}.${process.env.PLATFORM_DOMAIN || 'jeffistores.in'}`,
+    web: `${slug}.${domain}`,
     logoUrl: '',
   }
 }
 
 export async function getSiteControls(): Promise<SiteControls> {
-  const key = cacheKey()
+  const key = await cacheKey()
   const hit = cache.get(key)
   if (hit && Date.now() < hit.expiresAt) return hit.value
 
@@ -267,7 +298,7 @@ export async function getSiteControls(): Promise<SiteControls> {
 
     const d = DEFAULTS
     // Identity falls back to the tenant's own record on a tenant host, never the platform's.
-    const id = identityDefaults()
+    const id = await identityDefaults()
     const tenantScoped = getCurrentTenant() != null
     const result: SiteControls = {
       identity: {
@@ -309,7 +340,7 @@ export async function getSiteControls(): Promise<SiteControls> {
         featuredLimit: Math.max(1, Math.round(num('storefront_featured_limit', d.storefront.featuredLimit))),
         newArrivalsLimit: Math.max(1, Math.round(num('storefront_new_arrivals_limit', d.storefront.newArrivalsLimit))),
         statsJson: str('storefront_stats_json', d.storefront.statsJson),
-        aboutCopy: str('storefront_about_copy', d.storefront.aboutCopy),
+        aboutCopy: str('storefront_about_copy', tenantScoped ? '' : d.storefront.aboutCopy),
         metaTagline: str('meta_tagline', tenantScoped ? '' : d.storefront.metaTagline),
         metaDescription: str('meta_description', tenantScoped ? '' : d.storefront.metaDescription),
       },
@@ -339,7 +370,7 @@ export async function getSiteControls(): Promise<SiteControls> {
     return result
   } catch {
     // Even the failure path must not hand a tenant the platform's identity.
-    return { ...DEFAULTS, identity: identityDefaults() }
+    return { ...DEFAULTS, identity: await identityDefaults() }
   }
 }
 

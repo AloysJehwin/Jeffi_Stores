@@ -31,6 +31,7 @@ export async function GET() {
       storefront: {
         featuredLimit: c.storefront.featuredLimit,
         newArrivalsLimit: c.storefront.newArrivalsLimit,
+        metaTagline: c.storefront.metaTagline,
       },
     },
     // No browser/CDN caching: flag changes must reach clients within the
