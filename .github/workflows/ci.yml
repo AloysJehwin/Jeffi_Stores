@@ -360,11 +360,20 @@ jobs:
             # takes effect. That silently disabled tenant mTLS for 11 days: the admin-{slug}
             # block's ssl_verify_client never reached nginx, so browsers were never asked for a
             # client certificate. Only recreating the container re-resolves the mount.
+            # The tenant admin block advertises this bundle so browsers can offer the right
+            # client certificate. Rebuilt before the freshness check below, because adding a
+            # tenant changes the bundle without changing nginx-servers.conf.
+            echo "── client CA bundle ──"
+            BUNDLE=/opt/jeffi-stores/certs/client-ca-bundle.pem
+            BUNDLE_BEFORE=$(md5sum "$BUNDLE" 2>/dev/null | awk '{print $1}' || true)
+            sudo -E bash deploy/build-client-ca-bundle.sh "$BUNDLE"
+            BUNDLE_AFTER=$(md5sum "$BUNDLE" 2>/dev/null | awk '{print $1}' || true)
+
             echo "── nginx config ──"
             HOST_MD5=$(md5sum deploy/nginx-servers.conf | awk '{print $1}')
             CONT_MD5=$(docker exec jeffi-nginx md5sum /etc/nginx/conf.d/servers.conf 2>/dev/null | awk '{print $1}' || true)
-            if [ "$HOST_MD5" != "$CONT_MD5" ]; then
-              echo "nginx config changed — validating before restart"
+            if [ "$HOST_MD5" != "$CONT_MD5" ] || [ "$BUNDLE_BEFORE" != "$BUNDLE_AFTER" ]; then
+              echo "nginx config or CA bundle changed — validating before restart"
               NET=$(docker inspect jeffi-nginx --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | awk '{print $1}')
               # Validate in a throwaway container first: restarting into a bad config would take
               # every site on this box down.
