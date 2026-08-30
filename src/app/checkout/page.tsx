@@ -32,6 +32,7 @@ function CheckoutPage() {
   const { user, isLoading: authLoading } = useAuth()
   const { showToast } = useToast()
   const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
+  const storeIdentity = useStoreConfig().identity
   const gstEnabled = useStoreConfig().flags.gstEnabled
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -388,7 +389,7 @@ function CheckoutPage() {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
         amount: rzpData.amount,
         currency: rzpData.currency,
-        name: 'Jeffi Stores',
+        name: storeIdentity.name,
         description: 'Order Payment',
         order_id: rzpData.razorpayOrderId,
         handler: async function (response: any) {
@@ -1053,14 +1054,21 @@ function CheckoutPage() {
                 <div className="border-t border-border-default pt-6 mb-6">
                   <h3 className="font-semibold text-foreground mb-4">Contact Us</h3>
                   <div className="space-y-3 text-sm">
-                    <a href="tel:+919685354099" className="flex items-center gap-3 text-foreground-secondary hover:text-accent-600 dark:hover:text-accent-400 transition-colors">
-                      <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
-                      +91 96853 54099
-                    </a>
-                    <a href="mailto:jeffistoress@gmail.com" className="flex items-center gap-3 text-foreground-secondary hover:text-accent-600 dark:hover:text-accent-400 transition-colors">
-                      <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                      jeffistoress@gmail.com
-                    </a>
+                    {storeIdentity.phone && (
+                      <a href={`tel:${storeIdentity.phone.replace(/[^+\d]/g, '')}`} className="flex items-center gap-3 text-foreground-secondary hover:text-accent-600 dark:hover:text-accent-400 transition-colors">
+                        <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                        {storeIdentity.phone}
+                      </a>
+                    )}
+                    {storeIdentity.email && (
+                      <a href={`mailto:${storeIdentity.email}`} className="flex items-center gap-3 text-foreground-secondary hover:text-accent-600 dark:hover:text-accent-400 transition-colors">
+                        <svg className="w-5 h-5 text-accent-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                        {storeIdentity.email}
+                      </a>
+                    )}
+                    {!storeIdentity.phone && !storeIdentity.email && (
+                      <p className="text-foreground-muted">Contact details coming soon.</p>
+                    )}
                   </div>
                 </div>
 
