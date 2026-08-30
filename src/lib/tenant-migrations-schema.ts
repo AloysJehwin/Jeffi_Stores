@@ -22,7 +22,7 @@ export function buildTenantSchemaSql(): string {
       parts.push(`-- ==== ${file} ====\n${stripPsqlMetaCommands(fs.readFileSync(p, 'utf8'))}`)
     }
   }
-  return hoistForeignKeys(parts.join('\n\n'))
+  return guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(parts.join('\n\n'))))
 }
 
 /**
@@ -71,4 +71,69 @@ function hoistForeignKeys(sql: string): string {
     return `ALTER TABLE ${table} DROP CONSTRAINT IF EXISTS ${name};\n${add}`
   })
   return `${body}\n\n-- ==== deferred foreign keys (hoisted so referenced PK/UNIQUE exist first) ====\n${emitted.join('\n\n')}\n`
+}
+
+/**
+ * Make every non-foreign-key `ADD CONSTRAINT` re-runnable.
+ *
+ * The schema files are pg_dump style, so constraints arrive as bare `ALTER TABLE ... ADD
+ * CONSTRAINT`, which errors if the constraint is already there. That is invisible while every
+ * tenant database is created fresh, but the fan-out re-applies the whole schema on each new
+ * git SHA, and it sends it as ONE multi-statement query that Postgres aborts on first error.
+ * The first of the 161 non-FK constraints that already exists therefore fails the entire
+ * migration for that tenant — every existing tenant, on the next deploy.
+ *
+ * Guarded by existence rather than the DROP-then-ADD used for foreign keys: dropping a PRIMARY
+ * KEY or UNIQUE that live foreign keys reference fails outright ("cannot drop ... because other
+ * objects depend on it"). Foreign keys stay on DROP IF EXISTS — dropping one of those is safe,
+ * and it lets a redefinition actually take effect.
+ *
+ * to_regclass() keeps the guard from throwing when a table is genuinely absent, so a missing
+ * table surfaces where it is created rather than here.
+ */
+function guardNonFkConstraints(sql: string): string {
+  const addRe = /ALTER TABLE\s+(?:ONLY\s+)?([A-Za-z0-9_.]+)\s+ADD CONSTRAINT\s+([A-Za-z0-9_]+)\b([^;]*);/gis
+  return sql.replace(addRe, (stmt, table, name, rest) => {
+    if (/FOREIGN KEY/i.test(rest)) return stmt   // hoisted, already self-guarded
+    return [
+      'DO $$ BEGIN',
+      `  IF to_regclass('${table}') IS NOT NULL AND NOT EXISTS (`,
+      `    SELECT 1 FROM pg_constraint WHERE conname = '${name}' AND conrelid = '${table}'::regclass`,
+      '  ) THEN',
+      `    ${stmt.trim()}`,
+      '  END IF;',
+      'END $$;',
+    ].join('\n')
+  })
+}
+
+/**
+ * Rewrite the pg_dump-style CREATE statements into forms that survive a second apply.
+ *
+ * The fan-out re-applies the whole desired-state schema on every new git SHA, as a single
+ * multi-statement query that Postgres aborts on first error — so one "already exists" fails the
+ * migration for that tenant entirely. The files were only ever exercised against fresh
+ * databases, so nothing had a guard: 121 CREATE TABLE, 237 CREATE INDEX, 3 CREATE SEQUENCE,
+ * 41 CREATE TRIGGER and 13 CREATE FUNCTION were all bare.
+ *
+ * Rewritten here rather than in database/*.sql because those files are also the desired-state
+ * input to migra in the schema-diff pipeline, which compares them against a live database and
+ * expects plain pg_dump output.
+ *
+ * Triggers get DROP-then-CREATE: there is no CREATE TRIGGER IF NOT EXISTS, and re-creating one
+ * is harmless. Functions become CREATE OR REPLACE so a changed body actually lands — an
+ * existence guard would silently keep the old definition forever.
+ */
+function makeCreatesIdempotent(sql: string): string {
+  let out = sql
+  out = out.replace(/CREATE TABLE\s+(?!IF NOT EXISTS)/gi, 'CREATE TABLE IF NOT EXISTS ')
+  out = out.replace(/CREATE\s+(UNIQUE\s+)?INDEX\s+(?!IF NOT EXISTS)/gi,
+    (_m, uniq) => `CREATE ${uniq ? 'UNIQUE ' : ''}INDEX IF NOT EXISTS `)
+  out = out.replace(/CREATE SEQUENCE\s+(?!IF NOT EXISTS)/gi, 'CREATE SEQUENCE IF NOT EXISTS ')
+  out = out.replace(/CREATE FUNCTION\s+/gi, 'CREATE OR REPLACE FUNCTION ')
+  out = out.replace(
+    /CREATE TRIGGER\s+([A-Za-z0-9_]+)([^;]*?\sON\s+([A-Za-z0-9_.]+)[^;]*);/gis,
+    (stmt, name, _rest, table) => `DROP TRIGGER IF EXISTS ${name} ON ${table};\n${stmt.trim()}`,
+  )
+  return out
 }
