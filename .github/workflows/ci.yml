@@ -607,14 +607,25 @@ jobs:
 
           # An instance whose SSM agent is not registered cannot be reached, and skipping it
           # silently would leave that box's tenants on stale code with a green pipeline.
+          # --output text separates ids with TABS, so a space-delimited match never fires and
+          # every instance reads as missing. tr normalises before comparing.
           MANAGED=$(aws ssm describe-instance-information \
-            --query 'InstanceInformationList[?PingStatus==`Online`].InstanceId' --output text)
+            --query 'InstanceInformationList[?PingStatus==`Online`].InstanceId' --output text | tr '\t' ' ')
+
+          # An empty list is ambiguous, and that ambiguity cost real debugging time: the first
+          # run called the box unreachable while it was in fact Online — CI simply lacked
+          # ssm:DescribeInstanceInformation and saw nothing. Name that case on its own.
+          if [ -z "$MANAGED" ]; then
+            echo "::error::SSM listed no managed instances. Either no agent is registered, or this CI principal lacks ssm:DescribeInstanceInformation — check the permission first."
+            exit 1
+          fi
+
           MISSING=""
           for id in $IDS; do
             case " $MANAGED " in *" $id "*) : ;; *) MISSING="$MISSING $id" ;; esac
           done
           if [ -n "$MISSING" ]; then
-            echo "::error::not reachable over SSM:$MISSING"
+            echo "::error::agent not Online on:$MISSING (SSM sees: $MANAGED)"
             exit 1
           fi
 
