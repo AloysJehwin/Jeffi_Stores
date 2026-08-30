@@ -1023,6 +1023,15 @@ export async function sendAdminCertificateEmail(
     ? `Your admin certificate for ${tenant.storeName}`
     : 'Your Admin Certificate - Jeffi Stores'
   const certFileSlug = (displayName || email).replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/^-|-$/g, '') || 'admin'
+  // A tenant owner administers their own store on their own host. Sending them to the
+  // platform's admin panel gave them a certificate their browser was never asked for, and a
+  // login they have no account on.
+  const platformDomain = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
+  const adminUrl = tenant
+    ? `https://admin-${tenant.slug}.${platformDomain}/admin/login`
+    : `${process.env.ADMIN_BASE_URL || `https://admin.${platformDomain}`}/admin/login`
+  // The header sits on the container's near-white #f9f9f9, so it must never be light.
+  const headerName = tenant ? tenant.storeName : storeName()
   const html = `
       <!DOCTYPE html>
       <html>
@@ -1103,12 +1112,12 @@ export async function sendAdminCertificateEmail(
         <body>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
+              <div style="font-size:28px;font-weight:bold;color:#1e293b;letter-spacing:0.5px;">${headerName}</div>
               <p style="color: #666;">Admin Panel Access</p>
             </div>
 
             <h2>Welcome, ${displayName}!</h2>
-            <p>You have been added as an <strong>${role}</strong> on the Jeffi Stores admin panel. Your client certificate is attached to this email.</p>
+            <p>You have been added as an <strong>${role}</strong> on the ${headerName} admin panel. Your client certificate is attached to this email.</p>
 
             <div class="credential-box">
               <div class="label">Email</div>
@@ -1140,16 +1149,16 @@ export async function sendAdminCertificateEmail(
                 <li>Download the attached <code>${certFileSlug}-admin-cert.p12</code> file.</li>
                 <li>Double-click the file to open it in your system's certificate manager.</li>
                 <li>Enter the certificate password shown above when prompted.</li>
-                <li>Navigate to <strong>https://admin.jeffistores.in/admin/login</strong> to access the admin panel.</li>
+                <li>Navigate to <a href="${adminUrl}" style="color:#2563eb;"><strong>${adminUrl}</strong></a> to access the admin panel.</li>
               </ol>
             </div>
 
             <p>If you have any questions, contact the super admin.</p>
 
             <div class="footer">
-              <p><strong>${storeName()}</strong></p>
-              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-              <p>Phone: +91 96853 54099 | Email: admin@jeffistores.in</p>
+              <p><strong>${headerName}</strong></p>
+              ${tenant ? '' : `<p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+              <p>Phone: +91 96853 54099 | Email: ${process.env.ADMIN_EMAIL || `admin@${platformDomain}`}</p>`}
             </div>
           </div>
         </body>

@@ -34,6 +34,18 @@ vi.mock('@/lib/razorpay-route', () => ({
   normalizeIndianPhone: vi.fn((p: string | null | undefined) =>
     p && /\d{10}/.test(String(p)) ? String(p).replace(/\D/g, '').slice(-10) : null
   ),
+  // Real rule: the PAN's 4th character must match the declared business type. Mirrored here
+  // rather than stubbed true so the approval path is exercised with a realistic verdict.
+  isValidCompanyPan: vi.fn((pan: string | null | undefined, type: string) => {
+    const chars: Record<string, string[]> = {
+      route_partnership: ['F'], route_llp: ['F'],
+      route_private_limited: ['C'], route_public_limited: ['C'],
+      route_ngo: ['T', 'A', 'B'],
+      route_proprietorship: [], route_not_yet_registered: [],
+    }
+    const p = String(pan ?? '').trim().toUpperCase()
+    return /^[A-Z]{5}[0-9]{4}[A-Z]$/.test(p) && (chars[type]?.includes(p[3]) ?? false)
+  }),
 }))
 
 vi.mock('@/lib/ecom-emails', () => ({

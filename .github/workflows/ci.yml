@@ -354,6 +354,33 @@ jobs:
             echo "── Logging in to GHCR ──"
             echo "$GH_DEPLOY_TOKEN" | docker login ghcr.io -u "$GH_ACTOR" --password-stdin
 
+            # nginx's config is bind-mounted as a single FILE, which Docker resolves once, by
+            # inode. `git reset --hard` above writes a NEW inode, so the running container keeps
+            # serving the old content indefinitely — a config change appears deployed but never
+            # takes effect. That silently disabled tenant mTLS for 11 days: the admin-{slug}
+            # block's ssl_verify_client never reached nginx, so browsers were never asked for a
+            # client certificate. Only recreating the container re-resolves the mount.
+            echo "── nginx config ──"
+            HOST_MD5=$(md5sum deploy/nginx-servers.conf | awk '{print $1}')
+            CONT_MD5=$(docker exec jeffi-nginx md5sum /etc/nginx/conf.d/servers.conf 2>/dev/null | awk '{print $1}' || true)
+            if [ "$HOST_MD5" != "$CONT_MD5" ]; then
+              echo "nginx config changed — validating before restart"
+              NET=$(docker inspect jeffi-nginx --format '{{range $k,$v := .NetworkSettings.Networks}}{{$k}} {{end}}' | awk '{print $1}')
+              # Validate in a throwaway container first: restarting into a bad config would take
+              # every site on this box down.
+              docker run --rm --network "$NET" \
+                -v /etc/letsencrypt:/etc/letsencrypt:ro \
+                -v /opt/jeffi-stores/certbot-webroot:/var/www/certbot:ro \
+                -v /opt/jeffi-stores/certs:/etc/nginx/certs:ro \
+                -v /opt/jeffi-stores/deploy/active-upstream.conf:/etc/nginx/conf.d/upstream.conf:ro \
+                -v /opt/jeffi-stores/deploy/nginx-servers.conf:/etc/nginx/conf.d/servers.conf:ro \
+                nginx:alpine nginx -t
+              docker restart jeffi-nginx
+              echo "nginx restarted on the new config"
+            else
+              echo "nginx config unchanged"
+            fi
+
             echo "── Blue-green deploy ──"
             bash deploy/blue-green-deploy.sh
 
