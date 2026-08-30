@@ -9,9 +9,13 @@ import { buildTenantSchemaSql } from './tenant-migrations-schema'
  * Multi-tenant schema migration fan-out (Part B of the SaaS plan).
  *
  * Applies the desired-state schema (database/*.sql topic files) to every active
- * tenant's dedicated RDS. The topic files are idempotent (CREATE ... IF NOT EXISTS),
- * so re-applying is safe. One `tenant_migration_runs` row is written per (tenant, gitSha)
- * so a failure on one tenant is visible and doesn't block the others.
+ * tenant's dedicated RDS. The topic files themselves are plain pg_dump output and are NOT
+ * idempotent; buildTenantSchemaSql() rewrites them into re-appliable form (see
+ * tenant-migrations-schema.ts). That matters because the whole schema is sent as one
+ * multi-statement query, which Postgres aborts on first error — before the rewrite, the
+ * first already-existing object failed the migration for every tenant that was not brand
+ * new. One `tenant_migration_runs` row is written per (tenant, gitSha) so a failure on one
+ * tenant is visible and doesn't block the others.
  *
  * Ordering matters: extensions → tables → constraints → indexes → functions → triggers.
  */
