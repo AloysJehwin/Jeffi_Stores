@@ -436,11 +436,16 @@ jobs:
 
       - name: Run schema diff and apply via EC2
         uses: appleboy/ssh-action@v1
+        env:
+          DEPLOY_SHA: ${{ github.sha }}
         with:
           host: ${{ steps.ec2.outputs.host }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          command_timeout: 10m
+          command_timeout: 15m
+          # ssh-action only forwards variables named here; the fan-out records this SHA per
+          # tenant so a re-run can skip stores that already have it.
+          envs: DEPLOY_SHA
           script: |
             set -e
             cd /opt/jeffi-stores
@@ -456,6 +461,30 @@ jobs:
             # SaaS control plane - previously never diffed, which is how it ended up
             # missing tenant_ca/tenant_admin_certs and provisioning_jobs.next_attempt_at.
             RDS_DB=jeffi_control_plane bash deploy/schema-diff.sh --set=control-plane
+
+            # Every tenant's own database. The two diffs above only ever touched the flagship
+            # and the control plane, so a schema change on main never reached a customer store
+            # — their databases silently fell behind the code deployed to serve them.
+            #
+            # Not migra: each tenant gets the same desired-state schema applied idempotently,
+            # which is far cheaper than diffing N databases and is what the provisioning path
+            # already uses. runMigrationFanout skips tenants already recorded at this SHA and
+            # isolates failures per tenant, so one bad store cannot block the rest.
+            echo "── Tenant schema fan-out ──"
+            CRON_SECRET=$(docker exec jeffi-app-$(cat active_slot 2>/dev/null || echo blue) printenv CRON_SECRET 2>/dev/null || true)
+            if [ -z "$CRON_SECRET" ]; then
+              echo "::error::CRON_SECRET unavailable — cannot run the tenant fan-out"
+              exit 1
+            fi
+            CODE=$(curl -s -o /tmp/fanout.json -w '%{http_code}' --max-time 300 \
+              -X POST http://localhost/api/internal/migrations/fanout \
+              -H "Authorization: Bearer $CRON_SECRET" \
+              -H 'Content-Type: application/json' \
+              -H 'Host: jeffistores.in' \
+              -d "{\"gitSha\":\"$DEPLOY_SHA\"}")
+            cat /tmp/fanout.json; echo
+            rm -f /tmp/fanout.json
+            [ "$CODE" = "200" ] || { echo "::error::tenant schema fan-out failed (HTTP $CODE)"; exit 1; }
 
   # ────────────────────────────────────────────────────────
   # Stage 5 — Run DB Migrations  (main only, gate: deploy + migrations changed)
