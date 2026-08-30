@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft, saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount } from '@/lib/tenant-registry'
 import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
-import { createLinkedAccount, createRouteStakeholder, configureRouteSettlement, mapBusinessType, inferProfileCategory, normalizeIndianPhone } from '@/lib/razorpay-route'
+import { createLinkedAccount, createRouteStakeholder, configureRouteSettlement, mapBusinessType, inferProfileCategory, normalizeIndianPhone, isValidCompanyPan } from '@/lib/razorpay-route'
 import { sendKycApprovedEmail } from '@/lib/ecom-emails'
 // TEMPORARY payment bypass - see src/lib/ecom-payment-bypass.ts
 import { stateFromPincode } from '@/lib/india-pincode-state'
@@ -73,9 +73,21 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           `cannot determine the state from pincode ${postalCode} — its postal circle spans more than one state, so it must be set on the KYC record`,
         )
       }
+      const businessType = mapBusinessType(kyc.business_type ?? 'other')
+
+      // Omitted rather than fatal, but the operator should know KYC is incomplete at Razorpay:
+      // a PAN whose holder character disagrees with the business type is usually a data-entry
+      // mistake (an individual PAN entered for a partnership, say), not a missing document.
+      if (kyc.pan && !isValidCompanyPan(kyc.pan, businessType)) {
+        process.stderr.write(
+          `[route] company PAN not registered for ${tenantId}: PAN holder type '${kyc.pan.trim().toUpperCase()[3]}' ` +
+          `does not match business type ${businessType} — add it from the Razorpay dashboard\n`,
+        )
+      }
+
       linkedAccountId = await createLinkedAccount({
         businessName: kyc.business_name ?? tenant.display_name,
-        businessType: mapBusinessType(kyc.business_type ?? 'other'),
+        businessType,
         legalBusinessName: kyc.business_name ?? tenant.display_name,
         profileCategory: category,
         profileSubcategory: subcategory,
