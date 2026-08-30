@@ -20,26 +20,31 @@ jobs:
   # Stage 0 — Detect entity schema changes  (main push only)
   # Watches database/*.sql (not migrations/) — triggers schema-diff job
   # ────────────────────────────────────────────────────────
-  check-schema:
-    name: Check for Schema Changes
+  detect-changes:
+    name: Detect changed paths
     runs-on: ubuntu-latest
+    # One checkout answers both questions. They always ran in parallel and finished in ~8s, so
+    # splitting them bought no wall-clock time and cost a second runner allocation per run.
     outputs:
       schema_changed: ${{ steps.detect.outputs.schema_changed }}
+      migrations_changed: ${{ steps.detect.outputs.migrations_changed }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
-      - name: Detect entity SQL file changes
+      - name: Detect schema and migration file changes
         id: detect
         run: |
+          CHANGED=$(git diff --name-only HEAD~1 HEAD)
+
           # NOTE: the previous pattern was [^/]+ which matched only files DIRECTLY under
           # database/, so database/control-plane/schema.sql never triggered a diff and the
           # control plane silently drifted. .+ covers subdirectories.
           # schema-diff.sh itself counts too: a fix to the differ must actually run, or it
           # sits dormant until the next unrelated schema edit while the drift it repairs
           # stays live.
-          if git diff --name-only HEAD~1 HEAD | grep -qP '^(database/(?!migrations/).+\.sql|deploy/schema-diff\.sh)'; then
+          if echo "$CHANGED" | grep -qP '^(database/(?!migrations/).+\.sql|deploy/schema-diff\.sh)'; then
             echo "schema_changed=true" >> $GITHUB_OUTPUT
             echo "Entity SQL files changed — will schema-diff against live RDS"
           else
@@ -47,24 +52,7 @@ jobs:
             echo "No entity SQL changes — skipping schema-diff job"
           fi
 
-  # ────────────────────────────────────────────────────────
-  # Stage 0 — Detect migration changes  (main push only)
-  # Watches database/migrations/*.sql — triggers run-migrations job
-  # ────────────────────────────────────────────────────────
-  check-migrations:
-    name: Check for Migration Changes
-    runs-on: ubuntu-latest
-    outputs:
-      migrations_changed: ${{ steps.detect.outputs.migrations_changed }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
-
-      - name: Detect migration file changes
-        id: detect
-        run: |
-          if git diff --name-only HEAD~1 HEAD | grep -q '^database/migrations/.*\.sql'; then
+          if echo "$CHANGED" | grep -q '^database/migrations/.*\.sql'; then
             echo "migrations_changed=true" >> $GITHUB_OUTPUT
             echo "Migration files changed — will apply to RDS after deploy"
           else
@@ -424,8 +412,8 @@ jobs:
   schema-diff:
     name: Schema Diff & Apply
     runs-on: ubuntu-latest
-    needs: [deploy, check-schema]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-schema.outputs.schema_changed == 'true'
+    needs: [deploy, detect-changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.schema_changed == 'true'
     steps:
       - name: Get EC2 public IP
         id: ec2
@@ -661,8 +649,8 @@ jobs:
   migrate:
     name: Run DB Migrations
     runs-on: ubuntu-latest
-    needs: [deploy, check-migrations]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-migrations.outputs.migrations_changed == 'true'
+    needs: [deploy, detect-changes]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.detect-changes.outputs.migrations_changed == 'true'
     steps:
       - name: Get EC2 public IP
         id: ec2
