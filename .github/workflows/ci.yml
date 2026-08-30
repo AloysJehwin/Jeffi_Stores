@@ -390,15 +390,6 @@ jobs:
               echo "nginx config unchanged"
             fi
 
-            # Publish the same config for the tenant fleet. Pool boxes have no deploy token and
-            # so cannot pull the repo; they fetch these two files with their instance profile.
-            # The CA bundle has to be built here because only this box can reach the control
-            # plane to enumerate tenant_ca.
-            echo "── publishing fleet config ──"
-            aws s3 cp "$BUNDLE" s3://jeffi-stores-mtls-truststore/fleet/client-ca-bundle.pem --only-show-errors
-            aws s3 cp deploy/nginx-servers.conf s3://jeffi-stores-mtls-truststore/fleet/nginx-servers.conf --only-show-errors
-            aws s3 cp deploy/fleet-apply.sh s3://jeffi-stores-mtls-truststore/fleet/fleet-apply.sh --only-show-errors
-            echo "fleet config published" 
 
             echo "── Blue-green deploy ──"
             bash deploy/blue-green-deploy.sh
@@ -497,6 +488,70 @@ jobs:
             [ "$CODE" = "200" ] || { echo "::error::tenant schema fan-out failed (HTTP $CODE)"; exit 1; }
 
   # ────────────────────────────────────────────────────────
+  # Stage 4a — Publish the config the tenant fleet fetches
+  # ────────────────────────────────────────────────────────
+  # Split out of the flagship deploy so that deploy and deploy-fleet can run in PARALLEL. While
+  # the publish lived inside the flagship job, the fleet had to wait for the flagship purely to
+  # get its config — and running them side by side without this split would have had pool boxes
+  # fetch the PREVIOUS revision's files.
+  #
+  # The two static files go straight from the runner's checkout. Only the CA bundle needs the
+  # flagship, because just that box can reach the control plane to enumerate tenant_ca — and it
+  # builds it from a script fetched out of S3 rather than from the box's checkout, which the
+  # flagship deploy is concurrently rewriting with `git reset --hard`.
+  fleet-config:
+    name: Publish fleet config
+    runs-on: ubuntu-latest
+    needs: [docker]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      FLEET: s3://jeffi-stores-mtls-truststore/fleet
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Upload nginx config and fleet scripts
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          set -euo pipefail
+          aws s3 cp deploy/nginx-servers.conf        "$FLEET/nginx-servers.conf"        --only-show-errors
+          aws s3 cp deploy/fleet-apply.sh            "$FLEET/fleet-apply.sh"            --only-show-errors
+          aws s3 cp deploy/build-client-ca-bundle.sh "$FLEET/build-client-ca-bundle.sh" --only-show-errors
+          echo "published nginx config + fleet scripts"
+
+      - name: Get EC2 public IP
+        id: ec2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          IP=$(aws ec2 describe-instances \
+            --instance-ids ${{ secrets.EC2_INSTANCE_ID }} \
+            --query 'Reservations[0].Instances[0].PublicIpAddress' --output text)
+          echo "host=$IP" >> $GITHUB_OUTPUT
+
+      - name: Build and publish the client-CA bundle
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ steps.ec2.outputs.host }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          command_timeout: 5m
+          script: |
+            set -e
+            FLEET=s3://jeffi-stores-mtls-truststore/fleet
+            aws s3 cp "$FLEET/build-client-ca-bundle.sh" /tmp/build-ca.sh --only-show-errors
+            sudo bash /tmp/build-ca.sh /tmp/client-ca-bundle.pem
+            aws s3 cp /tmp/client-ca-bundle.pem "$FLEET/client-ca-bundle.pem" --only-show-errors
+            # sudo wrote it, so it is root-owned — a plain rm fails and `set -e` would take
+            # the whole step down after the work already succeeded.
+            sudo rm -f /tmp/build-ca.sh /tmp/client-ca-bundle.pem
+            echo "client-CA bundle published"
+
+  # ────────────────────────────────────────────────────────
   # Stage 4b — Roll the same image onto every tenant-serving box
   # ────────────────────────────────────────────────────────
   # The flagship deploy above targets one pinned instance. Tenant stores are served by pool
@@ -515,7 +570,9 @@ jobs:
   deploy-fleet:
     name: Deploy to tenant fleet
     runs-on: ubuntu-latest
-    needs: [deploy]
+    # Not [deploy]: the flagship and the fleet serve different hosts and share nothing but the
+    # image, so they roll in parallel. Only the published config is a real prerequisite.
+    needs: [docker, fleet-config]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Roll every pool instance
@@ -759,7 +816,7 @@ jobs:
   summary:
     name: Pipeline Summary
     runs-on: ubuntu-latest
-    needs: [lint, typecheck, test, build, docker, deploy, deploy-fleet, schema-diff, migrate, smoke-test, invalidate-cdn, finalize-deploy, pr-gate]
+    needs: [lint, typecheck, test, build, docker, deploy, fleet-config, deploy-fleet, schema-diff, migrate, smoke-test, invalidate-cdn, finalize-deploy, pr-gate]
     if: always()
     steps:
       - name: Result
