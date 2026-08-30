@@ -33,6 +33,23 @@ jobs:
         with:
           fetch-depth: 2
 
+      # A script this workflow runs but which is not committed fails only at deploy time —
+      # after test, build and the image push. That is exactly what happened: .gitignore has a
+      # blanket *.sh, so two new scripts were silently dropped by `git add -A` and the deploy
+      # died on "No such file or directory". Catch it here, at t=0, for the price of a grep.
+      - name: Verify referenced scripts are committed
+        run: |
+          set -euo pipefail
+          MISSING=""
+          for f in $(grep -ohE '(\.github/scripts|deploy)/[A-Za-z0-9_.-]+\.sh' .github/workflows/*.yml | sort -u); do
+            [ -f "$f" ] || MISSING="$MISSING $f"
+          done
+          if [ -n "$MISSING" ]; then
+            echo "::error::workflow references scripts that are not in the repo (check .gitignore):$MISSING"
+            exit 1
+          fi
+          echo "all referenced scripts are committed"
+
       - name: Detect schema and migration file changes
         id: detect
         run: |
@@ -359,7 +376,7 @@ jobs:
             echo "── client CA bundle ──"
             BUNDLE=/opt/jeffi-stores/certs/client-ca-bundle.pem
             BUNDLE_BEFORE=$(md5sum "$BUNDLE" 2>/dev/null | awk '{print $1}' || true)
-            sudo -E bash deploy/build-client-ca-bundle.sh "$BUNDLE"
+            sudo -E bash .github/scripts/build-client-ca-bundle.sh "$BUNDLE"
             BUNDLE_AFTER=$(md5sum "$BUNDLE" 2>/dev/null | awk '{print $1}' || true)
 
             echo "── nginx config ──"
@@ -510,8 +527,8 @@ jobs:
         run: |
           set -euo pipefail
           aws s3 cp deploy/nginx-servers.conf        "$FLEET/nginx-servers.conf"        --only-show-errors
-          aws s3 cp deploy/fleet-apply.sh            "$FLEET/fleet-apply.sh"            --only-show-errors
-          aws s3 cp deploy/build-client-ca-bundle.sh "$FLEET/build-client-ca-bundle.sh" --only-show-errors
+          aws s3 cp .github/scripts/fleet-apply.sh            "$FLEET/fleet-apply.sh"            --only-show-errors
+          aws s3 cp .github/scripts/build-client-ca-bundle.sh "$FLEET/build-client-ca-bundle.sh" --only-show-errors
           echo "published nginx config + fleet scripts"
 
       - name: Get EC2 public IP
@@ -556,7 +573,7 @@ jobs:
   # and GitHub runners have rotating addresses, so there is no SSH path from CI that does not
   # mean opening the box to the internet. SSM needs no inbound port at all.
   #
-  # Each box runs deploy/fleet-apply.sh, fetched from S3 because a pool box has no deploy token
+  # Each box runs .github/scripts/fleet-apply.sh, fetched from S3 because a pool box has no deploy token
   # and cannot pull the repo. That script syncs the nginx config and client-CA bundle the
   # flagship published, then runs the SAME deploy/blue-green-deploy.sh the flagship uses — so a
   # box that comes up unhealthy keeps serving its current version instead of going dark.
