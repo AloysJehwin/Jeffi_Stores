@@ -390,6 +390,16 @@ jobs:
               echo "nginx config unchanged"
             fi
 
+            # Publish the same config for the tenant fleet. Pool boxes have no deploy token and
+            # so cannot pull the repo; they fetch these two files with their instance profile.
+            # The CA bundle has to be built here because only this box can reach the control
+            # plane to enumerate tenant_ca.
+            echo "── publishing fleet config ──"
+            aws s3 cp "$BUNDLE" s3://jeffi-stores-mtls-truststore/fleet/client-ca-bundle.pem --only-show-errors
+            aws s3 cp deploy/nginx-servers.conf s3://jeffi-stores-mtls-truststore/fleet/nginx-servers.conf --only-show-errors
+            aws s3 cp deploy/fleet-apply.sh s3://jeffi-stores-mtls-truststore/fleet/fleet-apply.sh --only-show-errors
+            echo "fleet config published" 
+
             echo "── Blue-green deploy ──"
             bash deploy/blue-green-deploy.sh
 
@@ -498,9 +508,10 @@ jobs:
   # and GitHub runners have rotating addresses, so there is no SSH path from CI that does not
   # mean opening the box to the internet. SSM needs no inbound port at all.
   #
-  # Each box runs the SAME deploy/blue-green-deploy.sh the flagship uses — health-check the
-  # idle slot, flip nginx, stop the old one — so a box that comes up unhealthy keeps serving
-  # its current version instead of going dark.
+  # Each box runs deploy/fleet-apply.sh, fetched from S3 because a pool box has no deploy token
+  # and cannot pull the repo. That script syncs the nginx config and client-CA bundle the
+  # flagship published, then runs the SAME deploy/blue-green-deploy.sh the flagship uses — so a
+  # box that comes up unhealthy keeps serving its current version instead of going dark.
   deploy-fleet:
     name: Deploy to tenant fleet
     runs-on: ubuntu-latest
@@ -546,7 +557,7 @@ jobs:
             CMD=$(aws ssm send-command --instance-ids "$id" \
               --document-name AWS-RunShellScript \
               --comment "deploy ${GITHUB_SHA:0:7}" \
-              --parameters 'commands=["set -e","cd /opt/jeffi-stores","bash deploy/blue-green-deploy.sh"]' \
+              --parameters 'commands=["set -e","aws s3 cp s3://jeffi-stores-mtls-truststore/fleet/fleet-apply.sh /tmp/fleet-apply.sh --only-show-errors","bash /tmp/fleet-apply.sh","rm -f /tmp/fleet-apply.sh"]' \
               --query 'Command.CommandId' --output text)
 
             # Poll rather than `aws ssm wait`: the blue-green health check alone allows five
