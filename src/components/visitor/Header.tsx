@@ -12,7 +12,7 @@ import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 export default function Header() {
   const { cartCount } = useCart()
-  const { identity } = useStoreConfig()
+  const { identity, storefront } = useStoreConfig()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [pulseBadge, setPulseBadge] = useState(false)
@@ -43,7 +43,9 @@ export default function Header() {
                 />
                 <div>
                   <div className="text-base sm:text-lg lg:text-xl font-bold text-secondary-500 dark:text-primary-400">{identity.name}</div>
-                  <div className="hidden sm:block text-xs text-foreground-muted">Hardware & Tools</div>
+                  {storefront.metaTagline && (
+                    <div className="hidden sm:block text-xs text-foreground-muted">{storefront.metaTagline}</div>
+                  )}
                 </div>
               </div>
             </Link>
