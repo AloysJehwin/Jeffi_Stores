@@ -5,13 +5,14 @@ import { hasScope } from '@/lib/scopes'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import QuotationDetailClient from './QuotationDetailClient'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 export const dynamic = 'force-dynamic'
 
 export default async function QuotationDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')
+  const token = cookieStore.get(await adminCookieName())
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
 

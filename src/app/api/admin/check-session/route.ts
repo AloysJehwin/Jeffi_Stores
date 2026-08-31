@@ -1,21 +1,22 @@
 import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
-import { cookies } from 'next/headers'
 import { resolveSession } from '@/lib/auth-sessions'
+import { readAdminSid } from '@/lib/admin-cookie'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 
 export async function GET(request: NextRequest) {
   try {
-    const cookieStore = await cookies()
-    const token = cookieStore.get('admin_sid')
+    const token = await readAdminSid()
 
     const hostname = request.nextUrl.hostname || request.headers.get('host') || ''
-    const isAdminSubdomain = hostname.startsWith('admin.')
     const isLocalhost = hostname === 'localhost' || hostname.startsWith('localhost:')
-    const certStatus = isAdminSubdomain ? 'valid' : (isLocalhost ? 'development' : 'missing')
+    // Set only after the certificate actually verified — by nginx on the platform admin
+    // block, by middleware against the tenant's own CA on admin-{slug}.
+    const certVerified = !!(request.headers.get('x-client-cert-cn') || request.headers.get('x-client-cert-serial'))
+    const certStatus = certVerified ? 'valid' : (isLocalhost ? 'development' : 'missing')
 
     if (!token) {
-      const res = NextResponse.json({ authenticated: false, expiresAt: null })
+      const res = NextResponse.json({ authenticated: false, expiresAt: null, certStatus })
       res.headers.set('x-cert-status', certStatus)
       return res
     }
@@ -23,10 +24,10 @@ export async function GET(request: NextRequest) {
     // Opaque session: resolve the cookie's sid → live admin session (revoked/idle/expiry).
     // Pass the request UA so a cookie replayed from a different browser is revoked here too
     // (the 15s poll doubles as a device-binding tripwire). expiresAt comes from the row.
-    const s = await resolveSession(token.value, extractSessionSignals(request))
+    const s = await resolveSession(token, extractSessionSignals(request))
 
     if (!s || s.principalType !== 'admin') {
-      const res = NextResponse.json({ authenticated: false, expiresAt: null })
+      const res = NextResponse.json({ authenticated: false, expiresAt: null, certStatus })
       res.headers.set('x-cert-status', certStatus)
       return res
     }
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
     const res = NextResponse.json({
       authenticated: true,
       expiresAt,
+      certStatus,
       user: { adminId: s.principalId, email: s.email, role: s.role, scopes: s.scopes },
     })
     res.headers.set('x-cert-status', certStatus)

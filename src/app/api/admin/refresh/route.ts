@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin, JWT_MAX_AGE_S } from '@/lib/jwt'
 import { extendSession } from '@/lib/auth-sessions'
-import { cookieDomainOption } from '@/lib/cookie-domain'
+import { adminCookieName, adminCookieDomain } from '@/lib/admin-cookie'
 
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
@@ -12,13 +12,13 @@ export async function POST(request: NextRequest) {
   await extendSession(admin.sid, JWT_MAX_AGE_S)
 
   const response = NextResponse.json({ success: true })
-  response.cookies.set('admin_sid', admin.sid, {
+  response.cookies.set(await adminCookieName(), admin.sid, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'lax',
     maxAge: JWT_MAX_AGE_S,
     path: '/',
-    ...cookieDomainOption(),
+    ...(await adminCookieDomain()),
   })
   return response
 }

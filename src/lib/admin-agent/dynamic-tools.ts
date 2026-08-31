@@ -1,25 +1,7 @@
-import { Pool } from 'pg'
-import { query, queryMany, queryOne } from '@/lib/db'
+import { query, queryMany, queryOne, getClient } from '@/lib/db'
 
 const FORBIDDEN_RE = /\b(admins|admin_agent_messages|admin_agent_actions|admin_sessions|payment_methods|razorpay_webhooks|webhook_events|password_hash|password|totp_secret|reset_token)\b/i
 const DML_RE = /\b(insert|update|delete|drop|truncate|alter|create|grant|revoke|copy|vacuum|analyze|reindex|comment|cluster|lock|listen|notify|set\s+role|reset\s+role)\b/i
-
-let _pool: Pool | null = null
-function getReadonlyPool(): Pool {
-  if (!_pool) {
-    const conn = process.env.DATABASE_URL
-    if (!conn) throw new Error('DATABASE_URL not configured')
-    _pool = new Pool({
-      connectionString: conn,
-      max: 2,
-      idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 5000,
-      ssl: /amazonaws|sslmode=require/.test(conn) ? { rejectUnauthorized: false } : undefined,
-    })
-    _pool.on('error', () => {})
-  }
-  return _pool
-}
 
 export interface ApprovedDynamicTool {
   id: string
@@ -84,8 +66,9 @@ export async function runReadonlySql(tool: ApprovedDynamicTool, args: Record<str
   }
 
   const guarded = `${rendered} LIMIT 100`
-  const pool = getReadonlyPool()
-  const client = await pool.connect()
+  // getClient() selects the pool for the tenant in scope; a private DATABASE_URL pool made
+  // the agent read the platform database from every tenant's admin panel.
+  const client = await getClient()
   try {
     await client.query('BEGIN READ ONLY')
     await client.query("SET LOCAL statement_timeout = '5s'")

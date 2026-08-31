@@ -8,14 +8,17 @@ import AdminShell from '@/components/admin/AdminShell'
 import AdminShortcutHandler from '@/components/admin/AdminShortcutHandler'
 import { AdminMobileProvider } from '@/contexts/AdminMobileProvider'
 import DesktopRequiredBanner from '@/components/admin/DesktopRequiredBanner'
-import { getSiteControls } from '@/lib/site-controls'
+import { getSiteControls, getStoreIdentity } from '@/lib/site-controls'
 import { getHost } from '@/lib/get-host'
 import { LogOut } from 'lucide-react'
 
-export const metadata = {
-  title: 'Admin Panel - Jeffi Stores',
-  description: 'Secure admin panel for Jeffi Stores',
-  robots: 'noindex, nofollow',
+export async function generateMetadata() {
+  const { name } = await getStoreIdentity()
+  return {
+    title: `Admin Panel - ${name}`,
+    description: `Secure admin panel for ${name}`,
+    robots: 'noindex, nofollow',
+  }
 }
 
 export default async function AdminLayout({
@@ -120,6 +123,7 @@ export default async function AdminLayout({
     <AdminMobileProvider isMobile={isMobile}>
       <AdminShortcutHandler shortcuts={controls.shortcuts} host={host} />
       <AdminShell
+        brandName={controls.identity.name}
         desktopNavLinks={desktopNavLinks}
         allNavLinks={filteredNavLinks}
         displayName={displayName}

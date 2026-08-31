@@ -11,6 +11,7 @@ import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 const PAGE_SIZE = 25
 
@@ -268,7 +269,7 @@ export default async function BusinessCustomersPage({
   // redirected before any content (stats or list) is rendered/streamed.
   const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')
+  const token = cookieStore.get(await adminCookieName())
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)

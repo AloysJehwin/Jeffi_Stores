@@ -21,11 +21,11 @@ import { cookies } from 'next/headers'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-function makeReq(host = 'admin.example.com', ua = 'Chrome') {
+function makeReq(host = 'admin.example.com', ua = 'Chrome', certHeaders: Record<string, string> = {}) {
   const url = `http://${host}/api/admin/check-session`
   return new NextRequest(url, {
     method: 'GET',
-    headers: new Headers({ host, 'user-agent': ua }),
+    headers: new Headers({ host, 'user-agent': ua, ...certHeaders }),
   })
 }
 
@@ -56,10 +56,22 @@ describe('GET /api/admin/check-session', () => {
     expect(body.expiresAt).toBeNull()
   })
 
-  it('sets x-cert-status to valid on admin subdomain', async () => {
+  it('sets x-cert-status to valid when a verified cert identity is present', async () => {
+    setCookieToken(null)
+    const res = await GET(makeReq('admin.jeffistores.com', 'Chrome', { 'x-client-cert-serial': 'AB12' }))
+    expect(res.headers.get('x-cert-status')).toBe('valid')
+  })
+
+  it('sets x-cert-status to valid for a tenant admin host verified by middleware', async () => {
+    setCookieToken(null)
+    const res = await GET(makeReq('admin-acme.jeffistores.com', 'Chrome', { 'x-client-cert-cn': 'owner@acme.test' }))
+    expect(res.headers.get('x-cert-status')).toBe('valid')
+  })
+
+  it('does not claim valid on an admin host with no verified cert', async () => {
     setCookieToken(null)
     const res = await GET(makeReq('admin.jeffistores.com'))
-    expect(res.headers.get('x-cert-status')).toBe('valid')
+    expect(res.headers.get('x-cert-status')).toBe('missing')
   })
 
   it('sets x-cert-status to development on localhost', async () => {

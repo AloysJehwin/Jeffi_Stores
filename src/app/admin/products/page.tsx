@@ -23,6 +23,7 @@ import DraftRowActions from '@/components/admin/DraftRowActions'
 import AdminStatsSkeleton from '@/components/admin/AdminStatsSkeleton'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 import ProductBreakdownChart from '@/components/admin/ProductBreakdownChart'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -330,7 +331,7 @@ export default async function ProductsPage({ searchParams }: { searchParams: Pro
 
   // Read admin role for super_admin-only features (e.g. delete product)
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')
+  const token = cookieStore.get(await adminCookieName())
   let isSuperAdmin = false
   if (token) {
     try {

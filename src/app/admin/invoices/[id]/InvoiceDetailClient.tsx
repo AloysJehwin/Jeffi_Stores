@@ -7,6 +7,7 @@ import { Check, Pencil, QrCode } from 'lucide-react'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -32,6 +33,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   const [loading, setLoading] = useState(true)
   const [qrLoading, setQrLoading] = useState(false)
   const { showToast } = useToast()
+  const storeName = useStoreConfig().identity.name
   const [qrImageUrl, setQrImageUrl] = useState<string | null>(null)
   const [qrModalOpen, setQrModalOpen] = useState(false)
   const [finalizing, setFinalizing] = useState(false)
@@ -106,7 +108,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
         body: JSON.stringify({
           orderId: data.order.id,
           amountPaise: Math.round(parseFloat(data.order.total_amount) * 100),
-          description: `Jeffi Stores Invoice ${data.order.invoice_number}`,
+          description: `${storeName} Invoice ${data.order.invoice_number}`,
         }),
       })
       const json = await res.json()

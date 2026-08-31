@@ -4,12 +4,14 @@ import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 type Step = 'identity' | 'verify' | 'enroll'
 
 const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || ''
 
 export default function AdminLogin() {
+  const { name: storeName, web: storeWeb } = useStoreConfig().identity
   const router = useRouter()
   const searchParams = useSearchParams()
   const callbackUrl = searchParams.get('callbackUrl') || ap('/admin/dashboard')
@@ -34,24 +36,21 @@ export default function AdminLogin() {
       try {
         const response = await fetch('/api/admin/check-session')
         const data = await response.json()
+        setCertStatus(
+          data.certStatus === 'valid' ? 'verified'
+            : data.certStatus === 'development' ? 'development'
+            : 'not_found'
+        )
         if (data.authenticated) {
           router.push(callbackUrl)
           return
         }
       } catch {
+        setCertStatus('not_found')
       }
       setCheckingSession(false)
     }
     checkSession()
-
-    const host = window.location.hostname
-    if (host.startsWith('admin.')) {
-      setCertStatus('verified')
-    } else if (host === 'localhost' || host === '127.0.0.1') {
-      setCertStatus('development')
-    } else {
-      setCertStatus('not_found')
-    }
   }, [router])
 
   // Shared: both identity factors (email-OTP, Google) return {mfa_required|enroll_required, ticket}.
@@ -235,7 +234,7 @@ export default function AdminLogin() {
     <div className="min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center px-4 py-10">
         <div className="w-full max-w-md">
           <div className="text-center mb-8">
-            <h1 className="text-5xl font-bold text-white mb-3">Jeffi Stores</h1>
+            <h1 className="text-5xl font-bold text-white mb-3">{storeName}</h1>
             <h2 className="text-2xl font-semibold text-white mb-2">Admin Panel</h2>
             <p className="text-gray-300">
               {step === 'identity' && 'Sign in to access the dashboard'}
@@ -345,7 +344,7 @@ export default function AdminLogin() {
                       value={email} onChange={(e) => setEmail(e.target.value)}
                       required autoFocus autoComplete="email"
                       className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all"
-                      placeholder="you@jeffistores.in"
+                      placeholder={`you@${storeWeb || 'example.com'}`}
                     />
                   </div>
                   <button type="submit" disabled={loading}

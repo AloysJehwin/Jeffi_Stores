@@ -53,14 +53,14 @@ function makeFile(type = 'image/jpeg', size = 1024): File {
 }
 
 describe('getS3Url', () => {
-  it('returns S3 URL when no CLOUDFRONT_URL', () => {
-    const url = getS3Url('products/p1/img.jpg')
+  it('returns S3 URL when no CLOUDFRONT_URL', async () => {
+    const url = await getS3Url('products/p1/img.jpg')
     expect(url).toContain('s3.')
     expect(url).toContain('img.jpg')
   })
 
-  it('includes the canonical key in the URL', () => {
-    const url = getS3Url('test/key.png')
+  it('includes the canonical key in the URL', async () => {
+    const url = await getS3Url('test/key.png')
     expect(url).toContain('test/key.png')
   })
 })

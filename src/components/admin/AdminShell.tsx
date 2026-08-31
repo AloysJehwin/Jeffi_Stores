@@ -19,6 +19,7 @@ interface NavLink {
 
 interface Props {
   children: React.ReactNode
+  brandName: string
   desktopNavLinks: NavLink[]
   allNavLinks: NavLink[]
   displayName: string
@@ -33,6 +34,7 @@ interface Props {
 
 export default function AdminShell({
   children,
+  brandName,
   desktopNavLinks,
   allNavLinks,
   displayName,
@@ -72,7 +74,7 @@ export default function AdminShell({
             username={displayName}
             role={role}
           />
-          <span className="font-bold text-white text-sm">Jeffi Admin</span>
+          <span className="font-bold text-white text-sm truncate max-w-[9rem]">{brandName}</span>
         </div>
 
         {/* Brand title + collapse toggle — desktop; pinned to the far left */}
@@ -95,7 +97,7 @@ export default function AdminShell({
               )}
             </svg>
           </button>
-          <span className="font-bold text-white text-sm select-none">Jeffi Stores</span>
+          <span className="font-bold text-white text-sm select-none truncate max-w-[14rem]">{brandName}</span>
         </div>
 
         {/* Right side: avatar + name + role + theme + logout */}

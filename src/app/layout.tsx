@@ -3,6 +3,7 @@ import ConditionalLayout from '@/components/ConditionalLayout'
 import Script from 'next/script'
 import { getHost } from '@/lib/get-host'
 import { getStoreIdentity, getSiteControls, getStorefrontContent } from '@/lib/site-controls'
+import { appFromHost } from '@/lib/tenant-registry'
 import type { StoreConfig } from '@/contexts/StoreConfigContext'
 
 export async function generateMetadata() {
@@ -36,10 +37,11 @@ export const viewport = {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const host = await getHost()
-  const isFormsSubdomain = host.startsWith('forms.')
-  const isDocumentSubdomain = host.startsWith('invoice.') || host.startsWith('quotation.') || host.startsWith('purchaseorder.')
-  const isBusinessSubdomain = host.startsWith('business.')
-  const isAdminSubdomain = host.startsWith('admin.')
+  const hostApp = appFromHost(host)
+  const isFormsSubdomain = hostApp === 'forms'
+  const isDocumentSubdomain = hostApp === 'invoice' || hostApp === 'quotation' || hostApp === 'purchaseorder'
+  const isBusinessSubdomain = hostApp === 'business'
+  const isAdminSubdomain = hostApp === 'admin'
   const isEcomSubdomain = host.startsWith('ecom.')
 
   // Read the browser-safe store config on the server so the very first render

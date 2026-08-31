@@ -143,7 +143,7 @@ export default async function SiteControlsPage() {
         <div>
           <SectionCard title="Store Identity" description="Name, logo and contact details used across the site, emails, invoices and documents." columns>
             <FullSpan><LogoUploader initialUrl={c.identity.logoUrl} /></FullSpan>
-            <TextControl settingKey="business_name" label="Store name" hint="Shown in the header, footer, emails ({store_name}) and page titles." initial={c.identity.name} placeholder="Jeffi Stores" />
+            <TextControl settingKey="business_name" label="Store name" hint="Shown in the header, footer, emails ({store_name}) and page titles." initial={c.identity.name} placeholder="Your store name" />
             <TextControl settingKey="business_email" label="Contact email" type="email" initial={c.identity.email} placeholder="hello@jeffistores.in" />
             <TextControl settingKey="business_phone" label="Contact phone" initial={c.identity.phone} placeholder="+91 96853 54099" />
             <TextControl settingKey="business_web" label="Website URL" hint="Customer-facing site URL used in emails ({store_web})." initial={c.identity.web} placeholder="jeffistores.in" />

@@ -10,6 +10,7 @@ import QuickActionBar from '@/components/admin/dashboard/QuickActionBar'
 import PendingTasksCard from '@/components/admin/dashboard/PendingTasksCard'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -96,7 +97,7 @@ export default async function AdminDashboard() {
   const headersList = await headers()
   // Prefer the admin's full name (first + last) over the username for the greeting.
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')?.value
+  const token = cookieStore.get(await adminCookieName())?.value
   let displayName = headersList.get('x-username') || 'Admin'
   // Role + scopes gate which quick actions are shown (same as the sidebar nav).
   // Prefer the middleware-injected, verified headers; fall back to the JWT.

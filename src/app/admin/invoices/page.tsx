@@ -5,12 +5,13 @@ import { hasScope } from '@/lib/scopes'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import InvoicesClient from './InvoicesClient'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 export const metadata = { title: 'Invoices — Jeffi Admin' }
 
 export default async function InvoicesPage() {
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')
+  const token = cookieStore.get(await adminCookieName())
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
 
