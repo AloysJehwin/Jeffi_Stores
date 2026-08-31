@@ -7,6 +7,7 @@
  * PDF libs. Route files can't export non-handler symbols, hence this lib.
  */
 import { round2 } from '@/lib/gst'
+import { storeSignature } from '@/lib/brand'
 
 const PDFDocument = eval('require')('pdfkit')
 const bwipjs = eval('require')('bwip-js')
@@ -52,7 +53,7 @@ async function drawLabelPage(doc: any, input: LabelInput): Promise<void> {
   const pkgAdd: string = pkg.add || ''
   const addrFromDB: string = [orderRow.address_line1, orderRow.address_line2, orderRow.landmark, orderRow.city, orderRow.state].filter(Boolean).join(', ')
   const consigneeAdd: string = pkgAdd || addrFromDB
-  const sellerName: string = pkg.sname || 'Jeffi Stores'
+  const sellerName: string = pkg.sname || (await storeSignature()).name
   const sellerAdd: string = pkg.sadd || process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
   const invoiceNo: string = pkg.oid || pkg.order || orderRow.order_number || ''
   const productDesc: string = pkg.prd || 'Hardware / Fasteners'

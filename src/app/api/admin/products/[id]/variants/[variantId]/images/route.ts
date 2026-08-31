@@ -66,8 +66,8 @@ export async function POST(request: NextRequest, { params }: Params) {
         [gallery_image_id]
       )
       if (!gimg) return NextResponse.json({ error: 'Gallery image not found' }, { status: 404 })
-      const imageUrl = gimg.image_url || (gimg.s3_key ? getS3Url(gimg.s3_key) : null)
-      const thumbnailUrl = gimg.thumbnail_url || (gimg.s3_thumbnail_key ? getS3Url(gimg.s3_thumbnail_key) : null)
+      const imageUrl = gimg.image_url || (gimg.s3_key ? await getS3Url(gimg.s3_key) : null)
+      const thumbnailUrl = gimg.thumbnail_url || (gimg.s3_thumbnail_key ? await getS3Url(gimg.s3_thumbnail_key) : null)
       if (!imageUrl) return NextResponse.json({ error: 'Gallery image has no usable URL' }, { status: 400 })
 
       try {

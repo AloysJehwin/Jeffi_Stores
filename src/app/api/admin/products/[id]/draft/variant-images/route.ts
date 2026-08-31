@@ -89,13 +89,13 @@ export async function POST(request: NextRequest, { params }: Params) {
       if (!parsedJson.ok) return parsedJson.response
       const gimg = await queryOne<any>(`SELECT * FROM gallery_images WHERE id = $1`, [parsedJson.data.gallery_image_id])
       if (!gimg) return NextResponse.json({ error: 'Gallery image not found' }, { status: 404 })
-      const imageUrl = gimg.image_url || (gimg.s3_key ? getS3Url(gimg.s3_key) : null)
+      const imageUrl = gimg.image_url || (gimg.s3_key ? await getS3Url(gimg.s3_key) : null)
       if (!imageUrl) return NextResponse.json({ error: 'Gallery image has no usable URL' }, { status: 400 })
       staged = {
         id: `draft-vi-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         variant_id: variantId,
         image_url: imageUrl,
-        thumbnail_url: gimg.thumbnail_url || (gimg.s3_thumbnail_key ? getS3Url(gimg.s3_thumbnail_key) : null),
+        thumbnail_url: gimg.thumbnail_url || (gimg.s3_thumbnail_key ? await getS3Url(gimg.s3_thumbnail_key) : null),
         s3_bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
         s3_key: gimg.s3_key, s3_thumbnail_key: gimg.s3_thumbnail_key,
         file_name: gimg.custom_name || gimg.file_name, file_size: gimg.file_size, mime_type: gimg.mime_type,

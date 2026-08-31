@@ -9,11 +9,11 @@ const TEMPLATES = [
     label: 'Processing Delay',
     subject: 'Update on Your Order #{order_number}',
     body: `<p>Dear {customer_first_name},</p>
-<p>Thank you for your order with Jeffi Stores.</p>
+<p>Thank you for your order with {store_name}.</p>
 <p>We wanted to let you know that your order <strong>#{order_number}</strong> is currently in the final stages of processing. Our team is ensuring everything is packed perfectly before it heads your way.</p>
 <p>We expect your order to be dispatched within the next 1–2 business days. You'll receive a shipping confirmation with tracking details as soon as it's on the way.</p>
 <p>We sincerely appreciate your patience and look forward to getting your order to you soon.</p>
-<p>Warm regards,<br>Team Jeffi Stores</p>`,
+<p>Warm regards,<br>Team {store_name}</p>`,
   },
   {
     id: 'delay_shipping',
@@ -24,34 +24,34 @@ const TEMPLATES = [
 <p>Due to some logistical factors outside our control, there has been a slight delay in the delivery timeline. We sincerely apologise for any inconvenience this may have caused.</p>
 <p>Your order is still on its way and we expect it to reach you soon. We'll keep you updated and notify you as soon as there's any further progress.</p>
 <p>Thank you so much for your understanding — it truly means a lot to us.</p>
-<p>Warm regards,<br>Team Jeffi Stores</p>`,
+<p>Warm regards,<br>Team {store_name}</p>`,
   },
   {
     id: 'out_of_stock',
     label: 'Item Unavailable',
     subject: 'Important Update About Your Order #{order_number}',
     body: `<p>Dear {customer_first_name},</p>
-<p>Thank you for choosing Jeffi Stores. We're reaching out regarding your order <strong>#{order_number}</strong>.</p>
+<p>Thank you for choosing {store_name}. We're reaching out regarding your order <strong>#{order_number}</strong>.</p>
 <p>Unfortunately, one of the items in your order has become temporarily unavailable due to higher-than-expected demand. We completely understand how frustrating this can be and we are truly sorry for the inconvenience.</p>
 <p>Our team is actively working to source the item at the earliest. We will reach out to you as soon as it is available. In the meantime, if you'd prefer a full refund or would like to explore alternative options, please don't hesitate to reply to this email or contact our support team.</p>
 <p>We value your trust in us and will do our best to make this right.</p>
-<p>Warm regards,<br>Team Jeffi Stores</p>`,
+<p>Warm regards,<br>Team {store_name}</p>`,
   },
   {
     id: 'quality_check',
     label: 'Quality Check Hold',
     subject: 'Brief Hold on Your Order #{order_number}',
     body: `<p>Dear {customer_first_name},</p>
-<p>We appreciate your order with Jeffi Stores.</p>
+<p>We appreciate your order with {store_name}.</p>
 <p>We wanted to inform you that your order <strong>#{order_number}</strong> is currently undergoing our quality verification process. This is a standard check we carry out to ensure that every product we send meets our quality standards.</p>
 <p>This should be resolved within 24 hours and your order will be dispatched promptly thereafter. We'll notify you as soon as it's on the way.</p>
 <p>Thank you for your patience and continued trust in us.</p>
-<p>Warm regards,<br>Team Jeffi Stores</p>`,
+<p>Warm regards,<br>Team {store_name}</p>`,
   },
   {
     id: 'custom',
     label: 'Custom Message',
-    subject: 'Message from Jeffi Stores',
+    subject: 'Message from {store_name}',
     body: '',
   },
 ]

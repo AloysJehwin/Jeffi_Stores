@@ -21,7 +21,7 @@ const mockQueryOne = vi.mocked(queryOne)
 const mockQueryMany = vi.mocked(queryMany)
 
 const superAdmin = {
-  adminId: 'a1', username: 'admin', role: 'super_admin', scopes: [],
+  adminId: 'a1', username: 'admin', role: 'administrator', scopes: [],
 }
 const regularAdmin = {
   adminId: 'a2', username: 'staff', role: 'admin', scopes: ['gst'],

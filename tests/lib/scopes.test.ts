@@ -257,10 +257,17 @@ describe('getScopeForPath', () => {
 // hasScope
 // ---------------------------------------------------------------------------
 describe('hasScope', () => {
-  it('super_admin always has access regardless of scopes array', () => {
-    expect(hasScope('super_admin', [], 'products:read')).toBe(true)
-    expect(hasScope('super_admin', [], 'settings:read')).toBe(true)
-    expect(hasScope('super_admin', ['orders:read'], 'products:read')).toBe(true)
+  it('administrator always has access regardless of scopes array', () => {
+    expect(hasScope('administrator', [], 'products:read')).toBe(true)
+    expect(hasScope('administrator', [], 'settings:read')).toBe(true)
+    expect(hasScope('administrator', ['orders:read'], 'products:read')).toBe(true)
+  })
+
+  it('super_admin is held to its scopes — a tenant owner is super_admin', () => {
+    // The blanket bypass let every tenant owner past its plan entitlement.
+    expect(hasScope('super_admin', [], 'products:read')).toBe(false)
+    expect(hasScope('super_admin', ['orders:read'], 'products:read')).toBe(false)
+    expect(hasScope('super_admin', ['products:read'], 'products:read')).toBe(true)
   })
 
   it('non-super_admin grants access when scope is in the list', () => {

@@ -65,3 +65,21 @@ export function adminMailFrom(): string {
   const addr = process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`
   return `"${platformBrandName()}" <${addr}>`
 }
+
+/**
+ * The store's own name and web address for customer-facing output (SMS, WhatsApp, PDFs).
+ * Prefers the store's configured identity, so a tenant that set a business name gets it.
+ * Imported lazily to keep this module free of a site-controls → db import cycle.
+ */
+export async function storeSignature(): Promise<{ name: string; web: string }> {
+  try {
+    const { getStoreIdentity } = await import('./site-controls')
+    const id = await getStoreIdentity()
+    return {
+      name: id.name?.trim() || currentBrandName(),
+      web: id.web?.trim() || PLATFORM_DOMAIN,
+    }
+  } catch {
+    return { name: currentBrandName(), web: PLATFORM_DOMAIN }
+  }
+}

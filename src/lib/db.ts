@@ -190,8 +190,8 @@ async function getRequestAdminId(): Promise<string | null> {
   const local = getCurrentAuditAdminId()
   if (local) return local
   try {
-    const { cookies } = await import('next/headers')
-    const sid = (await cookies()).get('admin_sid')?.value
+    const { readAdminSid } = await import('./admin-cookie')
+    const sid = await readAdminSid()
     if (!sid) return null
     // Cookie value is the opaque session id. Dynamic import avoids a db.ts ↔ auth-sessions
     // circular import at module load.

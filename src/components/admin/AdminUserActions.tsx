@@ -25,10 +25,12 @@ export default function AdminUserActions({
   admin,
   currentAdminId,
   onUpdate,
+  allowedScopeKeys,
 }: {
   admin: AdminUser
   currentAdminId: string
   onUpdate?: () => void
+  allowedScopeKeys?: string[]
 }) {
   const [editing, setEditing] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -311,7 +313,7 @@ export default function AdminUserActions({
                     {allSelected ? 'Deselect all' : 'Select all'}
                   </button>
                 </div>
-                <ScopeGrid selected={scopes} onToggle={toggleScope} variant="button" />
+                <ScopeGrid selected={scopes} onToggle={toggleScope} variant="button" allowedKeys={allowedScopeKeys} />
               </div>
 
               {error && (

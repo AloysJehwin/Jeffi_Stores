@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { hasScope, getScopeForPath } from './scopes'
 import { resolveSession, type SessionSignals } from './auth-sessions'
 import { extractSessionSignals } from './session-signals-request'
+import { adminCookieNameForHost } from './admin-cookie'
 
 // OPAQUE SESSIONS: the auth cookie value is the session id (a uuid), NOT a JWT.
 // authenticate*/verify* read the cookie and resolveSession() it (Postgres) — the single
@@ -29,6 +30,7 @@ export interface JWTPayload {
   role: string
   scopes: string[]
   authCertCN?: string
+  tenantId?: string | null
   [key: string]: any
 }
 
@@ -84,6 +86,7 @@ export async function verifyToken(token: string, current?: string | null | Sessi
     authCertCN: s.certCN || undefined,
     sid: s.sid,
     displayName: s.displayName || undefined,
+    tenantId: s.tenantId,
   }
 }
 
@@ -161,7 +164,8 @@ export async function requireAdminScope(
 }
 
 export async function authenticateAdmin(request: NextRequest): Promise<AdminJWTPayload | null> {
-  const sid = getTokenFromRequest(request, 'admin_sid')
+  const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || ''
+  const sid = getTokenFromRequest(request, adminCookieNameForHost(host))
   if (!sid) return null
   const s = await resolveSession(sid, extractSessionSignals(request))
   if (!s || s.principalType !== 'admin') {

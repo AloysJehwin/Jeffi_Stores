@@ -1,6 +1,6 @@
 'use client'
 
-import { ADMIN_SCOPES } from '@/lib/scopes'
+import { ADMIN_SCOPES, assignableScopes, type ScopeDefinition } from '@/lib/scopes'
 
 interface Props {
   selected: string[]
@@ -8,11 +8,14 @@ interface Props {
   onSelectAll?: () => void
   onClearAll?: () => void
   variant?: 'card' | 'button'
+  includePlatformScopes?: boolean
+  /** Plan entitlement — omit on the platform, where every scope is sellable. */
+  allowedKeys?: string[]
 }
 
-function buildScopeGrid() {
+function buildScopeGrid(SCOPES: ScopeDefinition[]) {
   const byBase: Record<string, { read?: typeof ADMIN_SCOPES[0]; write?: typeof ADMIN_SCOPES[0] }> = {}
-  for (const s of ADMIN_SCOPES) {
+  for (const s of SCOPES) {
     const base = s.key.replace(/:read$|:write$/, '')
     byBase[base] = byBase[base] || {}
     if (s.key.endsWith(':read')) byBase[base].read = s
@@ -29,10 +32,11 @@ function buildScopeGrid() {
   return groups
 }
 
-const SCOPE_GRID = buildScopeGrid()
 const GROUP_ORDER = ['Dashboard', 'Catalogue', 'Sales', 'Fulfilment', 'Finance', 'Marketing', 'AI', 'Business', 'Settings', 'General']
 
-export default function ScopeGrid({ selected, onToggle, onSelectAll, onClearAll }: Props) {
+export default function ScopeGrid({ selected, onToggle, onSelectAll, onClearAll, includePlatformScopes = false, allowedKeys }: Props) {
+  const base = assignableScopes(includePlatformScopes)
+  const SCOPE_GRID = buildScopeGrid(allowedKeys ? base.filter(s => allowedKeys.includes(s.key)) : base)
   const orderedGroups = GROUP_ORDER.filter(g => SCOPE_GRID[g])
 
   return (

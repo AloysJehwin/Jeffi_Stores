@@ -4,6 +4,8 @@ export interface ScopeDefinition {
   description: string
   routes: string[]
   group?: string
+  /** SaaS control plane — meaningful only on the platform's own admin, never in a tenant. */
+  platformOnly?: boolean
 }
 
 export const ADMIN_SCOPES: ScopeDefinition[] = [
@@ -541,6 +543,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     description: 'View SaaS tenant stores, plans and status',
     routes: ['/admin/ecom/customers'],
     group: 'Ecom Store',
+    platformOnly: true,
   },
   {
     key: 'ecom_customers:write',
@@ -548,6 +551,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     description: 'Manage SaaS tenants: suspend, resume, terminate, change plan',
     routes: ['/admin/ecom/customers'],
     group: 'Ecom Store',
+    platformOnly: true,
   },
   {
     key: 'ecom_instances:read',
@@ -555,6 +559,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     description: 'View per-tenant EC2/RDS/nginx/CDN/cert infrastructure status',
     routes: ['/admin/ecom/instances'],
     group: 'Ecom Store',
+    platformOnly: true,
   },
   {
     key: 'ecom_billing:read',
@@ -562,6 +567,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     description: 'View tenant subscriptions, settlement ledger and payouts',
     routes: ['/admin/ecom/billing'],
     group: 'Ecom Store',
+    platformOnly: true,
   },
   {
     key: 'ecom_billing:write',
@@ -569,10 +575,19 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     description: 'Manage tenant subscriptions, adjust settlements and trigger payouts',
     routes: ['/admin/ecom/billing'],
     group: 'Ecom Store',
+    platformOnly: true,
   },
 ]
 
 export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
+
+/** Scopes a tenant admin may hold. Granting a tenant the control-plane scopes is meaningless
+ *  at best — the routes they gate are 404 on a tenant host — and misleading in the team UI. */
+export const TENANT_SCOPE_KEYS = ADMIN_SCOPES.filter(s => !s.platformOnly).map(s => s.key)
+
+export function assignableScopes(includePlatform: boolean): ScopeDefinition[] {
+  return includePlatform ? ADMIN_SCOPES : ADMIN_SCOPES.filter(s => !s.platformOnly)
+}
 
 export const SUPER_ROLES = ['administrator', 'super_admin'] as const
 
@@ -677,7 +692,9 @@ const LEGACY_SCOPE_PARENTS: Record<string, string> = {
 }
 
 export function hasScope(role: string, scopes: string[], requiredScope: string): boolean {
-  if (isPlatformOwner(role)) return true
+  // Only the platform operator short-circuits. A tenant owner is also 'super_admin', so the
+  // wider isPlatformOwner() check let every tenant past its plan entitlement entirely.
+  if (isPlatformAdmin(role)) return true
   if (scopes.includes(requiredScope)) return true
   // write implies read for all namespaced scopes (e.g. products:write grants products:read)
   if (requiredScope.endsWith(':read')) {

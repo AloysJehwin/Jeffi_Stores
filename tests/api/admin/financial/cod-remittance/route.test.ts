@@ -9,7 +9,7 @@ import { GET, POST } from '@/app/api/admin/financial/cod-remittance/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryMany, query } from '@/lib/db'
 
-const ADMIN = { adminId: 'a1', role: 'super_admin', scopes: ['finance'] }
+const ADMIN = { adminId: 'a1', role: 'administrator', scopes: ['finance'] }
 
 const ORDERS = [
   { id: 'o1', order_number: '1001', customer_name: 'Alice', payment_status: 'cod_collected', delivered_at: '2024-06-03T10:00:00Z', total_amount: '500' },

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { JWT_MAX_AGE_S } from '@/lib/jwt'
 import { createSession, type SessionSignals } from '@/lib/auth-sessions'
-import { cookieDomainOption } from '@/lib/cookie-domain'
+import { adminCookieName, adminCookieDomain } from '@/lib/admin-cookie'
 import { resolveRequestTenantId } from '@/lib/request-tenant'
 
 export interface AdminSessionAdmin {
@@ -44,13 +44,13 @@ export async function issueAdminSession(
     admin: { name: displayName, email: admin.email || undefined, role: admin.role },
     ...(extraBody || {}),
   })
-  response.cookies.set('admin_sid', sid, {
+  response.cookies.set(await adminCookieName(), sid, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
     sameSite: 'strict',
     maxAge: JWT_MAX_AGE_S,
     path: '/',
-    ...cookieDomainOption(),
+    ...(await adminCookieDomain()),
   })
   return response
 }
