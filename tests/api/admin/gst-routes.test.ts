@@ -17,7 +17,7 @@ const mockAuth = vi.mocked(authenticateAdmin)
 const mockQueryMany = vi.mocked(queryMany)
 const mockQueryOne = vi.mocked(queryOne)
 
-const SUPER_ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: [] }
+const SUPER_ADMIN = { adminId: 'admin-1', role: 'administrator', scopes: [] }
 
 function makeReq(url: string) {
   return new NextRequest(new Request(url))

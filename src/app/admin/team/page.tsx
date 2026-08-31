@@ -66,9 +66,18 @@ export default async function TeamPage() {
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
   const host = await getHost()
-  // Control-plane scopes belong to the platform operator alone and are never assigned to a
-  // team member, so they are not listed here on any host.
-  const visibleScopes = assignableScopes(false)
+  // Control-plane scopes belong to the platform operator alone. On a tenant the list narrows
+  // again to what its plan actually sells, so nobody is offered a scope the gate would refuse.
+  const tenantId = headersList.get('x-tenant-id')
+  let visibleScopes = assignableScopes(false)
+  let planSlug: string | null = null
+  if (tenantId) {
+    const { getTenantPlan } = await import('@/lib/plan-gate')
+    const { plan, scopes } = await getTenantPlan(tenantId)
+    planSlug = plan
+    if (scopes.size > 0) visibleScopes = visibleScopes.filter(s => scopes.has(s.key))
+  }
+  const allowedScopeKeys = tenantId ? visibleScopes.map(s => s.key) : undefined
   const adminInfo = await getAdminInfo(adminId)
   if (!isPlatformOwner(adminInfo?.role || '')) redirect(ap('/admin/settings', host))
 
@@ -95,7 +104,7 @@ export default async function TeamPage() {
           <p className="text-xs text-foreground-muted mt-0.5">Generate credentials and a client certificate for a new admin user</p>
         </div>
         <div className="p-5">
-          <CreateAdminForm />
+          <CreateAdminForm allowedScopeKeys={allowedScopeKeys} />
         </div>
       </section>
       </div>
@@ -164,7 +173,7 @@ export default async function TeamPage() {
                 </div>
 
                 <div className="pt-0.5">
-                  <AdminUserActions admin={admin} currentAdminId={adminInfo.id} />
+                  <AdminUserActions admin={admin} currentAdminId={adminInfo.id} allowedScopeKeys={allowedScopeKeys} />
                 </div>
               </div>
             )
@@ -258,7 +267,7 @@ export default async function TeamPage() {
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end">
-                        <AdminUserActions admin={admin} currentAdminId={adminInfo.id} />
+                        <AdminUserActions admin={admin} currentAdminId={adminInfo.id} allowedScopeKeys={allowedScopeKeys} />
                       </div>
                     </td>
                   </tr>
@@ -273,7 +282,7 @@ export default async function TeamPage() {
       <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
         <div className="px-5 py-4 border-b border-border-default">
           <h2 className="text-sm font-semibold text-foreground">Available Scopes</h2>
-          <p className="text-xs text-foreground-muted mt-0.5">{visibleScopes.length} scopes — assign these when creating a team member</p>
+          <p className="text-xs text-foreground-muted mt-0.5">{visibleScopes.length} scopes{planSlug ? ` on the ${planSlug} plan` : ''} — assign these when creating a team member</p>
         </div>
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {Array.from(new Set(visibleScopes.map(s => s.group || 'General'))).map(groupName => {
