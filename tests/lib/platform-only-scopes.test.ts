@@ -31,3 +31,16 @@ describe('control-plane scopes belong to the platform operator alone', () => {
     expect(keys).toContain('settings:write')
   })
 })
+
+// Live control plane, 2026-09-01: basic 21, growth 48, pro 66, enterprise 71, and no plan at
+// any tier references a control-plane scope. Enterprise equalling TENANT_SCOPE_KEYS is what
+// makes 71 the ceiling a tenant can hold.
+describe('the plan ladder never exceeds what a tenant may hold', () => {
+  it('caps the top tier at the full tenant scope set', () => {
+    expect(TENANT_SCOPE_KEYS.length).toBe(71)
+  })
+
+  it('keeps every control-plane scope out of the tenant set', () => {
+    for (const key of ECOM) expect(TENANT_SCOPE_KEYS).not.toContain(key)
+  })
+})
