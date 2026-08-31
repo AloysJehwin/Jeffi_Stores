@@ -237,7 +237,10 @@ export default function OnboardWizard({ plans, initialDraft }: {
     if (step === 0) return !!planSlug
     if (step === 1) return displayName.trim().length > 0 && effectiveSlug.length >= 3 && productCats.length > 0
     if (step === 2) return bizName.trim().length > 0 && !!bizType && pan.trim().length === 10 && bizAddress.trim().length > 5
-    if (step === 3) return gstNumber.trim().length === 15
+    // Optional: registration is not required below the turnover threshold, and Razorpay does
+    // not need a GSTIN to create a linked account. Forcing it made the one tenant who had none
+    // paste the platform's own GSTIN to get past this step.
+    if (step === 3) return gstNumber.trim().length === 0 || gstNumber.trim().length === 15
     if (step === 4) return true
     if (step === 5) return bankVerified
     if (step === 6) return /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '').slice(-10)) && !!logoS3Key && legalsAccepted
@@ -412,12 +415,12 @@ export default function OnboardWizard({ plans, initialDraft }: {
           {step === 3 && (
             <div className="w-full max-w-xl">
               <h1 className="text-3xl font-bold text-foreground mb-1">GST details</h1>
-              <p className="text-foreground-muted mb-8">Required for compliant invoicing on your store.</p>
+              <p className="text-foreground-muted mb-8">Only if your business is GST-registered. Leave blank if it is not.</p>
               <div className="space-y-5">
                 <div>
-                  <label className={lbl}>GSTIN</label>
-                  <input className={inp} value={gstNumber} onChange={(e) => setGstNumber(e.target.value.toUpperCase())} placeholder="22AAAAA0000A1Z5" maxLength={15} />
-                  <p className="text-xs text-foreground-muted mt-1">15-character GST Identification Number</p>
+                  <label className={lbl}>GSTIN <span className="text-foreground-muted font-normal">(optional)</span></label>
+                  <input className={inp} value={gstNumber} onChange={(e) => setGstNumber(e.target.value.toUpperCase())} placeholder="29AAAAA0000A1Z5" maxLength={15} />
+                  <p className="text-xs text-foreground-muted mt-1">15-character GST Identification Number. Leave blank if you are not registered — never enter another business&apos;s number.</p>
                 </div>
                 <div>
                   <label className={lbl}>GST registration certificate <span className="text-foreground-muted font-normal">(optional — PDF, JPG or PNG, max 5 MB)</span></label>
