@@ -3,10 +3,11 @@ import { verifyToken } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import CatalogEnrichmentClient from './CatalogEnrichmentClient'
 import AccessDenied from '@/components/admin/AccessDenied'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 export default async function CatalogEnrichmentPage() {
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')
+  const token = cookieStore.get(await adminCookieName())
   let role = ''
   let scopes: string[] = []
   try {

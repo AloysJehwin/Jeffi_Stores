@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { renderTextWithLinks } from '@/lib/linkify'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface Message {
   id: string
@@ -27,7 +28,7 @@ const QUICK_REPLIES = [
   {
     category: 'Greeting',
     replies: [
-      'Hello! Thank you for reaching out to Jeffi Stores support. How can I help you today?',
+      'Hello! Thank you for reaching out to {store} support. How can I help you today?',
       'Hi! I\'m here to assist you. Let me look into this for you right away.',
     ],
   },
@@ -59,7 +60,7 @@ const QUICK_REPLIES = [
     category: 'Closing',
     replies: [
       'Is there anything else I can help you with?',
-      'Thank you for contacting Jeffi Stores support. Have a great day!',
+      'Thank you for contacting {store} support. Have a great day!',
       'Your issue has been resolved. Please don\'t hesitate to reach out if you need further assistance.',
     ],
   },
@@ -110,6 +111,8 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
   const [isLoading, setIsLoading] = useState(true)
   const [showQuickReplies, setShowQuickReplies] = useState(false)
   const [activeCategory, setActiveCategory] = useState(QUICK_REPLIES[0].category)
+  const storeName = useStoreConfig().identity.name
+  const withStore = (t: string) => t.replaceAll('{store}', storeName)
   const [isClosingReply, setIsClosingReply] = useState(false)
   const [adminUsername, setAdminUsername] = useState<string>('')
   const [sessionClosed, setSessionClosed] = useState(false)
@@ -188,7 +191,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
   }
 
   async function autoGreet(sessionId: string, username: string) {
-    const greeting = `Hi! I'm ${username} from Jeffi Stores support. How can I help you today?`
+    const greeting = `Hi! I'm ${username} from ${storeName} support. How can I help you today?`
     try {
       const res = await fetch(`/api/admin/support/sessions/${sessionId}/messages`, {
         method: 'POST',
@@ -324,7 +327,7 @@ export default function AdminSupportChat({ customerId, autoOpen = false }: Props
     )
   }
 
-  const activeCategoryReplies = QUICK_REPLIES.find(c => c.category === activeCategory)?.replies ?? []
+  const activeCategoryReplies = (QUICK_REPLIES.find(c => c.category === activeCategory)?.replies ?? []).map(withStore)
 
   return (
     <div className="bg-surface-elevated rounded-xl border border-border-default overflow-hidden">

@@ -13,12 +13,9 @@ export interface TemplateVarContext {
   }
 }
 
-const STORE_DEFAULTS = {
-  name: 'Jeffi Stores',
-  email: 'jeffistoress@gmail.com',
-  phone: '+91 96853 54099',
-  web: 'jeffistores.in',
-}
+// Blank, not the platform's identity: a caller that omits `store` on a tenant would
+// otherwise sign the tenant's mail with the platform's name and contact details.
+const STORE_DEFAULTS = { name: '', email: '', phone: '', web: '' }
 
 export interface TemplateVar {
   key: string

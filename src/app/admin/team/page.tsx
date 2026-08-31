@@ -2,7 +2,7 @@ import { queryOne, queryMany } from '@/lib/db'
 import CreateAdminForm from '@/components/admin/CreateAdminForm'
 import AdminUserActions from '@/components/admin/AdminUserActions'
 import { headers } from 'next/headers'
-import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/scopes'
+import { ADMIN_SCOPES, isPlatformOwner, assignableScopes } from '@/lib/scopes'
 import { redirect } from 'next/navigation'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
@@ -66,6 +66,9 @@ export default async function TeamPage() {
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
   const host = await getHost()
+  // Control-plane scopes belong to the platform operator alone and are never assigned to a
+  // team member, so they are not listed here on any host.
+  const visibleScopes = assignableScopes(false)
   const adminInfo = await getAdminInfo(adminId)
   if (!isPlatformOwner(adminInfo?.role || '')) redirect(ap('/admin/settings', host))
 
@@ -270,11 +273,11 @@ export default async function TeamPage() {
       <section className="bg-surface-elevated rounded-xl border border-border-default shadow-sm">
         <div className="px-5 py-4 border-b border-border-default">
           <h2 className="text-sm font-semibold text-foreground">Available Scopes</h2>
-          <p className="text-xs text-foreground-muted mt-0.5">{ADMIN_SCOPES.length} scopes — assign these when creating a team member</p>
+          <p className="text-xs text-foreground-muted mt-0.5">{visibleScopes.length} scopes — assign these when creating a team member</p>
         </div>
         <div className="p-5 grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {Array.from(new Set(ADMIN_SCOPES.map(s => s.group || 'General'))).map(groupName => {
-            const groupScopes = ADMIN_SCOPES.filter(s => (s.group || 'General') === groupName)
+          {Array.from(new Set(visibleScopes.map(s => s.group || 'General'))).map(groupName => {
+            const groupScopes = visibleScopes.filter(s => (s.group || 'General') === groupName)
             return (
               <div key={groupName} className="bg-surface rounded-lg border border-border-default p-4">
                 <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wider mb-3">{groupName}</p>

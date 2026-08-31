@@ -37,6 +37,9 @@ const EDITABLE_KEYS = [
   // Feature flags
   'feature_razorpay_enabled',
   'feature_gst_enabled',
+  'feature_inventory_validation_enabled',
+  'feature_sms_enabled',
+  'feature_whatsapp_enabled',
   'feature_ondevice_summary_enabled',
   'feature_ondevice_finetune_enabled',
   'feature_ondevice_summary_mobile_enabled',

@@ -6,8 +6,8 @@ import { getS3Url } from '@/lib/s3'
 // Resolve a gallery image URL. Prefer the S3 key (which getS3Url prefixes with the
 // current env's S3_KEY_PREFIX, e.g. dev/) so dev + prod URLs match where the object
 // physically lives; fall back to the stored absolute URL when no key is present.
-function galleryImageUrl(s3Key: string | null, fallback: string | null): string | null {
-  if (s3Key) return getS3Url(s3Key)
+async function galleryImageUrl(s3Key: string | null, fallback: string | null): Promise<string | null> {
+  if (s3Key) return await getS3Url(s3Key)
   return fallback
 }
 
@@ -44,11 +44,11 @@ export async function GET(request: NextRequest) {
     filterParams
   )
 
-  const normalized = (images || []).map((img: any) => ({
+  const normalized = await Promise.all((images || []).map(async (img: any) => ({
     ...img,
-    image_url: galleryImageUrl(img.s3_key, img.image_url),
-    thumbnail_url: galleryImageUrl(img.s3_thumbnail_key, img.thumbnail_url),
-  }))
+    image_url: await galleryImageUrl(img.s3_key, img.image_url),
+    thumbnail_url: await galleryImageUrl(img.s3_thumbnail_key, img.thumbnail_url),
+  })))
 
   return NextResponse.json({ images: normalized, total: parseInt(countRow?.total || '0'), page, limit })
 }

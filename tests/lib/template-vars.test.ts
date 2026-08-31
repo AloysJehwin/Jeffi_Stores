@@ -25,10 +25,12 @@ describe('buildVarMap', () => {
     expect(map.customer_name).toBe('Jones')
   })
 
-  it('uses store defaults when no store context given', () => {
+  it('leaves store fields blank when no store context is given', () => {
+    // Never the platform's identity: a tenant caller that omits `store` would otherwise
+    // sign its mail with the platform's name and contact details.
     const map = buildVarMap({ recipient: { email: 'x@y.com' } })
-    expect(map.store_name).toBe('Jeffi Stores')
-    expect(map.store_email).toBe('jeffistoress@gmail.com')
+    expect(map.store_name).toBe('')
+    expect(map.store_email).toBe('')
   })
 
   it('overrides store fields when store context provided', () => {
@@ -38,8 +40,7 @@ describe('buildVarMap', () => {
     })
     expect(map.store_name).toBe('My Shop')
     expect(map.store_email).toBe('shop@test.com')
-    // non-overridden fields stay as defaults
-    expect(map.store_phone).toBe('+91 96853 54099')
+    expect(map.store_phone).toBe('')
   })
 
   it('includes current_year as a 4-digit string', () => {

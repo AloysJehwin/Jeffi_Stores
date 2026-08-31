@@ -5,13 +5,14 @@ import { hasScope } from '@/lib/scopes'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import CashSaleClient from './CashSaleClient'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 export const metadata = { title: 'Cash Sale — Jeffi Admin' }
 
 export default async function CashSalePage() {
   const host = await getHost()
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')
+  const token = cookieStore.get(await adminCookieName())
   if (!token) redirect(ap('/admin/login', host))
 
   let session: any = null

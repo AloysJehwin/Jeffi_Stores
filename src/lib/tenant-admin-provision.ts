@@ -3,7 +3,7 @@ import { issueTenantAdminCert } from './tenant-ca'
 import { sendAdminCertificateEmail } from './email'
 import { runWithTenantContext } from './tenant-context'
 import { query, queryOne } from './db'
-import { ALL_SCOPE_KEYS } from './scopes'
+import { TENANT_SCOPE_KEYS } from './scopes'
 import type { TenantContext } from './tenant-context'
 
 /**
@@ -74,7 +74,7 @@ export async function provisionTenantOwnerAdmin(opts: {
          ON CONFLICT (user_id) DO UPDATE
            SET role='super_admin', scopes=$2::jsonb, is_active=true
          RETURNING id`,
-        [userId, JSON.stringify(ALL_SCOPE_KEYS)]
+        [userId, JSON.stringify(TENANT_SCOPE_KEYS)]
       )
       const adminId = adminRow!.id
 

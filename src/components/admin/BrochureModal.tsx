@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Toggle from '@/components/ui/Toggle'
 import CopySku from '@/components/ui/CopySku'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 type Mode = 'category' | 'brand'
 
@@ -549,6 +550,7 @@ function Thumb({ url, size, radius = 4 }: { url: string | null; size: number; ra
 
 /** Cover preview card (page 1) — mirrors the PDF's advertising cover. */
 function CoverPreviewCard({ title, promo }: { title: string; promo: string }) {
+  const storeName = useStoreConfig().identity.name
   return (
     <div
       className="rounded-sm overflow-hidden shadow-sm flex flex-col items-center justify-center text-center px-4"
@@ -557,7 +559,7 @@ function CoverPreviewCard({ title, promo }: { title: string; promo: string }) {
       <div className="w-10 h-10 rounded-full bg-white/90 grid place-items-center mb-2">
         <span className="text-[#3d6b00] font-black text-sm">JS</span>
       </div>
-      <div className="text-white font-extrabold text-sm uppercase leading-tight">Jeffi Stores</div>
+      <div className="text-white font-extrabold text-sm uppercase leading-tight">{storeName}</div>
       <div className="w-8 border-t border-[#d4edaa] my-1.5" />
       <div className="text-white font-bold text-[11px] leading-tight">{title}</div>
       {promo && <div className="text-[#eaffd0] italic text-[8px] mt-1 leading-tight">{promo}</div>}
@@ -568,10 +570,11 @@ function CoverPreviewCard({ title, promo }: { title: string; promo: string }) {
 
 /** Index preview card (page 2) — families → page numbers. */
 function IndexPreviewCard({ families }: { families: { name: string; page: number }[] }) {
+  const storeName = useStoreConfig().identity.name
   return (
     <div className="bg-white dark:bg-zinc-900 shadow-sm rounded-sm overflow-hidden" style={{ aspectRatio: `1 / ${A4_RATIO}` }}>
       <div className="bg-[#3d6b00] text-white px-3 py-2 flex items-center justify-between">
-        <div className="text-[11px] font-bold uppercase truncate">Jeffi Stores</div>
+        <div className="text-[11px] font-bold uppercase truncate">{storeName}</div>
         <div className="text-[8px] opacity-90 uppercase tracking-wide">Index</div>
       </div>
       <div className="p-3">
@@ -597,13 +600,14 @@ function IndexPreviewCard({ families }: { families: { name: string; page: number
 function PreviewPageCard({
   page, pageNum, totalPages, title, showPrices,
 }: { page: PreviewPage; pageNum: number; totalPages: number; title: string; showPrices: boolean }) {
+  const storeName = useStoreConfig().identity.name
   const heading = page.kind === 'matrix' ? 'Featured Products' : (pageNum === 1 ? 'Products' : 'More Products')
   return (
     <div className="bg-white dark:bg-zinc-900 shadow-sm rounded-sm overflow-hidden" style={{ aspectRatio: `1 / ${A4_RATIO}` }}>
       {/* header */}
       <div className="bg-[#3d6b00] text-white px-3 py-2 flex items-start justify-between">
         <div className="min-w-0">
-          <div className="text-[11px] font-bold uppercase leading-tight truncate">Jeffi Stores</div>
+          <div className="text-[11px] font-bold uppercase leading-tight truncate">{storeName}</div>
           <div className="text-[8px] opacity-80 truncate">{title}</div>
         </div>
         <div className="text-[8px] opacity-90 uppercase tracking-wide shrink-0 pl-2 pt-0.5">{heading}</div>
@@ -666,7 +670,7 @@ function PreviewPageCard({
       {/* footer */}
       <div className="border-t border-[#7cb900] mx-2 mt-1" />
       <div className="px-2 py-1 flex items-center justify-between text-[6px] text-gray-500">
-        <span className="truncate">Jeffi Stores</span>
+        <span className="truncate">{storeName}</span>
         <span className="shrink-0">Page {pageNum} of {totalPages}</span>
       </div>
     </div>

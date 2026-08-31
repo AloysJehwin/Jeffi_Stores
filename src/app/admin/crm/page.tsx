@@ -13,6 +13,7 @@ import RecentSignupsCard from './RecentSignupsCard'
 import SegmentsCard from './SegmentsCard'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,7 +21,7 @@ export const dynamic = 'force-dynamic'
 export default async function CrmDashboardPage() {
   const host = await getHost()
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')?.value
+  const token = cookieStore.get(await adminCookieName())?.value
   let adminId = ''
   if (token) {
     try { adminId = (await verifyToken(token))?.adminId || '' } catch {}
