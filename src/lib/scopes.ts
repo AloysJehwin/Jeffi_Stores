@@ -692,7 +692,9 @@ const LEGACY_SCOPE_PARENTS: Record<string, string> = {
 }
 
 export function hasScope(role: string, scopes: string[], requiredScope: string): boolean {
-  if (isPlatformOwner(role)) return true
+  // Only the platform operator short-circuits. A tenant owner is also 'super_admin', so the
+  // wider isPlatformOwner() check let every tenant past its plan entitlement entirely.
+  if (isPlatformAdmin(role)) return true
   if (scopes.includes(requiredScope)) return true
   // write implies read for all namespaced scopes (e.g. products:write grants products:read)
   if (requiredScope.endsWith(':read')) {

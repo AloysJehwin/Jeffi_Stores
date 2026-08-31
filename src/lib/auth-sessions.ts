@@ -279,6 +279,26 @@ export async function createSession(args: {
 // is REVOKED and null returned. On success, throttled fire-and-forget last_seen_at touch (never
 // awaited). email/displayName joined fresh: admins.user_id → users for admin; principal_id → users
 // for customer/business.
+/**
+ * A tenant admin may hold more scopes than its plan sells — provisioning grants a fixed set,
+ * and a plan change must take effect without re-provisioning. Intersecting here means every
+ * consumer (middleware, authenticateAdmin, server components) sees the entitled set.
+ *
+ * Fails open on lookup error or an empty plan: locking a paying customer out of their own
+ * store over a control-plane blip is worse than briefly over-granting.
+ */
+async function effectiveScopes(tenantId: string | null, granted: string[]): Promise<string[]> {
+  if (!tenantId || granted.length === 0) return granted
+  try {
+    const { getTenantPlan } = await import('./plan-gate')
+    const { scopes } = await getTenantPlan(tenantId)
+    if (scopes.size === 0) return granted
+    return granted.filter(s => scopes.has(s))
+  } catch {
+    return granted
+  }
+}
+
 export async function resolveSession(sid: string, current?: string | null | SessionSignals): Promise<ResolvedSession | null> {
   if (!sid) return null
   // Route the lookup by cookie shape (cheap, pre-DB): token → token_hash; legacy uuid → id.
@@ -346,12 +366,13 @@ export async function resolveSession(sid: string, current?: string | null | Sess
   }
 
   const displayName = `${row.first_name || ''} ${row.last_name || ''}`.trim() || null
+  const granted: string[] = Array.isArray(row.scopes) ? row.scopes : []
   return {
     sid,
     principalType: row.principal_type,
     principalId: row.principal_id,
     role: row.role,
-    scopes: Array.isArray(row.scopes) ? row.scopes : [],
+    scopes: await effectiveScopes(row.tenant_id, granted),
     certCN: row.cert_cn,
     approvalStatus: row.approval_status,
     tenantId: row.tenant_id,

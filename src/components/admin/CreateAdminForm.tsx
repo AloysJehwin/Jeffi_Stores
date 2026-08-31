@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { ADMIN_SCOPES } from '@/lib/scopes'
 import ScopeGrid from '@/components/admin/ScopeGrid'
 
-export default function CreateAdminForm({ onCreated }: { onCreated?: () => void }) {
+export default function CreateAdminForm({ onCreated, allowedScopeKeys }: { onCreated?: () => void; allowedScopeKeys?: string[] }) {
   const [isOpen, setIsOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -37,7 +37,7 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
   function selectAllScopes() {
     setForm(prev => ({
       ...prev,
-      scopes: ADMIN_SCOPES.map(s => s.key),
+      scopes: allowedScopeKeys ?? ADMIN_SCOPES.map(s => s.key),
     }))
   }
 
@@ -237,7 +237,7 @@ export default function CreateAdminForm({ onCreated }: { onCreated?: () => void 
 
       <div>
         <label className="block text-sm font-medium text-foreground-secondary mb-2">Scopes</label>
-        <ScopeGrid selected={form.scopes} onToggle={toggleScope} onSelectAll={selectAllScopes} onClearAll={clearAllScopes} />
+        <ScopeGrid selected={form.scopes} onToggle={toggleScope} onSelectAll={selectAllScopes} onClearAll={clearAllScopes} allowedKeys={allowedScopeKeys} />
       </div>
 
       <div className="flex gap-3 pt-2">

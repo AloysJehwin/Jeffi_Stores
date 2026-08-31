@@ -9,6 +9,8 @@ interface Props {
   onClearAll?: () => void
   variant?: 'card' | 'button'
   includePlatformScopes?: boolean
+  /** Plan entitlement — omit on the platform, where every scope is sellable. */
+  allowedKeys?: string[]
 }
 
 function buildScopeGrid(SCOPES: ScopeDefinition[]) {
@@ -32,8 +34,9 @@ function buildScopeGrid(SCOPES: ScopeDefinition[]) {
 
 const GROUP_ORDER = ['Dashboard', 'Catalogue', 'Sales', 'Fulfilment', 'Finance', 'Marketing', 'AI', 'Business', 'Settings', 'General']
 
-export default function ScopeGrid({ selected, onToggle, onSelectAll, onClearAll, includePlatformScopes = false }: Props) {
-  const SCOPE_GRID = buildScopeGrid(assignableScopes(includePlatformScopes))
+export default function ScopeGrid({ selected, onToggle, onSelectAll, onClearAll, includePlatformScopes = false, allowedKeys }: Props) {
+  const base = assignableScopes(includePlatformScopes)
+  const SCOPE_GRID = buildScopeGrid(allowedKeys ? base.filter(s => allowedKeys.includes(s.key)) : base)
   const orderedGroups = GROUP_ORDER.filter(g => SCOPE_GRID[g])
 
   return (
