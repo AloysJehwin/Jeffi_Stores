@@ -133,6 +133,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       // no linked account, no stakeholder and no settlement bank in Route.
       const reason = err?.error?.description ?? err?.message ?? 'unknown error'
       process.stderr.write(`[route] linked account creation failed for ${tenantId}: ${reason}\n`)
+      // Persist it: stderr does not survive the next deploy, and this failure was diagnosed
+      // days later only by reconstructing the payload by hand.
+      try {
+        const { recordTenantStepEvent } = await import('@/lib/tenant-registry')
+        await recordTenantStepEvent(tenantId, 'razorpay_linked_account', 'error', reason, {
+          code: err?.error?.code ?? null,
+          field: err?.error?.field ?? null,
+          step: err?.error?.step ?? null,
+          businessType: kyc.business_type ?? null,
+        })
+      } catch { /* never mask the original failure */ }
       try {
         const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
         await alertProvisioningFailure(tenant.slug, 'razorpay_linked_account', reason, tenantId)
