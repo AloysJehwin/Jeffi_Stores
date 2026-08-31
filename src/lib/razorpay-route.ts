@@ -187,13 +187,16 @@ export async function createLinkedAccount(input: LinkedAccountInput): Promise<st
  */
 export async function createRouteStakeholder(
   accountId: string,
-  { name, pan }: { name: string; pan?: string }
+  { name, email, pan }: { name: string; email: string; pan?: string }
 ): Promise<string> {
   const rz = getRazorpayInstance()
 
   try {
+    // email is mandatory — without it Razorpay answers "The email field is required.",
+    // which the caller swallows, leaving an account with no stakeholder and no settlement.
     const stakeholder = await (rz as any).stakeholders.create(accountId, {
       name,
+      email,
       ...(pan ? { kyc: { pan } } : {}),
     })
     return stakeholder.id as string
@@ -388,10 +391,13 @@ export function mapBusinessType(kycType: string): LinkedAccountInput['businessTy
  * Used when creating the linked account.
  */
 export function inferProfileCategory(productCategories: string | null): { category: string; subcategory: string } {
+  // Subcategories are validated against the category. 'electronics', 'pharmacy' and
+  // 'e_commerce' are not members of 'ecommerce' and were rejected with
+  // "Invalid business subcategory for business category: ecommerce".
   const cats = (productCategories ?? '').toLowerCase()
-  if (cats.includes('electronics') || cats.includes('gadget')) return { category: 'ecommerce', subcategory: 'electronics' }
+  if (cats.includes('electronics') || cats.includes('gadget')) return { category: 'ecommerce', subcategory: 'electronics_and_furniture' }
   if (cats.includes('fashion') || cats.includes('apparel')) return { category: 'ecommerce', subcategory: 'fashion_and_lifestyle' }
   if (cats.includes('food') || cats.includes('groceri')) return { category: 'food', subcategory: 'online_food_ordering' }
-  if (cats.includes('health') || cats.includes('beauty')) return { category: 'ecommerce', subcategory: 'pharmacy' }
-  return { category: 'ecommerce', subcategory: 'e_commerce' }
+  if (cats.includes('health') || cats.includes('beauty')) return { category: 'healthcare', subcategory: 'pharmacy' }
+  return { category: 'ecommerce', subcategory: 'ecommerce_marketplace' }
 }

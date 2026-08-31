@@ -108,6 +108,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       try {
         await createRouteStakeholder(linkedAccountId, {
           name: kyc.business_name ?? owner.name ?? owner.email,
+          email: owner.email,
           pan: kyc.pan ?? undefined,
         })
       } catch (sErr: any) {
