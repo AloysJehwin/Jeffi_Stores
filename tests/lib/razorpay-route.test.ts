@@ -34,7 +34,7 @@ const baseInput = {
   businessType: 'proprietorship' as const,
   legalBusinessName: 'Acme Traders Pvt',
   profileCategory: 'ecommerce',
-  profileSubcategory: 'e_commerce',
+  profileSubcategory: 'ecommerce_marketplace',
   ownerEmail: 'owner@acme.in',
   ownerPhone: '9876543210',
   ownerName: 'Owner One',
@@ -212,23 +212,23 @@ describe('createRouteStakeholder', () => {
   it('creates a stakeholder and returns its id (with kyc.pan when supplied)', async () => {
     rz.stakeholders.create.mockResolvedValue({ id: 'sth_1' })
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    const id = await createRouteStakeholder('acc_1', { name: 'Owner', pan: 'ABCPD1234E' })
+    const id = await createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test', pan: 'ABCPD1234E' })
     expect(id).toBe('sth_1')
-    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', { name: 'Owner', kyc: { pan: 'ABCPD1234E' } })
+    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', { name: 'Owner', email: 'owner@acme.test', kyc: { pan: 'ABCPD1234E' } })
   })
 
   it('omits kyc when no PAN is given', async () => {
     rz.stakeholders.create.mockResolvedValue({ id: 'sth_2' })
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await createRouteStakeholder('acc_1', { name: 'Owner' })
-    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', { name: 'Owner' })
+    await createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })
+    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', { name: 'Owner', email: 'owner@acme.test' })
   })
 
   it('returns the existing stakeholder when Razorpay says it already exists', async () => {
     rz.stakeholders.create.mockRejectedValue({ error: { description: 'stakeholder already exists' } })
     rz.stakeholders.all.mockResolvedValue({ items: [{ id: 'sth_existing' }] })
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    const id = await createRouteStakeholder('acc_1', { name: 'Owner' })
+    const id = await createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })
     expect(id).toBe('sth_existing')
   })
 
@@ -236,20 +236,20 @@ describe('createRouteStakeholder', () => {
     rz.stakeholders.create.mockRejectedValue({ message: 'already exists' })
     rz.stakeholders.all.mockResolvedValue({ items: [] })
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await expect(createRouteStakeholder('acc_1', { name: 'Owner' })).rejects.toMatchObject({ message: 'already exists' })
+    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toMatchObject({ message: 'already exists' })
   })
 
   it('re-throws the "already exists" error when the list lookup itself fails', async () => {
     rz.stakeholders.create.mockRejectedValue({ message: 'already exists' })
     rz.stakeholders.all.mockRejectedValue(new Error('list boom'))
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await expect(createRouteStakeholder('acc_1', { name: 'Owner' })).rejects.toMatchObject({ message: 'already exists' })
+    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toMatchObject({ message: 'already exists' })
   })
 
   it('re-throws a non-idempotent error unchanged', async () => {
     rz.stakeholders.create.mockRejectedValue(new Error('validation failed'))
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await expect(createRouteStakeholder('acc_1', { name: 'Owner' })).rejects.toThrow('validation failed')
+    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toThrow('validation failed')
     expect(rz.stakeholders.all).not.toHaveBeenCalled()
   })
 })
@@ -439,15 +439,15 @@ describe('mapBusinessType', () => {
 describe('inferProfileCategory', () => {
   it('classifies electronics / fashion / food / health', async () => {
     const { inferProfileCategory } = await import('@/lib/razorpay-route')
-    expect(inferProfileCategory('Electronics & gadgets')).toEqual({ category: 'ecommerce', subcategory: 'electronics' })
+    expect(inferProfileCategory('Electronics & gadgets')).toEqual({ category: 'ecommerce', subcategory: 'electronics_and_furniture' })
     expect(inferProfileCategory('Fashion apparel')).toEqual({ category: 'ecommerce', subcategory: 'fashion_and_lifestyle' })
     expect(inferProfileCategory('Groceries and food')).toEqual({ category: 'food', subcategory: 'online_food_ordering' })
-    expect(inferProfileCategory('Health & beauty')).toEqual({ category: 'ecommerce', subcategory: 'pharmacy' })
+    expect(inferProfileCategory('Health & beauty')).toEqual({ category: 'healthcare', subcategory: 'pharmacy' })
   })
 
   it('defaults to generic e-commerce for null / unrecognised categories', async () => {
     const { inferProfileCategory } = await import('@/lib/razorpay-route')
-    expect(inferProfileCategory(null)).toEqual({ category: 'ecommerce', subcategory: 'e_commerce' })
-    expect(inferProfileCategory('random stuff')).toEqual({ category: 'ecommerce', subcategory: 'e_commerce' })
+    expect(inferProfileCategory(null)).toEqual({ category: 'ecommerce', subcategory: 'ecommerce_marketplace' })
+    expect(inferProfileCategory('random stuff')).toEqual({ category: 'ecommerce', subcategory: 'ecommerce_marketplace' })
   })
 })
