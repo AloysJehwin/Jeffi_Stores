@@ -64,7 +64,7 @@ export function normalizeIndianPhone(raw: string | null | undefined): string | n
 
 export interface LinkedAccountInput {
   businessName: string
-  businessType: 'route_proprietorship' | 'route_partnership' | 'route_private_limited' | 'route_public_limited' | 'route_llp' | 'route_ngo' | 'route_not_yet_registered'
+  businessType: 'proprietorship' | 'partnership' | 'private_limited' | 'public_limited' | 'llp' | 'ngo' | 'not_yet_registered'
   legalBusinessName: string
   businessDescription?: string
   profileCategory: string
@@ -109,13 +109,13 @@ export interface TransferResult {
  * proprietor's personal PAN, and an unregistered business has none at all.
  */
 const COMPANY_PAN_CHARS: Record<LinkedAccountInput['businessType'], string[]> = {
-  route_proprietorship:     [],
-  route_not_yet_registered: [],
-  route_partnership:        ['F'],
-  route_llp:                ['F'],
-  route_private_limited:    ['C'],
-  route_public_limited:     ['C'],
-  route_ngo:                ['T', 'A', 'B'],
+  proprietorship:     [],
+  not_yet_registered: [],
+  partnership:        ['F'],
+  llp:                ['F'],
+  private_limited:    ['C'],
+  public_limited:     ['C'],
+  ngo:                ['T', 'A', 'B'],
 }
 
 const PAN_SHAPE = /^[A-Z]{5}[0-9]{4}[A-Z]$/
@@ -137,6 +137,18 @@ export function isValidCompanyPan(
   return COMPANY_PAN_CHARS[businessType]?.includes(p[3]) ?? false
 }
 
+const GSTIN_SHAPE = /^[0123][0-9][A-Z]{5}[0-9]{4}[A-Z][0-9][A-Z0-9][A-Z0-9]$/i
+
+/** legal_info carries the company PAN and GSTIN. Both are optional; an invalid one is
+ *  omitted rather than sent, because Razorpay rejects the whole create on either. */
+function legalInfo(input: LinkedAccountInput): { legal_info?: { pan?: string; gst?: string } } {
+  const info: { pan?: string; gst?: string } = {}
+  if (isValidCompanyPan(input.pan, input.businessType)) info.pan = input.pan.trim().toUpperCase()
+  const gst = (input.gstNumber ?? '').trim().toUpperCase()
+  if (GSTIN_SHAPE.test(gst)) info.gst = gst
+  return Object.keys(info).length ? { legal_info: info } : {}
+}
+
 export async function createLinkedAccount(input: LinkedAccountInput): Promise<string> {
   const rz = getRazorpayInstance()
 
@@ -151,7 +163,7 @@ export async function createLinkedAccount(input: LinkedAccountInput): Promise<st
           street1: input.streetAddress,
           street2: input.streetAddress2 || 'N/A',
           city: input.city,
-          state: input.state,
+          state: input.state.trim().toUpperCase(),
           postal_code: input.postalCode,
           country: 'IN',
         },
@@ -160,13 +172,7 @@ export async function createLinkedAccount(input: LinkedAccountInput): Promise<st
     type: 'route',
     legal_business_name: input.legalBusinessName,
     business_type: input.businessType,
-    // legal_info.pan is the *company* PAN, and Razorpay rejects the whole create when it does
-    // not match the declared business type. Sent only when the PAN's holder character agrees;
-    // otherwise omitted so provisioning still completes. The PAN always reaches Razorpay on the
-    // stakeholder's kyc.pan regardless.
-    ...(isValidCompanyPan(input.pan, input.businessType)
-      ? { legal_info: { pan: input.pan.trim().toUpperCase() } }
-      : {}),
+    ...legalInfo(input),
     contact_name: input.ownerName,
   })
 
@@ -368,13 +374,13 @@ export async function recordCodSettlement(opts: {
  */
 export function mapBusinessType(kycType: string): LinkedAccountInput['businessType'] {
   const map: Record<string, LinkedAccountInput['businessType']> = {
-    proprietor:  'route_proprietorship',
-    partnership: 'route_partnership',
-    pvt_ltd:     'route_private_limited',
-    llp:         'route_llp',
-    other:       'route_not_yet_registered',
+    proprietor:  'proprietorship',
+    partnership: 'partnership',
+    pvt_ltd:     'private_limited',
+    llp:         'llp',
+    other:       'not_yet_registered',
   }
-  return map[kycType] ?? 'route_not_yet_registered'
+  return map[kycType] ?? 'not_yet_registered'
 }
 
 /**
