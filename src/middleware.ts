@@ -299,6 +299,29 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(`https://forms.jeffistores.in/${slug}`, 301)
   }
 
+  // Tenant admin mTLS. admin.jeffistores.in is gated by nginx against the platform CA; nginx
+  // cannot select a per-tenant CA from a regex server_name, so for admin-{slug} it passes the
+  // cert through (optional_no_ca) and we verify against that tenant's own CA.
+  //
+  // This runs BEFORE the public-API allowlist below. Under it, the login and MFA endpoints
+  // were reachable on a tenant admin host with no client certificate at all, and
+  // check-session never saw the verified identity, so the panel reported "not detected"
+  // however valid the cert was.
+  if (isTenantAdminSubdomain && tenant && process.env.TENANT_MTLS_ENFORCED !== 'false') {
+    const { decodeClientCertHeader, verifyTenantClientCert } = await import('./lib/tenant-mtls')
+    const pem = decodeClientCertHeader(request.headers.get('x-client-cert'))
+    const v = await verifyTenantClientCert(pem, tenant.tenantId)
+      .catch((): Awaited<ReturnType<typeof verifyTenantClientCert>> => ({ ok: false, reason: 'malformed' }))
+    if (!v.ok) {
+      return addSecurityHeaders(new NextResponse(
+        'A client certificate is required to access this admin panel.',
+        { status: 403, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store', 'X-Mtls-Reason': v.reason ?? 'denied' } },
+      ))
+    }
+    stripped.set('x-client-cert-serial', v.serial ?? '')
+    stripped.set('x-client-cert-cn', v.commonName ?? '')
+  }
+
   const publicApiPaths = [
     '/api/admin/auth/email-otp/start',
     '/api/admin/auth/email-otp/verify',
@@ -320,24 +343,6 @@ export async function middleware(request: NextRequest) {
     // Tenant admin subdomains (admin-{slug}.jeffistores.in) must never expose these routes.
     if (isTenantAdminSubdomain && (pathname.startsWith('/ecom') || pathname.startsWith('/api/admin/ecom'))) {
       return new NextResponse('Not found', { status: 404 })
-    }
-
-    // Tenant admin mTLS. admin.jeffistores.in is gated by nginx against the platform CA;
-    // nginx cannot select a per-tenant CA from a regex server_name, so for admin-{slug} it
-    // passes the cert through (optional_no_ca) and we verify against that tenant's own CA.
-    if (isTenantAdminSubdomain && tenant && process.env.TENANT_MTLS_ENFORCED !== 'false') {
-      const { decodeClientCertHeader, verifyTenantClientCert } = await import('./lib/tenant-mtls')
-      const pem = decodeClientCertHeader(request.headers.get('x-client-cert'))
-      const v = await verifyTenantClientCert(pem, tenant.tenantId)
-        .catch((): Awaited<ReturnType<typeof verifyTenantClientCert>> => ({ ok: false, reason: 'malformed' }))
-      if (!v.ok) {
-        return addSecurityHeaders(new NextResponse(
-          'A client certificate is required to access this admin panel.',
-          { status: 403, headers: { 'Content-Type': 'text/plain', 'Cache-Control': 'no-store', 'X-Mtls-Reason': v.reason ?? 'denied' } },
-        ))
-      }
-      stripped.set('x-client-cert-serial', v.serial ?? '')
-      stripped.set('x-client-cert-cn', v.commonName ?? '')
     }
 
     // On an admin host the panel is served at the root, so /admin/x is a duplicate of /x.
