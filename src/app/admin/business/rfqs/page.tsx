@@ -10,6 +10,7 @@ import { queryMany } from '@/lib/db'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 const PAGE_SIZE = 25
 
@@ -61,7 +62,7 @@ export default function BusinessRFQsPage({
 async function BusinessRFQsShell({ searchParams }: { searchParams: Promise<SP> }) {
   const resolvedSearchParams = await searchParams
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')
+  const token = cookieStore.get(await adminCookieName())
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
   const session = await verifyToken(token.value).catch(() => null)

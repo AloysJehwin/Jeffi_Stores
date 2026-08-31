@@ -818,8 +818,8 @@ describe('middleware', () => {
   // -------------------------------------------------------------------------
   describe('buildRedirectUrl — forwarded headers', () => {
     it('uses x-forwarded-host and x-forwarded-proto when building redirect URL', async () => {
-      // No token — triggers redirect to /admin/login. The redirect URL should use the forwarded host/proto.
-      const req = makeNextRequest('http://localhost/admin/dashboard', {
+      // No token — triggers redirect to /login. The redirect URL should use the forwarded host/proto.
+      const req = makeNextRequest('http://localhost/dashboard', {
         headers: {
           'x-forwarded-host': 'admin.jeffistores.in',
           'x-forwarded-proto': 'https',

@@ -1,10 +1,38 @@
 import { S3Client, PutObjectCommand, DeleteObjectCommand, CopyObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
 import sharp from 'sharp'
+import { getCurrentTenant } from './tenant-context'
 
 const AWS_REGION = process.env.AWS_REGION || 'us-east-1'
-const BUCKET_NAME = process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'
+const DEFAULT_BUCKET = process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket'
 const KEY_PREFIX = process.env.S3_KEY_PREFIX ? `${process.env.S3_KEY_PREFIX}/` : ''
 const CLOUDFRONT_URL = process.env.CLOUDFRONT_URL?.replace(/\/$/, '') ?? ''
+
+/**
+ * The bucket for the store this request belongs to. Falls back to the header when the ALS
+ * context has not been established yet (it is set lazily by the first DB query), so an upload
+ * on a tenant host cannot land in the platform bucket.
+ */
+async function resolveBucket(): Promise<string> {
+  const t = getCurrentTenant()
+  if (t?.infra?.s3Bucket) return t.infra.s3Bucket
+  try {
+    const { headers } = await import('next/headers')
+    const slug = (await headers()).get('x-tenant-slug')
+    if (slug) {
+      const { lookupTenantContextBySlug } = await import('./tenant-registry')
+      const ctx = await lookupTenantContextBySlug(slug)
+      if (ctx?.infra?.s3Bucket) return ctx.infra.s3Bucket
+    }
+  } catch { /* outside a request scope (jobs) — platform bucket is correct */ }
+  return DEFAULT_BUCKET
+}
+
+// The platform CloudFront distribution only fronts the platform bucket, so a tenant object
+// must be addressed directly or the URL 404s.
+function publicUrl(bucket: string, fullKey: string): string {
+  if (bucket === DEFAULT_BUCKET && CLOUDFRONT_URL) return `${CLOUDFRONT_URL}/${fullKey}`
+  return `https://${bucket}.s3.${AWS_REGION}.amazonaws.com/${fullKey}`
+}
 
 const s3Client = new S3Client({
   region: AWS_REGION,
@@ -17,10 +45,9 @@ const s3Client = new S3Client({
 const MAX_FILE_SIZE = 5 * 1024 * 1024
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 
-export function getS3Url(canonicalKey: string): string {
+export async function getS3Url(canonicalKey: string): Promise<string> {
   const fullKey = KEY_PREFIX ? `${KEY_PREFIX}${canonicalKey}` : canonicalKey
-  if (CLOUDFRONT_URL) return `${CLOUDFRONT_URL}/${fullKey}`
-  return `https://${BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/${fullKey}`
+  return publicUrl(await resolveBucket(), fullKey)
 }
 
 export function generateProductImageKeys(productId: string, fileName: string) {
@@ -45,6 +72,7 @@ export interface UploadResult {
 }
 
 export async function uploadProductImage(file: File, productId: string): Promise<UploadResult> {
+  const BUCKET_NAME = await resolveBucket()
   if (!ALLOWED_TYPES.includes(file.type)) {
     throw new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.')
   }
@@ -61,8 +89,8 @@ export async function uploadProductImage(file: File, productId: string): Promise
   await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnailBuffer, ContentType: 'image/jpeg' }))
 
   return {
-    url: getS3Url(s3Key),
-    thumbnailUrl: getS3Url(s3ThumbnailKey),
+    url: await getS3Url(s3Key),
+    thumbnailUrl: await getS3Url(s3ThumbnailKey),
     s3Key,
     s3ThumbnailKey,
     fileName: file.name,
@@ -74,6 +102,7 @@ export async function uploadProductImage(file: File, productId: string): Promise
 }
 
 export async function uploadInvoicePDF(pdfBuffer: Buffer, invoiceNumber: string, financialYear: string): Promise<string> {
+  const BUCKET_NAME = await resolveBucket()
   const safeFileName = invoiceNumber.replace(/\//g, '-')
   const s3Key = `invoices/${financialYear}/${safeFileName}.pdf`
   await s3Client.send(new PutObjectCommand({
@@ -83,10 +112,11 @@ export async function uploadInvoicePDF(pdfBuffer: Buffer, invoiceNumber: string,
     ContentType: 'application/pdf',
     ContentDisposition: `inline; filename="${safeFileName}.pdf"`,
   }))
-  return getS3Url(s3Key)
+  return await getS3Url(s3Key)
 }
 
 export async function deleteProductImage(s3Key: string, s3ThumbnailKey: string) {
+  const BUCKET_NAME = await resolveBucket()
   await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}` }))
   await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}` }))
 }
@@ -95,6 +125,7 @@ export async function saveProductImages(
   productId: string,
   images: { url: string; thumbnailUrl: string; s3Key: string; s3ThumbnailKey: string; fileName: string; fileSize: number; mimeType: string; width: number; height: number; altText?: string; isPrimary?: boolean }[]
 ) {
+  const BUCKET_NAME = await resolveBucket()
   const { query } = await import('./db')
   for (let i = 0; i < images.length; i++) {
     const image = images[i]
@@ -118,6 +149,7 @@ export interface GalleryUploadResult {
 }
 
 export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string): Promise<GalleryUploadResult> {
+  const BUCKET_NAME = await resolveBucket()
   const timestamp = Date.now()
   const baseName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_').replace(/\.[^.]+$/, '')
   const s3Key = `gallery/${timestamp}-${baseName}.png`
@@ -131,8 +163,8 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
   await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnailBuffer, ContentType: 'image/png' }))
 
   return {
-    url: getS3Url(s3Key),
-    thumbnailUrl: getS3Url(s3ThumbnailKey),
+    url: await getS3Url(s3Key),
+    thumbnailUrl: await getS3Url(s3ThumbnailKey),
     s3Key,
     s3ThumbnailKey,
     fileName: `${baseName}.png`,
@@ -147,6 +179,7 @@ export async function uploadGalleryImage(imageBuffer: Buffer, fileName: string):
 // Try the prefixed path first, then the bare path. Returns the CopySource-ready
 // key (relative to the bucket), or null if the object exists at neither.
 async function resolveSourceKey(canonicalKey: string): Promise<string | null> {
+  const BUCKET_NAME = await resolveBucket()
   const prefixed = `${KEY_PREFIX}${canonicalKey}`
   try { await s3Client.send(new HeadObjectCommand({ Bucket: BUCKET_NAME, Key: prefixed })); return prefixed } catch {}
   if (KEY_PREFIX) {
@@ -160,6 +193,7 @@ export async function copyGalleryImageToProduct(
   galleryS3ThumbnailKey: string,
   productId: string,
 ): Promise<{ s3Key: string; s3ThumbnailKey: string; url: string; thumbnailUrl: string }> {
+  const BUCKET_NAME = await resolveBucket()
   const fileName = galleryS3Key.replace(/^gallery\//, '')
   const thumbFileName = galleryS3ThumbnailKey.replace(/^gallery\/thumbnails\//, '')
 
@@ -190,12 +224,13 @@ export async function copyGalleryImageToProduct(
       CopySource: `${BUCKET_NAME}/${srcThumbKey}`,
       Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
     }))
-    return { s3Key, s3ThumbnailKey, url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3ThumbnailKey) }
+    return { s3Key, s3ThumbnailKey, url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3ThumbnailKey) }
   }
-  return { s3Key, s3ThumbnailKey: s3Key, url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3Key) }
+  return { s3Key, s3ThumbnailKey: s3Key, url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3Key) }
 }
 
 export async function uploadVariantImage(file: File, variantId: string): Promise<UploadResult> {
+  const BUCKET_NAME = await resolveBucket()
   if (!ALLOWED_TYPES.includes(file.type)) {
     throw new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.')
   }
@@ -212,8 +247,8 @@ export async function uploadVariantImage(file: File, variantId: string): Promise
   await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: buffer, ContentType: file.type }))
   await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnailBuffer, ContentType: 'image/jpeg' }))
   return {
-    url: getS3Url(s3Key),
-    thumbnailUrl: getS3Url(s3ThumbnailKey),
+    url: await getS3Url(s3Key),
+    thumbnailUrl: await getS3Url(s3ThumbnailKey),
     s3Key,
     s3ThumbnailKey,
     fileName: file.name,
@@ -225,6 +260,7 @@ export async function uploadVariantImage(file: File, variantId: string): Promise
 }
 
 export async function uploadReviewImage(file: File, reviewId: string): Promise<{ url: string; thumbnailUrl: string }> {
+  const BUCKET_NAME = await resolveBucket()
   if (!ALLOWED_TYPES.includes(file.type)) {
     throw new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.')
   }
@@ -240,10 +276,11 @@ export async function uploadReviewImage(file: File, reviewId: string): Promise<{
   const thumbnail = await sharp(buffer).rotate().resize(300, 300, { fit: 'cover' }).jpeg({ quality: 80 }).toBuffer()
   await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}`, Body: resized, ContentType: 'image/jpeg' }))
   await s3Client.send(new PutObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}`, Body: thumbnail, ContentType: 'image/jpeg' }))
-  return { url: getS3Url(s3Key), thumbnailUrl: getS3Url(s3ThumbnailKey) }
+  return { url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3ThumbnailKey) }
 }
 
 export async function uploadAvatarImage(buffer: Buffer, userId: string): Promise<{ url: string; s3Key: string }> {
+  const BUCKET_NAME = await resolveBucket()
   const s3Key = `avatars/${userId}.jpg`
   const resized = await sharp(buffer).rotate().resize(256, 256, { fit: 'cover' }).jpeg({ quality: 85 }).toBuffer()
   await s3Client.send(new PutObjectCommand({
@@ -252,13 +289,14 @@ export async function uploadAvatarImage(buffer: Buffer, userId: string): Promise
     Body: resized,
     ContentType: 'image/jpeg',
   }))
-  return { url: getS3Url(s3Key), s3Key }
+  return { url: await getS3Url(s3Key), s3Key }
 }
 
 // Store logo. Preserves transparency (PNG), fits within a wide bounding box so
 // horizontal wordmark logos aren't cropped. Cache-busted via a version query param
 // on the returned URL so replacing the logo takes effect immediately.
 export async function uploadStoreLogo(buffer: Buffer): Promise<{ url: string; s3Key: string }> {
+  const BUCKET_NAME = await resolveBucket()
   const s3Key = `branding/store-logo.png`
   const resized = await sharp(buffer)
     .rotate()
@@ -272,13 +310,14 @@ export async function uploadStoreLogo(buffer: Buffer): Promise<{ url: string; s3
     ContentType: 'image/png',
     CacheControl: 'public, max-age=60',
   }))
-  return { url: `${getS3Url(s3Key)}?v=${Date.now()}`, s3Key }
+  return { url: `${await getS3Url(s3Key)}?v=${Date.now()}`, s3Key }
 }
 
 // Per-owner branding asset (logo/seal) captured during onboarding — distinct from the global
 // platform store-logo above. Publicly readable (storefront + legal-doc + social use). Key is
 // owner-scoped so each tenant owner has their own.
 export async function uploadBrandingImage(buffer: Buffer, ownerId: string, kind: 'logo' | 'seal'): Promise<{ url: string; s3Key: string }> {
+  const BUCKET_NAME = await resolveBucket()
   const s3Key = `branding/${ownerId}/${kind}.png`
   const resized = await sharp(buffer)
     .rotate()
@@ -292,11 +331,12 @@ export async function uploadBrandingImage(buffer: Buffer, ownerId: string, kind:
     ContentType: 'image/png',
     CacheControl: 'public, max-age=60',
   }))
-  return { url: `${getS3Url(s3Key)}?v=${Date.now()}`, s3Key }
+  return { url: `${await getS3Url(s3Key)}?v=${Date.now()}`, s3Key }
 }
 
 
 export async function deleteGalleryImage(s3Key: string, s3ThumbnailKey: string) {
+  const BUCKET_NAME = await resolveBucket()
   await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3Key}` }))
   if (s3ThumbnailKey) {
     await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}` }))

@@ -4,6 +4,10 @@ vi.mock('@/lib/db', () => ({
   query: vi.fn(),
   queryMany: vi.fn(),
   queryOne: vi.fn(),
+  getClient: vi.fn(async () => ({
+    query: vi.fn(async () => ({ rowCount: 0, rows: [], fields: [] })),
+    release: vi.fn(),
+  })),
 }))
 vi.mock('pg', () => {
   const mockClient = {
@@ -143,10 +147,12 @@ describe('dynamic-tools', () => {
       await expect(runReadonlySql(t, {})).rejects.toThrow(/Arg substitution failed|Missing arg/)
     })
 
-    it('throws when DATABASE_URL not configured', async () => {
-      // DATABASE_URL is not set, pool creation throws
-      await expect(runReadonlySql(readonlyTool, { customer_id: '123' }))
-        .rejects.toThrow('DATABASE_URL not configured')
+    it('runs through the tenant-aware client, not a private pool', async () => {
+      // A private DATABASE_URL pool made the agent read the platform database from every
+      // tenant's admin panel; getClient() selects the pool for the tenant in scope.
+      const { getClient } = await import('@/lib/db')
+      await runReadonlySql(readonlyTool, { customer_id: '123' })
+      expect(getClient).toHaveBeenCalled()
     })
   })
 

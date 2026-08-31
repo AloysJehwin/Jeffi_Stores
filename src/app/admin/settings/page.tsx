@@ -3,6 +3,7 @@ import TwoFactorCard from '@/components/admin/TwoFactorCard'
 import ExtensionTokenCard from '@/components/admin/ExtensionTokenCard'
 import { headers } from 'next/headers'
 import { ADMIN_SCOPES, isPlatformOwner } from '@/lib/scopes'
+import { getStoreIdentity } from '@/lib/site-controls'
 
 async function getAdminInfo(adminId: string) {
   return queryOne(
@@ -20,6 +21,7 @@ async function getAllAdmins() {
 }
 
 export default async function SettingsPage() {
+  const { name: storeName } = await getStoreIdentity()
   const headersList = await headers()
   const adminId = headersList.get('x-user-id') || ''
 
@@ -118,7 +120,7 @@ export default async function SettingsPage() {
         <div className="p-5 flex flex-wrap gap-8 text-sm">
           <div>
             <p className="text-xs text-foreground-muted mb-0.5">Platform</p>
-            <p className="font-medium text-foreground">Jeffi Stores Admin</p>
+            <p className="font-medium text-foreground">{storeName} Admin</p>
           </div>
           <div>
             <p className="text-xs text-foreground-muted mb-0.5">Version</p>

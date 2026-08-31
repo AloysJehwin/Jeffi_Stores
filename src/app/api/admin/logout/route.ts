@@ -2,14 +2,15 @@ import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { revokeSession } from '@/lib/auth-sessions'
-import { cookieDomainOption } from '@/lib/cookie-domain'
+import { adminCookieName, adminCookieDomain } from '@/lib/admin-cookie'
 
 export async function POST() {
   try {
     const cookieStore = await cookies()
 
     // Revoke the server-side session before clearing the cookie.
-    const existing = cookieStore.get('admin_sid')?.value
+    const name = await adminCookieName()
+    const existing = cookieStore.get(name)?.value
     if (existing) {
       try {
         const payload = await verifyToken(existing)
@@ -25,15 +26,14 @@ export async function POST() {
       maxAge: 0,
       path: '/',
     }
-    cookieStore.set('admin_sid', '', baseOpts)
-    cookieStore.set('admin_sid', '', { ...baseOpts, ...cookieDomainOption() })
+    cookieStore.set(name, '', baseOpts)
+    cookieStore.set(name, '', { ...baseOpts, ...(await adminCookieDomain()) })
 
     const res = NextResponse.json({ message: 'Logged out' })
     const flags = `Path=/; Max-Age=0; HttpOnly; SameSite=Lax${process.env.NODE_ENV === 'production' ? '; Secure' : ''}`
-    res.headers.append('Set-Cookie', `admin_sid=; ${flags}`)
-    if (process.env.NODE_ENV === 'production') {
-      res.headers.append('Set-Cookie', `admin_sid=; Domain=.jeffistores.in; ${flags}`)
-    }
+    res.headers.append('Set-Cookie', `${name}=; ${flags}`)
+    const dom = (await adminCookieDomain()).domain
+    if (dom) res.headers.append('Set-Cookie', `${name}=; Domain=${dom}; ${flags}`)
     return res
   } catch (err) {
     console.error('[route]', err)

@@ -5,6 +5,8 @@ import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 import { extractSessionSignals } from './lib/session-signals-request'
 import { resolveTenantFromHost, appFromHost, slugFromHost } from './lib/tenant-registry'
+import { runWithTenantContext } from './lib/tenant-context'
+import { adminCookieNameForHost } from './lib/admin-cookie'
 
 // Node runtime: the auth cookie is now an opaque session id, so middleware must resolve
 // it against Postgres (via verifyToken/verifyBusinessToken → resolveSession). Node
@@ -97,7 +99,9 @@ export async function middleware(request: NextRequest) {
   const isAdminApiPath = pathname.startsWith('/api/admin')
   const hostApp = appFromHost(hostname)
   const isAdminSubdomain = hostApp === 'admin'
-  const isAdminPath = pathname.startsWith('/admin')
+  const isTenantAdminSubdomain = isAdminSubdomain && /^admin-[^.]+\./.test(hostname)
+  const isAdminPath = pathname === '/admin' || pathname.startsWith('/admin/')
+  const adminCookie = adminCookieNameForHost(hostname)
 
   if (!isAdminApiPath && pathname.startsWith('/api/')) {
     const limited = await applyRateLimit(request)
@@ -122,6 +126,14 @@ export async function middleware(request: NextRequest) {
   stripped.delete('x-client-cert')
   stripped.delete('x-client-cert-serial')
   stripped.delete('x-client-cert-cn')
+  // nginx sets these from the TLS handshake on the platform admin block, so restore its
+  // values after the strip — service-account mTLS auth reads them downstream.
+  if (isAdminSubdomain && !isTenantAdminSubdomain) {
+    const ngSerial = request.headers.get('x-client-cert-serial')
+    const ngCn = request.headers.get('x-client-cert-cn')
+    if (ngSerial) stripped.set('x-client-cert-serial', ngSerial)
+    if (ngCn) stripped.set('x-client-cert-cn', ngCn)
+  }
 
   // Multi-tenant SaaS: resolve the tenant from the Host header (cached ~60s in-process).
   // Returns null for the platform's own hosts (jeffistores.in + app subdomains) and unknown
@@ -144,27 +156,31 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Tenant isolation guard: a session is bound (snapshotted) to exactly one tenant.
-  // If the host resolves to tenant A but the caller presents a session minted for
-  // tenant B, reject it — a shared-cookie-domain replay across tenant subdomains
-  // must not grant access. Only fires when BOTH sides are known (host tenant + a
-  // session with a non-null tenant_id); null on either side = platform/legacy →
-  // allowed (fail-open, no mass logout). This is the mismatch-rejection half of the
-  // tenant_id session claim.
+  // Bare NextResponse.next() drops x-tenant-slug, and db.ts then serves the platform pool.
+  const passThrough = (extra?: Record<string, string>) => {
+    if (extra) for (const [k, v] of Object.entries(extra)) stripped.set(k, v)
+    return NextResponse.next({ request: { headers: stripped } })
+  }
+
+  // Sessions and admins live in each tenant's OWN database, so every session lookup below
+  // must run against that DB. Unwrapped, they all resolve against the platform pool.
+  const inTenant = <T,>(fn: () => Promise<T>): Promise<T> =>
+    tenant ? runWithTenantContext(tenant, fn) : fn()
+
+  // Defence in depth behind the per-tenant DB: a session must have been minted for exactly
+  // the tenant addressed by this host. Cookies are NOT cleared — admin_sid is shared across
+  // *.jeffistores.in, so deleting it here would sign the operator out of the platform admin.
   if (tenant) {
-    const anySid = request.cookies.get('admin_sid')?.value
+    const anySid = request.cookies.get(adminCookie)?.value
       || request.cookies.get('user_sid')?.value
       || request.cookies.get('business_sid')?.value
     if (anySid) {
-      const { resolveSession } = await import('./lib/auth-sessions')
-      const sess = await resolveSession(anySid, reqSignals).catch(() => null)
-      if (sess && sess.tenantId && sess.tenantId !== tenant.tenantId) {
-        // Cross-tenant session replay — clear the offending cookies and send to login.
-        const res = NextResponse.redirect(buildRedirectUrl(request, '/'))
-        res.cookies.delete('admin_sid')
-        res.cookies.delete('user_sid')
-        res.cookies.delete('business_sid')
-        return addSecurityHeaders(res)
+      const sess = await inTenant(async () => {
+        const { resolveSession } = await import('./lib/auth-sessions')
+        return resolveSession(anySid, reqSignals).catch(() => null)
+      })
+      if (sess && sess.tenantId !== tenant.tenantId) {
+        return addSecurityHeaders(NextResponse.redirect(buildRedirectUrl(request, '/')))
       }
     }
   }
@@ -172,10 +188,10 @@ export async function middleware(request: NextRequest) {
   if (hostname.startsWith('ecom.')) {
     // SaaS control plane (ecom.jeffistores.in). Public: marketing (/), /signin, /signup.
     // Protected (owner session required): /onboard, /dashboard. API under /api/ecom.
-    if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
     // Shared platform legal pages (/legal/*) render as-is on the ecom host too — the
     // onboarding legals-consent links here — so don't rewrite them into /ecom/legal (404).
-    if (pathname === '/legal' || pathname.startsWith('/legal/')) return addSecurityHeaders(NextResponse.next())
+    if (pathname === '/legal' || pathname.startsWith('/legal/')) return addSecurityHeaders(passThrough())
     const OWNER_PROTECTED = ['/onboard', '/dashboard']
     if (OWNER_PROTECTED.some((p) => pathname === p || pathname.startsWith(p + '/'))) {
       const ownerSid = request.cookies.get('owner_sid')?.value
@@ -198,32 +214,32 @@ export async function middleware(request: NextRequest) {
 
   if (hostApp === 'forms') {
     if (pathname.startsWith('/api/')) {
-      return addSecurityHeaders(NextResponse.next())
+      return addSecurityHeaders(passThrough())
     }
     const slug = pathname === '/' ? '' : pathname
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/forms${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostApp === 'quotation') {
-    if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
     const slug = pathname === '/' ? '' : pathname
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/quotation${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostApp === 'invoice') {
-    if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
     const slug = pathname === '/' ? '' : pathname
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/invoice${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostApp === 'purchaseorder') {
-    if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
     const slug = pathname === '/' ? '' : pathname
     return addSecurityHeaders(NextResponse.rewrite(new URL(`/purchaseorder${slug}${request.nextUrl.search}`, request.url), { request: { headers: stripped } }))
   }
 
   if (hostApp === 'business') {
-    if (pathname.startsWith('/api/')) return addSecurityHeaders(NextResponse.next())
+    if (pathname.startsWith('/api/')) return addSecurityHeaders(passThrough())
     // Public pages on the subdomain (paths are /signin, /signup, /pending — no /business/ prefix)
     const PUBLIC_BUSINESS_SUBDOMAIN = ['/signin', '/signup', '/pending']
     const isPublicSubdomain = pathname === '/' || PUBLIC_BUSINESS_SUBDOMAIN.some(p => pathname.startsWith(p))
@@ -232,7 +248,7 @@ export async function middleware(request: NextRequest) {
       if (!token) {
         return NextResponse.redirect(buildRedirectUrl(request, '/signin'))
       }
-      const payload = await verifyBusinessToken(token, reqSignals)
+      const payload = await inTenant(() => verifyBusinessToken(token, reqSignals))
       if (!payload) {
         const res = NextResponse.redirect(buildRedirectUrl(request, '/signin'))
         res.cookies.delete('business_sid')
@@ -261,7 +277,7 @@ export async function middleware(request: NextRequest) {
         signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
         return NextResponse.redirect(signinUrl)
       }
-      const payload = await verifyBusinessToken(token, reqSignals)
+      const payload = await inTenant(() => verifyBusinessToken(token, reqSignals))
       if (!payload) {
         const signinUrl = buildRedirectUrl(request, '/business/signin')
         signinUrl.searchParams.set('callbackUrl', pathname + request.nextUrl.search)
@@ -296,13 +312,12 @@ export async function middleware(request: NextRequest) {
   if (isAdminApiPath && publicApiPaths.some(path => pathname.startsWith(path))) {
     const limited = await applyRateLimit(request)
     if (limited) return limited
-    return addSecurityHeaders(NextResponse.next())
+    return addSecurityHeaders(passThrough())
   }
 
   if (isAdminSubdomain) {
     // Ecom control-plane pages are ONLY available on admin.jeffistores.in (platform admin).
     // Tenant admin subdomains (admin-{slug}.jeffistores.in) must never expose these routes.
-    const isTenantAdminSubdomain = /^admin-[^.]+\./.test(hostname)
     if (isTenantAdminSubdomain && (pathname.startsWith('/ecom') || pathname.startsWith('/api/admin/ecom'))) {
       return new NextResponse('Not found', { status: 404 })
     }
@@ -325,10 +340,16 @@ export async function middleware(request: NextRequest) {
       stripped.set('x-client-cert-cn', v.commonName ?? '')
     }
 
+    // On an admin host the panel is served at the root, so /admin/x is a duplicate of /x.
+    if (isAdminPath) {
+      const target = (pathname.replace(/^\/admin/, '') || '/') + request.nextUrl.search
+      return NextResponse.redirect(buildRedirectUrl(request, target), 308)
+    }
+
     if (isAdminApiPath) {
       // Admin API auth is handled below — fall through
     } else if (pathname.startsWith('/api/')) {
-      return addSecurityHeaders(NextResponse.next())
+      return addSecurityHeaders(passThrough())
     } else if (!isAdminPath) {
       // B2B portal pages have no admin equivalent — redirect to the business subdomain
       const BUSINESS_ONLY = ['/business/signin', '/business/signup', '/business/pending']
@@ -345,14 +366,14 @@ export async function middleware(request: NextRequest) {
       // Auth check before rewrite so server components receive x-user-id etc.
       const isAdminLogin = pathname === '/login'
       if (!isAdminLogin) {
-        const token = request.cookies.get('admin_sid')?.value
+        const token = request.cookies.get(adminCookie)?.value
         if (!token) {
           return NextResponse.redirect(buildRedirectUrl(request, '/login'))
         }
-        const payload = await verifyToken(token, reqSignals)
+        const payload = await inTenant(() => verifyToken(token, reqSignals))
         if (!payload) {
           const res = NextResponse.redirect(buildRedirectUrl(request, '/login'))
-          res.cookies.delete('admin_sid')
+          res.cookies.delete(adminCookie)
           return res
         }
         const rewriteUrl = new URL(`/admin${slug}${search}`, request.url)
@@ -373,7 +394,7 @@ export async function middleware(request: NextRequest) {
         // routes a tenant admin's queries to the tenant's own RDS.
         stripped.set('x-pathname', `/admin${slug}`)
         stripped.set('x-user-id', payload.adminId)
-        stripped.set('x-username', payload.displayName || `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || 'Admin')
+        stripped.set('x-username', payload.displayName || payload.email || 'Admin')
         stripped.set('x-user-role', payload.role)
         stripped.set('x-user-scopes', JSON.stringify(payload.scopes || []))
         const response = NextResponse.rewrite(rewriteUrl, { request: { headers: stripped } })
@@ -387,7 +408,7 @@ export async function middleware(request: NextRequest) {
     // Machine-to-machine endpoints authenticated by Bearer token — skip cookie check.
     const bearerOnlyPaths = ['/api/admin/replication/log']
     if (bearerOnlyPaths.some(p => pathname.startsWith(p)) && request.method === 'POST') {
-      return addSecurityHeaders(NextResponse.next())
+      return addSecurityHeaders(passThrough())
     }
 
     // Service account auth via mTLS client certificate serial.
@@ -396,15 +417,15 @@ export async function middleware(request: NextRequest) {
     // route handler validate via authenticateServiceAccount() in jwt.ts.
     const certSerial = request.headers.get('x-client-cert-serial') || ''
     if (certSerial) {
-      return addSecurityHeaders(NextResponse.next())
+      return addSecurityHeaders(passThrough())
     }
 
-    const token = request.cookies.get('admin_sid')?.value
+    const token = request.cookies.get(adminCookie)?.value
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const payload = await verifyToken(token, reqSignals)
+    const payload = await inTenant(() => verifyToken(token, reqSignals))
     if (!payload) {
       return NextResponse.json({ error: 'Invalid token' }, { status: 401 })
     }
@@ -427,7 +448,7 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
-    return addSecurityHeaders(NextResponse.next())
+    return addSecurityHeaders(passThrough())
   }
 
   if (isAdminPath) {
@@ -438,9 +459,7 @@ export async function middleware(request: NextRequest) {
                        hostname.endsWith('.ngrok-free.app') || hostname.endsWith('.ngrok-free.dev')
 
     if (pathname === '/admin/login') {
-      const response = NextResponse.next()
-      response.headers.set('x-pathname', pathname)
-      return addSecurityHeaders(response)
+      return addSecurityHeaders(passThrough({ 'x-pathname': pathname }))
     }
 
     if (!isAdminSubdomain && !isLocalhost) {
@@ -450,7 +469,7 @@ export async function middleware(request: NextRequest) {
       })
     }
 
-    const token = request.cookies.get('admin_sid')?.value
+    const token = request.cookies.get(adminCookie)?.value
 
     if (!token) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
@@ -458,13 +477,13 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(loginUrl)
     }
 
-    const payload = await verifyToken(token, reqSignals)
+    const payload = await inTenant(() => verifyToken(token, reqSignals))
 
     if (!payload) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
       const response = NextResponse.redirect(loginUrl)
-      response.cookies.delete('admin_sid')
+      response.cookies.delete(adminCookie)
       return response
     }
 
@@ -474,7 +493,7 @@ export async function middleware(request: NextRequest) {
       const loginUrl = buildRedirectUrl(request, '/admin/login')
       loginUrl.searchParams.set('callbackUrl', pathname)
       const response = NextResponse.redirect(loginUrl)
-      response.cookies.delete('admin_sid')
+      response.cookies.delete(adminCookie)
       return response
     }
 
@@ -499,20 +518,16 @@ export async function middleware(request: NextRequest) {
       return NextResponse.redirect(buildRedirectUrl(request, `${parentPath}?desktop_required=1`))
     }
 
-    const response = NextResponse.next()
-    response.headers.set('x-pathname', pathname)
-    response.headers.set('x-user-id', payload.adminId)
-    response.headers.set('x-username', `${payload.first_name || ''} ${payload.last_name || ''}`.trim() || payload.email || '')
-    response.headers.set('x-user-role', payload.role)
-    response.headers.set('x-user-scopes', JSON.stringify(payload.scopes || []))
-    return addSecurityHeaders(response)
+    return addSecurityHeaders(passThrough({
+      'x-pathname': pathname,
+      'x-user-id': payload.adminId,
+      'x-username': payload.displayName || payload.email || 'Admin',
+      'x-user-role': payload.role,
+      'x-user-scopes': JSON.stringify(payload.scopes || []),
+    }))
   }
 
-  // Storefront catch-all ({slug}.jeffistores.in and the platform's own store). Forward
-  // the mutated request headers (incl. x-tenant-slug set above) so getPool() can route
-  // to the tenant's own RDS. Without { request: { headers: stripped } } the header is
-  // dropped and every tenant request silently falls back to the main platform DB.
-  return addSecurityHeaders(NextResponse.next({ request: { headers: stripped } }))
+  return addSecurityHeaders(passThrough())
 }
 
 export const config = {

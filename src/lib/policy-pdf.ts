@@ -1,5 +1,6 @@
 import path from 'path'
 import type { Policy, Section } from '@/app/legal/policies'
+import { getStoreIdentity } from '@/lib/site-controls'
 
 const PDFDocument = eval('require')('pdfkit')
 
@@ -15,30 +16,28 @@ const COLOR_MUTED = '#666666'
 const COLOR_RULE = '#dddddd'
 const COLOR_ACCENT = '#7cb900'
 
-const STORE_NAME = "Jeffi Stores"
 const STORE_ADDR = 'SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092'
-const STORE_PHONE = '+91 96853 54099'
-const STORE_EMAIL = 'jeffistoress@gmail.com'
-const STORE_WEB = 'jeffistores.in'
 
-function drawHeader(doc: any, logo?: string | Buffer) {
+interface StoreHeading { name: string; phone: string; email: string; web: string }
+
+function drawHeader(doc: any, store: StoreHeading, logo?: string | Buffer) {
   doc.rect(0, 0, PAGE_W, 80).fillColor(COLOR_DARK).fill()
   const logoSrc = logo ?? path.join(process.cwd(), 'public', 'images', 'store-logo.png')
   try {
     doc.image(logoSrc, ML, 14, { width: 52, height: 52 })
   } catch {}
   doc.font('Helvetica-Bold').fontSize(20).fillColor('#ffffff')
-  doc.text(STORE_NAME.toUpperCase(), ML + 64, 22, { lineBreak: false })
+  doc.text(store.name.toUpperCase(), ML + 64, 22, { lineBreak: false })
   doc.font('Helvetica').fontSize(8).fillColor('#cfe1c5')
   doc.text(STORE_ADDR, ML + 64, 46, { width: CW - 64, lineBreak: false })
-  doc.text(`${STORE_PHONE}  |  ${STORE_EMAIL}  |  ${STORE_WEB}`, ML + 64, 58, { width: CW - 64, lineBreak: false })
+  doc.text([store.phone, store.email, store.web].filter(Boolean).join('  |  '), ML + 64, 58, { width: CW - 64, lineBreak: false })
 }
 
-function drawFooter(doc: any, pageNum: number, totalPages: number) {
+function drawFooter(doc: any, store: StoreHeading, pageNum: number, totalPages: number) {
   const y = PAGE_H - 36
   doc.moveTo(ML, y).lineTo(PAGE_W - MR, y).lineWidth(0.5).strokeColor(COLOR_RULE).stroke()
   doc.font('Helvetica').fontSize(8).fillColor(COLOR_MUTED)
-  doc.text(`© ${new Date().getFullYear()} ${STORE_NAME} · ${STORE_WEB}`, ML, y + 8, { lineBreak: false })
+  doc.text(`© ${new Date().getFullYear()} ${store.name} · ${store.web}`, ML, y + 8, { lineBreak: false })
   doc.text(`Page ${pageNum} of ${totalPages}`, PAGE_W - MR - 80, y + 8, { width: 80, align: 'right', lineBreak: false })
 }
 
@@ -100,6 +99,13 @@ function renderSection(doc: any, section: Section, startY: number, drawHeaderFn:
 }
 
 export async function generatePolicyPDF(policy: Policy, branding?: { logo?: string | Buffer; seal?: string | Buffer }): Promise<Buffer> {
+  const identity = await getStoreIdentity()
+  const store: StoreHeading = {
+    name: identity.name,
+    phone: identity.phone,
+    email: identity.email,
+    web: identity.web,
+  }
   return new Promise((resolve, reject) => {
     const doc = new PDFDocument({ size: 'A4', margin: 0, autoFirstPage: false, bufferPages: true })
     const chunks: Buffer[] = []
@@ -107,7 +113,7 @@ export async function generatePolicyPDF(policy: Policy, branding?: { logo?: stri
     doc.on('end', () => resolve(Buffer.concat(chunks)))
     doc.on('error', reject)
 
-    const drawHeaderFn = () => drawHeader(doc, branding?.logo)
+    const drawHeaderFn = () => drawHeader(doc, store, branding?.logo)
 
     doc.addPage()
     drawHeaderFn()
@@ -139,7 +145,7 @@ export async function generatePolicyPDF(policy: Policy, branding?: { logo?: stri
     y += 12
     doc.font('Helvetica').fontSize(9).fillColor(COLOR_MUTED)
     doc.text(
-      `This document is an authorised copy of the ${policy.title} as published on ${STORE_WEB}/legal/${policy.slug}. The official version on the website is the source of truth and may be updated from time to time.`,
+      `This document is an authorised copy of the ${policy.title} as published on ${store.web}/legal/${policy.slug}. The official version on the website is the source of truth and may be updated from time to time.`,
       ML,
       y,
       { width: CW - 130, lineGap: 1.5, align: 'justify' }
@@ -151,7 +157,7 @@ export async function generatePolicyPDF(policy: Policy, branding?: { logo?: stri
     for (let i = 0; i < total; i++) {
       doc.switchToPage(range.start + i)
       drawSeal(doc, branding?.seal)
-      drawFooter(doc, i + 1, total)
+      drawFooter(doc, store, i + 1, total)
     }
 
     doc.end()

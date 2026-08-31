@@ -21,8 +21,8 @@ export async function generateTenantLegals(tenantId: string, _endpoint?: string)
     gstin: kyc?.gst_number || undefined,
     email: tenant.noreply_email || undefined,
     phone: kyc?.mobile || undefined,
-    logoUrl: kyc?.logo_s3_key ? getS3Url(kyc.logo_s3_key) : undefined,
-    sealUrl: kyc?.seal_s3_key ? getS3Url(kyc.seal_s3_key) : undefined,
+    logoUrl: kyc?.logo_s3_key ? await getS3Url(kyc.logo_s3_key) : undefined,
+    sealUrl: kyc?.seal_s3_key ? await getS3Url(kyc.seal_s3_key) : undefined,
   }
 
   const built = buildTenantPolicies(info)

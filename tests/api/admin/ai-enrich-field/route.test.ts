@@ -14,7 +14,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
-const ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: [] }
+const ADMIN = { adminId: 'admin-1', role: 'administrator', scopes: [] }
 
 function makeReq(body: object) {
   return new NextRequest('http://localhost/api/admin/ai-enrich-field', {

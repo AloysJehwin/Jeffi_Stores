@@ -7,13 +7,14 @@ import { getHost } from '@/lib/get-host'
 import LabelsClient from '@/components/admin/LabelsClient'
 import { LABEL_SIZES } from '@/lib/label-pdf'
 import { getAllCategories } from '@/lib/queries'
+import { adminCookieName } from '@/lib/admin-cookie'
 
 export const metadata = {
   title: 'Label Generator — Jeffi Admin' }
 
 export default async function LabelsPage() {
   const cookieStore = await cookies()
-  const token = cookieStore.get('admin_sid')
+  const token = cookieStore.get(await adminCookieName())
   const host = await getHost()
   if (!token) redirect(ap('/admin/login', host))
 

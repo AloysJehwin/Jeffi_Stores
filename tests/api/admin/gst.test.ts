@@ -25,7 +25,7 @@ import { queryMany } from '@/lib/db'
 // Helpers
 // ---------------------------------------------------------------------------
 
-const SUPER_ADMIN = { adminId: 'admin-1', role: 'super_admin', scopes: [] }
+const SUPER_ADMIN = { adminId: 'admin-1', role: 'administrator', scopes: [] }
 const REGULAR_ADMIN = { adminId: 'admin-2', role: 'admin', scopes: [] }
 
 function makeReq(url: string) {
