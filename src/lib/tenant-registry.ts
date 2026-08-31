@@ -712,6 +712,30 @@ export async function setTenantInstanceState(tenantId: string, state: 'running' 
   await pool.query(`UPDATE tenants SET instance_state=$1, updated_at=now() WHERE id=$2`, [state, tenantId])
 }
 /** Write resolved infra pointers after provisioning. */
+/**
+ * Record a step outcome that happened outside the provisioning worker — the Route linked
+ * account is created at KYC approval, not by a job. Without this the only trace was a stderr
+ * line, which the next blue-green deploy discarded, so a failure could not be diagnosed after
+ * the fact. Attaches to the tenant's most recent job (job_id is NOT NULL) and never throws.
+ */
+export async function recordTenantStepEvent(
+  tenantId: string,
+  step: string,
+  status: 'ok' | 'error',
+  message: string | null,
+  detail: Record<string, unknown> = {},
+): Promise<void> {
+  try {
+    await controlPlanePool().query(
+      `INSERT INTO provisioning_step_events (job_id, tenant_id, step, status, message, detail)
+       SELECT j.id, $1, $2, $3, $4, $5::jsonb
+         FROM provisioning_jobs j WHERE j.tenant_id = $1
+         ORDER BY j.created_at DESC LIMIT 1`,
+      [tenantId, step, status, message, JSON.stringify(detail)],
+    )
+  } catch { /* a log line must never fail the operation it describes */ }
+}
+
 export async function writeTenantInfra(tenantId: string, infra: { rdsEndpoint: string; s3Bucket: string }): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(

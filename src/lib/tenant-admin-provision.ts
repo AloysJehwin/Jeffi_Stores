@@ -25,6 +25,7 @@ export async function provisionTenantOwnerAdmin(opts: {
   tenantSlug: string
   ownerEmail: string
   ownerName: string | null
+  storeName?: string | null
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const ctx = await resolveTenantCtx(opts.tenantId)
@@ -32,6 +33,7 @@ export async function provisionTenantOwnerAdmin(opts: {
       return { success: false, error: 'Tenant DB not yet provisioned — will retry on next activation' }
     }
 
+    const storeName = opts.storeName?.trim() || ctx.displayName?.trim() || opts.tenantSlug
     await runWithTenantContext(ctx, async () => {
       // Idempotency: skip if super_admin already exists for this email
       const existing = await queryOne<{ id: string }>(
@@ -106,7 +108,7 @@ export async function provisionTenantOwnerAdmin(opts: {
         cert.serial,
         cert.expiresAt.toISOString(),
         'super_admin',
-        { slug: opts.tenantSlug, storeName: opts.tenantSlug },
+        { slug: opts.tenantSlug, storeName },
       )
     })
 
