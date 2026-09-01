@@ -20,6 +20,42 @@ TEMP_DB="schema_diff_$$"
 cleanup() { docker rm -f "$TEMP_DB" 2>/dev/null || true; }
 trap cleanup EXIT
 
+# seed-plans.sql is row data (plans + plan_features), not structure, so migra never sees it.
+# It is transactional and authoritative (upsert + prune), so re-running on every deploy keeps
+# plan entitlements in step with the seed — without it an over-grant like Basic carrying
+# merchant_sync/crm survives forever and leaks over-plan nav. Only meaningful for the control
+# plane; the platform DB has no plans table. Called on both the no-diff and applied paths so it
+# runs on every control-plane deploy regardless of whether structure changed.
+seed_control_plane() {
+  [ "${SCHEMA_SET:-}" = "control-plane" ] || return 0
+  [ -f database/control-plane/seed-plans.sql ] || return 0
+  echo ""
+  echo "── Seeding control-plane plans/entitlements ──"
+  local SEED_TOKEN SEED_LOG
+  SEED_TOKEN=$(aws rds generate-db-auth-token \
+    --hostname "$RDS_HOST" \
+    --port "${RDS_PORT:-5432}" \
+    --region "${AWS_REGION:-us-east-1}" \
+    --username "$RDS_USER")
+  SEED_LOG=$(mktemp /tmp/schema_seed_XXXXXX.log)
+  PGPASSWORD="$SEED_TOKEN" PGSSLMODE=require psql \
+    -h "$RDS_HOST" \
+    -p "${RDS_PORT:-5432}" \
+    -U "$RDS_USER" \
+    -d "$RDS_DB" \
+    -v ON_ERROR_STOP=1 \
+    -f database/control-plane/seed-plans.sql 2>&1 | tee "$SEED_LOG"
+  if grep -q '^ERROR:' "$SEED_LOG"; then
+    echo ""
+    echo "seed-plans.sql FAILED — plan entitlements not updated."
+    grep '^ERROR:' "$SEED_LOG" | sed 's/^/  /'
+    rm -f "$SEED_LOG"
+    exit 1
+  fi
+  rm -f "$SEED_LOG"
+  echo "Control-plane seed applied."
+}
+
 # ── 1. Install migra (idempotent) ─────────────────────────────────────────────
 echo "── Installing migra ──"
 pip3 install --quiet --break-system-packages migra psycopg2-binary 2>/dev/null || \
@@ -223,6 +259,7 @@ rm -f "$FILTER_SCRIPT"
 
 if [ -z "$DIFF" ]; then
   echo "No schema differences — live RDS matches entity files."
+  seed_control_plane
   exit 0
 fi
 
@@ -273,4 +310,6 @@ if [ "${ERRORS:-0}" -gt 0 ]; then
 fi
 rm -f "$APPLY_LOG"
 
+# ── 6. Seed control-plane reference data ──────────────────────────────────────
 echo "Schema diff applied successfully ($SCHEMA_SET -> $RDS_DB)."
+seed_control_plane

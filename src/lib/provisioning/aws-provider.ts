@@ -13,6 +13,7 @@ import {
   S3Client,
   CreateBucketCommand,
   PutPublicAccessBlockCommand,
+  PutBucketPolicyCommand,
   PutBucketCorsCommand,
   DeleteBucketCommand,
   ListObjectsV2Command,
@@ -219,13 +220,27 @@ export class AwsProvisioningProvider implements ProvisioningProvider {
     } catch (err) {
       if (!isAlreadyExists(err)) throw err
     }
-    // Block ALL public access — app writes via IAM, CloudFront reads via OAC
+    // Tenant objects (product images, invoices) are served by direct public S3 URL — the same
+    // read model as the platform bucket (s3.ts publicUrl). There is no per-tenant CloudFront, so
+    // the bucket must allow public read or every uploaded image 403s on display. The app writes
+    // with IAM creds; the policy below only opens read + the app's own write, mirroring
+    // jeffi-stores-bucket. Public access block must be OFF for the policy to take effect.
     await this.s3.send(new PutPublicAccessBlockCommand({
       Bucket: bucket,
       PublicAccessBlockConfiguration: {
-        BlockPublicAcls: true, IgnorePublicAcls: true,
-        BlockPublicPolicy: true, RestrictPublicBuckets: true,
+        BlockPublicAcls: false, IgnorePublicAcls: false,
+        BlockPublicPolicy: false, RestrictPublicBuckets: false,
       },
+    }))
+    await this.s3.send(new PutBucketPolicyCommand({
+      Bucket: bucket,
+      Policy: JSON.stringify({
+        Version: '2012-10-17',
+        Statement: [
+          { Sid: 'PublicReadAccess', Effect: 'Allow', Principal: '*', Action: ['s3:GetObject', 's3:GetObjectVersion'], Resource: `arn:aws:s3:::${bucket}/*` },
+          { Sid: 'AllowUploadFromApplication', Effect: 'Allow', Principal: '*', Action: ['s3:PutObject', 's3:PutObjectAcl', 's3:DeleteObject'], Resource: `arn:aws:s3:::${bucket}/*` },
+        ],
+      }),
     }))
     await this.s3.send(new PutBucketCorsCommand({
       Bucket: bucket,
