@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Props {
   entityId: string
@@ -62,20 +63,22 @@ export default function DraftRowActions({ name, subtitle, updatedAt, editHref, p
         <p className="text-xs text-amber-500 mr-2">
           {new Date(updatedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
         </p>
-        <button
-          onClick={handlePublish}
-          disabled={publishing || discarding}
-          className="px-2.5 py-1 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50"
-        >
-          {publishing ? '…' : 'Publish'}
-        </button>
-        <button
-          onClick={handleDiscard}
-          disabled={publishing || discarding}
-          className="px-2.5 py-1 text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors disabled:opacity-50"
-        >
-          {discarding ? '…' : 'Discard'}
-        </button>
+        <RequireWrite scope="orders:write">
+          <button
+            onClick={handlePublish}
+            disabled={publishing || discarding}
+            className="px-2.5 py-1 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors disabled:opacity-50"
+          >
+            {publishing ? '…' : 'Publish'}
+          </button>
+          <button
+            onClick={handleDiscard}
+            disabled={publishing || discarding}
+            className="px-2.5 py-1 text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors disabled:opacity-50"
+          >
+            {discarding ? '…' : 'Discard'}
+          </button>
+        </RequireWrite>
       </div>
     </div>
   )

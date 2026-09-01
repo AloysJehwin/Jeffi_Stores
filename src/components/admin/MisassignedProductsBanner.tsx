@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AdminSelect from './AdminSelect'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Product {
   id: string
@@ -102,13 +103,15 @@ export default function MisassignedProductsBanner({
                   ...subs.map(sub => ({ value: sub.id, label: sub.name })),
                 ]}
               />
-              <button
-                onClick={() => reassign(product)}
-                disabled={!selections[product.id] || saving[product.id]}
-                className="text-xs bg-accent-500 hover:bg-accent-600 text-white px-2.5 py-1 rounded font-semibold transition-colors disabled:opacity-40"
-              >
-                {saving[product.id] ? 'Moving…' : 'Move'}
-              </button>
+              <RequireWrite scope="products:write">
+                <button
+                  onClick={() => reassign(product)}
+                  disabled={!selections[product.id] || saving[product.id]}
+                  className="text-xs bg-accent-500 hover:bg-accent-600 text-white px-2.5 py-1 rounded font-semibold transition-colors disabled:opacity-40"
+                >
+                  {saving[product.id] ? 'Moving…' : 'Move'}
+                </button>
+              </RequireWrite>
               {errors[product.id] && (
                 <span className="text-xs text-red-600 dark:text-red-400">{errors[product.id]}</span>
               )}

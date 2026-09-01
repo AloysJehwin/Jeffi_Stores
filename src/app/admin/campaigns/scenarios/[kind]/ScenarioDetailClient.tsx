@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/admin-path'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface ParamDef {
   type: 'integer' | 'number' | 'boolean'
@@ -127,12 +128,14 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
             </div>
             <p className="text-sm text-foreground-secondary mt-1">{scenario.description}</p>
           </div>
-          <Link
-            href={ap(`/admin/campaigns/new?scenario=${scenario.kind}`)}
-            className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 shrink-0"
-          >
-            + New campaign
-          </Link>
+          <RequireWrite scope="campaigns:write">
+            <Link
+              href={ap(`/admin/campaigns/new?scenario=${scenario.kind}`)}
+              className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 shrink-0"
+            >
+              + New campaign
+            </Link>
+          </RequireWrite>
         </div>
 
         <div className="mt-4 p-3 bg-surface-secondary rounded-lg border-l-2 border-accent-500">
@@ -163,12 +166,14 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
         {campaigns.length === 0 ? (
           <div className="bg-surface-elevated rounded-xl border border-border-default p-8 text-center">
             <p className="text-sm text-foreground-muted mb-4">No campaigns are using this scenario yet.</p>
-            <Link
-              href={ap(`/admin/campaigns/new?scenario=${scenario.kind}`)}
-              className="inline-block px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
-            >
-              Create the first one
-            </Link>
+            <RequireWrite scope="campaigns:write">
+              <Link
+                href={ap(`/admin/campaigns/new?scenario=${scenario.kind}`)}
+                className="inline-block px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
+              >
+                Create the first one
+              </Link>
+            </RequireWrite>
           </div>
         ) : (
           <div className="space-y-4">
@@ -265,23 +270,25 @@ export default function ScenarioDetailClient({ kind }: { kind: string }) {
                     </div>
 
                     <div className="mt-3 flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => saveOverrides(c.kind)}
-                        disabled={savingKey === c.kind}
-                        className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-                      >
-                        {savingKey === c.kind ? 'Saving…' : 'Save overrides'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setOverrides(o => ({ ...o, [c.kind]: {} }))
-                        }}
-                        className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
-                      >
-                        Reset to defaults
-                      </button>
+                      <RequireWrite scope="campaigns:write">
+                        <button
+                          type="button"
+                          onClick={() => saveOverrides(c.kind)}
+                          disabled={savingKey === c.kind}
+                          className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {savingKey === c.kind ? 'Saving…' : 'Save overrides'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOverrides(o => ({ ...o, [c.kind]: {} }))
+                          }}
+                          className="px-4 py-2 text-sm font-medium text-foreground-muted hover:text-foreground transition-colors"
+                        >
+                          Reset to defaults
+                        </button>
+                      </RequireWrite>
                     </div>
                   </div>
                 </div>

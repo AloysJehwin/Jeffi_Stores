@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/admin-path'
 
 interface AdminOption {
@@ -119,6 +120,7 @@ function AssignSelect({
   task, admins, onReassigned,
 }: { task: TaskRow; admins: AdminOption[]; onReassigned: () => void }) {
   const [saving, setSaving] = useState(false)
+  const canWrite = useCanWrite('tasks:write')
 
   const options = [
     { value: '', label: 'Unassigned' },
@@ -140,6 +142,11 @@ function AssignSelect({
     }
   }
 
+  if (!canWrite) {
+    const label = options.find(o => o.value === (task.assigned_to || ''))?.label || 'Unassigned'
+    return <span className="text-[11px] text-foreground-muted">{label}</span>
+  }
+
   return (
     <div onClick={e => e.stopPropagation()} className={`transition-opacity ${saving ? 'opacity-50 pointer-events-none' : ''}`}>
       <AdminSelect
@@ -155,6 +162,7 @@ function AssignSelect({
 
 export default function AdminTasksClient() {
   const router = useRouter()
+  const canWrite = useCanWrite('tasks:write')
   const [scope, setScope]       = useState<'mine' | 'all' | 'unassigned'>('mine')
   const [status, setStatus]     = useState<'open' | 'overdue' | 'completed'>('open')
   const [priority, setPriority] = useState<string>('all')
@@ -434,10 +442,10 @@ export default function AdminTasksClient() {
                   const seg = segmentOf(t)
                   return (
                     <div key={t.id} className="px-5 py-3 flex items-start gap-3 hover:bg-surface-secondary/50 transition-colors">
-                      <button type="button" onClick={() => complete(t)} disabled={busy}
+                      <button type="button" onClick={() => complete(t)} disabled={busy || !canWrite}
                         className={`mt-0.5 w-4 h-4 rounded border-2 shrink-0 flex items-center justify-center transition-colors ${
                           completed ? 'bg-green-500 border-green-500' : 'border-border-secondary hover:border-accent-500'
-                        }`}
+                        } ${!canWrite ? 'cursor-default' : ''}`}
                         aria-label={completed ? 'Mark incomplete' : 'Mark complete'}>
                         {completed && (
                           <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>

@@ -8,6 +8,7 @@ import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 import { useToast } from '@/contexts/ToastContext'
 import { useStoreConfig } from '@/contexts/StoreConfigContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -43,6 +44,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
   const [amendError, setAmendError] = useState<string | null>(null)
   const qrModalRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+  const canWrite = useCanWrite('invoices')
 
   function loadData() {
     return fetch(`/api/admin/invoices/${id}/detail`)
@@ -303,7 +305,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               Edit
             </a>
           )}
-          {o.status === 'draft' && (
+          {o.status === 'draft' && canWrite && (
             <button
               onClick={finalizeInvoice}
               disabled={finalizing}
@@ -312,7 +314,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               {finalizing ? 'Finalizing…' : 'Finalize Invoice'}
             </button>
           )}
-          {showQrSection && (
+          {showQrSection && canWrite && (
             <button
               onClick={() => qrImageUrl ? setQrModalOpen(true) : generateQr()}
               disabled={qrLoading}
@@ -322,7 +324,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               {qrLoading ? 'Generating…' : 'QR'}
             </button>
           )}
-          {o.invoice_number && o.status !== 'draft' && amendDraft === null && (
+          {o.invoice_number && o.status !== 'draft' && amendDraft === null && canWrite && (
             <button
               onClick={createAmendmentDraft}
               disabled={amending}

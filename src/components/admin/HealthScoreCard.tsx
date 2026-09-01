@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface HealthBreakdown {
   score: number
@@ -70,6 +71,7 @@ export default function HealthScoreCard({ customerId, initial }: { customerId: s
       <div>
         <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest mb-3">Health Score</h2>
         <p className="text-sm text-foreground-muted">No score computed yet.</p>
+        <RequireWrite scope="customers:write">
         <button
           type="button"
           onClick={recompute}
@@ -78,6 +80,7 @@ export default function HealthScoreCard({ customerId, initial }: { customerId: s
         >
           {busy ? 'Computing…' : 'Compute now'}
         </button>
+        </RequireWrite>
       </div>
     )
   }
@@ -98,6 +101,7 @@ export default function HealthScoreCard({ customerId, initial }: { customerId: s
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xs font-semibold text-foreground-muted uppercase tracking-widest">Health Score</h2>
+        <RequireWrite scope="customers:write">
         <button
           type="button"
           onClick={recompute}
@@ -106,6 +110,7 @@ export default function HealthScoreCard({ customerId, initial }: { customerId: s
         >
           {busy ? 'Recomputing…' : 'Recompute'}
         </button>
+        </RequireWrite>
       </div>
 
       <div className="flex items-center gap-4 mb-4">

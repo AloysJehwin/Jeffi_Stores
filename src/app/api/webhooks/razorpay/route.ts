@@ -14,6 +14,9 @@ import { getFeatureFlags } from '@/lib/site-controls'
 import { settleVariantChangePayment } from '@/lib/variant-change'
 import { logActivity } from '@/lib/activity'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
+import { getCurrentTenant } from '@/lib/tenant-context'
+import { transferToLinkedAccount } from '@/lib/razorpay-route'
+import { controlPlanePool } from '@/lib/tenant-registry'
 
 export async function POST(request: NextRequest) {
   try {
@@ -59,6 +62,43 @@ export async function POST(request: NextRequest) {
   }
 }
 
+async function fireRouteTransfer(opts: {
+  paymentId: string
+  totalAmountInr: number
+  orderId: string
+  orderRef: string
+}) {
+  const tenant = getCurrentTenant()
+  if (!tenant?.tenantId) return
+
+  const pool = controlPlanePool()
+  const row = await pool.query(
+    `SELECT razorpay_linked_account_id, daily_payout FROM tenants WHERE id=$1 AND status='active'`, [tenant.tenantId]
+  ).catch(() => null)
+  const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
+  if (!linkedAccountId) return
+  const dailyPayout = row?.rows[0]?.daily_payout === true
+
+  const result = await transferToLinkedAccount({
+    paymentId: opts.paymentId,
+    grossAmountPaise: Math.round(opts.totalAmountInr * 100),
+    linkedAccountId,
+    orderId: opts.orderId,
+    tenantSlug: tenant.slug ?? '',
+    dailyPayout,
+  })
+
+  await pool.query(
+    `INSERT INTO tenant_transactions
+       (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, gateway_txn_id, is_cod, status, occurred_at)
+     VALUES ($1,$2,$3,$4,$5,$6,'razorpay_route',$7,false,'captured',now())
+     ON CONFLICT DO NOTHING`,
+    [tenant.tenantId, opts.orderRef, opts.totalAmountInr,
+     result.amount / 100, result.platformCommissionPaise / 100,
+     (result.gatewayFeePaise + result.transferFeePaise) / 100, result.transferId]
+  ).catch(() => {})
+}
+
 async function handlePaymentCaptured(payment: any) {
   const razorpayOrderId = payment.order_id
   const razorpayPaymentId = payment.id
@@ -92,14 +132,16 @@ async function handlePaymentCaptured(payment: any) {
 
   const orderId = paymentRecord.order_id
 
+  let flippedToPaid = false
   await withTransaction(async (client) => {
-    await client.query(
+    const upd = await client.query(
       `UPDATE orders SET payment_status = 'paid',
         status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
         updated_at = NOW()
        WHERE id = $1 AND payment_status != 'paid'`,
       [orderId]
     )
+    flippedToPaid = (upd.rowCount ?? 0) > 0
 
     await client.query(
       `UPDATE payments
@@ -130,6 +172,18 @@ async function handlePaymentCaptured(payment: any) {
       sendPaymentStatusUpdate(user.email, userName, order.order_number, orderId, 'paid', parseFloat(order.total_amount)).catch(() => {})
       attributeConversion(paymentRecord.user_id, orderId).catch(() => {})
     }
+  }
+
+  // Only the handler that actually flipped the order to paid moves money — the transfer API
+  // is not idempotent, so gating on the atomic paid-flip is what prevents a double-transfer
+  // when the browser return to /verify races this webhook.
+  if (flippedToPaid) {
+    fireRouteTransfer({
+      paymentId: razorpayPaymentId,
+      totalAmountInr: parseFloat(paymentRecord.total_amount),
+      orderId,
+      orderRef: paymentRecord.order_number,
+    }).catch(() => {})
   }
 }
 
@@ -185,8 +239,9 @@ async function handlePaymentLinkPaid(paymentLink: any) {
 
   if (!order || order.payment_status === 'paid') return
 
+  let flippedToPaid = false
   await withTransaction(async (client) => {
-    await client.query(
+    const upd = await client.query(
       `UPDATE orders SET
         payment_status = 'paid',
         status = CASE WHEN status = 'pending' THEN 'confirmed' ELSE status END,
@@ -195,6 +250,7 @@ async function handlePaymentLinkPaid(paymentLink: any) {
        WHERE id = $1 AND payment_status != 'paid'`,
       [order.id]
     )
+    flippedToPaid = (upd.rowCount ?? 0) > 0
 
     await client.query(
       `INSERT INTO payments (order_id, payment_gateway, transaction_id, amount, status, gateway_response)
@@ -218,6 +274,16 @@ async function handlePaymentLinkPaid(paymentLink: any) {
       sendNewOrderNotification(fullOrder, orderItems || [], user).catch(() => {})
       sendPaymentStatusUpdate(user.email, userName, order.order_number, order.id, 'paid', parseFloat(order.total_amount)).catch(() => {})
     }
+  }
+
+  const linkPaymentId = paymentLink.payments?.[0]?.payment_id
+  if (flippedToPaid && linkPaymentId) {
+    fireRouteTransfer({
+      paymentId: linkPaymentId,
+      totalAmountInr: parseFloat(order.total_amount),
+      orderId: order.id,
+      orderRef: order.order_number,
+    }).catch(() => {})
   }
 }
 
@@ -368,4 +434,13 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
     summary: `Placed order #${created.order_number} via webhook recovery`, metadata: { orderNumber: created.order_number, total: created.total_amount } }).catch(() => {})
   recordImplicitSignalsForProducts(intent.user_id, (orderItems || []).map((i: any) => i.product_id), 'purchased').catch(() => {})
   attributeConversion(intent.user_id, created.id).catch(() => {})
+
+  // The intent claim above (committed=false → true, RETURNING) already elected a single winner,
+  // so this transfer fires exactly once per payment.
+  fireRouteTransfer({
+    paymentId: razorpayPaymentId,
+    totalAmountInr: parseFloat(created.total_amount),
+    orderId: created.id,
+    orderRef: created.order_number,
+  }).catch(() => {})
 }

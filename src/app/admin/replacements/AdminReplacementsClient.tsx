@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface ReplacementRow {
   id: string
@@ -84,6 +85,7 @@ function customerName(row: ReplacementRow) {
 }
 
 function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated: () => void }) {
+  const canWrite = useCanWrite('replacements:write')
   const [condition, setCondition] = useState<string>('')
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -277,7 +279,7 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
                   {row.valuated_at && <span className="text-green-700 dark:text-green-400 ml-1">· {new Date(row.valuated_at).toLocaleDateString('en-IN')}</span>}
                 </span>
               </div>
-            ) : (
+            ) : canWrite ? (
               <div className="space-y-3">
                 <p className="text-sm font-medium text-foreground">Item Valuation</p>
                 {error && <p className="text-xs text-red-600 dark:text-red-400">{error}</p>}
@@ -317,7 +319,7 @@ function ReplacementCard({ row, onValuated }: { row: ReplacementRow; onValuated:
                   {isSubmitting ? 'Saving...' : 'Complete Valuation'}
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         )}
       </div>

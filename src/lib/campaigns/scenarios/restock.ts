@@ -1,6 +1,5 @@
 import { queryMany, query } from '@/lib/db'
 import {
-  APP_URL,
   fetchUserContext,
   fetchProductImageUrl,
   resolveCoupon,
@@ -57,7 +56,7 @@ export const restock: ScenarioModule<Params, Row> = {
 
     const { couponCode, discountPercent } = await resolveCoupon(campaign, row.user_id)
     const productImageUrl = await fetchProductImageUrl(row.product_id)
-    const productUrl = `${APP_URL}/products/${row.product_slug}`
+    const productUrl = `${user.baseUrl}/products/${row.product_slug}`
     const productCard = renderHeroProduct({
       name: row.product_name,
       imageUrl: productImageUrl,

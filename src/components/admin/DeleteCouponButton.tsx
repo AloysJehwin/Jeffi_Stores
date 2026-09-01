@@ -4,12 +4,14 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 export default function DeleteCouponButton({ id, code }: { id: string; code: string }) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const canWrite = useCanWrite('coupons:write')
 
   const handleDelete = async () => {
     const ok = await confirm({
@@ -31,6 +33,8 @@ export default function DeleteCouponButton({ id, code }: { id: string; code: str
     }
     setLoading(false)
   }
+
+  if (!canWrite) return null
 
   return (
     <button onClick={handleDelete} disabled={loading} className="text-red-500 hover:underline text-sm disabled:opacity-50">

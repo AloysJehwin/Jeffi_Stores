@@ -120,10 +120,11 @@ async function fireRouteTransfer(opts: {
   // tenant's account outlives the tenant. Gating on status is what actually makes it inert:
   // never move money into an account whose store is suspended or terminated.
   const row = await pool.query(
-    `SELECT razorpay_linked_account_id FROM tenants WHERE id=$1 AND status='active'`, [tenant.tenantId]
+    `SELECT razorpay_linked_account_id, daily_payout FROM tenants WHERE id=$1 AND status='active'`, [tenant.tenantId]
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
   if (!linkedAccountId) return  // not active, or no linked account yet — skip silently
+  const dailyPayout = row?.rows[0]?.daily_payout === true
 
   const grossPaise = Math.round(opts.totalAmountInr * 100)
   const result = await transferToLinkedAccount({
@@ -133,6 +134,7 @@ async function fireRouteTransfer(opts: {
     isCod: opts.isCod,
     orderId: opts.orderId,
     tenantSlug: tenant.slug ?? '',
+    dailyPayout,
   })
 
   // Record in control-plane tenant_transactions for billing visibility

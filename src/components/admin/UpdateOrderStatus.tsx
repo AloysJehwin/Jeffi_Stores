@@ -6,6 +6,7 @@ import AdminSelect from './AdminSelect'
 import BatchPickerModal, { BatchPickerItem, BatchAssignment } from './BatchPickerModal'
 import SerialEntryModal, { SerialItem, SerialAssignment } from './SerialEntryModal'
 import Toggle from '../ui/Toggle'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface UpdateOrderStatusProps {
   orderId: string
@@ -97,6 +98,7 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
 
   const [overrideMode, setOverrideMode] = useState(false)
   const [overrideReason, setOverrideReason] = useState('')
+  const canWrite = useCanWrite('orders:write')
 
   const allowedStatuses = [currentStatus, ...(VALID_STATUS_TRANSITIONS[currentStatus] ?? [])]
   const allowedPaymentStatuses = [currentPaymentStatus, ...(VALID_PAYMENT_TRANSITIONS[currentPaymentStatus] ?? [])]
@@ -230,6 +232,12 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
 
   const isTerminal = (VALID_STATUS_TRANSITIONS[currentStatus]?.length === 0) &&
     (VALID_PAYMENT_TRANSITIONS[currentPaymentStatus]?.length === 0)
+
+  if (!canWrite) {
+    return (
+      <p className="text-sm text-foreground-muted">You do not have permission to modify this order.</p>
+    )
+  }
 
   if (isTerminal && !canOverride) {
     return (

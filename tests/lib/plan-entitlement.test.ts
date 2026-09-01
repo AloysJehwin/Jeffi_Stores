@@ -12,7 +12,7 @@ import { resolveSession } from '@/lib/auth-sessions'
 import crypto from 'crypto'
 
 const TOKEN = crypto.randomBytes(32).toString('hex')
-const GRANTED = ['products:read', 'products:write', 'invoices:read', 'labels:read']
+const GRANTED = ['dashboard:read', 'settings:read', 'products:read', 'products:write', 'invoices:read', 'labels:read']
 const BASIC = new Set(['products:read', 'products:write'])
 
 function row(tenantId: string | null) {
@@ -48,17 +48,17 @@ describe('a session carries the plan entitlement, not the raw grant', () => {
     expect(mockGetTenantPlan).not.toHaveBeenCalled()
   })
 
-  it('fails open when the control plane cannot be reached', async () => {
+  it('fails closed to the safe core when the control plane cannot be reached', async () => {
     mockQueryOne.mockResolvedValue(row('t-1'))
     mockGetTenantPlan.mockRejectedValue(new Error('control plane unreachable'))
     const s = await resolveSession(TOKEN)
-    expect(s!.scopes.sort()).toEqual([...GRANTED].sort())
+    expect(s!.scopes.sort()).toEqual(['dashboard:read', 'settings:read'])
   })
 
-  it('fails open on an empty plan rather than locking the owner out', async () => {
+  it('fails closed to the safe core on an empty plan rather than over-granting', async () => {
     mockQueryOne.mockResolvedValue(row('t-1'))
     mockGetTenantPlan.mockResolvedValue({ plan: 'basic', scopes: new Set() })
     const s = await resolveSession(TOKEN)
-    expect(s!.scopes.sort()).toEqual([...GRANTED].sort())
+    expect(s!.scopes.sort()).toEqual(['dashboard:read', 'settings:read'])
   })
 })

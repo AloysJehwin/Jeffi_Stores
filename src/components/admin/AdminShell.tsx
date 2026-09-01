@@ -7,6 +7,7 @@ import AdminAgentTrigger from './AdminAgentTrigger'
 import ScanActionPopup from './ScanActionPopup'
 import ThemeToggle from '@/components/ThemeToggle'
 import SessionGuard from './SessionGuard'
+import { AdminScopesProvider } from '@/contexts/AdminScopesContext'
 
 const COOKIE_NAME = 'sidebar_collapsed'
 
@@ -126,7 +127,9 @@ export default function AdminShell({
         />
 
         <main className="flex-1 min-w-0 bg-surface-secondary overflow-y-auto relative z-0">
-          {children}
+          <AdminScopesProvider role={role} scopes={scopes}>
+            {children}
+          </AdminScopesProvider>
         </main>
       </div>
 

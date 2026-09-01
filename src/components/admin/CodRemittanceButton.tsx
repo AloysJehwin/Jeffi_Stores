@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface Props {
   orderId: string
@@ -15,6 +16,7 @@ interface Props {
 export default function CodRemittanceButton({ orderId, remittedAt, codAmount }: Props) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  const canWrite = useCanWrite('financial:write')
 
   async function setRemitted(remitted: boolean) {
     setSaving(true)
@@ -49,13 +51,15 @@ export default function CodRemittanceButton({ orderId, remittedAt, codAmount }: 
             COD {inr} remitted on {new Date(remittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}
           </p>
         </div>
-        <button
-          onClick={() => setRemitted(false)}
-          disabled={saving}
-          className="text-xs text-foreground-muted hover:text-foreground disabled:opacity-50 transition-colors"
-        >
-          {saving ? '…' : 'Undo'}
-        </button>
+        {canWrite && (
+          <button
+            onClick={() => setRemitted(false)}
+            disabled={saving}
+            className="text-xs text-foreground-muted hover:text-foreground disabled:opacity-50 transition-colors"
+          >
+            {saving ? '…' : 'Undo'}
+          </button>
+        )}
       </div>
     )
   }
@@ -71,13 +75,15 @@ export default function CodRemittanceButton({ orderId, remittedAt, codAmount }: 
           {error && <p className="text-xs text-red-500 mt-0.5">{error}</p>}
         </div>
       </div>
-      <button
-        onClick={() => setRemitted(true)}
-        disabled={saving}
-        className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors flex-shrink-0"
-      >
-        {saving ? 'Saving…' : 'Mark as remitted'}
-      </button>
+      {canWrite && (
+        <button
+          onClick={() => setRemitted(true)}
+          disabled={saving}
+          className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-accent-500 hover:bg-accent-600 text-white disabled:opacity-50 transition-colors flex-shrink-0"
+        >
+          {saving ? 'Saving…' : 'Mark as remitted'}
+        </button>
+      )}
     </div>
   )
 }

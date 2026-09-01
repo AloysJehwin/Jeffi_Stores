@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 
 export interface CustomShortcut {
   id: string
@@ -65,11 +66,12 @@ async function saveCustom(shortcuts: CustomShortcut[]): Promise<boolean> {
 }
 
 function ShortcutRow({
-  shortcut, isMac, allShortcuts, onDelete, onChange,
+  shortcut, isMac, allShortcuts, canWrite, onDelete, onChange,
 }: {
   shortcut: CustomShortcut
   isMac: boolean
   allShortcuts: CustomShortcut[]
+  canWrite: boolean
   onDelete: () => void
   onChange: (updated: CustomShortcut) => void
 }) {
@@ -140,7 +142,7 @@ function ShortcutRow({
         {preview}
       </kbd>
       <div className="w-36 shrink-0">
-        <AdminSelect value={modifier} options={modifierOptions} onChange={handleModChange} sm />
+        <AdminSelect value={modifier} options={modifierOptions} onChange={handleModChange} disabled={!canWrite} sm />
       </div>
       <div className="w-16 shrink-0">
         {modifier === 'f' ? (
@@ -152,6 +154,7 @@ function ShortcutRow({
               setKey(k)
               onChange({ ...shortcut, combo: k })
             }}
+            disabled={!canWrite}
             sm
           />
         ) : (
@@ -159,23 +162,26 @@ function ShortcutRow({
             type="text"
             value={display}
             readOnly
+            disabled={!canWrite}
             onKeyDown={handleKeyDown}
             placeholder="key"
             title="Click and press any letter or number"
-            className="w-full text-center px-2 py-1.5 text-sm font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 cursor-pointer caret-transparent"
+            className="w-full text-center px-2 py-1.5 text-sm font-mono border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-accent-500 cursor-pointer caret-transparent disabled:opacity-60"
           />
         )}
       </div>
-      <button
-        type="button"
-        onClick={onDelete}
-        className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-        title="Remove"
-      >
-        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-        </svg>
-      </button>
+      <RequireWrite scope="settings:write">
+        <button
+          type="button"
+          onClick={onDelete}
+          className="shrink-0 w-7 h-7 flex items-center justify-center rounded-lg text-foreground-muted hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          title="Remove"
+        >
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </RequireWrite>
     </div>
   )
 }
@@ -187,6 +193,7 @@ export default function CustomShortcutsCard({
   isMac: boolean
 }) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('settings:write')
   const [shortcuts, setShortcuts] = useState<CustomShortcut[]>(initial)
   const [saving, setSaving] = useState(false)
   const [newLabel, setNewLabel] = useState('')
@@ -242,6 +249,7 @@ export default function CustomShortcutsCard({
           shortcut={s}
           isMac={isMac}
           allShortcuts={shortcuts}
+          canWrite={canWrite}
           onDelete={() => handleDelete(s.id)}
           onChange={handleChange}
         />
@@ -279,7 +287,7 @@ export default function CustomShortcutsCard({
         />
         <button
           type="button"
-          disabled={saving || !newLabel.trim() || !newPath.trim()}
+          disabled={saving || !canWrite || !newLabel.trim() || !newPath.trim()}
           onClick={handleAdd}
           className="shrink-0 px-3 py-1.5 text-sm font-medium rounded-lg bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-50 transition-colors"
         >

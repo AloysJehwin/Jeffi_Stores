@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import DatePicker from '@/components/ui/DatePicker'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface Task {
   id: string
@@ -37,7 +38,6 @@ interface AdminOption {
 
 interface CustomerTasksProps {
   customerId: string
-  canWrite?: boolean
 }
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -47,7 +47,8 @@ const PRIORITY_BADGE: Record<string, string> = {
   low:    'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
 }
 
-export default function CustomerTasks({ customerId, canWrite = false }: CustomerTasksProps) {
+export default function CustomerTasks({ customerId }: CustomerTasksProps) {
+  const canWrite = useCanWrite('customers:write')
   const router = useRouter()
   const confirm = useConfirm()
   const [tasks, setTasks] = useState<Task[]>([])

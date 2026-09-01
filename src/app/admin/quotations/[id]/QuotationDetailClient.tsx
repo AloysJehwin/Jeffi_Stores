@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ChevronLeft, Pencil } from 'lucide-react'
 import { ap } from '@/lib/admin-path'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -29,6 +30,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
   const [finalizing, setFinalizing] = useState(false)
   const [finalizeError, setFinalizeError] = useState('')
   const confirm = useConfirm()
+  const canWrite = useCanWrite('quotations')
 
   useEffect(() => {
     fetch(`/api/admin/quotations/${id}`)
@@ -178,7 +180,7 @@ export default function QuotationDetailClient({ id }: { id: string }) {
               Edit
             </a>
           )}
-          {q.status === 'draft' && q.from_rfq && (
+          {q.status === 'draft' && q.from_rfq && canWrite && (
             <button
               onClick={finalize}
               disabled={finalizing}

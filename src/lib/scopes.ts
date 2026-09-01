@@ -585,6 +585,14 @@ export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
  *  at best — the routes they gate are 404 on a tenant host — and misleading in the team UI. */
 export const TENANT_SCOPE_KEYS = ADMIN_SCOPES.filter(s => !s.platformOnly).map(s => s.key)
 
+/**
+ * The scopes safe to fall back to when a tenant's plan entitlement cannot be resolved (control-
+ * plane error or empty plan). Every plan — including Basic — sells these, so falling back to them
+ * keeps the admin shell and settings reachable during a blip without exposing any feature page a
+ * plan may not have bought. Fail closed: never fall back to the full grant.
+ */
+export const SAFE_CORE_SCOPE_KEYS = ['dashboard:read', 'settings:read']
+
 export function assignableScopes(includePlatform: boolean): ScopeDefinition[] {
   return includePlatform ? ADMIN_SCOPES : ADMIN_SCOPES.filter(s => !s.platformOnly)
 }

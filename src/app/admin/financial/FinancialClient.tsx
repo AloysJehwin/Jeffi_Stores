@@ -8,6 +8,7 @@ import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 type Tab = 'receivables' | 'payables' | 'transactions' | 'pl' | 'cashflow' | 'cod_remittance'
 
@@ -118,6 +119,7 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
   const [markingPaid, setMarkingPaid] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 50
+  const canWrite = useCanWrite('financial:write')
 
   useEffect(() => { if (initialData !== null) { setData(initialData); setPage(1) } }, [initialData])
 
@@ -243,6 +245,7 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
                         <td className="px-4 py-3 text-center">{agingBadge(r.aging_bucket)}</td>
                         <td className="px-4 py-3 text-center"><StatusBadge status={r.payment_status} /></td>
                         <td className="px-4 py-3 text-center">
+                          {canWrite && (
                           <button
                             className="px-3 py-1 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
                             disabled={markingPaid === r.order_id}
@@ -250,6 +253,7 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
                           >
                             {markingPaid === r.order_id ? '…' : 'Mark Paid'}
                           </button>
+                          )}
                         </td>
                       </tr>
                     ))}
@@ -284,6 +288,7 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
                       {agingBadge(r.aging_bucket)}
                       <StatusBadge status={r.payment_status} />
                     </div>
+                    {canWrite && (
                     <button
                       className="w-full mt-1 py-1.5 rounded-lg text-xs font-medium bg-green-600 hover:bg-green-700 text-white disabled:opacity-50 transition-colors"
                       disabled={markingPaid === r.order_id}
@@ -291,6 +296,7 @@ function ReceivablesTab({ initialData }: { initialData: any }) {
                     >
                       {markingPaid === r.order_id ? '…' : 'Mark Paid'}
                     </button>
+                    )}
                   </div>
                 ))}
               </div>
@@ -339,6 +345,7 @@ function PayablesTab({ initialData }: { initialData: any }) {
   const [payoutResult, setPayoutResult] = useState<any>(null)
   const [page, setPage] = useState(1)
   const PAGE_SIZE = 50
+  const canWrite = useCanWrite('financial:write')
 
   useEffect(() => { if (initialData !== null) { setData(initialData); setPage(1) } }, [initialData])
 
@@ -445,7 +452,7 @@ function PayablesTab({ initialData }: { initialData: any }) {
           </div>
           <div className="flex gap-2 pb-0.5">
             <button className={btnPrimary} onClick={handleRefresh}>{loading ? 'Loading…' : 'Refresh'}</button>
-            <button className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>+ Add Bill</button>
+            {canWrite && <button className={btnSecondary} onClick={() => setShowAddForm(v => !v)}>+ Add Bill</button>}
           </div>
         </div>
       </div>
@@ -549,12 +556,14 @@ function PayablesTab({ initialData }: { initialData: any }) {
                           <td className="px-4 py-3 text-right text-foreground-secondary">{formatINR(parseFloat(r.paid_amount))}</td>
                           <td className="px-4 py-3 text-center"><StatusBadge status={r.status} /></td>
                           <td className="px-4 py-3 text-center">
+                            {canWrite && (
                             <button
                               className="px-3 py-1 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 text-white dark:text-secondary-900 transition-colors"
                               onClick={() => openPayModal(r)}
                             >
                               Pay
                             </button>
+                            )}
                           </td>
                         </tr>
                       )
@@ -593,12 +602,14 @@ function PayablesTab({ initialData }: { initialData: any }) {
                       )}
                       <div className="flex items-center justify-between gap-2">
                         <StatusBadge status={r.status} />
+                        {canWrite && (
                         <button
                           className="px-4 py-1.5 rounded-lg text-xs font-medium bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 text-white dark:text-secondary-900 transition-colors"
                           onClick={() => openPayModal(r)}
                         >
                           Pay
                         </button>
+                        )}
                       </div>
                     </div>
                   )
@@ -1633,6 +1644,7 @@ function CodRemittanceTab() {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [marking, setMarking] = useState(false)
   const [msg, setMsg] = useState<string | null>(null)
+  const canWrite = useCanWrite('financial:write')
 
   const load = useCallback(() => {
     setLoading(true)
@@ -1699,7 +1711,7 @@ function CodRemittanceTab() {
             </button>
           ))}
         </div>
-        {selected.size > 0 && (
+        {canWrite && selected.size > 0 && (
           <button onClick={() => markRemitted(Array.from(selected))} disabled={marking}
             className="px-4 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg disabled:opacity-50 transition-colors">
             {marking ? 'Marking…' : `Mark ${selected.size} selected as Remitted`}
@@ -1727,6 +1739,7 @@ function CodRemittanceTab() {
                   <span className="ml-3 text-xs text-foreground-muted">{week.orders.length} orders · {formatINR(week.total)}</span>
                 </div>
                 <div className="flex items-center gap-2">
+                  {canWrite && (<>
                   <button onClick={() => setSelected(prev => {
                     const next = new Set(prev)
                     week.orders.forEach((o: any) => next.add(o.id))
@@ -1738,6 +1751,7 @@ function CodRemittanceTab() {
                     className="text-xs px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded-lg disabled:opacity-50 font-medium transition-colors">
                     {marking ? '…' : 'Mark week remitted'}
                   </button>
+                  </>)}
                 </div>
               </div>
               <div className="overflow-x-auto">
@@ -1745,6 +1759,7 @@ function CodRemittanceTab() {
                   <thead className="bg-surface-secondary/50">
                     <tr className="text-xs font-medium text-foreground-secondary uppercase tracking-wide">
                       <th className="px-4 py-2 w-8">
+                        {canWrite && (
                         <input type="checkbox"
                           checked={week.orders.length > 0 && week.orders.every((o: any) => selected.has(o.id))}
                           onChange={e => setSelected(prev => {
@@ -1752,6 +1767,7 @@ function CodRemittanceTab() {
                             week.orders.forEach((o: any) => e.target.checked ? next.add(o.id) : next.delete(o.id))
                             return next
                           })} />
+                        )}
                       </th>
                       <th className="px-4 py-2 text-left">Order</th>
                       <th className="px-4 py-2 text-left">Customer</th>
@@ -1763,8 +1779,10 @@ function CodRemittanceTab() {
                     {week.orders.map((o: any) => (
                       <tr key={o.id} className="hover:bg-surface-secondary/40 transition-colors">
                         <td className="px-4 py-2.5">
+                          {canWrite && (
                           <input type="checkbox" checked={selected.has(o.id)}
                             onChange={e => setSelected(prev => { const next = new Set(prev); e.target.checked ? next.add(o.id) : next.delete(o.id); return next })} />
+                          )}
                         </td>
                         <td className="px-4 py-2.5">
                           <Link href={`/admin/orders/${o.id}`} className="text-secondary-500 hover:underline font-mono text-xs font-medium">#{o.order_number}</Link>

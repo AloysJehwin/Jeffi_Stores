@@ -349,6 +349,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                     </svg>
                   </Link>
                   {product.is_active ? (
+                    canWrite && (
                     <button
                       onClick={() => setDraftProduct({ id: product.id, name: String(product.name || ''), sku: product.sku ? String(product.sku) : null, backUrl })}
                       title="Edit Product"
@@ -358,7 +359,9 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                     </button>
+                    )
                   ) : (
+                    canWrite && (
                     <Link
                       href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(backUrl)}`)}
                       title="Edit Product"
@@ -368,6 +371,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                         <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                       </svg>
                     </Link>
+                    )
                   )}
                   <button
                     onClick={() => setLabelProduct({ id: product.id, name: product.name, has_variants: product.has_variants })}
@@ -379,7 +383,7 @@ export default function ProductsTableClient({ products, featuredCount, backUrl =
                     </svg>
                   </button>
                   <DownloadAdButton productId={product.id} productName={product.name} productSlug={product.slug} />
-                  {isSuperAdmin && (
+                  {isSuperAdmin && canWrite && (
                     <button
                       onClick={() => handleDelete(product.id, product.name)}
                       disabled={deletingId === product.id}

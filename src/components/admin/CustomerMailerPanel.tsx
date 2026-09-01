@@ -5,6 +5,7 @@ import { Mail, Tag, Package, X, ChevronDown, Wand2 } from 'lucide-react'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import RichTextEditor from '@/components/admin/RichTextEditor'
 import { useToast } from '@/contexts/ToastContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Coupon {
   id: string
@@ -727,6 +728,7 @@ export default function CustomerMailerPanel({
       {/* Send */}
       <div className="flex flex-col gap-1 pt-1 border-t border-border-default">
         <div className="flex items-center gap-2 flex-wrap">
+          <RequireWrite scope="customers:write">
           <button
             type="button"
             onClick={handleSend}
@@ -739,6 +741,7 @@ export default function CustomerMailerPanel({
             }
             {sending ? 'Sending…' : `Send to ${customerName}`}
           </button>
+          </RequireWrite>
           <p className="text-[10px] text-foreground-muted">Subject and headline required.</p>
         </div>
         {sendError && <p className="text-xs text-red-500">{sendError}</p>}

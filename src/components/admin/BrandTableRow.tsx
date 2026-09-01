@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import HoverCard from '@/components/ui/HoverCard'
 import DeleteBrandButton from '@/components/admin/DeleteBrandButton'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Brand {
   id: string
@@ -194,22 +195,34 @@ export default function BrandTableRow({ brand, backUrl = '/admin/brands' }: { br
           )}
         </td>
         <td className="px-6 py-4 whitespace-nowrap">
-          <button
-            onClick={toggleStatus}
-            disabled={toggling}
-            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full transition-opacity ${toggling ? 'opacity-50' : 'hover:opacity-75'} ${
+          <RequireWrite scope="brands:write" fallback={
+            <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
               isActive
                 ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
                 : 'bg-surface-secondary text-foreground'
-            }`}
-          >
-            {isActive ? 'Active' : 'Inactive'}
-          </button>
+            }`}>
+              {isActive ? 'Active' : 'Inactive'}
+            </span>
+          }>
+            <button
+              onClick={toggleStatus}
+              disabled={toggling}
+              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full transition-opacity ${toggling ? 'opacity-50' : 'hover:opacity-75'} ${
+                isActive
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                  : 'bg-surface-secondary text-foreground'
+              }`}
+            >
+              {isActive ? 'Active' : 'Inactive'}
+            </button>
+          </RequireWrite>
         </td>
         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
-          <Link href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 hover:text-accent-600 mr-4">
-            Edit
-          </Link>
+          <RequireWrite scope="brands:write">
+            <Link href={ap(`/admin/brands/edit/${brand.id}?back=${encodeURIComponent(backUrl)}`)} className="text-accent-500 hover:text-accent-600 mr-4">
+              Edit
+            </Link>
+          </RequireWrite>
           <DeleteBrandButton brandId={brand.id} brandName={brand.name} />
         </td>
       </tr>

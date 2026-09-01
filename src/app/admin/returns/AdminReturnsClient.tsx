@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface ReturnRow {
   id: string
@@ -74,6 +75,7 @@ function customerName(row: ReturnRow) {
 }
 
 function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => void }) {
+  const canWrite = useCanWrite('returns:write')
   const [condition, setCondition] = useState<string>('')
   const [notes, setNotes] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -235,7 +237,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
                   {row.valuated_at && <span className="text-green-700 dark:text-green-400 ml-1">· {new Date(row.valuated_at).toLocaleDateString('en-IN')}</span>}
                 </span>
               </div>
-            ) : (
+            ) : canWrite ? (
               <div className="space-y-3">
                 <p className="text-sm font-medium text-foreground">Item Valuation</p>
 
@@ -285,7 +287,7 @@ function ReturnCard({ row, onValuated }: { row: ReturnRow; onValuated: () => voi
                   {isSubmitting ? 'Saving...' : 'Complete Valuation'}
                 </button>
               </div>
-            )}
+            ) : null}
           </div>
         )}
       </div>

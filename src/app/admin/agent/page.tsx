@@ -5,6 +5,7 @@ import { Bot, Send, MessageSquare, Slash, LayoutGrid, CheckCircle, XCircle, Load
 import { useToast } from '@/contexts/ToastContext'
 import AdminAgentMessage from '@/components/admin/AdminAgentMessage'
 import AdminAgentBlocks, { type UiBlock } from '@/components/admin/AdminAgentBlocks'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface ProposedAction {
   id: string
@@ -540,14 +541,16 @@ export default function AdminAgentPage() {
                             <p className="text-xs font-semibold text-amber-900 dark:text-amber-200 mb-2">Pending approval — {action.kind}</p>
                             <p className="text-xs text-foreground mb-3">{action.confirmation}</p>
                             {action.status === 'proposed' && (
-                              <div className="flex gap-2">
-                                <button onClick={() => decideAction(turn.id, action.id, 'approve')} className="flex-1 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1">
-                                  <CheckCircle className="w-3.5 h-3.5" /> Approve
-                                </button>
-                                <button onClick={() => decideAction(turn.id, action.id, 'reject')} className="flex-1 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default">
-                                  <XCircle className="w-3.5 h-3.5" /> Reject
-                                </button>
-                              </div>
+                              <RequireWrite scope="agent:write">
+                                <div className="flex gap-2">
+                                  <button onClick={() => decideAction(turn.id, action.id, 'approve')} className="flex-1 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1">
+                                    <CheckCircle className="w-3.5 h-3.5" /> Approve
+                                  </button>
+                                  <button onClick={() => decideAction(turn.id, action.id, 'reject')} className="flex-1 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default">
+                                    <XCircle className="w-3.5 h-3.5" /> Reject
+                                  </button>
+                                </div>
+                              </RequireWrite>
                             )}
                             {action.status === 'approving' && <p className="text-xs text-foreground-muted flex items-center gap-1.5"><Loader2 className="w-3 h-3 animate-spin" /> Executing</p>}
                             {action.status === 'approved' && <p className="text-xs text-green-700 dark:text-green-300 flex items-center gap-1.5"><CheckCircle className="w-3 h-3" /> Executed</p>}

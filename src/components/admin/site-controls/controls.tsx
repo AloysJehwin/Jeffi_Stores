@@ -4,6 +4,7 @@ import { useState, ReactNode, useEffect } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import Toggle from '@/components/ui/Toggle'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 // Shared auto-save form primitives for the Site Controls page. Each field saves
 // to PATCH /api/admin/settings on blur (text/number) or on change (toggle),
@@ -47,6 +48,7 @@ export function TextControl({
   settingKey, label, hint, initial, placeholder, type = 'text',
 }: { settingKey: string; label: string; hint?: string; initial: string; placeholder?: string; type?: string }) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('settings:write')
   const [value, setValue] = useState(initial)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -70,7 +72,7 @@ export function TextControl({
         placeholder={placeholder}
         onChange={e => { setValue(e.target.value); setDirty(true) }}
         onBlur={save}
-        disabled={saving}
+        disabled={saving || !canWrite}
         className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60"
       />
     </div>
@@ -81,6 +83,7 @@ export function TextAreaControl({
   settingKey, label, hint, initial, rows = 4,
 }: { settingKey: string; label: string; hint?: string; initial: string; rows?: number }) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('settings:write')
   const [value, setValue] = useState(initial)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -103,7 +106,7 @@ export function TextAreaControl({
         rows={rows}
         onChange={e => { setValue(e.target.value); setDirty(true) }}
         onBlur={save}
-        disabled={saving}
+        disabled={saving || !canWrite}
         className="w-full px-3 py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60 resize-y"
       />
     </div>
@@ -114,6 +117,7 @@ export function NumberControl({
   settingKey, label, hint, initial, prefix, suffix, min = 0, max, step = 1,
 }: { settingKey: string; label: string; hint?: string; initial: number; prefix?: string; suffix?: string; min?: number; max?: number; step?: number }) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('settings:write')
   const [value, setValue] = useState<number>(initial)
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
@@ -141,7 +145,7 @@ export function NumberControl({
           value={Number.isFinite(value) ? value : 0}
           onChange={e => { setValue(parseFloat(e.target.value) || 0); setDirty(true) }}
           onBlur={save}
-          disabled={saving}
+          disabled={saving || !canWrite}
           className={`w-full ${prefix ? 'pl-7' : 'pl-3'} ${suffix ? 'pr-12' : 'pr-3'} py-2 text-sm border border-border-secondary rounded-lg bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-60`}
         />
         {suffix && <span className="absolute right-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{suffix}</span>}
@@ -154,6 +158,7 @@ export function ToggleControl({
   settingKey, label, hint, initial, locked, lockedHint,
 }: { settingKey: string; label: string; hint?: string; initial: boolean; locked?: boolean; lockedHint?: string }) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('settings:write')
   const [checked, setChecked] = useState(initial)
   const [saving, setSaving] = useState(false)
 
@@ -168,14 +173,14 @@ export function ToggleControl({
   }
 
   return (
-    <div className={`flex items-center justify-between gap-3 p-4 bg-surface-secondary rounded-lg border border-border-default ${locked ? 'opacity-60' : ''}`}>
+    <div className={`flex items-center justify-between gap-3 p-4 bg-surface-secondary rounded-lg border border-border-default ${locked || !canWrite ? 'opacity-60' : ''}`}>
       <div>
         <p className="text-sm font-semibold text-foreground">{label}</p>
         {locked && lockedHint
           ? <p className="text-xs text-foreground-muted mt-0.5">{lockedHint}</p>
           : hint && <p className="text-xs text-foreground-muted mt-0.5">{hint}</p>}
       </div>
-      <Toggle checked={checked} onChange={onChange} disabled={saving || !!locked} />
+      <Toggle checked={checked} onChange={onChange} disabled={saving || !!locked || !canWrite} />
     </div>
   )
 }
@@ -220,6 +225,7 @@ export function KeyboardShortcutControl({
   settingKey, label, initial,
 }: { settingKey: string; label: string; initial: string }) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('settings:write')
   const [isMac, setIsMac] = useState(false)
   const [saving, setSaving] = useState(false)
 
@@ -335,7 +341,7 @@ export function KeyboardShortcutControl({
           value={modifier}
           options={modifierOptions}
           onChange={handleModifierChange}
-          disabled={saving}
+          disabled={saving || !canWrite}
           sm
         />
       </div>
@@ -349,14 +355,14 @@ export function KeyboardShortcutControl({
               if (conflict) { showToast(`${k.toUpperCase()} is already assigned to another shortcut`, 'error'); return }
               setKey(k); save('f', k)
             }}
-            disabled={saving}
+            disabled={saving || !canWrite}
             sm
           />
         ) : (
           <input
             type="text"
             value={inputDisplay}
-            disabled={saving}
+            disabled={saving || !canWrite}
             readOnly
             onKeyDown={handleKeyDown}
             placeholder="key"

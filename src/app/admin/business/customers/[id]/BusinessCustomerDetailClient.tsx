@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
+import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Customer {
   id: string
@@ -40,6 +41,7 @@ const STATUS_STYLES: Record<string, string> = {
 }
 
 export default function BusinessCustomerDetailClient({ id }: { id: string }) {
+  const canWrite = useCanWrite('business_customers:write')
   const [customer, setCustomer] = useState<Customer | null>(null)
   const [discounts, setDiscounts] = useState<Discount[]>([])
   const [categories, setCategories] = useState<Category[]>([])
@@ -314,20 +316,23 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                         type="number"
                         defaultValue={d.discount_pct}
                         min={0} max={100} step={0.5}
+                        disabled={!canWrite}
                         onBlur={e => {
                           const val = parseFloat(e.target.value)
                           if (!isNaN(val) && val !== d.discount_pct) handleDiscountChange(d.category_id, val)
                         }}
-                        className="w-20 px-2 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 text-right"
+                        className="w-20 px-2 py-1.5 text-sm rounded-lg border border-border-default bg-surface focus:outline-none focus:ring-2 focus:ring-accent-500 text-right disabled:opacity-60"
                       />
                       <span className="text-sm text-foreground-secondary">%</span>
                       {savingDiscount === d.category_id && <span className="text-xs text-accent-500">Saving…</span>}
-                      <button
-                        onClick={() => handleDiscountChange(d.category_id, 0)}
-                        className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                      >
-                        Remove
-                      </button>
+                      <RequireWrite scope="business_customers:write">
+                        <button
+                          onClick={() => handleDiscountChange(d.category_id, 0)}
+                          className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                        >
+                          Remove
+                        </button>
+                      </RequireWrite>
                     </div>
                   </div>
                 ))}
@@ -337,6 +342,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
             )}
 
             {availableCategories.length > 0 && (
+              <RequireWrite scope="business_customers:write">
               <div className="flex items-end gap-3 pt-4 border-t border-border-default">
                 <div className="flex-1">
                   <AdminSelect
@@ -367,6 +373,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                   Add
                 </button>
               </div>
+              </RequireWrite>
             )}
           </div>
         </div>
@@ -381,6 +388,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                 <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3 text-sm text-yellow-700 dark:text-yellow-400">
                   This account is awaiting your review.
                 </div>
+                <RequireWrite scope="business_customers:write">
                 <button onClick={handleApprove} disabled={actionLoading}
                   className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60">
                   Approve Account
@@ -407,6 +415,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                     </div>
                   </div>
                 )}
+                </RequireWrite>
               </div>
             )}
 
@@ -415,6 +424,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                 <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-3 text-sm text-green-700 dark:text-green-400">
                   Approved{customer.approved_at ? ` on ${new Date(customer.approved_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}` : ''}
                 </div>
+                <RequireWrite scope="business_customers:write">
                 {!showRejectForm ? (
                   <button onClick={() => setShowRejectForm(true)}
                     className="w-full px-4 py-2 border border-red-400 text-red-600 dark:text-red-400 text-sm font-semibold rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
@@ -437,6 +447,7 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                     </div>
                   </div>
                 )}
+                </RequireWrite>
               </div>
             )}
 
@@ -446,10 +457,12 @@ export default function BusinessCustomerDetailClient({ id }: { id: string }) {
                   Account rejected
                   {customer.rejection_note && <p className="mt-1 font-normal text-foreground-secondary">{customer.rejection_note}</p>}
                 </div>
-                <button onClick={handleApprove} disabled={actionLoading}
-                  className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60">
-                  Approve Instead
-                </button>
+                <RequireWrite scope="business_customers:write">
+                  <button onClick={handleApprove} disabled={actionLoading}
+                    className="w-full px-4 py-2 bg-green-600 text-white text-sm font-semibold rounded-lg hover:bg-green-700 transition-colors disabled:opacity-60">
+                    Approve Instead
+                  </button>
+                </RequireWrite>
               </div>
             )}
           </div>
