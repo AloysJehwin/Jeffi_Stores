@@ -404,6 +404,7 @@ export interface TenantDetail extends TenantRow {
   iam_auth: boolean | null
   cloudfront_id: string | null
   instance_state: string
+  ec2_instance_id: string | null
 }
 
 /** Full detail for one tenant (object page). */
@@ -414,7 +415,7 @@ export async function getTenant(id: string): Promise<TenantDetail | null> {
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,
-            i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.ec2_target, i.region, i.cloudfront_id
+            i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.ec2_target, i.ec2_instance_id, i.region, i.cloudfront_id
      FROM tenants t
      LEFT JOIN plans p ON p.id = t.plan_id
      LEFT JOIN tenant_infra i ON i.tenant_id = t.id
@@ -748,7 +749,7 @@ export async function writeTenantInfra(tenantId: string, infra: { rdsEndpoint: s
 export async function clearTenantInfra(tenantId: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
-    `UPDATE tenant_infra SET rds_endpoint=NULL, updated_at=now() WHERE tenant_id=$1`,
+    `UPDATE tenant_infra SET rds_endpoint=NULL, ec2_instance_id=NULL, updated_at=now() WHERE tenant_id=$1`,
     [tenantId])
   clearTenantCache()
 }
@@ -768,12 +769,12 @@ export async function setPlatformInfra(key: string, value: string | null): Promi
     [key, value])
 }
 
-/** Persist a tenant's serving EC2 target (dedicated instance IP or pool IP) + region. */
-export async function writeTenantEc2(tenantId: string, ec2Target: string): Promise<void> {
+/** Persist a tenant's serving EC2 target (dedicated instance IP or pool IP) + optional instance id. */
+export async function writeTenantEc2(tenantId: string, ec2Target: string, ec2InstanceId?: string | null): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
-    `UPDATE tenant_infra SET ec2_target=$1, updated_at=now() WHERE tenant_id=$2`,
-    [ec2Target, tenantId])
+    `UPDATE tenant_infra SET ec2_target=$1, ec2_instance_id=COALESCE($2, ec2_instance_id), updated_at=now() WHERE tenant_id=$3`,
+    [ec2Target, ec2InstanceId ?? null, tenantId])
 }
 
 // ── Owner accounts (ecom store owners) ───────────────────────────────────────
