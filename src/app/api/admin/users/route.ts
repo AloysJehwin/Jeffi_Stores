@@ -5,7 +5,8 @@ import { generateClientCertificate } from '@/lib/certificates'
 import { sendAdminCertificateEmail } from '@/lib/email'
 import { query } from '@/lib/db'
 import { NextRequest } from 'next/server'
-import { assignableScopeKeys, isPlatformOwner } from '@/lib/scopes'
+import { isPlatformOwner } from '@/lib/scopes'
+import { assignableScopeKeys } from '@/lib/scopes-server'
 import { resolveRequestTenantId } from '@/lib/request-tenant'
 
 export async function POST(request: NextRequest) {

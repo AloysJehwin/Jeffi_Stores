@@ -1920,13 +1920,13 @@
     "semantic_hash": ""
   },
   "src/app/api/admin/users/[id]/route.ts": {
-    "mtime": 1788241977.4063005,
-    "ast_hash": "d1999e1ac89f110d19dac58364765bf2",
+    "mtime": 1788252525.493563,
+    "ast_hash": "590fe36315bc47f2807d9496a33b74d4",
     "semantic_hash": ""
   },
   "src/app/api/admin/users/route.ts": {
-    "mtime": 1788241977.4057946,
-    "ast_hash": "252b48c249247a43b8c94b562005a0c1",
+    "mtime": 1788252530.7003977,
+    "ast_hash": "9da5799b5c689e0bfac7bab5fc0290df",
     "semantic_hash": ""
   },
   "src/app/api/ai-assistant/feedback/route.ts": {
@@ -4085,8 +4085,8 @@
     "semantic_hash": ""
   },
   "src/lib/scopes.ts": {
-    "mtime": 1788250312.7438233,
-    "ast_hash": "6664bb5012c0609d66750a4c22c32cc7",
+    "mtime": 1788252520.2371686,
+    "ast_hash": "2e4f052db8de0861136803223b6c5a90",
     "semantic_hash": ""
   },
   "src/lib/search.ts": {
@@ -6655,8 +6655,8 @@
     "semantic_hash": ""
   },
   "tests/lib/automation-emails.test.ts": {
-    "mtime": 1787763975.699404,
-    "ast_hash": "e30c96dd194c956a6a10664c7442013c",
+    "mtime": 1788253064.0249963,
+    "ast_hash": "dbef8c2cca65a6e93c599968e5594d38",
     "semantic_hash": ""
   },
   "tests/lib/business-discount.test.ts": {
@@ -9465,8 +9465,8 @@
     "semantic_hash": ""
   },
   "tests/lib/razorpay-route.test.ts": {
-    "mtime": 1788207057.0759335,
-    "ast_hash": "16b39acfbca91152d38a020f7d032940",
+    "mtime": 1788252858.1882818,
+    "ast_hash": "a05ae5ab33b877fd3a17efe4a673f0ab",
     "semantic_hash": ""
   },
   "tests/lib/razorpay-subscriptions.test.ts": {
@@ -9787,6 +9787,11 @@
   "tests/middleware-tenant-header.test.ts": {
     "mtime": 1788203501.4563544,
     "ast_hash": "623dd4f5fae8d79c4a3c42e59edc7c9e",
+    "semantic_hash": ""
+  },
+  "src/lib/scopes-server.ts": {
+    "mtime": 1788253028.546326,
+    "ast_hash": "abceaa62fe81ccccf2291ac39e222859",
     "semantic_hash": ""
   }
 }
