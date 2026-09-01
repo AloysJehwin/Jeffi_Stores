@@ -334,7 +334,7 @@ describe('tenant-registry — extended coverage', () => {
       const mod = await importRegistry()
       queueRows({ rows: [] })
       await mod.writeTenantEc2('t-1', '10.0.0.5')
-      expect(poolQuery.mock.calls[0][1]).toEqual(['10.0.0.5', 't-1'])
+      expect(poolQuery.mock.calls[0][1]).toEqual(['10.0.0.5', null, 't-1'])
     })
   })
 
