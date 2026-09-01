@@ -142,10 +142,22 @@ export default async function OnboardPage() {
   }
 
   const [plans, draft] = await Promise.all([listPlans(), getDraft(owner.id)])
+
+  // A submitted draft belongs to a store that already exists. Replaying it whole put the
+  // PREVIOUS store's name, slug and plan into the form for a second store, with nothing to
+  // say they were stale. Only what belongs to the owner rather than the store carries over:
+  // their legal entity, warehouse and bank. An in-progress draft is resumed as before.
+  const submitted = draft?.status === 'submitted'
+  const carried = submitted
+    ? (({ bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, wh, bank, bankVerified, mobile }: any) =>
+        ({ bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, wh, bank, bankVerified, mobile }))(draft!.data ?? {})
+    : (draft?.data ?? {})
+
   return (
     <OnboardWizard
       plans={plans}
-      initialDraft={draft ? { current_step: draft.current_step, data: draft.data } : null}
+      initialDraft={draft ? { current_step: submitted ? 0 : draft.current_step, data: carried } : null}
+      reusingPreviousDetails={submitted}
     />
   )
 }
