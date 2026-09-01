@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
 import { getRazorpayInstance } from '@/lib/razorpay'
+import { storeBaseUrlAsync } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
 
     const rzp = getRazorpayInstance() as any
     const expiresAt = Math.floor(Date.now() / 1000) + expiryHours * 60 * 60
+    const storeBaseUrl = await storeBaseUrlAsync()
 
     const link = await rzp.paymentLink.create({
       amount: Math.round(parseFloat(order.total_amount) * 100),
@@ -55,7 +57,7 @@ export async function POST(request: NextRequest) {
       reminder_enable: true,
       notes: { order_id: orderId, order_number: order.order_number },
       expire_by: expiresAt,
-      callback_url: `${process.env.NEXT_PUBLIC_APP_URL || ''}/api/razorpay/payment-link/callback`,
+      callback_url: `${storeBaseUrl}/api/razorpay/payment-link/callback`,
       callback_method: 'get',
     })
 

@@ -2,7 +2,9 @@ import { NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { query, queryOne } from '@/lib/db'
 import { NextRequest } from 'next/server'
-import { ALL_SCOPE_KEYS, isPlatformOwner } from '@/lib/scopes'
+import { isPlatformOwner } from '@/lib/scopes'
+import { assignableScopeKeys } from '@/lib/scopes-server'
+import { resolveRequestTenantId } from '@/lib/request-tenant'
 import { revokeAllForPrincipal } from '@/lib/auth-sessions'
 
 export async function PATCH(
@@ -38,7 +40,8 @@ export async function PATCH(
     let i = 1
 
     if (scopes !== undefined) {
-      if (!Array.isArray(scopes) || scopes.some((s: string) => !ALL_SCOPE_KEYS.includes(s))) {
+      const allowed = await assignableScopeKeys(await resolveRequestTenantId())
+      if (!Array.isArray(scopes) || scopes.some((s: string) => !allowed.includes(s))) {
         return NextResponse.json({ error: 'Invalid scopes' }, { status: 400 })
       }
       updates.push(`scopes = $${i++}`)

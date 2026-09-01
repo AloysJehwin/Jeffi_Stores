@@ -2,6 +2,7 @@
 
 import { useState, useRef } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 export default function LogoUploader({ initialUrl }: { initialUrl: string }) {
   const { showToast } = useToast()
@@ -62,24 +63,26 @@ export default function LogoUploader({ initialUrl }: { initialUrl: string }) {
         </div>
         <div className="flex flex-col gap-2">
           <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" onChange={onFile} className="hidden" />
-          <button
-            type="button"
-            onClick={() => inputRef.current?.click()}
-            disabled={busy}
-            className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors disabled:opacity-60"
-          >
-            {busy ? 'Uploading…' : url ? 'Replace logo' : 'Upload logo'}
-          </button>
-          {url && (
+          <RequireWrite scope="settings:write">
             <button
               type="button"
-              onClick={clearLogo}
+              onClick={() => inputRef.current?.click()}
               disabled={busy}
-              className="px-4 py-2 text-sm font-medium bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground-secondary rounded-lg transition-colors disabled:opacity-60"
+              className="px-4 py-2 text-sm font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-lg transition-colors disabled:opacity-60"
             >
-              Use default
+              {busy ? 'Uploading…' : url ? 'Replace logo' : 'Upload logo'}
             </button>
-          )}
+            {url && (
+              <button
+                type="button"
+                onClick={clearLogo}
+                disabled={busy}
+                className="px-4 py-2 text-sm font-medium bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground-secondary rounded-lg transition-colors disabled:opacity-60"
+              >
+                Use default
+              </button>
+            )}
+          </RequireWrite>
         </div>
       </div>
     </div>

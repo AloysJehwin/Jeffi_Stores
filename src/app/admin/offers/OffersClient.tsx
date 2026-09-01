@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import Toggle from '@/components/ui/Toggle'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface AdminOffer {
   id: string
@@ -26,8 +27,10 @@ function daysLeft(iso: string | null): number | null {
   return Math.floor((new Date(iso).getTime() - Date.now()) / 86_400_000)
 }
 
-export default function OffersClient({ canWrite }: { canWrite: boolean }) {
+export default function OffersClient({ canWrite: canWriteProp }: { canWrite: boolean }) {
   const { showToast } = useToast()
+  const hasWriteScope = useCanWrite('coupons:write')
+  const canWrite = canWriteProp && hasWriteScope
   const [offers, setOffers] = useState<AdminOffer[]>([])
   const [problem, setProblem] = useState<{ reason: string; detail: string } | null>(null)
   const [loading, setLoading] = useState(true)

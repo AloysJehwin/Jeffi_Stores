@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { CheckCircle, XCircle, Loader2, Code, Mail, Sparkles } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface ProposedTool {
   id: string
@@ -176,58 +177,60 @@ export default function ProposedToolsPage() {
             )}
 
             {item.status === 'proposed' && (
-              <div className="flex flex-col gap-2">
-                {rejectingId === item.id ? (
-                  <div className="flex flex-col gap-1.5">
-                    <input
-                      type="text"
-                      autoFocus
-                      value={rejectReason}
-                      onChange={e => setRejectReason(e.target.value)}
-                      placeholder="Reason for rejecting (optional)"
-                      className="w-full px-3 py-1.5 text-xs border border-border-default rounded bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') submitDecision(item.id, 'reject', rejectReason)
-                        if (e.key === 'Escape') { setRejectingId(null); setRejectReason('') }
-                      }}
-                    />
+              <RequireWrite scope="agent:write">
+                <div className="flex flex-col gap-2">
+                  {rejectingId === item.id ? (
+                    <div className="flex flex-col gap-1.5">
+                      <input
+                        type="text"
+                        autoFocus
+                        value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)}
+                        placeholder="Reason for rejecting (optional)"
+                        className="w-full px-3 py-1.5 text-xs border border-border-default rounded bg-surface text-foreground focus:outline-none focus:ring-2 focus:ring-accent-500"
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') submitDecision(item.id, 'reject', rejectReason)
+                          if (e.key === 'Escape') { setRejectingId(null); setRejectReason('') }
+                        }}
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          disabled={busyId === item.id}
+                          onClick={() => submitDecision(item.id, 'reject', rejectReason)}
+                          className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
+                        >
+                          {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
+                          Confirm reject
+                        </button>
+                        <button
+                          onClick={() => { setRejectingId(null); setRejectReason('') }}
+                          className="px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold border border-border-default"
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
                     <div className="flex gap-2">
                       <button
                         disabled={busyId === item.id}
-                        onClick={() => submitDecision(item.id, 'reject', rejectReason)}
-                        className="flex-1 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
+                        onClick={() => decide(item.id, 'approve')}
+                        className="flex-1 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
                       >
-                        {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <XCircle className="w-3.5 h-3.5" />}
-                        Confirm reject
+                        {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                        Approve and register
                       </button>
                       <button
-                        onClick={() => { setRejectingId(null); setRejectReason('') }}
-                        className="px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold border border-border-default"
+                        disabled={busyId === item.id}
+                        onClick={() => decide(item.id, 'reject')}
+                        className="flex-1 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default disabled:opacity-50"
                       >
-                        Cancel
+                        <XCircle className="w-3.5 h-3.5" /> Reject
                       </button>
                     </div>
-                  </div>
-                ) : (
-                  <div className="flex gap-2">
-                    <button
-                      disabled={busyId === item.id}
-                      onClick={() => decide(item.id, 'approve')}
-                      className="flex-1 px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded text-xs font-semibold flex items-center justify-center gap-1 disabled:opacity-50"
-                    >
-                      {busyId === item.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                      Approve and register
-                    </button>
-                    <button
-                      disabled={busyId === item.id}
-                      onClick={() => decide(item.id, 'reject')}
-                      className="flex-1 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground rounded text-xs font-semibold flex items-center justify-center gap-1 border border-border-default disabled:opacity-50"
-                    >
-                      <XCircle className="w-3.5 h-3.5" /> Reject
-                    </button>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              </RequireWrite>
             )}
           </div>
         ))}

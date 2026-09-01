@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface InitiateRefundButtonProps {
   orderId: string
@@ -50,6 +51,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
         </p>
 
         {showConfirm ? (
+          <RequireWrite scope="orders:write">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -75,7 +77,9 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
               Cancel
             </button>
           </div>
+          </RequireWrite>
         ) : (
+          <RequireWrite scope="orders:write">
           <button
             type="button"
             onClick={() => setShowConfirm(true)}
@@ -83,6 +87,7 @@ export default function InitiateRefundButton({ orderId, orderNumber, amount, isR
           >
             Initiate Refund ₹{amount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
           </button>
+          </RequireWrite>
         )}
       </div>
     </div>

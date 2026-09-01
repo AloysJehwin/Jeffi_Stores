@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import CopySku from '@/components/ui/CopySku'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Props {
   productId: string
@@ -107,18 +108,20 @@ export default function DraftConfirmModal({ productId, productName, productSku, 
           >
             Cancel
           </button>
-          <button
-            onClick={existingDraftId ? () => router.push(`${apPrefix}/admin/${entity}/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`) : createDraft}
-            disabled={loading}
-            className="flex-1 px-4 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                Creating…
-              </>
-            ) : existingDraftId ? 'Edit Draft' : 'Create Draft & Edit'}
-          </button>
+          <RequireWrite scope="orders:write">
+            <button
+              onClick={existingDraftId ? () => router.push(`${apPrefix}/admin/${entity}/edit/${productId}${backUrl ? `?back=${encodeURIComponent(backUrl)}` : ''}`) : createDraft}
+              disabled={loading}
+              className="flex-1 px-4 py-2.5 rounded-xl bg-accent-500 hover:bg-accent-600 text-white text-sm font-semibold transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <span className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                  Creating…
+                </>
+              ) : existingDraftId ? 'Edit Draft' : 'Create Draft & Edit'}
+            </button>
+          </RequireWrite>
         </div>
       </div>
     </div>,

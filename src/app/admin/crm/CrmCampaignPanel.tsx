@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 import { ap } from '@/lib/admin-path'
 
 interface CampaignForm {
@@ -284,31 +285,33 @@ export default function CrmCampaignPanel({ defaultKind, recipientCount, onClose 
       )}
 
       {/* Action buttons */}
-      <div className="flex items-center gap-2 flex-wrap pt-1">
-        <button
-          type="button"
-          onClick={saveOnly}
-          disabled={saving || running || !form}
-          className="px-3 py-1.5 rounded-lg border border-border-secondary text-xs font-semibold text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
-        >
-          {saving ? 'Saving…' : 'Save settings'}
-        </button>
-        <button
-          type="button"
-          onClick={saveAndRun}
-          disabled={saving || running || !form}
-          className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
-        >
-          {running ? (
-            <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : (
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-            </svg>
-          )}
-          {running ? 'Sending…' : `Save & send to ${recipientCount}`}
-        </button>
-      </div>
+      <RequireWrite scope="crm:write">
+        <div className="flex items-center gap-2 flex-wrap pt-1">
+          <button
+            type="button"
+            onClick={saveOnly}
+            disabled={saving || running || !form}
+            className="px-3 py-1.5 rounded-lg border border-border-secondary text-xs font-semibold text-foreground hover:bg-surface-secondary transition-colors disabled:opacity-50"
+          >
+            {saving ? 'Saving…' : 'Save settings'}
+          </button>
+          <button
+            type="button"
+            onClick={saveAndRun}
+            disabled={saving || running || !form}
+            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+          >
+            {running ? (
+              <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+              </svg>
+            )}
+            {running ? 'Sending…' : `Save & send to ${recipientCount}`}
+          </button>
+        </div>
+      </RequireWrite>
     </div>
   )
 }

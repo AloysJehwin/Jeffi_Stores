@@ -6,6 +6,7 @@ import { useSearchParams, useRouter } from 'next/navigation'
 import { createPortal } from 'react-dom'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import DatePicker from '@/components/ui/DatePicker'
@@ -94,6 +95,7 @@ function calcTotals(items: LineItem[]) {
 export default function CashSaleClient() {
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const canWrite = useCanWrite('invoices')
   const searchParams = useSearchParams()
   const router = useRouter()
   const [view, setView] = useState<View>('list')
@@ -657,6 +659,7 @@ export default function CashSaleClient() {
                     <div className="w-2 h-2 rounded-full bg-green-500" />
                     <span className="text-xs text-foreground-muted">Walk-in Customer</span>
                   </div>
+                  {canWrite && (
                   <button
                     type="submit"
                     disabled={submitting}
@@ -664,6 +667,7 @@ export default function CashSaleClient() {
                   >
                     {submitting ? 'Processing…' : 'Complete Sale'}
                   </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -680,6 +684,7 @@ export default function CashSaleClient() {
           <h1 className="text-2xl sm:text-3xl font-bold text-secondary-500 dark:text-foreground">Cash Sales</h1>
           <p className="text-foreground-secondary mt-1 text-sm">Walk-in sales — no customer details</p>
         </div>
+        {canWrite && (
         <button
           onClick={() => { resetForm(); setView('new') }}
           className="flex items-center gap-2 px-4 py-2 bg-secondary-500 hover:bg-secondary-600 dark:bg-secondary-400 dark:hover:bg-secondary-300 dark:text-secondary-900 text-white rounded-lg text-sm font-semibold transition-colors"
@@ -689,6 +694,7 @@ export default function CashSaleClient() {
           </svg>
           New Cash Sale
         </button>
+        )}
       </div>
 
       <div className="bg-surface-elevated border border-border-default rounded-xl p-4 space-y-3">
@@ -856,7 +862,7 @@ export default function CashSaleClient() {
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
                           </a>
-                          {sale.status !== 'cancelled' && (
+                          {sale.status !== 'cancelled' && canWrite && (
                             <button
                               onClick={() => cancelSale(sale.id)}
                               disabled={cancellingId === sale.id}
@@ -930,7 +936,7 @@ export default function CashSaleClient() {
                     >
                       View Detail
                     </a>
-                    {sale.status !== 'cancelled' && (
+                    {sale.status !== 'cancelled' && canWrite && (
                       <button
                         onClick={() => cancelSale(sale.id)}
                         disabled={cancellingId === sale.id}
@@ -981,6 +987,7 @@ export default function CashSaleClient() {
 function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClose: () => void; onCancelled: () => void }) {
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const canWrite = useCanWrite('invoices')
   const [cancelling, setCancelling] = useState(false)
 
   async function handleCancel() {
@@ -1116,7 +1123,7 @@ function SaleDetailModal({ sale, onClose, onCancelled }: { sale: CashSale; onClo
               </svg>
               View Order
             </a>
-            {!isCancelled && (
+            {!isCancelled && canWrite && (
               <div className="ml-auto">
                 <button
                   onClick={handleCancel}

@@ -203,21 +203,21 @@ export async function getAssignedCouponCode(couponId: string): Promise<{ code: s
   )
 }
 
-export function buildUnsubscribeUrl(token: string, campaignKind: CampaignKind): string {
-  return `${APP_URL}/api/unsubscribe?token=${token}&campaign=${campaignKind}`
+export function buildUnsubscribeUrl(token: string, campaignKind: CampaignKind, baseUrl: string = APP_URL): string {
+  return `${baseUrl}/api/unsubscribe?token=${token}&campaign=${campaignKind}`
 }
 
-export function buildTrackingPixelUrl(sentId: string): string {
-  return `${APP_URL}/api/email-events/open?id=${sentId}`
+export function buildTrackingPixelUrl(sentId: string, baseUrl: string = APP_URL): string {
+  return `${baseUrl}/api/email-events/open?id=${sentId}`
 }
 
-export function buildClickTrackingUrl(sentId: string, destinationUrl: string): string {
-  return `${APP_URL}/api/email-events/click?id=${sentId}&url=${encodeURIComponent(destinationUrl)}`
+export function buildClickTrackingUrl(sentId: string, destinationUrl: string, baseUrl: string = APP_URL): string {
+  return `${baseUrl}/api/email-events/click?id=${sentId}&url=${encodeURIComponent(destinationUrl)}`
 }
 
-export function rewriteLinksForTracking(html: string, sentId: string): string {
+export function rewriteLinksForTracking(html: string, sentId: string, baseUrl: string = APP_URL): string {
   return html.replace(/href="(https?:\/\/[^"]+)"/g, (_match, url) => {
-    return `href="${buildClickTrackingUrl(sentId, url)}"`
+    return `href="${buildClickTrackingUrl(sentId, url, baseUrl)}"`
   })
 }
 
@@ -228,12 +228,12 @@ export function renderTemplate(template: string, vars: Record<string, string | n
   })
 }
 
-export function wrapWithTracking(html: string, sentId: string, unsubscribeUrl: string): string {
-  const rewritten = rewriteLinksForTracking(html, sentId)
-  const pixel = `<img src="${buildTrackingPixelUrl(sentId)}" width="1" height="1" alt="" style="display:none;"/>`
+export function wrapWithTracking(html: string, sentId: string, unsubscribeUrl: string, baseUrl: string = APP_URL, storeName?: string): string {
+  const rewritten = rewriteLinksForTracking(html, sentId, baseUrl)
+  const pixel = `<img src="${buildTrackingPixelUrl(sentId, baseUrl)}" width="1" height="1" alt="" style="display:none;"/>`
   const footer = `
     <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-      <p>You're receiving this email because you signed up at Jeffi Stores.<br/>
+      <p>You're receiving this email because you signed up at ${storeName || 'Jeffi Stores'}.<br/>
       <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a> from marketing emails.</p>
     </div>
   `

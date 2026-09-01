@@ -388,6 +388,17 @@ export async function middleware(request: NextRequest) {
             headers: { 'Content-Type': 'text/plain' },
           })
         }
+        // Page-level scope gate. Only the /admin/* branch below used to run this, and on an
+        // admin host every page arrives here instead — so pages were reachable without the
+        // scope they declare. Most admin pages are server components that query directly
+        // rather than through /api/admin, whose own gate would not have covered them.
+        const pageScope = getScopeForPath(`/admin${slug}`)
+        if (pageScope && !hasScope(payload.role, payload.scopes || [], pageScope)) {
+          return new NextResponse('Insufficient permissions', {
+            status: 403,
+            headers: { 'Content-Type': 'text/plain' },
+          })
+        }
         // Block mobile users from write-action pages (orders exempt)
         if (isMobileUA(request.headers.get('user-agent')) && isAdminWritePath(`/admin${slug}`)) {
           const parentPath = adminWritePathParent(`/admin${slug}`)

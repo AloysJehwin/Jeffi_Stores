@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 export default function ExtensionTokenCard() {
   const [copied, setCopied] = useState(false)
@@ -59,12 +60,14 @@ export default function ExtensionTokenCard() {
         </div>
         {error && <p className="text-sm text-red-500">{error}</p>}
         {token && <p className="text-xs text-amber-600 dark:text-amber-400">Auto-copy unavailable on this origin — select the token above and copy it manually.</p>}
-        <button
-          onClick={handleCopy}
-          className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${copied ? 'bg-green-500 text-white' : 'bg-accent-500 hover:bg-accent-600 text-white'}`}
-        >
-          {copied ? 'Copied!' : 'Copy Token'}
-        </button>
+        <RequireWrite scope="settings:write">
+          <button
+            onClick={handleCopy}
+            className={`w-full py-2 rounded-lg text-sm font-semibold transition-colors ${copied ? 'bg-green-500 text-white' : 'bg-accent-500 hover:bg-accent-600 text-white'}`}
+          >
+            {copied ? 'Copied!' : 'Copy Token'}
+          </button>
+        </RequireWrite>
         <p className="text-xs text-foreground-muted">Scoped to product image uploads only, valid 24 hours. Generate a fresh token when it expires. Your login session is never shared.</p>
       </div>
     </div>

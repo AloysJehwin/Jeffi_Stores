@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface CustomerActionButtonProps {
   customerId: string
@@ -131,6 +132,7 @@ export default function CustomerActionButton({
   }
 
   return (
+    <RequireWrite scope="customers:write">
     <div className="flex flex-wrap gap-3">
       {(isActive || isFlagged) && (
         <button
@@ -157,5 +159,6 @@ export default function CustomerActionButton({
         </button>
       )}
     </div>
+    </RequireWrite>
   )
 }

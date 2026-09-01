@@ -45,6 +45,34 @@ export function currentBrandName(): string {
 }
 
 /**
+ * Admin URL for whichever store the current request belongs to. A tenant's mail linked to
+ * admin.jeffistores.in — the platform's own panel, which their certificate cannot open.
+ */
+export function currentAdminBaseUrl(): string {
+  const t = getCurrentTenant()
+  if (t?.slug) return `https://admin-${t.slug}.${PLATFORM_DOMAIN}`
+  return process.env.ADMIN_BASE_URL || `https://admin.${PLATFORM_DOMAIN}`
+}
+
+/** Storefront URL for the current store. */
+export function currentStoreUrl(): string {
+  const t = getCurrentTenant()
+  if (t?.slug) return `https://${t.slug}.${PLATFORM_DOMAIN}`
+  return process.env.APP_URL || `https://${PLATFORM_DOMAIN}`
+}
+
+/**
+ * Storefront base URL, resolved even before the first DB query (via the x-tenant-slug header) —
+ * the one to prefer in mail/notification builders, which run before any tenant-scoped query and
+ * would otherwise capture the platform host. Falls back to the platform APP_URL off-tenant.
+ */
+export async function storeBaseUrlAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (t?.slug) return `https://${t.slug}.${PLATFORM_DOMAIN}`
+  return process.env.APP_URL || `https://${PLATFORM_DOMAIN}`
+}
+
+/**
  * `From` header for customer-facing mail.
  *
  * On a tenant host this is the tenant's name and its own noreply- address, so a buyer sees the
@@ -59,6 +87,76 @@ export function customerMailFrom(): string {
     return `"${name}" <${tenantNoReplyAddress(t.slug)}>`
   }
   return `"${platformBrandName()}" <${process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`}>`
+}
+
+/**
+ * Async form of the sender, and the one to prefer. currentBrandName/customerMailFrom read the
+ * tenant from AsyncLocalStorage, which db.ts establishes lazily on the first query — so on a
+ * path that has not queried yet they silently return the platform's name and noreply address.
+ * This falls back to the x-tenant-slug header middleware sets, the same fix identityDefaults
+ * needed.
+ */
+export async function resolveCurrentTenant(): Promise<{ slug: string; displayName: string | null } | null> {
+  const t = getCurrentTenant()
+  if (t?.slug) return { slug: t.slug, displayName: t.displayName ?? null }
+  try {
+    const { headers } = await import('next/headers')
+    const slug = (await headers()).get('x-tenant-slug')
+    if (!slug) return null
+    const { lookupTenantContextBySlug } = await import('./tenant-registry')
+    const ctx = await lookupTenantContextBySlug(slug)
+    return ctx ? { slug: ctx.slug, displayName: ctx.displayName ?? null } : { slug, displayName: null }
+  } catch {
+    return null
+  }
+}
+
+/** `From` for customer mail, resolved even when the ALS context is not yet established. */
+export async function customerMailFromAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (t?.slug) {
+    const name = t.displayName?.trim() || `${t.slug} Store`
+    return `"${name}" <${tenantNoReplyAddress(t.slug)}>`
+  }
+  return `"${platformBrandName()}" <${process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`}>`
+}
+
+/** Store name for mail bodies, resolved the same way. */
+export async function currentBrandNameAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (t?.displayName?.trim()) return t.displayName.trim()
+  return t?.slug ? `${t.slug} Store` : platformBrandName()
+}
+
+/**
+ * `From` for marketing/campaign mail, resolved even before the first query. On a tenant host this
+ * is the tenant's name and its own campaigns- address; off-tenant it is the platform's promo
+ * sender. Keeps campaign mail from a tenant signed as that tenant, not the platform.
+ */
+export async function campaignMailFromAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (t?.slug) {
+    const name = t.displayName?.trim() || `${t.slug} Store`
+    return `"${name}" <${tenantCampaignAddress(t.slug)}>`
+  }
+  const addr = process.env.SES_PROMO_FROM_EMAIL || process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`
+  return `"${platformBrandName()}" <${addr}>`
+}
+
+/**
+ * Contact line for a mail footer. A tenant's customers were shown the platform's phone and
+ * mailbox; a tenant that has set neither gets an empty line rather than someone else's, which
+ * is the same choice identityDefaults makes.
+ */
+export async function storeContactLine(): Promise<string> {
+  try {
+    const { getStoreIdentity } = await import('./site-controls')
+    const id = await getStoreIdentity()
+    const parts = [id.phone?.trim(), id.email?.trim()].filter(Boolean)
+    return parts.join(' | ')
+  } catch {
+    return ''
+  }
 }
 
 /** `From` for operator-facing mail (admin alerts). Always the platform, never a tenant. */

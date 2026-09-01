@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback, useEffect } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import GalleryPicker from '@/components/admin/GalleryPicker'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import { ALL_DIMENSIONS, DIMENSION_LABEL, UNITS, type Dimension, computeAreaFactor, computeVolumeFactor } from '@/lib/units'
 
 type SnapRow = { id: string; name?: string; before: Record<string, any> }
@@ -101,6 +102,7 @@ const inputCls = 'w-full px-3 py-2 border border-border-secondary rounded-lg bg-
 
 export default function ControlsClient({ categories, brands }: { categories: Category[]; brands: Brand[] }) {
   const confirm = useConfirm()
+  const canWrite = useCanWrite('controls:write')
 
   // ── filters ───────────────────────────────────────────────────────────────
   const [activeFilters, setActiveFilters] = useState<Partial<Record<FilterKey, string>>>({})
@@ -693,7 +695,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
                 opDef?.danger
                   ? 'bg-red-600 hover:bg-red-700 text-white'
                   : 'bg-accent-500 hover:bg-accent-600 text-white'
-              }`}>
+              } ${!canWrite ? 'hidden' : ''}`}>
               {imageJob ? 'Replacing images…' : applying ? 'Applying…' : `Apply to ${selectedIds.size} product${selectedIds.size !== 1 ? 's' : ''}`}
             </button>
 
@@ -999,7 +1001,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
           {applySuccess && (
             <div className="flex items-center gap-3 flex-wrap">
               <p className="text-sm text-green-600 dark:text-green-400 font-medium flex-1">{applySuccess}</p>
-              {lastLogId && lastLogLabel && (
+              {lastLogId && lastLogLabel && canWrite && (
                 <button
                   type="button"
                   onClick={() => handleRollback(lastLogId, lastLogLabel)}
@@ -1104,7 +1106,7 @@ export default function ControlsClient({ categories, brands }: { categories: Cat
                             {log.rolled_back_at ? ' · Rolled back' : ''}
                           </p>
                         </div>
-                        {!log.rolled_back_at && (
+                        {!log.rolled_back_at && canWrite && (
                           <span
                             role="button"
                             onClick={e => { e.stopPropagation(); handleRollback(log.id, opLabel) }}

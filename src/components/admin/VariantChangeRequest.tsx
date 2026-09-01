@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import AdminSelect from '@/components/admin/AdminSelect'
 import CopySku from '@/components/ui/CopySku'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface OrderItemLite {
   id: string
@@ -152,7 +153,9 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
       <div className="px-6 py-4 border-b border-border-default flex items-center justify-between">
         <h2 className="text-lg font-semibold text-foreground">Request Variant Change</h2>
         {!open && !done && !hasPending && (
-          <button onClick={openPanel} className="text-sm font-semibold text-accent-500 hover:text-accent-400">Start</button>
+          <RequireWrite scope="orders:write">
+            <button onClick={openPanel} className="text-sm font-semibold text-accent-500 hover:text-accent-400">Start</button>
+          </RequireWrite>
         )}
       </div>
       <div className="p-4 sm:p-6 space-y-4">
@@ -178,10 +181,12 @@ export default function VariantChangeRequest({ orderId, items }: { orderId: stri
                       {STATUS_LABEL[h.status] || h.status}
                     </span>
                     {(h.status === 'pending_customer' || h.status === 'awaiting_payment') && (
-                      <button onClick={() => cancelRequest(h.id)} disabled={cancellingId === h.id}
-                        className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50">
-                        {cancellingId === h.id ? 'Cancelling…' : 'Cancel request'}
-                      </button>
+                      <RequireWrite scope="orders:write">
+                        <button onClick={() => cancelRequest(h.id)} disabled={cancellingId === h.id}
+                          className="text-[11px] text-red-600 hover:text-red-700 disabled:opacity-50">
+                          {cancellingId === h.id ? 'Cancelling…' : 'Cancel request'}
+                        </button>
+                      </RequireWrite>
                     )}
                   </div>
                 </div>

@@ -5,7 +5,9 @@ import { generateClientCertificate } from '@/lib/certificates'
 import { sendAdminCertificateEmail } from '@/lib/email'
 import { query } from '@/lib/db'
 import { NextRequest } from 'next/server'
-import { ALL_SCOPE_KEYS, isPlatformOwner } from '@/lib/scopes'
+import { isPlatformOwner } from '@/lib/scopes'
+import { assignableScopeKeys } from '@/lib/scopes-server'
+import { resolveRequestTenantId } from '@/lib/request-tenant'
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,8 +35,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Scopes must be an array' }, { status: 400 })
     }
     if (scopes) {
+      // Not ALL_SCOPE_KEYS: a tenant owner is super_admin, so validating against the platform's
+      // full set let them grant control-plane scopes the UI does not offer.
+      const allowed = await assignableScopeKeys(await resolveRequestTenantId())
       for (const scope of scopes) {
-        if (!ALL_SCOPE_KEYS.includes(scope)) {
+        if (!allowed.includes(scope)) {
           return NextResponse.json({ error: `Invalid scope: ${scope}` }, { status: 400 })
         }
       }

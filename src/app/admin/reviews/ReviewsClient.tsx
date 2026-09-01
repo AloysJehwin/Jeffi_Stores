@@ -7,6 +7,7 @@ import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import { ap } from '@/lib/admin-path'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface Review {
   id: string
@@ -41,9 +42,11 @@ function Stars({ rating }: { rating: number }) {
   )
 }
 
-export default function ReviewsClient({ canWrite = false }: { canWrite?: boolean }) {
+export default function ReviewsClient({ canWrite: canWriteProp = false }: { canWrite?: boolean }) {
   const searchParams = useSearchParams()
   const router = useRouter()
+  const hasWriteScope = useCanWrite('reviews:write')
+  const canWrite = canWriteProp && hasWriteScope
 
   const [reviews, setReviews] = useState<Review[]>([])
   const [total, setTotal] = useState(0)

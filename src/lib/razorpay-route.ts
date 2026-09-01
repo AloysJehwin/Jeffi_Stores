@@ -10,7 +10,7 @@ import { getRazorpayInstance } from './razorpay'
  * 3. Razorpay settles tenant's linked account balance to their registered bank
  *
  * Commission structure (platform takes from each order):
- *   - Platform fee: configurable % (default 3%)
+ *   - Platform fee: configurable % (default 5%), +5% when the tenant is on daily payout (→10%)
  *   - Delhivery charge correction buffer: ₹20 per COD order
  *   - Razorpay's own charges, passed through to the tenant (see below)
  *
@@ -24,7 +24,35 @@ import { getRazorpayInstance } from './razorpay'
  * rather than estimated, because the real rate varies by method — UPI bills far less than cards.
  */
 
-export const PLATFORM_COMMISSION_PCT = parseFloat(process.env.PLATFORM_COMMISSION_PCT || '3') / 100
+export const PLATFORM_COMMISSION_PCT = parseFloat(process.env.PLATFORM_COMMISSION_PCT || '5') / 100
+
+/** Extra commission for tenants who opt into daily (vs weekly) payout — added on top of the base. */
+export const DAILY_PAYOUT_SURCHARGE_PCT = parseFloat(process.env.DAILY_PAYOUT_SURCHARGE_PCT || '5') / 100
+
+/**
+ * Compute the effective commission rate for a transfer: base, plus the daily-payout surcharge
+ * when the tenant is on the faster cadence.
+ */
+function commissionPct(dailyPayout?: boolean): number {
+  return PLATFORM_COMMISSION_PCT + (dailyPayout ? DAILY_PAYOUT_SURCHARGE_PCT : 0)
+}
+
+/**
+ * Unix timestamp (seconds) at which a held transfer should auto-release.
+ *
+ * Weekly tenants release ~7 days out, daily tenants ~1 day out. Always at least 30 minutes in the
+ * future — Razorpay ignores an on_hold_until in the past, and a too-near value risks racing its
+ * own settlement cycle.
+ *
+ * CAVEAT: on_hold_until only gates the transfer if the PLATFORM's own linked-account settlement
+ * schedule is faster than this hold. The native per-linked-account schedule (support-only, no API)
+ * takes precedence, so the platform main account must be on a fast cycle for this to be effective.
+ */
+function nextPayoutReleaseTs(dailyPayout?: boolean): number {
+  const now = Math.floor(Date.now() / 1000)
+  const days = dailyPayout ? 1 : 7
+  return Math.max(now + 30 * 60, now + days * 24 * 60 * 60)
+}
 
 /** Razorpay's fee for moving money to a linked account, charged on the transferred amount. */
 export const ROUTE_TRANSFER_FEE_PCT = parseFloat(process.env.ROUTE_TRANSFER_FEE_PCT || '0.25') / 100
@@ -291,10 +319,11 @@ export async function transferToLinkedAccount(opts: {
   delhiveryChargePaise?: number
   orderId?: string
   tenantSlug?: string
+  dailyPayout?: boolean
 }): Promise<TransferResult> {
   const rz = getRazorpayInstance()
 
-  const platformCommission = Math.round(opts.grossAmountPaise * PLATFORM_COMMISSION_PCT)
+  const platformCommission = Math.round(opts.grossAmountPaise * commissionPct(opts.dailyPayout))
   const delhivery = opts.delhiveryChargePaise ?? 0
   // NOTE: COD orders are settled via recordCodSettlement() (ledger-based), NOT here —
   // this transfer path is only for online payments that have a Razorpay payment_id.
@@ -324,7 +353,8 @@ export async function transferToLinkedAccount(opts: {
           delhivery_charge: delhivery,
         },
         linked_account_notes: ['order_id', 'tenant_slug'],
-        on_hold: 0,
+        on_hold: true,
+        on_hold_until: nextPayoutReleaseTs(opts.dailyPayout),
       }],
     },
   })
@@ -367,12 +397,14 @@ export async function recordCodSettlement(opts: {
   orderRef: string
   grossAmountInr: number
   actualDelhiveryChargeInr: number
+  dailyPayout?: boolean
 }): Promise<void> {
   const { controlPlanePool } = await import('./tenant-registry')
   const pool = controlPlanePool()
 
   const grossPaise = Math.round(opts.grossAmountInr * 100)
-  const commissionPaise = Math.round(grossPaise * PLATFORM_COMMISSION_PCT)
+  const rate = commissionPct(opts.dailyPayout)
+  const commissionPaise = Math.round(grossPaise * rate)
   const delhiveryPaise = Math.round(opts.actualDelhiveryChargeInr * 100)
   const tenantSharePaise = Math.max(0, grossPaise - commissionPaise - delhiveryPaise)
 
@@ -395,7 +427,7 @@ export async function recordCodSettlement(opts: {
        ($1, 'delhivery_correction', $6, $7, now())`,
     [opts.tenantId,
      opts.grossAmountInr, `COD collected — order ${opts.orderRef}`,
-     -(commissionPaise / 100), `Platform commission (${(PLATFORM_COMMISSION_PCT * 100).toFixed(1)}%) — order ${opts.orderRef}`,
+     -(commissionPaise / 100), `Platform commission (${(rate * 100).toFixed(1)}%) — order ${opts.orderRef}`,
      -(delhiveryPaise / 100), `Delhivery charge (actual) — order ${opts.orderRef}`]
   ).catch(() => {})
 }

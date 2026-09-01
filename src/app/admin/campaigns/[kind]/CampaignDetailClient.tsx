@@ -7,6 +7,7 @@ import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import { MessageCircle } from 'lucide-react'
 import { campaignSupportsWhatsApp } from '@/lib/campaigns/whatsapp-kinds'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface EligibleRecipient {
   reference_id: string
@@ -443,6 +444,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
 
   return (
     <div className="space-y-5">
+      <RequireWrite scope="campaigns:write">
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
         <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Regenerate template with AI</p>
         <div className="flex gap-2">
@@ -465,6 +467,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         </div>
         <p className="text-[10px] text-foreground-muted">AI will rewrite the subject and body. Your other settings are untouched.</p>
       </div>
+      </RequireWrite>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">
@@ -585,6 +588,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
         </div>
 
         {hasDraft && (
+          <RequireWrite scope="campaigns:write">
           <div className="mt-4 flex items-center gap-3 px-4 py-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700">
             <p className="text-sm text-amber-800 dark:text-amber-300 flex-1">Draft pending — changes not live yet.</p>
             <button type="button" onClick={discardDraft} className="text-xs text-amber-600 dark:text-amber-400 hover:underline">Discard</button>
@@ -593,8 +597,10 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
               {publishing ? 'Publishing…' : 'Publish'}
             </button>
           </div>
+          </RequireWrite>
         )}
 
+        <RequireWrite scope="campaigns:write">
         <div className="flex items-center gap-2 mt-5 flex-wrap">
           <input
             type="email"
@@ -620,6 +626,7 @@ export default function CampaignDetailClient({ kind }: { kind: string }) {
             {saving ? 'Saving…' : 'Save Draft'}
           </button>
         </div>
+        </RequireWrite>
       </div>
 
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5">

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface CustomerContactFormProps {
   customerId: string
@@ -46,6 +47,7 @@ export default function CustomerContactForm({ customerId }: CustomerContactFormP
 
   if (!isOpen) {
     return (
+      <RequireWrite scope="customers:write">
       <button
         onClick={() => setIsOpen(true)}
         className="w-full px-4 py-2 bg-zinc-700 hover:bg-zinc-600 dark:bg-zinc-700 dark:hover:bg-zinc-600 text-white rounded-lg text-sm font-medium transition-colors text-left flex items-center gap-2"
@@ -55,6 +57,7 @@ export default function CustomerContactForm({ customerId }: CustomerContactFormP
         </svg>
         Send Message
       </button>
+      </RequireWrite>
     )
   }
 

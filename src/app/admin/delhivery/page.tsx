@@ -5,6 +5,7 @@ import Link from 'next/link'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
 import DatePicker from '@/components/ui/DatePicker'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 type EligibleOrder = {
   id: string
@@ -48,6 +49,7 @@ const STATUS_STYLES: Record<PickupRequest['pickup_status'], string> = {
 }
 
 export default function DelhiveryPickupPage() {
+  const canWrite = useCanWrite('delhivery:write')
   const [orders, setOrders] = useState<EligibleOrder[]>([])
   const [pickupHistory, setPickupHistory] = useState<PickupRequest[]>([])
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -360,6 +362,7 @@ export default function DelhiveryPickupPage() {
 
             <div className="px-6 py-4 border-t border-border-default flex items-center justify-between gap-3">
               <p className="text-sm text-foreground-secondary">{selected.size} of {orders.length} selected</p>
+              {canWrite && (
               <button onClick={handleSubmit} disabled={submitting || selected.size === 0}
                 className="px-5 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center gap-2">
                 {submitting ? (
@@ -379,6 +382,7 @@ export default function DelhiveryPickupPage() {
                   </>
                 )}
               </button>
+              )}
             </div>
           </>
         )}
@@ -466,7 +470,7 @@ export default function DelhiveryPickupPage() {
                               </svg>
                             </button>
                           )}
-                          {req.pickup_status === 'pending' && orders.length > 0 && (
+                          {req.pickup_status === 'pending' && orders.length > 0 && canWrite && (
                             <button
                               onClick={() => { setAddAwbFor(addAwbFor === req.id ? null : req.id); setAddAwbOrderId('') }}
                               className="h-[34px] px-3 rounded-lg text-sm font-medium bg-surface border border-border-default text-foreground-secondary hover:text-foreground hover:border-accent-500 transition-colors whitespace-nowrap"
@@ -474,7 +478,7 @@ export default function DelhiveryPickupPage() {
                               + Add AWB
                             </button>
                           )}
-                          {req.pickup_status !== 'picked_up' && (
+                          {req.pickup_status !== 'picked_up' && canWrite && (
                             <AdminSelect
                               sm
                               value={req.pickup_status}

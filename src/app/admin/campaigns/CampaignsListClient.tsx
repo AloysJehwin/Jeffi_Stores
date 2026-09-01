@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface CampaignRow {
   kind: string
@@ -173,9 +174,11 @@ export default function CampaignsListClient() {
             Scenarios
           </Link>
         </div>
-        <Link href={ap('/admin/campaigns/new')} className="mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95">
-          + New Campaign
-        </Link>
+        <RequireWrite scope="campaigns:write">
+          <Link href={ap('/admin/campaigns/new')} className="mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95">
+            + New Campaign
+          </Link>
+        </RequireWrite>
       </div>
 
       {/* Search + Filters */}
@@ -255,13 +258,15 @@ export default function CampaignsListClient() {
                     <p className="text-sm font-medium text-amber-900 dark:text-amber-200">{d.name}</p>
                   </Link>
                   <div className="flex items-center gap-2 shrink-0">
-                    <Link href={ap(`/admin/campaigns/${d.kind}`)} className="px-2.5 py-1 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">
-                      Publish
-                    </Link>
-                    <button type="button" onClick={() => discardDraft(d)} disabled={busy === d.kind}
-                      className="px-2.5 py-1 text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors disabled:opacity-50">
-                      {busy === d.kind ? '…' : 'Discard'}
-                    </button>
+                    <RequireWrite scope="campaigns:write">
+                      <Link href={ap(`/admin/campaigns/${d.kind}`)} className="px-2.5 py-1 text-xs font-semibold bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors">
+                        Publish
+                      </Link>
+                      <button type="button" onClick={() => discardDraft(d)} disabled={busy === d.kind}
+                        className="px-2.5 py-1 text-xs font-semibold bg-surface border border-amber-300 dark:border-amber-600 text-amber-800 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/40 rounded-md transition-colors disabled:opacity-50">
+                        {busy === d.kind ? '…' : 'Discard'}
+                      </button>
+                    </RequireWrite>
                   </div>
                 </div>
               ))}
@@ -298,14 +303,16 @@ export default function CampaignsListClient() {
               </p>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              <button type="button" onClick={() => toggle(c)} disabled={busy === c.kind}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${c.enabled ? 'bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200' : 'bg-green-500 hover:bg-green-600 text-white'}`}>
-                {c.enabled ? 'Pause' : 'Activate'}
-              </button>
-              <button type="button" onClick={() => runNow(c)} disabled={busy === c.kind || !c.enabled}
-                className="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50">
-                Run now
-              </button>
+              <RequireWrite scope="campaigns:write">
+                <button type="button" onClick={() => toggle(c)} disabled={busy === c.kind}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50 ${c.enabled ? 'bg-zinc-200 hover:bg-zinc-300 text-zinc-800 dark:bg-zinc-700 dark:text-zinc-200' : 'bg-green-500 hover:bg-green-600 text-white'}`}>
+                  {c.enabled ? 'Pause' : 'Activate'}
+                </button>
+                <button type="button" onClick={() => runNow(c)} disabled={busy === c.kind || !c.enabled}
+                  className="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95 disabled:opacity-50">
+                  Run now
+                </button>
+              </RequireWrite>
               <Link href={ap(`/admin/campaigns/${c.kind}`)} className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-semibold transition-all">
                 View / Edit
               </Link>

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 export interface AIFillField {
   name: string
@@ -67,29 +68,31 @@ export default function AIFillForm({ fields, onFill, context }: Props) {
           placeholder="e.g. 10% discount coupon for new customers, valid 30 days…"
           className="flex-1 px-3 py-2 text-sm border border-violet-200 dark:border-violet-700 rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent"
         />
-        <button
-          type="button"
-          onClick={handleFill}
-          disabled={loading || !scenario.trim()}
-          className="px-4 py-2 text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
-        >
-          {loading ? (
-            <>
-              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-              </svg>
-              Filling…
-            </>
-          ) : filled ? (
-            <>
-              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-              </svg>
-              Filled!
-            </>
-          ) : 'Fill with AI'}
-        </button>
+        <RequireWrite scope="products:write">
+          <button
+            type="button"
+            onClick={handleFill}
+            disabled={loading || !scenario.trim()}
+            className="px-4 py-2 text-sm font-semibold bg-violet-600 hover:bg-violet-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 flex-shrink-0"
+          >
+            {loading ? (
+              <>
+                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                </svg>
+                Filling…
+              </>
+            ) : filled ? (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                </svg>
+                Filled!
+              </>
+            ) : 'Fill with AI'}
+          </button>
+        </RequireWrite>
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
     </div>

@@ -2,14 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 export default function DispatchCampaignButton({ id, scheduledAt }: { id: string; scheduledAt?: string | null }) {
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
   const router = useRouter()
+  const canWrite = useCanWrite('campaigns:write')
 
   // Auto-dispatch if scheduled time has passed
   useEffect(() => {
+    if (!canWrite) return
     if (!scheduledAt) return
     const due = new Date(scheduledAt) <= new Date()
     if (!due) return
@@ -28,6 +31,8 @@ export default function DispatchCampaignButton({ id, scheduledAt }: { id: string
     setLoading(false)
     router.refresh()
   }
+
+  if (!canWrite) return null
 
   return (
     <button

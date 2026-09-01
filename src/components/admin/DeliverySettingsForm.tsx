@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react'
 import Toggle from '@/components/ui/Toggle'
 import { useToast } from '@/contexts/ToastContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import type { DeliverySettings } from '@/lib/delivery-rules'
 import { applyDeliveryRules } from '@/lib/delivery-rules'
 
@@ -15,6 +16,7 @@ const SAMPLE_SUBTOTALS = [500, 2000, 6000]
 
 export default function DeliverySettingsForm({ initial }: Props) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('settings:write')
   const [settings, setSettings] = useState<DeliverySettings>(initial)
   const [saving, setSaving] = useState<string | null>(null)
 
@@ -68,7 +70,7 @@ export default function DeliverySettingsForm({ initial }: Props) {
         <Toggle
           checked={settings.enabled}
           onChange={toggleEnabled}
-          disabled={saving === 'delivery_charges_enabled'}
+          disabled={saving === 'delivery_charges_enabled' || !canWrite}
         />
       </div>
 
@@ -80,7 +82,7 @@ export default function DeliverySettingsForm({ initial }: Props) {
           value={settings.freeThreshold}
           onChange={v => bump('freeThreshold', v)}
           onBlur={() => save('delivery_free_threshold', settings.freeThreshold)}
-          saving={saving === 'delivery_free_threshold'}
+          saving={saving === 'delivery_free_threshold' || !canWrite}
         />
       </div>
 

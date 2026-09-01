@@ -5,6 +5,7 @@ import { useToast } from '@/contexts/ToastContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import Toggle from '@/components/ui/Toggle'
+import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 
 export interface HeroSlideRow {
   id: string
@@ -66,12 +67,13 @@ function buildPreviewHref(s: Partial<HeroSlideRow>): string {
   return `/products${qs ? `?${qs}` : ''}`
 }
 
-function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materialOptions, onChange, onDelete }: {
+function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materialOptions, canWrite, onChange, onDelete }: {
   slide: HeroSlideRow
   categoryOptions: Option[]
   brandOptions: Option[]
   gradeOptions: Option[]
   materialOptions: Option[]
+  canWrite: boolean
   onChange: (patch: Partial<HeroSlideRow>) => void
   onDelete: () => void
 }) {
@@ -219,6 +221,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
           <Toggle
             checked={slide.is_active}
             onChange={next => field({ is_active: next }, { isActive: next })}
+            disabled={!canWrite}
           />
         </div>
         <button type="button" onClick={() => setExpanded(v => !v)}
@@ -236,7 +239,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
             <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Banner image — desktop</label>
             <div className="flex items-center gap-3 mb-2">
               <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={e => onFile(e, 'image_url')} className="hidden" />
-              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading || generating}
+              <button type="button" onClick={() => fileRef.current?.click()} disabled={uploading || generating || !canWrite}
                 className="px-3 py-1.5 rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50">
                 {uploading ? 'Uploading…' : slide.image_url ? 'Replace image' : 'Upload image'}
               </button>
@@ -248,7 +251,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
             <label className="block text-xs font-medium text-foreground-secondary mb-1.5">Banner image — mobile</label>
             <div className="flex items-center gap-3 mb-2">
               <input ref={fileMobileRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={e => onFile(e, 'image_url_mobile')} className="hidden" />
-              <button type="button" onClick={() => fileMobileRef.current?.click()} disabled={uploadingMobile || generating}
+              <button type="button" onClick={() => fileMobileRef.current?.click()} disabled={uploadingMobile || generating || !canWrite}
                 className="px-3 py-1.5 rounded-lg border border-border-default text-sm hover:bg-surface-secondary disabled:opacity-50">
                 {uploadingMobile ? 'Uploading…' : slide.image_url_mobile ? 'Replace mobile image' : 'Upload mobile image'}
               </button>
@@ -256,15 +259,18 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
                 ? (
                   <>
                     <img src={slide.image_url_mobile} alt="" className="w-10 h-10 rounded object-cover border border-border-default" />
-                    <button type="button" onClick={clearMobileImage}
-                      className="text-[11px] text-foreground-muted hover:text-red-500 underline">
-                      Clear
-                    </button>
+                    {canWrite && (
+                      <button type="button" onClick={clearMobileImage}
+                        className="text-[11px] text-foreground-muted hover:text-red-500 underline">
+                        Clear
+                      </button>
+                    )}
                   </>
                 )
                 : <span className="text-[11px] text-foreground-muted">Falls back to the desktop image</span>}
             </div>
             {/* AI generation — one scenario fills every field */}
+            <RequireWrite scope="settings:write">
             <div className="rounded-lg border border-violet-200 dark:border-violet-800/50 bg-violet-50 dark:bg-violet-900/10 p-3">
               <div className="flex items-center gap-1.5 mb-2">
                 <svg viewBox="0 0 24 24" className="w-4 h-4 text-violet-500" fill="none" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
@@ -289,6 +295,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
               </div>
               <p className="mt-1.5 text-[11px] text-violet-500/80 dark:text-violet-400/80">Image generation can take up to a minute.</p>
             </div>
+            </RequireWrite>
           </div>
 
           {/* Title + Subtitle */}
@@ -301,7 +308,8 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
                 <input type="text" value={slide.title}
                   onChange={e => onChange({ title: e.target.value })}
                   onBlur={e => save({ title: e.target.value })}
-                  className="w-full pr-9 px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+                  disabled={!canWrite}
+                  className="w-full pr-9 px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60" />
               </AIEnrichButton>
             </div>
             <div>
@@ -312,7 +320,8 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
                 <input type="text" value={slide.subtitle ?? ''}
                   onChange={e => onChange({ subtitle: e.target.value })}
                   onBlur={e => save({ subtitle: e.target.value })}
-                  className="w-full pr-9 px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+                  disabled={!canWrite}
+                  className="w-full pr-9 px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60" />
               </AIEnrichButton>
             </div>
           </div>
@@ -328,7 +337,8 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
                   onChange={e => onChange({ badge_text: e.target.value })}
                   onBlur={e => save({ badgeText: e.target.value })}
                   placeholder="New Arrivals"
-                  className="w-full pr-9 px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+                  disabled={!canWrite}
+                  className="w-full pr-9 px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60" />
               </AIEnrichButton>
             </div>
             <div>
@@ -337,7 +347,8 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
                 {BADGE_COLORS.map(c => (
                   <button key={c.value} type="button" title={c.label}
                     onClick={() => field({ badge_color: c.value }, { badgeColor: c.value })}
-                    className={`w-6 h-6 rounded-full border-2 transition-all ${slide.badge_color === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
+                    disabled={!canWrite}
+                    className={`w-6 h-6 rounded-full border-2 transition-all disabled:opacity-60 ${slide.badge_color === c.value ? 'border-foreground scale-110' : 'border-transparent'}`}
                     style={{ background: c.swatch }} />
                 ))}
               </div>
@@ -354,37 +365,43 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
                 <label className="block text-[11px] text-foreground-muted mb-1">Category</label>
                 <AdminSelect value={slide.filter_category ?? ''} placeholder="Any"
                   options={[{ value: '', label: 'Any' }, ...categoryOptions]}
+                  disabled={!canWrite}
                   onChange={v => field({ filter_category: v || null }, { filterCategory: v || null })} />
               </div>
               <div>
                 <label className="block text-[11px] text-foreground-muted mb-1">Brand</label>
                 <AdminSelect value={slide.filter_brand ?? ''} placeholder="Any"
                   options={[{ value: '', label: 'Any' }, ...brandOptions]}
+                  disabled={!canWrite}
                   onChange={v => field({ filter_brand: v || null }, { filterBrand: v || null })} />
               </div>
               <div>
                 <label className="block text-[11px] text-foreground-muted mb-1">Grade</label>
                 <AdminSelect value={slide.filter_grade ?? ''} placeholder="Any"
                   options={[{ value: '', label: 'Any' }, ...gradeOptions]}
+                  disabled={!canWrite}
                   onChange={v => field({ filter_grade: v || null }, { filterGrade: v || null })} />
               </div>
               <div>
                 <label className="block text-[11px] text-foreground-muted mb-1">Material</label>
                 <AdminSelect value={slide.filter_material ?? ''} placeholder="Any"
                   options={[{ value: '', label: 'Any' }, ...materialOptions]}
+                  disabled={!canWrite}
                   onChange={v => field({ filter_material: v || null }, { filterMaterial: v || null })} />
               </div>
               <div>
                 <label className="block text-[11px] text-foreground-muted mb-1">Min price ₹</label>
                 <input type="number" defaultValue={slide.filter_min_price ?? ''}
                   onBlur={e => field({ filter_min_price: e.target.value ? Number(e.target.value) : null }, { filterMinPrice: e.target.value ? Number(e.target.value) : null })}
-                  className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+                  disabled={!canWrite}
+                  className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60" />
               </div>
               <div>
                 <label className="block text-[11px] text-foreground-muted mb-1">Max price ₹</label>
                 <input type="number" defaultValue={slide.filter_max_price ?? ''}
                   onBlur={e => field({ filter_max_price: e.target.value ? Number(e.target.value) : null }, { filterMaxPrice: e.target.value ? Number(e.target.value) : null })}
-                  className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+                  disabled={!canWrite}
+                  className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60" />
               </div>
             </div>
 
@@ -392,12 +409,14 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
               <label className="flex items-center gap-2 text-xs text-foreground-secondary cursor-pointer">
                 <input type="checkbox" checked={slide.filter_in_stock}
                   onChange={e => field({ filter_in_stock: e.target.checked }, { filterInStock: e.target.checked })}
+                  disabled={!canWrite}
                   className="rounded border-border-strong text-accent-500 focus:ring-accent-400" />
                 In stock only
               </label>
               <label className="flex items-center gap-2 text-xs text-foreground-secondary cursor-pointer">
                 <input type="checkbox" checked={slide.filter_on_sale}
                   onChange={e => field({ filter_on_sale: e.target.checked }, { filterOnSale: e.target.checked })}
+                  disabled={!canWrite}
                   className="rounded border-border-strong text-accent-500 focus:ring-accent-400" />
                 On sale
               </label>
@@ -407,19 +426,22 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
               <label className="block text-[11px] text-foreground-muted mb-1">Manual URL (overrides filters)</label>
               <input type="text" defaultValue={slide.cta_url ?? ''} placeholder="/categories/fasteners or https://…"
                 onBlur={e => field({ cta_url: e.target.value || null }, { ctaUrl: e.target.value || null })}
-                className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400" />
+                disabled={!canWrite}
+                className="w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-sm focus:outline-none focus:ring-2 focus:ring-accent-400 disabled:opacity-60" />
             </div>
 
             <p className="text-[11px] text-foreground-muted">Links to: <span className="font-mono text-accent-600 dark:text-accent-400">{href}</span></p>
           </div>
 
           {/* Delete */}
-          <div className="flex justify-end pt-1">
-            <button type="button" onClick={onDelete}
-              className="px-3 py-1.5 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-              Delete slide
-            </button>
-          </div>
+          <RequireWrite scope="settings:write">
+            <div className="flex justify-end pt-1">
+              <button type="button" onClick={onDelete}
+                className="px-3 py-1.5 rounded-lg text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                Delete slide
+              </button>
+            </div>
+          </RequireWrite>
         </div>
       )}
     </div>
@@ -428,6 +450,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
 
 export default function HeroSlideManager({ initialSlides, categoryOptions, brandOptions, gradeOptions, materialOptions }: Props) {
   const { showToast, showConfirm } = useToast()
+  const canWrite = useCanWrite('settings:write')
   const [slides, setSlides] = useState<HeroSlideRow[]>(initialSlides)
   const [creating, setCreating] = useState(false)
 
@@ -486,29 +509,34 @@ export default function HeroSlideManager({ initialSlides, categoryOptions, brand
       {slides.map((slide, i) => (
         <div key={slide.id} className="flex items-start gap-2">
           {/* Reorder controls */}
-          <div className="flex flex-col gap-1 pt-3">
-            <button type="button" onClick={() => move(slide.id, -1)} disabled={i === 0}
-              className="p-0.5 rounded text-foreground-muted hover:text-foreground disabled:opacity-30" title="Move up">
-              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}><path d="M4 10l4-4 4 4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
-            <button type="button" onClick={() => move(slide.id, 1)} disabled={i === slides.length - 1}
-              className="p-0.5 rounded text-foreground-muted hover:text-foreground disabled:opacity-30" title="Move down">
-              <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}><path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" /></svg>
-            </button>
-          </div>
+          <RequireWrite scope="settings:write">
+            <div className="flex flex-col gap-1 pt-3">
+              <button type="button" onClick={() => move(slide.id, -1)} disabled={i === 0}
+                className="p-0.5 rounded text-foreground-muted hover:text-foreground disabled:opacity-30" title="Move up">
+                <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}><path d="M4 10l4-4 4 4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+              <button type="button" onClick={() => move(slide.id, 1)} disabled={i === slides.length - 1}
+                className="p-0.5 rounded text-foreground-muted hover:text-foreground disabled:opacity-30" title="Move down">
+                <svg viewBox="0 0 16 16" className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2}><path d="M4 6l4 4 4-4" strokeLinecap="round" strokeLinejoin="round" /></svg>
+              </button>
+            </div>
+          </RequireWrite>
           <div className="flex-1 min-w-0">
             <SlideCard slide={slide}
               categoryOptions={categoryOptions} brandOptions={brandOptions}
               gradeOptions={gradeOptions} materialOptions={materialOptions}
+              canWrite={canWrite}
               onChange={patch => patchSlide(slide.id, patch)}
               onDelete={() => deleteSlide(slide.id)} />
           </div>
         </div>
       ))}
-      <button type="button" onClick={addSlide} disabled={creating}
-        className="w-full py-2.5 rounded-xl border-2 border-dashed border-border-default text-sm font-medium text-foreground-secondary hover:border-accent-400 hover:text-accent-600 dark:hover:text-accent-400 transition-colors disabled:opacity-50">
-        {creating ? 'Adding…' : '+ Add hero slide'}
-      </button>
+      <RequireWrite scope="settings:write">
+        <button type="button" onClick={addSlide} disabled={creating}
+          className="w-full py-2.5 rounded-xl border-2 border-dashed border-border-default text-sm font-medium text-foreground-secondary hover:border-accent-400 hover:text-accent-600 dark:hover:text-accent-400 transition-colors disabled:opacity-50">
+          {creating ? 'Adding…' : '+ Add hero slide'}
+        </button>
+      </RequireWrite>
     </div>
   )
 }
