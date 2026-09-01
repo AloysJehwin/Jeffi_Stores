@@ -7,6 +7,7 @@ import { parseBody, zNonEmpty } from '@/lib/validate'
 import { sendAuditedMail } from '@/lib/mail-audit'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { getFeatureFlags } from '@/lib/site-controls'
+import { storeContactLine } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -80,6 +81,8 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const storeName = await (await import('@/lib/site-controls')).getStoreIdentity().then(i => i.name)
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -172,8 +175,7 @@ export async function PATCH(
           <p style="margin:24px 0 0;color:#475569;">Thank you for shopping with us,<br>The Jeffi Stores team</p>
         </td></tr>
         <tr><td style="padding:18px 28px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;">
-          Jeffi Stores | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092<br>
-          Phone: +91 96853 54099 | Email: jeffistoress@gmail.com
+          ${storeName}<br>${contactLine}
         </td></tr>
       </table>
     </td></tr>

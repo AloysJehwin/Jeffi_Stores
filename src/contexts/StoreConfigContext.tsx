@@ -33,10 +33,12 @@ export interface StoreConfig {
 // via NEXT_PUBLIC_ so the pre-fetch state matches historical behavior).
 const DEFAULT_CONFIG: StoreConfig = {
   identity: {
-    name: 'Jeffi Stores',
-    email: 'jeffistoress@gmail.com',
-    phone: '+91 96853 54099',
-    web: 'jeffistores.in',
+    // Blank, not the platform's: this shows for the instant before the server config
+    // arrives, and a tenant must never flash another business's contact details.
+    name: '',
+    email: '',
+    phone: '',
+    web: '',
     logoUrl: '',
   },
   flags: {
