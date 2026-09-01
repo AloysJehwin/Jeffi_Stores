@@ -116,11 +116,14 @@ async function fireRouteTransfer(opts: {
 
   // Fetch linked account id from control plane
   const pool = controlPlanePool()
+  // Razorpay cannot suspend or delete a linked account through its API, so a deprovisioned
+  // tenant's account outlives the tenant. Gating on status is what actually makes it inert:
+  // never move money into an account whose store is suspended or terminated.
   const row = await pool.query(
-    `SELECT razorpay_linked_account_id FROM tenants WHERE id=$1`, [tenant.tenantId]
+    `SELECT razorpay_linked_account_id FROM tenants WHERE id=$1 AND status='active'`, [tenant.tenantId]
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
-  if (!linkedAccountId) return  // linked account not yet created — skip silently
+  if (!linkedAccountId) return  // not active, or no linked account yet — skip silently
 
   const grossPaise = Math.round(opts.totalAmountInr * 100)
   const result = await transferToLinkedAccount({
