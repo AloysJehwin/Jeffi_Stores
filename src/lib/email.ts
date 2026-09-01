@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'
-import { customerMailFrom, adminMailFrom, currentBrandName } from './brand'
+import { customerMailFrom, adminMailFrom, currentBrandName, currentAdminBaseUrl, platformAdminEmail } from './brand'
 
 /**
  * Store name for email bodies. Synchronous on purpose: templates are built inside string
@@ -1531,12 +1531,14 @@ export async function sendSupportEscalationEmail(
   sessionId: string,
   adminEmails: string[]
 ): Promise<{ success: boolean; error?: unknown }> {
-  const adminBaseUrl = process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'
-  const chatLink = `${adminBaseUrl}/admin/customers/${customerId}?chat=true`
-  const recipients = adminEmails.length > 0 ? adminEmails : [process.env.SUPPORT_EMAIL || 'aloysjehwin@gmail.com']
+  // Three things were wrong here: the link went to the platform's admin panel, which a
+  // tenant's certificate cannot open; the sender was the platform's; and the fallback
+  // recipient was a personal Gmail, so a tenant's support request reached an individual.
+  const chatLink = `${currentAdminBaseUrl()}/customers/${customerId}?chat=true`
+  const recipients = adminEmails.length > 0 ? adminEmails : [platformAdminEmail()]
 
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.SES_FROM_EMAIL}>`,
+    from: customerMailFrom(),
     to: recipients.join(', '),
     subject: `Support Request from ${customerName}`,
     html: `
