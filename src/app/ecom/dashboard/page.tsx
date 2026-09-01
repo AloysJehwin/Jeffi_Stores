@@ -2,20 +2,17 @@ import { cookies, headers } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
-import { getOwnerTenants } from '@/lib/tenant-registry'
+import { getOwnerTenants, getTenantBilling } from '@/lib/tenant-registry'
+import { getSubscription } from '@/lib/razorpay-subscriptions'
 import { StatusPill } from '@/components/admin/ecom/EcomUI'
+import SiteReachabilityBadge from '@/components/admin/SiteReachabilityBadge'
+import StoreDashboardTabs from './StoreDashboardTabs'
+import SubdomainList from './SubdomainList'
+import CustomDomains from './CustomDomains'
 
 export const dynamic = 'force-dynamic'
 
-const SUB_PILL: Record<string, { label: string; cls: string }> = {
-  active:        { label: 'Active',      cls: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' },
-  created:       { label: 'Pending',     cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  authenticated: { label: 'Pending',     cls: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400' },
-  halted:        { label: 'Payment due', cls: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' },
-  cancelled:     { label: 'Cancelled',   cls: 'bg-surface-secondary text-foreground-muted' },
-}
-
-export default async function OwnerDashboard() {
+export default async function OwnerDashboard({ searchParams }: { searchParams: Promise<{ tenant?: string }> }) {
   const sid = (await cookies()).get(OWNER_COOKIE)?.value
   const h = await headers()
   const signals = { userAgent: h.get('user-agent'), acceptLanguage: h.get('accept-language'), uaPlatform: h.get('sec-ch-ua-platform') }
@@ -23,164 +20,213 @@ export default async function OwnerDashboard() {
   if (!owner) redirect('/signin')
 
   const tenants = await getOwnerTenants(owner.id)
-  const hasStore = tenants.length > 0
+  if (tenants.length === 0) redirect('/onboard')
 
-  // No store yet → send to onboard
-  if (!hasStore) redirect('/onboard')
-
-  // PRE-PAYMENT states (application submitted / approved-awaiting-payment) belong in the onboard
-  // flow — the owner shouldn't reach the dashboard until they've paid. /onboard shows the
-  // 'under review' → payment-link states for these.
+  // PRE-PAYMENT states belong in the onboard flow — the owner shouldn't reach the dashboard until
+  // they've paid. /onboard shows the 'under review' → payment-link states for these.
   if (tenants.some((t) => t.status === 'pending_approval' || t.status === 'awaiting_payment')) {
     redirect('/onboard')
   }
 
-  // Post-payment (provisioning/suspended) IS shown in the dashboard with a status card — do NOT
-  // redirect those to /onboard (would re-show the payment step and risk a double charge).
+  const { tenant: wanted } = await searchParams
+  const tenant =
+    (wanted && tenants.find((t) => t.slug === wanted)) ||
+    tenants.find((t) => t.status === 'active') ||
+    tenants[0]
+
+  const [billing, rzpSub] = await Promise.all([
+    getTenantBilling(tenant.id),
+    tenant.razorpay_subscription_id && tenant.subscription_status === 'active'
+      ? getSubscription(tenant.razorpay_subscription_id).catch(() => null)
+      : Promise.resolve(null),
+  ])
+
+  const renewalDate = rzpSub?.current_end
+    ? new Date(rzpSub.current_end * 1000).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+    : null
+
+  const isLive = tenant.status === 'active'
+  const storeUrl = `https://${tenant.slug}.jeffistores.in`
+  const monthly = Number(tenant.monthly_price_inr ?? 0)
+  const price = tenant.billing_interval === 'yearly' ? monthly * 12 : monthly
 
   return (
     <div className="w-full min-h-screen bg-surface-secondary">
       {/* Top bar */}
       <div className="border-b border-border-default bg-surface-elevated px-6 lg:px-10 py-4">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Dashboard</h1>
-            <p className="text-xs text-foreground-muted mt-0.5">{owner.name || owner.email}</p>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold text-foreground">{tenant.display_name}</h1>
+            <StatusPill status={tenant.status} />
+            {isLive && <SiteReachabilityBadge url={storeUrl} />}
           </div>
-          <div className="flex items-center gap-2">
-            <Link href="/dashboard/integrations"
-              className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
-              Integrations
-            </Link>
-            <Link href="/dashboard/payouts"
-              className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
-              Payouts
-            </Link>
-            <Link href="/dashboard/billing"
-              className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
+          <div className="flex gap-2">
+            <Link href={`/dashboard/billing?tenant=${tenant.slug}`}
+              className="px-4 py-2 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
               Billing
             </Link>
-            {!hasStore && (
-              <Link href="/onboard"
+            <Link href="/onboard"
+              className="px-4 py-2 rounded-lg border border-border-default text-sm text-foreground-secondary hover:bg-surface-secondary transition-colors">
+              + New store
+            </Link>
+            {isLive && (
+              <a href={storeUrl} target="_blank" rel="noopener noreferrer"
                 className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-sm font-medium transition-colors">
-                + New store
-              </Link>
+                Open store →
+              </a>
             )}
           </div>
         </div>
-      </div>
 
-      <div className="px-6 lg:px-10 py-8">
-        {!hasStore ? (
-          /* ── Empty state ── */
-          <div className="max-w-lg mx-auto mt-16 rounded-2xl border border-border-default bg-surface-elevated p-12 text-center">
-            <div className="w-14 h-14 rounded-2xl bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-800 flex items-center justify-center mx-auto mb-5">
-              <svg className="w-7 h-7 text-accent-600 dark:text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 21v-7.5A2.25 2.25 0 0 0 11.25 11.25h-1.5A2.25 2.25 0 0 0 7.5 13.5V21M3 7.5A4.5 4.5 0 0 1 7.5 3h9A4.5 4.5 0 0 1 21 7.5v0a4.5 4.5 0 0 1-4.5 4.5h-9A4.5 4.5 0 0 1 3 7.5z" />
-              </svg>
-            </div>
-            <h2 className="text-xl font-semibold text-foreground">No store yet</h2>
-            <p className="text-foreground-muted text-sm mt-2 max-w-sm mx-auto">
-              Launch your store in minutes — storefront, payments, delivery and GST all included.
-            </p>
-            <Link href="/onboard"
-              className="inline-block mt-6 px-6 py-2.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors">
-              Launch your store
-            </Link>
-          </div>
-        ) : (
-          <div className="space-y-5">
+        {/* Store switcher — only when the owner has more than one store */}
+        {tenants.length > 1 && (
+          <div className="mt-3 flex flex-wrap gap-2">
             {tenants.map((t) => {
-              const sub = SUB_PILL[t.subscription_status] ?? { label: t.subscription_status, cls: 'bg-surface-secondary text-foreground-muted' }
-              const monthly = Number(t.monthly_price_inr ?? 0)
-              const price = t.billing_interval === 'yearly' ? monthly * 12 : monthly
-              const isLive = t.status === 'active'
-
+              const active = t.slug === tenant.slug
               return (
-                <Link key={t.id} href={`/dashboard/store/${t.slug}`}
-                  className="block rounded-2xl border border-border-default bg-surface-elevated hover:border-accent-400 hover:shadow-sm transition-all group overflow-hidden">
-
-                  {/* Card header */}
-                  <div className="px-6 py-5 flex flex-wrap items-start justify-between gap-3 border-b border-border-default/60">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-accent-500 to-primary-600 flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                        {t.display_name[0].toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-base font-bold text-foreground group-hover:text-accent-600 dark:group-hover:text-accent-400 transition-colors">
-                            {t.display_name}
-                          </span>
-                          <StatusPill status={t.status} />
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${sub.cls}`}>
-                            {sub.label}
-                          </span>
-                        </div>
-                        <div className="text-xs text-foreground-muted mt-0.5 font-mono">{t.slug}.jeffistores.in</div>
-                      </div>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <div className="text-sm font-semibold text-foreground capitalize">{t.plan ?? '—'} plan</div>
-                      <div className="text-xs text-foreground-muted capitalize mt-0.5">
-                        {price > 0 ? `₹${price.toLocaleString('en-IN')}/${t.billing_interval === 'yearly' ? 'yr' : 'mo'}` : '—'}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Stats grid */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 divide-x divide-border-default/60">
-                    {[
-                      { label: 'Billing', value: t.billing_interval, capitalize: true },
-                      { label: 'Subscription', value: sub.label, capitalize: false },
-                      { label: 'Store status', value: t.status, capitalize: true },
-                      { label: 'Since', value: new Date(t.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }), capitalize: false },
-                      { label: 'Region', value: t.region ?? 'us-east-1', capitalize: false },
-                      { label: 'Storefront', value: isLive ? 'Live' : 'Provisioning', capitalize: false },
-                    ].map((s) => (
-                      <div key={s.label} className="px-5 py-4">
-                        <div className="text-[10px] text-foreground-muted uppercase tracking-widest mb-1">{s.label}</div>
-                        <div className={`text-sm font-medium text-foreground ${s.capitalize ? 'capitalize' : ''}`}>{s.value}</div>
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Provisioned URLs — only when active */}
-                  {isLive && (
-                    <div className="px-6 py-3 bg-surface-secondary/50 border-t border-border-default/60 flex flex-wrap gap-x-8 gap-y-1.5 items-center">
-                      <div className="flex items-center gap-2 text-xs">
-                        <span className="text-foreground-muted">Storefront</span>
-                        <a href={`https://${t.slug}.jeffistores.in`} target="_blank" rel="noopener noreferrer"
-                          className="font-mono text-accent-600 dark:text-accent-400 hover:underline">{t.slug}.jeffistores.in</a>
-                      </div>
-                      {t.rds_endpoint && (
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="text-foreground-muted">DB</span>
-                          <span className="font-mono text-foreground">{t.rds_endpoint}</span>
-                        </div>
-                      )}
-                      {t.s3_bucket && (
-                        <div className="flex items-center gap-2 text-xs">
-                          <span className="text-foreground-muted">Bucket</span>
-                          <span className="font-mono text-foreground">{t.s3_bucket}</span>
-                        </div>
-                      )}
-                      <span className="ml-auto text-xs text-accent-600 dark:text-accent-400 font-medium group-hover:underline">View details →</span>
-                    </div>
-                  )}
-
-                  {/* Provisioning state */}
-                  {!isLive && (
-                    <div className="px-6 py-3 bg-surface-secondary/50 border-t border-border-default/60 flex items-center gap-2 text-xs text-foreground-muted">
-                      <div className="w-3.5 h-3.5 border-2 border-accent-500 border-t-transparent rounded-full animate-spin flex-shrink-0" />
-                      Provisioning — URLs will appear once your store is live.
-                      <span className="ml-auto text-accent-600 dark:text-accent-400 font-medium group-hover:underline">View details →</span>
-                    </div>
-                  )}
+                <Link key={t.id} href={`/dashboard?tenant=${t.slug}`}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                    active
+                      ? 'border-accent-400 bg-accent-50 dark:bg-accent-900/20 text-accent-700 dark:text-accent-300'
+                      : 'border-border-default text-foreground-secondary hover:bg-surface-secondary'
+                  }`}>
+                  {t.display_name}
+                  <span className="font-mono text-[10px] text-foreground-muted">{t.slug}</span>
                 </Link>
               )
             })}
           </div>
         )}
+      </div>
+
+      <div className="px-6 lg:px-10 py-8 space-y-6">
+        {/* Store info cards row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* Store identity */}
+          <div className="lg:col-span-2 rounded-2xl border border-border-default bg-surface-elevated p-5">
+            <div className="text-xs text-foreground-muted uppercase tracking-widest mb-3">Store identity</div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-foreground-muted">Name</span>
+                <span className="font-medium text-foreground">{tenant.display_name}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-foreground-muted">Subdomain</span>
+                <span className="font-mono text-foreground text-xs">{tenant.slug}.jeffistores.in</span>
+              </div>
+              {tenant.custom_domain && (
+                <div className="flex justify-between">
+                  <span className="text-foreground-muted">Custom domain</span>
+                  <span className="font-mono text-foreground text-xs">{tenant.custom_domain}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <span className="text-foreground-muted">Status</span>
+                <StatusPill status={tenant.status} />
+              </div>
+              <div className="flex justify-between">
+                <span className="text-foreground-muted">Created</span>
+                <span className="text-foreground">{new Date(tenant.created_at).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Subscription */}
+          <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
+            <div className="text-xs text-foreground-muted uppercase tracking-widest mb-3">Subscription</div>
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-foreground-muted">Plan</span>
+                <span className="font-semibold text-foreground capitalize">{tenant.plan ?? '—'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-foreground-muted">Billing</span>
+                <span className="text-foreground capitalize">{tenant.billing_interval}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-foreground-muted">Price</span>
+                <span className="text-foreground font-medium">
+                  {price > 0 ? `₹${price.toLocaleString('en-IN')}/${tenant.billing_interval === 'yearly' ? 'yr' : 'mo'}` : '—'}
+                </span>
+              </div>
+              {renewalDate && (
+                <div className="flex justify-between">
+                  <span className="text-foreground-muted">Renews</span>
+                  <span className="text-foreground">{renewalDate}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Infrastructure — only show provisioned URLs when active */}
+          <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
+            <div className="text-xs text-foreground-muted uppercase tracking-widest mb-3">Infrastructure</div>
+            {isLive ? (
+              <div className="space-y-2 text-sm">
+                <div>
+                  <div className="text-foreground-muted text-xs mb-1">Storefront</div>
+                  <a href={storeUrl} target="_blank" rel="noopener noreferrer"
+                    className="font-mono text-xs text-accent-600 dark:text-accent-400 hover:underline break-all">
+                    {tenant.slug}.jeffistores.in
+                  </a>
+                </div>
+                {tenant.rds_endpoint && (
+                  <div>
+                    <div className="text-foreground-muted text-xs mb-1">Database</div>
+                    <span className="font-mono text-xs text-foreground break-all">{tenant.rds_endpoint}</span>
+                  </div>
+                )}
+                {tenant.s3_bucket && (
+                  <div>
+                    <div className="text-foreground-muted text-xs mb-1">Storage bucket</div>
+                    <span className="font-mono text-xs text-foreground break-all">{tenant.s3_bucket}</span>
+                  </div>
+                )}
+                {tenant.region && (
+                  <div>
+                    <div className="text-foreground-muted text-xs mb-1">Region</div>
+                    <span className="text-xs text-foreground">{tenant.region}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center h-24 text-center">
+                <div className="w-6 h-6 border-2 border-accent-500 border-t-transparent rounded-full animate-spin mb-2" />
+                <p className="text-xs text-foreground-muted">Provisioning in progress…</p>
+                <p className="text-xs text-foreground-muted mt-1">URLs will appear once live.</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Subdomains */}
+        <div className="rounded-2xl border border-border-default bg-surface-elevated p-5">
+          <div className="text-xs text-foreground-muted uppercase tracking-widest mb-4">Your subdomains</div>
+          <SubdomainList
+            slug={tenant.slug}
+            plan={tenant.plan}
+            maxCustomDomains={tenant.max_custom_domains ?? 0}
+            rdsReady={!!tenant.rds_endpoint}
+          />
+        </div>
+
+        {/* Custom domains */}
+        <CustomDomains tenantId={tenant.id} slug={tenant.slug} maxDomains={tenant.max_custom_domains ?? 0} />
+
+        {/* Transactions + ledger tabs */}
+        <div className="rounded-2xl border border-border-default bg-surface-elevated p-6">
+          <StoreDashboardTabs
+            transactions={billing.transactions}
+            ledger={billing.ledger}
+            balance={billing.balance}
+            totals={billing.totals}
+            subscriptionStatus={tenant.subscription_status}
+            billingInterval={tenant.billing_interval}
+            plan={tenant.plan}
+            renewalDate={renewalDate}
+            slug={tenant.slug}
+          />
+        </div>
       </div>
     </div>
   )

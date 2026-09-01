@@ -1,9 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query } from '@/lib/db'
+import { storeBaseUrlAsync } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
-
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
 
 export async function GET(req: NextRequest) {
   const id = req.nextUrl.searchParams.get('id')
@@ -21,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   let target = url
   if (!target || !/^https?:\/\//i.test(target)) {
-    target = APP_URL
+    target = await storeBaseUrlAsync()
   }
 
   return NextResponse.redirect(target, 302)

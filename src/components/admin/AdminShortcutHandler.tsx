@@ -3,27 +3,9 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { KeyboardShortcuts } from '@/lib/site-controls'
+import { hasScope } from '@/lib/scopes'
+import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/shortcut-scopes'
 import { ap } from '@/lib/admin-path'
-
-const BUILTIN_PATHS: Record<keyof Omit<KeyboardShortcuts, 'customShortcuts'>, string> = {
-  newProduct:   '/admin/products/add',
-  cashSale:     '/admin/cash-sale',
-  quotation:    '/admin/quotations',
-  newPo:        '/admin/inventory/po/new',
-  orders:       '/admin/orders',
-  packingSlips: '/admin/packing-slips',
-  returns:      '/admin/returns',
-  gst:          '/admin/gst',
-  labels:       '/admin/labels',
-  inventory:    '/admin/inventory',
-  coupons:      '/admin/coupons/add',
-  campaign:     '/admin/campaigns/new',
-  financial:    '/admin/financial',
-  customers:    '/admin/customers',
-  crm:          '/admin/crm',
-  reviews:      '/admin/reviews',
-  aiAgent:      '/admin/agent',
-}
 
 interface Combo { modifier: 'mod' | 'mod+shift' | 'f'; key: string }
 
@@ -51,9 +33,13 @@ function matches(combo: Combo, e: KeyboardEvent): boolean {
 export default function AdminShortcutHandler({
   shortcuts,
   host,
+  role,
+  scopes,
 }: {
   shortcuts: KeyboardShortcuts
   host: string
+  role: string
+  scopes: string[]
 }) {
   const router = useRouter()
 
@@ -71,8 +57,11 @@ export default function AdminShortcutHandler({
       }
     } catch { /* malformed JSON — skip */ }
 
-    for (const [field, path] of Object.entries(BUILTIN_PATHS)) {
-      const raw = shortcuts[field as keyof typeof BUILTIN_PATHS]
+    for (const [field, { path, scope }] of Object.entries(BUILTIN_SHORTCUT_SCOPES)) {
+      // Skip binding a shortcut the session's plan/role can't reach — an out-of-plan
+      // key must be inert, not silently route into a 403.
+      if (!hasScope(role, scopes, scope)) continue
+      const raw = shortcuts[field as keyof typeof BUILTIN_SHORTCUT_SCOPES]
       const combo = parseCombo(raw)
       if (combo) entries.push({ combo, path })
     }
@@ -91,7 +80,7 @@ export default function AdminShortcutHandler({
 
     document.addEventListener('keydown', handler)
     return () => document.removeEventListener('keydown', handler)
-  }, [shortcuts, host, router])
+  }, [shortcuts, host, router, role, scopes])
 
   return null
 }

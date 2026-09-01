@@ -1,7 +1,7 @@
 import { queryOne, query } from '@/lib/db'
 import { productToGmcItems } from './mapper'
 import { fetchAllActiveProducts, fetchProduct } from './product-fetch'
-import { upsertProduct, deleteProductByOfferId, listProducts, customBatchUpsert, getMerchantId, GMC_PUSH_DISABLED } from './client'
+import { upsertProduct, deleteProductByOfferId, listProducts, customBatchUpsert, getMerchantId, merchantConfigured, GMC_PUSH_DISABLED } from './client'
 
 const ADMIN_EMAIL = 'jeffistoress@jeffistores.in'
 const BATCH_SIZE = 100
@@ -54,6 +54,14 @@ export async function syncAllProductsToMerchant(): Promise<SyncResult> {
     return {
       synced: 0, deleted: 0,
       errors: [{ sku: '__disabled__', error: 'GMC push is disabled in this environment' }],
+      startedAt: now, finishedAt: now,
+    }
+  }
+  if (!(await merchantConfigured())) {
+    const now = new Date().toISOString()
+    return {
+      synced: 0, deleted: 0,
+      errors: [{ sku: '__config__', error: 'Google Merchant is not connected' }],
       startedAt: now, finishedAt: now,
     }
   }
@@ -148,7 +156,7 @@ async function runFullSync(): Promise<SyncResult> {
 }
 
 export async function syncProductToMerchant(productId: string): Promise<void> {
-  if (GMC_PUSH_DISABLED) return
+  if (GMC_PUSH_DISABLED || !(await merchantConfigured())) return
   const product = await fetchProduct(productId)
 
   if (!product) return
