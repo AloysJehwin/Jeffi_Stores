@@ -186,6 +186,14 @@ CREATE INDEX IF NOT EXISTS idx_settlement_ledger_tenant ON public.settlement_led
 ALTER TABLE public.tenants ADD COLUMN IF NOT EXISTS instance_state character varying(16) NOT NULL DEFAULT 'running';
 
 --
+-- ec2_instance_id on tenant_infra: durable pointer to the tenant's dedicated EC2
+-- instance so health-checks / rollback / deprovision can find and verify (or
+-- terminate) the box from the control plane instead of only the provisioning job's
+-- created_resources JSON. NULL for pool-served tenants.
+--
+ALTER TABLE public.tenant_infra ADD COLUMN IF NOT EXISTS ec2_instance_id text;
+
+--
 -- provisioning_jobs: async state machine that turns a 'provisioning' tenant into
 -- a real, 'active' one. One row per tenant provision attempt; the worker advances
 -- one step per tick. created_resources tracks what's been made for rollback.

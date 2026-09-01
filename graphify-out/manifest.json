@@ -8360,8 +8360,8 @@
     "semantic_hash": ""
   },
   "database/control-plane/schema.sql": {
-    "mtime": 1787998674.1832328,
-    "ast_hash": "972e4a078c3d0c4ff7e7134fb10be96a",
+    "mtime": 1788282232.8460398,
+    "ast_hash": "8bc47f2e9ea8243bb259a53ef3db1038",
     "semantic_hash": ""
   },
   "deploy/ec2-iam-policy.json": {
@@ -8890,8 +8890,8 @@
     "semantic_hash": ""
   },
   "src/lib/provisioning/steps.ts": {
-    "mtime": 1788234094.8136954,
-    "ast_hash": "2622f41540506656ff64a4a991a305b8",
+    "mtime": 1788282268.013115,
+    "ast_hash": "a65e69f8930262d31a97442a5b752806",
     "semantic_hash": ""
   },
   "src/lib/provisioning/stub-provider.ts": {
@@ -8920,8 +8920,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenant-admin-provision.ts": {
-    "mtime": 1788206171.2287517,
-    "ast_hash": "bd1b6c507d345ed2c1da257f27409da9",
+    "mtime": 1788282296.1979325,
+    "ast_hash": "f891341c27f09fad0ad1f5dbe4e90388",
     "semantic_hash": ""
   },
   "src/lib/tenant-backup-store.ts": {
@@ -8950,8 +8950,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenant-registry.ts": {
-    "mtime": 1788234763.6606014,
-    "ast_hash": "fdfda1943ff16cfed5878e21637aa70f",
+    "mtime": 1788282220.336603,
+    "ast_hash": "bedf5302987f38060df4eac2a01f1e2f",
     "semantic_hash": ""
   },
   "src/lib/variant-change.ts": {
