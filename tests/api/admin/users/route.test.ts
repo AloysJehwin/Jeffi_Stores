@@ -23,10 +23,13 @@ vi.mock('@/lib/email', () => ({
   sendAdminCertificateEmail: vi.fn(),
 }))
 
+vi.mock('@/lib/request-tenant', () => ({ resolveRequestTenantId: vi.fn(async () => null) }))
 vi.mock('@/lib/scopes', () => ({
   ALL_SCOPE_KEYS: ['products', 'orders', 'inventory', 'financial', 'customers', 'mailer', 'audit', 'agent'],
   hasScope: vi.fn(),
   isPlatformOwner: (role: string) => role === 'administrator' || role === 'super_admin',
+  // A tenant may only hand out what its plan sells; off-tenant this is the full set.
+  assignableScopeKeys: vi.fn(async () => ['products', 'orders', 'inventory', 'financial', 'customers', 'mailer', 'audit', 'agent']),
 }))
 
 // ── Imports (after mocks) ─────────────────────────────────────────────────────
