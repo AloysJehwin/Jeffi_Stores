@@ -4,7 +4,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne, queryMany } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
 import { WA_TEMPLATE_REGISTRY, sendTemplateByKey, sendFreeTextWhatsApp } from '@/lib/whatsapp'
-import { APP_URL } from '@/lib/automation-emails'
+import { storeBaseUrlAsync } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,7 +104,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     if (form?.slug) feedbackUrl = `https://forms.jeffistores.in/${form.slug}`
   } catch {}
 
-  const cartUrl = `${APP_URL}/cart`
+  const cartUrl = `${await storeBaseUrlAsync()}/cart`
 
   let amountFormatted = ''
   if (latestOrder) {

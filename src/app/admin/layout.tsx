@@ -121,7 +121,7 @@ export default async function AdminLayout({
 
   return (
     <AdminMobileProvider isMobile={isMobile}>
-      <AdminShortcutHandler shortcuts={controls.shortcuts} host={host} />
+      <AdminShortcutHandler shortcuts={controls.shortcuts} host={host} role={role} scopes={scopes} />
       <AdminShell
         brandName={controls.identity.name}
         desktopNavLinks={desktopNavLinks}

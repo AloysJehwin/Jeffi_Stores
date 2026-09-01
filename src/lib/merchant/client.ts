@@ -19,6 +19,17 @@ export async function getMerchantId(): Promise<string> {
   return (await resolveGoogleMerchantCreds()).merchantId
 }
 
+// Non-throwing connection check. resolveGoogleMerchantCreds() throws for an unconnected tenant
+// rather than silently using Jeffi's env service account, so callers that must SKIP cleanly when
+// Google Merchant is not connected use this instead of a bare getMerchantId() guard.
+export async function merchantConfigured(): Promise<boolean> {
+  try {
+    return !!(await getMerchantId())
+  } catch {
+    return false
+  }
+}
+
 function baseUrl(merchantId: string): string {
   return `https://shoppingcontent.googleapis.com/content/v2.1/${merchantId}`
 }

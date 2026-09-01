@@ -1,5 +1,5 @@
 import { queryMany, query } from '@/lib/db'
-import { matchAsin, getSellerId } from './client'
+import { matchAsin, amazonConfigured } from './client'
 
 // Backfill Amazon ASINs onto product variants (and simple products) by matching against the
 // live Amazon catalog. READ-ONLY vs Amazon (searchCatalogItems is not brand-gated), so this is
@@ -103,7 +103,7 @@ export async function backfillAsins(opts: { dryRun?: boolean; brand?: string; li
   const dryRun = opts.dryRun !== false // default to dry run for safety
   const limit = Math.min(5000, Math.max(1, opts.limit || 2000))
 
-  if (!(await getSellerId())) {
+  if (!(await amazonConfigured())) {
     return { scanned: 0, matched: 0, gtin: 0, keyword: 0, unmatched: 0, applied: 0, dryRun, rows: [] }
   }
 
