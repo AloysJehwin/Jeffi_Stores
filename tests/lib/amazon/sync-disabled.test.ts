@@ -27,6 +27,7 @@ describe('amazon/sync disabled + config branches', () => {
       AMAZON_PUSH_DISABLED: false,
       getSellerId: vi.fn().mockResolvedValue('SELLER'),
       getMarketplaceId: vi.fn().mockResolvedValue('A21TJRUUN4KGV'),
+      amazonConfigured: vi.fn().mockResolvedValue(true),
       ...clientOverrides,
     }))
   }
@@ -39,7 +40,7 @@ describe('amazon/sync disabled + config branches', () => {
   })
 
   it('syncAllProductsToAmazon returns config error when SELLER_ID empty', async () => {
-    commonMocks({ getSellerId: vi.fn().mockResolvedValue('') })
+    commonMocks({ getSellerId: vi.fn().mockResolvedValue(''), amazonConfigured: vi.fn().mockResolvedValue(false) })
     const mod = await import('@/lib/amazon/sync')
     const r = await mod.syncAllProductsToAmazon()
     expect(r.errors[0].sku).toBe('__config__')
@@ -54,7 +55,7 @@ describe('amazon/sync disabled + config branches', () => {
   })
 
   it('deleteProductFromAmazon no-ops when SELLER_ID empty', async () => {
-    commonMocks({ getSellerId: vi.fn().mockResolvedValue('') })
+    commonMocks({ getSellerId: vi.fn().mockResolvedValue(''), amazonConfigured: vi.fn().mockResolvedValue(false) })
     const client = await import('@/lib/amazon/client')
     const mod = await import('@/lib/amazon/sync')
     await mod.deleteProductFromAmazon('S')
@@ -62,7 +63,7 @@ describe('amazon/sync disabled + config branches', () => {
   })
 
   it('validateProductForAmazon returns config row when SELLER_ID empty', async () => {
-    commonMocks({ getSellerId: vi.fn().mockResolvedValue('') })
+    commonMocks({ getSellerId: vi.fn().mockResolvedValue(''), amazonConfigured: vi.fn().mockResolvedValue(false) })
     const mod = await import('@/lib/amazon/sync')
     const out = await mod.validateProductForAmazon('p1')
     expect(out[0].sku).toBe('__config__')

@@ -7,6 +7,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/amazon/client', () => ({
   matchAsin: vi.fn(),
   getSellerId: vi.fn().mockResolvedValue('SELLER-123'),
+  amazonConfigured: vi.fn().mockResolvedValue(true),
 }))
 
 import { backfillAsins } from '@/lib/amazon/asin-backfill'
@@ -17,11 +18,13 @@ const mockQuery = vi.mocked(db.query)
 const mockQueryMany = vi.mocked(db.queryMany)
 const mockMatchAsin = vi.mocked(client.matchAsin)
 const mockGetSellerId = vi.mocked(client.getSellerId)
+const mockAmazonConfigured = vi.mocked(client.amazonConfigured)
 
 describe('amazon/asin-backfill', () => {
   beforeEach(() => {
     vi.resetAllMocks()
     mockGetSellerId.mockResolvedValue('SELLER-123')
+    mockAmazonConfigured.mockResolvedValue(true)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockQueryMany.mockResolvedValue([])
     mockMatchAsin.mockResolvedValue(null)

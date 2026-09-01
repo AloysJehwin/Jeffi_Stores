@@ -25,7 +25,7 @@ function makeRequest(params: Record<string, string> = {}) {
 describe('GET /api/email-events/click', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    process.env.NEXT_PUBLIC_APP_URL = 'http://localhost:3000'
+    process.env.APP_URL = 'http://localhost:3000'
   })
 
   it('redirects to the provided url param (302)', async () => {
