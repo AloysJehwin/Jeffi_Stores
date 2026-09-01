@@ -21,6 +21,9 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'users', 'users/[id]', 'users/[id]/revoke-sessions', 'users/[id]/resend-certificate',
   // Platform control plane: gated by host and isPlatformAdmin in middleware.
   'ecom/kyc/[tenantId]/approve', 'ecom/kyc/[tenantId]/reject',
+  // Hard-delete of a deprovisioned tenant — gated on isPlatformAdmin (platform super-admin),
+  // which is strictly stronger than any :write scope, so a read-only member can never reach it.
+  'ecom/customers/[id]/purge',
   // Signature-verified webhook, not an admin action.
   'financial/payables/webhook',
   // Renders a preview; writes nothing.
