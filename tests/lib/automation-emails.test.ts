@@ -241,7 +241,11 @@ describe('fetchUserContext', () => {
     const [sql, params] = mockQueryOne.mock.calls[0]
     expect(sql).toContain('FROM users u')
     expect(params).toEqual(['user-1'])
-    expect(result).toMatchObject(mockUser)
+    const { baseUrl: _baseUrl, ...fromDb } = mockUser
+    expect(result).toMatchObject(fromDb)
+    // baseUrl is resolved per-request (tenant storefront on a tenant host), not read from the row.
+    expect(typeof result?.baseUrl).toBe('string')
+    expect(result?.baseUrl).not.toBe('')
   })
 
   it('returns null when user not found', async () => {
