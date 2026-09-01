@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 export default function GenerateInvoiceButton({ orderId }: { orderId: string }) {
   const [loading, setLoading] = useState(false)
@@ -44,6 +45,7 @@ export default function GenerateInvoiceButton({ orderId }: { orderId: string }) 
   }
 
   return (
+    <RequireWrite scope="orders:write">
     <div className="inline-flex items-center gap-2">
       <button
         onClick={handleGenerate}
@@ -57,5 +59,6 @@ export default function GenerateInvoiceButton({ orderId }: { orderId: string }) 
       </button>
       {error && <span className="text-sm text-red-600 dark:text-red-400">{error}</span>}
     </div>
+    </RequireWrite>
   )
 }

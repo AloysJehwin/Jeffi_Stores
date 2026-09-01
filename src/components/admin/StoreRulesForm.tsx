@@ -2,8 +2,10 @@
 
 import { useState } from 'react'
 import { round2 } from '@/lib/gst'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 export default function StoreRulesForm({ minOrderAmount }: { minOrderAmount: number }) {
+  const canWrite = useCanWrite('settings:write')
   const [value, setValue] = useState(String(minOrderAmount))
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -56,7 +58,7 @@ export default function StoreRulesForm({ minOrderAmount }: { minOrderAmount: num
           </div>
           <button
             onClick={handleSave}
-            disabled={saving}
+            disabled={saving || !canWrite}
             className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-60"
           >
             {saving ? 'Saving…' : 'Save'}

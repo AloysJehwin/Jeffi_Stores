@@ -105,6 +105,11 @@ export async function POST(request: NextRequest) {
   // Delhivery charge). Uses the reconciled delhivery_billed_amount when available.
   const tenant = getCurrentTenant()
   if (tenant?.tenantId && remitted.rows.length > 0) {
+    const { controlPlanePool } = await import('@/lib/tenant-registry')
+    const cpRow = await controlPlanePool()
+      .query(`SELECT daily_payout FROM tenants WHERE id=$1`, [tenant.tenantId])
+      .catch(() => null)
+    const dailyPayout = cpRow?.rows[0]?.daily_payout === true
     const settledOrders = await queryMany<{
       order_number: string; total_amount: string
       delhivery_billed_amount: string | null; shipping_amount: string | null
@@ -123,6 +128,7 @@ export async function POST(request: NextRequest) {
         orderRef: o.order_number,
         grossAmountInr: parseFloat(o.total_amount),
         actualDelhiveryChargeInr: actualDelhivery,
+        dailyPayout,
       }).catch(() => {})
     }
   }

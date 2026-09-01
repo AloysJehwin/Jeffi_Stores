@@ -18,18 +18,18 @@ const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
 
 type TemplateData = Record<string, string>
 
-function baseLayout(title: string, body: string) {
+function baseLayout(title: string, body: string, baseUrl: string = BASE_URL) {
   return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5f5;padding:32px 16px;">
   <tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
       <tr><td style="background:#1a3a4a;padding:20px 32px;border-radius:8px 8px 0 0;">
-        <a href="${BASE_URL}" style="text-decoration:none;color:#ffffff;font-size:20px;font-weight:700;">{store_name}</a>
+        <a href="${baseUrl}" style="text-decoration:none;color:#ffffff;font-size:20px;font-weight:700;">{store_name}</a>
       </td></tr>
       <tr><td style="background:#ffffff;padding:32px;border-radius:0 0 8px 8px;">${body}</td></tr>
       <tr><td style="padding:16px 0;text-align:center;font-size:12px;color:#999;">
-        &copy; ${new Date().getFullYear()} {store_name} &bull; <a href="${BASE_URL}" style="color:#999;">{store_web}</a>
+        &copy; ${new Date().getFullYear()} {store_name} &bull; <a href="${baseUrl}" style="color:#999;">{store_web}</a>
       </td></tr>
     </table>
   </td></tr>
@@ -43,15 +43,16 @@ function ctaButton(text: string, url: string) {
 
 export { baseLayout, ctaButton }
 
-export function renderCampaignEmail(templateKey: string, data: TemplateData, recipientName?: string): { subject: string; html: string; ampHtml?: string } {
+export function renderCampaignEmail(templateKey: string, data: TemplateData, recipientName?: string, baseUrl?: string): { subject: string; html: string; ampHtml?: string } {
   const greeting = recipientName ? `Hi ${recipientName},` : 'Hi there,'
+  const url = baseUrl || BASE_URL
 
   switch (templateKey) {
     case 'review_request': {
       const subject = data.subject || 'How was your order? Share your thoughts ⭐'
       const items: Array<{ name: string; imageUrl: string | null; starLinks: string[]; productUrl?: string }> = JSON.parse(data.itemsJson || '[]')
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'https://jeffistores.in'
-      const ampBaseUrl = 'https://jeffistores.in'
+      const appUrl = url
+      const ampBaseUrl = url
 
       // Fallback HTML: one link per product to its detail page (non-Gmail clients)
       const fallbackLinks = items.map(item => {
@@ -77,7 +78,7 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
         <p style="color:#555;line-height:1.6;margin:0 0 20px;">We hope you love your recent purchase! Tap a product below to leave a quick review.</p>
         <table cellpadding="0" cellspacing="0" width="100%">${fallbackLinks}</table>
         ${couponBlock}
-      `)
+      `, url)
 
       // AMP HTML: inline form per product (Gmail only)
       const ampProductForms = items.map((item, idx) => {
@@ -174,9 +175,9 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
         <p style="color:#555;line-height:1.6;margin:0 0 20px;">
           We'd love to hear what you think! Leave us a Google review and we'll send you a special discount as a thank-you.
         </p>
-        ${ctaButton('Leave a Review & Claim Reward', data.formUrl || BASE_URL)}
+        ${ctaButton('Leave a Review & Claim Reward', data.formUrl || url)}
         <p style="color:#999;font-size:13px;margin:20px 0 0;">Or paste this link: <a href="${data.formUrl}" style="color:#e07b3f;">${data.formUrl}</a></p>
-      `)
+      `, url)
       return { subject, html }
     }
 
@@ -187,7 +188,7 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
         <h2 style="font-size:24px;color:#1a3a4a;margin:0 0 16px;">${data.headline}</h2>
         <p style="color:#555;line-height:1.6;margin:0 0 20px;">${(data.body || '').replace(/\n/g, '<br>')}</p>
         ${data.ctaUrl ? ctaButton(data.ctaText || 'Shop Now', data.ctaUrl) : ''}
-      `)
+      `, url)
       return { subject, html }
     }
 
@@ -199,7 +200,7 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
         ${data.eventDate ? `<p style="color:#e07b3f;font-weight:600;margin:0 0 16px;">${data.eventDate}</p>` : ''}
         <p style="color:#555;line-height:1.6;margin:0 0 20px;">${(data.eventDetails || '').replace(/\n/g, '<br>')}</p>
         ${data.ctaUrl ? ctaButton('Learn More', data.ctaUrl) : ''}
-      `)
+      `, url)
       return { subject, html }
     }
 
@@ -209,8 +210,8 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
         <p style="font-size:16px;color:#333;margin:0 0 12px;">${greeting}</p>
         <h2 style="font-size:24px;color:#1a3a4a;margin:0 0 16px;">${data.headline}</h2>
         <p style="color:#555;line-height:1.6;margin:0 0 20px;">${(data.body || '').replace(/\n/g, '<br>')}</p>
-        ${ctaButton('Visit Our Store', BASE_URL)}
-      `)
+        ${ctaButton('Visit Our Store', url)}
+      `, url)
       return { subject, html }
     }
 
@@ -220,7 +221,7 @@ export function renderCampaignEmail(templateKey: string, data: TemplateData, rec
       const isFullDoc = /<html[\s>]/i.test(body) || /<!DOCTYPE/i.test(body)
       const html = isFullDoc
         ? body
-        : baseLayout(subject, `<p style="font-size:16px;color:#333;margin:0 0 12px;">${greeting}</p>${body}`)
+        : baseLayout(subject, `<p style="font-size:16px;color:#333;margin:0 0 12px;">${greeting}</p>${body}`, url)
       return { subject, html }
     }
 
@@ -307,10 +308,11 @@ export async function sendCampaign(campaignId: string, opts?: { batchSize?: numb
 
   const recipients = await resolveAudience(campaign.audience_type, campaign.audience_filter)
 
-  // Store identity fetched once for the whole campaign — drives {store_*} vars
-  // and the From display name. Address stays the SES-verified sender.
+  // Store identity drives {store_*} vars. From sender and base URL are tenant-aware.
   const store = await getStoreIdentity()
-  const fromAddr = `"${store.name}" <${process.env.SES_FROM_EMAIL}>`
+  const { campaignMailFromAsync, storeBaseUrlAsync } = await import('./brand')
+  const fromAddr = await campaignMailFromAsync()
+  const baseUrl = await storeBaseUrlAsync()
 
   let sent = 0
   let failed = 0
@@ -344,7 +346,7 @@ export async function sendCampaign(campaignId: string, opts?: { batchSize?: numb
           }
         }
 
-        const { subject, html } = renderCampaignEmail(campaign.template_key, templateData, recipient.first_name || undefined)
+        const { subject, html } = renderCampaignEmail(campaign.template_key, templateData, recipient.first_name || undefined, baseUrl)
         const vars = buildVarMap({
           recipient: { email: recipient.email, first_name: recipient.first_name },
           store: { name: store.name, email: store.email, phone: store.phone, web: store.web },

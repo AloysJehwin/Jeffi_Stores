@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface Tag {
   id: string
@@ -38,8 +39,9 @@ function tagClasses(color: string) {
   return COLOR_CLASSES[color] ?? COLOR_CLASSES.accent
 }
 
-export default function CustomerTags({ customerId, initialTags, canWrite = false }: CustomerTagsProps) {
+export default function CustomerTags({ customerId, initialTags, canWrite: canWriteProp = false }: CustomerTagsProps) {
   const router = useRouter()
+  const canWrite = canWriteProp && useCanWrite('customers:write')
   const [tags, setTags] = useState<Tag[]>(initialTags)
   const [definitions, setDefinitions] = useState<TagDefinition[]>([])
   const [open, setOpen] = useState(false)

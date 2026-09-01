@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback, Fragment } from 'react'
 import { CheckCircle, XCircle, Loader2, Sparkles, Play, ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
 
@@ -177,7 +178,7 @@ export default function CatalogEnrichmentPage() {
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           {selected.size > 0 && statusFilter === 'proposed' && (
-            <>
+            <RequireWrite scope="catalog_enrichment:write">
               <button
                 onClick={() => bulkAction('approve')}
                 disabled={bulkBusy}
@@ -195,16 +196,18 @@ export default function CatalogEnrichmentPage() {
                 Reject {selected.size}
               </button>
               <div className="w-px h-5 bg-border-default" />
-            </>
+            </RequireWrite>
           )}
-          <button
-            onClick={runAll}
-            disabled={runningAll}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
-          >
-            {runningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
-            Run All
-          </button>
+          <RequireWrite scope="catalog_enrichment:write">
+            <button
+              onClick={runAll}
+              disabled={runningAll}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-surface hover:bg-surface-secondary text-foreground border border-border-default rounded text-xs font-semibold disabled:opacity-50"
+            >
+              {runningAll ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Play className="w-3.5 h-3.5" />}
+              Run All
+            </button>
+          </RequireWrite>
           <AdminSelect
             sm
             value={statusFilter}
@@ -307,7 +310,7 @@ export default function CatalogEnrichmentPage() {
                             {expanded.has(item.id) ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
                           </button>
                           {item.status === 'proposed' && (
-                            <>
+                            <RequireWrite scope="catalog_enrichment:write">
                               <button
                                 disabled={busyId === item.id}
                                 onClick={() => decide(item.id, 'approve')}
@@ -324,7 +327,7 @@ export default function CatalogEnrichmentPage() {
                               >
                                 <XCircle className="w-3.5 h-3.5" />
                               </button>
-                            </>
+                            </RequireWrite>
                           )}
                         </div>
                       </td>

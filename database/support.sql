@@ -22,6 +22,7 @@ CREATE TABLE public.support_messages (
 CREATE TABLE public.support_sessions (
     id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
     user_id uuid,
+    tenant_id uuid,
     status character varying(20) DEFAULT 'open'::character varying,
     admin_name character varying(100),
     created_at timestamp with time zone DEFAULT now(),

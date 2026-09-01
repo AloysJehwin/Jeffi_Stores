@@ -10,6 +10,7 @@ import FormsPreview from '@/components/forms/FormsPreview'
 import Toggle from '@/components/ui/Toggle'
 import AIFillForm from '@/components/admin/AIFillForm'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Coupon {
   id: string
@@ -214,18 +215,20 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
   return (
     <form onSubmit={handleSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start">
       <div className="xl:col-span-2">
-        <AIFillForm
-          fields={[
-            { name: 'title', label: 'Form Title', type: 'text' },
-            { name: 'slug', label: 'URL Slug', type: 'text' },
-            { name: 'template_type', label: 'Template (google_review, product_feedback, or testimonial)', type: 'text' },
-            { name: 'google_review_url', label: 'Google Review URL', type: 'text' },
-            { name: 'description', label: 'Description', type: 'textarea' },
-            { name: 'is_active', label: 'Active', type: 'boolean' },
-          ]}
-          onFill={handleAIFill}
-          context="Review form for jeffistores.com hardware store"
-        />
+        <RequireWrite scope="review_forms:write">
+          <AIFillForm
+            fields={[
+              { name: 'title', label: 'Form Title', type: 'text' },
+              { name: 'slug', label: 'URL Slug', type: 'text' },
+              { name: 'template_type', label: 'Template (google_review, product_feedback, or testimonial)', type: 'text' },
+              { name: 'google_review_url', label: 'Google Review URL', type: 'text' },
+              { name: 'description', label: 'Description', type: 'textarea' },
+              { name: 'is_active', label: 'Active', type: 'boolean' },
+            ]}
+            onFill={handleAIFill}
+            context="Review form for jeffistores.com hardware store"
+          />
+        </RequireWrite>
       </div>
       <div className="space-y-5">
         <div>
@@ -341,22 +344,24 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
           <Link href={ap(backUrl && backUrl.startsWith('/admin/review-forms') ? backUrl : '/admin/review-forms')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">
             Cancel
           </Link>
-          {isDraft ? (
-            <>
-              <button type="submit" value="draft" disabled={submitting} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
-                {submitting ? 'Saving…' : 'Save Draft'}
+          <RequireWrite scope="review_forms:write">
+            {isDraft ? (
+              <>
+                <button type="submit" value="draft" disabled={submitting} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
+                  {submitting ? 'Saving…' : 'Save Draft'}
+                </button>
+                <button type="submit" value="publish" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
+                  {submitting ? 'Publishing…' : 'Publish'}
+                </button>
+                {autoSaveStatus === 'saving' && <span className="text-xs text-foreground-muted">Saving…</span>}
+                {autoSaveStatus === 'saved' && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
+              </>
+            ) : (
+              <button type="submit" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
+                {submitting ? 'Saving…' : (submitLabel || 'Save Changes')}
               </button>
-              <button type="submit" value="publish" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
-                {submitting ? 'Publishing…' : 'Publish'}
-              </button>
-              {autoSaveStatus === 'saving' && <span className="text-xs text-foreground-muted">Saving…</span>}
-              {autoSaveStatus === 'saved' && <span className="text-xs text-green-600 dark:text-green-400">Saved</span>}
-            </>
-          ) : (
-            <button type="submit" disabled={submitting} className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors text-sm disabled:opacity-50">
-              {submitting ? 'Saving…' : (submitLabel || 'Save Changes')}
-            </button>
-          )}
+            )}
+          </RequireWrite>
         </div>
       </div>
 

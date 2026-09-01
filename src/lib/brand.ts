@@ -62,6 +62,17 @@ export function currentStoreUrl(): string {
 }
 
 /**
+ * Storefront base URL, resolved even before the first DB query (via the x-tenant-slug header) —
+ * the one to prefer in mail/notification builders, which run before any tenant-scoped query and
+ * would otherwise capture the platform host. Falls back to the platform APP_URL off-tenant.
+ */
+export async function storeBaseUrlAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (t?.slug) return `https://${t.slug}.${PLATFORM_DOMAIN}`
+  return process.env.APP_URL || `https://${PLATFORM_DOMAIN}`
+}
+
+/**
  * `From` header for customer-facing mail.
  *
  * On a tenant host this is the tenant's name and its own noreply- address, so a buyer sees the
@@ -115,6 +126,21 @@ export async function currentBrandNameAsync(): Promise<string> {
   const t = await resolveCurrentTenant()
   if (t?.displayName?.trim()) return t.displayName.trim()
   return t?.slug ? `${t.slug} Store` : platformBrandName()
+}
+
+/**
+ * `From` for marketing/campaign mail, resolved even before the first query. On a tenant host this
+ * is the tenant's name and its own campaigns- address; off-tenant it is the platform's promo
+ * sender. Keeps campaign mail from a tenant signed as that tenant, not the platform.
+ */
+export async function campaignMailFromAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (t?.slug) {
+    const name = t.displayName?.trim() || `${t.slug} Store`
+    return `"${name}" <${tenantCampaignAddress(t.slug)}>`
+  }
+  const addr = process.env.SES_PROMO_FROM_EMAIL || process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`
+  return `"${platformBrandName()}" <${addr}>`
 }
 
 /**

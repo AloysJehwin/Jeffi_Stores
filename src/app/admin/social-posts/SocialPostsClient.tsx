@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from '@/components/admin/AdminSelect'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
@@ -63,8 +64,10 @@ function fmtDate(s: string) {
   return d.toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-export default function SocialPostsClient({ canWrite = false }: { canWrite?: boolean }) {
+export default function SocialPostsClient({ canWrite: canWriteProp = false }: { canWrite?: boolean }) {
   const { showToast } = useToast()
+  const canWriteScope = useCanWrite('campaigns:write')
+  const canWrite = canWriteProp && canWriteScope
   const [posts, setPosts] = useState<SocialPost[]>([])
   const [loading, setLoading] = useState(true)
   const [publishingId, setPublishingId] = useState<string | null>(null)

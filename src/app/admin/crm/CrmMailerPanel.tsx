@@ -6,6 +6,7 @@ import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import RichTextEditor from '@/components/admin/RichTextEditor'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Coupon {
   id: string
@@ -486,24 +487,26 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
       )}
 
       {/* Send */}
-      <div className="flex flex-col gap-1 pt-1 border-t border-border-default">
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={handleSend}
-            disabled={sending || !subject.trim() || !headline.trim()}
-            className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
-          >
-            {sending
-              ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              : <Mail className="w-3.5 h-3.5" />
-            }
-            {sending ? 'Sending…' : `Send to ${recipientCount} ${segmentLabel}`}
-          </button>
-          <p className="text-[10px] text-foreground-muted">Subject and headline required to send.</p>
+      <RequireWrite scope="crm:write">
+        <div className="flex flex-col gap-1 pt-1 border-t border-border-default">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              type="button"
+              onClick={handleSend}
+              disabled={sending || !subject.trim() || !headline.trim()}
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-accent-500 hover:bg-accent-600 text-white text-xs font-semibold transition-colors disabled:opacity-60"
+            >
+              {sending
+                ? <span className="w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : <Mail className="w-3.5 h-3.5" />
+              }
+              {sending ? 'Sending…' : `Send to ${recipientCount} ${segmentLabel}`}
+            </button>
+            <p className="text-[10px] text-foreground-muted">Subject and headline required to send.</p>
+          </div>
+          {sendError && <p className="text-xs text-red-500">{sendError}</p>}
         </div>
-        {sendError && <p className="text-xs text-red-500">{sendError}</p>}
-      </div>
+      </RequireWrite>
     </div>
   )
 }

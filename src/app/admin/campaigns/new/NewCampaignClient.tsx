@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import AdminSelect, { type SelectOption } from '@/components/admin/AdminSelect'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface CouponOption {
   id: string
@@ -172,6 +173,7 @@ export default function NewCampaignClient() {
 
   return (
     <div className="space-y-5">
+      <RequireWrite scope="campaigns:write">
       <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-3">
         <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide">Generate template with AI</p>
         <div className="flex gap-2">
@@ -194,6 +196,7 @@ export default function NewCampaignClient() {
         </div>
         <p className="text-[10px] text-foreground-muted">AI will fill the name, kind, subject and body. You can edit anything afterwards.</p>
       </div>
+      </RequireWrite>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
         <div className="bg-surface-elevated rounded-xl border border-border-default p-5 space-y-4">
@@ -311,14 +314,16 @@ export default function NewCampaignClient() {
           </div>
 
           <div className="flex items-center gap-3 pt-1">
-            <button
-              type="button"
-              onClick={create}
-              disabled={creating || !form.name.trim() || !form.kind.trim()}
-              className="px-5 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-            >
-              {creating ? 'Creating…' : 'Save as Draft'}
-            </button>
+            <RequireWrite scope="campaigns:write">
+              <button
+                type="button"
+                onClick={create}
+                disabled={creating || !form.name.trim() || !form.kind.trim()}
+                className="px-5 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+              >
+                {creating ? 'Creating…' : 'Save as Draft'}
+              </button>
+            </RequireWrite>
             <button
               type="button"
               onClick={() => router.push(ap('/admin/campaigns'))}

@@ -3,11 +3,13 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 export default function DeleteCampaignButton({ id, title }: { id: string; title: string }) {
   const [loading, setLoading] = useState(false)
   const router = useRouter()
   const confirm = useConfirm()
+  const canWrite = useCanWrite('campaigns:write')
 
   async function handleDelete() {
     const ok = await confirm({
@@ -24,6 +26,8 @@ export default function DeleteCampaignButton({ id, title }: { id: string; title:
     router.refresh()
     setLoading(false)
   }
+
+  if (!canWrite) return null
 
   return (
     <button type="button" onClick={handleDelete} disabled={loading} className="text-red-500 hover:underline text-sm disabled:opacity-50">

@@ -11,6 +11,7 @@ import ProductStockMovements from '@/components/admin/ProductStockMovements'
 import UnitsManager from '@/components/admin/UnitsManager'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 function formatINR(n: number) {
   return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 2 }).format(n)
@@ -202,6 +203,7 @@ function AiPanel({ productId, onClose, onApproved }: { productId: string; onClos
         </div>
 
         {item?.status === 'proposed' && (
+          <RequireWrite scope="products:write">
           <div className="px-5 py-4 border-t border-border-default flex gap-2 flex-shrink-0">
             <button
               onClick={() => decide('approve')}
@@ -220,6 +222,7 @@ function AiPanel({ productId, onClose, onApproved }: { productId: string; onClos
               Reject
             </button>
           </div>
+          </RequireWrite>
         )}
       </div>
     </div>,
@@ -647,12 +650,14 @@ export default function ProductDetailClient({ id }: { id: string }) {
           <Link href={ap(`/admin/products/${p.id}/analytics`)} className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground-secondary hover:bg-surface-secondary transition-colors">
             Analytics
           </Link>
-          <button
-            onClick={() => setShowDraftModal(true)}
-            className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
-          >
-            Edit
-          </button>
+          <RequireWrite scope="products:write">
+            <button
+              onClick={() => setShowDraftModal(true)}
+              className="px-3 py-1.5 rounded-lg border border-border-default text-sm font-medium text-foreground hover:bg-surface-secondary transition-colors"
+            >
+              Edit
+            </button>
+          </RequireWrite>
           {showDraftModal && (
             <DraftConfirmModal
               productId={p.id}

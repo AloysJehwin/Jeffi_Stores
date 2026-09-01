@@ -5,6 +5,7 @@ import { Check, X } from 'lucide-react'
 import AdminTypeahead from '@/components/admin/AdminTypeahead'
 import AdminSelect from '@/components/admin/AdminSelect'
 import CopySku from '@/components/ui/CopySku'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 export interface Warehouse {
   id: string
@@ -197,6 +198,7 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
   siblingLocations: ShelfLocation[]
   onRefresh: () => void
 }) {
+  const canWrite = useCanWrite('shelving')
   const factor = Number(row.unit_factor) || 1
   const isContinuous = ['length', 'weight', 'area', 'volume'].includes(row.unit_dimension ?? '')
   const unitLabel = row.unit_label || 'unit'
@@ -323,17 +325,20 @@ export function StockRow({ row, locationId, siblingLocations, onRefresh }: {
           ) : (
             <button
               onClick={() => { setNewQty(displayQty); setEditing(true) }}
-              className="text-sm font-bold tabular-nums text-foreground hover:text-secondary-500 dark:hover:text-secondary-400 transition-colors min-w-[2rem] text-right"
+              disabled={!canWrite}
+              className="text-sm font-bold tabular-nums text-foreground enabled:hover:text-secondary-500 dark:enabled:hover:text-secondary-400 transition-colors min-w-[2rem] text-right disabled:cursor-default"
             >
               {displayQty} <span className="text-xs font-normal text-foreground-muted">{unitLabel}</span>
             </button>
           )}
-          <button
-            onClick={() => { if (isPerishableWithBatches) initBatchMove(); setMoving(!moving) }}
-            className="px-2.5 py-1 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
-          >
-            Move
-          </button>
+          {canWrite && (
+            <button
+              onClick={() => { if (isPerishableWithBatches) initBatchMove(); setMoving(!moving) }}
+              className="px-2.5 py-1 rounded-lg text-xs font-medium border border-border-default bg-surface hover:bg-surface-secondary text-foreground-secondary hover:text-foreground transition-colors"
+            >
+              Move
+            </button>
+          )}
         </div>
       </div>
 

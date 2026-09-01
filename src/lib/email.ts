@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'
-import { customerMailFromAsync, adminMailFrom, currentBrandName, currentAdminBaseUrl, platformAdminEmail, storeContactLine } from './brand'
+import { customerMailFromAsync, adminMailFrom, currentBrandName, currentAdminBaseUrl, platformAdminEmail, storeContactLine, storeBaseUrlAsync } from './brand'
 
 /**
  * Store name for email bodies. Synchronous on purpose: templates are built inside string
@@ -152,6 +152,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
 }
 
 export async function sendWelcomeEmail(email: string, name: string) {
+  const baseUrl = await storeBaseUrlAsync()
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const from = await customerMailFromAsync()
   const subject = 'Welcome to Jeffi Stores!'
@@ -224,7 +225,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
             </ul>
 
             <div style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/products" class="button" style="color:#ffffff;">
+              <a href="${baseUrl}/products" class="button" style="color:#ffffff;">
                 Start Shopping
               </a>
             </div>
@@ -567,6 +568,7 @@ export async function sendOrderStatusUpdate(
   invoicePdfBuffer?: Buffer | null,
   cancellationNote?: string,
 ) {
+  const baseUrl = await storeBaseUrlAsync()
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
     pending: {
@@ -733,7 +735,7 @@ export async function sendOrderStatusUpdate(
                 <h4 style="margin-top: 0; color: #1e40af;">Your order is on its way!</h4>
                 <p>Track your shipment live by visiting your order page:</p>
                 <p style="text-align: center; margin: 0;">
-                  <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
+                  <a href="${baseUrl}/account/orders/${orderId}"
                      style="display: inline-block; background-color: #2563eb; color: white; padding: 10px 24px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 14px;">
                     Track Your Order
                   </a>
@@ -749,7 +751,7 @@ export async function sendOrderStatusUpdate(
             ` : ''}
 
             <p style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
+              <a href="${baseUrl}/account/orders/${orderId}"
                  class="button" style="color:#ffffff;">
                 View Order Details
               </a>
@@ -798,6 +800,7 @@ export async function sendPaymentStatusUpdate(
   newPaymentStatus: string,
   orderTotal: number
 ) {
+  const baseUrl = await storeBaseUrlAsync()
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const paymentMessages: Record<string, { title: string; message: string; color: string }> = {
     paid: {
@@ -974,7 +977,7 @@ export async function sendPaymentStatusUpdate(
             ` : ''}
 
             <p style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
+              <a href="${baseUrl}/account/orders/${orderId}"
                  class="button" style="color:#ffffff;">
                 View Order Details
               </a>
@@ -1593,11 +1596,11 @@ export async function sendAgentConnectedEmail(
   customerEmail: string,
   agentName: string
 ): Promise<{ success: boolean; error?: unknown }> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'
+  const appUrl = await storeBaseUrlAsync()
   const chatLink = `${appUrl}/support`
 
   const mailOptions = {
-    from: `"Jeffi Stores Support" <${process.env.SES_FROM_EMAIL}>`,
+    from: await customerMailFromAsync(),
     to: customerEmail,
     subject: `A support agent has joined your chat`,
     html: `
@@ -1650,7 +1653,7 @@ export async function sendReturnStatusEmail(
   event: ReturnEmailEvent,
   extra?: { adminNotes?: string; replacementOrderNumber?: string; returnType?: string; reason?: string; appUrl?: string }
 ): Promise<{ success: boolean; error?: unknown }> {
-  const appUrl = extra?.appUrl || process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'
+  const appUrl = extra?.appUrl || await storeBaseUrlAsync()
   const orderLink = `${appUrl}/account/orders/${orderId}`
   const to = Array.isArray(recipientEmail) ? recipientEmail.join(', ') : recipientEmail
 
@@ -1699,7 +1702,7 @@ export async function sendReturnStatusEmail(
   }
 
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.SES_FROM_EMAIL}>`,
+    from: await customerMailFromAsync(),
     to,
     subject: subjects[event],
     html: `
@@ -1743,7 +1746,7 @@ export async function sendPaymentRetryEmail(
   orderNumber: string,
   orderTotal: number,
 ) {
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
+  const BASE_URL = await storeBaseUrlAsync()
   const shopUrl = `${BASE_URL}/products`
   const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(orderTotal)
 
@@ -2103,7 +2106,7 @@ export async function sendOrderAutoCancelledEmail(
   redirectPath: string
 ) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
+  const baseUrl = await storeBaseUrlAsync()
   const isDirect = orderType === 'direct'
   const ctaLabel = isDirect ? 'Place Order Again' : 'Return to Cart'
   const bodyMessage = isDirect
@@ -2319,7 +2322,7 @@ export async function sendProductAnnouncementEmail(args: {
   products: AnnouncementProduct[]
 }) {
   const { toEmail, customerName, subject, intro, products } = args
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://jeffistores.in'
+  const siteUrl = await storeBaseUrlAsync()
   const cleanIntro = intro
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
     .replace(/\[([^\]]+)\]\(https?:[^)]+\)/g, '$1')
@@ -2393,7 +2396,7 @@ export async function sendVariantChangeRequestedEmail(params: {
   newTotal: number
 }): Promise<{ success: boolean; messageId?: string; error?: unknown }> {
   const from = await customerMailFromAsync()
-  const orderUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${params.orderId}`
+  const orderUrl = `${await storeBaseUrlAsync()}/account/orders/${params.orderId}`
   const absDiff = Math.abs(params.priceDiff)
   const diffLine = params.settlementType === 'refund'
     ? `We'll <strong>refund &#8377;${absDiff.toFixed(2)}</strong> to your original payment once you confirm.`

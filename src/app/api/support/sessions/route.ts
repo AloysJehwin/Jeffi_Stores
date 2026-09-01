@@ -3,12 +3,35 @@ import { authenticateAnyUser } from '@/lib/jwt'
 import { query, queryOne, queryMany } from '@/lib/db'
 import { sendSupportEscalationEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
+import { getCurrentTenant } from '@/lib/tenant-context'
+import { getTenantOwners } from '@/lib/tenant-registry'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/validate'
 
 const postSchema = z.object({
   productId: zUuid.nullish(),
 })
+
+/**
+ * Who a support escalation should reach. On a tenant host the request belongs to that store, so
+ * it must go to the store's own owner(s) only — never the platform's admins or ADMIN_EMAIL, which
+ * previously fanned every tenant's support request out to the platform team. Off-tenant (the
+ * platform's own store) keeps the platform-admin + ADMIN_EMAIL behaviour.
+ */
+async function resolveEscalationRecipients(tenantId: string | null): Promise<string[]> {
+  if (tenantId) {
+    const owners = await getTenantOwners(tenantId).catch(() => [])
+    return owners.map(o => o.email).filter((e): e is string => !!e)
+  }
+  const admins = await queryMany(
+    `SELECT u.email FROM admins a JOIN users u ON u.id = a.user_id WHERE a.is_active = true AND u.email IS NOT NULL`,
+    []
+  )
+  const emails = admins.map((a: any) => a.email)
+  const fallback = process.env.ADMIN_EMAIL
+  if (fallback && !emails.includes(fallback)) emails.push(fallback)
+  return emails
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -50,9 +73,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ session: existing })
     }
 
+    const tenant = getCurrentTenant()
+
     const session = await queryOne(
-      `INSERT INTO support_sessions (user_id) VALUES ($1) RETURNING id, status, created_at`,
-      [authUser.userId]
+      `INSERT INTO support_sessions (user_id, tenant_id) VALUES ($1, $2) RETURNING id, status, created_at`,
+      [authUser.userId, tenant?.tenantId ?? null]
     )
 
     logActivity({
@@ -70,14 +95,10 @@ export async function POST(request: NextRequest) {
 
     if (user) {
       const name = `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'Customer'
-      const admins = await queryMany(
-        `SELECT u.email FROM admins a JOIN users u ON u.id = a.user_id WHERE a.is_active = true AND u.email IS NOT NULL`,
-        []
-      )
-      const adminEmails = admins.map((a: any) => a.email)
-      const fallback = process.env.ADMIN_EMAIL
-      if (fallback && !adminEmails.includes(fallback)) adminEmails.push(fallback)
-      await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id, adminEmails)
+      const recipients = await resolveEscalationRecipients(tenant?.tenantId ?? null)
+      if (recipients.length > 0) {
+        await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id, recipients)
+      }
     }
 
     return NextResponse.json({ session })
