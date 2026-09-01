@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'products:write')) {
+  if (!hasScope(admin.role, admin.scopes, 'campaigns:write')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 

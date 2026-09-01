@@ -45,6 +45,23 @@ export function currentBrandName(): string {
 }
 
 /**
+ * Admin URL for whichever store the current request belongs to. A tenant's mail linked to
+ * admin.jeffistores.in — the platform's own panel, which their certificate cannot open.
+ */
+export function currentAdminBaseUrl(): string {
+  const t = getCurrentTenant()
+  if (t?.slug) return `https://admin-${t.slug}.${PLATFORM_DOMAIN}`
+  return process.env.ADMIN_BASE_URL || `https://admin.${PLATFORM_DOMAIN}`
+}
+
+/** Storefront URL for the current store. */
+export function currentStoreUrl(): string {
+  const t = getCurrentTenant()
+  if (t?.slug) return `https://${t.slug}.${PLATFORM_DOMAIN}`
+  return process.env.APP_URL || `https://${PLATFORM_DOMAIN}`
+}
+
+/**
  * `From` header for customer-facing mail.
  *
  * On a tenant host this is the tenant's name and its own noreply- address, so a buyer sees the

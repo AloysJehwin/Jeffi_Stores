@@ -630,7 +630,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/tasks')) return 'tasks:read'
   if (pathname.startsWith('/api/admin/suppliers')) return 'inventory:read'
   if (pathname.startsWith('/api/admin/shelving')) return 'shelving:read'
-  if (pathname.startsWith('/api/admin/merchant-sync')) return 'merchant_sync:read'
+  if (pathname.startsWith('/api/admin/merchant')) return 'merchant_sync:read'
   if (pathname.startsWith('/api/admin/returns')) return 'returns:read'
   if (pathname.startsWith('/api/admin/replacements')) return 'replacements:read'
   if (pathname.startsWith('/api/admin/delhivery')) return 'delhivery:read'
@@ -644,6 +644,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/review-forms')) return 'review_forms:read'
   if (pathname.startsWith('/api/admin/mailer')) return 'mailer:read'
   if (pathname.startsWith('/api/admin/suggest')) return null
+  if (pathname.startsWith('/api/admin/social-posts')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'
   if (pathname.startsWith('/api/admin/campaigns')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/agent')) return 'agent:read'
