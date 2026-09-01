@@ -41,7 +41,8 @@ function tagClasses(color: string) {
 
 export default function CustomerTags({ customerId, initialTags, canWrite: canWriteProp = false }: CustomerTagsProps) {
   const router = useRouter()
-  const canWrite = canWriteProp && useCanWrite('customers:write')
+  const canWriteScope = useCanWrite('customers:write')
+  const canWrite = canWriteProp && canWriteScope
   const [tags, setTags] = useState<Tag[]>(initialTags)
   const [definitions, setDefinitions] = useState<TagDefinition[]>([])
   const [open, setOpen] = useState(false)

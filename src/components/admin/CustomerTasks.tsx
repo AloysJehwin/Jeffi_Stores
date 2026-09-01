@@ -38,6 +38,7 @@ interface AdminOption {
 
 interface CustomerTasksProps {
   customerId: string
+  canWrite?: boolean
 }
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -47,8 +48,9 @@ const PRIORITY_BADGE: Record<string, string> = {
   low:    'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300',
 }
 
-export default function CustomerTasks({ customerId }: CustomerTasksProps) {
-  const canWrite = useCanWrite('customers:write')
+export default function CustomerTasks({ customerId, canWrite: canWriteProp = false }: CustomerTasksProps) {
+  const canWriteScope = useCanWrite('customers:write')
+  const canWrite = canWriteProp && canWriteScope
   const router = useRouter()
   const confirm = useConfirm()
   const [tasks, setTasks] = useState<Task[]>([])
