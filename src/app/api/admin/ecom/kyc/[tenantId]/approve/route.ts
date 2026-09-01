@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft, saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount, getOwnerBankWithRoute } from '@/lib/tenant-registry'
+import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft, saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount, getOwnerBankWithRoute, persistLinkedAccountToOwnerBank } from '@/lib/tenant-registry'
 import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
 import { createLinkedAccount, createRouteStakeholder, configureRouteSettlement, mapBusinessType, inferProfileCategory, normalizeIndianPhone, isValidCompanyPan } from '@/lib/razorpay-route'
 import { sendKycApprovedEmail } from '@/lib/ecom-emails'
@@ -40,6 +40,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (survivor?.linkedAccountId) {
       linkedAccountId = survivor.linkedAccountId
       await saveLinkedAccountId(tenantId, linkedAccountId).catch(() => {})
+      await persistLinkedAccountToOwnerBank(kyc.owner_id, linkedAccountId).catch(() => {})
     }
   }
   if (!linkedAccountId) {
@@ -112,6 +113,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         postalCode,
       })
       await saveLinkedAccountId(tenantId, linkedAccountId)
+      // Copy it onto the owner-scoped bank row immediately, not only at purge. Razorpay enforces
+      // one linked account per merchant email, so if this tenant is later suspended/rolled back
+      // (its tenants.razorpay_linked_account_id no longer readable as 'active') and re-provisioned,
+      // the survivor row is the only place the acc_xxx persists — without it the retry hits
+      // "Merchant email already exists for account - acc_xxx" and cannot recover.
+      await persistLinkedAccountToOwnerBank(kyc.owner_id, linkedAccountId).catch(() => {})
 
       // Attach a stakeholder + settlement bank so payouts can settle. Both are
       // non-fatal: needs LIVE Razorpay keys to fully succeed and must not block go-live.
