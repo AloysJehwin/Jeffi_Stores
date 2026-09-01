@@ -412,6 +412,7 @@ export async function getTenant(id: string): Promise<TenantDetail | null> {
   const res = await pool.query(
     `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at, t.instance_state,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
+            t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,
             i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.ec2_target, i.region, i.cloudfront_id
      FROM tenants t
