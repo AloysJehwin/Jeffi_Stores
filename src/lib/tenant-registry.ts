@@ -878,6 +878,47 @@ export async function saveBankVerification(args: {
 }
 
 /** The owner's current bank account (for gating go-live). */
+/**
+ * The owner's bank alongside the linked account of whichever store it settles to. Used by the
+ * dashboard to show verification state, and by a re-verify to know which Route account to push
+ * the corrected details at — Razorpay refuses a second linked account on the same email, so a
+ * correction must update the existing one rather than create another.
+ */
+export async function getOwnerBankWithRoute(ownerId: string): Promise<{
+  accountNumber: string | null
+  ifsc: string | null
+  holderName: string | null
+  verifiedName: string | null
+  verificationStatus: string | null
+  verificationRef: string | null
+  linkedAccountId: string | null
+  tenantSlug: string | null
+} | null> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `SELECT b.account_number, b.ifsc, b.holder_name, b.verified_name,
+            b.verification_status, b.verification_ref,
+            COALESCE(b.linked_account_id, t.razorpay_linked_account_id) AS linked_account_id,
+            t.slug AS tenant_slug
+       FROM tenant_bank_accounts b
+       LEFT JOIN owner_tenants ot ON ot.owner_id = b.owner_id
+       LEFT JOIN tenants t ON t.id = ot.tenant_id AND t.status = 'active'
+      WHERE b.owner_id = $1
+      ORDER BY b.created_at DESC LIMIT 1`, [ownerId])
+  const row = r.rows[0]
+  if (!row) return null
+  return {
+    accountNumber: row.account_number ?? null,
+    ifsc: row.ifsc ?? null,
+    holderName: row.holder_name ?? null,
+    verifiedName: row.verified_name ?? null,
+    verificationStatus: row.verification_status ?? null,
+    verificationRef: row.verification_ref ?? null,
+    linkedAccountId: row.linked_account_id ?? null,
+    tenantSlug: row.tenant_slug ?? null,
+  }
+}
+
 export async function getOwnerBankAccount(ownerId: string): Promise<BankAccount | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
