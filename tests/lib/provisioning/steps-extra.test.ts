@@ -103,7 +103,7 @@ describe('ensure_compute', () => {
     await advanceProvisioningJob(job({ step: 'ensure_compute', created_resources: {} }), new StubProvisioningProvider(0))
     const p = patches().find((x) => x.step === 'setup_delhivery')
     expect(p?.created_resources).toMatchObject({ ec2Target: '203.0.113.10', computeMode: 'shared-target' })
-    expect(reg.writeTenantEc2).toHaveBeenCalledWith('t-1', '203.0.113.10')
+    expect(reg.writeTenantEc2).toHaveBeenCalledWith('t-1', '203.0.113.10', undefined)
   })
 
   it('REFUSES to serve a tenant from the flagship app instance', async () => {
