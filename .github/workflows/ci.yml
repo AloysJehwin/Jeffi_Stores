@@ -449,6 +449,10 @@ jobs:
         uses: appleboy/ssh-action@v1
         env:
           DEPLOY_SHA: ${{ github.sha }}
+          # Authoritative source for the fan-out call. Passing it here decouples the fan-out from
+          # container/slot state on the box — the prior run failed because the container lookup
+          # (docker exec printenv) came back empty when no active-slot container was up.
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
         with:
           host: ${{ steps.ec2.outputs.host }}
           username: ${{ secrets.EC2_USER }}
@@ -456,7 +460,7 @@ jobs:
           command_timeout: 15m
           # ssh-action only forwards variables named here; the fan-out records this SHA per
           # tenant so a re-run can skip stores that already have it.
-          envs: DEPLOY_SHA
+          envs: DEPLOY_SHA,CRON_SECRET
           script: |
             set -e
             cd /opt/jeffi-stores
@@ -482,9 +486,19 @@ jobs:
             # already uses. runMigrationFanout skips tenants already recorded at this SHA and
             # isolates failures per tenant, so one bad store cannot block the rest.
             echo "── Tenant schema fan-out ──"
-            CRON_SECRET=$(docker exec jeffi-app-$(cat active_slot 2>/dev/null || echo blue) printenv CRON_SECRET 2>/dev/null || true)
+            # Prefer the secret forwarded from GitHub; fall back to the running container's env only
+            # if it was not configured. The old code read solely from the container, so a missing or
+            # down active-slot container surfaced as "CRON_SECRET unavailable" even when the secret existed.
             if [ -z "$CRON_SECRET" ]; then
-              echo "::error::CRON_SECRET unavailable — cannot run the tenant fan-out"
+              SLOT=$(cat active_slot 2>/dev/null || echo blue)
+              if ! docker inspect jeffi-app-$SLOT >/dev/null 2>&1; then
+                echo "::error::app container jeffi-app-$SLOT not found — cannot source CRON_SECRET for the fan-out"
+                exit 1
+              fi
+              CRON_SECRET=$(docker exec jeffi-app-$SLOT printenv CRON_SECRET 2>/dev/null || true)
+            fi
+            if [ -z "$CRON_SECRET" ]; then
+              echo "::error::CRON_SECRET unavailable (not forwarded from GitHub and absent from the app container) — cannot run the tenant fan-out"
               exit 1
             fi
             CODE=$(curl -s -o /tmp/fanout.json -w '%{http_code}' --max-time 300 \
