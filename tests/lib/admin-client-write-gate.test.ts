@@ -25,6 +25,7 @@ const ALLOWED_WITHOUT_CLIENT_GATE = new Set([
   // Platform control plane: gated by host + isPlatformAdmin, not a tenant scope.
   'src/app/admin/ecom/kyc/KycActionButtons.tsx',
   'src/components/admin/ecom/TenantActions.tsx',
+  'src/components/admin/ecom/PurgeCustomerButton.tsx',
   // Owner-only: gated on isPlatformOwner, which no tenant scope expresses.
   'src/components/admin/CreateAdminForm.tsx',
   'src/components/admin/AdminUserActions.tsx',

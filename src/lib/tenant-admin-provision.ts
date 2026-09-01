@@ -17,7 +17,7 @@ import type { TenantContext } from './tenant-context'
  * 4. Issue an mTLS client certificate from the TENANT's own CA
  * 5. Email cert + password to owner
  *
- * Idempotent — skips if super_admin already exists for this email.
+ * Idempotent — skips only if the owner super_admin already has an issued client cert.
  * Non-fatal — if tenant DB not ready yet, logs and returns false (retried on next event).
  */
 export async function provisionTenantOwnerAdmin(opts: {
@@ -43,9 +43,15 @@ export async function provisionTenantOwnerAdmin(opts: {
       if (scopes.size > 0) grantedScopes = TENANT_SCOPE_KEYS.filter(k => scopes.has(k))
     } catch { /* keep the full tenant set */ }
     await runWithTenantContext(ctx, async () => {
-      // Idempotency: skip if super_admin already exists for this email
+      // Idempotency: skip only when the owner super_admin ALREADY HAS an issued client
+      // certificate. Checking for the super_admin row alone is wrong on re-provision —
+      // deprovision backs up the tenant DB and restore_data brings the admins/users rows
+      // back, so the row exists again while admin_certificates was never re-issued. That
+      // path silently skipped cert issuance + the creds email, leaving the owner with no
+      // way in. Gate on the credential that actually matters (the p12 in admin_certificates).
       const existing = await queryOne<{ id: string }>(
-        `SELECT a.id FROM admins a
+        `SELECT ac.id FROM admin_certificates ac
+         JOIN admins a ON a.id = ac.admin_id
          JOIN users u ON u.id = a.user_id
          WHERE u.email = $1 AND a.role = 'super_admin' LIMIT 1`,
         [opts.ownerEmail]
