@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { cookies } from 'next/headers'
-import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
-import { extractSessionSignals } from '@/lib/session-signals-request'
+import { requireAdminScope } from '@/lib/jwt'
+import { getCurrentTenant } from '@/lib/tenant-context'
 import {
-  getOwnerTenants,
   saveIntegrationCredential,
   listIntegrationCredentials,
   deleteIntegrationCredential,
@@ -14,54 +12,49 @@ import { parseServiceAccountJson } from '@/lib/google-credentials'
 
 export const dynamic = 'force-dynamic'
 
-// Owner-facing integration credentials management. Owner-gated + requires a PROVISIONED
-// (active) store. Secrets are only ever written here (encrypted) — GET never returns them,
-// only non-secret display fields + status. Providers: google_merchant, amazon_seller
-// (Meta lives in tenant_social_accounts and is managed by the /social routes).
+// Store-admin integration credentials management. Admin-scope gated; the tenant is taken from the
+// request's ALS context (the admin host resolves it), never from the client — a tenant admin can
+// only manage their OWN tenant's creds. Secrets are only ever written here (encrypted); GET never
+// returns them, only non-secret display fields + status. Providers: google_merchant, amazon_seller
+// (Meta lives in tenant_social_accounts, managed by the /api/admin/social routes).
 
 const PROVIDERS = ['google_merchant', 'amazon_seller'] as const
 
-async function requireOwnerAndActiveTenant(request: NextRequest, tenantId: string) {
-  const sid = (await cookies()).get(OWNER_COOKIE)?.value
-  const owner = await resolveOwnerSession(sid, extractSessionSignals(request))
-  if (!owner) return { error: NextResponse.json({ error: 'Not signed in' }, { status: 401 }) }
-  const tenant = (await getOwnerTenants(owner.id)).find((t) => t.id === tenantId)
-  if (!tenant) return { error: NextResponse.json({ error: 'Tenant not found' }, { status: 404 }) }
-  if (tenant.status !== 'active') {
-    return { error: NextResponse.json({ error: 'Store is not provisioned yet' }, { status: 409 }) }
-  }
-  return { owner, tenant }
+function requireTenant(): { tenantId: string } | { error: NextResponse } {
+  const t = getCurrentTenant()
+  if (!t) return { error: NextResponse.json({ error: 'No tenant context' }, { status: 400 }) }
+  return { tenantId: t.tenantId }
 }
 
 export async function GET(request: NextRequest) {
-  const tenantId = request.nextUrl.searchParams.get('tenantId') || ''
-  const gate = await requireOwnerAndActiveTenant(request, tenantId)
+  const admin = await requireAdminScope(request, 'merchant_sync:read')
+  if (admin instanceof NextResponse) return admin
+  const gate = requireTenant()
   if ('error' in gate) return gate.error
-  const integrations = await listIntegrationCredentials(tenantId)
+  const integrations = await listIntegrationCredentials(gate.tenantId)
   return NextResponse.json({ integrations })
 }
 
 const PostSchema = z.object({
-  tenantId: z.string().uuid(),
   provider: z.enum(PROVIDERS),
   config: z.record(z.string(), z.any()),
 })
 
 export async function POST(request: NextRequest) {
+  const admin = await requireAdminScope(request, 'merchant_sync:write')
+  if (admin instanceof NextResponse) return admin
+  const gate = requireTenant()
+  if ('error' in gate) return gate.error
+
   const raw = await request.json().catch(() => null)
   const parsed = PostSchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
-  const { tenantId, provider, config } = parsed.data
+  const { provider, config } = parsed.data
 
-  const gate = await requireOwnerAndActiveTenant(request, tenantId)
-  if ('error' in gate) return gate.error
-
-  // Provider-specific validation + non-secret meta for display.
   let normalized: Record<string, any>
   let meta: Record<string, any>
   if (provider === 'google_merchant') {
     if (!config.merchant_id) return NextResponse.json({ error: 'merchant_id is required' }, { status: 400 })
-    // Accept either a pasted service-account JSON string or already-parsed fields.
     let sa: any
     try {
       sa = typeof config.service_account_json === 'string'
@@ -76,7 +69,6 @@ export async function POST(request: NextRequest) {
     normalized = { client_email: sa.client_email, private_key: sa.private_key, merchant_id: String(config.merchant_id) }
     meta = { merchant_id: String(config.merchant_id), client_email: sa.client_email }
   } else {
-    // amazon_seller
     const required = ['client_id', 'client_secret', 'refresh_token', 'seller_id']
     for (const k of required) {
       if (!config[k]) return NextResponse.json({ error: `${k} is required` }, { status: 400 })
@@ -90,7 +82,7 @@ export async function POST(request: NextRequest) {
   }
 
   await saveIntegrationCredential({
-    tenantId,
+    tenantId: gate.tenantId,
     provider,
     label: provider === 'google_merchant' ? 'Google Merchant Center' : 'Amazon Seller',
     configEnc: encryptToken(JSON.stringify(normalized)),
@@ -99,17 +91,18 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ ok: true, provider, meta })
 }
 
-const DeleteSchema = z.object({ tenantId: z.string().uuid(), provider: z.enum(PROVIDERS) })
+const DeleteSchema = z.object({ provider: z.enum(PROVIDERS) })
 
 export async function DELETE(request: NextRequest) {
+  const admin = await requireAdminScope(request, 'merchant_sync:write')
+  if (admin instanceof NextResponse) return admin
+  const gate = requireTenant()
+  if ('error' in gate) return gate.error
+
   const raw = await request.json().catch(() => null)
   const parsed = DeleteSchema.safeParse(raw)
   if (!parsed.success) return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 })
-  const { tenantId, provider } = parsed.data
 
-  const gate = await requireOwnerAndActiveTenant(request, tenantId)
-  if ('error' in gate) return gate.error
-
-  await deleteIntegrationCredential(tenantId, provider)
+  await deleteIntegrationCredential(gate.tenantId, parsed.data.provider)
   return NextResponse.json({ ok: true })
 }

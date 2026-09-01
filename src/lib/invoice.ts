@@ -126,7 +126,10 @@ export async function generateOrderInvoice(orderId: string): Promise<Buffer | nu
     let orderIsIgst = order.is_igst || false
 
     if (gstEnabled && taxableAmount === 0 && parseFloat(order.tax_amount || '0') > 0) {
-      const sellerStateCode = process.env.BUSINESS_STATE_CODE || '22'
+      const stateCodeResult = await client.query(
+        "SELECT value FROM site_settings WHERE key = 'business_state_code'"
+      )
+      const sellerStateCode = stateCodeResult.rows[0]?.value || process.env.BUSINESS_STATE_CODE || '22'
       const buyerState = order.state || ''
       orderIsIgst = isInterState(buyerState, sellerStateCode)
 

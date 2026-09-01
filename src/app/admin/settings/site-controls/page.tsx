@@ -12,6 +12,7 @@ import CustomShortcutsCard, { CustomShortcut } from '@/components/admin/site-con
 import HeroSlideManager from '@/components/admin/HeroSlideManager'
 import DeliverySettingsForm from '@/components/admin/DeliverySettingsForm'
 import CustomerTagDefinitionsCard from '@/components/admin/CustomerTagDefinitionsCard'
+import { BUILTIN_SHORTCUT_SCOPES } from '@/lib/shortcut-scopes'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -126,6 +127,10 @@ export default async function SiteControlsPage() {
 
   let customShortcuts: CustomShortcut[] = []
   try { customShortcuts = JSON.parse(c.shortcuts.customShortcuts || '[]') } catch { /* ignore */ }
+  // A shortcut is only offered if the admin can reach its destination — same scope map the
+  // runtime handler binds against, so the editor never lists an action the session can't use.
+  const canShortcut = (field: keyof typeof BUILTIN_SHORTCUT_SCOPES) =>
+    hasScope(admin.role, admin.scopes || [], BUILTIN_SHORTCUT_SCOPES[field].scope)
   const uaHeader = headersList.get('user-agent') || ''
   const isMac = /mac/i.test(uaHeader) && !/iphone|ipad/i.test(uaHeader)
 
@@ -260,23 +265,23 @@ export default async function SiteControlsPage() {
 
         <div>
           <SectionCard title="Keyboard Shortcuts" description="Assign a shortcut to each quick action. Choose a modifier (⌘/Ctrl, ⌘/Ctrl+Shift, or a standalone F-key), then click the key box and press any letter or number to record it." columns>
-            <KeyboardShortcutControl settingKey="shortcut_new_product"   label="New Product"   initial={c.shortcuts.newProduct} />
-            <KeyboardShortcutControl settingKey="shortcut_cash_sale"     label="Cash Sale"     initial={c.shortcuts.cashSale} />
-            <KeyboardShortcutControl settingKey="shortcut_quotation"     label="Quotation"     initial={c.shortcuts.quotation} />
-            <KeyboardShortcutControl settingKey="shortcut_new_po"        label="New PO"        initial={c.shortcuts.newPo} />
-            <KeyboardShortcutControl settingKey="shortcut_orders"        label="Orders"        initial={c.shortcuts.orders} />
-            <KeyboardShortcutControl settingKey="shortcut_packing_slips" label="Packing Slips" initial={c.shortcuts.packingSlips} />
-            <KeyboardShortcutControl settingKey="shortcut_returns"       label="Returns"       initial={c.shortcuts.returns} />
-            <KeyboardShortcutControl settingKey="shortcut_gst"           label="GST"           initial={c.shortcuts.gst} />
-            <KeyboardShortcutControl settingKey="shortcut_labels"        label="Labels"        initial={c.shortcuts.labels} />
-            <KeyboardShortcutControl settingKey="shortcut_inventory"     label="Inventory"     initial={c.shortcuts.inventory} />
-            <KeyboardShortcutControl settingKey="shortcut_coupons"       label="Coupons"       initial={c.shortcuts.coupons} />
-            <KeyboardShortcutControl settingKey="shortcut_campaign"      label="Campaign"      initial={c.shortcuts.campaign} />
-            <KeyboardShortcutControl settingKey="shortcut_financial"     label="Financial"     initial={c.shortcuts.financial} />
-            <KeyboardShortcutControl settingKey="shortcut_customers"     label="Customers"     initial={c.shortcuts.customers} />
-            <KeyboardShortcutControl settingKey="shortcut_crm"           label="CRM"           initial={c.shortcuts.crm} />
-            <KeyboardShortcutControl settingKey="shortcut_reviews"       label="Reviews"       initial={c.shortcuts.reviews} />
-            <FullSpan><KeyboardShortcutControl settingKey="shortcut_ai_agent" label="AI Agent" initial={c.shortcuts.aiAgent} /></FullSpan>
+            {canShortcut('newProduct')   && <KeyboardShortcutControl settingKey="shortcut_new_product"   label="New Product"   initial={c.shortcuts.newProduct} />}
+            {canShortcut('cashSale')     && <KeyboardShortcutControl settingKey="shortcut_cash_sale"     label="Cash Sale"     initial={c.shortcuts.cashSale} />}
+            {canShortcut('quotation')    && <KeyboardShortcutControl settingKey="shortcut_quotation"     label="Quotation"     initial={c.shortcuts.quotation} />}
+            {canShortcut('newPo')        && <KeyboardShortcutControl settingKey="shortcut_new_po"        label="New PO"        initial={c.shortcuts.newPo} />}
+            {canShortcut('orders')       && <KeyboardShortcutControl settingKey="shortcut_orders"        label="Orders"        initial={c.shortcuts.orders} />}
+            {canShortcut('packingSlips') && <KeyboardShortcutControl settingKey="shortcut_packing_slips" label="Packing Slips" initial={c.shortcuts.packingSlips} />}
+            {canShortcut('returns')      && <KeyboardShortcutControl settingKey="shortcut_returns"       label="Returns"       initial={c.shortcuts.returns} />}
+            {canShortcut('gst')          && <KeyboardShortcutControl settingKey="shortcut_gst"           label="GST"           initial={c.shortcuts.gst} />}
+            {canShortcut('labels')       && <KeyboardShortcutControl settingKey="shortcut_labels"        label="Labels"        initial={c.shortcuts.labels} />}
+            {canShortcut('inventory')    && <KeyboardShortcutControl settingKey="shortcut_inventory"     label="Inventory"     initial={c.shortcuts.inventory} />}
+            {canShortcut('coupons')      && <KeyboardShortcutControl settingKey="shortcut_coupons"       label="Coupons"       initial={c.shortcuts.coupons} />}
+            {canShortcut('campaign')     && <KeyboardShortcutControl settingKey="shortcut_campaign"      label="Campaign"      initial={c.shortcuts.campaign} />}
+            {canShortcut('financial')    && <KeyboardShortcutControl settingKey="shortcut_financial"     label="Financial"     initial={c.shortcuts.financial} />}
+            {canShortcut('customers')    && <KeyboardShortcutControl settingKey="shortcut_customers"     label="Customers"     initial={c.shortcuts.customers} />}
+            {canShortcut('crm')          && <KeyboardShortcutControl settingKey="shortcut_crm"           label="CRM"           initial={c.shortcuts.crm} />}
+            {canShortcut('reviews')      && <KeyboardShortcutControl settingKey="shortcut_reviews"       label="Reviews"       initial={c.shortcuts.reviews} />}
+            {canShortcut('aiAgent')      && <FullSpan><KeyboardShortcutControl settingKey="shortcut_ai_agent" label="AI Agent" initial={c.shortcuts.aiAgent} /></FullSpan>}
             <FullSpan>
               <div className="pt-2 border-t border-border-default">
                 <p className="text-xs font-semibold text-foreground-muted uppercase tracking-wide mb-2">Custom Shortcuts</p>

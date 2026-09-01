@@ -29,8 +29,12 @@ export interface StoreConfig {
   }
 }
 
-// Defaults mirror src/lib/site-controls.ts DEFAULTS (env-driven flags read here
-// via NEXT_PUBLIC_ so the pre-fetch state matches historical behavior).
+// The server (app/layout.tsx → getSiteControls) always supplies initialConfig from the
+// tenant's own DB, so this object is only the pre-hydration fallback for a stray client
+// render with no SSR value. It must therefore carry NO platform state: reading the shared
+// build-time NEXT_PUBLIC_ENABLE_* here would flash the platform's flags on a tenant, the
+// same leak the identity block above already guards against. Neutral defaults only; gst
+// stays on so prices render inclusive (a price-flash guard, not a platform value).
 const DEFAULT_CONFIG: StoreConfig = {
   identity: {
     // Blank, not the platform's: this shows for the instant before the server config
@@ -42,34 +46,14 @@ const DEFAULT_CONFIG: StoreConfig = {
     logoUrl: '',
   },
   flags: {
-    razorpayEnabled: process.env.NEXT_PUBLIC_ENABLE_RAZORPAY === 'true',
-    // Seed from NEXT_PUBLIC_ENABLE_GST so the pre-fetch first paint matches the
-    // real GST state (avoids a price flash before /api/store-config resolves).
-    // Default to true (GST-inclusive prices) when the env var is unset.
-    gstEnabled: process.env.NEXT_PUBLIC_ENABLE_GST !== 'false',
-    ondeviceSummaryEnabled:
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === 'true' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
-    ondeviceFinetuneEnabled:
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === 'true' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
-    // Desktop mirrors the master default; mobile off by default (server fallback).
-    ondeviceSummaryDesktopEnabled:
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP === 'true' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_DESKTOP === '1' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === 'true' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY === '1',
-    ondeviceSummaryMobileEnabled:
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE === 'true' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_SUMMARY_MOBILE === '1',
-    ondeviceFinetuneDesktopEnabled:
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP === 'true' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_DESKTOP === '1' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === 'true' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE === '1',
-    ondeviceFinetuneMobileEnabled:
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE === 'true' ||
-      process.env.NEXT_PUBLIC_ENABLE_ONDEVICE_FINETUNE_MOBILE === '1',
+    razorpayEnabled: false,
+    gstEnabled: true,
+    ondeviceSummaryEnabled: false,
+    ondeviceFinetuneEnabled: false,
+    ondeviceSummaryDesktopEnabled: false,
+    ondeviceSummaryMobileEnabled: false,
+    ondeviceFinetuneDesktopEnabled: false,
+    ondeviceFinetuneMobileEnabled: false,
   },
   orderAutoCancelMinutes: 10,
   storefront: {

@@ -159,6 +159,23 @@ export async function storeContactLine(): Promise<string> {
   }
 }
 
+/**
+ * Physical address for a mail footer. A tenant's customers were shown the platform's Raipur
+ * address baked into the template; a tenant that has set none gets an empty string rather than
+ * the platform's, the same choice storeContactLine makes.
+ */
+export async function storeAddressLine(): Promise<string> {
+  try {
+    const { queryMany } = await import('./db')
+    const rows = await queryMany<{ value: string }>(
+      `SELECT value FROM site_settings WHERE key = 'business_address'`
+    )
+    return rows[0]?.value?.trim() || ''
+  } catch {
+    return ''
+  }
+}
+
 /** `From` for operator-facing mail (admin alerts). Always the platform, never a tenant. */
 export function adminMailFrom(): string {
   const addr = process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`

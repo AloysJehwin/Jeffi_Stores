@@ -43,6 +43,7 @@ vi.mock('@aws-sdk/client-rds', () => ({
 const S3Commands = {
   CreateBucketCommand: cmd('CreateBucket'),
   PutPublicAccessBlockCommand: cmd('PutPublicAccessBlock'),
+  PutBucketPolicyCommand: cmd('PutBucketPolicy'),
   PutBucketCorsCommand: cmd('PutBucketCors'),
   DeleteBucketCommand: cmd('DeleteBucket'),
   ListObjectsV2Command: cmd('ListObjectsV2'),
@@ -279,21 +280,24 @@ describe('AwsProvisioningProvider', () => {
 
   // -------------------------------------------------------------------------
   describe('ensureBucket', () => {
-    it('creates the bucket then BLOCKS ALL PUBLIC ACCESS and sets CORS', async () => {
+    it('creates the bucket, opens public read via policy, and sets CORS', async () => {
       const p = await makeProvider()
       await p.ensureBucket('jeffi-tenant-acme')
 
-      expect(sentTypes(s3Send)).toEqual(['CreateBucket', 'PutPublicAccessBlock', 'PutBucketCors'])
+      expect(sentTypes(s3Send)).toEqual(['CreateBucket', 'PutPublicAccessBlock', 'PutBucketPolicy', 'PutBucketCors'])
+      // Public access block is OFF so the public-read bucket policy takes effect —
+      // tenant product images are served by direct public S3 URL (no per-tenant CDN).
       expect(sentInputs(s3Send)[1].PublicAccessBlockConfiguration).toEqual({
-        BlockPublicAcls: true, IgnorePublicAcls: true,
-        BlockPublicPolicy: true, RestrictPublicBuckets: true,
+        BlockPublicAcls: false, IgnorePublicAcls: false,
+        BlockPublicPolicy: false, RestrictPublicBuckets: false,
       })
+      expect(sentInputs(s3Send)[2].Policy).toContain('PublicReadAccess')
     })
 
     it('restricts CORS to the platform domain', async () => {
       const p = await makeProvider()
       await p.ensureBucket('b')
-      expect(sentInputs(s3Send)[2].CORSConfiguration.CORSRules[0].AllowedOrigins)
+      expect(sentInputs(s3Send)[3].CORSConfiguration.CORSRules[0].AllowedOrigins)
         .toEqual(['https://*.jeffistores.in'])
     })
 

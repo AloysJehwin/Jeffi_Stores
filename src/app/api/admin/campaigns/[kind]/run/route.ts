@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { storeBaseUrlAsync } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
-
-const APP_URL = (process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || 'http://localhost:3000').replace(/\/$/, '')
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ kind: string }> }) {
   const { kind } = await params
@@ -19,7 +18,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ kin
   }
 
   try {
-    const res = await fetch(`${APP_URL}/api/cron/run-campaigns?kind=${kind}`, {
+    const baseUrl = await storeBaseUrlAsync()
+    const res = await fetch(`${baseUrl}/api/cron/run-campaigns?kind=${kind}`, {
       headers: { Authorization: `Bearer ${process.env.CRON_SECRET}` },
     })
     const data = await res.json()

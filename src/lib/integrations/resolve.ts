@@ -5,9 +5,19 @@ import { loadGoogleServiceAccount } from '../google-credentials'
 
 // Runtime credential resolution for external integrations. The rule is uniform: if there is a
 // tenant in the AsyncLocalStorage context (a tenant-scoped request/job), use THAT tenant's
-// stored+encrypted credentials; otherwise fall back to the platform env vars (Jeffi's own
-// account). This mirrors how getPool()/S3 already scope by getCurrentTenant(), so existing
-// single-tenant (Jeffi) behavior is unchanged when no tenant is set.
+// stored+encrypted credentials — and if the tenant has NOT connected the provider, fail loudly.
+// A tenant must NEVER fall through to the platform env creds (Jeffi's own Google/Amazon account),
+// or an unconnected tenant would silently sync into Jeffi's Merchant Center / Seller account.
+// The platform env fallback is reachable only off-tenant (getCurrentTenant() === null), i.e.
+// Jeffi's own single-tenant use. This mirrors social/publisher.ts, which uses jeffiCreds() only
+// when post.tenant_id === null.
+
+export class IntegrationNotConnectedError extends Error {
+  constructor(public provider: string, tenantId: string) {
+    super(`Integration '${provider}' is not connected for tenant ${tenantId}`)
+    this.name = 'IntegrationNotConnectedError'
+  }
+}
 
 export interface GoogleMerchantCreds {
   clientEmail: string
@@ -36,8 +46,10 @@ async function tenantConfig(provider: string): Promise<Record<string, any> | nul
   }
 }
 
-/** Resolve Google Merchant credentials: tenant's own if connected, else platform env. */
+/** Resolve Google Merchant credentials: the tenant's own if connected. In a tenant context an
+ * unconnected provider throws — it never falls back to the platform account. */
 export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds> {
+  const tenant = getCurrentTenant()
   const cfg = await tenantConfig('google_merchant')
   if (cfg?.private_key && cfg?.client_email && cfg?.merchant_id) {
     return {
@@ -46,7 +58,8 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
       merchantId: String(cfg.merchant_id),
     }
   }
-  // Platform fallback (Jeffi's own): env service-account + GMC_MERCHANT_ID.
+  if (tenant) throw new IntegrationNotConnectedError('google_merchant', tenant.tenantId)
+  // Off-tenant only (Jeffi's own): env service-account + GMC_MERCHANT_ID.
   const sa = loadGoogleServiceAccount()
   return {
     clientEmail: sa.client_email,
@@ -55,8 +68,10 @@ export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds>
   }
 }
 
-/** Resolve Amazon SP-API credentials: tenant's own if connected, else platform env. */
+/** Resolve Amazon SP-API credentials: the tenant's own if connected. In a tenant context an
+ * unconnected provider throws — it never falls back to the platform account. */
 export async function resolveAmazonCreds(): Promise<AmazonCreds> {
+  const tenant = getCurrentTenant()
   const cfg = await tenantConfig('amazon_seller')
   if (cfg?.refresh_token && cfg?.client_id) {
     return {
@@ -67,6 +82,7 @@ export async function resolveAmazonCreds(): Promise<AmazonCreds> {
       marketplaceId: cfg.marketplace_id ?? (process.env.AMAZON_MARKETPLACE_ID || 'A21TJRUUN4KGV'),
     }
   }
+  if (tenant) throw new IntegrationNotConnectedError('amazon_seller', tenant.tenantId)
   return {
     clientId: process.env.AMAZON_LWA_CLIENT_ID || '',
     clientSecret: process.env.AMAZON_LWA_CLIENT_SECRET || '',
