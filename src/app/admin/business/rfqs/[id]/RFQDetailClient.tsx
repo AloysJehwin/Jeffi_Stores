@@ -1098,7 +1098,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
                       Send Reply
                     </button>
                   </div>
-                )
+                )}
                 </RequireWrite>
               )}
             </div>
