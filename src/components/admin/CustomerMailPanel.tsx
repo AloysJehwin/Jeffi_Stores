@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import RichTextEditor from '@/components/admin/RichTextEditor'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 const TEMPLATES = [
   {
@@ -321,6 +322,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
           )}
 
           <div className="flex gap-3">
+            <RequireWrite scope="customers:write">
             <button
               type="button"
               onClick={handleSend}
@@ -344,6 +346,7 @@ export default function CustomerMailPanel({ orderId, orderNumber, customerName, 
                 </>
               )}
             </button>
+            </RequireWrite>
             <button
               type="button"
               onClick={() => setOpen(false)}

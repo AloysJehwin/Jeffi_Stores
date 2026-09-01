@@ -307,18 +307,18 @@ describe('transferToLinkedAccount', () => {
       paymentId: 'pay_1', grossAmountPaise: 100000, linkedAccountId: 'acc_1',
       delhiveryChargePaise: 2000, orderId: 'o-1', tenantSlug: 'acme',
     })
-    // 100000 - 3000 commission - 2360 gateway - 2000 delhivery = 92640
-    // transfer fee = round(92640 * 0.0025 * 1.18) = 273 → 92367
+    // 100000 - 5000 commission - 2360 gateway - 2000 delhivery = 90640
+    // transfer fee = round(90640 * 0.0025 * 1.18) = 267 → 90373
     expect(out).toEqual({
-      transferId: 'trf_1', amount: 92367, linkedAccountId: 'acc_1', status: 'processed',
-      gatewayFeePaise: 2360, transferFeePaise: 273, platformCommissionPaise: 3000,
+      transferId: 'trf_1', amount: 90373, linkedAccountId: 'acc_1', status: 'processed',
+      gatewayFeePaise: 2360, transferFeePaise: 267, platformCommissionPaise: 5000,
     })
     expect(rz.payments.fetch).toHaveBeenCalledWith('pay_1')
     const body = rz.api.post.mock.calls[0][0]
     expect(body.url).toBe('/payments/pay_1/transfers')
-    expect(body.data.transfers[0]).toMatchObject({ account: 'acc_1', amount: 92367, currency: 'INR' })
+    expect(body.data.transfers[0]).toMatchObject({ account: 'acc_1', amount: 90373, currency: 'INR' })
     expect(body.data.transfers[0].notes).toMatchObject({
-      platform_commission: 3000, gateway_fee: 2360, transfer_fee: 273, delhivery_charge: 2000,
+      platform_commission: 5000, gateway_fee: 2360, transfer_fee: 267, delhivery_charge: 2000,
     })
   })
 
@@ -331,7 +331,7 @@ describe('transferToLinkedAccount', () => {
       paymentId: 'pay_upi', grossAmountPaise: 100000, linkedAccountId: 'acc_1',
     })
     expect(out.gatewayFeePaise).toBe(140)
-    expect(out.amount).toBe(96574)  // 100000-3000-140 = 96860, less 286 transfer fee
+    expect(out.amount).toBe(94580)  // 100000-5000-140 = 94860, less 280 transfer fee
   })
 
   // The payment already succeeded; abandoning the transfer would strand the tenant's money.
@@ -403,8 +403,8 @@ describe('recordCodSettlement', () => {
     expect(pool.query).toHaveBeenCalledTimes(2)
     const [txnSql, txnParams] = pool.query.mock.calls[0]
     expect(txnSql).toMatch(/INSERT INTO tenant_transactions/)
-    // gross 1000 → commission 3% = 30 → tenant share = 1000 - 30 - 50 = 920
-    expect(txnParams).toEqual(['t-1', 'ORD-1', 1000, 920, 30])
+    // gross 1000 → commission 5% = 50 → tenant share = 1000 - 50 - 50 = 900
+    expect(txnParams).toEqual(['t-1', 'ORD-1', 1000, 900, 50])
     const [ledgerSql] = pool.query.mock.calls[1]
     expect(ledgerSql).toMatch(/INSERT INTO settlement_ledger/)
   })

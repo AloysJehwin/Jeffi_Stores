@@ -171,14 +171,14 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'invoices:read',
     label: 'Invoices (Read)',
     description: 'View invoices and invoice details',
-    routes: ['/admin/invoices'],
+    routes: ['/admin/invoices', '/admin/cash-sale'],
     group: 'Sales',
   },
   {
     key: 'invoices:write',
     label: 'Invoices (Write)',
     description: 'Create offline invoices, cash sales and manage invoice drafts',
-    routes: ['/admin/invoices'],
+    routes: ['/admin/invoices', '/admin/cash-sale'],
     group: 'Sales',
   },
   {
@@ -331,14 +331,14 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'campaigns:read',
     label: 'Campaigns (Read)',
     description: 'View marketing campaigns',
-    routes: ['/admin/campaigns'],
+    routes: ['/admin/campaigns', '/admin/social-posts'],
     group: 'Marketing',
   },
   {
     key: 'campaigns:write',
     label: 'Campaigns (Write)',
     description: 'Create and manage marketing campaigns',
-    routes: ['/admin/campaigns'],
+    routes: ['/admin/campaigns', '/admin/social-posts'],
     group: 'Marketing',
   },
   // Traffic analytics — previously piggybacked on dashboard:read. Dedicated key.
@@ -369,14 +369,14 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'inventory:read',
     label: 'Inventory (Read)',
     description: 'View stock levels, purchase orders, suppliers and movements',
-    routes: ['/admin/inventory'],
+    routes: ['/admin/inventory', '/admin/suppliers'],
     group: 'Finance',
   },
   {
     key: 'inventory:write',
     label: 'Inventory (Write)',
     description: 'Manage stock, raise purchase orders and update supplier records',
-    routes: ['/admin/inventory'],
+    routes: ['/admin/inventory', '/admin/suppliers'],
     group: 'Finance',
   },
   // Shelving — previously piggybacked on inventory:read. Dedicated key for tiering.
@@ -541,7 +541,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_customers:read',
     label: 'Ecom Customers (Read)',
     description: 'View SaaS tenant stores, plans and status',
-    routes: ['/admin/ecom/customers'],
+    routes: ['/admin/ecom/customers', '/admin/ecom/store-status'],
     group: 'Ecom Store',
     platformOnly: true,
   },
@@ -549,7 +549,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'ecom_customers:write',
     label: 'Ecom Customers (Write)',
     description: 'Manage SaaS tenants: suspend, resume, terminate, change plan',
-    routes: ['/admin/ecom/customers'],
+    routes: ['/admin/ecom/customers', '/admin/ecom/store-status'],
     group: 'Ecom Store',
     platformOnly: true,
   },
@@ -584,6 +584,14 @@ export const ALL_SCOPE_KEYS = ADMIN_SCOPES.map(s => s.key)
 /** Scopes a tenant admin may hold. Granting a tenant the control-plane scopes is meaningless
  *  at best — the routes they gate are 404 on a tenant host — and misleading in the team UI. */
 export const TENANT_SCOPE_KEYS = ADMIN_SCOPES.filter(s => !s.platformOnly).map(s => s.key)
+
+/**
+ * The scopes safe to fall back to when a tenant's plan entitlement cannot be resolved (control-
+ * plane error or empty plan). Every plan — including Basic — sells these, so falling back to them
+ * keeps the admin shell and settings reachable during a blip without exposing any feature page a
+ * plan may not have bought. Fail closed: never fall back to the full grant.
+ */
+export const SAFE_CORE_SCOPE_KEYS = ['dashboard:read', 'settings:read']
 
 export function assignableScopes(includePlatform: boolean): ScopeDefinition[] {
   return includePlatform ? ADMIN_SCOPES : ADMIN_SCOPES.filter(s => !s.platformOnly)
@@ -630,7 +638,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/tasks')) return 'tasks:read'
   if (pathname.startsWith('/api/admin/suppliers')) return 'inventory:read'
   if (pathname.startsWith('/api/admin/shelving')) return 'shelving:read'
-  if (pathname.startsWith('/api/admin/merchant-sync')) return 'merchant_sync:read'
+  if (pathname.startsWith('/api/admin/merchant')) return 'merchant_sync:read'
   if (pathname.startsWith('/api/admin/returns')) return 'returns:read'
   if (pathname.startsWith('/api/admin/replacements')) return 'replacements:read'
   if (pathname.startsWith('/api/admin/delhivery')) return 'delhivery:read'
@@ -644,6 +652,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/review-forms')) return 'review_forms:read'
   if (pathname.startsWith('/api/admin/mailer')) return 'mailer:read'
   if (pathname.startsWith('/api/admin/suggest')) return null
+  if (pathname.startsWith('/api/admin/social-posts')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/traffic')) return 'traffic:read'
   if (pathname.startsWith('/api/admin/campaigns')) return 'campaigns:read'
   if (pathname.startsWith('/api/admin/agent')) return 'agent:read'

@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, Fragment } from 'react'
 import AdminSelect, { SelectOption } from '@/components/admin/AdminSelect'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface Category {
   id: string
@@ -99,6 +100,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
   const [rollingBack, setRollingBack] = useState<string | null>(null)
   const [rollbackError, setRollbackError] = useState<string | null>(null)
   const confirm = useConfirm()
+  const canWrite = useCanWrite('financial:write')
 
   const PAGE_SIZE = 25
   const [logsPage, setLogsPage] = useState(1)
@@ -397,7 +399,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
           >
             {previewLoading ? 'Loading…' : 'Preview Changes'}
           </button>
-          {preview && (
+          {preview && canWrite && (
             <button
               type="button"
               onClick={handleApply}
@@ -532,7 +534,7 @@ export default function InflationClient({ categories, brands }: { categories: Ca
                         )}
                       </td>
                       <td className="py-2.5 px-3 text-right" onClick={e => e.stopPropagation()}>
-                        {!log.is_rollback && !log.rolled_back_at && log.snapshot && (
+                        {canWrite && !log.is_rollback && !log.rolled_back_at && log.snapshot && (
                           <button
                             type="button"
                             onClick={() => handleRollback(log)}

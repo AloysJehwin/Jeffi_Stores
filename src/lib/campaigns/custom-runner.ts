@@ -4,8 +4,8 @@ import {
   resolveCoupon,
   sendCampaignEmail,
   renderItemRows,
-  APP_URL,
 } from '@/lib/automation-emails'
+import { storeBaseUrlAsync } from '@/lib/brand'
 import type { Campaign, CampaignKind } from '@/lib/marketing'
 import type { SweepResult } from './types'
 import { validateScenarioSql } from './sql-safety'
@@ -81,12 +81,14 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
 
   result.attempted = userIds.length
 
+  const baseUrl = await storeBaseUrlAsync()
+
   const itemsHtml = products.length > 0
     ? renderItemRows(products.map(p => ({
         name: p.name,
         price: p.price ?? undefined,
         imageUrl: p.image_url,
-        productUrl: p.slug ? `${APP_URL}/products/${p.slug}` : null,
+        productUrl: p.slug ? `${baseUrl}/products/${p.slug}` : null,
       })))
     : ''
 
@@ -105,7 +107,7 @@ export async function runCustomScenario(scenarioKind: string, campaign: Campaign
         couponCode,
         discountPercent,
         itemsHtml,
-        ctaUrl: `${APP_URL}/products`,
+        ctaUrl: `${user.baseUrl}/products`,
       },
     })
     if (r.ok) result.sent++; else result.skipped++

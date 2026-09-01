@@ -1536,6 +1536,13 @@ CREATE INDEX idx_support_sessions_status ON public.support_sessions USING btree 
 CREATE INDEX idx_support_sessions_user_id ON public.support_sessions USING btree (user_id);
 
 
+--
+-- Name: idx_support_sessions_tenant_id; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_support_sessions_tenant_id ON public.support_sessions USING btree (tenant_id);
+
+
 
 --
 -- Name: idx_unique_primary_image_per_product; Type: INDEX; Schema: public; Owner: -

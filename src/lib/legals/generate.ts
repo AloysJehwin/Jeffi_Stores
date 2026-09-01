@@ -1,9 +1,12 @@
 import type { Policy, Section } from '@/app/legal/policies'
 import { policies, POLICY_VERSION } from '@/app/legal/policies'
 import { generatePolicyPDF } from '@/lib/policy-pdf'
+import { tenantNoReplyAddress } from '../brand'
 
 export interface TenantLegalInfo {
   businessName: string
+  /** Used for the tenant's own noreply address when they have set no contact email. */
+  slug: string
   address: string
   gstin?: string
   email?: string
@@ -32,12 +35,20 @@ function applyReplacements(text: string, info: TenantLegalInfo): string {
     .split('Raipur, Chhattisgarh, India').join(info.address)
     .split('Raipur, Chhattisgarh').join(info.address)
 
-  if (info.phone) out = out.split(PLATFORM.phone).join(info.phone)
+  // Guarding on the tenant having a phone or email left the PLATFORM's in place when they do
+  // not — and a tenant's contact details are blank until they set them, so every generated
+  // policy named the platform's mailbox and number as the tenant's own. A legal document must
+  // never carry another business's contact details: fall back to the tenant's own noreply
+  // address, and drop the phone line rather than substitute someone else's number.
+  const contactEmail = info.email?.trim() || tenantNoReplyAddress(info.slug)
+  out = out.split(PLATFORM.supportEmail).join(contactEmail)
+  out = out.split(PLATFORM.email).join(contactEmail)
 
-  if (info.email) {
-    out = out.split(PLATFORM.supportEmail).join(info.email)
-    out = out.split(PLATFORM.email).join(info.email)
-  }
+  out = info.phone?.trim()
+    ? out.split(PLATFORM.phone).join(info.phone.trim())
+    : out.split(` or call ${PLATFORM.phone}`).join('')
+        .split(`, or call ${PLATFORM.phone}`).join('')
+        .split(PLATFORM.phone).join(contactEmail)
 
   out = out.split(`${PLATFORM.businessName}, ${info.address}`).join(`${info.businessName}, ${info.address}`)
   out = out.split(PLATFORM.businessName).join(info.businessName)

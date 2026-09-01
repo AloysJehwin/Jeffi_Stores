@@ -17,6 +17,7 @@ export async function generateTenantLegals(tenantId: string, _endpoint?: string)
 
   const info: TenantLegalInfo = {
     businessName: kyc?.business_name || tenant.display_name,
+    slug: tenant.slug,
     address: kyc?.business_address || '',
     gstin: kyc?.gst_number || undefined,
     email: tenant.noreply_email || undefined,

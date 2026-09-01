@@ -1,6 +1,7 @@
 'use client'
 import { useState } from 'react'
 import DatePicker from '@/components/ui/DatePicker'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 export default function ExtendEddButton({ orderId, currentEdd }: { orderId: string; currentEdd: string | null }) {
   const [open, setOpen] = useState(false)
@@ -31,16 +32,19 @@ export default function ExtendEddButton({ orderId, currentEdd }: { orderId: stri
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        className="mt-2 text-xs text-accent-500 hover:underline"
-      >
-        {currentEdd ? 'Change EDD' : 'Set EDD'}
-      </button>
+      <RequireWrite scope="orders:write">
+        <button
+          onClick={() => setOpen(true)}
+          className="mt-2 text-xs text-accent-500 hover:underline"
+        >
+          {currentEdd ? 'Change EDD' : 'Set EDD'}
+        </button>
+      </RequireWrite>
     )
   }
 
   return (
+    <RequireWrite scope="orders:write">
     <div className="mt-3 flex flex-col gap-2">
       <DatePicker
         value={date}
@@ -64,5 +68,6 @@ export default function ExtendEddButton({ orderId, currentEdd }: { orderId: stri
         </button>
       </div>
     </div>
+    </RequireWrite>
   )
 }

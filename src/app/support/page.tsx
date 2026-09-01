@@ -1,6 +1,7 @@
 import SupportChat from '@/components/visitor/SupportChat'
 import { cookies } from 'next/headers'
 import { verifyUserToken } from '@/lib/jwt'
+import { getStoreIdentity } from '@/lib/site-controls'
 
 export const metadata = {
   title: 'Support | Jeffi Stores',
@@ -19,6 +20,7 @@ async function getAuthUser() {
 }
 
 export default async function SupportPage() {
+  const storeIdentity = await getStoreIdentity()
   const user = await getAuthUser()
 
   return (
@@ -41,12 +43,12 @@ export default async function SupportPage() {
 
             <div>
               <p className="text-xs text-foreground-muted mb-1">Phone</p>
-              <a href="tel:+919685354099" className="text-sm font-medium text-foreground hover:text-accent-500 block transition-colors">+91 96853 54099</a>
+              <a href={`tel:${storeIdentity.phone}`} className="text-sm font-medium text-foreground hover:text-accent-500 block transition-colors">{storeIdentity.phone}</a>
             </div>
 
             <div>
               <p className="text-xs text-foreground-muted mb-1">Email</p>
-              <a href="mailto:jeffistoress@gmail.com" className="text-sm font-medium text-foreground hover:text-accent-500 transition-colors break-all">jeffistoress@gmail.com</a>
+              <a href={`mailto:${storeIdentity.email}`} className="text-sm font-medium text-foreground hover:text-accent-500 transition-colors break-all">{storeIdentity.email}</a>
             </div>
 
             <div>

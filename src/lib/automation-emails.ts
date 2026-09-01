@@ -71,13 +71,15 @@ export async function sendCampaignEmail(params: {
 
   const subject = renderTemplate(campaign.subject_template, vars)
   const renderedBody = renderTemplate(campaign.body_template, vars)
-  const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind)
-  const tracked = wrapWithTracking(renderedBody, sentId, unsubscribeUrl)
+  const { campaignMailFromAsync, currentBrandNameAsync } = await import('./brand')
+  const [fromAddr, storeName] = await Promise.all([campaignMailFromAsync(), currentBrandNameAsync()])
+  const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind, user.baseUrl)
+  const tracked = wrapWithTracking(renderedBody, sentId, unsubscribeUrl, user.baseUrl, storeName)
   const html = baseLayout(subject, tracked)
 
   try {
     await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_PROMO_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+      from: fromAddr,
       to: user.email,
       subject,
       html,
@@ -122,12 +124,14 @@ export async function sendCampaignEmailRendered(params: {
   })
   if (!sentId) return { ok: false, reason: 'record_failed' }
 
-  const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind)
-  const tracked = wrapWithTracking(html, sentId, unsubscribeUrl)
+  const { campaignMailFromAsync, currentBrandNameAsync } = await import('./brand')
+  const [fromAddr, storeName] = await Promise.all([campaignMailFromAsync(), currentBrandNameAsync()])
+  const unsubscribeUrl = buildUnsubscribeUrl(user.unsubscribe_token, campaign.kind as CampaignKind, user.baseUrl)
+  const tracked = wrapWithTracking(html, sentId, unsubscribeUrl, user.baseUrl, storeName)
 
   try {
     await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_PROMO_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+      from: fromAddr,
       to: user.email,
       subject,
       html: tracked,
@@ -159,7 +163,8 @@ export async function fetchUserContext(userId: string): Promise<UserContext | nu
     [userId]
   )
   if (!row) return null
-  return { ...row, baseUrl: row.is_business ? businessBaseUrl() : APP_URL }
+  const { storeBaseUrlAsync } = await import('./brand')
+  return { ...row, baseUrl: row.is_business ? businessBaseUrl() : await storeBaseUrlAsync() }
 }
 
 export async function fetchProductImageUrl(productId: string): Promise<string> {
@@ -270,7 +275,7 @@ export async function sendAbandonedCartEmail(userId: string, cartItems: Array<{ 
       cartItems: `<ul>${itemsHtml}</ul>`,
       couponCode,
       discountPercent,
-      ctaUrl: `${APP_URL}/cart`,
+      ctaUrl: `${user.baseUrl}/cart`,
     },
   })
 }
@@ -292,7 +297,7 @@ export async function sendAbandonedCheckoutEmail(userId: string, order: { id: st
       total: Number(order.total_amount).toFixed(2),
       couponCode,
       discountPercent,
-      ctaUrl: `${APP_URL}/cart`,
+      ctaUrl: `${user.baseUrl}/cart`,
     },
   })
 }
@@ -313,7 +318,7 @@ export async function sendPostPurchaseEmail(userId: string, order: { id: string;
       orderNumber: order.order_number,
       couponCode,
       discountPercent,
-      ctaUrl: `${APP_URL}/account/orders/${order.id}`,
+      ctaUrl: `${user.baseUrl}/account/orders/${order.id}`,
     },
   })
 }
@@ -334,7 +339,7 @@ export async function sendReviewReminderEmail(userId: string, order: { id: strin
       orderNumber: order.order_number,
       couponCode,
       discountPercent,
-      ctaUrl: `${APP_URL}/account/orders/${order.id}`,
+      ctaUrl: `${user.baseUrl}/account/orders/${order.id}`,
     },
   })
 }
@@ -357,7 +362,7 @@ export async function sendWinbackEmail(userId: string, kind: 'winback_90' | 'win
       firstName: user.first_name || 'there',
       discountPercent,
       couponCode,
-      ctaUrl: `${APP_URL}/products`,
+      ctaUrl: `${user.baseUrl}/products`,
     },
   })
 }
@@ -380,7 +385,7 @@ export async function sendRestockEmail(userId: string, product: { id: string; na
       productImageUrl,
       couponCode,
       discountPercent,
-      ctaUrl: `${APP_URL}/products/${product.slug}`,
+      ctaUrl: `${user.baseUrl}/products/${product.slug}`,
     },
   })
 }
@@ -410,7 +415,7 @@ export async function sendPriceDropEmail(
       newPrice: Math.round(newPrice).toString(),
       couponCode,
       discountPercent,
-      ctaUrl: `${APP_URL}/products/${product.slug}`,
+      ctaUrl: `${user.baseUrl}/products/${product.slug}`,
     },
   })
 }
@@ -418,6 +423,9 @@ export async function sendPriceDropEmail(
 export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string) {
   const campaign = await getCampaign(kind)
   if (!campaign) return { ok: false, reason: 'campaign_not_found' }
+
+  const { storeBaseUrlAsync } = await import('./brand')
+  const baseUrl = await storeBaseUrlAsync()
 
   const sampleItems = [
     { name: 'Sample Product A', quantity: 2, price: 500, imageUrl: 'https://placehold.co/120x120/e07b3f/ffffff?text=A', productUrl: '#' },
@@ -437,7 +445,7 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
     productImageUrl: 'https://placehold.co/280x280/e07b3f/ffffff?text=Product',
     oldPrice: '999',
     newPrice: '799',
-    ctaUrl: `${APP_URL}/products`,
+    ctaUrl: `${baseUrl}/products`,
   }
 
   const subject = `[TEST] ${renderTemplate(campaign.subject_template, sampleVars)}`

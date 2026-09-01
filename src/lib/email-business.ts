@@ -1,10 +1,21 @@
 import { sendAuditedMail } from './mail-audit'
+import { customerMailFromAsync, currentBrandNameAsync, platformAdminEmail, storeContactLine, resolveCurrentTenant } from './brand'
 
-const FROM = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
-const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'admin@admin.jeffistores.in'
-const BUSINESS_URL = 'https://business.jeffistores.in'
+const PLATFORM_DOMAIN = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
 
-function baseLayout(body: string) {
+// Was 'admin@admin.jeffistores.in' — a typo'd host that does not exist, so the fallback
+// silently bounced whenever adminEmail() was unset.
+const adminEmail = () => platformAdminEmail()
+
+/** The business portal for whichever store this mail belongs to. */
+async function businessUrl(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  return t?.slug ? `https://${t.slug}.business.${PLATFORM_DOMAIN}` : `https://business.${PLATFORM_DOMAIN}`
+}
+
+async function baseLayout(body: string) {
+  const brand = await currentBrandNameAsync()
+  const contact = await storeContactLine()
   return `<!DOCTYPE html><html>
 <head><style>
   body{font-family:Arial,sans-serif;background:#f5f5f5;margin:0;padding:20px}
@@ -16,9 +27,9 @@ function baseLayout(body: string) {
   .f{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
 </style></head>
 <body><div class="c">
-  <div class="h"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div></div>
+  <div class="h"><div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">${brand}</div></div>
   <div class="b">${body}</div>
-  <div class="f"><p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p><p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p></div>
+  <div class="f"><p><strong>${brand}</strong></p>${contact ? `<p>${contact}</p>` : ''}</div>
 </div></body></html>`
 }
 
@@ -30,7 +41,7 @@ async function send(
 ) {
   try {
     const info = await sendAuditedMail({
-      from: FROM,
+      from: await customerMailFromAsync(),
       to,
       subject,
       html,
@@ -52,17 +63,17 @@ export async function sendRfqSubmittedEmail(
   name: string,
   rfqNumber: string,
 ) {
-  const userHtml = baseLayout(`
+  const userHtml = await baseLayout(`
     <p>Dear ${name},</p>
     <p>Your Request for Quotation has been submitted successfully. Our team will review it and send you a quotation shortly.</p>
     <div class="box">
       <p style="margin:0 0 6px"><strong>RFQ No.:</strong> ${rfqNumber}</p>
     </div>
     <p>You can track the status of your RFQ by logging into your account.</p>
-    <p style="text-align:center"><a href="${BUSINESS_URL}/rfqs" class="btn" style="color:#ffffff;">View My RFQs</a></p>
+    <p style="text-align:center"><a href="${await businessUrl()}/rfqs" class="btn" style="color:#ffffff;">View My RFQs</a></p>
   `)
 
-  const adminHtml = baseLayout(`
+  const adminHtml = await baseLayout(`
     <p>A new RFQ has been submitted.</p>
     <div class="box">
       <p style="margin:0 0 6px"><strong>RFQ No.:</strong> ${rfqNumber}</p>
@@ -75,7 +86,7 @@ export async function sendRfqSubmittedEmail(
     send(toEmail, `RFQ ${rfqNumber} submitted — Jeffi Stores`, userHtml, {
       templateName: 'rfq_submitted_user',
     }),
-    send(ADMIN_EMAIL, `New RFQ ${rfqNumber} from ${name}`, adminHtml, {
+    send(adminEmail(), `New RFQ ${rfqNumber} from ${name}`, adminHtml, {
       templateName: 'rfq_submitted_admin',
     }),
   ])
@@ -91,7 +102,7 @@ export async function sendRfqConvertedToQuotationEmail(
   viewUrl: string,
 ) {
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-  const html = baseLayout(`
+  const html = await baseLayout(`
     <p>Dear ${name},</p>
     <p>Your RFQ <strong>${rfqNumber}</strong> has been reviewed and a quotation has been prepared for you.</p>
     <div class="box">
@@ -112,11 +123,11 @@ export async function sendBusinessAccountApprovedEmail(
   name: string,
   companyName: string,
 ) {
-  const html = baseLayout(`
+  const html = await baseLayout(`
     <p>Dear ${name},</p>
     <p>We are pleased to inform you that your business account for <strong>${companyName}</strong> has been <strong>approved</strong>.</p>
     <p>You can now log in and start placing RFQs and orders.</p>
-    <p style="text-align:center"><a href="${BUSINESS_URL}/signin" class="btn" style="color:#ffffff;">Log In to Business Portal</a></p>
+    <p style="text-align:center"><a href="${await businessUrl()}/signin" class="btn" style="color:#ffffff;">Log In to Business Portal</a></p>
   `)
   return send(toEmail, `Business account approved — Jeffi Stores`, html, {
     templateName: 'business_account_approved',
@@ -130,11 +141,12 @@ export async function sendBusinessAccountRejectedEmail(
   companyName: string,
   rejectionNote?: string | null,
 ) {
-  const html = baseLayout(`
+  const contact = await storeContactLine()
+  const html = await baseLayout(`
     <p>Dear ${name},</p>
     <p>We regret to inform you that your business account application for <strong>${companyName}</strong> could not be approved at this time.</p>
     ${rejectionNote ? `<div class="box"><p style="margin:0"><strong>Reason:</strong> ${rejectionNote}</p></div>` : ''}
-    <p>If you believe this is an error or would like to reapply, please contact us at jeffistoress@gmail.com or +91 96853 54099.</p>
+    <p>If you believe this is an error or would like to reapply, please contact us${contact ? ` at ${contact}` : ''}.</p>
   `)
   return send(toEmail, `Business account application update — Jeffi Stores`, html, {
     templateName: 'business_account_rejected',
@@ -150,8 +162,9 @@ export async function sendBusinessInvoiceGeneratedEmail(
   totalAmount: number,
   invoiceViewUrl: string,
 ) {
+  const contact = await storeContactLine()
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
-  const html = baseLayout(`
+  const html = await baseLayout(`
     <p>Dear ${name},</p>
     <p>Your invoice has been generated. Please find the details below.</p>
     <div class="box">
@@ -160,7 +173,7 @@ export async function sendBusinessInvoiceGeneratedEmail(
       <p style="margin:0"><strong>Amount Due:</strong> ₹${formatted}</p>
     </div>
     <p style="text-align:center"><a href="${invoiceViewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>
-    <p>For payment enquiries, contact us at +91 96853 54099 or jeffistoress@gmail.com.</p>
+    <p>For payment enquiries, contact us${contact ? ` at ${contact}` : ''}.</p>
   `)
   return send(toEmail, `Invoice ${invoiceNumber} — Jeffi Stores`, html, {
     templateName: 'business_invoice_generated',
@@ -175,6 +188,7 @@ export async function sendBusinessOrderStatusEmail(
   status: string,
   invoiceViewUrl?: string,
 ) {
+  const contact = await storeContactLine()
   const statusLabel: Record<string, string> = {
     processing: 'Processing',
     shipped: 'Shipped',
@@ -182,11 +196,11 @@ export async function sendBusinessOrderStatusEmail(
     cancelled: 'Cancelled',
   }
   const label = statusLabel[status] || status
-  const html = baseLayout(`
+  const html = await baseLayout(`
     <p>Dear ${name},</p>
     <p>Your order <strong>${orderNumber}</strong> is now <strong>${label}</strong>.</p>
     ${invoiceViewUrl ? `<p style="text-align:center"><a href="${invoiceViewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>` : ''}
-    <p>For any queries, contact us at +91 96853 54099 or jeffistoress@gmail.com.</p>
+    <p>For any queries, contact us${contact ? ` at ${contact}` : ''}.</p>
   `)
   return send(toEmail, `Order ${orderNumber} — ${label} | Jeffi Stores`, html, {
     templateName: 'business_order_status',

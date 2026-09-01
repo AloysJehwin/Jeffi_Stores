@@ -10,6 +10,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 const PURCHASE_UNITS = [
   { value: '', label: '— same as sell unit —' },
@@ -789,9 +790,11 @@ export default function NewPOPage() {
         )}
 
         <div className="flex gap-3">
-          <button type="submit" disabled={saving || !form.supplier_id} className={btnPrimary}>
-            {saving ? 'Creating...' : 'Create PO'}
-          </button>
+          <RequireWrite scope="inventory">
+            <button type="submit" disabled={saving || !form.supplier_id} className={btnPrimary}>
+              {saving ? 'Creating...' : 'Create PO'}
+            </button>
+          </RequireWrite>
           <Link href={ap('/admin/inventory?tab=po')} className={btnSecondary}>
             Cancel
           </Link>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import UnitRulesPanel, { ProductUnitRule } from '@/components/admin/UnitRulesPanel'
 import BaseUnitForm, { BaseUnitRow } from '@/components/admin/BaseUnitForm'
 import { type ProductUnit } from '@/components/admin/BaseUnitForm'
@@ -36,6 +37,7 @@ type FormMode = 'base' | 'extra' | null
 
 export default function UnitsManager({ productId, variantId, subVariantId, basePrice, onUnitLoaded, isDraft = false, readOnly = false }: Props) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('inventory')
   const [allUnits, setAllUnits] = useState<ProductUnit[]>([])
   const [inherited, setInherited] = useState(false)
   const [rules, setRules] = useState<ProductUnitRule[]>([])
@@ -318,7 +320,7 @@ export default function UnitsManager({ productId, variantId, subVariantId, baseP
 
   if (loading) return <div className="text-xs text-foreground-muted py-3">Loading…</div>
 
-  if (readOnly) {
+  if (readOnly || !canWrite) {
     const baseUnit = allUnits.find(u => u.is_base) ?? allUnits[0] ?? null
     const extras = allUnits.filter(u => !u.is_base)
     if (!baseUnit) return <p className="text-xs text-foreground-muted py-2">No selling unit configured.</p>

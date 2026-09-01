@@ -10,6 +10,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/admin-path'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 type Tab = 'locations' | 'labels'
 
@@ -20,6 +21,7 @@ const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
 export default function ShelvingClient() {
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const canWrite = useCanWrite('shelving')
   const router = useRouter()
   const searchParams = useSearchParams()
   const tabParam = searchParams.get('tab') as Tab | null
@@ -288,6 +290,7 @@ export default function ShelvingClient() {
                   warehouses.map(w => (
                     <WarehouseChip
                       key={w.id} warehouse={w} selected={selectedWarehouse === w.id}
+                      canWrite={canWrite}
                       onSelect={() => {
                         setSelectedWarehouse(selectedWarehouse === w.id ? null : w.id)
                         setShowWarehouseForm(false); setShowLocationForm(false)
@@ -297,12 +300,14 @@ export default function ShelvingClient() {
                     />
                   ))
                 )}
+                {canWrite && (
                 <button
                   onClick={() => { setEditWarehouse(null); setShowWarehouseForm(!showWarehouseForm); setShowLocationForm(false) }}
                   className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-dashed border-border-default text-foreground-muted hover:border-secondary-400 hover:text-secondary-500 dark:hover:border-secondary-500 dark:hover:text-secondary-400 transition-colors text-xs">
                   <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   Add
                 </button>
+                )}
               </div>
             </div>
 
@@ -347,7 +352,7 @@ export default function ShelvingClient() {
                               onLabel={() => downloadSyntheticLabel(openShelf.display_code, activeWarehouse?.name || '', `shelf-label-${openShelf.display_code}.pdf`)}
                             />
                           )}
-                          {selectedWarehouse && (
+                          {selectedWarehouse && canWrite && (
                             <button onClick={() => {
                               setEditLocation(null)
                               setPrefillLocation({}); setPrefillLocked([])
@@ -375,6 +380,7 @@ export default function ShelvingClient() {
                           <LevelChip key={r} label={r} selected={selectedRack === r}
                             onSelect={() => { setSelectedRack(selectedRack === r ? null : r); setSelectedShelf(null); setSelectedLocation(null) }} />
                         ))}
+                        {canWrite && (
                         <button onClick={() => {
                           setEditLocation(null)
                           setPrefillLocation({ aisle_code: selectedAisle })
@@ -385,6 +391,7 @@ export default function ShelvingClient() {
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                           Add
                         </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -406,6 +413,7 @@ export default function ShelvingClient() {
                             onLabel={() => downloadLabels([loc.id], 1, `shelf-label-${loc.display_code}.pdf`)}
                           />
                         ))}
+                        {canWrite && (
                         <button onClick={() => {
                           setEditLocation(null)
                           setPrefillLocation({ aisle_code: selectedAisle, rack_code: selectedRack })
@@ -416,6 +424,7 @@ export default function ShelvingClient() {
                           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                           Add
                         </button>
+                        )}
                       </div>
                     </div>
                   )}
@@ -479,7 +488,7 @@ export default function ShelvingClient() {
                   </div>
                   <div className="flex items-center gap-2">
                     {/* Location actions: label, edit, delete */}
-                    {selectedLocation && !activeLocation.is_open_shelf && (
+                    {selectedLocation && !activeLocation.is_open_shelf && canWrite && (
                       <>
                         <button onClick={() => { setEditLocation(activeLocation); setShowLocationForm(true); setShowWarehouseForm(false) }}
                           title="Edit location"
@@ -508,9 +517,11 @@ export default function ShelvingClient() {
                         {generatingLabels ? 'Generating…' : 'Print Label'}
                       </button>
                     )}
+                    {canWrite && (
                     <button onClick={() => setShowAssignStock(!showAssignStock)} className={btnPrimary + ' !px-3 text-xs'}>
                       + Assign Stock
                     </button>
+                    )}
                   </div>
                 </div>
 
@@ -533,9 +544,11 @@ export default function ShelvingClient() {
                     <div className="bg-surface-elevated rounded-xl border border-border-default p-12 text-center">
                       <p className="text-sm font-medium text-foreground-secondary">No stock assigned here yet</p>
                       <p className="text-xs text-foreground-muted mt-1 mb-4">Use the button above to assign products to this location</p>
+                      {canWrite && (
                       <button onClick={() => setShowAssignStock(true)} className={btnPrimary + ' !px-4 text-xs'}>
                         + Assign Stock
                       </button>
+                      )}
                     </div>
                   )}
 
@@ -580,8 +593,8 @@ function LevelChip({ label, selected, onSelect }: {
   )
 }
 
-function WarehouseChip({ warehouse, selected, onSelect, onEdit, onDelete }: {
-  warehouse: Warehouse; selected: boolean
+function WarehouseChip({ warehouse, selected, canWrite, onSelect, onEdit, onDelete }: {
+  warehouse: Warehouse; selected: boolean; canWrite: boolean
   onSelect: () => void; onEdit: () => void; onDelete: () => void
 }) {
   return (
@@ -603,14 +616,18 @@ function WarehouseChip({ warehouse, selected, onSelect, onEdit, onDelete }: {
         )}
       </button>
       <div className="hidden group-hover:flex items-center gap-0.5 ml-0.5">
+        {canWrite && (
         <button onClick={e => { e.stopPropagation(); onEdit() }}
           className="flex items-center justify-center w-5 h-5 rounded hover:bg-surface-secondary text-foreground-muted hover:text-secondary-500 transition-colors">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
         </button>
+        )}
+        {canWrite && (
         <button onClick={e => { e.stopPropagation(); onDelete() }}
           className="flex items-center justify-center w-5 h-5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 text-foreground-muted hover:text-red-500 transition-colors">
           <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
         </button>
+        )}
       </div>
     </div>
   )

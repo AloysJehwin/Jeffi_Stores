@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'
-import { customerMailFrom, adminMailFrom, currentBrandName } from './brand'
+import { customerMailFromAsync, adminMailFrom, currentBrandName, currentAdminBaseUrl, platformAdminEmail, storeContactLine, storeBaseUrlAsync } from './brand'
 
 /**
  * Store name for email bodies. Synchronous on purpose: templates are built inside string
@@ -42,7 +42,8 @@ async function getAdminNotificationEmails(): Promise<string> {
 }
 
 export async function sendOTPEmail(email: string, otp: string, name?: string) {
-  const from = customerMailFrom()
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const from = await customerMailFromAsync()
   const subject = 'Your Verification Code - Jeffi Stores'
   const html = `
       <!DOCTYPE html>
@@ -125,7 +126,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
             <div class="footer">
               <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-                            <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+                            ${contactLine}
             </div>
           </div>
         </body>
@@ -151,7 +152,9 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
 }
 
 export async function sendWelcomeEmail(email: string, name: string) {
-  const from = customerMailFrom()
+  const baseUrl = await storeBaseUrlAsync()
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const from = await customerMailFromAsync()
   const subject = 'Welcome to Jeffi Stores!'
   const html = `
       <!DOCTYPE html>
@@ -222,7 +225,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
             </ul>
 
             <div style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/products" class="button" style="color:#ffffff;">
+              <a href="${baseUrl}/products" class="button" style="color:#ffffff;">
                 Start Shopping
               </a>
             </div>
@@ -232,7 +235,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
             <div class="footer">
               <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-                                          <p>Phone: +91 96853 54099<br>Email: jeffistoress@gmail.com</p>
+                                          ${contactLine}
             </div>
           </div>
         </body>
@@ -255,7 +258,8 @@ export async function sendWelcomeEmail(email: string, name: string) {
 }
 
 export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[]) {
-  const from = customerMailFrom()
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const from = await customerMailFromAsync()
   const subject = `Order Received - ${order.order_number}`
   const html = `
       <!DOCTYPE html>
@@ -387,7 +391,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
             </div>
 
             <p>If you have any questions, feel free to contact us:</p>
-                                        <p>Phone: +91 96853 54099<br>Email: jeffistoress@gmail.com</p>
+                                        ${contactLine}
 
             <div class="footer">
               <p><strong>${storeName()}</strong></p>
@@ -526,7 +530,7 @@ export async function sendNewOrderNotification(order: any, orderItems: any[], _u
             </div>
 
             <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'}/admin/orders/${order.id}"
+              <a href="${currentAdminBaseUrl()}/orders/${order.id}"
                  style="display: inline-block; background-color: #2563eb; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                 View Order in Admin Panel
               </a>
@@ -564,6 +568,8 @@ export async function sendOrderStatusUpdate(
   invoicePdfBuffer?: Buffer | null,
   cancellationNote?: string,
 ) {
+  const baseUrl = await storeBaseUrlAsync()
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
     pending: {
       title: 'Order Received',
@@ -618,7 +624,7 @@ export async function sendOrderStatusUpdate(
     color: '#6b7280',
   }
 
-  const from = customerMailFrom()
+  const from = await customerMailFromAsync()
   const subject = `${statusInfo.title} - Order ${orderNumber}`
   const html = `
       <!DOCTYPE html>
@@ -729,7 +735,7 @@ export async function sendOrderStatusUpdate(
                 <h4 style="margin-top: 0; color: #1e40af;">Your order is on its way!</h4>
                 <p>Track your shipment live by visiting your order page:</p>
                 <p style="text-align: center; margin: 0;">
-                  <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
+                  <a href="${baseUrl}/account/orders/${orderId}"
                      style="display: inline-block; background-color: #2563eb; color: white; padding: 10px 24px; border-radius: 6px; font-weight: bold; text-decoration: none; font-size: 14px;">
                     Track Your Order
                   </a>
@@ -745,7 +751,7 @@ export async function sendOrderStatusUpdate(
             ` : ''}
 
             <p style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
+              <a href="${baseUrl}/account/orders/${orderId}"
                  class="button" style="color:#ffffff;">
                 View Order Details
               </a>
@@ -756,7 +762,7 @@ export async function sendOrderStatusUpdate(
             <div class="footer">
               <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-                            <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+                            ${contactLine}
             </div>
           </div>
         </body>
@@ -794,6 +800,8 @@ export async function sendPaymentStatusUpdate(
   newPaymentStatus: string,
   orderTotal: number
 ) {
+  const baseUrl = await storeBaseUrlAsync()
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const paymentMessages: Record<string, { title: string; message: string; color: string }> = {
     paid: {
       title: 'Payment Received',
@@ -823,7 +831,7 @@ export async function sendPaymentStatusUpdate(
     color: '#6b7280',
   }
 
-  const from = customerMailFrom()
+  const from = await customerMailFromAsync()
   const subject = `${paymentInfo.title} - Order ${orderNumber}`
   const html = `
       <!DOCTYPE html>
@@ -969,7 +977,7 @@ export async function sendPaymentStatusUpdate(
             ` : ''}
 
             <p style="text-align: center;">
-              <a href="${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${orderId}"
+              <a href="${baseUrl}/account/orders/${orderId}"
                  class="button" style="color:#ffffff;">
                 View Order Details
               </a>
@@ -980,7 +988,7 @@ export async function sendPaymentStatusUpdate(
             <div class="footer">
               <p><strong>${storeName()}</strong></p>
               <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
-                            <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+                            ${contactLine}
             </div>
           </div>
         </body>
@@ -1029,7 +1037,7 @@ export async function sendAdminCertificateEmail(
   const platformDomain = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
   const adminUrl = tenant
     ? `https://admin-${tenant.slug}.${platformDomain}/admin/login`
-    : `${process.env.ADMIN_BASE_URL || `https://admin.${platformDomain}`}/admin/login`
+    : `${currentAdminBaseUrl()}/login`
   // The header sits on the container's near-white #f9f9f9, so it must never be light.
   const headerName = tenant ? tenant.storeName : storeName()
   const html = `
@@ -1332,7 +1340,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
             </div>
 
             <div style="text-align: center; margin: 30px 0;">
-              <a href="${process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'}/admin/reviews" class="button" style="color:#ffffff;">
+              <a href="${currentAdminBaseUrl()}/reviews" class="button" style="color:#ffffff;">
                 Approve / Reject Review
               </a>
             </div>
@@ -1441,7 +1449,7 @@ export async function sendPaymentFailedAdminNotification(
             </div>
 
             <p style="text-align: center; margin-top: 30px;">
-              <a href="${process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'}/admin/orders/${order.id}"
+              <a href="${currentAdminBaseUrl()}/orders/${order.id}"
                  style="display: inline-block; background-color: #2563eb; color: #ffffff !important; padding: 12px 30px; text-decoration: none; border-radius: 5px; font-weight: bold;">
                 View Order in Admin Panel
               </a>
@@ -1473,11 +1481,12 @@ export async function sendAdminContactEmail(
   message: string,
   opts: { isHtml?: boolean; entityType?: string; entityId?: string } = {}
 ) {
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const messageHtml = opts.isHtml
     ? message
     : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const mailOptions = {
-    from: customerMailFrom(),
+    from: await customerMailFromAsync(),
     to: email,
     subject,
     html: `
@@ -1503,7 +1512,7 @@ export async function sendAdminContactEmail(
             <div class="footer">
               <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
               <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
-              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+              ${contactLine}
             </div>
           </div>
         </body>
@@ -1531,12 +1540,14 @@ export async function sendSupportEscalationEmail(
   sessionId: string,
   adminEmails: string[]
 ): Promise<{ success: boolean; error?: unknown }> {
-  const adminBaseUrl = process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'
-  const chatLink = `${adminBaseUrl}/admin/customers/${customerId}?chat=true`
-  const recipients = adminEmails.length > 0 ? adminEmails : [process.env.SUPPORT_EMAIL || 'aloysjehwin@gmail.com']
+  // Three things were wrong here: the link went to the platform's admin panel, which a
+  // tenant's certificate cannot open; the sender was the platform's; and the fallback
+  // recipient was a personal Gmail, so a tenant's support request reached an individual.
+  const chatLink = `${currentAdminBaseUrl()}/customers/${customerId}?chat=true`
+  const recipients = adminEmails.length > 0 ? adminEmails : [platformAdminEmail()]
 
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.SES_FROM_EMAIL}>`,
+    from: await customerMailFromAsync(),
     to: recipients.join(', '),
     subject: `Support Request from ${customerName}`,
     html: `
@@ -1585,11 +1596,11 @@ export async function sendAgentConnectedEmail(
   customerEmail: string,
   agentName: string
 ): Promise<{ success: boolean; error?: unknown }> {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'
+  const appUrl = await storeBaseUrlAsync()
   const chatLink = `${appUrl}/support`
 
   const mailOptions = {
-    from: `"Jeffi Stores Support" <${process.env.SES_FROM_EMAIL}>`,
+    from: await customerMailFromAsync(),
     to: customerEmail,
     subject: `A support agent has joined your chat`,
     html: `
@@ -1642,7 +1653,7 @@ export async function sendReturnStatusEmail(
   event: ReturnEmailEvent,
   extra?: { adminNotes?: string; replacementOrderNumber?: string; returnType?: string; reason?: string; appUrl?: string }
 ): Promise<{ success: boolean; error?: unknown }> {
-  const appUrl = extra?.appUrl || process.env.NEXT_PUBLIC_APP_URL || 'https://jeffistores.in'
+  const appUrl = extra?.appUrl || await storeBaseUrlAsync()
   const orderLink = `${appUrl}/account/orders/${orderId}`
   const to = Array.isArray(recipientEmail) ? recipientEmail.join(', ') : recipientEmail
 
@@ -1663,7 +1674,7 @@ export async function sendReturnStatusEmail(
         <p style="margin:0 0 6px"><strong>Type:</strong> ${extra?.returnType || 'N/A'}</p>
         <p style="margin:0"><strong>Reason:</strong> ${extra?.reason || 'N/A'}</p>
       </div>
-      <a href="${process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'}/admin/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">Review Request</a>
+      <a href="${currentAdminBaseUrl()}/orders/${orderId}" style="display:inline-block;background:#f97316;color:#fff;padding:12px 28px;border-radius:6px;text-decoration:none;font-weight:bold;">Review Request</a>
     `,
     approved: `
       <p>Your return/replacement request for order <strong>#${orderNumber}</strong> has been <strong style="color:#16a34a;">approved</strong>.</p>
@@ -1691,7 +1702,7 @@ export async function sendReturnStatusEmail(
   }
 
   const mailOptions = {
-    from: `"Jeffi Stores" <${process.env.SES_FROM_EMAIL}>`,
+    from: await customerMailFromAsync(),
     to,
     subject: subjects[event],
     html: `
@@ -1735,7 +1746,7 @@ export async function sendPaymentRetryEmail(
   orderNumber: string,
   orderTotal: number,
 ) {
-  const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
+  const BASE_URL = await storeBaseUrlAsync()
   const shopUrl = `${BASE_URL}/products`
   const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(orderTotal)
 
@@ -1772,7 +1783,7 @@ export async function sendPaymentRetryEmail(
 
   try {
     await sendAuditedMail({
-      from: customerMailFrom(),
+      from: await customerMailFromAsync(),
       to: customerEmail,
       subject: `Sorry your order didn't go through — Order #${orderNumber}`,
       html,
@@ -1796,9 +1807,10 @@ export async function sendInvoiceFinalizedEmail(
   orderNumber?: string,
   viewUrl?: string
 ) {
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const mailOptions = {
-    from: customerMailFrom(),
+    from: await customerMailFromAsync(),
     to: toEmail,
     subject: `Invoice ${invoiceNumber} from Jeffi Stores`,
     html: `
@@ -1829,7 +1841,7 @@ export async function sendInvoiceFinalizedEmail(
               </div>
               ${viewUrl ? `<p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>` : ''}
               <p>For any queries, please contact us.</p>
-              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+              ${contactLine}
             </div>
             <div class="footer">
               <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
@@ -1863,6 +1875,7 @@ export async function sendPurchaseOrderEmail(
   items: Array<{ product_name: string; variant_name?: string | null; quantity: number; unit_cost: number }>,
   viewUrl?: string
 ) {
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const itemRows = items.map(it =>
     `<tr>
@@ -1872,7 +1885,7 @@ export async function sendPurchaseOrderEmail(
     </tr>`
   ).join('')
   const mailOptions = {
-    from: customerMailFrom(),
+    from: await customerMailFromAsync(),
     to: toEmail,
     subject: `Purchase Order ${poNumber} from Jeffi Stores`,
     html: `
@@ -1911,7 +1924,7 @@ export async function sendPurchaseOrderEmail(
                 <tbody>${itemRows}</tbody>
               </table>
               <p style="margin-top:20px">For any questions, please contact us.</p>
-              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+              ${contactLine}
             </div>
             <div class="footer">
               <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
@@ -1945,6 +1958,7 @@ export async function sendPOReceiveNotificationEmail(
   newStatus: string,
   items: Array<{ product_name: string; variant_name?: string | null; quantity_received: number; unit_cost: number }>
 ) {
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const statusLabel = newStatus === 'received' ? 'Fully Received' : 'Partially Received'
   const itemRows = items.map(it =>
     `<tr>
@@ -1954,7 +1968,7 @@ export async function sendPOReceiveNotificationEmail(
     </tr>`
   ).join('')
   const mailOptions = {
-    from: customerMailFrom(),
+    from: await customerMailFromAsync(),
     to: toEmail,
     subject: `Goods Receipt Confirmation — PO ${poNumber} (${statusLabel})`,
     html: `
@@ -1992,7 +2006,7 @@ export async function sendPOReceiveNotificationEmail(
                 <tbody>${itemRows}</tbody>
               </table>
               <p style="margin-top:20px">Thank you for your supply.</p>
-              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+              ${contactLine}
             </div>
             <div class="footer">
               <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
@@ -2024,9 +2038,10 @@ export async function sendQuotationFinalizedEmail(
   totalAmount: number,
   viewUrl: string
 ) {
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const mailOptions = {
-    from: customerMailFrom(),
+    from: await customerMailFromAsync(),
     to: toEmail,
     subject: `Quotation ${quoteNumber} from Jeffi Stores`,
     html: `
@@ -2056,7 +2071,7 @@ export async function sendQuotationFinalizedEmail(
               </div>
               <p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Quotation</a></p>
               <p>If you have any questions regarding this quotation, please feel free to contact us.</p>
-              <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+              ${contactLine}
             </div>
             <div class="footer">
               <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
@@ -2090,7 +2105,8 @@ export async function sendOrderAutoCancelledEmail(
   orderTotal: number,
   redirectPath: string
 ) {
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const baseUrl = await storeBaseUrlAsync()
   const isDirect = orderType === 'direct'
   const ctaLabel = isDirect ? 'Place Order Again' : 'Return to Cart'
   const bodyMessage = isDirect
@@ -2098,7 +2114,7 @@ export async function sendOrderAutoCancelledEmail(
     : 'Your order was automatically cancelled because payment was not completed within the 10-minute window. The items have been returned to your cart so you can try again.'
 
   const mailOptions = {
-    from: customerMailFrom(),
+    from: await customerMailFromAsync(),
     to: customerEmail,
     subject: `Order Cancelled - ${orderNumber}`,
     html: `
@@ -2141,7 +2157,7 @@ export async function sendOrderAutoCancelledEmail(
             </div>
             <p style="margin-top:25px;">If you completed the payment but still received this email, please contact us so we can reconcile your transaction.</p>
             <div class="footer">
-              <p>Need help? Reply to this email or contact <a href="mailto:${process.env.SUPPORT_EMAIL || 'jeffistoress@gmail.com'}">${process.env.SUPPORT_EMAIL || 'jeffistoress@gmail.com'}</a></p>
+              ${contactLine || '<p>Need help? Reply to this email.</p>'}
               <p>&copy; ${new Date().getFullYear()} Jeffi Stores</p>
             </div>
           </div>
@@ -2167,7 +2183,7 @@ export async function sendOrderAutoCancelledEmail(
 
 export async function sendOrderAutoCancelledAdminNotification(order: any, redirectPath: string) {
   const adminEmail = await getAdminNotificationEmails()
-  const baseUrl = process.env.ADMIN_BASE_URL || 'https://admin.jeffistores.in'
+  const baseUrl = currentAdminBaseUrl()
   const total = parseFloat(order.total_amount || 0)
 
   const mailOptions = {
@@ -2268,7 +2284,7 @@ If you have any questions, just reply to this email.
 
   try {
     const info = await sendAuditedMail({
-      from: customerMailFrom(),
+      from: await customerMailFromAsync(),
       to: toEmail,
       subject,
       html,
@@ -2306,7 +2322,7 @@ export async function sendProductAnnouncementEmail(args: {
   products: AnnouncementProduct[]
 }) {
   const { toEmail, customerName, subject, intro, products } = args
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://jeffistores.in'
+  const siteUrl = await storeBaseUrlAsync()
   const cleanIntro = intro
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
     .replace(/\[([^\]]+)\]\(https?:[^)]+\)/g, '$1')
@@ -2350,7 +2366,7 @@ export async function sendProductAnnouncementEmail(args: {
 
   try {
     const info = await sendAuditedMail({
-      from: customerMailFrom(),
+      from: await customerMailFromAsync(),
       to: toEmail,
       subject,
       html,
@@ -2379,8 +2395,8 @@ export async function sendVariantChangeRequestedEmail(params: {
   settlementType: 'refund' | 'collect' | 'cod_adjust' | 'none'
   newTotal: number
 }): Promise<{ success: boolean; messageId?: string; error?: unknown }> {
-  const from = customerMailFrom()
-  const orderUrl = `${process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000'}/account/orders/${params.orderId}`
+  const from = await customerMailFromAsync()
+  const orderUrl = `${await storeBaseUrlAsync()}/account/orders/${params.orderId}`
   const absDiff = Math.abs(params.priceDiff)
   const diffLine = params.settlementType === 'refund'
     ? `We'll <strong>refund &#8377;${absDiff.toFixed(2)}</strong> to your original payment once you confirm.`

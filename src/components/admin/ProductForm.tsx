@@ -15,6 +15,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import AIEnrichButton from './AIEnrichButton'
 import UnitsManager, { UnitLoadedInfo } from './UnitsManager'
 import { applyDiscount } from '@/lib/pricing'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Category {
   id: string
@@ -3234,26 +3235,28 @@ export default function ProductForm({ categories, brands, action, product, produ
         >
           Cancel
         </Link>
-        <button
-          type="submit"
-          name="intent"
-          value="draft"
-          disabled={isSubmitting}
-          onClick={() => setIsActive(false)}
-          className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? 'Saving...' : 'Save as Draft'}
-        </button>
-        <button
-          type="submit"
-          name="intent"
-          value="publish"
-          disabled={isSubmitting}
-          onClick={() => setIsActive(true)}
-          className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isSubmitting ? 'Saving...' : product ? 'Update & Publish' : 'Save & Publish'}
-        </button>
+        <RequireWrite scope="products:write">
+          <button
+            type="submit"
+            name="intent"
+            value="draft"
+            disabled={isSubmitting}
+            onClick={() => setIsActive(false)}
+            className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Saving...' : 'Save as Draft'}
+          </button>
+          <button
+            type="submit"
+            name="intent"
+            value="publish"
+            disabled={isSubmitting}
+            onClick={() => setIsActive(true)}
+            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSubmitting ? 'Saving...' : product ? 'Update & Publish' : 'Save & Publish'}
+          </button>
+        </RequireWrite>
       </div>
       {/* Variant Detail Popup */}
       {variantPopupId && (() => {

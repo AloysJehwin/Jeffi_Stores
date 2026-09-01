@@ -7,6 +7,7 @@ import AdminSelect from './AdminSelect'
 import * as Icons from 'lucide-react'
 import Toggle from '@/components/ui/Toggle'
 import AIEnrichButton from './AIEnrichButton'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 const ICON_OPTIONS = [
   'Anchor', 'Anvil', 'Aperture', 'Axe', 'Battery', 'BatteryCharging',
@@ -206,24 +207,26 @@ export default function CategoryForm({ categories, action, category, backUrl, is
               <div className="flex flex-col gap-1.5">
                 <p className="text-sm font-semibold text-foreground">{selectedIcon}</p>
                 <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleGenerate}
-                    disabled={generating}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
-                  >
-                    {generating ? (
-                      <>
-                        <Icons.Loader2 className="w-3 h-3 animate-spin" />
-                        Generating…
-                      </>
-                    ) : (
-                      <>
-                        <Icons.Sparkles className="w-3 h-3" />
-                        Generate with AI
-                      </>
-                    )}
-                  </button>
+                  <RequireWrite scope="categories:write">
+                    <button
+                      type="button"
+                      onClick={handleGenerate}
+                      disabled={generating}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent-500 hover:bg-accent-600 text-white rounded-md transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                      {generating ? (
+                        <>
+                          <Icons.Loader2 className="w-3 h-3 animate-spin" />
+                          Generating…
+                        </>
+                      ) : (
+                        <>
+                          <Icons.Sparkles className="w-3 h-3" />
+                          Generate with AI
+                        </>
+                      )}
+                    </button>
+                  </RequireWrite>
                   <button
                     type="button"
                     onClick={() => setShowPicker(v => !v)}
@@ -469,7 +472,7 @@ export default function CategoryForm({ categories, action, category, backUrl, is
           Cancel
         </Link>
         {isDraft ? (
-          <>
+          <RequireWrite scope="categories:write">
             <button type="submit" name="intent" value="draft" disabled={isSubmitting}
               className="px-6 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-semibold transition-colors disabled:opacity-50">
               {isSubmitting ? 'Saving…' : 'Save Draft'}
@@ -478,12 +481,14 @@ export default function CategoryForm({ categories, action, category, backUrl, is
               className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50">
               {isSubmitting ? 'Publishing…' : 'Publish'}
             </button>
-          </>
+          </RequireWrite>
         ) : (
-          <button type="submit" disabled={isSubmitting}
-            className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
-            {isSubmitting ? 'Saving…' : submitLabel || (category ? 'Update Category' : 'Create Category')}
-          </button>
+          <RequireWrite scope="categories:write">
+            <button type="submit" disabled={isSubmitting}
+              className="px-6 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+              {isSubmitting ? 'Saving…' : submitLabel || (category ? 'Update Category' : 'Create Category')}
+            </button>
+          </RequireWrite>
         )}
       </div>
     </form>

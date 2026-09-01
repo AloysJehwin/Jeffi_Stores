@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { Check, X } from 'lucide-react'
 import { useToast } from '@/contexts/ToastContext'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Validation {
   ok: boolean
@@ -192,14 +193,16 @@ export default function NewScenarioClient() {
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={generate}
-              disabled={generating || !aiPrompt.trim()}
-              className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-            >
-              {generating ? 'Generating…' : 'Generate SQL with AI'}
-            </button>
+            <RequireWrite scope="campaigns:write">
+              <button
+                type="button"
+                onClick={generate}
+                disabled={generating || !aiPrompt.trim()}
+                className="px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+              >
+                {generating ? 'Generating…' : 'Generate SQL with AI'}
+              </button>
+            </RequireWrite>
             <Link href={ap('/admin/campaigns/scenarios')} className="px-5 py-2 bg-surface border border-border-secondary hover:bg-surface-secondary text-foreground rounded-lg font-medium transition-colors text-sm">Cancel</Link>
           </div>
         </div>
@@ -280,22 +283,24 @@ export default function NewScenarioClient() {
           )}
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={dryRun}
-              disabled={dryRunning || !validationOk}
-              className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-            >
-              {dryRunning ? 'Running…' : (dryRunCount !== null ? 'Re-run dry run' : 'Run dry run')}
-            </button>
-            <button
-              type="button"
-              onClick={generate}
-              disabled={generating}
-              className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
-            >
-              {generating ? 'Regenerating…' : 'Regenerate SQL'}
-            </button>
+            <RequireWrite scope="campaigns:write">
+              <button
+                type="button"
+                onClick={dryRun}
+                disabled={dryRunning || !validationOk}
+                className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+              >
+                {dryRunning ? 'Running…' : (dryRunCount !== null ? 'Re-run dry run' : 'Run dry run')}
+              </button>
+              <button
+                type="button"
+                onClick={generate}
+                disabled={generating}
+                className="px-4 py-2 text-sm text-foreground-muted hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                {generating ? 'Regenerating…' : 'Regenerate SQL'}
+              </button>
+            </RequireWrite>
           </div>
 
           {dryRunCount !== null && (
@@ -382,14 +387,16 @@ export default function NewScenarioClient() {
               </div>
 
               <div className="flex items-center gap-2 pt-1">
-                <button
-                  type="button"
-                  onClick={save}
-                  disabled={saving || !name.trim()}
-                  className="px-5 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
-                >
-                  {saving ? 'Saving…' : 'Save scenario (paused)'}
-                </button>
+                <RequireWrite scope="campaigns:write">
+                  <button
+                    type="button"
+                    onClick={save}
+                    disabled={saving || !name.trim()}
+                    className="px-5 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95 disabled:opacity-50"
+                  >
+                    {saving ? 'Saving…' : 'Save scenario (paused)'}
+                  </button>
+                </RequireWrite>
                 <span className="text-[10px] text-foreground-muted">Saved scenarios are paused until you enable them on the list page.</span>
               </div>
             </div>

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { Star } from 'lucide-react'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface CustomField {
   id: string
@@ -176,22 +177,24 @@ export default function SubmissionsPage({ params }: { params: Promise<{ id: stri
                 <p className="text-xs text-foreground-muted">{new Date(s.submitted_at).toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}</p>
 
                 {s.status === 'pending' && (
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      onClick={() => updateStatus(s.id, 'approved')}
-                      disabled={updating === s.id}
-                      className="flex-1 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                    >
-                      Approve
-                    </button>
-                    <button
-                      onClick={() => updateStatus(s.id, 'rejected')}
-                      disabled={updating === s.id}
-                      className="flex-1 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                    >
-                      Reject
-                    </button>
-                  </div>
+                  <RequireWrite scope="review_forms:write">
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={() => updateStatus(s.id, 'approved')}
+                        disabled={updating === s.id}
+                        className="flex-1 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                      >
+                        Approve
+                      </button>
+                      <button
+                        onClick={() => updateStatus(s.id, 'rejected')}
+                        disabled={updating === s.id}
+                        className="flex-1 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
+                      >
+                        Reject
+                      </button>
+                    </div>
+                  </RequireWrite>
                 )}
               </div>
             </div>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface DeactivateProductButtonProps {
   productId: string
@@ -53,12 +54,14 @@ export default function DeactivateProductButton({ productId, productName, isActi
   }
 
   return (
-    <button
-      onClick={handleToggle}
-      disabled={isUpdating}
-      className={`disabled:opacity-50 ${isActive ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'}`}
-    >
-      {isUpdating ? (isActive ? 'Deactivating...' : 'Activating...') : (isActive ? 'Deactivate' : 'Activate')}
-    </button>
+    <RequireWrite scope="products:write">
+      <button
+        onClick={handleToggle}
+        disabled={isUpdating}
+        className={`disabled:opacity-50 ${isActive ? 'text-orange-600 hover:text-orange-900' : 'text-green-600 hover:text-green-900'}`}
+      >
+        {isUpdating ? (isActive ? 'Deactivating...' : 'Activating...') : (isActive ? 'Deactivate' : 'Activate')}
+      </button>
+    </RequireWrite>
   )
 }

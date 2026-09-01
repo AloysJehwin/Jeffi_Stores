@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface DeleteCategoryButtonProps {
   categoryId: string
@@ -50,12 +51,14 @@ export default function DeleteCategoryButton({ categoryId, categoryName, onDelet
   }
 
   return (
-    <button
-      onClick={handleDelete}
-      disabled={isDeleting}
-      className="text-red-600 hover:text-red-900 disabled:opacity-50"
-    >
-      {isDeleting ? 'Deleting...' : 'Delete'}
-    </button>
+    <RequireWrite scope="categories:write">
+      <button
+        onClick={handleDelete}
+        disabled={isDeleting}
+        className="text-red-600 hover:text-red-900 disabled:opacity-50"
+      >
+        {isDeleting ? 'Deleting...' : 'Delete'}
+      </button>
+    </RequireWrite>
   )
 }

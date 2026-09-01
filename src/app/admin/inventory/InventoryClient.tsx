@@ -13,6 +13,7 @@ import DatePicker from '@/components/ui/DatePicker'
 import { ap } from '@/lib/admin-path'
 import CopySku from '@/components/ui/CopySku'
 import { useBarcodeScanner } from '@/components/admin/useBarcodeScanner'
+import { RequireWrite, useCanWrite } from '@/contexts/AdminScopesContext'
 
 type Tab = 'suppliers' | 'po' | 'stock'
 
@@ -180,9 +181,11 @@ function SuppliersTab() {
         <div className="flex flex-col">
           <span className={labelCls}>&nbsp;</span>
           <div className="hidden md:block">
-            <Link href={ap('/admin/suppliers/new')} className={btnPrimary}>
-              + Add Supplier
-            </Link>
+            <RequireWrite scope="inventory">
+              <Link href={ap('/admin/suppliers/new')} className={btnPrimary}>
+                + Add Supplier
+              </Link>
+            </RequireWrite>
           </div>
         </div>
       </div>
@@ -233,10 +236,12 @@ function SuppliersTab() {
                     </td>
                     <td className="px-4 py-3 text-right">
                       <div className="hidden md:flex items-center justify-end gap-3">
-                        <Link href={ap(`/admin/suppliers/${s.id}/edit`)} className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium">Edit</Link>
-                        <button className="text-xs text-foreground-secondary hover:text-foreground hover:underline" onClick={() => toggleActive(s)}>
-                          {s.is_active ? 'Deactivate' : 'Activate'}
-                        </button>
+                        <RequireWrite scope="inventory">
+                          <Link href={ap(`/admin/suppliers/${s.id}/edit`)} className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium">Edit</Link>
+                          <button className="text-xs text-foreground-secondary hover:text-foreground hover:underline" onClick={() => toggleActive(s)}>
+                            {s.is_active ? 'Deactivate' : 'Activate'}
+                          </button>
+                        </RequireWrite>
                       </div>
                     </td>
                   </tr>
@@ -1057,15 +1062,19 @@ function POTab({ initialPO }: { initialPO?: string }) {
         )}
 
         {viewPO.po.status === 'draft' && (
-          <div className="flex gap-3 pt-2">
-            <button className={btnPrimary} onClick={() => sendPO(viewPO.po.id)}>Mark as Sent</button>
-            <button className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors" onClick={() => cancelPO(viewPO.po.id)}>Cancel PO</button>
-          </div>
+          <RequireWrite scope="inventory">
+            <div className="flex gap-3 pt-2">
+              <button className={btnPrimary} onClick={() => sendPO(viewPO.po.id)}>Mark as Sent</button>
+              <button className="px-4 py-2 rounded-lg text-sm font-medium bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/30 transition-colors" onClick={() => cancelPO(viewPO.po.id)}>Cancel PO</button>
+            </div>
+          </RequireWrite>
         )}
         {['sent', 'partial'].includes(viewPO.po.status) && (
-          <div className="flex gap-3 pt-2">
-            <button className={btnPrimary} onClick={() => { setViewPO(null); openReceive(viewPO.po.id) }}>Record Receipt</button>
-          </div>
+          <RequireWrite scope="inventory">
+            <div className="flex gap-3 pt-2">
+              <button className={btnPrimary} onClick={() => { setViewPO(null); openReceive(viewPO.po.id) }}>Record Receipt</button>
+            </div>
+          </RequireWrite>
         )}
       </div>
     )
@@ -1127,9 +1136,11 @@ function POTab({ initialPO }: { initialPO?: string }) {
         </div>
         <div className="hidden md:flex flex-col">
           <span className={labelCls}>&nbsp;</span>
-          <Link href={ap('/admin/inventory/po/new')} className={`${btnPrimary} h-9 inline-flex items-center whitespace-nowrap`}>
-            + Create PO
-          </Link>
+          <RequireWrite scope="inventory">
+            <Link href={ap('/admin/inventory/po/new')} className={`${btnPrimary} h-9 inline-flex items-center whitespace-nowrap`}>
+              + Create PO
+            </Link>
+          </RequireWrite>
         </div>
       </div>
 
@@ -1186,34 +1197,36 @@ function POTab({ initialPO }: { initialPO?: string }) {
                     <td className="px-4 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">
                         <button className="text-xs text-secondary-500 dark:text-secondary-400 hover:underline font-medium" onClick={() => openPO(po.id)}>View</button>
-                        {po.status === 'draft' && (
-                          <button className="text-xs text-accent-500 hover:underline font-medium" onClick={() => sendPO(po.id)}>Send</button>
-                        )}
-                        {['sent', 'partial'].includes(po.status) && (
-                          <button className="text-xs text-green-600 dark:text-green-400 hover:underline font-medium" onClick={() => openReceive(po.id)}>Receive</button>
-                        )}
-                        {po.supplier_email && (
-                          <button
-                            onClick={() => sendPOEmail(po)}
-                            disabled={sendingEmailId === po.id}
-                            title={`Send email to ${po.supplier_email}`}
-                            className="p-1 text-foreground-secondary hover:text-secondary-500 transition-colors disabled:opacity-50"
-                          >
-                            {sendingEmailId === po.id ? (
-                              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
-                                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
-                                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
-                              </svg>
-                            ) : (
-                              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                              </svg>
-                            )}
-                          </button>
-                        )}
-                        {po.status === 'draft' && (
-                          <button className="text-xs text-red-500 hover:underline font-medium" onClick={() => cancelPO(po.id)}>Cancel</button>
-                        )}
+                        <RequireWrite scope="inventory">
+                          {po.status === 'draft' && (
+                            <button className="text-xs text-accent-500 hover:underline font-medium" onClick={() => sendPO(po.id)}>Send</button>
+                          )}
+                          {['sent', 'partial'].includes(po.status) && (
+                            <button className="text-xs text-green-600 dark:text-green-400 hover:underline font-medium" onClick={() => openReceive(po.id)}>Receive</button>
+                          )}
+                          {po.supplier_email && (
+                            <button
+                              onClick={() => sendPOEmail(po)}
+                              disabled={sendingEmailId === po.id}
+                              title={`Send email to ${po.supplier_email}`}
+                              className="p-1 text-foreground-secondary hover:text-secondary-500 transition-colors disabled:opacity-50"
+                            >
+                              {sendingEmailId === po.id ? (
+                                <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth={4} />
+                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                                </svg>
+                              )}
+                            </button>
+                          )}
+                          {po.status === 'draft' && (
+                            <button className="text-xs text-red-500 hover:underline font-medium" onClick={() => cancelPO(po.id)}>Cancel</button>
+                          )}
+                        </RequireWrite>
                       </div>
                     </td>
                   </tr>
@@ -1249,6 +1262,7 @@ function StockTab() {
   const router = useRouter()
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const canWrite = useCanWrite('inventory')
   const [transactions, setTransactions] = useState<StockTransaction[]>([])
   const [txTotal, setTxTotal] = useState(0)
   const [txPage, setTxPage] = useState(1)
@@ -1733,6 +1747,7 @@ function StockTab() {
                     title={p.perishable ? 'Stock managed via batches — use GRN to receive or Remove to deduct' : 'Adjust stock'}
                     disabled={!!p.perishable}
                     className={`p-1.5 rounded-lg transition-colors ${p.perishable ? 'opacity-30 cursor-not-allowed text-foreground-muted' : 'hover:bg-surface-secondary text-foreground-secondary hover:text-accent-500'}`}
+                    hidden={!canWrite}
                   >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                       <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
@@ -1792,6 +1807,7 @@ function StockTab() {
                           <td className="py-1.5 pr-4 text-right font-medium text-foreground">{qty}</td>
                           <td className="py-1.5 pr-4 text-right font-semibold text-foreground">{formatINR(batchValue)}</td>
                           <td className="py-1.5 text-right">
+                            {canWrite && (
                             <button
                               onClick={async () => {
                                 const ok = await confirm({
@@ -1813,6 +1829,7 @@ function StockTab() {
                               className="text-red-500 hover:text-red-700 text-xs px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                               title="Remove batch"
                             >Remove</button>
+                            )}
                           </td>
                         </tr>
                       )

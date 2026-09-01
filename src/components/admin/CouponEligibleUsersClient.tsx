@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import CouponUserPicker from './CouponUserPicker'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface EligibleUser {
   id: string
@@ -20,10 +21,13 @@ interface Props {
 }
 
 export default function CouponEligibleUsersClient({ couponId, initialUsers, canRemove, canAdd, allUsersMode }: Props) {
+  const canWrite = useCanWrite('coupons:write')
   const [users, setUsers] = useState<EligibleUser[]>(initialUsers)
   const [removing, setRemoving] = useState<string | null>(null)
   const [showPicker, setShowPicker] = useState(false)
   const existingIds = new Set(users.map(u => u.id))
+  const showAdd = canAdd && canWrite
+  const showRemove = canRemove && canWrite
 
   async function handleRemove(userId: string) {
     setRemoving(userId)
@@ -62,7 +66,7 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
 
   return (
     <div>
-      {canAdd && (
+      {showAdd && (
         <div className="px-5 py-3 border-b border-border-default">
           {!showPicker ? (
             <button
@@ -100,7 +104,7 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
               <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">User</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Email</th>
               <th className="px-4 py-3 text-left text-xs font-semibold text-foreground-secondary uppercase tracking-wider">Redeemed</th>
-              {canRemove && <th className="px-4 py-3 w-16"/>}
+              {showRemove && <th className="px-4 py-3 w-16"/>}
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
@@ -115,7 +119,7 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
                     ? <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300">{u.times_used}x used</span>
                     : <span className="px-2 py-0.5 text-xs font-medium rounded-full bg-surface-secondary text-foreground-muted">Not used</span>}
                 </td>
-                {canRemove && (
+                {showRemove && (
                   <td className="px-4 py-3 text-right">
                     <button
                       type="button"
@@ -131,7 +135,7 @@ export default function CouponEligibleUsersClient({ couponId, initialUsers, canR
             ))}
             {users.length === 0 && (
               <tr>
-                <td colSpan={canRemove ? 4 : 3} className="px-4 py-6 text-center text-foreground-muted text-sm">
+                <td colSpan={showRemove ? 4 : 3} className="px-4 py-6 text-center text-foreground-muted text-sm">
                   No users found
                 </td>
               </tr>

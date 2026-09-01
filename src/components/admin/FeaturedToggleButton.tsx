@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Star } from 'lucide-react'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Props {
   productId: string
@@ -48,25 +49,27 @@ export default function FeaturedToggleButton({ productId, isFeatured, featuredCo
   }
 
   return (
-    <div className="relative inline-flex flex-col items-end">
-      <button
-        onClick={toggle}
-        disabled={loading}
-        title={optimistic ? 'Remove from featured' : featuredCount >= 6 ? 'Max 6 featured reached' : 'Mark as featured'}
-        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${
-          optimistic
-            ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/50'
-            : 'bg-surface-secondary text-foreground-muted hover:bg-yellow-50 hover:text-yellow-700'
-        } ${loading ? 'opacity-60 cursor-wait' : ''}`}
-      >
-        <Star className={`w-3 h-3 ${optimistic ? 'fill-current' : ''}`} />
-        <span>{optimistic ? 'Featured' : 'Feature'}</span>
-      </button>
-      {error && (
-        <div className="absolute top-full mt-1 right-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg">
-          {error}
-        </div>
-      )}
-    </div>
+    <RequireWrite scope="products:write">
+      <div className="relative inline-flex flex-col items-end">
+        <button
+          onClick={toggle}
+          disabled={loading}
+          title={optimistic ? 'Remove from featured' : featuredCount >= 6 ? 'Max 6 featured reached' : 'Mark as featured'}
+          className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold transition-colors ${
+            optimistic
+              ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300 hover:bg-yellow-200 dark:hover:bg-yellow-900/50'
+              : 'bg-surface-secondary text-foreground-muted hover:bg-yellow-50 hover:text-yellow-700'
+          } ${loading ? 'opacity-60 cursor-wait' : ''}`}
+        >
+          <Star className={`w-3 h-3 ${optimistic ? 'fill-current' : ''}`} />
+          <span>{optimistic ? 'Featured' : 'Feature'}</span>
+        </button>
+        {error && (
+          <div className="absolute top-full mt-1 right-0 z-50 bg-red-600 text-white text-xs px-2 py-1 rounded whitespace-nowrap shadow-lg">
+            {error}
+          </div>
+        )}
+      </div>
+    </RequireWrite>
   )
 }

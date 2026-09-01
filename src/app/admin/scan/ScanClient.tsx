@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { BrowserQRCodeReader, IScannerControls } from '@zxing/browser'
 import CopySku from '@/components/ui/CopySku'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface OrderInfo {
   id: string
@@ -94,6 +95,7 @@ export default function ScanClient() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const controlsRef = useRef<IScannerControls | null>(null)
   const scanningRef = useRef(false)
+  const canWrite = useCanWrite('quick_scan:write')
 
   const stopCamera = useCallback(() => {
     controlsRef.current?.stop()
@@ -404,7 +406,7 @@ export default function ScanClient() {
             </div>
           </div>
 
-          {nextStatuses.length === 0 ? (
+          {nextStatuses.length === 0 || !canWrite ? (
             <div className="bg-gray-800 rounded-2xl p-4 text-center text-gray-400 text-sm">
               No further status updates available for this order.
             </div>

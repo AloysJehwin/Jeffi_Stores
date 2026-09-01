@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 interface Note {
   id: string
@@ -19,9 +20,11 @@ interface CustomerNotesProps {
   canWrite?: boolean
 }
 
-export default function CustomerNotes({ customerId, initialNotes, canWrite = false }: CustomerNotesProps) {
+export default function CustomerNotes({ customerId, initialNotes, canWrite: canWriteProp = false }: CustomerNotesProps) {
   const router = useRouter()
   const confirm = useConfirm()
+  const canWriteScope = useCanWrite('customers:write')
+  const canWrite = canWriteProp && canWriteScope
   const [notes, setNotes] = useState<Note[]>(initialNotes)
   const [body, setBody] = useState('')
   const [busy, setBusy] = useState(false)

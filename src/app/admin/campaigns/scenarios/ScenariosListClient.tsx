@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface ScenarioCampaign {
   scenario_kind: string
@@ -132,12 +133,14 @@ export default function ScenariosListClient() {
             Scenarios
           </Link>
         </div>
-        <Link
-          href={ap('/admin/campaigns/scenarios/new')}
-          className="mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
-        >
-          + New scenario
-        </Link>
+        <RequireWrite scope="campaigns:write">
+          <Link
+            href={ap('/admin/campaigns/scenarios/new')}
+            className="mb-1 px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-sm font-semibold transition-all active:scale-95"
+          >
+            + New scenario
+          </Link>
+        </RequireWrite>
       </div>
 
       {loading ? (
@@ -179,6 +182,7 @@ export default function ScenariosListClient() {
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {s.type === 'custom' && (
+                    <RequireWrite scope="campaigns:write">
                     <button
                       type="button"
                       onClick={() => toggle(s)}
@@ -191,13 +195,16 @@ export default function ScenariosListClient() {
                     >
                       {s.enabled ? 'Pause' : 'Activate'}
                     </button>
+                    </RequireWrite>
                   )}
-                  <Link
-                    href={ap(`/admin/campaigns/new?scenario=${s.kind}`)}
-                    className="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95"
-                  >
-                    + New campaign
-                  </Link>
+                  <RequireWrite scope="campaigns:write">
+                    <Link
+                      href={ap(`/admin/campaigns/new?scenario=${s.kind}`)}
+                      className="px-3 py-1.5 bg-accent-500 hover:bg-accent-600 text-white rounded-lg text-xs font-semibold transition-all active:scale-95"
+                    >
+                      + New campaign
+                    </Link>
+                  </RequireWrite>
                   <Link
                     href={ap(`/admin/campaigns/scenarios/${s.kind}`)}
                     className="px-3 py-1.5 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-xs font-semibold transition-all"
@@ -205,6 +212,7 @@ export default function ScenariosListClient() {
                     Configure
                   </Link>
                   {s.type === 'custom' && s.stats.campaigns_count === 0 && (
+                    <RequireWrite scope="campaigns:write">
                     <button
                       type="button"
                       onClick={() => remove(s)}
@@ -213,6 +221,7 @@ export default function ScenariosListClient() {
                     >
                       Delete
                     </button>
+                    </RequireWrite>
                   )}
                 </div>
               </div>

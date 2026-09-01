@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ap } from '@/lib/admin-path'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 import AdminSelect from './AdminSelect'
 
 interface ReturnRequest {
@@ -45,6 +46,7 @@ const REASON_LABELS: Record<string, string> = {
 }
 
 export default function ReturnReview({ orderId, returnRequest, replacementOrderNumber }: ReturnReviewProps) {
+  const canWrite = useCanWrite('returns:write')
   const [adminNotes, setAdminNotes] = useState('')
   const [returnTrackingNumber, setReturnTrackingNumber] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -179,7 +181,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
           ⚠ {stockWarning}
         </div>
       )}
-      {variantPick && variantPick.length > 0 && (
+      {variantPick && variantPick.length > 0 && canWrite && (
         <div className="p-3 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800 rounded-lg space-y-3">
           <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Choose replacement variant(s)</p>
           {variantPick.map((it: any) => (
@@ -287,7 +289,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
         </div>
       )}
 
-      {status === 'pending_approval' && (
+      {status === 'pending_approval' && canWrite && (
         <div className="space-y-3 pt-2 border-t border-border-default">
           <div>
             <label className="block text-sm font-medium text-foreground-secondary mb-1">
@@ -330,7 +332,7 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                 <span className="text-foreground-secondary">RVP AWB:</span>
                 <span className="font-mono font-medium text-foreground">{returnRequest.rvp_awb_number}</span>
               </div>
-            ) : (
+            ) : canWrite ? (
               <button
                 type="button"
                 onClick={handleCreateRVP}
@@ -339,28 +341,32 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
               >
                 {isSubmitting ? 'Creating...' : 'Create RVP Pickup (Delhivery QC)'}
               </button>
-            )}
+            ) : null}
           </div>
-          <div>
-            <label className="block text-sm font-medium text-foreground-secondary mb-1">
-              Return tracking number (optional)
-            </label>
-            <input
-              type="text"
-              value={returnTrackingNumber}
-              onChange={e => setReturnTrackingNumber(e.target.value)}
-              placeholder="e.g. 123456789012"
-              className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
-            />
-          </div>
-          <button
-            type="button"
-            onClick={() => submit('mark_received')}
-            disabled={isSubmitting}
-            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
-          >
-            {isSubmitting ? 'Processing...' : 'Mark Item as Received'}
-          </button>
+          {canWrite && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-foreground-secondary mb-1">
+                  Return tracking number (optional)
+                </label>
+                <input
+                  type="text"
+                  value={returnTrackingNumber}
+                  onChange={e => setReturnTrackingNumber(e.target.value)}
+                  placeholder="e.g. 123456789012"
+                  className="w-full px-3 py-2 border border-border-secondary rounded-lg bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm"
+                />
+              </div>
+              <button
+                type="button"
+                onClick={() => submit('mark_received')}
+                disabled={isSubmitting}
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? 'Processing...' : 'Mark Item as Received'}
+              </button>
+            </>
+          )}
         </div>
       )}
 
@@ -395,14 +401,16 @@ export default function ReturnReview({ orderId, returnRequest, replacementOrderN
                     ? 'Issue a full refund via Razorpay.'
                     : 'Create a replacement order (confirmed, paid).'}
                 </p>
-                <button
-                  type="button"
-                  onClick={() => submit('process')}
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
-                >
-                  {isSubmitting ? 'Processing...' : type === 'refund' ? 'Process Refund' : 'Create Replacement Order'}
-                </button>
+                {canWrite && (
+                  <button
+                    type="button"
+                    onClick={() => submit('process')}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold text-sm transition-colors disabled:opacity-50"
+                  >
+                    {isSubmitting ? 'Processing...' : type === 'refund' ? 'Process Refund' : 'Create Replacement Order'}
+                  </button>
+                )}
               </div>
             </>
           )}

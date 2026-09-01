@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 const inputCls = 'w-full px-3 py-2 rounded-lg border border-border-default bg-surface text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent transition-colors placeholder:text-foreground-muted'
 const labelCls = 'block text-xs font-medium text-foreground-secondary mb-1'
@@ -157,7 +158,9 @@ export default function EditSupplierPage() {
             <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">Draft pending</p>
             <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5">Changes are saved to draft. The live supplier stays unchanged until you publish.</p>
           </div>
-          <button type="button" onClick={discardDraft} className="text-xs text-amber-600 hover:underline ml-4">Discard draft</button>
+          <RequireWrite scope="inventory">
+            <button type="button" onClick={discardDraft} className="text-xs text-amber-600 hover:underline ml-4">Discard draft</button>
+          </RequireWrite>
         </div>
       )}
 
@@ -239,12 +242,14 @@ export default function EditSupplierPage() {
         )}
 
         <div className="flex gap-3">
-          <button type="submit" disabled={saving || !form.name.trim()} className={btnPrimary}>
-            {saving ? 'Saving…' : 'Save Draft'}
-          </button>
-          <button type="button" onClick={publish} disabled={publishing || !form.name.trim()} className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
-            {publishing ? 'Publishing…' : 'Publish'}
-          </button>
+          <RequireWrite scope="inventory">
+            <button type="submit" disabled={saving || !form.name.trim()} className={btnPrimary}>
+              {saving ? 'Saving…' : 'Save Draft'}
+            </button>
+            <button type="button" onClick={publish} disabled={publishing || !form.name.trim()} className="px-4 py-2 rounded-lg text-sm font-medium bg-green-600 hover:bg-green-700 text-white transition-colors disabled:opacity-50">
+              {publishing ? 'Publishing…' : 'Publish'}
+            </button>
+          </RequireWrite>
           <Link href={ap('/admin/inventory?tab=suppliers')} className={btnSecondary}>
             Cancel
           </Link>

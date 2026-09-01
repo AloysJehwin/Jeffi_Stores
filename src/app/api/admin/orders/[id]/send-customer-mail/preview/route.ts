@@ -3,10 +3,13 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 import { buildVarMap, substituteVars } from '@/lib/template-vars'
+import { storeContactLine } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const storeName = await (await import('@/lib/site-controls')).getStoreIdentity().then(i => i.name)
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -56,8 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       <div class="message-box">${finalBody}</div>
       <div class="footer">
         <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
-        <p><strong>Jeffi Stores</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
-        <p>Phone: +91 96853 54099 | Email: jeffistoress@gmail.com</p>
+        <p><strong>${storeName}</strong></p>${contactLine}
       </div>
     </div>
   </body>

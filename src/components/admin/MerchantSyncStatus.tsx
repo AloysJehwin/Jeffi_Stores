@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import CopySku from '@/components/ui/CopySku'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface SyncStatus {
   status: 'success' | 'error' | 'running' | null
@@ -82,13 +83,15 @@ export default function MerchantSyncStatus() {
               {expanded ? 'Hide' : 'Show'} errors
             </button>
           )}
-          <button
-            onClick={triggerSync}
-            disabled={syncing}
-            className="px-3 py-1.5 text-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 transition-colors"
-          >
-            {syncing ? 'Syncing…' : 'Sync now'}
-          </button>
+          <RequireWrite scope="merchant_sync:write">
+            <button
+              onClick={triggerSync}
+              disabled={syncing}
+              className="px-3 py-1.5 text-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 transition-colors"
+            >
+              {syncing ? 'Syncing…' : 'Sync now'}
+            </button>
+          </RequireWrite>
         </div>
       </div>
 

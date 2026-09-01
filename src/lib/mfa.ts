@@ -3,7 +3,11 @@ import { SignJWT, jwtVerify } from 'jose'
 import crypto from 'crypto'
 
 const ALG = 'aes-256-gcm'
-const ISSUER = 'Jeffi Stores Admin'
+// Shown in the authenticator app beside the code. A tenant owner enrolling on their own
+// store saw the platform's name, so two stores would be indistinguishable in the app.
+const PLATFORM_ISSUER = process.env.PLATFORM_BRAND_NAME
+  ? `${process.env.PLATFORM_BRAND_NAME} Admin`
+  : 'Jeffi Stores Admin'
 const TICKET_TTL = '5m'
 
 if (!process.env.JWT_SECRET) {
@@ -69,8 +73,8 @@ export async function generateTotpSecret(): Promise<string> {
   return await generateSecret()
 }
 
-export async function buildOtpauthUrl(label: string, secret: string): Promise<string> {
-  return await generateURI({ secret, label, issuer: ISSUER })
+export async function buildOtpauthUrl(label: string, secret: string, issuer?: string): Promise<string> {
+  return await generateURI({ secret, label, issuer: issuer?.trim() || PLATFORM_ISSUER })
 }
 
 export async function verifyTotp(secret: string, code: string): Promise<boolean> {

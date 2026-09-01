@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { MessageCircle, Send, ChevronDown, Check, X } from 'lucide-react'
 import AdminSelect from '@/components/admin/AdminSelect'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface ThreadMessage {
   id: string
@@ -205,6 +206,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
   )
 
   const composeArea = (
+    <RequireWrite scope="customers:write">
     <div className="px-4 py-3 border-t border-border-default space-y-3 shrink-0">
       {sendError && <p className="text-xs text-red-600 dark:text-red-400 leading-snug">{sendError}</p>}
       <div className="space-y-2">
@@ -270,6 +272,7 @@ export default function WhatsAppEngagement({ customerId, phone, marketingOptOut,
         </p>
       </div>
     </div>
+    </RequireWrite>
   )
 
   if (!phone) {

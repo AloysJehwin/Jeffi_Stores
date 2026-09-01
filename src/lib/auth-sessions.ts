@@ -284,18 +284,21 @@ export async function createSession(args: {
  * and a plan change must take effect without re-provisioning. Intersecting here means every
  * consumer (middleware, authenticateAdmin, server components) sees the entitled set.
  *
- * Fails open on lookup error or an empty plan: locking a paying customer out of their own
- * store over a control-plane blip is worse than briefly over-granting.
+ * Fails CLOSED on lookup error or an empty plan: falls back to the safe-core scopes (intersected
+ * with what was granted), never the full grant. A control-plane blip must not silently expose
+ * feature pages a plan never bought; it only keeps the shell + settings reachable.
  */
 async function effectiveScopes(tenantId: string | null, granted: string[]): Promise<string[]> {
   if (!tenantId || granted.length === 0) return granted
   try {
     const { getTenantPlan } = await import('./plan-gate')
+    const { SAFE_CORE_SCOPE_KEYS } = await import('./scopes')
     const { scopes } = await getTenantPlan(tenantId)
-    if (scopes.size === 0) return granted
+    if (scopes.size === 0) return granted.filter(s => SAFE_CORE_SCOPE_KEYS.includes(s))
     return granted.filter(s => scopes.has(s))
   } catch {
-    return granted
+    const { SAFE_CORE_SCOPE_KEYS } = await import('./scopes')
+    return granted.filter(s => SAFE_CORE_SCOPE_KEYS.includes(s))
   }
 }
 

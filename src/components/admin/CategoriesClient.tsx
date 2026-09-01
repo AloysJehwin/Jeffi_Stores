@@ -27,6 +27,7 @@ import CategoryIcon from '@/components/visitor/CategoryIcon'
 import HoverCard from '@/components/ui/HoverCard'
 import Toggle from '@/components/ui/Toggle'
 import { ap } from '@/lib/admin-path'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Category {
   id: string
@@ -273,13 +274,15 @@ function PolicyExpandRow({ category, parentCategory, colSpan, onSaved, onClose }
             <button onClick={onClose} className="px-3 py-1.5 text-xs border border-border-secondary rounded-lg text-foreground-secondary hover:bg-surface transition-colors">
               Cancel
             </button>
-            <button
-              onClick={handleSave}
-              disabled={saving}
-              className="px-3 py-1.5 text-xs bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
-            >
-              {saving ? 'Saving…' : 'Save Policy'}
-            </button>
+            <RequireWrite scope="categories:write">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="px-3 py-1.5 text-xs bg-accent-500 hover:bg-accent-600 text-white rounded-lg font-semibold transition-colors disabled:opacity-50"
+              >
+                {saving ? 'Saving…' : 'Save Policy'}
+              </button>
+            </RequireWrite>
           </div>
         </div>
       </td>
@@ -333,18 +336,20 @@ function SortableRow({
     >
       <td className="px-4 py-3 whitespace-nowrap">
         <div className={`flex items-center gap-2 ${isSubcat ? 'ml-8' : ''}`}>
-          <button
-            {...attributes}
-            {...listeners}
-            suppressHydrationWarning
-            className="cursor-grab active:cursor-grabbing text-foreground-muted hover:text-foreground p-1 rounded touch-none"
-            title="Drag to reorder"
-            onClick={e => e.stopPropagation()}
-          >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
-            </svg>
-          </button>
+          <RequireWrite scope="categories:write">
+            <button
+              {...attributes}
+              {...listeners}
+              suppressHydrationWarning
+              className="cursor-grab active:cursor-grabbing text-foreground-muted hover:text-foreground p-1 rounded touch-none"
+              title="Drag to reorder"
+              onClick={e => e.stopPropagation()}
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+              </svg>
+            </button>
+          </RequireWrite>
           {!isSubcat && (
             <button
               onClick={e => { e.stopPropagation(); onToggleCollapse?.() }}
@@ -454,26 +459,40 @@ function SortableRow({
       <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground-secondary">{category.slug}</td>
       <td className="px-4 py-3 whitespace-nowrap text-sm text-foreground">{category.display_order}</td>
       <td className="px-4 py-3 whitespace-nowrap">
-        <button
-          onClick={e => { e.stopPropagation(); onToggleStatus?.() }}
-          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full hover:opacity-75 transition-opacity ${
-            category.is_active
-              ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-              : 'bg-surface-secondary text-foreground'
-          }`}
-        >
-          {category.is_active ? 'Active' : 'Inactive'}
-        </button>
+        <RequireWrite scope="categories:write" fallback={
+          <span
+            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+              category.is_active
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                : 'bg-surface-secondary text-foreground'
+            }`}
+          >
+            {category.is_active ? 'Active' : 'Inactive'}
+          </span>
+        }>
+          <button
+            onClick={e => { e.stopPropagation(); onToggleStatus?.() }}
+            className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full hover:opacity-75 transition-opacity ${
+              category.is_active
+                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                : 'bg-surface-secondary text-foreground'
+            }`}
+          >
+            {category.is_active ? 'Active' : 'Inactive'}
+          </button>
+        </RequireWrite>
       </td>
       <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium" onClick={e => e.stopPropagation()}>
-        <button
-          onClick={onTogglePolicy}
-          title="Edit return & replacement policy"
-          className={`mr-3 text-xs px-2 py-1 rounded border transition-colors ${policyOpen ? 'bg-accent-100 dark:bg-accent-900/30 border-accent-400 text-accent-600 dark:text-accent-400' : 'border-border-secondary text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
-        >
-          Policy
-        </button>
-        <DraftEditButton entity="categories" id={category.id} name={category.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 hover:text-accent-600 mr-4 text-sm" />
+        <RequireWrite scope="categories:write">
+          <button
+            onClick={onTogglePolicy}
+            title="Edit return & replacement policy"
+            className={`mr-3 text-xs px-2 py-1 rounded border transition-colors ${policyOpen ? 'bg-accent-100 dark:bg-accent-900/30 border-accent-400 text-accent-600 dark:text-accent-400' : 'border-border-secondary text-foreground-muted hover:text-foreground hover:bg-surface-secondary'}`}
+          >
+            Policy
+          </button>
+          <DraftEditButton entity="categories" id={category.id} name={category.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 hover:text-accent-600 mr-4 text-sm" />
+        </RequireWrite>
         <DeleteCategoryButton categoryId={category.id} categoryName={category.name} onDeleted={onDeleted} />
       </td>
     </tr>
@@ -828,12 +847,18 @@ export default function CategoriesClient({
                     </div>
                     {sub.name}
                   </div>
-                  <button
-                    onClick={e => { e.stopPropagation(); handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub) }}
-                    className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
-                  >
-                    {sub.is_active ? 'Active' : 'Inactive'}
-                  </button>
+                  <RequireWrite scope="categories:write" fallback={
+                    <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+                      {sub.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  }>
+                    <button
+                      onClick={e => { e.stopPropagation(); handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub) }}
+                      className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
+                    >
+                      {sub.is_active ? 'Active' : 'Inactive'}
+                    </button>
+                  </RequireWrite>
                 </div>
                 {parent && <p className="text-xs text-foreground-muted mb-1">Under: {parent.name}</p>}
                 <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
@@ -841,7 +866,9 @@ export default function CategoriesClient({
                   <span>Order: {sub.display_order}</span>
                 </div>
                 <div className="hidden md:flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                  <DraftEditButton entity="categories" id={sub.id} name={sub.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
+                  <RequireWrite scope="categories:write">
+                    <DraftEditButton entity="categories" id={sub.id} name={sub.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
+                  </RequireWrite>
                   <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                 </div>
               </div>
@@ -877,19 +904,27 @@ export default function CategoriesClient({
                         <span className="text-xs text-foreground-muted bg-surface-secondary px-1.5 py-0.5 rounded-full">{subcats.length}</span>
                       )}
                     </div>
-                    <button
-                      onClick={e => { e.stopPropagation(); handleToggleStatus(categories.find(c => c.id === cat.id) ?? cat) }}
-                      className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
-                    >
-                      {cat.is_active ? 'Active' : 'Inactive'}
-                    </button>
+                    <RequireWrite scope="categories:write" fallback={
+                      <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+                        {cat.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    }>
+                      <button
+                        onClick={e => { e.stopPropagation(); handleToggleStatus(categories.find(c => c.id === cat.id) ?? cat) }}
+                        className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${cat.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
+                      >
+                        {cat.is_active ? 'Active' : 'Inactive'}
+                      </button>
+                    </RequireWrite>
                   </div>
                   <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
                     <span>{cat.slug}</span>
                     <span>Order: {cat.display_order}</span>
                   </div>
                   <div className="hidden md:flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                    <DraftEditButton entity="categories" id={cat.id} name={cat.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
+                    <RequireWrite scope="categories:write">
+                      <DraftEditButton entity="categories" id={cat.id} name={cat.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
+                    </RequireWrite>
                     <DeleteCategoryButton categoryId={cat.id} categoryName={cat.name} onDeleted={() => handleCategoryDeleted(cat.id)} />
                   </div>
                 </div>
@@ -907,19 +942,27 @@ export default function CategoriesClient({
                         </div>
                         <span className="text-foreground-muted mr-1">└</span>{sub.name}
                       </div>
-                      <button
-                        onClick={e => { e.stopPropagation(); handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub) }}
-                        className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
-                      >
-                        {sub.is_active ? 'Active' : 'Inactive'}
-                      </button>
+                      <RequireWrite scope="categories:write" fallback={
+                        <span className={`px-2 py-0.5 text-xs font-semibold rounded-full ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}>
+                          {sub.is_active ? 'Active' : 'Inactive'}
+                        </span>
+                      }>
+                        <button
+                          onClick={e => { e.stopPropagation(); handleToggleStatus(categories.find(c => c.id === sub.id) ?? sub) }}
+                          className={`px-2 py-0.5 text-xs font-semibold rounded-full hover:opacity-75 transition-opacity ${sub.is_active ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300' : 'bg-surface-secondary text-foreground'}`}
+                        >
+                          {sub.is_active ? 'Active' : 'Inactive'}
+                        </button>
+                      </RequireWrite>
                     </div>
                     <div className="flex items-center justify-between text-xs text-foreground-muted mb-3">
                       <span>{sub.slug}</span>
                       <span>Order: {sub.display_order}</span>
                     </div>
                     <div className="hidden md:flex items-center justify-end gap-3 text-sm" onClick={e => e.stopPropagation()}>
-                      <DraftEditButton entity="categories" id={sub.id} name={sub.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
+                      <RequireWrite scope="categories:write">
+                        <DraftEditButton entity="categories" id={sub.id} name={sub.name} hasDraft={false} backUrl={backUrl} label="Edit" className="text-accent-500 font-medium text-sm" />
+                      </RequireWrite>
                       <DeleteCategoryButton categoryId={sub.id} categoryName={sub.name} onDeleted={() => handleCategoryDeleted(sub.id)} />
                     </div>
                   </div>

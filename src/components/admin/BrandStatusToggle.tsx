@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Props {
   brandId: string
@@ -53,16 +54,18 @@ export default function BrandStatusToggle({ brandId, brandData }: Props) {
   }
 
   return (
-    <button
-      onClick={toggle}
-      disabled={toggling}
-      className={`flex-shrink-0 ml-2 px-2 py-0.5 text-xs font-semibold rounded-full transition-opacity ${toggling ? 'opacity-50' : 'hover:opacity-75'} ${
-        isActive
-          ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-          : 'bg-surface-secondary text-foreground'
-      }`}
-    >
-      {isActive ? 'Active' : 'Inactive'}
-    </button>
+    <RequireWrite scope="brands:write">
+      <button
+        onClick={toggle}
+        disabled={toggling}
+        className={`flex-shrink-0 ml-2 px-2 py-0.5 text-xs font-semibold rounded-full transition-opacity ${toggling ? 'opacity-50' : 'hover:opacity-75'} ${
+          isActive
+            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+            : 'bg-surface-secondary text-foreground'
+        }`}
+      >
+        {isActive ? 'Active' : 'Inactive'}
+      </button>
+    </RequireWrite>
   )
 }

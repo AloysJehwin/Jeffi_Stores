@@ -5,6 +5,7 @@ import Link from 'next/link'
 import CopySku from '@/components/ui/CopySku'
 import { ap } from '@/lib/admin-path'
 import { useToast } from '@/contexts/ToastContext'
+import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface RFQMessage {
   id: string
@@ -128,6 +129,7 @@ function applyDiscount(price: number, pct: number): number {
 
 export default function RFQDetailClient({ id }: { id: string }) {
   const { showToast } = useToast()
+  const canWrite = useCanWrite('business_rfqs:write')
   const [rfq, setRfq] = useState<RFQ | null>(null)
   const [items, setItems] = useState<RFQItem[]>([])
   const [discountMap, setDiscountMap] = useState<Record<string, number>>({})
@@ -366,22 +368,26 @@ export default function RFQDetailClient({ id }: { id: string }) {
           <div className="shrink-0 flex flex-col items-end gap-2">
             {rfq.status === 'pending' && (
               <div className="flex items-center gap-2">
-                <button onClick={() => handleStatusChange('reviewed')} disabled={actionLoading}
-                  className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60">
-                  Mark Reviewed
-                </button>
-                <button onClick={() => setShowRejectForm(s => !s)}
-                  className="px-4 py-2 border border-red-400 text-red-300 text-sm font-semibold rounded-lg hover:bg-red-900/30 transition-colors">
-                  Reject
-                </button>
+                <RequireWrite scope="business_rfqs:write">
+                  <button onClick={() => handleStatusChange('reviewed')} disabled={actionLoading}
+                    className="px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-60">
+                    Mark Reviewed
+                  </button>
+                  <button onClick={() => setShowRejectForm(s => !s)}
+                    className="px-4 py-2 border border-red-400 text-red-300 text-sm font-semibold rounded-lg hover:bg-red-900/30 transition-colors">
+                    Reject
+                  </button>
+                </RequireWrite>
               </div>
             )}
             {(rfq.status === 'reviewed' || rfq.status === 'negotiating' || rfq.status === 'offer_accepted') && (
-              <button onClick={() => setConfirmOpen(true)} disabled={converting}
-                className={`px-5 py-2 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2 ${rfq.status === 'offer_accepted' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-accent-500 hover:bg-accent-600'}`}>
-                {converting && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-                {rfq.status === 'offer_accepted' ? 'Convert to Quotation ✓' : 'Convert to Quotation'}
-              </button>
+              <RequireWrite scope="business_rfqs:write">
+                <button onClick={() => setConfirmOpen(true)} disabled={converting}
+                  className={`px-5 py-2 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2 ${rfq.status === 'offer_accepted' ? 'bg-teal-600 hover:bg-teal-700' : 'bg-accent-500 hover:bg-accent-600'}`}>
+                  {converting && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+                  {rfq.status === 'offer_accepted' ? 'Convert to Quotation ✓' : 'Convert to Quotation'}
+                </button>
+              </RequireWrite>
             )}
             {rfq.status === 'converted' && rfq.converted_quotation_id && (
               <div className="flex flex-col gap-2 items-end">
@@ -421,6 +427,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
 
       {/* Reject form */}
       {showRejectForm && (
+        <RequireWrite scope="business_rfqs:write">
         <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4 space-y-3">
           <p className="text-sm font-semibold text-red-700 dark:text-red-400">Reject this RFQ</p>
           <textarea value={adminNote} onChange={e => setAdminNote(e.target.value)}
@@ -438,6 +445,7 @@ export default function RFQDetailClient({ id }: { id: string }) {
             </button>
           </div>
         </div>
+        </RequireWrite>
       )}
 
       {/* Offer accepted banner */}
@@ -454,14 +462,16 @@ export default function RFQDetailClient({ id }: { id: string }) {
               <p className="text-xs text-teal-600/80 dark:text-teal-500">Ready to convert — create the quotation now.</p>
             </div>
           </div>
-          <button
-            onClick={() => setConfirmOpen(true)}
-            disabled={converting}
-            className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2 shrink-0"
-          >
-            {converting && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
-            Convert to Quotation
-          </button>
+          <RequireWrite scope="business_rfqs:write">
+            <button
+              onClick={() => setConfirmOpen(true)}
+              disabled={converting}
+              className="px-5 py-2 bg-teal-600 hover:bg-teal-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-60 flex items-center gap-2 shrink-0"
+            >
+              {converting && <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
+              Convert to Quotation
+            </button>
+          </RequireWrite>
         </div>
       )}
 
@@ -935,7 +945,8 @@ export default function RFQDetailClient({ id }: { id: string }) {
 
               {/* Reply composer — hidden once customer has accepted */}
               {!['converted', 'rejected', 'offer_accepted'].includes(rfq.status) && (
-                ['pending', 'reviewed'].includes(rfq.status) ? (
+                <RequireWrite scope="business_rfqs:write">
+                {['pending', 'reviewed'].includes(rfq.status) ? (
                   /* Quick-send chips for early stages — no free-text, structured actions only */
                   <div className="border-t border-border-default p-4 space-y-4">
                     <p className="text-[11px] font-semibold text-foreground-muted uppercase tracking-wide">Quick Replies</p>
@@ -1087,7 +1098,8 @@ export default function RFQDetailClient({ id }: { id: string }) {
                       Send Reply
                     </button>
                   </div>
-                )
+                )}
+                </RequireWrite>
               )}
             </div>
           ) : null}

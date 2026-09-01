@@ -2,9 +2,11 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 export default function CancelReview({ orderId }: { orderId: string }) {
   const router = useRouter()
+  const canWrite = useCanWrite('reviews:write')
   const [isProcessing, setIsProcessing] = useState(false)
   const [result, setResult] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [showRejectForm, setShowRejectForm] = useState(false)
@@ -42,6 +44,8 @@ export default function CancelReview({ orderId }: { orderId: string }) {
       setIsProcessing(false)
     }
   }
+
+  if (!canWrite) return null
 
   return (
     <div>

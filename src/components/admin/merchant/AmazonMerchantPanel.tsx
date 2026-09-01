@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import CopySku from '@/components/ui/CopySku'
+import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Summary {
   last_refreshed_at: string | null
@@ -145,12 +146,14 @@ export default function AmazonMerchantPanel() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={syncNow} disabled={syncing} className="px-3 py-1.5 text-sm border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50 transition-colors">
-            {syncing ? 'Pushing…' : 'Sync now (push to Amazon)'}
-          </button>
-          <button onClick={refresh} disabled={refreshing} className="px-3 py-1.5 text-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 transition-colors">
-            {refreshing ? 'Refreshing…' : 'Refresh from Amazon'}
-          </button>
+          <RequireWrite scope="merchant_sync:write">
+            <button onClick={syncNow} disabled={syncing} className="px-3 py-1.5 text-sm border border-border-default rounded-lg text-foreground-secondary hover:bg-surface-secondary disabled:opacity-50 transition-colors">
+              {syncing ? 'Pushing…' : 'Sync now (push to Amazon)'}
+            </button>
+            <button onClick={refresh} disabled={refreshing} className="px-3 py-1.5 text-sm bg-accent-500 hover:bg-accent-600 text-white rounded-lg disabled:opacity-50 transition-colors">
+              {refreshing ? 'Refreshing…' : 'Refresh from Amazon'}
+            </button>
+          </RequireWrite>
         </div>
       </div>
 

@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 export interface ProductUnitRule {
   id: string
@@ -41,6 +42,7 @@ export default function UnitRulesPanel({
 }: Props) {
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const canWrite = useCanWrite('inventory')
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [minQty, setMinQty] = useState('')
@@ -157,66 +159,74 @@ export default function UnitRulesPanel({
                       }
                     </span>
                     <span className="text-[10px] text-foreground-muted">p{rule.priority}</span>
-                    <button
-                      type="button"
-                      onClick={() => toggleActive(rule)}
-                      disabled={busy}
-                      className={`text-[10px] px-2 py-0.5 rounded border disabled:opacity-50 ${
-                        rule.is_active
-                          ? 'border-green-500/40 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20'
-                          : 'border-border-secondary text-foreground-muted'
-                      }`}
-                      title={rule.is_active ? 'Active — click to disable' : 'Inactive — click to enable'}
-                    >
-                      {rule.is_active ? 'on' : 'off'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteRule(rule)}
-                      disabled={busy}
-                      className="text-[10px] text-red-600 hover:underline disabled:opacity-50"
-                    >
-                      delete
-                    </button>
+                    {canWrite && (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => toggleActive(rule)}
+                          disabled={busy}
+                          className={`text-[10px] px-2 py-0.5 rounded border disabled:opacity-50 ${
+                            rule.is_active
+                              ? 'border-green-500/40 text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20'
+                              : 'border-border-secondary text-foreground-muted'
+                          }`}
+                          title={rule.is_active ? 'Active — click to disable' : 'Inactive — click to enable'}
+                        >
+                          {rule.is_active ? 'on' : 'off'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => deleteRule(rule)}
+                          disabled={busy}
+                          className="text-[10px] text-red-600 hover:underline disabled:opacity-50"
+                        >
+                          delete
+                        </button>
+                      </>
+                    )}
                   </div>
                 )
               })}
             </div>
           )}
 
-          <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end pt-1">
-            <div>
-              <label className="block text-[10px] text-foreground-muted mb-0.5">Min qty</label>
-              <input
-                type="number" step="0.01" min="0.01"
-                value={minQty}
-                onChange={e => setMinQty(e.target.value)}
-                className={inputCls}
-                placeholder={`e.g. 10 ${unitLabel}`}
-              />
-            </div>
-            <div>
-              <label className="block text-[10px] text-foreground-muted mb-0.5">Price (ex GST)</label>
-              <input
-                type="number" step="0.01" min="0"
-                value={price}
-                onChange={e => setPrice(e.target.value)}
-                className={inputCls}
-                placeholder={`per ${unitLabel}`}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={addTier}
-              disabled={busy}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50 h-[34px]"
-            >
-              + Add Tier
-            </button>
-          </div>
-          <p className="text-[10px] text-foreground-muted">
-            Price applies when ordered qty is ≥ min qty. Highest matching tier wins (lowest priority number first).
-          </p>
+          {canWrite && (
+            <>
+              <div className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end pt-1">
+                <div>
+                  <label className="block text-[10px] text-foreground-muted mb-0.5">Min qty</label>
+                  <input
+                    type="number" step="0.01" min="0.01"
+                    value={minQty}
+                    onChange={e => setMinQty(e.target.value)}
+                    className={inputCls}
+                    placeholder={`e.g. 10 ${unitLabel}`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] text-foreground-muted mb-0.5">Price (ex GST)</label>
+                  <input
+                    type="number" step="0.01" min="0"
+                    value={price}
+                    onChange={e => setPrice(e.target.value)}
+                    className={inputCls}
+                    placeholder={`per ${unitLabel}`}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={addTier}
+                  disabled={busy}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-50 h-[34px]"
+                >
+                  + Add Tier
+                </button>
+              </div>
+              <p className="text-[10px] text-foreground-muted">
+                Price applies when ordered qty is ≥ min qty. Highest matching tier wins (lowest priority number first).
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>
