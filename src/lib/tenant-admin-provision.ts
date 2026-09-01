@@ -25,6 +25,7 @@ export async function provisionTenantOwnerAdmin(opts: {
   tenantSlug: string
   ownerEmail: string
   ownerName: string | null
+  storeName?: string | null
 }): Promise<{ success: boolean; error?: string }> {
   try {
     const ctx = await resolveTenantCtx(opts.tenantId)
@@ -32,6 +33,15 @@ export async function provisionTenantOwnerAdmin(opts: {
       return { success: false, error: 'Tenant DB not yet provisioned — will retry on next activation' }
     }
 
+    const storeName = opts.storeName?.trim() || ctx.displayName?.trim() || opts.tenantSlug
+    // Fails open to every tenant scope: a control-plane hiccup must not provision an owner
+    // who cannot reach their own store. The request-time gate still holds them to the plan.
+    let grantedScopes: string[] = TENANT_SCOPE_KEYS
+    try {
+      const { getTenantPlan } = await import('./plan-gate')
+      const { scopes } = await getTenantPlan(opts.tenantId)
+      if (scopes.size > 0) grantedScopes = TENANT_SCOPE_KEYS.filter(k => scopes.has(k))
+    } catch { /* keep the full tenant set */ }
     await runWithTenantContext(ctx, async () => {
       // Idempotency: skip if super_admin already exists for this email
       const existing = await queryOne<{ id: string }>(
@@ -63,7 +73,9 @@ export async function provisionTenantOwnerAdmin(opts: {
       )
       const userId = userRow!.id
 
-      // 2. Create super_admin with all scopes
+      // 2. Create super_admin with the scopes this tenant's plan actually sells. The stored
+      //    grant should reflect what was bought; resolveSession intersects with the plan again
+      //    at request time so an upgrade or downgrade needs no re-provisioning.
       const adminRow = await queryOne<{ id: string }>(
         // admins.scopes is jsonb. Passing the JS array directly makes node-postgres send a
         // Postgres array literal ({a,b,c}), which jsonb rejects with "invalid input syntax for
@@ -74,7 +86,7 @@ export async function provisionTenantOwnerAdmin(opts: {
          ON CONFLICT (user_id) DO UPDATE
            SET role='super_admin', scopes=$2::jsonb, is_active=true
          RETURNING id`,
-        [userId, JSON.stringify(TENANT_SCOPE_KEYS)]
+        [userId, JSON.stringify(grantedScopes)]
       )
       const adminId = adminRow!.id
 
@@ -106,7 +118,7 @@ export async function provisionTenantOwnerAdmin(opts: {
         cert.serial,
         cert.expiresAt.toISOString(),
         'super_admin',
-        { slug: opts.tenantSlug, storeName: opts.tenantSlug },
+        { slug: opts.tenantSlug, storeName },
       )
     })
 

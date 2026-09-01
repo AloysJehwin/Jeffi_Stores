@@ -52,6 +52,10 @@ export default async function OwnerDashboard() {
               className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
               Integrations
             </Link>
+            <Link href="/dashboard/payouts"
+              className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
+              Payouts
+            </Link>
             <Link href="/dashboard/billing"
               className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
               Billing

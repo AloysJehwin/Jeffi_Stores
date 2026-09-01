@@ -31,10 +31,10 @@ vi.mock('@/lib/tenant-registry', () => ({ controlPlanePool: () => pool }))
 
 const baseInput = {
   businessName: 'Acme Traders',
-  businessType: 'route_proprietorship' as const,
+  businessType: 'proprietorship' as const,
   legalBusinessName: 'Acme Traders Pvt',
   profileCategory: 'ecommerce',
-  profileSubcategory: 'e_commerce',
+  profileSubcategory: 'ecommerce_marketplace',
   ownerEmail: 'owner@acme.in',
   ownerPhone: '9876543210',
   ownerName: 'Owner One',
@@ -106,7 +106,7 @@ describe('createLinkedAccount', () => {
       email: 'owner@acme.in',
       type: 'route',
       legal_business_name: 'Acme Traders Pvt',
-      business_type: 'route_proprietorship',
+      business_type: 'proprietorship',
       contact_name: 'Owner One',
     })
     expect(payload.profile.addresses.registered).toMatchObject({ street1: '1 Main St', country: 'IN' })
@@ -120,21 +120,21 @@ describe('createLinkedAccount', () => {
     rz.accounts.create.mockResolvedValue({ id: 'acc_p' })
     const { createLinkedAccount } = await import('@/lib/razorpay-route')
     // individual PAN ('P') declared as a partnership — the exact live failure
-    await createLinkedAccount({ ...baseInput, businessType: 'route_partnership', pan: 'ABCPD1234E' })
+    await createLinkedAccount({ ...baseInput, businessType: 'partnership', pan: 'ABCPD1234E' })
     expect(rz.accounts.create.mock.calls[0][0]).not.toHaveProperty('legal_info')
   })
 
   it('sends the company PAN when the holder character agrees', async () => {
     rz.accounts.create.mockResolvedValue({ id: 'acc_c' })
     const { createLinkedAccount } = await import('@/lib/razorpay-route')
-    await createLinkedAccount({ ...baseInput, businessType: 'route_private_limited', pan: 'ABCCD1234E' })
+    await createLinkedAccount({ ...baseInput, businessType: 'private_limited', pan: 'ABCCD1234E' })
     expect(rz.accounts.create.mock.calls[0][0]).toMatchObject({ legal_info: { pan: 'ABCCD1234E' } })
   })
 
   it('normalises a lowercase / padded PAN before sending it', async () => {
     rz.accounts.create.mockResolvedValue({ id: 'acc_l' })
     const { createLinkedAccount } = await import('@/lib/razorpay-route')
-    await createLinkedAccount({ ...baseInput, businessType: 'route_llp', pan: '  abcfd1234e ' })
+    await createLinkedAccount({ ...baseInput, businessType: 'llp', pan: '  abcfd1234e ' })
     expect(rz.accounts.create.mock.calls[0][0]).toMatchObject({ legal_info: { pan: 'ABCFD1234E' } })
   })
 })
@@ -143,22 +143,22 @@ describe('createLinkedAccount', () => {
 describe('isValidCompanyPan', () => {
   const cases: Array<[string, string, boolean, string]> = [
     // partnerships and LLPs hold a firm PAN ('F')
-    ['ABCFD1234E', 'route_partnership',        true,  'firm PAN for a partnership'],
-    ['ABCPD1234E', 'route_partnership',        false, 'individual PAN for a partnership (live failure)'],
-    ['ABCCD1234E', 'route_partnership',        false, 'company PAN for a partnership'],
-    ['ABCFD1234E', 'route_llp',                true,  'firm PAN for an LLP'],
+    ['ABCFD1234E', 'partnership',        true,  'firm PAN for a partnership'],
+    ['ABCPD1234E', 'partnership',        false, 'individual PAN for a partnership (live failure)'],
+    ['ABCCD1234E', 'partnership',        false, 'company PAN for a partnership'],
+    ['ABCFD1234E', 'llp',                true,  'firm PAN for an LLP'],
     // companies hold 'C'
-    ['ABCCD1234E', 'route_private_limited',    true,  'company PAN for a pvt ltd'],
-    ['ABCCD1234E', 'route_public_limited',     true,  'company PAN for a public ltd'],
-    ['ABCFD1234E', 'route_private_limited',    false, 'firm PAN for a pvt ltd'],
+    ['ABCCD1234E', 'private_limited',    true,  'company PAN for a pvt ltd'],
+    ['ABCCD1234E', 'public_limited',     true,  'company PAN for a public ltd'],
+    ['ABCFD1234E', 'private_limited',    false, 'firm PAN for a pvt ltd'],
     // no entity PAN exists for these
-    ['ABCPD1234E', 'route_proprietorship',     false, 'individual PAN for a proprietorship (live failure)'],
-    ['ABCCD1234E', 'route_proprietorship',     false, 'even a company PAN for a proprietorship'],
-    ['ABCFD1234E', 'route_not_yet_registered', false, 'unregistered business has none'],
+    ['ABCPD1234E', 'proprietorship',     false, 'individual PAN for a proprietorship (live failure)'],
+    ['ABCCD1234E', 'proprietorship',     false, 'even a company PAN for a proprietorship'],
+    ['ABCFD1234E', 'not_yet_registered', false, 'unregistered business has none'],
     // NGOs may be a trust, association or body of individuals
-    ['ABCTD1234E', 'route_ngo',                true,  'trust PAN for an NGO'],
-    ['ABCAD1234E', 'route_ngo',                true,  'association PAN for an NGO'],
-    ['ABCPD1234E', 'route_ngo',                false, 'individual PAN for an NGO'],
+    ['ABCTD1234E', 'ngo',                true,  'trust PAN for an NGO'],
+    ['ABCAD1234E', 'ngo',                true,  'association PAN for an NGO'],
+    ['ABCPD1234E', 'ngo',                false, 'individual PAN for an NGO'],
   ]
   it.each(cases)('%s + %s -> %s (%s)', async (pan, type, expected) => {
     const { isValidCompanyPan } = await import('@/lib/razorpay-route')
@@ -172,13 +172,13 @@ describe('isValidCompanyPan', () => {
     ['ABCFD1234', 'missing check letter'],
   ])('rejects a malformed PAN (%s — %s)', async (pan) => {
     const { isValidCompanyPan } = await import('@/lib/razorpay-route')
-    expect(isValidCompanyPan(pan, 'route_partnership')).toBe(false)
+    expect(isValidCompanyPan(pan, 'partnership')).toBe(false)
   })
 
   it('rejects null and undefined', async () => {
     const { isValidCompanyPan } = await import('@/lib/razorpay-route')
-    expect(isValidCompanyPan(null, 'route_partnership')).toBe(false)
-    expect(isValidCompanyPan(undefined, 'route_partnership')).toBe(false)
+    expect(isValidCompanyPan(null, 'partnership')).toBe(false)
+    expect(isValidCompanyPan(undefined, 'partnership')).toBe(false)
   })
 
   // mapBusinessType() can only ever produce these, so every one must be covered by the table.
@@ -212,23 +212,23 @@ describe('createRouteStakeholder', () => {
   it('creates a stakeholder and returns its id (with kyc.pan when supplied)', async () => {
     rz.stakeholders.create.mockResolvedValue({ id: 'sth_1' })
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    const id = await createRouteStakeholder('acc_1', { name: 'Owner', pan: 'ABCPD1234E' })
+    const id = await createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test', pan: 'ABCPD1234E' })
     expect(id).toBe('sth_1')
-    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', { name: 'Owner', kyc: { pan: 'ABCPD1234E' } })
+    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', { name: 'Owner', email: 'owner@acme.test', kyc: { pan: 'ABCPD1234E' } })
   })
 
   it('omits kyc when no PAN is given', async () => {
     rz.stakeholders.create.mockResolvedValue({ id: 'sth_2' })
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await createRouteStakeholder('acc_1', { name: 'Owner' })
-    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', { name: 'Owner' })
+    await createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })
+    expect(rz.stakeholders.create).toHaveBeenCalledWith('acc_1', { name: 'Owner', email: 'owner@acme.test' })
   })
 
   it('returns the existing stakeholder when Razorpay says it already exists', async () => {
     rz.stakeholders.create.mockRejectedValue({ error: { description: 'stakeholder already exists' } })
     rz.stakeholders.all.mockResolvedValue({ items: [{ id: 'sth_existing' }] })
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    const id = await createRouteStakeholder('acc_1', { name: 'Owner' })
+    const id = await createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })
     expect(id).toBe('sth_existing')
   })
 
@@ -236,20 +236,20 @@ describe('createRouteStakeholder', () => {
     rz.stakeholders.create.mockRejectedValue({ message: 'already exists' })
     rz.stakeholders.all.mockResolvedValue({ items: [] })
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await expect(createRouteStakeholder('acc_1', { name: 'Owner' })).rejects.toMatchObject({ message: 'already exists' })
+    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toMatchObject({ message: 'already exists' })
   })
 
   it('re-throws the "already exists" error when the list lookup itself fails', async () => {
     rz.stakeholders.create.mockRejectedValue({ message: 'already exists' })
     rz.stakeholders.all.mockRejectedValue(new Error('list boom'))
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await expect(createRouteStakeholder('acc_1', { name: 'Owner' })).rejects.toMatchObject({ message: 'already exists' })
+    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toMatchObject({ message: 'already exists' })
   })
 
   it('re-throws a non-idempotent error unchanged', async () => {
     rz.stakeholders.create.mockRejectedValue(new Error('validation failed'))
     const { createRouteStakeholder } = await import('@/lib/razorpay-route')
-    await expect(createRouteStakeholder('acc_1', { name: 'Owner' })).rejects.toThrow('validation failed')
+    await expect(createRouteStakeholder('acc_1', { name: 'Owner', email: 'owner@acme.test' })).rejects.toThrow('validation failed')
     expect(rz.stakeholders.all).not.toHaveBeenCalled()
   })
 })
@@ -423,31 +423,31 @@ describe('recordCodSettlement', () => {
 describe('mapBusinessType', () => {
   it('maps known KYC types', async () => {
     const { mapBusinessType } = await import('@/lib/razorpay-route')
-    expect(mapBusinessType('proprietor')).toBe('route_proprietorship')
-    expect(mapBusinessType('partnership')).toBe('route_partnership')
-    expect(mapBusinessType('pvt_ltd')).toBe('route_private_limited')
-    expect(mapBusinessType('llp')).toBe('route_llp')
-    expect(mapBusinessType('other')).toBe('route_not_yet_registered')
+    expect(mapBusinessType('proprietor')).toBe('proprietorship')
+    expect(mapBusinessType('partnership')).toBe('partnership')
+    expect(mapBusinessType('pvt_ltd')).toBe('private_limited')
+    expect(mapBusinessType('llp')).toBe('llp')
+    expect(mapBusinessType('other')).toBe('not_yet_registered')
   })
 
   it('falls back to not_yet_registered for an unknown type', async () => {
     const { mapBusinessType } = await import('@/lib/razorpay-route')
-    expect(mapBusinessType('mystery')).toBe('route_not_yet_registered')
+    expect(mapBusinessType('mystery')).toBe('not_yet_registered')
   })
 })
 
 describe('inferProfileCategory', () => {
   it('classifies electronics / fashion / food / health', async () => {
     const { inferProfileCategory } = await import('@/lib/razorpay-route')
-    expect(inferProfileCategory('Electronics & gadgets')).toEqual({ category: 'ecommerce', subcategory: 'electronics' })
+    expect(inferProfileCategory('Electronics & gadgets')).toEqual({ category: 'ecommerce', subcategory: 'electronics_and_furniture' })
     expect(inferProfileCategory('Fashion apparel')).toEqual({ category: 'ecommerce', subcategory: 'fashion_and_lifestyle' })
     expect(inferProfileCategory('Groceries and food')).toEqual({ category: 'food', subcategory: 'online_food_ordering' })
-    expect(inferProfileCategory('Health & beauty')).toEqual({ category: 'ecommerce', subcategory: 'pharmacy' })
+    expect(inferProfileCategory('Health & beauty')).toEqual({ category: 'healthcare', subcategory: 'pharmacy' })
   })
 
   it('defaults to generic e-commerce for null / unrecognised categories', async () => {
     const { inferProfileCategory } = await import('@/lib/razorpay-route')
-    expect(inferProfileCategory(null)).toEqual({ category: 'ecommerce', subcategory: 'e_commerce' })
-    expect(inferProfileCategory('random stuff')).toEqual({ category: 'ecommerce', subcategory: 'e_commerce' })
+    expect(inferProfileCategory(null)).toEqual({ category: 'ecommerce', subcategory: 'ecommerce_marketplace' })
+    expect(inferProfileCategory('random stuff')).toEqual({ category: 'ecommerce', subcategory: 'ecommerce_marketplace' })
   })
 })

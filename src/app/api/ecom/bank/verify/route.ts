@@ -34,10 +34,41 @@ export async function POST(request: NextRequest) {
     ifsc: ifsc.toUpperCase(),
     holderName,
   })
+  if (result.status === 'failed') {
+    return NextResponse.json({ status: result.status, verifiedName: null, reason: result.reason ?? null }, { status: 400 })
+  }
 
+  // Push to Route when the owner already has a linked account. Storing the correction locally
+  // was not enough: Razorpay keeps settling to the old account until its settlement config is
+  // updated, so a bank fixed here never reached the place the money actually goes.
+  let settlement: { ok: boolean; error?: string } | null = null
+  const { getOwnerBankWithRoute, saveBankVerification } = await import('@/lib/tenant-registry')
+  const existing = await getOwnerBankWithRoute(owner.id).catch(() => null)
+  if (existing?.linkedAccountId) {
+    const { configureRouteSettlement } = await import('@/lib/razorpay-route')
+    settlement = await configureRouteSettlement(existing.linkedAccountId, {
+      accountNumber,
+      ifsc: ifsc.toUpperCase(),
+      beneficiaryName: result.verifiedName ?? holderName,
+    })
+    // Razorpay is the authority on whether this account can receive money, so its answer —
+    // not the local format check — decides what the owner is shown.
+    await saveBankVerification({
+      ownerId: owner.id,
+      accountNumber,
+      ifsc: ifsc.toUpperCase(),
+      holderName,
+      status: settlement.ok ? 'verified' : 'failed',
+      ref: settlement.ok ? 'route_settlement' : 'route_rejected',
+      verifiedName: result.verifiedName ?? holderName,
+    }).catch(() => {})
+  }
+
+  const ok = settlement ? settlement.ok : true
   return NextResponse.json({
-    status: result.status,
+    status: settlement ? (settlement.ok ? 'verified' : 'failed') : result.status,
     verifiedName: result.verifiedName ?? null,
-    reason: result.reason ?? null,
-  }, { status: result.status === 'failed' ? 400 : 200 })
+    reason: settlement?.error ?? result.reason ?? null,
+    pushedToRoute: !!settlement,
+  }, { status: ok ? 200 : 400 })
 }

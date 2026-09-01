@@ -93,3 +93,32 @@ describe('every tenant-host exit forwards x-tenant-slug to the request', () => {
     }
   })
 })
+
+// The cert badge reads x-client-cert-cn, but check-session sits in the public-API allowlist,
+// which returned before the mTLS block ran — so the header never arrived and the panel
+// reported "not detected" however valid the certificate was.
+describe('a verified client certificate reaches the routes that read it', () => {
+  beforeEach(() => {
+    mockResolveTenant.mockReset()
+    mockResolveTenant.mockResolvedValue(ACTIVE)
+    mockVerifyToken.mockReset()
+    mockVerifyToken.mockResolvedValue({ adminId: 'a-1', role: 'admin', scopes: [], email: 'a@acme.test' })
+  })
+
+  const cn = (res: Response) => res.headers.get('x-middleware-request-x-client-cert-cn')
+
+  it('forwards the verified CN to check-session', async () => {
+    const res = await middleware(req('https://admin-acme.jeffistores.in/api/admin/check-session', 'admin-acme.jeffistores.in'))
+    expect(cn(res)).toBe('owner')
+  })
+
+  it('forwards it to the login OTP endpoint', async () => {
+    const res = await middleware(req('https://admin-acme.jeffistores.in/api/admin/auth/email-otp/start', 'admin-acme.jeffistores.in'))
+    expect(cn(res)).toBe('owner')
+  })
+
+  it('forwards it on a normal admin page', async () => {
+    const res = await middleware(req('https://admin-acme.jeffistores.in/products', 'admin-acme.jeffistores.in', { admin: true }))
+    expect(cn(res)).toBe('owner')
+  })
+})

@@ -412,6 +412,7 @@ export async function getTenant(id: string): Promise<TenantDetail | null> {
   const res = await pool.query(
     `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at, t.instance_state,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
+            t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,
             i.rds_endpoint, i.rds_db, i.rds_port, i.iam_auth, i.s3_bucket, i.ec2_target, i.region, i.cloudfront_id
      FROM tenants t
@@ -712,6 +713,30 @@ export async function setTenantInstanceState(tenantId: string, state: 'running' 
   await pool.query(`UPDATE tenants SET instance_state=$1, updated_at=now() WHERE id=$2`, [state, tenantId])
 }
 /** Write resolved infra pointers after provisioning. */
+/**
+ * Record a step outcome that happened outside the provisioning worker — the Route linked
+ * account is created at KYC approval, not by a job. Without this the only trace was a stderr
+ * line, which the next blue-green deploy discarded, so a failure could not be diagnosed after
+ * the fact. Attaches to the tenant's most recent job (job_id is NOT NULL) and never throws.
+ */
+export async function recordTenantStepEvent(
+  tenantId: string,
+  step: string,
+  status: 'ok' | 'error',
+  message: string | null,
+  detail: Record<string, unknown> = {},
+): Promise<void> {
+  try {
+    await controlPlanePool().query(
+      `INSERT INTO provisioning_step_events (job_id, tenant_id, step, status, message, detail)
+       SELECT j.id, $1, $2, $3, $4, $5::jsonb
+         FROM provisioning_jobs j WHERE j.tenant_id = $1
+         ORDER BY j.created_at DESC LIMIT 1`,
+      [tenantId, step, status, message, JSON.stringify(detail)],
+    )
+  } catch { /* a log line must never fail the operation it describes */ }
+}
+
 export async function writeTenantInfra(tenantId: string, infra: { rdsEndpoint: string; s3Bucket: string }): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
@@ -853,6 +878,47 @@ export async function saveBankVerification(args: {
 }
 
 /** The owner's current bank account (for gating go-live). */
+/**
+ * The owner's bank alongside the linked account of whichever store it settles to. Used by the
+ * dashboard to show verification state, and by a re-verify to know which Route account to push
+ * the corrected details at — Razorpay refuses a second linked account on the same email, so a
+ * correction must update the existing one rather than create another.
+ */
+export async function getOwnerBankWithRoute(ownerId: string): Promise<{
+  accountNumber: string | null
+  ifsc: string | null
+  holderName: string | null
+  verifiedName: string | null
+  verificationStatus: string | null
+  verificationRef: string | null
+  linkedAccountId: string | null
+  tenantSlug: string | null
+} | null> {
+  const pool = controlPlanePool()
+  const r = await pool.query(
+    `SELECT b.account_number, b.ifsc, b.holder_name, b.verified_name,
+            b.verification_status, b.verification_ref,
+            COALESCE(b.linked_account_id, t.razorpay_linked_account_id) AS linked_account_id,
+            t.slug AS tenant_slug
+       FROM tenant_bank_accounts b
+       LEFT JOIN owner_tenants ot ON ot.owner_id = b.owner_id
+       LEFT JOIN tenants t ON t.id = ot.tenant_id AND t.status = 'active'
+      WHERE b.owner_id = $1
+      ORDER BY b.created_at DESC LIMIT 1`, [ownerId])
+  const row = r.rows[0]
+  if (!row) return null
+  return {
+    accountNumber: row.account_number ?? null,
+    ifsc: row.ifsc ?? null,
+    holderName: row.holder_name ?? null,
+    verifiedName: row.verified_name ?? null,
+    verificationStatus: row.verification_status ?? null,
+    verificationRef: row.verification_ref ?? null,
+    linkedAccountId: row.linked_account_id ?? null,
+    tenantSlug: row.tenant_slug ?? null,
+  }
+}
+
 export async function getOwnerBankAccount(ownerId: string): Promise<BankAccount | null> {
   const pool = controlPlanePool()
   const res = await pool.query(

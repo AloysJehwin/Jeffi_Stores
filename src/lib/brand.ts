@@ -40,7 +40,8 @@ export function tenantCampaignAddress(slug: string): string {
  */
 export function currentBrandName(): string {
   const t = getCurrentTenant()
-  return t?.displayName || t?.slug || platformBrandName()
+  if (t?.displayName?.trim()) return t.displayName.trim()
+  return t?.slug ? `${t.slug} Store` : platformBrandName()
 }
 
 /**

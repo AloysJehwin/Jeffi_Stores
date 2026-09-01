@@ -60,9 +60,11 @@ function StepIcon({ icon, className }: { icon: string; className?: string }) {
 }
 
 // ── Main Wizard ────────────────────────────────────────────────────────────────
-export default function OnboardWizard({ plans, initialDraft }: {
+export default function OnboardWizard({ plans, initialDraft, reusingPreviousDetails }: {
   plans: Plan[]
   initialDraft?: { current_step: number; data: Record<string, any> } | null
+  /** Opening a second store: the owner's own details were carried over, the previous store's were not. */
+  reusingPreviousDetails?: boolean
 }) {
   const router = useRouter()
   const init = initialDraft?.data ?? {}
@@ -98,6 +100,7 @@ export default function OnboardWizard({ plans, initialDraft }: {
   // Step 4 — Warehouse
   const [dailyPayout, setDailyPayout] = useState(init.dailyPayout ?? false)
   const [wh, setWh] = useState(init.wh ?? { originPincode: '', pickupLocation: '', sellerName: '', sellerAddress: '', sellerPhone: '' })
+  const [pinCheck, setPinCheck] = useState<{ state: 'idle' | 'checking' | 'ok' | 'warn' | 'bad'; msg: string }>({ state: 'idle', msg: '' })
 
   // Step 5 — Bank
   const [bank, setBank] = useState(init.bank ?? { accountNumber: '', ifsc: '', holderName: '' })
@@ -233,12 +236,42 @@ export default function OnboardWizard({ plans, initialDraft }: {
   }
 
   // ── Can proceed? ─────────────────────────────────────────────────────────────
+  useEffect(() => {
+    const pin = wh.originPincode.replace(/\D/g, '')
+    if (pin.length !== 6) { setPinCheck({ state: 'idle', msg: '' }); return }
+    let cancelled = false
+    setPinCheck({ state: 'checking', msg: 'Checking with Delhivery…' })
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/ecom/onboard/pincode?pin=${pin}`)
+        const d = await res.json()
+        if (cancelled) return
+        if (d.error) setPinCheck({ state: 'warn', msg: d.error })
+        else if (!d.serviceable) setPinCheck({ state: 'bad', msg: 'Delhivery does not serve this pincode.' })
+        else if (!d.pickup) setPinCheck({ state: 'bad', msg: 'Delhivery delivers here but cannot collect pickups — orders could not be shipped from this address.' })
+        else setPinCheck({ state: 'ok', msg: `Pickup available${d.district ? ` · ${d.district}` : ''}${d.cod ? ' · COD supported' : ' · prepaid only'}` })
+      } catch {
+        // Never block onboarding on our own check being unreachable.
+        if (!cancelled) setPinCheck({ state: 'warn', msg: 'Could not check this pincode right now.' })
+      }
+    }, 500)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [wh.originPincode])
+
   function canNext(): boolean {
     if (step === 0) return !!planSlug
     if (step === 1) return displayName.trim().length > 0 && effectiveSlug.length >= 3 && productCats.length > 0
     if (step === 2) return bizName.trim().length > 0 && !!bizType && pan.trim().length === 10 && bizAddress.trim().length > 5
-    if (step === 3) return gstNumber.trim().length === 15
-    if (step === 4) return true
+    // Optional: registration is not required below the turnover threshold, and Razorpay does
+    // not need a GSTIN to create a linked account. Forcing it made the one tenant who had none
+    // paste the platform's own GSTIN to get past this step.
+    if (step === 3) return gstNumber.trim().length === 0 || gstNumber.trim().length === 15
+    if (step === 4) {
+      return /^\d{6}$/.test(wh.originPincode.replace(/\D/g, ''))
+        && /^[6-9]\d{9}$/.test(wh.sellerPhone.replace(/\D/g, '').slice(-10))
+        && wh.sellerAddress.trim().length > 5
+        && pinCheck.state !== 'bad'
+    }
     if (step === 5) return bankVerified
     if (step === 6) return /^[6-9]\d{9}$/.test(mobile.replace(/\D/g, '').slice(-10)) && !!logoS3Key && legalsAccepted
     return true
@@ -315,6 +348,16 @@ export default function OnboardWizard({ plans, initialDraft }: {
             <div className="w-full max-w-3xl">
               <h1 className="text-3xl font-bold text-foreground mb-1">Choose your plan</h1>
               <p className="text-foreground-muted mb-8">All plans include the full storefront. Cancel anytime.</p>
+              {reusingPreviousDetails && (
+                <div className="mb-8 rounded-xl border border-border-default bg-surface-elevated px-4 py-3">
+                  <p className="text-sm text-foreground">
+                    We have carried over your business details, warehouse and bank account.
+                  </p>
+                  <p className="text-xs text-foreground-muted mt-1">
+                    You can change any of them as you go. Your new store gets its own name and address.
+                  </p>
+                </div>
+              )}
               <div className="inline-flex items-center rounded-xl border border-border-default bg-surface p-1 mb-8 gap-1">
                 {(['monthly', 'yearly'] as Interval[]).map((iv) => (
                   <button key={iv} type="button" onClick={() => setInterval(iv)}
@@ -412,12 +455,12 @@ export default function OnboardWizard({ plans, initialDraft }: {
           {step === 3 && (
             <div className="w-full max-w-xl">
               <h1 className="text-3xl font-bold text-foreground mb-1">GST details</h1>
-              <p className="text-foreground-muted mb-8">Required for compliant invoicing on your store.</p>
+              <p className="text-foreground-muted mb-8">Only if your business is GST-registered. Leave blank if it is not.</p>
               <div className="space-y-5">
                 <div>
-                  <label className={lbl}>GSTIN</label>
-                  <input className={inp} value={gstNumber} onChange={(e) => setGstNumber(e.target.value.toUpperCase())} placeholder="22AAAAA0000A1Z5" maxLength={15} />
-                  <p className="text-xs text-foreground-muted mt-1">15-character GST Identification Number</p>
+                  <label className={lbl}>GSTIN <span className="text-foreground-muted font-normal">(optional)</span></label>
+                  <input className={inp} value={gstNumber} onChange={(e) => setGstNumber(e.target.value.toUpperCase())} placeholder="29AAAAA0000A1Z5" maxLength={15} />
+                  <p className="text-xs text-foreground-muted mt-1">15-character GST Identification Number. Leave blank if you are not registered — never enter another business&apos;s number.</p>
                 </div>
                 <div>
                   <label className={lbl}>GST registration certificate <span className="text-foreground-muted font-normal">(optional — PDF, JPG or PNG, max 5 MB)</span></label>
@@ -456,7 +499,15 @@ export default function OnboardWizard({ plans, initialDraft }: {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className={lbl}>Origin pincode</label>
-                    <input className={inp} placeholder="560001" value={wh.originPincode} onChange={(e) => setWh({ ...wh, originPincode: e.target.value })} />
+                    <input className={inp} placeholder="560001" maxLength={6} value={wh.originPincode} onChange={(e) => setWh({ ...wh, originPincode: e.target.value.replace(/\D/g, '') })} />
+                    {pinCheck.state !== 'idle' && (
+                      <p className={`text-xs mt-1 ${
+                        pinCheck.state === 'ok' ? 'text-green-700 dark:text-green-400'
+                        : pinCheck.state === 'bad' ? 'text-red-600 dark:text-red-400'
+                        : 'text-foreground-muted'}`}>
+                        {pinCheck.msg}
+                      </p>
+                    )}
                   </div>
                   <div>
                     <label className={lbl}>Pickup location name</label>
