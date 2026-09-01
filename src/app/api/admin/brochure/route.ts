@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const admin = await authenticateAdmin(request)
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!hasScope(admin.role, admin.scopes, 'products:read')) {
+    if (!hasScope(admin.role, admin.scopes, 'products:write')) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
     }
 
