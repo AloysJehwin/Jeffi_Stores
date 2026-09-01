@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Settings, X } from 'lucide-react'
+import { useCanWrite } from '@/contexts/AdminScopesContext'
 
 type IntegrationRow = { provider: string; label: string | null; status: string; meta: Record<string, any> }
 type SocialRow = { provider: 'facebook' | 'instagram'; page_name: string | null; status: string }
@@ -22,6 +23,7 @@ export default function AdminIntegrationsPopup({
   socialAccounts: SocialRow[]
 }) {
   const router = useRouter()
+  const canWrite = useCanWrite(scope === 'merchant' ? 'merchant_sync' : 'campaigns')
   const [open, setOpen] = useState(false)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
 
@@ -74,11 +76,11 @@ export default function AdminIntegrationsPopup({
               )}
               {scope === 'merchant' ? (
                 <>
-                  <GoogleCard row={google} onDone={() => router.refresh()} setToast={setToast} />
-                  <AmazonCard row={amazon} onDone={() => router.refresh()} setToast={setToast} />
+                  <GoogleCard row={google} canWrite={canWrite} onDone={() => router.refresh()} setToast={setToast} />
+                  <AmazonCard row={amazon} canWrite={canWrite} onDone={() => router.refresh()} setToast={setToast} />
                 </>
               ) : (
-                <MetaCard fb={fb} ig={ig} />
+                <MetaCard fb={fb} ig={ig} canWrite={canWrite} />
               )}
             </div>
           </div>
@@ -113,8 +115,8 @@ function CardShell({ title, subtitle, connected, children }: {
   )
 }
 
-function GoogleCard({ row, onDone, setToast }: {
-  row?: IntegrationRow
+function GoogleCard({ row, canWrite, onDone, setToast }: {
+  row?: IntegrationRow; canWrite: boolean
   onDone: () => void; setToast: (t: { ok: boolean; text: string } | null) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -140,6 +142,10 @@ function GoogleCard({ row, onDone, setToast }: {
       {connected && row?.meta?.merchant_id && (
         <div className="text-xs text-foreground-muted font-mono">Merchant ID: {row.meta.merchant_id}</div>
       )}
+      {!canWrite ? (
+        <p className="text-xs text-foreground-muted">You don&apos;t have permission to change these credentials.</p>
+      ) : (
+      <>
       <div className="flex flex-wrap items-center gap-2">
         {!connected && (
           <a href="/api/admin/integrations/google/connect"
@@ -172,12 +178,14 @@ function GoogleCard({ row, onDone, setToast }: {
           </button>
         </div>
       )}
+      </>
+      )}
     </CardShell>
   )
 }
 
-function AmazonCard({ row, onDone, setToast }: {
-  row?: IntegrationRow
+function AmazonCard({ row, canWrite, onDone, setToast }: {
+  row?: IntegrationRow; canWrite: boolean
   onDone: () => void; setToast: (t: { ok: boolean; text: string } | null) => void
 }) {
   const [open, setOpen] = useState(false)
@@ -215,6 +223,10 @@ function AmazonCard({ row, onDone, setToast }: {
       {connected && row?.meta?.seller_id && (
         <div className="text-xs text-foreground-muted font-mono">Seller ID: {row.meta.seller_id}</div>
       )}
+      {!canWrite ? (
+        <p className="text-xs text-foreground-muted">You don&apos;t have permission to change these credentials.</p>
+      ) : (
+      <>
       <div className="flex flex-wrap items-center gap-2">
         {!connected && (
           <a href="/api/admin/integrations/amazon/connect"
@@ -243,22 +255,28 @@ function AmazonCard({ row, onDone, setToast }: {
           </button>
         </div>
       )}
+      </>
+      )}
     </CardShell>
   )
 }
 
-function MetaCard({ fb, ig }: { fb?: SocialRow; ig?: SocialRow }) {
+function MetaCard({ fb, ig, canWrite }: { fb?: SocialRow; ig?: SocialRow; canWrite: boolean }) {
   const connected = !!fb || !!ig
   return (
     <CardShell title="Meta (Facebook & Instagram)" subtitle="Auto-post new products to your pages." connected={connected}>
       {fb && <div className="text-xs text-foreground-muted">Facebook: <span className="text-foreground font-medium">{fb.page_name || 'Connected'}</span></div>}
       {ig && <div className="text-xs text-foreground-muted">Instagram: <span className="text-foreground font-medium">{ig.page_name || 'Connected'}</span></div>}
+      {!canWrite ? (
+        <p className="text-xs text-foreground-muted">You don&apos;t have permission to change these credentials.</p>
+      ) : (
       <button type="button" onClick={() => { window.location.href = '/api/admin/social/connect/facebook' }}
         className={`inline-block px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${connected
           ? 'border border-border-default text-foreground-secondary hover:bg-surface-secondary'
           : 'bg-accent-600 hover:bg-accent-700 text-white'}`}>
         {connected ? 'Reconnect' : 'Connect'}
       </button>
+      )}
     </CardShell>
   )
 }
