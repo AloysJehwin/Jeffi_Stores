@@ -3860,8 +3860,8 @@
     "semantic_hash": ""
   },
   "src/lib/delhivery.ts": {
-    "mtime": 1788235113.4154792,
-    "ast_hash": "9db8ccc1c76e4978dfabc830ffb52d8d",
+    "mtime": 1788283547.9225647,
+    "ast_hash": "4e45b454ede562fd811ee67ef60af730",
     "semantic_hash": ""
   },
   "src/lib/delivery-rules.ts": {
@@ -4190,8 +4190,8 @@
     "semantic_hash": ""
   },
   ".claude/settings.local.json": {
-    "mtime": 1787767938.882437,
-    "ast_hash": "a451357d975cf1094dbfa705b2c82e48",
+    "mtime": 1788282442.7798278,
+    "ast_hash": "63cacf47cf41887a8972415a6d6fe8f5",
     "semantic_hash": ""
   },
   ".eslintrc.json": {
@@ -8385,8 +8385,8 @@
     "semantic_hash": ""
   },
   "src/app/admin/ecom/customers/page.tsx": {
-    "mtime": 1787896216.3012009,
-    "ast_hash": "d915931f2aa83b110204c48b965b03cd",
+    "mtime": 1788283624.8533244,
+    "ast_hash": "03f238edf009fec037b9e37881c99e92",
     "semantic_hash": ""
   },
   "src/app/admin/ecom/instances/page.tsx": {
@@ -8430,8 +8430,8 @@
     "semantic_hash": ""
   },
   "src/app/api/admin/ecom/kyc/[tenantId]/approve/route.ts": {
-    "mtime": 1788207009.7045593,
-    "ast_hash": "175b8395784056d84e16331213a6630f",
+    "mtime": 1788283245.3049343,
+    "ast_hash": "3736563785c43a860c40437608de05a6",
     "semantic_hash": ""
   },
   "src/app/api/admin/ecom/kyc/[tenantId]/cert/route.ts": {
@@ -8890,8 +8890,8 @@
     "semantic_hash": ""
   },
   "src/lib/provisioning/steps.ts": {
-    "mtime": 1788282268.013115,
-    "ast_hash": "a65e69f8930262d31a97442a5b752806",
+    "mtime": 1788283562.4622345,
+    "ast_hash": "6039cfc560247f62eced68403fdbf142",
     "semantic_hash": ""
   },
   "src/lib/provisioning/stub-provider.ts": {
@@ -8925,8 +8925,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenant-backup-store.ts": {
-    "mtime": 1787763975.370462,
-    "ast_hash": "ceb6bb6e2aead00874f8bbd508108b13",
+    "mtime": 1788283167.548877,
+    "ast_hash": "ea5ccef1e8641318e535fa6204b42e40",
     "semantic_hash": ""
   },
   "src/lib/tenant-context.ts": {
@@ -8950,8 +8950,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenant-registry.ts": {
-    "mtime": 1788282220.336603,
-    "ast_hash": "bedf5302987f38060df4eac2a01f1e2f",
+    "mtime": 1788283576.6365292,
+    "ast_hash": "245abaf6921fee62e6fc78edffac31e0",
     "semantic_hash": ""
   },
   "src/lib/variant-change.ts": {
@@ -9792,6 +9792,16 @@
   "src/app/ecom/dashboard/SubdomainList.tsx": {
     "mtime": 1788261246.1896558,
     "ast_hash": "444e77406630a5fcedf93722db9ca5c0",
+    "semantic_hash": ""
+  },
+  "src/app/api/admin/ecom/customers/[id]/purge/route.ts": {
+    "mtime": 1788283225.569091,
+    "ast_hash": "bba05d5cf168734fd731a77d9b26a09a",
+    "semantic_hash": ""
+  },
+  "src/components/admin/ecom/PurgeCustomerButton.tsx": {
+    "mtime": 1788283603.8794384,
+    "ast_hash": "9c0fee1042ba9f3421d15b9aa2022496",
     "semantic_hash": ""
   }
 }

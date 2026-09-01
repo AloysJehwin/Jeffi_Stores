@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { isPlatformAdmin } from '@/lib/scopes'
 import { listTenants, tenantSummary, planMix } from '@/lib/tenant-registry'
 import { EcomHero, PlanMixChart, EcomFilters, StatusPill } from '@/components/admin/ecom/EcomUI'
+import PurgeCustomerButton from '@/components/admin/ecom/PurgeCustomerButton'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,11 +53,12 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
               <th className="text-left px-4 py-3 font-medium">Price</th>
               <th className="text-left px-4 py-3 font-medium">Status</th>
               <th className="text-left px-4 py-3 font-medium">Created</th>
+              <th className="text-right px-4 py-3 font-medium">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border-default">
             {tenants.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-foreground-muted">No tenants match.</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">No tenants match.</td></tr>
             )}
             {tenants.map((t) => (
               <tr key={t.id} className="hover:bg-surface-secondary cursor-pointer">
@@ -68,6 +70,11 @@ export default async function EcomCustomersPage({ searchParams }: { searchParams
                 <td className="px-4 py-3 text-foreground-secondary">{t.monthly_price_inr ? '₹' + Number(t.monthly_price_inr).toLocaleString('en-IN') : '—'}{t.daily_payout ? ' +daily' : ''}</td>
                 <td className="px-4 py-3"><StatusPill status={t.status} /></td>
                 <td className="px-4 py-3 text-foreground-muted">{new Date(t.created_at).toLocaleDateString('en-IN')}</td>
+                <td className="px-4 py-3 text-right">
+                  {(t.status === 'terminated' || t.status === 'deprovisioned') && (
+                    <PurgeCustomerButton tenantId={t.id} slug={t.slug} />
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

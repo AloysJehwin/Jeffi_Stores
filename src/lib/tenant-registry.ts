@@ -657,6 +657,21 @@ export async function saveLinkedAccountId(tenantId: string, linkedAccountId: str
   )
 }
 
+/**
+ * Copy the Razorpay linked account (acc_xxx) onto the owner-scoped bank row so it survives a
+ * hard tenant purge. tenant_bank_accounts cascades off owners (not tenants), so this value
+ * outlives the tenant DELETE and lets a re-onboarding owner reuse their existing Route account
+ * (Razorpay enforces one linked account per merchant email). Idempotent.
+ */
+export async function persistLinkedAccountToOwnerBank(ownerId: string, linkedAccountId: string): Promise<void> {
+  const pool = controlPlanePool()
+  await pool.query(
+    `UPDATE tenant_bank_accounts SET linked_account_id=$2, updated_at=now()
+     WHERE owner_id=$1 AND linked_account_id IS DISTINCT FROM $2`,
+    [ownerId, linkedAccountId],
+  )
+}
+
 export async function saveSubscriptionId(tenantId: string, subscriptionId: string, billingInterval?: string, checkoutUrl?: string): Promise<void> {
   const pool = controlPlanePool()
   await pool.query(
@@ -752,6 +767,53 @@ export async function clearTenantInfra(tenantId: string): Promise<void> {
     `UPDATE tenant_infra SET rds_endpoint=NULL, ec2_instance_id=NULL, updated_at=now() WHERE tenant_id=$1`,
     [tenantId])
   clearTenantCache()
+}
+
+/**
+ * Permanently purge a deprovisioned tenant: preserve the owner's Razorpay linked account, delete
+ * both S3 backup copies, then DELETE the tenant row (cascades to all tenant-scoped tables). The
+ * owners row and the owner-scoped tenant_bank_accounts row are intentionally kept so a returning
+ * owner can reuse their existing Route account. No restore after this.
+ *
+ * Refuses a tenant that still has live infra — the caller must deprovision first.
+ */
+export async function purgeTenant(tenantId: string): Promise<{ ok: boolean; error?: string; deletedBackups?: number }> {
+  const pool = controlPlanePool()
+  const tenant = await getTenant(tenantId)
+  if (!tenant) return { ok: false, error: 'Tenant not found' }
+  if (tenant.rds_endpoint || (tenant.status !== 'terminated' && tenant.status !== 'deprovisioned')) {
+    return { ok: false, error: 'Tenant must be deprovisioned before it can be deleted' }
+  }
+
+  const ownerRow = await pool.query(
+    `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [tenantId],
+  ).catch(() => null)
+  const ownerId: string | null = ownerRow?.rows[0]?.owner_id ?? null
+
+  if (ownerId && tenant.razorpay_linked_account_id) {
+    await persistLinkedAccountToOwnerBank(ownerId, tenant.razorpay_linked_account_id)
+  }
+
+  // Delhivery has no delete for a client warehouse — deactivate the pickup address so the purged
+  // store's origin stops being usable. Deprovision already does this; repeated here so a purge of
+  // a tenant deprovisioned before that change (or a partial teardown) still retires it.
+  if (ownerId) {
+    const draft = await getDraft(ownerId).catch(() => null)
+    const pickupName = (draft?.data as any)?.wh?.pickupLocation || tenant.slug
+    const { deactivateDelhiveryPickupLocation } = await import('./delhivery')
+    await deactivateDelhiveryPickupLocation(pickupName).catch(() => {})
+  }
+
+  let deletedBackups = 0
+  if (ownerId) {
+    const { deleteTenantBackups } = await import('./tenant-backup-store')
+    const res = await deleteTenantBackups({ ownerId, slug: tenant.slug })
+    deletedBackups = res.deleted
+  }
+
+  await pool.query(`DELETE FROM tenants WHERE id=$1`, [tenantId])
+  clearTenantCache()
+  return { ok: true, deletedBackups }
 }
 
 /** Platform-wide infra KV (e.g. the shared pool EC2 instance id/ip). */

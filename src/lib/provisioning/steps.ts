@@ -729,10 +729,16 @@ export async function deprovisionTenant(
       }
       const { getDraft: loadDraft } = await import('../tenant-registry')
       const draft = await loadDraft((created.ownerId as string) ?? '').catch(() => null)
+      const pickupName = (draft?.data as any)?.wh?.pickupLocation || slug
+      const { deactivateDelhiveryPickupLocation } = await import('../delhivery')
+      const deactivated = await deactivateDelhiveryPickupLocation(pickupName).catch(
+        (e: any) => ({ ok: false, error: e?.message ?? String(e) }),
+      )
       manualCleanup.delhiveryPickup = {
-        name: (draft?.data as any)?.wh?.pickupLocation || slug,
+        name: pickupName,
         deletable: false,
-        needsManualRemoval: true,
+        deactivated: deactivated.ok,
+        ...(deactivated.error ? { deactivateError: deactivated.error } : {}),
       }
       const { alertProvisioningFailure } = await import('./alerts')
       await alertProvisioningFailure(slug, 'external_cleanup',
