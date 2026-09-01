@@ -257,10 +257,17 @@ async function identityDefaults(): Promise<StoreIdentity> {
   const slug = t?.slug ?? (await tenantSlugFromHeaders())
   if (!slug) return DEFAULTS.identity
   const domain = process.env.PLATFORM_DOMAIN || 'jeffistores.in'
+  // The ALS context is established lazily by the first DB query, so on a page that has not
+  // queried yet (the login screen) it is empty and only the header slug is known. Resolving
+  // the tenant by slug recovers its real name — otherwise the store is shown its own URL
+  // slug, "aloys-jehwin Store", instead of the business name it registered.
+  let displayName = t?.displayName?.trim()
+  if (!displayName) {
+    const { lookupTenantContextBySlug } = await import('./tenant-registry')
+    displayName = (await lookupTenantContextBySlug(slug).catch(() => null))?.displayName?.trim() || ''
+  }
   return {
-    // Falls back to the header slug when the ALS context is not established, so a tenant host
-    // shows its own name rather than the platform's even on a path that never queried.
-    name: t?.displayName?.trim() || `${slug} Store`,
+    name: displayName || `${slug} Store`,
     email: '',
     phone: '',
     web: `${slug}.${domain}`,

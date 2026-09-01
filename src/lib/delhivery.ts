@@ -7,6 +7,54 @@ const SELLER_NAME = process.env.DELHIVERY_SELLER_NAME || 'Jeffi Stores'
 const SELLER_ADD = process.env.DELHIVERY_SELLER_ADDRESS || 'Near Arihant Complex, Sanjay Gandhi Chowk, Station Road, Raipur'
 const SELLER_PHONE = process.env.DELHIVERY_SELLER_PHONE || '07713585374'
 
+export interface PincodeServiceability {
+  serviceable: boolean
+  pickup: boolean
+  cod: boolean
+  prepaid: boolean
+  district?: string
+  state?: string
+  error?: string
+}
+
+/**
+ * Delhivery pincode serviceability. Validates a pickup pincode at the point the owner types it,
+ * rather than at provisioning where a bad one is only discovered long after they have left the
+ * form — and where the step is skipped silently.
+ *
+ * Note this validates the PINCODE, not the address: a wrong house number still passes.
+ * Never throws — an unreachable Delhivery must not block onboarding, so an error is reported
+ * as "could not check" and the caller decides.
+ */
+export async function checkPincodeServiceability(pincode: string): Promise<PincodeServiceability> {
+  const token = process.env.DELHIVERY_API_KEY || process.env.DELHIVERY_TOKEN
+  const pin = String(pincode ?? '').replace(/\D/g, '')
+  if (!/^\d{6}$/.test(pin)) return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'A pincode is six digits.' }
+  if (!token) return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'Delivery partner not configured.' }
+
+  try {
+    const res = await fetch(
+      `https://track.delhivery.com/c/api/pin-codes/json/?filter_codes=${pin}`,
+      { headers: { Authorization: `Token ${token}`, Accept: 'application/json' }, cache: 'no-store' },
+    )
+    if (!res.ok) return { serviceable: false, pickup: false, cod: false, prepaid: false, error: `Could not check this pincode (${res.status}).` }
+    const data = await res.json().catch(() => null)
+    const entry = data?.delivery_codes?.[0]?.postal_code
+    if (!entry) return { serviceable: false, pickup: false, cod: false, prepaid: false }
+    const yes = (v: unknown) => String(v ?? '').toUpperCase() === 'Y' || v === true
+    return {
+      serviceable: true,
+      pickup: yes(entry.pickup),
+      cod: yes(entry.cod),
+      prepaid: yes(entry.pre_paid),
+      district: entry.district ?? undefined,
+      state: entry.state_code ?? undefined,
+    }
+  } catch {
+    return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'Could not reach the delivery partner.' }
+  }
+}
+
 export async function createDelhiveryPickupLocation(params: {
   name: string
   phone: string
