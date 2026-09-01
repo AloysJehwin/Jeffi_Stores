@@ -53,6 +53,21 @@ async function fireOwnerAdmin(tenantId: string): Promise<void> {
   }).catch((e: any) => ({ success: false, error: e?.message ?? String(e) }))
 
   if (!res.success) await reportOwnerAdminFailure(r.slug, res.error)
+
+  // The tenant CA now exists; refresh the fleet's client-CA bundle + reload nginx so this
+  // tenant's admin host advertises its CA (and prompts for the cert) without waiting for the
+  // next deploy. Non-fatal — the store is live regardless.
+  try {
+    const { refreshTenantMtlsFleet } = await import('@/lib/mtls-fleet')
+    await refreshTenantMtlsFleet(r.slug)
+  } catch (e: any) {
+    const reason = e?.message ?? String(e)
+    console.error(`[mtls-fleet] ${r.slug}: ${reason}`)
+    try {
+      const { alertProvisioningFailure } = await import('@/lib/provisioning/alerts')
+      await alertProvisioningFailure(r.slug, 'mtls_fleet_refresh', reason)
+    } catch { /* alerting must never mask the original failure */ }
+  }
 }
 
 /** Surface an owner-admin failure: logged, and alerted so it is not lost in the log. */
