@@ -78,6 +78,61 @@ export function customerMailFrom(): string {
   return `"${platformBrandName()}" <${process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`}>`
 }
 
+/**
+ * Async form of the sender, and the one to prefer. currentBrandName/customerMailFrom read the
+ * tenant from AsyncLocalStorage, which db.ts establishes lazily on the first query — so on a
+ * path that has not queried yet they silently return the platform's name and noreply address.
+ * This falls back to the x-tenant-slug header middleware sets, the same fix identityDefaults
+ * needed.
+ */
+export async function resolveCurrentTenant(): Promise<{ slug: string; displayName: string | null } | null> {
+  const t = getCurrentTenant()
+  if (t?.slug) return { slug: t.slug, displayName: t.displayName ?? null }
+  try {
+    const { headers } = await import('next/headers')
+    const slug = (await headers()).get('x-tenant-slug')
+    if (!slug) return null
+    const { lookupTenantContextBySlug } = await import('./tenant-registry')
+    const ctx = await lookupTenantContextBySlug(slug)
+    return ctx ? { slug: ctx.slug, displayName: ctx.displayName ?? null } : { slug, displayName: null }
+  } catch {
+    return null
+  }
+}
+
+/** `From` for customer mail, resolved even when the ALS context is not yet established. */
+export async function customerMailFromAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (t?.slug) {
+    const name = t.displayName?.trim() || `${t.slug} Store`
+    return `"${name}" <${tenantNoReplyAddress(t.slug)}>`
+  }
+  return `"${platformBrandName()}" <${process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`}>`
+}
+
+/** Store name for mail bodies, resolved the same way. */
+export async function currentBrandNameAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (t?.displayName?.trim()) return t.displayName.trim()
+  return t?.slug ? `${t.slug} Store` : platformBrandName()
+}
+
+/**
+ * Contact line for a mail footer. A tenant's customers were shown the platform's phone and
+ * mailbox; a tenant that has set neither gets an empty line rather than someone else's, which
+ * is the same choice identityDefaults makes.
+ */
+export async function storeContactLine(): Promise<string> {
+  try {
+    const { getStoreIdentity } = await import('./site-controls')
+    const id = await getStoreIdentity()
+    const parts = [id.phone?.trim(), id.email?.trim()].filter(Boolean)
+    return parts.join(' | ')
+  } catch {
+    return ''
+  }
+}
+
 /** `From` for operator-facing mail (admin alerts). Always the platform, never a tenant. */
 export function adminMailFrom(): string {
   const addr = process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`
