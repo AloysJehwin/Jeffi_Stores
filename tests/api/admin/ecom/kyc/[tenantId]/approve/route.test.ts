@@ -20,6 +20,7 @@ vi.mock('@/lib/tenant-registry', () => ({
   saveLinkedAccountId: vi.fn(),
   getOwnerBankAccount: vi.fn(),
   getOwnerBankWithRoute: vi.fn(),
+  persistLinkedAccountToOwnerBank: vi.fn(),
 }))
 
 vi.mock('@/lib/razorpay-subscriptions', () => ({
@@ -61,7 +62,7 @@ import { POST } from '@/app/api/admin/ecom/kyc/[tenantId]/approve/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import {
   approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft,
-  saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount, getOwnerBankWithRoute,
+  saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount, getOwnerBankWithRoute, persistLinkedAccountToOwnerBank,
 } from '@/lib/tenant-registry'
 import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
 import {
@@ -134,6 +135,7 @@ function primeHappyPath() {
   vi.mocked(createRouteStakeholder).mockResolvedValue(undefined as any)
   vi.mocked(getOwnerBankAccount).mockResolvedValue(BANK as any)
   vi.mocked(getOwnerBankWithRoute).mockResolvedValue(null as any)
+  vi.mocked(persistLinkedAccountToOwnerBank).mockResolvedValue(undefined)
   vi.mocked(configureRouteSettlement).mockResolvedValue({ ok: true } as any)
   vi.mocked(listPlans).mockResolvedValue([
     { slug: 'basic', name: 'Basic', tier: 1, monthly_price_inr: '499' },
