@@ -663,13 +663,46 @@ export async function deprovisionTenant(
     // refuses). Best-effort — a still-deleting DB is retried by a later sweep.
     await deleteParamGroupWhenDbGone(provider, instId, created.paramGroup || paramGroupName(slug))
 
+    // 3d. Neither provider supports deletion. Razorpay has no delete for a linked account and
+    // cannot clear a settlement bank (product-update only overwrites account/ifsc/beneficiary);
+    // Delhivery's client warehouse API is create and edit only. Both are therefore marked and
+    // recorded for an operator to close by hand, rather than silently left behind. The Razorpay
+    // id is kept: a second account on the same owner email is refused, so a re-onboarding has
+    // to reuse this one.
+    const manualCleanup: Record<string, unknown> = {}
+    try {
+      if (tenant.razorpay_linked_account_id) {
+        const { markLinkedAccountDeprovisioned } = await import('../razorpay-route')
+        const marked = await markLinkedAccountDeprovisioned(tenant.razorpay_linked_account_id, slug)
+        manualCleanup.routeAccount = {
+          id: tenant.razorpay_linked_account_id,
+          settlementBankRemovable: false,
+          needsManualSuspension: true,
+          marked: marked.ok,
+          ...(marked.error ? { markError: marked.error } : {}),
+        }
+      }
+      const { getDraft: loadDraft } = await import('../tenant-registry')
+      const draft = await loadDraft((created.ownerId as string) ?? '').catch(() => null)
+      manualCleanup.delhiveryPickup = {
+        name: (draft?.data as any)?.wh?.pickupLocation || slug,
+        deletable: false,
+        needsManualRemoval: true,
+      }
+      const { alertProvisioningFailure } = await import('./alerts')
+      await alertProvisioningFailure(slug, 'external_cleanup',
+        `Deprovisioned, but these cannot be deleted by API and need closing by hand: ${JSON.stringify(manualCleanup)}`,
+        tenantId)
+    } catch { /* bookkeeping must never fail a teardown that already deleted the billable resources */ }
+    const routeAccount = Object.keys(manualCleanup).length ? manualCleanup : undefined
+
     // 4. Clear infra pointers.
     await clearTenantInfra(tenantId)
 
     if (job) {
       await updateProvisioningJob(job.id, {
         status: 'done',
-        created_resources: { ...created, deprovisioned: true, backupKey },
+        created_resources: { ...created, deprovisioned: true, backupKey, ...(routeAccount ? { manualCleanup: routeAccount } : {}) },
       })
     }
     return { ok: true, backupKey, backedUp }

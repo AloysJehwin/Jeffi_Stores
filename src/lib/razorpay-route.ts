@@ -247,6 +247,34 @@ export async function configureRouteSettlement(
 }
 
 /**
+ * Razorpay has no delete for a linked account — the documented statuses are 'created' and
+ * 'suspended', and neither the account API nor the CLI can set them. A deprovisioned tenant
+ * therefore leaves the account behind for good.
+ *
+ * The most we can do is mark it, so an operator can find it in the dashboard and suspend it
+ * there, and so a later re-onboarding of the same owner recognises it. Razorpay rejects a
+ * second account on the same email ("Merchant email already exists"), so the id is worth
+ * keeping rather than forgetting.
+ *
+ * Never throws: teardown must not fail on a bookkeeping call.
+ */
+export async function markLinkedAccountDeprovisioned(
+  accountId: string,
+  slug: string,
+): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const rz = getRazorpayInstance()
+    await (rz.accounts as any).edit(accountId, {
+      notes: { deprovisioned_at: new Date().toISOString(), deprovisioned_slug: slug },
+      customer_facing_business_name: `[closed] ${slug}`.slice(0, 255),
+    })
+    return { ok: true }
+  } catch (err: any) {
+    return { ok: false, error: err?.error?.description ?? err?.message ?? String(err) }
+  }
+}
+
+/**
  * Transfer the tenant's share of an order payment to their linked account.
  *
  * @param paymentId  Razorpay payment_id (pay_xxxx) from the captured order
