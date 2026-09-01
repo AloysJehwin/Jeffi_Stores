@@ -135,7 +135,7 @@ async function createProduct(formData: FormData) {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
               data.id, uploadResult.url, uploadResult.thumbnailUrl,
-              process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+              uploadResult.s3Bucket,
               uploadResult.s3Key, uploadResult.s3ThumbnailKey,
               uploadResult.fileName, uploadResult.fileSize, uploadResult.mimeType,
               uploadResult.width, uploadResult.height, 999, false,
@@ -169,7 +169,7 @@ async function createProduct(formData: FormData) {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
               data.id, copied.url, copied.thumbnailUrl,
-              process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+              copied.s3Bucket,
               copied.s3Key, copied.s3ThumbnailKey,
               gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
               gimg.width, gimg.height, 999, false,

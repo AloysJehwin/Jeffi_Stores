@@ -27,6 +27,12 @@ async function resolveBucket(): Promise<string> {
   return DEFAULT_BUCKET
 }
 
+/** The S3 bucket this request's tenant writes to (tenant bucket, platform fallback).
+ * Exposed for DB writes that must record the same bucket the object physically lands in. */
+export async function currentBucket(): Promise<string> {
+  return resolveBucket()
+}
+
 // The platform CloudFront distribution only fronts the platform bucket, so a tenant object
 // must be addressed directly or the URL 404s.
 function publicUrl(bucket: string, fullKey: string): string {
@@ -62,6 +68,7 @@ export function generateProductImageKeys(productId: string, fileName: string) {
 export interface UploadResult {
   url: string
   thumbnailUrl: string
+  s3Bucket: string
   s3Key: string
   s3ThumbnailKey: string
   fileName: string
@@ -91,6 +98,7 @@ export async function uploadProductImage(file: File, productId: string): Promise
   return {
     url: await getS3Url(s3Key),
     thumbnailUrl: await getS3Url(s3ThumbnailKey),
+    s3Bucket: BUCKET_NAME,
     s3Key,
     s3ThumbnailKey,
     fileName: file.name,
@@ -192,7 +200,7 @@ export async function copyGalleryImageToProduct(
   galleryS3Key: string,
   galleryS3ThumbnailKey: string,
   productId: string,
-): Promise<{ s3Key: string; s3ThumbnailKey: string; url: string; thumbnailUrl: string }> {
+): Promise<{ s3Bucket: string; s3Key: string; s3ThumbnailKey: string; url: string; thumbnailUrl: string }> {
   const BUCKET_NAME = await resolveBucket()
   const fileName = galleryS3Key.replace(/^gallery\//, '')
   const thumbFileName = galleryS3ThumbnailKey.replace(/^gallery\/thumbnails\//, '')
@@ -224,9 +232,9 @@ export async function copyGalleryImageToProduct(
       CopySource: `${BUCKET_NAME}/${srcThumbKey}`,
       Key: `${KEY_PREFIX}${s3ThumbnailKey}`,
     }))
-    return { s3Key, s3ThumbnailKey, url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3ThumbnailKey) }
+    return { s3Bucket: BUCKET_NAME, s3Key, s3ThumbnailKey, url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3ThumbnailKey) }
   }
-  return { s3Key, s3ThumbnailKey: s3Key, url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3Key) }
+  return { s3Bucket: BUCKET_NAME, s3Key, s3ThumbnailKey: s3Key, url: await getS3Url(s3Key), thumbnailUrl: await getS3Url(s3Key) }
 }
 
 export async function uploadVariantImage(file: File, variantId: string): Promise<UploadResult> {
@@ -249,6 +257,7 @@ export async function uploadVariantImage(file: File, variantId: string): Promise
   return {
     url: await getS3Url(s3Key),
     thumbnailUrl: await getS3Url(s3ThumbnailKey),
+    s3Bucket: BUCKET_NAME,
     s3Key,
     s3ThumbnailKey,
     fileName: file.name,

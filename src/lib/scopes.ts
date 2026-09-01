@@ -676,26 +676,22 @@ export function getScopeForPath(pathname: string): string | null {
 
 // Newly-split scopes used to piggyback on a parent feature's scope. To avoid
 // locking out existing admins whose stored scopes predate the split, a grant of
-// the legacy parent scope still satisfies the new child scope. Plan-tier gating
-// (which builds fresh scope sets) can still withhold the child independently.
+// the legacy parent scope still satisfies the new child scope.
+//
+// ONLY safe when the parent is sold at the same-or-narrower plan tier than the
+// child — otherwise this fallback re-grants a scope that plan-tier gating
+// deliberately withheld. merchant_sync (Pro+) on products (all plans) let
+// Basic/Growth reach Merchant Sync; crm/tasks (Growth+) on customers (Basic+),
+// returns/replacements (Growth+) on orders (Basic+), and traffic (Growth+) on
+// dashboard (all) leaked the same way. Those children are gated purely by the
+// plan now. The entries kept below are same-tier splits where back-compat is safe.
 const LEGACY_SCOPE_PARENTS: Record<string, string> = {
-  'crm:read': 'customers:read',
-  'crm:write': 'customers:write',
-  'tasks:read': 'customers:read',
-  'tasks:write': 'customers:write',
-  'returns:read': 'orders:read',
-  'returns:write': 'orders:write',
-  'replacements:read': 'orders:read',
-  'replacements:write': 'orders:write',
   'delhivery:read': 'orders:read',
   'delhivery:write': 'orders:write',
   'shelving:read': 'inventory:read',
   'shelving:write': 'inventory:write',
-  'merchant_sync:read': 'products:read',
-  'merchant_sync:write': 'products:write',
   'campaigns:read': 'mailer:read',
   'campaigns:write': 'mailer:write',
-  'traffic:read': 'dashboard:read',
   'controls:read': 'inflation:read',
   'controls:write': 'inflation:write',
 }
