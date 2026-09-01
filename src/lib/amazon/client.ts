@@ -19,6 +19,18 @@ export async function getSellerId(): Promise<string> {
   return (await resolveAmazonCreds()).sellerId
 }
 
+// Non-throwing connection check for callers that must SKIP cleanly when the tenant (or platform,
+// off-tenant) has not connected Amazon. resolveAmazonCreds() now throws for an unconnected tenant
+// rather than silently using Jeffi's env creds, so a bare getSellerId() guard would surface that
+// throw; this absorbs it into a boolean.
+export async function amazonConfigured(): Promise<boolean> {
+  try {
+    return !!(await getSellerId())
+  } catch {
+    return false
+  }
+}
+
 // LWA token endpoint is global (not region-specific).
 const LWA_TOKEN_URL = 'https://api.amazon.com/auth/o2/token'
 const LISTINGS_BASE = '/listings/2021-08-01/items'

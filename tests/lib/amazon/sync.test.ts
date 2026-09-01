@@ -28,6 +28,7 @@ vi.mock('@/lib/amazon/client', () => ({
   AMAZON_PUSH_DISABLED: false,
   getSellerId: vi.fn().mockResolvedValue('SELLER-123'),
   getMarketplaceId: vi.fn().mockResolvedValue('A21TJRUUN4KGV'),
+  amazonConfigured: vi.fn().mockResolvedValue(true),
 }))
 
 import {
@@ -57,6 +58,7 @@ const mockDelete = vi.mocked(client.deleteListingsItem)
 const mockMatchAsin = vi.mocked(client.matchAsin)
 const mockGetSellerId = vi.mocked(client.getSellerId)
 const mockGetMarketplaceId = vi.mocked(client.getMarketplaceId)
+const mockAmazonConfigured = vi.mocked(client.amazonConfigured)
 
 function createListing(over: any = {}): any {
   return {
@@ -73,6 +75,7 @@ describe('amazon/sync', () => {
     vi.resetAllMocks()
     mockGetSellerId.mockResolvedValue('SELLER-123')
     mockGetMarketplaceId.mockResolvedValue('A21TJRUUN4KGV')
+    mockAmazonConfigured.mockResolvedValue(true)
     mockQuery.mockResolvedValue({ rows: [], rowCount: 1 } as any)
     mockQueryOne.mockResolvedValue({ acquired: true } as any)
     mockFetchAll.mockResolvedValue([] as any)

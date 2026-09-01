@@ -1,10 +1,11 @@
 /**
  * Tests for src/lib/integrations/resolve.ts — the tenant-or-env credential resolver.
  *
- * The rule pinned here is the one that keeps tenants isolated AND keeps single-tenant (Jeffi)
- * behaviour unchanged: when a tenant is in the AsyncLocalStorage context AND has a 'connected'
- * credential row, use THAT tenant's decrypted creds; otherwise fall back to the platform env.
- * A wrong answer here would either leak Jeffi's account to a tenant or a tenant's to Jeffi.
+ * The rule pinned here keeps tenants isolated: when a tenant is in the AsyncLocalStorage context
+ * AND has a 'connected' credential row, use THAT tenant's decrypted creds; when a tenant is in
+ * context but has NOT connected, THROW — a tenant must never fall through to the platform env
+ * (that would silently sync into Jeffi's own Merchant Center / Seller account). The platform env
+ * fallback is reachable only off-tenant (getCurrentTenant() === null), i.e. Jeffi's own use.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
@@ -93,23 +94,22 @@ describe('integrations/resolve', () => {
       expect(creds.privateKey).toBe('-----BEGIN-----\nLINE\n-----END-----')
     })
 
-    it('falls back to env when the tenant has no google_merchant row', async () => {
+    it('THROWS when the tenant has no google_merchant row — never falls back to platform env', async () => {
       ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
       registry.getIntegrationCredential.mockResolvedValue(null)
       const { resolveGoogleMerchantCreds } = await import('@/lib/integrations/resolve')
-      const creds = await resolveGoogleMerchantCreds()
-      expect(creds.merchantId).toBe('env-merchant-1')
-      expect(creds.clientEmail).toBe('platform@jeffi.iam.gserviceaccount.com')
+      await expect(resolveGoogleMerchantCreds()).rejects.toThrow(/not connected/i)
+      expect(google.loadGoogleServiceAccount).not.toHaveBeenCalled()
     })
 
-    it('falls back to env when the tenant row is not connected', async () => {
+    it('THROWS when the tenant row is not connected — never falls back to platform env', async () => {
       ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
       registry.getIntegrationCredential.mockResolvedValue(credRow({
         client_email: 'x', private_key: 'y', merchant_id: 'z',
       }, 'disconnected'))
       const { resolveGoogleMerchantCreds } = await import('@/lib/integrations/resolve')
-      const creds = await resolveGoogleMerchantCreds()
-      expect(creds.merchantId).toBe('env-merchant-1')
+      await expect(resolveGoogleMerchantCreds()).rejects.toThrow(/not connected/i)
+      expect(google.loadGoogleServiceAccount).not.toHaveBeenCalled()
     })
   })
 
@@ -163,13 +163,11 @@ describe('integrations/resolve', () => {
       expect(creds.sellerId).toBe('')
     })
 
-    it('falls back to env when the tenant has no amazon_seller row', async () => {
+    it('THROWS when the tenant has no amazon_seller row — never falls back to platform env', async () => {
       ctx.getCurrentTenant.mockReturnValue({ tenantId: 't-1' })
       registry.getIntegrationCredential.mockResolvedValue(null)
       const { resolveAmazonCreds } = await import('@/lib/integrations/resolve')
-      const creds = await resolveAmazonCreds()
-      expect(creds.clientId).toBe('env-cid')
-      expect(creds.marketplaceId).toBe('env-marketplace')
+      await expect(resolveAmazonCreds()).rejects.toThrow(/not connected/i)
     })
   })
 })

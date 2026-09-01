@@ -1,7 +1,7 @@
 import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'
-import { customerMailFromAsync, adminMailFrom, currentBrandName, currentAdminBaseUrl, platformAdminEmail, storeContactLine, storeBaseUrlAsync } from './brand'
+import { customerMailFromAsync, adminMailFrom, currentBrandName, currentBrandNameAsync, currentAdminBaseUrl, platformAdminEmail, storeContactLine, storeAddressLine, storeBaseUrlAsync } from './brand'
 
 /**
  * Store name for email bodies. Synchronous on purpose: templates are built inside string
@@ -44,6 +44,8 @@ async function getAdminNotificationEmails(): Promise<string> {
 export async function sendOTPEmail(email: string, otp: string, name?: string) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const from = await customerMailFromAsync()
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const subject = 'Your Verification Code - Jeffi Stores'
   const html = `
       <!DOCTYPE html>
@@ -105,7 +107,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Your Jeffi Stores OTP is ${otp} — valid for 10 minutes. Do not share.</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
+              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -124,8 +126,8 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
             <p>If you didn't request this verification code, please ignore this email or contact our support team.</p>
 
             <div class="footer">
-              <p><strong>${storeName()}</strong></p>
-              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong></p>
+              ${address ? `<p>${address}</p>` : ''}
                             ${contactLine}
             </div>
           </div>
@@ -155,6 +157,8 @@ export async function sendWelcomeEmail(email: string, name: string) {
   const baseUrl = await storeBaseUrlAsync()
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const from = await customerMailFromAsync()
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const subject = 'Welcome to Jeffi Stores!'
   const html = `
       <!DOCTYPE html>
@@ -208,7 +212,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Welcome to Jeffi Stores! Your account is ready — shop industrial tools, hardware and more.</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
+              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -233,8 +237,8 @@ export async function sendWelcomeEmail(email: string, name: string) {
             <p>If you have any questions or need assistance, feel free to reach out to our team.</p>
 
             <div class="footer">
-              <p><strong>${storeName()}</strong></p>
-              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong></p>
+              ${address ? `<p>${address}</p>` : ''}
                                           ${contactLine}
             </div>
           </div>
@@ -260,6 +264,8 @@ export async function sendWelcomeEmail(email: string, name: string) {
 export async function sendOrderConfirmationEmail(email: string, order: any, orderItems: any[]) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const from = await customerMailFromAsync()
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const subject = `Order Received - ${order.order_number}`
   const html = `
       <!DOCTYPE html>
@@ -331,7 +337,7 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Order confirmed! We've received your order and will keep you updated on dispatch.</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
+              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -394,8 +400,8 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
                                         ${contactLine}
 
             <div class="footer">
-              <p><strong>${storeName()}</strong></p>
-              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong></p>
+              ${address ? `<p>${address}</p>` : ''}
             </div>
           </div>
         </body>
@@ -570,6 +576,8 @@ export async function sendOrderStatusUpdate(
 ) {
   const baseUrl = await storeBaseUrlAsync()
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const statusMessages: Record<string, { title: string; message: string; color: string }> = {
     pending: {
       title: 'Order Received',
@@ -702,7 +710,7 @@ export async function sendOrderStatusUpdate(
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${statusInfo.title} — Order #${orderNumber}. ${statusInfo.message}</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
+              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -760,8 +768,8 @@ export async function sendOrderStatusUpdate(
             <p>If you have any questions about your order, please feel free to contact us.</p>
 
             <div class="footer">
-              <p><strong>${storeName()}</strong></p>
-              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong></p>
+              ${address ? `<p>${address}</p>` : ''}
                             ${contactLine}
             </div>
           </div>
@@ -802,6 +810,8 @@ export async function sendPaymentStatusUpdate(
 ) {
   const baseUrl = await storeBaseUrlAsync()
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const paymentMessages: Record<string, { title: string; message: string; color: string }> = {
     paid: {
       title: 'Payment Received',
@@ -921,7 +931,7 @@ export async function sendPaymentStatusUpdate(
           <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">${paymentInfo.title} — Order #${orderNumber}. ${paymentInfo.message}</span>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
+              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
               <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
@@ -986,8 +996,8 @@ export async function sendPaymentStatusUpdate(
             <p>If you have any questions about this payment update, please contact us.</p>
 
             <div class="footer">
-              <p><strong>${storeName()}</strong></p>
-              <p>SANJAY GANTHI CHOWK, STATION ROAD<br>RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong></p>
+              ${address ? `<p>${address}</p>` : ''}
                             ${contactLine}
             </div>
           </div>
@@ -1482,6 +1492,8 @@ export async function sendAdminContactEmail(
   opts: { isHtml?: boolean; entityType?: string; entityId?: string } = {}
 ) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const messageHtml = opts.isHtml
     ? message
     : message.replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -1505,13 +1517,13 @@ export async function sendAdminContactEmail(
         <body>
           <div class="container">
             <div class="header">
-              <div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div>
+              <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
               <p style="color: #666; margin: 4px 0 0;">Hardware &amp; Tools</p>
             </div>
             <div class="message-box">${messageHtml}</div>
             <div class="footer">
               <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
-              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
               ${contactLine}
             </div>
           </div>
@@ -1545,6 +1557,7 @@ export async function sendSupportEscalationEmail(
   // recipient was a personal Gmail, so a tenant's support request reached an individual.
   const chatLink = `${currentAdminBaseUrl()}/customers/${customerId}?chat=true`
   const recipients = adminEmails.length > 0 ? adminEmails : [platformAdminEmail()]
+  const brand = await currentBrandNameAsync()
 
   const mailOptions = {
     from: await customerMailFromAsync(),
@@ -1562,7 +1575,7 @@ export async function sendSupportEscalationEmail(
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
       <body><div class="container">
-        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
+        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
         <div class="body">
           <p style="font-size:16px;font-weight:bold;color:#1f2937;">New Support Chat Request</p>
           <p>A customer has requested to connect with a support agent.</p>
@@ -1598,6 +1611,7 @@ export async function sendAgentConnectedEmail(
 ): Promise<{ success: boolean; error?: unknown }> {
   const appUrl = await storeBaseUrlAsync()
   const chatLink = `${appUrl}/support`
+  const brand = await currentBrandNameAsync()
 
   const mailOptions = {
     from: await customerMailFromAsync(),
@@ -1615,7 +1629,7 @@ export async function sendAgentConnectedEmail(
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
       <body><div class="container">
-        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
+        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
         <div class="body">
           <p style="font-size:16px;font-weight:bold;color:#1f2937;">Hi ${customerName}, your support agent is here!</p>
           <p>A support agent has joined your chat and is ready to help you.</p>
@@ -1701,6 +1715,8 @@ export async function sendReturnStatusEmail(
     `,
   }
 
+  const brand = await currentBrandNameAsync()
+
   const mailOptions = {
     from: await customerMailFromAsync(),
     to,
@@ -1715,7 +1731,7 @@ export async function sendReturnStatusEmail(
         .footer{text-align:center;padding:20px;border-top:1px solid #e0e0e0;color:#888;font-size:12px}
       </style></head>
       <body><div class="container">
-        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
+        <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
         <div class="body">
           ${event !== 'requested_admin' ? `<p>Hi ${recipientName},</p>` : ''}
           ${bodies[event]}
@@ -1748,6 +1764,7 @@ export async function sendPaymentRetryEmail(
 ) {
   const BASE_URL = await storeBaseUrlAsync()
   const shopUrl = `${BASE_URL}/products`
+  const brand = await currentBrandNameAsync()
   const formatted = new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(orderTotal)
 
   const html = `<!DOCTYPE html>
@@ -1769,7 +1786,7 @@ export async function sendPaymentRetryEmail(
 </style></head>
 <body>
 <div class="wrap">
-  <div class="hdr"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
+  <div class="hdr"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
   <div class="body">
     <p style="color:#333;font-size:16px;margin:0 0 8px">Hi ${customerName},</p>
     <p style="color:#555;line-height:1.6;margin:0 0 16px">We're sorry your purchase didn't go through. It looks like the payment for order <strong>#${orderNumber}</strong> (${formatted}) could not be processed.</p>
@@ -1808,6 +1825,8 @@ export async function sendInvoiceFinalizedEmail(
   viewUrl?: string
 ) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const mailOptions = {
     from: await customerMailFromAsync(),
@@ -1830,7 +1849,7 @@ export async function sendInvoiceFinalizedEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
             <div class="body">
               <p>Dear ${customerName},</p>
               <p>Thank you for your purchase! Your invoice has been generated.</p>
@@ -1844,7 +1863,7 @@ export async function sendInvoiceFinalizedEmail(
               ${contactLine}
             </div>
             <div class="footer">
-              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
             </div>
           </div>
         </body>
@@ -1876,6 +1895,8 @@ export async function sendPurchaseOrderEmail(
   viewUrl?: string
 ) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const itemRows = items.map(it =>
     `<tr>
@@ -1908,7 +1929,7 @@ export async function sendPurchaseOrderEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
             <div class="body">
               <p>Dear ${contactName || supplierName},</p>
               <p>Please find below our purchase order. Kindly confirm receipt and expected delivery.</p>
@@ -1927,7 +1948,7 @@ export async function sendPurchaseOrderEmail(
               ${contactLine}
             </div>
             <div class="footer">
-              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
             </div>
           </div>
         </body>
@@ -1959,6 +1980,8 @@ export async function sendPOReceiveNotificationEmail(
   items: Array<{ product_name: string; variant_name?: string | null; quantity_received: number; unit_cost: number }>
 ) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const statusLabel = newStatus === 'received' ? 'Fully Received' : 'Partially Received'
   const itemRows = items.map(it =>
     `<tr>
@@ -1990,7 +2013,7 @@ export async function sendPOReceiveNotificationEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
             <div class="body">
               <p>Dear ${contactName || supplierName},</p>
               <p>We have recorded receipt of goods against your purchase order.</p>
@@ -2009,7 +2032,7 @@ export async function sendPOReceiveNotificationEmail(
               ${contactLine}
             </div>
             <div class="footer">
-              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
             </div>
           </div>
         </body>
@@ -2039,6 +2062,8 @@ export async function sendQuotationFinalizedEmail(
   viewUrl: string
 ) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
+  const brand = await currentBrandNameAsync()
+  const address = await storeAddressLine()
   const formatted = totalAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })
   const mailOptions = {
     from: await customerMailFromAsync(),
@@ -2061,7 +2086,7 @@ export async function sendQuotationFinalizedEmail(
         </head>
         <body>
           <div class="container">
-            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${storeName()}</div></div>
+            <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
             <div class="body">
               <p>Dear ${consigneeName},</p>
               <p>Please find your quotation from Jeffi Stores.</p>
@@ -2074,7 +2099,7 @@ export async function sendQuotationFinalizedEmail(
               ${contactLine}
             </div>
             <div class="footer">
-              <p><strong>${storeName()}</strong> | SANJAY GANTHI CHOWK, STATION ROAD, RAIPUR, CHHATTISGARH-490092</p>
+              <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
             </div>
           </div>
         </body>
@@ -2107,6 +2132,7 @@ export async function sendOrderAutoCancelledEmail(
 ) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const baseUrl = await storeBaseUrlAsync()
+  const brand = await currentBrandNameAsync()
   const isDirect = orderType === 'direct'
   const ctaLabel = isDirect ? 'Place Order Again' : 'Return to Cart'
   const bodyMessage = isDirect
@@ -2137,7 +2163,7 @@ export async function sendOrderAutoCancelledEmail(
         <body>
           <div class="container">
             <div class="header">
-              <div class="logo">${storeName()}</div>
+              <div class="logo">${brand}</div>
             </div>
             <p>Dear ${customerName},</p>
             <div class="badge">Order Auto-Cancelled</div>
@@ -2250,13 +2276,14 @@ export async function sendOrderDelayNotification(args: {
   const { toEmail, customerName, orderNumber, delayDays, reason } = args
   const dayLabel = delayDays === 1 ? 'day' : 'days'
   const subject = `Update on your Jeffi Stores order ${orderNumber}`
+  const brand = await currentBrandNameAsync()
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>${subject}</title></head>
 <body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:32px 0;">
     <tr><td align="center">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-        <tr><td style="background:#1a3a4a;padding:20px 28px;color:#ffffff;font-weight:700;font-size:18px;">${storeName()}</td></tr>
+        <tr><td style="background:#1a3a4a;padding:20px 28px;color:#ffffff;font-weight:700;font-size:18px;">${brand}</td></tr>
         <tr><td style="padding:28px 28px 8px;font-size:16px;line-height:1.5;">
           <p style="margin:0 0 16px;">Hi ${customerName},</p>
           <p style="margin:0 0 16px;">We're writing to let you know that your order <strong>${orderNumber}</strong> will be delayed by approximately <strong>${delayDays} ${dayLabel}</strong>.</p>
@@ -2323,6 +2350,7 @@ export async function sendProductAnnouncementEmail(args: {
 }) {
   const { toEmail, customerName, subject, intro, products } = args
   const siteUrl = await storeBaseUrlAsync()
+  const brand = await currentBrandNameAsync()
   const cleanIntro = intro
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '')
     .replace(/\[([^\]]+)\]\(https?:[^)]+\)/g, '$1')
@@ -2348,7 +2376,7 @@ export async function sendProductAnnouncementEmail(args: {
   <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="background:#f4f6f8;padding:24px 0;">
     <tr><td align="center">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
-        <tr><td style="background:#1a3a4a;padding:18px 24px;color:#ffffff;font-weight:700;font-size:18px;">${storeName()}</td></tr>
+        <tr><td style="background:#1a3a4a;padding:18px 24px;color:#ffffff;font-weight:700;font-size:18px;">${brand}</td></tr>
         <tr><td style="padding:24px 20px 8px;">
           <p style="margin:0 0 12px;font-size:15px;">Hi ${escapeHtml(customerName || 'there')},</p>
           <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#334155;">${escapeHtml(cleanIntro)}</p>

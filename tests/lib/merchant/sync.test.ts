@@ -22,6 +22,7 @@ vi.mock('@/lib/merchant/client', () => ({
   listProducts: vi.fn(),
   customBatchUpsert: vi.fn(),
   getMerchantId: vi.fn().mockResolvedValue('test-merchant-123'),
+  merchantConfigured: vi.fn().mockResolvedValue(true),
   GMC_PUSH_DISABLED: false,
 }))
 
@@ -57,6 +58,7 @@ describe('merchant/sync', () => {
     mockListProducts.mockResolvedValue({ resources: [], nextPageToken: undefined } as any)
     // resetAllMocks wipes the factory's getMerchantId implementation — re-stub it.
     vi.mocked(client.getMerchantId).mockResolvedValue('test-merchant-123')
+    vi.mocked(client.merchantConfigured).mockResolvedValue(true)
   })
 
   describe('getLastSyncStatus', () => {

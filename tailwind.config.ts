@@ -60,8 +60,8 @@ const config: Config = {
         inter: ['"Inter"', 'sans-serif'],
       },
       fontSize: {
-        xs:    ['clamp(0.75rem, 0.74rem + 0.05vw, 0.78rem)',  { lineHeight: '1rem' }],
-        sm:    ['clamp(0.875rem, 0.87rem + 0.05vw, 0.9rem)',  { lineHeight: '1.25rem' }],
+        xs:    ['clamp(0.8rem, 0.79rem + 0.05vw, 0.83rem)',   { lineHeight: '1rem' }],
+        sm:    ['clamp(0.9rem, 0.89rem + 0.05vw, 0.925rem)',  { lineHeight: '1.25rem' }],
         base:  ['clamp(0.9rem, 0.83rem + 0.31vw, 1rem)',      { lineHeight: '1.5rem' }],
         lg:    ['clamp(1rem, 0.92rem + 0.36vw, 1.125rem)',    { lineHeight: '1.6' }],
         xl:    ['clamp(1.1rem, 0.98rem + 0.53vw, 1.25rem)',   { lineHeight: '1.55' }],
