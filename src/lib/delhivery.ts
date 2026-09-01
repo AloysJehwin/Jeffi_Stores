@@ -55,6 +55,38 @@ export async function checkPincodeServiceability(pincode: string): Promise<Pinco
   }
 }
 
+// Delhivery has no delete for a client warehouse — the edit endpoint is the only way to retire
+// one, so we flip it inactive rather than removing the address. Keyed by warehouse name (the
+// pickup_location). Best-effort / idempotent: a missing warehouse is treated as already gone.
+export async function deactivateDelhiveryPickupLocation(name: string): Promise<{ ok: boolean; error?: string }> {
+  const token = process.env.DELHIVERY_API_KEY || process.env.DELHIVERY_TOKEN
+  if (!token) return { ok: false, error: 'DELHIVERY_API_KEY not configured' }
+  if (!name) return { ok: false, error: 'no pickup location name' }
+
+  try {
+    const res = await fetch('https://track.delhivery.com/api/backend/clientwarehouse/edit/', {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${token}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({ name, is_active: false, active: false }),
+      cache: 'no-store',
+    })
+
+    const data = await res.json().catch(() => ({}))
+    if (res.ok && data && data.success !== false) return { ok: true }
+
+    const message = JSON.stringify(data).toLowerCase()
+    if (message.includes('does not exist') || message.includes('not found')) return { ok: true }
+
+    return { ok: false, error: data.error || data.rmk || `Delhivery warehouse deactivation failed (${res.status})` }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
 export async function createDelhiveryPickupLocation(params: {
   name: string
   phone: string

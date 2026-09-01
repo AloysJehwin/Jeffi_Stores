@@ -249,7 +249,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           res.ec2Target = ip
           res.computeMode = 'pool'
         }
-        if (res.ec2Target) await writeTenantEc2(job.tenant_id, res.ec2Target)
+        if (res.ec2Target) await writeTenantEc2(job.tenant_id, res.ec2Target, res.ec2InstanceId)
         return await next(job.id, 'setup_delhivery', res)
       }
 
@@ -311,7 +311,21 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         const attempts = (res.verifyAttempts || 0) + 1
         res.verifyAttempts = attempts
         const MAX_VERIFY_ATTEMPTS = 6
+        // For a dedicated tenant, refuse to activate over a corpse: if the box we
+        // provisioned is gone/terminated, the host can only resolve to a dead IP.
+        // Treat it exactly like "not serving yet" (bounded retries) so a transient
+        // describe-instances blip doesn't trigger a rollback on the first bad read.
         let served = false
+        if (res.ec2InstanceId && res.computeMode === 'dedicated') {
+          const gone = await provider.isInstanceGone(res.ec2InstanceId).catch(() => false)
+          if (gone) {
+            if (attempts < MAX_VERIFY_ATTEMPTS) {
+              await updateProvisioningJob(job.id, { status: 'pending', created_resources: res })
+              return 'pending'
+            }
+            throw new Error(`verify_serving: dedicated instance ${res.ec2InstanceId} is gone/terminated after ${attempts} attempts`)
+          }
+        }
         try {
           const ctrl = new AbortController()
           const timer = setTimeout(() => ctrl.abort(), 10000)
@@ -338,6 +352,14 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
         const fresh = await getTenant(job.tenant_id)
         if (!fresh?.rds_endpoint) {
           throw new Error('activate blocked: tenant_infra.rds_endpoint not persisted')
+        }
+        // Close the verify→activate window: never flip active over a dedicated box that
+        // died between the serving probe and now (mirrors the rds_endpoint invariant).
+        if (res.ec2InstanceId && res.computeMode === 'dedicated') {
+          const gone = await provider.isInstanceGone(res.ec2InstanceId).catch(() => false)
+          if (gone) {
+            throw new Error(`activate blocked: dedicated instance ${res.ec2InstanceId} is gone/terminated`)
+          }
         }
         await setTenantStatus(job.tenant_id, 'active')
         await recordStepEvent(job.id, 'activate', 'ok', 'tenant activated', {})
@@ -479,10 +501,22 @@ export async function rollbackProvisioning(tenantId: string, provider: Provision
   // DNS first (cheap, no dependency) — use recorded hosts, else derive from slug.
   const hosts = (r.dnsHosts as string[] | undefined)
     ?? (tenant ? tenantHostnames(tenant.slug, tenant.plan) : [])
-  if (hosts.length) await provider.removeDns(hosts).catch(() => {})
+  // Best-effort but LOUD: a swallowed removeDns failure leaves zombie A-records pointing at a
+  // torn-down box (records outliving the instance). Record it + flag the lingering hosts for a
+  // reconciler instead of failing the rollback.
+  if (hosts.length) {
+    try {
+      await provider.removeDns(hosts)
+    } catch (e: any) {
+      if (job) await recordStepEvent(job.id, 'rollback', 'error', `removeDns failed: ${e?.message || e}`, { dnsHosts: hosts })
+      r.manualCleanup = { ...(r.manualCleanup as Record<string, unknown> || {}), dnsHosts: hosts }
+    }
+  }
   // Dedicated EC2 (higher plans) — terminate it; a Basic tenant used the shared pool (left alone
-  // here, reclaimed by deletePoolIfEmpty on the final deprovision).
-  if (r.ec2InstanceId) await provider.deleteAppInstance(r.ec2InstanceId).catch(() => {})
+  // here, reclaimed by deletePoolIfEmpty on the final deprovision). Prefer the durably-persisted
+  // instance id (tenant_infra.ec2_instance_id) over the job JSON, which can be trimmed/lost.
+  const rollbackInstanceId = r.ec2InstanceId || tenant?.ec2_instance_id
+  if (rollbackInstanceId) await provider.deleteAppInstance(rollbackInstanceId).catch(() => {})
   // Billable resources.
   if (r.bucket) await provider.deleteBucket(r.bucket).catch(() => {})
   if (r.dbInstanceId) await provider.deleteDbInstance(r.dbInstanceId).catch(() => {})
@@ -647,17 +681,27 @@ export async function deprovisionTenant(
     await provider.deleteBucket(bucket)
 
     // 3a. Compute teardown: a dedicated EC2 (higher plans) is terminated; a Basic tenant used
-    // the shared pool — reclaim the pool only when this was the LAST active tenant.
-    if (created.ec2InstanceId) {
-      await provider.deleteAppInstance(created.ec2InstanceId).catch(() => {})
+    // the shared pool — reclaim the pool only when this was the LAST active tenant. Prefer the
+    // durably-persisted instance id over the job JSON (which can be trimmed/lost).
+    const dedicatedInstanceId = created.ec2InstanceId || tenant.ec2_instance_id
+    if (dedicatedInstanceId) {
+      await provider.deleteAppInstance(dedicatedInstanceId).catch(() => {})
     } else {
       const { deletePoolIfEmpty } = await import('../pool-autoscale')
       await deletePoolIfEmpty().catch(() => {})
     }
 
-    // 3b. Remove the tenant's DNS records so the subdomains stop resolving.
+    // 3b. Remove the tenant's DNS records so the subdomains stop resolving. Best-effort but LOUD:
+    // a swallowed failure leaves zombie A-records pointing at the just-terminated box (records
+    // outliving the instance — a host that "resolves" to a dead IP). Record it + flag the hosts.
     const dnsHosts = (created.dnsHosts as string[] | undefined) ?? tenantHostnames(slug, tenant.plan)
-    await provider.removeDns(dnsHosts).catch(() => {})
+    let dnsRemovalFailed: string[] | null = null
+    try {
+      await provider.removeDns(dnsHosts)
+    } catch (e: any) {
+      dnsRemovalFailed = dnsHosts
+      if (job) await recordStepEvent(job.id, 'deprovision', 'error', `removeDns failed: ${e?.message || e}`, { dnsHosts })
+    }
 
     // 3c. Delete the tenant's param group once the DB instance is fully gone (else RDS
     // refuses). Best-effort — a still-deleting DB is retried by a later sweep.
@@ -670,6 +714,7 @@ export async function deprovisionTenant(
     // id is kept: a second account on the same owner email is refused, so a re-onboarding has
     // to reuse this one.
     const manualCleanup: Record<string, unknown> = {}
+    if (dnsRemovalFailed) manualCleanup.dnsHosts = dnsRemovalFailed
     try {
       if (tenant.razorpay_linked_account_id) {
         const { markLinkedAccountDeprovisioned } = await import('../razorpay-route')
@@ -684,10 +729,16 @@ export async function deprovisionTenant(
       }
       const { getDraft: loadDraft } = await import('../tenant-registry')
       const draft = await loadDraft((created.ownerId as string) ?? '').catch(() => null)
+      const pickupName = (draft?.data as any)?.wh?.pickupLocation || slug
+      const { deactivateDelhiveryPickupLocation } = await import('../delhivery')
+      const deactivated = await deactivateDelhiveryPickupLocation(pickupName).catch(
+        (e: any) => ({ ok: false, error: e?.message ?? String(e) }),
+      )
       manualCleanup.delhiveryPickup = {
-        name: (draft?.data as any)?.wh?.pickupLocation || slug,
+        name: pickupName,
         deletable: false,
-        needsManualRemoval: true,
+        deactivated: deactivated.ok,
+        ...(deactivated.error ? { deactivateError: deactivated.error } : {}),
       }
       const { alertProvisioningFailure } = await import('./alerts')
       await alertProvisioningFailure(slug, 'external_cleanup',

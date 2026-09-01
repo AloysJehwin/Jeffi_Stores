@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, GetObjectCommand, ListObjectsV2Command, DeleteObjectsCommand } from '@aws-sdk/client-s3'
 
 /**
  * Tenant DB backup storage in the platform S3 bucket (jeffi-stores-bucket).
@@ -106,4 +106,41 @@ export async function getTenantBackup(key: string): Promise<Buffer> {
   if (!res.Body) throw new Error('Empty S3 response for backup ' + key)
   const bytes = await res.Body.transformToByteArray()
   return Buffer.from(bytes)
+}
+
+async function deleteKeys(keys: string[]): Promise<number> {
+  if (keys.length === 0) return 0
+  const s3 = getS3Client()
+  const bucket = backupBucket()
+  let deleted = 0
+  for (let i = 0; i < keys.length; i += 1000) {
+    const batch = keys.slice(i, i + 1000)
+    await s3.send(new DeleteObjectsCommand({
+      Bucket: bucket,
+      Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
+    }))
+    deleted += batch.length
+  }
+  return deleted
+}
+
+/**
+ * Permanently delete an owner's backup objects for one store — both the by-owner and by-slug
+ * copies. Used by the hard-purge path; there is no restore after this.
+ *
+ * A single owner can own multiple stores, and the by-owner prefix is shared across them. So the
+ * by-owner deletion is restricted to the stamps that also exist under by-slug/{slug}/ (the
+ * dual-write in putTenantBackup guarantees each store's owner+slug copies share a stamp),
+ * ensuring a sibling store's backups are never touched.
+ */
+export async function deleteTenantBackups(opts: { ownerId: string; slug: string }): Promise<{ deleted: number }> {
+  const [ownerObjs, slugObjs] = await Promise.all([
+    listPrefix(ownerPrefix(opts.ownerId)).catch(() => []),
+    listPrefix(slugPrefix(opts.slug)).catch(() => []),
+  ])
+  const slugStamps = new Set(slugObjs.map((o) => o.capturedAt))
+  const ownerKeysForSlug = ownerObjs.filter((o) => slugStamps.has(o.capturedAt)).map((o) => o.key)
+  const slugKeys = slugObjs.map((o) => o.key)
+  const deleted = await deleteKeys([...ownerKeysForSlug, ...slugKeys])
+  return { deleted }
 }

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft, saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount } from '@/lib/tenant-registry'
+import { approveKyc, getTenant, listPlans, getKyc, getOwnerById, getDraft, saveSubscriptionId, saveLinkedAccountId, getOwnerBankAccount, getOwnerBankWithRoute } from '@/lib/tenant-registry'
 import { createRazorpaySubscription } from '@/lib/razorpay-subscriptions'
 import { createLinkedAccount, createRouteStakeholder, configureRouteSettlement, mapBusinessType, inferProfileCategory, normalizeIndianPhone, isValidCompanyPan } from '@/lib/razorpay-route'
 import { sendKycApprovedEmail } from '@/lib/ecom-emails'
@@ -30,8 +30,18 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   await approveKyc(tenantId, admin.email ?? 'admin')
 
   // 1. Create Razorpay Route linked account for POBO transfers.
-  // Only create if not already exists (idempotent — admin can retry).
+  // Only create if not already exists (idempotent — admin can retry). A returning owner whose
+  // previous store was purged keeps their acc_xxx on the owner-scoped bank row (the tenant row
+  // is gone) — reuse it rather than asking Razorpay for a second account on the same email,
+  // which it refuses ("Merchant email already exists for account - acc_xxx").
   let linkedAccountId = tenant.razorpay_linked_account_id ?? null
+  if (!linkedAccountId) {
+    const survivor = await getOwnerBankWithRoute(kyc.owner_id).catch(() => null)
+    if (survivor?.linkedAccountId) {
+      linkedAccountId = survivor.linkedAccountId
+      await saveLinkedAccountId(tenantId, linkedAccountId).catch(() => {})
+    }
+  }
   if (!linkedAccountId) {
     try {
       // The owner phone for the Route account comes from the onboarding warehouse config
