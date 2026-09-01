@@ -4,6 +4,7 @@ import SupportChat from '@/components/visitor/SupportChat'
 import { cookies, headers } from 'next/headers'
 import { verifyBusinessToken } from '@/lib/jwt'
 import { bp } from '@/lib/business-path'
+import { getStoreIdentity } from '@/lib/site-controls'
 
 export const metadata = {
   title: 'Support | Jeffi Stores Business',
@@ -22,6 +23,7 @@ async function getAuthUser() {
 }
 
 export default async function BusinessSupportPage() {
+  const storeIdentity = await getStoreIdentity()
   const user = await getAuthUser()
   const hdrs = await headers()
   const host = hdrs.get('x-forwarded-host') ?? hdrs.get('host') ?? ''
@@ -46,12 +48,12 @@ export default async function BusinessSupportPage() {
 
             <div>
               <p className="text-xs text-foreground-muted mb-1">Phone</p>
-              <a href="tel:+919685354099" className="text-sm font-medium text-foreground hover:text-accent-500 block transition-colors">+91 96853 54099</a>
+              <a href={`tel:${storeIdentity.phone}`} className="text-sm font-medium text-foreground hover:text-accent-500 block transition-colors">{storeIdentity.phone}</a>
             </div>
 
             <div>
               <p className="text-xs text-foreground-muted mb-1">Email</p>
-              <a href="mailto:jeffistoress@gmail.com" className="text-sm font-medium text-foreground hover:text-accent-500 transition-colors break-all">jeffistoress@gmail.com</a>
+              <a href={`mailto:${storeIdentity.email}`} className="text-sm font-medium text-foreground hover:text-accent-500 transition-colors break-all">{storeIdentity.email}</a>
             </div>
 
             <div>
