@@ -32,6 +32,7 @@ const STEPS = [
   'create_bucket',
   'write_infra',
   'generate_legals',
+  'seed_settings',
   'ensure_compute',
   'setup_delhivery',
   'configure_dns',
@@ -191,6 +192,30 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
           res.legalsGenerated = true
         } catch (e: any) {
           res.legalsError = e?.message || 'legals generation failed'
+        }
+        return await next(job.id, 'seed_settings', res)
+      }
+
+      case 'seed_settings': {
+        // Copy the owner's onboarding identity + warehouse (control-plane tenant/KYC/draft) into
+        // the tenant's own site_settings so the storefront renders the registered business name,
+        // contact, logo and seller/pickup fields instead of slug/blank/platform defaults. Runs
+        // after create_bucket + write_infra (logo copy needs the tenant bucket) and mirrors the
+        // legals identity read. NON-FATAL — a settings failure must not block go-live.
+        try {
+          const { controlPlanePool } = await import('../tenant-registry')
+          const ownerRow = await controlPlanePool().query(
+            `SELECT owner_id FROM owner_tenants WHERE tenant_id=$1 LIMIT 1`, [job.tenant_id]).catch(() => null)
+          const ownerId = ownerRow?.rows?.[0]?.owner_id
+          if (ownerId && res.endpoint) {
+            const { seedTenantSiteSettings } = await import('./seed-settings')
+            await seedTenantSiteSettings(job.tenant_id, ownerId, res.endpoint, 'jeffi_stores')
+            res.settingsSeeded = true
+          } else {
+            res.settingsSeeded = 'skipped (missing owner or db endpoint)'
+          }
+        } catch (e: any) {
+          res.settingsError = e?.message || 'settings seeding failed'
         }
         return await next(job.id, 'ensure_compute', res)
       }
@@ -461,6 +486,7 @@ const STEP_OUTPUTS: Partial<Record<Step, string[]>> = {
   seed_data: ['seeded', 'seedProfile'],
   create_bucket: ['bucket'],
   generate_legals: ['legalsGenerated'],
+  seed_settings: ['settingsSeeded'],
   ensure_compute: ['ec2Target', 'ec2InstanceId', 'computeMode'],
   setup_delhivery: ['delhiveryPickup'],
   configure_dns: ['dnsHosts'],

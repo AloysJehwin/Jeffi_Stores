@@ -12,6 +12,7 @@ import {
 } from '@/lib/order-commit'
 import { getFeatureFlags } from '@/lib/site-controls'
 import { parseBody, zNonEmpty } from '@/lib/validate'
+import { getCurrentTenant } from '@/lib/tenant-context'
 
 const CreateRazorpayOrderSchema = z.object({
   draftToken: z.string().nullish(),
@@ -84,11 +85,17 @@ async function handleDraftToken(token: string, userId: string) {
 
   const razorpay = getRazorpayInstance()
   const receipt = `draft-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.slice(0, 40)
+  const tenant = getCurrentTenant()
   const razorpayOrder = await razorpay.orders.create({
     amount: amountInPaise,
     currency: 'INR',
     receipt,
-    notes: { user_id: userId, mode: draft.mode },
+    notes: {
+      user_id: userId,
+      mode: draft.mode,
+      tenant_id: tenant?.tenantId ?? '',
+      tenant_slug: tenant?.slug ?? '',
+    },
   })
 
   // Store intent so webhook can recover if verify never completes
@@ -142,6 +149,7 @@ async function handleLegacyOrderId(orderId: string, userId: string, isBusiness: 
   const razorpay = getRazorpayInstance()
   const amountInPaise = Math.round(parseFloat(order.total_amount) * 100)
 
+  const tenant = getCurrentTenant()
   const razorpayOrder = await razorpay.orders.create({
     amount: amountInPaise,
     currency: 'INR',
@@ -149,6 +157,8 @@ async function handleLegacyOrderId(orderId: string, userId: string, isBusiness: 
     notes: {
       order_id: order.id,
       order_number: order.order_number,
+      tenant_id: tenant?.tenantId ?? '',
+      tenant_slug: tenant?.slug ?? '',
     },
   })
 

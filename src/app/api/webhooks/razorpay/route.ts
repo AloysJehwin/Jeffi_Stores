@@ -15,7 +15,7 @@ import { settleVariantChangePayment } from '@/lib/variant-change'
 import { logActivity } from '@/lib/activity'
 import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { getCurrentTenant } from '@/lib/tenant-context'
-import { transferToLinkedAccount } from '@/lib/razorpay-route'
+import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
 export async function POST(request: NextRequest) {
@@ -62,41 +62,71 @@ export async function POST(request: NextRequest) {
   }
 }
 
+async function resolveWebhookTenantId(payment: any, orderRef: string): Promise<{ tenantId: string; slug: string } | null> {
+  // getCurrentTenant() is empty on the webhook (Razorpay hits a fixed URL, no host), so the
+  // tenant is carried in the Razorpay order notes (set at create-order) and copied onto the
+  // captured payment. Fall back to the ALS context for the platform's own store.
+  const notes = payment?.notes ?? {}
+  const noteTenantId = (notes.tenant_id ?? '').toString().trim()
+  const noteSlug = (notes.tenant_slug ?? '').toString().trim()
+  if (noteTenantId) return { tenantId: noteTenantId, slug: noteSlug }
+  if (noteSlug) {
+    const { lookupTenantContextBySlug } = await import('@/lib/tenant-registry')
+    const ctx = await lookupTenantContextBySlug(noteSlug).catch(() => null)
+    if (ctx?.tenantId) return { tenantId: ctx.tenantId, slug: noteSlug }
+  }
+  const t = getCurrentTenant()
+  if (t?.tenantId) return { tenantId: t.tenantId, slug: t.slug ?? '' }
+  return null
+}
+
 async function fireRouteTransfer(opts: {
   paymentId: string
   totalAmountInr: number
   orderId: string
   orderRef: string
+  payment: any
 }) {
-  const tenant = getCurrentTenant()
-  if (!tenant?.tenantId) return
+  const resolved = await resolveWebhookTenantId(opts.payment, opts.orderRef)
+  if (!resolved) return  // platform's own store — no tenant billing
 
   const pool = controlPlanePool()
   const row = await pool.query(
-    `SELECT razorpay_linked_account_id, daily_payout FROM tenants WHERE id=$1 AND status='active'`, [tenant.tenantId]
+    `SELECT razorpay_linked_account_id, daily_payout FROM tenants WHERE id=$1 AND status='active'`, [resolved.tenantId]
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
-  if (!linkedAccountId) return
   const dailyPayout = row?.rows[0]?.daily_payout === true
+
+  if (!linkedAccountId) {
+    await recordTenantTransaction({
+      tenantId: resolved.tenantId,
+      orderRef: opts.orderRef,
+      grossAmountInr: opts.totalAmountInr,
+      gatewayTxnId: opts.paymentId,
+    })
+    return
+  }
 
   const result = await transferToLinkedAccount({
     paymentId: opts.paymentId,
     grossAmountPaise: Math.round(opts.totalAmountInr * 100),
     linkedAccountId,
     orderId: opts.orderId,
-    tenantSlug: tenant.slug ?? '',
+    tenantSlug: resolved.slug,
     dailyPayout,
   })
 
-  await pool.query(
-    `INSERT INTO tenant_transactions
-       (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, gateway_txn_id, is_cod, status, occurred_at)
-     VALUES ($1,$2,$3,$4,$5,$6,'razorpay_route',$7,false,'captured',now())
-     ON CONFLICT DO NOTHING`,
-    [tenant.tenantId, opts.orderRef, opts.totalAmountInr,
-     result.amount / 100, result.platformCommissionPaise / 100,
-     (result.gatewayFeePaise + result.transferFeePaise) / 100, result.transferId]
-  ).catch(() => {})
+  await recordTenantTransaction({
+    tenantId: resolved.tenantId,
+    orderRef: opts.orderRef,
+    grossAmountInr: opts.totalAmountInr,
+    gatewayTxnId: result.transferId || opts.paymentId,
+    split: {
+      tenantShareInr: result.amount / 100,
+      platformCommissionInr: result.platformCommissionPaise / 100,
+      gatewayFeeInr: (result.gatewayFeePaise + result.transferFeePaise) / 100,
+    },
+  })
 }
 
 async function handlePaymentCaptured(payment: any) {
@@ -183,6 +213,7 @@ async function handlePaymentCaptured(payment: any) {
       totalAmountInr: parseFloat(paymentRecord.total_amount),
       orderId,
       orderRef: paymentRecord.order_number,
+      payment,
     }).catch(() => {})
   }
 }
@@ -283,6 +314,7 @@ async function handlePaymentLinkPaid(paymentLink: any) {
       totalAmountInr: parseFloat(order.total_amount),
       orderId: order.id,
       orderRef: order.order_number,
+      payment: paymentLink,
     }).catch(() => {})
   }
 }
@@ -442,5 +474,6 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
     totalAmountInr: parseFloat(created.total_amount),
     orderId: created.id,
     orderRef: created.order_number,
+    payment,
   }).catch(() => {})
 }

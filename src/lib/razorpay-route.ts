@@ -467,6 +467,42 @@ export async function recordCodSettlement(opts: {
 }
 
 /**
+ * Record a captured online payment in the control-plane `tenant_transactions`, DECOUPLED from
+ * the Route transfer. The central-admin billing view reads this table; before this, the only
+ * writer welded the row to a successful Route transfer and bailed whenever the tenant had no
+ * approved linked account (or no request context, as on the webhook) — so real sales never
+ * showed up.
+ *
+ * Always records the gross. When a Route transfer fired, `split` carries the real
+ * tenant_share / commission / gateway_fee; otherwise the seller nominally keeps the gross
+ * (commission/fee 0) until Route onboarding reconciles. Idempotent on the
+ * (tenant_id, order_ref) unique key so verify + webhook can both fire for one order and write
+ * exactly one row. Non-fatal — a bookkeeping failure must not break payment handling.
+ */
+export async function recordTenantTransaction(opts: {
+  tenantId: string
+  orderRef: string
+  grossAmountInr: number
+  isCod?: boolean
+  gatewayTxnId?: string | null
+  split?: { tenantShareInr: number; platformCommissionInr: number; gatewayFeeInr: number }
+}): Promise<void> {
+  if (!opts.tenantId || !opts.orderRef) return
+  const { controlPlanePool } = await import('./tenant-registry')
+  const tenantShare = opts.split ? opts.split.tenantShareInr : opts.grossAmountInr
+  const commission = opts.split ? opts.split.platformCommissionInr : 0
+  const gatewayFee = opts.split ? opts.split.gatewayFeeInr : 0
+  await controlPlanePool().query(
+    `INSERT INTO tenant_transactions
+       (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, is_cod, gateway_txn_id, status, occurred_at)
+     VALUES ($1,$2,$3,$4,$5,$6,'razorpay_route',$7,$8,'captured',now())
+     ON CONFLICT (tenant_id, order_ref) DO NOTHING`,
+    [opts.tenantId, opts.orderRef, opts.grossAmountInr, tenantShare, commission, gatewayFee,
+     !!opts.isCod, opts.gatewayTxnId ?? null],
+  ).catch(() => {})
+}
+
+/**
  * Map KYC business_type to Razorpay Route account type.
  */
 export function mapBusinessType(kycType: string): LinkedAccountInput['businessType'] {
