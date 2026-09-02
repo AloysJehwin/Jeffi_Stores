@@ -3,6 +3,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne } from '@/lib/db'
 import { getRazorpayInstance } from '@/lib/razorpay'
+import { currentBrandNameAsync } from '@/lib/brand'
 import sharp from 'sharp'
 
 export const dynamic = 'force-dynamic'
@@ -50,7 +51,7 @@ export async function POST(request: NextRequest) {
       usage: 'single_use',
       fixed_amount: true,
       payment_amount: amountPaise,
-      description: description || 'Jeffi Stores Invoice',
+      description: description || `${await currentBrandNameAsync()} Invoice`,
       close_by: closeBy,
     })
 

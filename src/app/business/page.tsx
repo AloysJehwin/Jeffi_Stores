@@ -2,13 +2,18 @@ import Link from 'next/link'
 import { cookies, headers } from 'next/headers'
 import { verifyToken } from '@/lib/jwt'
 import { bp } from '@/lib/business-path'
+import { getStoreIdentity } from '@/lib/site-controls'
+import type { Metadata } from 'next'
 import BusinessPublicHeader from '@/components/business/PublicHeader'
 
 export const dynamic = 'force-dynamic'
 
-export const metadata = {
-  title: 'For Businesses — Jeffi Stores',
-  description: 'Bulk pricing, GST-compliant invoices, RFQ flow, and dedicated support for procurement teams.',
+export async function generateMetadata(): Promise<Metadata> {
+  const identity = await getStoreIdentity()
+  return {
+    title: `For Businesses — ${identity.name}`,
+    description: 'Bulk pricing, GST-compliant invoices, RFQ flow, and dedicated support for procurement teams.',
+  }
 }
 
 export default async function BusinessLandingPage() {

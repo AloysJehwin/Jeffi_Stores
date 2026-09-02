@@ -410,7 +410,7 @@ function CheckoutPage() {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
         amount: rzpData.amount,
         currency: rzpData.currency,
-        name: 'Jeffi Stores',
+        name: storeIdentity.name,
         description: 'Order Payment',
         order_id: rzpData.razorpayOrderId,
         handler: async function (response: any) {

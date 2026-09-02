@@ -1,14 +1,17 @@
 import Link from 'next/link'
 import { queryMany } from '@/lib/db'
+import { getStoreIdentity } from '@/lib/site-controls'
 import CategoryOffer, { type OfferCategory } from '@/components/visitor/CategoryOffer'
 
 export default async function AboutPage() {
-  // Load the full active category tree (top-level + subcategories) in one query, then group.
-  const rows = await queryMany<{ id: string; name: string; slug: string | null; icon_name: string | null; parent_category_id: string | null; display_order: number | null }>(
-    `SELECT id, name, slug, icon_name, parent_category_id, display_order
-       FROM categories WHERE is_active = true
-      ORDER BY display_order ASC NULLS LAST, name ASC`
-  ).catch(() => [])
+  const [identity, rows] = await Promise.all([
+    getStoreIdentity(),
+    queryMany<{ id: string; name: string; slug: string | null; icon_name: string | null; parent_category_id: string | null; display_order: number | null }>(
+      `SELECT id, name, slug, icon_name, parent_category_id, display_order
+         FROM categories WHERE is_active = true
+        ORDER BY display_order ASC NULLS LAST, name ASC`
+    ).catch(() => [])
+  ])
 
   const subsByParent = new Map<string, Array<{ id: string; name: string; slug: string | null }>>()
   for (const r of rows) {
@@ -27,10 +30,10 @@ export default async function AboutPage() {
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
           <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
-            About Jeffi Stores
+            About {identity.name}
           </h1>
           <p className="text-foreground-secondary">
-            Your trusted partner for industrial hardware and tools
+            Your trusted partner for quality products and services
           </p>
         </div>
       </div>
@@ -44,17 +47,16 @@ export default async function AboutPage() {
               <h2 className="text-2xl font-bold text-foreground mb-6">Who We Are</h2>
               <div className="prose prose-gray dark:prose-invert">
                 <p className="text-foreground-secondary mb-4 leading-relaxed">
-                  Jeffi Stores is your trusted hardware partner, offering a wide selection of industrial
-                  machinery parts. We guarantee high availability of quality components for manufacturing,
-                  construction, and repairs.
+                  {identity.name} is your trusted partner, offering a wide selection of quality products.
+                  We guarantee high availability of quality components for all your needs.
                 </p>
                 <p className="text-foreground-secondary mb-4 leading-relaxed">
-                  With years of experience in the hardware industry, we&apos;ve built a reputation for reliability,
+                  With years of experience, we&apos;ve built a reputation for reliability,
                   quality, and exceptional customer service. Our mission is to keep your operations running
-                  smoothly with the right tools and parts.
+                  smoothly with the right tools and products.
                 </p>
                 <p className="text-foreground-secondary mb-4 leading-relaxed">
-                  We ensure high availability of quality components for manufacturing, construction, and repairs.
+                  We ensure high availability of quality products and components.
                   Count on us for reliable products and expert service to keep your operations seamless!
                 </p>
               </div>
@@ -131,7 +133,7 @@ export default async function AboutPage() {
             <h2 className="text-2xl font-bold text-foreground">What We Offer</h2>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">{categories.length} Categories</span>
           </div>
-          <p className="text-foreground-secondary text-sm mb-6">Premium industrial hardware from the brands you trust</p>
+          <p className="text-foreground-secondary text-sm mb-6">Premium products from the brands you trust</p>
           <CategoryOffer categories={categories} />
           <div className="mt-8 text-center">
             <Link
@@ -150,7 +152,7 @@ export default async function AboutPage() {
         <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-lg shadow-sm p-4 sm:p-6 lg:p-8 text-center text-white">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-lg mb-6 text-primary-50">
-            Contact us today for all your hardware and industrial tool needs.
+            Contact us today for all your product and service needs.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link

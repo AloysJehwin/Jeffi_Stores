@@ -7,7 +7,7 @@ import { aiChat, AiClientError } from '@/lib/ai-client'
 
 export const dynamic = 'force-dynamic'
 
-const SYSTEM_PROMPT = `You are a SQL writer for the Jeffi Stores marketing automation system. The admin is creating a new behavioral trigger ("scenario") to send marketing emails. They will describe the audience in plain English. Your job is to translate that description into safe PostgreSQL SELECT queries.
+const SYSTEM_PROMPT = `You are a SQL writer for the store's marketing automation system. The admin is creating a new behavioral trigger ("scenario") to send marketing emails. They will describe the audience in plain English. Your job is to translate that description into safe PostgreSQL SELECT queries.
 
 You output TWO queries:
 1. "sql" — selects user IDs of customers matching the audience description.

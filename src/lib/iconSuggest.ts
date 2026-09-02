@@ -33,7 +33,7 @@ export async function suggestIcon(categoryName: string): Promise<string> {
       messages: [
         {
           role: 'system',
-          content: `You are an icon selector for an industrial hardware store. Given a product category name, pick the single most appropriate icon from this exact list: ${ICON_OPTIONS.join(', ')}. You MUST respond with valid JSON in this exact format: {"iconName":"<chosen icon>"}. No other text.`,
+          content: `You are an icon selector for an online store. Given a product category name, pick the single most appropriate icon from this exact list: ${ICON_OPTIONS.join(', ')}. You MUST respond with valid JSON in this exact format: {"iconName":"<chosen icon>"}. No other text.`,
         },
         {
           role: 'user',

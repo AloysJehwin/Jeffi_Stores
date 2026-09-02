@@ -4,6 +4,7 @@ import { query, queryOne } from '@/lib/db'
 import { logMessage } from '@/lib/message-log'
 import { logActivity } from '@/lib/activity'
 import { sendFreeTextWhatsApp, sendSupportAckWhatsApp } from '@/lib/whatsapp'
+import { currentBrandNameAsync } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -88,6 +89,7 @@ export async function POST(request: NextRequest) {
     })
 
     const cmd = (body || '').trim().toUpperCase()
+    const brand = await currentBrandNameAsync()
 
     if (STOP_CMDS.has(cmd)) {
       if (userId) {
@@ -100,7 +102,7 @@ export async function POST(request: NextRequest) {
         // SMS STOP is auto-handled by Twilio; only reply on WhatsApp.
         await sendFreeTextWhatsApp({
           phone: customerNumber,
-          body: 'Jeffi Stores: You have been unsubscribed from promotional messages. Reply START to resubscribe.',
+          body: `${brand}: You have been unsubscribed from promotional messages. Reply START to resubscribe.`,
         })
       }
       return twiml()
@@ -116,7 +118,7 @@ export async function POST(request: NextRequest) {
       if (channel === 'whatsapp') {
         await sendFreeTextWhatsApp({
           phone: customerNumber,
-          body: 'Jeffi Stores: You are resubscribed. Reply STOP to opt out anytime.',
+          body: `${brand}: You are resubscribed. Reply STOP to opt out anytime.`,
         })
       }
       return twiml()

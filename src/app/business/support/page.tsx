@@ -6,9 +6,12 @@ import { verifyBusinessToken } from '@/lib/jwt'
 import { bp } from '@/lib/business-path'
 import { getStoreIdentity } from '@/lib/site-controls'
 
-export const metadata = {
-  title: 'Support | Jeffi Stores Business',
-  description: 'Get help with your orders, payments, and more.',
+export async function generateMetadata() {
+  const storeName = (await getStoreIdentity()).name
+  return {
+    title: `Support | ${storeName} Business`,
+    description: 'Get help with your orders, payments, and more.',
+  }
 }
 
 async function getAuthUser() {

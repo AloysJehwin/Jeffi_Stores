@@ -176,7 +176,7 @@ export default async function EcomLandingPage() {
             <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 text-white text-xs">J</span>Jeffi Commerce
           </div>
           <div className="flex gap-6"><Link href="/pricing" className="hover:text-foreground">Pricing</Link><Link href="/signin" className="hover:text-foreground">Sign in</Link><Link href="/signup" className="hover:text-foreground">Get started</Link></div>
-          <div>© 2026 Jeffi Stores</div>
+          <div>© 2026 Jeffi Commerce</div>
         </div>
       </footer>
     </div>

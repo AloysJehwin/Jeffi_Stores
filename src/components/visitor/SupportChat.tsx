@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import type { BotPayload, BotOrderCard, BotAction, BotNavLink, BotChip } from '@/lib/support-bot'
 import { renderTextWithLinks } from '@/lib/linkify'
 
@@ -284,6 +285,8 @@ function PayloadRenderer({ payload, onQuery, onOrderSelect }: PayloadRendererPro
 
 export default function SupportChat({ portalHeader }: { portalHeader?: string } = {}) {
   const ph: Record<string, string> = portalHeader ? { 'X-Auth-Portal': portalHeader } : {}
+  const storeConfig = useStoreConfig()
+  const storeName = storeConfig.identity.name || 'Support'
   const [mode, setMode] = useState<'bot' | 'live'>('bot')
   const [messages, setMessages] = useState<Message[]>([
     {
@@ -561,7 +564,7 @@ export default function SupportChat({ portalHeader }: { portalHeader?: string } 
               {mode === 'bot' ? 'Jeffi' : (adminName ? adminName : 'Support Agent')}
             </p>
             <p className="text-white/70 text-xs mt-0.5">
-              {mode === 'bot' ? 'Support Assistant' : (adminName ? 'Jeffi Stores Support' : 'Connecting...')}
+              {mode === 'bot' ? 'Support Assistant' : (adminName ? `${storeName} Support` : 'Connecting...')}
             </p>
           </div>
         </div>

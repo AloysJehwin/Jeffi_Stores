@@ -274,7 +274,7 @@ export async function getCandidates(
 }
 
 // ── 3. LLM curation ───────────────────────────────────────────────────────
-const CURATE_SYSTEM = `You are a product recommender for Jeffi Stores, an Indian industrial tools & hardware store.
+const CURATE_SYSTEM = (store: string) => `You are a product recommender for ${store}.
 Given a shopper's recent interests and a numbered list of candidate products, pick and ORDER the best products for THIS shopper.
 Return ONLY valid JSON using the candidate NUMBERS: {"picks":[<number>, <number>, ...]}
 Rules: use only the numbers shown; order best-first; prefer variety across categories; return the requested count.`
@@ -358,13 +358,14 @@ async function curate(
   const userPrompt = `${interest}\n\nCandidates (numbered):\n${list}\n\nReturn the best ${want} as their numbers.`
 
   try {
+    const { storeDescriptorForPrompt } = await import('@/lib/brand')
     const r = await aiChat({
       modelHint: 'fast',
       jsonMode: true,
       temperature: 0.2,
       maxTokens: 400,
       messages: [
-        { role: 'system', content: CURATE_SYSTEM },
+        { role: 'system', content: CURATE_SYSTEM(await storeDescriptorForPrompt()) },
         { role: 'user', content: userPrompt },
       ],
     })

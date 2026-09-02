@@ -1,4 +1,5 @@
 import { Star, Camera, Paperclip, Check } from 'lucide-react'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface CustomField {
   id: string
@@ -27,11 +28,13 @@ function StarPreview() {
 }
 
 export default function FormsPreview({ title, description, templateType, googleReviewUrl, couponId, customFields }: Props) {
+  const storeConfig = useStoreConfig()
+  const storeName = storeConfig.identity.name || 'Our Store'
   return (
     <div className="bg-gradient-to-br from-slate-50 to-blue-50 rounded-xl overflow-hidden border border-gray-200">
       <div style={{ background: '#1a3a4a' }} className="px-4 py-3 flex items-center justify-between">
-        <span className="text-white font-bold text-sm">Jeffi Store&apos;s</span>
-        <span className="text-white/70 text-xs">Shop at Jeffi Stores →</span>
+        <span className="text-white font-bold text-sm">{storeName}</span>
+        <span className="text-white/70 text-xs">Shop with us →</span>
       </div>
 
       <div className="p-4 space-y-4 max-h-[600px] overflow-y-auto">

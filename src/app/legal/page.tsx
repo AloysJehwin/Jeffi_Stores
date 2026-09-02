@@ -1,9 +1,14 @@
 import Link from 'next/link'
 import { policies } from './policies'
+import { getStoreIdentity } from '@/lib/site-controls'
+import type { Metadata } from 'next'
 
-export const metadata = {
-  title: 'Legal & Policies | Jeffi Stores',
-  description: 'Privacy policy, terms & conditions, shipping, returns, and other legal documents for Jeffi Stores.',
+export async function generateMetadata(): Promise<Metadata> {
+  const identity = await getStoreIdentity()
+  return {
+    title: `Legal & Policies | ${identity.name}`,
+    description: `Privacy policy, terms & conditions, shipping, returns, and other legal documents for ${identity.name}.`,
+  }
 }
 
 const icons: Record<string, React.ReactNode> = {

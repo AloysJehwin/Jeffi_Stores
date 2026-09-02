@@ -1,6 +1,7 @@
 export const maxDuration = 120
 
 import { NextRequest, NextResponse } from 'next/server'
+import { storeDescriptorForPrompt } from '@/lib/brand'
 
 const OLLAMA_URL = () =>
   (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
   ].filter(Boolean).join(', ')
 
   const prompt =
-    'You are a friendly shopping assistant for an industrial hardware store. ' +
+    `You are a friendly shopping assistant for ${await storeDescriptorForPrompt()}. ` +
     'Write a warm, concise 2-3 sentence recap of what the customer is about to buy, noting how the items fit together and reassuring them. ' +
     'Do not invent products or prices.\n\n' +
     `### Cart\n${cartLines}${summary ? `\nSummary: ${summary}` : ''}\n\n` +

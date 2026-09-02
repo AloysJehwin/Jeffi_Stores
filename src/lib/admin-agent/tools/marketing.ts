@@ -297,7 +297,7 @@ export const MARKETING_TOOLS: ToolDef[] = [
         testEmail: { type: 'string', description: 'Required when audience=test_only. The address to send to.' },
         subject: { type: 'string', description: 'Email subject (1-160 chars).' },
         body: { type: 'string', description: 'HTML body of the email (1-50,000 chars).' },
-        fromName: { type: 'string', description: 'Optional display name for the From header. Default "Jeffi Stores".' },
+        fromName: { type: 'string', description: 'Optional display name for the From header. Defaults to the store name.' },
       },
       required: ['audience', 'subject', 'body'],
     },
@@ -341,7 +341,8 @@ export const MARKETING_TOOLS: ToolDef[] = [
         count = r?.n || 0
       }
 
-      const fromN = String(fromName || '').trim().slice(0, 80) || 'Jeffi Stores'
+      const { currentBrandNameAsync } = await import('@/lib/brand')
+      const fromN = String(fromName || '').trim().slice(0, 80) || await currentBrandNameAsync()
       const preview = html.slice(0, 500)
       return {
         proposed: true,
