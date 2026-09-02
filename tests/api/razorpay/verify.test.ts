@@ -12,6 +12,7 @@ vi.mock('@/lib/db', () => ({
   queryMany: vi.fn(),
   query: vi.fn().mockResolvedValue({ rows: [], rowCount: 0 }),
   withTransaction: vi.fn(),
+  resolveRequestTenant: vi.fn(async () => null),
 }))
 vi.mock('@/lib/email', () => ({
   sendOrderConfirmationEmail: vi.fn().mockResolvedValue(undefined),
