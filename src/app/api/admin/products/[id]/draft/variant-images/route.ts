@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne, query } from '@/lib/db'
-import { uploadVariantImage, getS3Url } from '@/lib/s3'
+import { uploadVariantImage, getS3Url, currentBucket } from '@/lib/s3'
 import { parseBody, zUuid } from '@/lib/validate'
 
 // Draft-scoped variant images. Uploads go to S3 immediately (a file must physically
@@ -96,7 +96,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         variant_id: variantId,
         image_url: imageUrl,
         thumbnail_url: gimg.thumbnail_url || (gimg.s3_thumbnail_key ? await getS3Url(gimg.s3_thumbnail_key) : null),
-        s3_bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+        s3_bucket: gimg.s3_bucket || await currentBucket(),
         s3_key: gimg.s3_key, s3_thumbnail_key: gimg.s3_thumbnail_key,
         file_name: gimg.custom_name || gimg.file_name, file_size: gimg.file_size, mime_type: gimg.mime_type,
         width: gimg.width, height: gimg.height, display_order: existing.length, is_primary: isPrimary,
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest, { params }: Params) {
         id: `draft-vi-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         variant_id: variantId,
         image_url: result.url, thumbnail_url: result.thumbnailUrl,
-        s3_bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+        s3_bucket: result.s3Bucket,
         s3_key: result.s3Key, s3_thumbnail_key: result.s3ThumbnailKey,
         file_name: result.fileName, file_size: result.fileSize, mime_type: result.mimeType,
         width: result.width, height: result.height, display_order: existing.length, is_primary: isPrimary,

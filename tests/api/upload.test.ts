@@ -13,6 +13,7 @@ vi.mock('@/lib/s3', () => ({
   uploadProductImage: vi.fn().mockResolvedValue({
     url: 'https://cdn.example.com/img.jpg',
     thumbnailUrl: 'https://cdn.example.com/img-thumb.jpg',
+    s3Bucket: 'jeffi-stores-bucket',
     s3Key: 'products/img.jpg',
     s3ThumbnailKey: 'products/img-thumb.jpg',
     fileName: 'img.jpg',
@@ -52,6 +53,7 @@ beforeEach(() => {
   mockUploadProductImage.mockResolvedValue({
     url: 'https://cdn.example.com/img.jpg',
     thumbnailUrl: 'https://cdn.example.com/img-thumb.jpg',
+    s3Bucket: 'jeffi-stores-bucket',
     s3Key: 'products/img.jpg',
     s3ThumbnailKey: 'products/img-thumb.jpg',
     fileName: 'img.jpg',

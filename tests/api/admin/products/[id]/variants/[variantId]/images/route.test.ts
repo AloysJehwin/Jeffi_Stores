@@ -20,6 +20,7 @@ vi.mock('@/lib/s3', () => ({
   uploadVariantImage: vi.fn(),
   deleteProductImage: vi.fn(),
   getS3Url: vi.fn((key: string) => `https://cdn.example.com/${key}`),
+  currentBucket: vi.fn().mockResolvedValue('jeffi-stores-bucket'),
 }))
 
 import { GET, POST, DELETE, PATCH } from '@/app/api/admin/products/[id]/variants/[variantId]/images/route'
@@ -167,6 +168,7 @@ describe('POST /api/admin/products/[id]/variants/[variantId]/images (file upload
     mockUploadVariantImage.mockResolvedValue({
       url: 'https://cdn.example.com/v/var-1/img.jpg',
       thumbnailUrl: 'https://cdn.example.com/v/var-1/img_thumb.jpg',
+      s3Bucket: 'jeffi-stores-bucket',
       s3Key: 'v/var-1/img.jpg',
       s3ThumbnailKey: 'v/var-1/img_thumb.jpg',
       fileName: 'img.jpg',

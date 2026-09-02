@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryOne, queryMany } from '@/lib/db'
-import { uploadVariantImage, deleteProductImage, getS3Url } from '@/lib/s3'
+import { uploadVariantImage, deleteProductImage, getS3Url, currentBucket } from '@/lib/s3'
 import { parseBody, zUuid } from '@/lib/validate'
 
 const GalleryPostSchema = z.object({ gallery_image_id: zUuid })
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest, { params }: Params) {
          RETURNING *`,
         [
           variantId, imageUrl, thumbnailUrl,
-          process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+          gimg.s3_bucket || await currentBucket(),
           gimg.s3_key, gimg.s3_thumbnail_key,
           gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
           gimg.width, gimg.height, existing.length, isPrimary,
@@ -111,7 +111,7 @@ export async function POST(request: NextRequest, { params }: Params) {
        RETURNING *`,
       [
         variantId, result.url, result.thumbnailUrl,
-        process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+        result.s3Bucket,
         result.s3Key, result.s3ThumbnailKey,
         result.fileName, result.fileSize, result.mimeType,
         result.width, result.height, existing.length, isPrimary,
