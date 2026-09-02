@@ -600,8 +600,8 @@
     "semantic_hash": ""
   },
   "src/app/admin/invoices/[id]/InvoiceDetailClient.tsx": {
-    "mtime": 1788248249.72295,
-    "ast_hash": "2b5843ed2d037199a83a55910c51b737",
+    "mtime": 1788338067.241406,
+    "ast_hash": "e8cb165ddc3eb169fcba2761584214bc",
     "semantic_hash": ""
   },
   "src/app/admin/invoices/[id]/loading.tsx": {
@@ -735,8 +735,8 @@
     "semantic_hash": ""
   },
   "src/app/admin/products/[id]/ProductDetailClient.tsx": {
-    "mtime": 1788248276.7108576,
-    "ast_hash": "092ad8e4c710900385f7a9a541ddd9ae",
+    "mtime": 1788338256.473097,
+    "ast_hash": "a2d9452ce045b5d1f35c5a4ece41686d",
     "semantic_hash": ""
   },
   "src/app/admin/products/[id]/analytics/ProductAnalyticsClient.tsx": {
@@ -760,8 +760,8 @@
     "semantic_hash": "e473b98e8b7e67d6178a8f49fb4dbc53"
   },
   "src/app/admin/products/[id]/page.tsx": {
-    "mtime": 1788197279.4758463,
-    "ast_hash": "7e98acacff0af1752c8c250115d940a4",
+    "mtime": 1788338239.1976619,
+    "ast_hash": "f91277d6fe3d34520909096a6a07a2f8",
     "semantic_hash": ""
   },
   "src/app/admin/products/add/loading.tsx": {
@@ -770,8 +770,8 @@
     "semantic_hash": "e0ab03bede55e4e34efd488a57053318"
   },
   "src/app/admin/products/add/page.tsx": {
-    "mtime": 1788331578.483959,
-    "ast_hash": "588b8ffb0b8ce8b710193fe8b498f4c4",
+    "mtime": 1788338207.1201675,
+    "ast_hash": "cbf2121ecde04465c55ff37015f0a945",
     "semantic_hash": ""
   },
   "src/app/admin/products/edit/[id]/loading.tsx": {
@@ -2300,8 +2300,8 @@
     "semantic_hash": ""
   },
   "src/app/api/razorpay/create-order/route.ts": {
-    "mtime": 1787763973.6985483,
-    "ast_hash": "84b3cf34a05e25f97423dc8dc31c98da",
+    "mtime": 1788340433.023395,
+    "ast_hash": "dc764f804e6bc8f436a0579787efa4eb",
     "semantic_hash": ""
   },
   "src/app/api/razorpay/payment-link/route.ts": {
@@ -2310,8 +2310,8 @@
     "semantic_hash": ""
   },
   "src/app/api/razorpay/verify/route.ts": {
-    "mtime": 1788250269.037914,
-    "ast_hash": "315a4677f4efd73a74eea49359ddae98",
+    "mtime": 1788340235.5432649,
+    "ast_hash": "7766672ef689cfc8cf9981dada665d2f",
     "semantic_hash": ""
   },
   "src/app/api/reviews/generate/route.ts": {
@@ -2420,8 +2420,8 @@
     "semantic_hash": ""
   },
   "src/app/api/webhooks/razorpay/route.ts": {
-    "mtime": 1788250252.729934,
-    "ast_hash": "d8c8030321f2c5ded4787e94c3ef08f2",
+    "mtime": 1788340406.049369,
+    "ast_hash": "447e0e1347b6eb5abbc0eb71488a6f09",
     "semantic_hash": ""
   },
   "src/app/api/wishlist/route.ts": {
@@ -3190,7 +3190,7 @@
     "semantic_hash": ""
   },
   "src/components/admin/ImageUpload.tsx": {
-    "mtime": 1788331517.1372397,
+    "mtime": 1788337748.5176916,
     "ast_hash": "77aa87e692e8ed983a65411458e1f405",
     "semantic_hash": ""
   },
@@ -3240,8 +3240,8 @@
     "semantic_hash": ""
   },
   "src/components/admin/ProductForm.tsx": {
-    "mtime": 1788331540.7599778,
-    "ast_hash": "4a7bc68e74ae765566fcad9ba2e66bfa",
+    "mtime": 1788338166.1684506,
+    "ast_hash": "d04d2350614f1a2facba061ad8510ee7",
     "semantic_hash": ""
   },
   "src/components/admin/ProductImage.tsx": {
@@ -7685,8 +7685,8 @@
     "semantic_hash": ""
   },
   "src/app/api/admin/products/[id]/draft/route.ts": {
-    "mtime": 1787763973.255735,
-    "ast_hash": "1a3ef44a9eae42278d0fd2930b5ba5b6",
+    "mtime": 1788337605.5896845,
+    "ast_hash": "cc379bc5594bb8f5c9cc06d5119c7827",
     "semantic_hash": ""
   },
   "src/app/api/admin/products/[id]/draft/sub-variants/route.ts": {
@@ -8360,8 +8360,8 @@
     "semantic_hash": ""
   },
   "database/control-plane/schema.sql": {
-    "mtime": 1788282232.8460398,
-    "ast_hash": "8bc47f2e9ea8243bb259a53ef3db1038",
+    "mtime": 1788340133.4416742,
+    "ast_hash": "3bfc57da25ad1663b968b67d0aaa94c3",
     "semantic_hash": ""
   },
   "deploy/ec2-iam-policy.json": {
@@ -8890,8 +8890,8 @@
     "semantic_hash": ""
   },
   "src/lib/provisioning/steps.ts": {
-    "mtime": 1788283950.0258918,
-    "ast_hash": "6039cfc560247f62eced68403fdbf142",
+    "mtime": 1788340121.5034325,
+    "ast_hash": "671269de241dd8e9fe5a9ef482f63746",
     "semantic_hash": ""
   },
   "src/lib/provisioning/stub-provider.ts": {
@@ -8900,8 +8900,8 @@
     "semantic_hash": ""
   },
   "src/lib/razorpay-route.ts": {
-    "mtime": 1788288649.8902264,
-    "ast_hash": "8216dea5d4ab829f3e76a2779759c43e",
+    "mtime": 1788340191.413624,
+    "ast_hash": "266dd819aae5dd0bf59ffd473d670cc1",
     "semantic_hash": ""
   },
   "src/lib/razorpay-subscriptions.ts": {
@@ -9812,6 +9812,21 @@
   "src/lib/ssm-client.ts": {
     "mtime": 1788289936.8649652,
     "ast_hash": "48d6b83dc86c4df90c318412185a4865",
+    "semantic_hash": ""
+  },
+  "src/app/api/admin/products/[id]/draft/images/route.ts": {
+    "mtime": 1788337595.4425719,
+    "ast_hash": "27b938b856c464cc000edc6749726491",
+    "semantic_hash": ""
+  },
+  "tests/api/admin/products/id/draft/images/route.test.ts": {
+    "mtime": 1788338040.428991,
+    "ast_hash": "f72381c2159f238cbd24c2ad808bd38e",
+    "semantic_hash": ""
+  },
+  "src/lib/provisioning/seed-settings.ts": {
+    "mtime": 1788340073.351343,
+    "ast_hash": "643e7ea682bdbe84d225d535ee627488",
     "semantic_hash": ""
   }
 }

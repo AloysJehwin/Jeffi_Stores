@@ -165,6 +165,7 @@ CREATE TABLE IF NOT EXISTS public.tenant_metrics_daily (
 );
 
 ALTER TABLE ONLY public.tenant_transactions  ADD CONSTRAINT tenant_transactions_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_transactions  ADD CONSTRAINT tenant_transactions_tenant_order_key UNIQUE (tenant_id, order_ref);
 ALTER TABLE ONLY public.settlement_ledger    ADD CONSTRAINT settlement_ledger_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_metrics_daily ADD CONSTRAINT tenant_metrics_daily_pkey PRIMARY KEY (id);
 ALTER TABLE ONLY public.tenant_metrics_daily ADD CONSTRAINT tenant_metrics_daily_date_key UNIQUE (metric_date);

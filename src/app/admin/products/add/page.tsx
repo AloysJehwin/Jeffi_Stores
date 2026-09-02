@@ -7,6 +7,8 @@ import { generateProductSku, generateVariantSku } from '@/lib/sku'
 import ProductForm from '@/components/admin/ProductForm'
 import { ChevronLeft } from 'lucide-react'
 import { round2 } from '@/lib/gst'
+import { getAdminSession } from '@/lib/admin-auth'
+import { hasScope } from '@/lib/scopes'
 
 async function createProduct(formData: FormData) {
   'use server'
@@ -261,6 +263,8 @@ export default async function AddProductPage() {
   const host = await getHost()
   const categories = await getAllCategories()
   const brands = await getAllBrands()
+  const session = await getAdminSession()
+  const hasInventory = hasScope(session?.role ?? '', session?.scopes ?? [], 'inventory:read')
 
   return (
     <div className="p-4 sm:p-6">
@@ -282,6 +286,7 @@ export default async function AddProductPage() {
         categories={categories || []}
         brands={brands || []}
         action={createProduct}
+        hasInventory={hasInventory}
       />
     </div>
   )

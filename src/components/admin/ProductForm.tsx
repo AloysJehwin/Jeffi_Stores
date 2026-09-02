@@ -254,6 +254,17 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [galleryImageIds, setGalleryImageIds] = useState<{ id: string; isPrimary: boolean }[]>([])
   const [imageOrder, setImageOrder] = useState<string[]>([])
   const [tempProductId] = useState<string>(productId || crypto.randomUUID())
+  const useDraftImages = isDraft && !!productId
+  const [productImages, setProductImages] = useState<any[]>(() =>
+    Array.isArray(product?.product_images) ? product!.product_images : []
+  )
+  const [productImageUploading, setProductImageUploading] = useState(false)
+  const [productImagePendingAdds, setProductImagePendingAdds] = useState(0)
+  const [productImageDeleting, setProductImageDeleting] = useState<Record<string, boolean>>({})
+  const [productImageError, setProductImageError] = useState<string | null>(null)
+  const [productGalleryOpen, setProductGalleryOpen] = useState(false)
+  const productImageDragIndex = useRef<number | null>(null)
+  const productImageDragOverIndex = useRef<number | null>(null)
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantPopupId, setVariantPopupId] = useState<string | null>(null)
   const pendingPopupVariantIdRef = useRef<string | null>(null)
@@ -1286,6 +1297,131 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
   }
 
+  const openProductGallery = useCallback(() => { setProductGalleryOpen(true) }, [])
+
+  const draftImagesUrl = productId ? `/api/admin/products/${productId}/draft/images` : ''
+
+  useEffect(() => {
+    if (!useDraftImages) return
+    let cancelled = false
+    ;(async () => {
+      const res = await fetch(draftImagesUrl)
+      if (!res.ok) return
+      const data = await res.json()
+      if (!cancelled && Array.isArray(data.images)) setProductImages(data.images)
+    })()
+    return () => { cancelled = true }
+  }, [useDraftImages, draftImagesUrl])
+
+  async function uploadProductImageFile(file: File) {
+    if (!useDraftImages) return
+    if (productImages.length + productImagePendingAdds >= 5) {
+      setProductImageError('Maximum 5 images per product')
+      return
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setProductImageError(`${file.name} is too large (max 5MB per image)`)
+      return
+    }
+    setProductImageError(null)
+    setProductImageUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch(draftImagesUrl, { method: 'POST', body: fd })
+      if (res.ok) {
+        const data = await res.json()
+        setProductImages(imgs => [...imgs, data.image])
+      } else {
+        const err = await res.json().catch(() => ({}))
+        setProductImageError(err.error || `Upload failed (${res.status})`)
+      }
+    } catch {
+      setProductImageError('Upload failed — network error')
+    } finally {
+      setProductImageUploading(false)
+    }
+  }
+
+  async function addProductImagesFromGallery(picked: { id: string }[]) {
+    if (!useDraftImages) return
+    const slotsLeft = 5 - productImages.length
+    const toAdd = picked.map(p => p.id).slice(0, slotsLeft)
+    setProductGalleryOpen(false)
+    setProductImageError(null)
+    setProductImagePendingAdds(n => n + toAdd.length)
+    for (const galleryImageId of toAdd) {
+      try {
+        const res = await fetch(draftImagesUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ gallery_image_id: galleryImageId }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          setProductImages(imgs => [...imgs, data.image])
+        } else {
+          const err = await res.json().catch(() => ({}))
+          setProductImageError(err.error || `Failed to add image (${res.status})`)
+          return
+        }
+      } finally {
+        setProductImagePendingAdds(n => Math.max(0, n - 1))
+      }
+    }
+  }
+
+  async function deleteProductImageRow(imageId: string) {
+    if (!useDraftImages) return
+    setProductImageDeleting(m => ({ ...m, [imageId]: true }))
+    try {
+      await fetch(draftImagesUrl, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ imageId }),
+      })
+      setProductImages(imgs => {
+        const next = imgs.filter((img: any) => img.id !== imageId)
+        if (next.length > 0 && !next.some((i: any) => i.is_primary)) next[0].is_primary = true
+        return next
+      })
+    } finally {
+      setProductImageDeleting(m => {
+        const n = { ...m }
+        delete n[imageId]
+        return n
+      })
+    }
+  }
+
+  async function setProductImagePrimary(imageId: string) {
+    if (!useDraftImages) return
+    await fetch(draftImagesUrl, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ imageId, isPrimary: true }),
+    })
+    setProductImages(imgs => imgs.map((img: any) => ({ ...img, is_primary: img.id === imageId })))
+  }
+
+  async function reorderProductImages(fromIndex: number, toIndex: number) {
+    if (!useDraftImages || fromIndex === toIndex) return
+    if (fromIndex < 0 || fromIndex >= productImages.length || toIndex < 0 || toIndex >= productImages.length) return
+    const next = [...productImages]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    setProductImages(next)
+    await Promise.all(
+      next.map((img: any, idx: number) =>
+        fetch(draftImagesUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageId: img.id, displayOrder: idx }),
+        }),
+      ),
+    )
+  }
+
   async function addSubVariant(variantId: string) {
     if (!productId) {
       setVariantImageError('Save the product first to add sub-variants.')
@@ -2004,7 +2140,7 @@ export default function ProductForm({ categories, brands, action, product, produ
             <p className="text-xs text-foreground-muted mt-1">Used for P&amp;L gross margin — not shown to customers</p>
           </div>
 
-          {!hasVariants && (
+          {hasInventory && !hasVariants && (
             <div>
               <ProductSupplierList
                 suppliers={suppliers}
@@ -2217,17 +2353,100 @@ export default function ProductForm({ categories, brands, action, product, produ
 
           {/* Image Upload */}
           <div className="md:col-span-2">
-            <ImageUpload
-              productId={tempProductId}
-              maxImages={5}
-              existingImages={product?.product_images || []}
-              onImagesChange={(files, existingToKeep, galleryImgs, orderedKeys) => {
-                setImageFiles(files)
-                setExistingImagesToKeep(existingToKeep)
-                setGalleryImageIds(galleryImgs)
-                setImageOrder(orderedKeys)
-              }}
-            />
+            {useDraftImages ? (
+              <div className="space-y-3">
+                <div>
+                  <h3 className="text-sm font-medium text-foreground-secondary">Product Images</h3>
+                  <p className="text-xs text-foreground-muted mt-1">Select up to 5 images. First image is shown first on the product page.</p>
+                </div>
+                {productImages.length > 1 && (
+                  <p className="text-xs text-foreground-muted">
+                    <span className="hidden sm:inline">Drag</span><span className="sm:hidden">Use ◀ ▶</span> to reorder · First image is shown first on the product page
+                  </p>
+                )}
+                <div className="flex flex-wrap gap-2">
+                  {productImages.map((img: any, imgIdx: number, arr: any[]) => (
+                    <div
+                      key={img.id}
+                      className="relative group w-24 h-24 rounded border border-border-default overflow-hidden bg-surface cursor-grab active:cursor-grabbing select-none"
+                      draggable
+                      onDragStart={() => { productImageDragIndex.current = imgIdx }}
+                      onDragEnter={() => { productImageDragOverIndex.current = imgIdx }}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDragEnd={() => {
+                        const from = productImageDragIndex.current
+                        const to = productImageDragOverIndex.current
+                        productImageDragIndex.current = null
+                        productImageDragOverIndex.current = null
+                        if (from === null || to === null || from === to) return
+                        reorderProductImages(from, to)
+                      }}
+                    >
+                      <img src={img.thumbnail_url || img.image_url} alt="" className="w-full h-full object-cover pointer-events-none select-none" />
+                      <span className="absolute top-0 right-0 text-[10px] bg-black/60 text-white px-1 leading-4 font-bold">{imgIdx + 1}</span>
+                      {img.is_primary && <span className="absolute top-0 left-0 bg-accent-500 text-white px-1 py-0.5 leading-none"><Star className="w-2.5 h-2.5 fill-current" /></span>}
+                      {arr.length > 1 && (
+                        <div className="absolute inset-x-0 bottom-0 flex justify-between px-0.5 pb-0.5 sm:opacity-0 sm:group-hover:opacity-100 sm:transition-opacity">
+                          <button type="button" onClick={() => imgIdx > 0 && reorderProductImages(imgIdx, imgIdx - 1)} disabled={imgIdx === 0} className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30" title="Move left" aria-label="Move image left">◀</button>
+                          <button type="button" onClick={() => imgIdx < arr.length - 1 && reorderProductImages(imgIdx, imgIdx + 1)} disabled={imgIdx === arr.length - 1} className="w-5 h-5 flex items-center justify-center rounded bg-black/60 text-white text-xs leading-none disabled:opacity-30" title="Move right" aria-label="Move image right">▶</button>
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 top-4 bottom-6 sm:inset-0 sm:top-0 sm:bottom-0 bg-black/50 sm:bg-black/0 sm:group-hover:bg-black/50 transition-opacity flex items-center justify-center gap-1">
+                        {!img.is_primary && <button type="button" onClick={() => setProductImagePrimary(img.id)} className="text-yellow-300 hover:text-yellow-100 leading-none sm:opacity-0 sm:group-hover:opacity-100" title="Set primary"><Star className="w-4 h-4" /></button>}
+                        <button type="button" onClick={() => deleteProductImageRow(img.id)} disabled={!!productImageDeleting[img.id]} className="text-red-300 hover:text-red-100 leading-none sm:opacity-0 sm:group-hover:opacity-100 disabled:opacity-50" title="Delete"><X className="w-4 h-4" /></button>
+                      </div>
+                      {productImageDeleting[img.id] && (
+                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center pointer-events-none">
+                          <svg className="w-5 h-5 text-white animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {Array.from({ length: productImagePendingAdds }).map((_, k) => (
+                    <div key={`pending-${k}`} className="relative w-24 h-24 rounded border border-border-default bg-surface-secondary flex items-center justify-center overflow-hidden">
+                      <div className="absolute inset-0 animate-pulse bg-surface-tertiary/40" />
+                      <svg className="relative w-5 h-5 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                    </div>
+                  ))}
+                  {productImages.length + productImagePendingAdds < 5 && (
+                    <label className={`w-24 h-24 rounded border-2 border-dashed border-border-secondary flex items-center justify-center cursor-pointer hover:border-accent-400 transition-colors ${productImageUploading ? 'opacity-50 pointer-events-none' : ''}`}>
+                      <input type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadProductImageFile(f); e.target.value = '' }} />
+                      {productImageUploading ? <svg className="w-4 h-4 text-foreground-muted animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg> : <svg className="w-5 h-5 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
+                    </label>
+                  )}
+                </div>
+                {productImages.length < 5 && (
+                  <button
+                    type="button"
+                    onClick={openProductGallery}
+                    className="px-2.5 py-1 bg-surface-secondary hover:bg-surface-elevated border border-border-default text-foreground-secondary rounded-lg text-xs font-semibold transition-colors"
+                  >
+                    Choose from Gallery
+                  </button>
+                )}
+                {productImageError && <p className="text-xs text-red-500">{productImageError}</p>}
+                {productGalleryOpen && (
+                  <GalleryPicker
+                    mode="multi"
+                    maxSelect={Math.max(0, 5 - productImages.length)}
+                    onClose={() => setProductGalleryOpen(false)}
+                    onConfirm={addProductImagesFromGallery}
+                  />
+                )}
+              </div>
+            ) : (
+              <ImageUpload
+                productId={tempProductId}
+                maxImages={5}
+                existingImages={product?.product_images || []}
+                onImagesChange={(files, existingToKeep, galleryImgs, orderedKeys) => {
+                  setImageFiles(files)
+                  setExistingImagesToKeep(existingToKeep)
+                  setGalleryImageIds(galleryImgs)
+                  setImageOrder(orderedKeys)
+                }}
+              />
+            )}
           </div>
 
           {/* Checkboxes */}
@@ -3441,7 +3660,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                 </div>
 
                 {/* Suppliers — VARIANT leaf (only when this variant has no sub-variants) */}
-                {!popupVariant.sub_variant_type_on && (
+                {hasInventory && !popupVariant.sub_variant_type_on && (
                   <div>
                     <ProductSupplierList
                       suppliers={suppliers}
@@ -3757,7 +3976,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     {/* Suppliers per SUB-VARIANT leaf — same popup, separate section */}
-                    {(subVariantsMap[variantPopupId] || []).length > 0 && (
+                    {hasInventory && (subVariantsMap[variantPopupId] || []).length > 0 && (
                       <div className="mb-3 space-y-3 rounded-lg border border-border-secondary bg-surface-secondary/30 p-3">
                         <p className="text-xs font-semibold text-foreground-secondary uppercase tracking-wide">Suppliers per Sub-Variant</p>
                         {(subVariantsMap[variantPopupId] || []).map((sv: any) => (
