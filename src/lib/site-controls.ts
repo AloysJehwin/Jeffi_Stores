@@ -306,7 +306,10 @@ export async function getSiteControls(): Promise<SiteControls> {
     const d = DEFAULTS
     // Identity falls back to the tenant's own record on a tenant host, never the platform's.
     const id = await identityDefaults()
-    const tenantScoped = getCurrentTenant() != null
+    // Header-aware like identityDefaults: the ALS may be empty on a page that hasn't queried yet,
+    // but the x-tenant-slug header still marks a tenant host — otherwise the flagship's tagline,
+    // about copy and meta description leak onto a tenant store that hasn't set its own.
+    const tenantScoped = getCurrentTenant() != null || (await tenantSlugFromHeaders()) != null
     const result: SiteControls = {
       identity: {
         name: str('business_name', id.name),

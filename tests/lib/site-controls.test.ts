@@ -131,4 +131,34 @@ describe('site-controls tenant isolation', () => {
     expect(c.identity.name).toBe('Acme Traders')
     expect(c.identity.email).toBe('hi@acme.in')
   })
+
+  // The header (Header.tsx) renders storefront.metaTagline directly. On a tenant host with no
+  // settings this fell back to the flagship's trade ("Industrial Hardware & Tools"), so a grocery
+  // store advertised a hardware shop's niche in its own header. Header-awareness must suppress it.
+  it('never leaks the flagship tagline/about/description onto a tenant host', async () => {
+    mockTenantSlug = 'acme'
+    mockQueryMany.mockResolvedValueOnce([] as any)
+    const c = await getSiteControls()
+    expect(c.storefront.metaTagline).toBe('')
+    expect(c.storefront.aboutCopy).toBe('')
+    expect(c.storefront.metaDescription).toBe('')
+  })
+
+  // The flagship's own storefront (platform host) must keep its configured copy.
+  it('keeps the flagship storefront copy off-tenant', async () => {
+    mockTenantSlug = null
+    mockQueryMany.mockResolvedValueOnce([] as any)
+    const c = await getSiteControls()
+    expect(c.storefront.metaTagline).toBe('Industrial Hardware & Tools')
+    expect(c.storefront.aboutCopy).not.toBe('')
+    expect(c.storefront.metaDescription).not.toBe('')
+  })
+
+  // A tenant that DID set its own tagline keeps it (scoping suppresses only the flagship fallback).
+  it('respects a tenant\'s own configured tagline', async () => {
+    mockTenantSlug = 'acme'
+    mockQueryMany.mockResolvedValueOnce(rows({ meta_tagline: 'Fresh Groceries Daily' }) as any)
+    const c = await getSiteControls()
+    expect(c.storefront.metaTagline).toBe('Fresh Groceries Daily')
+  })
 })
