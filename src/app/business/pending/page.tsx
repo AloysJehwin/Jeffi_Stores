@@ -2,8 +2,10 @@
 
 import Link from 'next/link'
 import { bp } from '@/lib/business-path'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 export default function BusinessPendingPage() {
+  const config = useStoreConfig()
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center px-4 py-12">
       <div className="max-w-lg w-full text-center">
@@ -15,7 +17,7 @@ export default function BusinessPendingPage() {
 
         <h1 className="text-2xl font-bold text-foreground mb-3">Application Under Review</h1>
         <p className="text-foreground-secondary leading-relaxed mb-6">
-          Thank you for applying to the Jeffi Stores Business Partner program.
+          Thank you for applying to the {config.identity.name} Business Partner program.
           Our team is reviewing your application and will get back to you within <strong>24–48 hours</strong>.
         </p>
 

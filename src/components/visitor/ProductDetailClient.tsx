@@ -249,7 +249,7 @@ const DeliveryInfo = ({ returnAllowed, returnDays, replacementAllowed, replaceme
       ),
       label: '100% Genuine',
       sub: 'Verified authentic products',
-      detail: 'Every product on Jeffi Stores is sourced directly from authorised distributors or manufacturers.',
+      detail: 'Every product is sourced directly from authorised distributors or manufacturers.',
       bullets: [
         'Sourced directly from authorised distributors',
         'Zero tolerance for counterfeit or grey-market goods',

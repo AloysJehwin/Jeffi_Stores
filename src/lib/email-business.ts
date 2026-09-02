@@ -82,8 +82,9 @@ export async function sendRfqSubmittedEmail(
     <p style="text-align:center"><a href="https://admin.jeffistores.in/admin/business/rfqs" class="btn" style="color:#ffffff;">View RFQs</a></p>
   `)
 
+  const brand = await currentBrandNameAsync()
   await Promise.allSettled([
-    send(toEmail, `RFQ ${rfqNumber} submitted — Jeffi Stores`, userHtml, {
+    send(toEmail, `RFQ ${rfqNumber} submitted — ${brand}`, userHtml, {
       templateName: 'rfq_submitted_user',
     }),
     send(adminEmail(), `New RFQ ${rfqNumber} from ${name}`, adminHtml, {
@@ -112,7 +113,8 @@ export async function sendRfqConvertedToQuotationEmail(
     <p style="text-align:center"><a href="${viewUrl}" class="btn" style="color:#ffffff;">View Quotation</a></p>
     <p>Please review the quotation. If you have any questions, contact us at +91 96853 54099.</p>
   `)
-  return send(toEmail, `Quotation ${quoteNumber} ready — Jeffi Stores`, html, {
+  const brand = await currentBrandNameAsync()
+  return send(toEmail, `Quotation ${quoteNumber} ready — ${brand}`, html, {
     templateName: 'rfq_converted_to_quotation',
   })
 }
@@ -129,7 +131,8 @@ export async function sendBusinessAccountApprovedEmail(
     <p>You can now log in and start placing RFQs and orders.</p>
     <p style="text-align:center"><a href="${await businessUrl()}/signin" class="btn" style="color:#ffffff;">Log In to Business Portal</a></p>
   `)
-  return send(toEmail, `Business account approved — Jeffi Stores`, html, {
+  const brand = await currentBrandNameAsync()
+  return send(toEmail, `Business account approved — ${brand}`, html, {
     templateName: 'business_account_approved',
   })
 }
@@ -148,7 +151,8 @@ export async function sendBusinessAccountRejectedEmail(
     ${rejectionNote ? `<div class="box"><p style="margin:0"><strong>Reason:</strong> ${rejectionNote}</p></div>` : ''}
     <p>If you believe this is an error or would like to reapply, please contact us${contact ? ` at ${contact}` : ''}.</p>
   `)
-  return send(toEmail, `Business account application update — Jeffi Stores`, html, {
+  const brand = await currentBrandNameAsync()
+  return send(toEmail, `Business account application update — ${brand}`, html, {
     templateName: 'business_account_rejected',
   })
 }
@@ -175,7 +179,8 @@ export async function sendBusinessInvoiceGeneratedEmail(
     <p style="text-align:center"><a href="${invoiceViewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>
     <p>For payment enquiries, contact us${contact ? ` at ${contact}` : ''}.</p>
   `)
-  return send(toEmail, `Invoice ${invoiceNumber} — Jeffi Stores`, html, {
+  const brand = await currentBrandNameAsync()
+  return send(toEmail, `Invoice ${invoiceNumber} — ${brand}`, html, {
     templateName: 'business_invoice_generated',
   })
 }
@@ -202,7 +207,8 @@ export async function sendBusinessOrderStatusEmail(
     ${invoiceViewUrl ? `<p style="text-align:center"><a href="${invoiceViewUrl}" class="btn" style="color:#ffffff;">View Invoice</a></p>` : ''}
     <p>For any queries, contact us${contact ? ` at ${contact}` : ''}.</p>
   `)
-  return send(toEmail, `Order ${orderNumber} — ${label} | Jeffi Stores`, html, {
+  const brand = await currentBrandNameAsync()
+  return send(toEmail, `Order ${orderNumber} — ${label} | ${brand}`, html, {
     templateName: 'business_order_status',
   })
 }

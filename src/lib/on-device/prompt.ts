@@ -121,7 +121,7 @@ export function serializeSignals(sig: SessionSignals): string {
 
 /** Instruction prefix prepended to the serialized signals for the base/-it model. */
 export const RECAP_INSTRUCTION =
-  'You are a friendly shopping assistant for an industrial hardware store. ' +
+  'You are a friendly shopping assistant for an online store. ' +
   'Write a warm, concise 2–3 sentence recap of what the customer is about to buy, ' +
   'noting how the items fit together and reassuring them. Do not invent products or prices.'
 
@@ -133,7 +133,7 @@ export function buildRecapPrompt(sig: SessionSignals): string {
 /** Prompt for cart insight — narrates what the cart collectively adds up to. */
 export function buildCartInsightPrompt(sig: SessionSignals): string {
   const instruction =
-    'You are a friendly shopping assistant for an industrial hardware store. ' +
+    'You are a friendly shopping assistant for an online store. ' +
     'In one short sentence (max 20 words), describe what the customer is building or working on based on their cart. ' +
     'Be specific and practical. Do not mention prices.'
   return `${instruction}\n\n${serializeSignals(sig)}\n### Insight`
@@ -147,7 +147,7 @@ export function buildProductPitchPrompt(
   profile: import('./user-profile').UserProfile | null
 ): string {
   const instruction =
-    'You are a friendly shopping assistant for an industrial hardware store. ' +
+    'You are a friendly shopping assistant for an online store. ' +
     'Write exactly one sentence (max 20 words) explaining why this product fits the customer\'s needs based on their history. ' +
     'Be specific. Do not mention prices or make things up.'
   const lines = [`### Product\n${productName}${brand ? ` (${brand})` : ''}${category ? ` — ${category}` : ''}`]
@@ -168,7 +168,7 @@ export function buildAffirmationPrompt(
   profile: import('./user-profile').UserProfile | null
 ): string {
   const instruction =
-    'You are a friendly shopping assistant for an industrial hardware store. ' +
+    'You are a friendly shopping assistant for an online store. ' +
     'Write one warm sentence (max 20 words) affirming the customer\'s purchase decision. ' +
     'Reference what they bought. Do not mention prices.'
   const lines = [`### Purchased\n${itemNames.slice(0, 5).map(n => `- ${n}`).join('\n')}`]

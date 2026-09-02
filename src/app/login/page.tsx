@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 
 export default function LoginPageWrapper() {
@@ -24,6 +25,7 @@ function LoginPage() {
   const { user, isLoading: authLoading, login, googleLoginWithAccessToken, refreshUser } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
+  const config = useStoreConfig()
 
   const [step, setStep] = useState<'email' | 'otp'>('email')
   const [email, setEmail] = useState('')
@@ -321,7 +323,7 @@ function LoginPage() {
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-foreground">Welcome Back</h2>
             <p className="mt-2 text-sm text-foreground-secondary">
-              Login to your Jeffi Stores account
+              Login to your {config.identity.name} account
             </p>
           </div>
 

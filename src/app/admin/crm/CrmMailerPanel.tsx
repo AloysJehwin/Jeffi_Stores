@@ -7,6 +7,7 @@ import RichTextEditor from '@/components/admin/RichTextEditor'
 import { useToast } from '@/contexts/ToastContext'
 import { useConfirm } from '@/contexts/ConfirmContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface Coupon {
   id: string
@@ -115,6 +116,8 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
 
   const { showToast } = useToast()
   const confirm = useConfirm()
+  const storeConfig = useStoreConfig()
+  const storeName = storeConfig.identity.name || 'this store'
 
   const quickTemplates = QUICK_TEMPLATES[segmentKey] || DEFAULT_TEMPLATES
 
@@ -236,7 +239,7 @@ export default function CrmMailerPanel({ segmentKey, segmentLabel, recipientCoun
     }
   }
 
-  const aiContext = `Segment: ${segmentLabel}. Email template type: ${templateKey}. Store: Jeffi Store's (hardware/tools).`
+  const aiContext = `Segment: ${segmentLabel}. Email template type: ${templateKey}. Store: ${storeName}.`
 
   if (sendResult) {
     return (

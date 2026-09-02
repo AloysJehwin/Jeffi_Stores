@@ -380,7 +380,8 @@ async function executeAction(action: AgentAction, cookieHeader: string): Promise
       } else {
         return { result: null, error: `Unknown audience: ${audience}` }
       }
-      const fromHeader = `"${(fromName || 'Jeffi Stores').replace(/"/g, '')}" <${process.env.SES_FROM_EMAIL}>`
+      const { currentBrandNameAsync } = await import('@/lib/brand')
+      const fromHeader = `"${(fromName || await currentBrandNameAsync()).replace(/"/g, '')}" <${process.env.SES_FROM_EMAIL}>`
       let sent = 0, failed = 0
       for (const r of recipients) {
         try {

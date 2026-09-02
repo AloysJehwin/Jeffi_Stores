@@ -404,7 +404,7 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
   const campaign = await getCampaign(kind)
   if (!campaign) return { ok: false, reason: 'campaign_not_found' }
 
-  const { storeBaseUrlAsync } = await import('./brand')
+  const { storeBaseUrlAsync, campaignMailFromAsync } = await import('./brand')
   const baseUrl = await storeBaseUrlAsync()
 
   const sampleItems = [
@@ -434,7 +434,7 @@ export async function sendTestCampaignEmail(kind: CampaignKind, toEmail: string)
 
   try {
     await sendAuditedMail({
-      from: `"Jeffi Store's" <${process.env.SES_PROMO_FROM_EMAIL || process.env.SES_FROM_EMAIL}>`,
+      from: await campaignMailFromAsync(),
       to: toEmail,
       subject,
       html,

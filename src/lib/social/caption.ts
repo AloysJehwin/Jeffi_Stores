@@ -8,7 +8,7 @@ const OLLAMA_URL = () =>
 const OLLAMA_MODEL = () => process.env.OLLAMA_EMAIL_MODEL || 'gemma3:4b'
 const GENERATE_TIMEOUT_MS = 30_000
 
-const SYSTEM_PROMPT = `You write short social media captions for Jeffi Stores, an Indian hardware & tools store.
+const SYSTEM_PROMPT = (store: string) => `You write short social media captions for ${store}.
 Return ONLY valid JSON: {"caption":"<caption text>"}
 
 RULES:
@@ -28,13 +28,15 @@ export async function generateSocialCaption(opts: { productName: string; product
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS)
   try {
+    const { storeDescriptorForPrompt } = await import('@/lib/brand')
+    const systemPrompt = SYSTEM_PROMPT(await storeDescriptorForPrompt())
     const res = await fetch(`${OLLAMA_URL()}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
         model: OLLAMA_MODEL(),
-        prompt: `${SYSTEM_PROMPT}\n\nUser: ${userPrompt}\n\nAssistant:`,
+        prompt: `${systemPrompt}\n\nUser: ${userPrompt}\n\nAssistant:`,
         stream: false,
         format: 'json',
         options: { temperature: 0.4, num_predict: 300 },

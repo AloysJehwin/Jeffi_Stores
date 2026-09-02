@@ -8,7 +8,7 @@ import type { Metadata } from 'next'
 import { queryOne, queryMany } from '@/lib/db'
 import { VARIANT_MIN_PRICE_INCL_GST_SQL, VARIANT_MIN_PRICE_EX_GST_SQL, VARIANT_MIN_MRP_SQL, VARIANT_STOCK_TOTAL_SQL } from '@/lib/queries'
 import { mrpDiscountPct, pickUnitPrice } from '@/lib/pricing'
-import { getFeatureFlags } from '@/lib/site-controls'
+import { getFeatureFlags, getStoreIdentity } from '@/lib/site-controls'
 import { bp } from '@/lib/business-path'
 import ProductDetailClient from '@/components/business/ProductDetailClient'
 import CopySku from '@/components/ui/CopySku'
@@ -103,13 +103,14 @@ export async function generateMetadata({
     ? product.variant_min_price
     : pickUnitPrice({ inclusive: product.base_price, exGst: product.price_ex_gst }, gstEnabled)
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistoress.com'
+  const storeName = (await getStoreIdentity()).name
 
   return {
-    title: `${product.name} | Jeffi Stores`,
-    description: product.description?.slice(0, 160) || `Buy ${product.name} at Jeffi Stores`,
+    title: `${product.name} | ${storeName}`,
+    description: product.description?.slice(0, 160) || `Buy ${product.name} at ${storeName}`,
     openGraph: {
       title: product.name,
-      description: product.description?.slice(0, 160) || `Buy ${product.name} at Jeffi Stores`,
+      description: product.description?.slice(0, 160) || `Buy ${product.name} at ${storeName}`,
       url: `${baseUrl}/products/${product.slug}`,
       images: primaryImage ? [{ url: primaryImage.image_url, alt: product.name }] : [],
       type: 'website',

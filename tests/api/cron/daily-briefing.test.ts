@@ -16,7 +16,7 @@ vi.mock('@/lib/daily-briefing', () => ({
   collectBriefingData: vi.fn(),
   narrate: vi.fn(),
   renderBriefingEmail: vi.fn(),
-  BRIEFING_FROM: 'briefing@example.com',
+  briefingFromAsync: vi.fn(async () => 'briefing@example.com'),
 }))
 
 import { GET } from '@/app/api/cron/daily-briefing/route'
