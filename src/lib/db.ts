@@ -20,6 +20,7 @@ const tenantPools: Map<string, Pool> = dbGlobal.__tenantPools ?? (dbGlobal.__ten
 
 export { getCurrentAuditAdminId, setAuditAdminId, runWithAuditContext }
 export { getCurrentTenant, getCurrentTenantId, runWithTenantContext }
+export { ensureTenantContext as resolveRequestTenant }
 
 function makeRdsSigner(host: string, port: number, user: string, region: string): () => Promise<string> {
   const signer = new Signer({ hostname: host, port, region, username: user })
