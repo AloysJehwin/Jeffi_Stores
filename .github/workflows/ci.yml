@@ -469,13 +469,18 @@ jobs:
             export RDS_PORT=5432
             export RDS_USER=app_user
             export AWS_REGION=us-east-1
+            echo "Applying schema at SHA $DEPLOY_SHA against host $RDS_HOST"
 
             # Platform store DB
+            echo "::group::Platform DB diff (jeffi_stores)"
             RDS_DB=jeffi_stores bash deploy/schema-diff.sh --set=platform
+            echo "::endgroup::"
 
             # SaaS control plane - previously never diffed, which is how it ended up
             # missing tenant_ca/tenant_admin_certs and provisioning_jobs.next_attempt_at.
+            echo "::group::Control-plane DB diff (jeffi_control_plane)"
             RDS_DB=jeffi_control_plane bash deploy/schema-diff.sh --set=control-plane
+            echo "::endgroup::"
 
             # Every tenant's own database. The two diffs above only ever touched the flagship
             # and the control plane, so a schema change on main never reached a customer store
@@ -485,7 +490,7 @@ jobs:
             # which is far cheaper than diffing N databases and is what the provisioning path
             # already uses. runMigrationFanout skips tenants already recorded at this SHA and
             # isolates failures per tenant, so one bad store cannot block the rest.
-            echo "── Tenant schema fan-out ──"
+            echo "::group::Tenant schema fan-out"
             # Prefer the secret forwarded from GitHub; fall back to the running container's env only
             # if it was not configured. The old code read solely from the container, so a missing or
             # down active-slot container surfaced as "CRON_SECRET unavailable" even when the secret existed.
@@ -501,14 +506,35 @@ jobs:
               echo "::error::CRON_SECRET unavailable (not forwarded from GitHub and absent from the app container) — cannot run the tenant fan-out"
               exit 1
             fi
+            echo "POST /api/internal/migrations/fanout  (gitSha=$DEPLOY_SHA, 300s timeout)"
             CODE=$(curl -s -o /tmp/fanout.json -w '%{http_code}' --max-time 300 \
               -X POST http://localhost/api/internal/migrations/fanout \
               -H "Authorization: Bearer $CRON_SECRET" \
               -H 'Content-Type: application/json' \
               -H 'Host: jeffistores.in' \
               -d "{\"gitSha\":\"$DEPLOY_SHA\"}")
-            cat /tmp/fanout.json; echo
+
+            # The endpoint returns aggregate counts plus a slug+error per failing tenant. The old
+            # code just cat'd the raw JSON, so a failed run meant eyeballing an unformatted blob to
+            # find which store broke. Parse it into a readable summary and enumerate the failures by
+            # name. jq is present on the flagship; if it somehow is not, fall back to the raw body so
+            # this never becomes the reason a deploy fails.
+            if command -v jq >/dev/null 2>&1 && jq -e . /tmp/fanout.json >/dev/null 2>&1; then
+              TOTAL=$(jq -r '.result.total   // 0' /tmp/fanout.json)
+              APPLIED=$(jq -r '.result.applied // 0' /tmp/fanout.json)
+              SKIPPED=$(jq -r '.result.skipped // 0' /tmp/fanout.json)
+              FAILEDN=$(jq -r '.result.failed  // 0' /tmp/fanout.json)
+              echo "Tenants: $TOTAL total — $APPLIED applied, $SKIPPED already current, $FAILEDN failed"
+              if [ "$FAILEDN" != "0" ]; then
+                echo "Failed tenants:"
+                jq -r '.result.failures[]? | "  ✗ \(.slug): \(.error)"' /tmp/fanout.json
+              fi
+            else
+              echo "(could not parse fan-out response as JSON — raw body follows)"
+              cat /tmp/fanout.json; echo
+            fi
             rm -f /tmp/fanout.json
+            echo "::endgroup::"
             [ "$CODE" = "200" ] || { echo "::error::tenant schema fan-out failed (HTTP $CODE)"; exit 1; }
 
   # ────────────────────────────────────────────────────────
@@ -607,17 +633,30 @@ jobs:
         run: |
           set -euo pipefail
 
+          echo "::group::Enumerate tenant fleet"
+          echo "Image SHA to roll: ${GITHUB_SHA:0:7}  (full: $GITHUB_SHA)"
+
           # Tag-selected, not a hardcoded list: the pool scales with tenant count, so any
-          # fixed set would silently miss boxes added since it was written.
-          IDS=$(aws ec2 describe-instances \
+          # fixed set would silently miss boxes added since it was written. Pull the Name tag
+          # alongside the id so the logs read as store boxes, not opaque i-0abc… strings.
+          INSTANCE_JSON=$(aws ec2 describe-instances \
             --filters "Name=tag:app,Values=jeffi-tenant" "Name=instance-state-name,Values=running" \
-            --query 'Reservations[].Instances[].InstanceId' --output text)
+            --query 'Reservations[].Instances[].{Id:InstanceId,Name:Tags[?Key==`Name`]|[0].Value}' \
+            --output json)
+          IDS=$(echo "$INSTANCE_JSON" | jq -r '.[].Id')
+          name_of() { echo "$INSTANCE_JSON" | jq -r --arg id "$1" '.[]|select(.Id==$id)|.Name // "unnamed"'; }
 
           if [ -z "$IDS" ]; then
             echo "No running tenant instances — nothing to roll."
+            echo "::endgroup::"
+            echo "### Tenant fleet deploy" >> "$GITHUB_STEP_SUMMARY"
+            echo "_No running tenant instances — nothing to roll._" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          echo "Targets: $IDS"
+          COUNT=$(echo "$IDS" | wc -w | tr -d ' ')
+          echo "Found $COUNT running tenant box(es):"
+          for id in $IDS; do echo "  • $id  ($(name_of "$id"))"; done
+          echo "::endgroup::"
 
           # An instance whose SSM agent is not registered cannot be reached, and skipping it
           # silently would leave that box's tenants on stale code with a green pipeline.
@@ -642,15 +681,22 @@ jobs:
             echo "::error::agent not Online on:$MISSING (SSM sees: $MANAGED)"
             exit 1
           fi
+          echo "SSM agent Online on all $COUNT target(s)."
 
+          # Accumulate a per-box row for the run summary table so the whole fleet's outcome is
+          # visible on the Actions summary page without expanding every log group.
+          SUMMARY_ROWS=""
           FAILED=""
           for id in $IDS; do
-            echo "── $id ──"
+            NAME=$(name_of "$id")
+            echo "::group::Roll $id ($NAME)"
+            START=$(date +%s)
             CMD=$(aws ssm send-command --instance-ids "$id" \
               --document-name AWS-RunShellScript \
               --comment "deploy ${GITHUB_SHA:0:7}" \
               --parameters 'commands=["set -e","aws s3 cp s3://jeffi-stores-mtls-truststore/fleet/fleet-apply.sh /tmp/fleet-apply.sh --only-show-errors","bash /tmp/fleet-apply.sh","rm -f /tmp/fleet-apply.sh"]' \
               --query 'Command.CommandId' --output text)
+            echo "SSM CommandId: $CMD"
 
             # Poll rather than `aws ssm wait`: the blue-green health check alone allows five
             # minutes, and the wait command gives up sooner than that.
@@ -661,18 +707,32 @@ jobs:
                 --query 'Status' --output text 2>/dev/null || echo Pending)
               case "$STATUS" in Success|Failed|Cancelled|TimedOut) break ;; esac
             done
+            ELAPSED=$(( $(date +%s) - START ))
 
+            echo "── stdout (last 20 lines) ──"
             aws ssm get-command-invocation --command-id "$CMD" --instance-id "$id" \
               --query 'StandardOutputContent' --output text 2>/dev/null | tail -20
             if [ "$STATUS" != "Success" ]; then
-              echo "::error::$id finished $STATUS"
+              echo "── stderr (last 20 lines) ──"
               aws ssm get-command-invocation --command-id "$CMD" --instance-id "$id" \
                 --query 'StandardErrorContent' --output text 2>/dev/null | tail -20
+              echo "::error::$id ($NAME) finished $STATUS after ${ELAPSED}s — full log: aws ssm get-command-invocation --command-id $CMD --instance-id $id"
               FAILED="$FAILED $id"
+              SUMMARY_ROWS="$SUMMARY_ROWS| \`$id\` | $NAME | ❌ $STATUS | ${ELAPSED}s |"$'\n'
             else
-              echo "$id updated"
+              echo "✓ $id ($NAME) updated in ${ELAPSED}s"
+              SUMMARY_ROWS="$SUMMARY_ROWS| \`$id\` | $NAME | ✅ Success | ${ELAPSED}s |"$'\n'
             fi
+            echo "::endgroup::"
           done
+
+          {
+            echo "### Tenant fleet deploy — image \`${GITHUB_SHA:0:7}\`"
+            echo ""
+            echo "| Instance | Name | Result | Time |"
+            echo "|---|---|---|---|"
+            printf '%s' "$SUMMARY_ROWS"
+          } >> "$GITHUB_STEP_SUMMARY"
 
           # Boxes that succeeded are already serving the new image and must not be rolled back
           # to match the ones that did not — each tenant is pinned to a box by DNS, so a mixed
@@ -681,7 +741,7 @@ jobs:
             echo "::error::tenant fleet deploy failed on:$FAILED"
             exit 1
           fi
-          echo "Tenant fleet up to date."
+          echo "Tenant fleet up to date — all $COUNT box(es) on ${GITHUB_SHA:0:7}."
 
   # ────────────────────────────────────────────────────────
   # Stage 5 — Run DB Migrations  (main only, gate: deploy + migrations changed)
@@ -723,8 +783,35 @@ jobs:
             export RDS_USER=app_user
             export RDS_DB=jeffi_stores
             export AWS_REGION=us-east-1
+            echo "Applying flagship migrations to $RDS_DB on $RDS_HOST"
 
+            # run-migrations.sh already logs each pending/applied file; it also has a --dry-run that
+            # lists the pending set without touching the DB, using the same IAM auth as the real run.
+            # Use it to capture what is about to apply (for the count + step summary) before running
+            # the apply for real — no separate psql connection, so the box's IAM/SSL path is the only
+            # one in play. The dry run is read-only and guarded so it can never fail the step.
+            echo "::group::Pending migrations (dry run)"
+            DRY=$(bash deploy/run-migrations.sh --dry-run 2>&1 || true)
+            echo "$DRY"
+            PENDING=$(printf '%s\n' "$DRY" | sed -n 's/^  + //p')
+            echo "::endgroup::"
+
+            echo "::group::Apply migrations"
             bash deploy/run-migrations.sh
+            echo "::endgroup::"
+
+            {
+              echo "### Flagship DB migrations"
+              echo ""
+              if [ -z "$PENDING" ]; then
+                echo "_No pending migrations — schema already current._"
+              else
+                COUNT=$(printf '%s\n' "$PENDING" | wc -l | tr -d ' ')
+                echo "Applied **$COUNT** migration(s):"
+                echo ""
+                printf '%s\n' "$PENDING" | sed 's/^/- `/;s/$/`/'
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
 
   # ────────────────────────────────────────────────────────
   # Stage 6 — Smoke test  (main only, gate: deploy + CDN invalidation)

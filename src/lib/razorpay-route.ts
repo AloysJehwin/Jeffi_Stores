@@ -177,12 +177,12 @@ function legalInfo(input: LinkedAccountInput): { legal_info?: { pan?: string; gs
   return Object.keys(info).length ? { legal_info: info } : {}
 }
 
-export async function createLinkedAccount(input: LinkedAccountInput): Promise<string> {
-  const rz = getRazorpayInstance()
-
-  const account = await (rz.accounts as any).create({
-    email: input.ownerEmail,
+// The fields Razorpay accepts on both create and update (PATCH forbids business_type + email).
+// Shared so a recovered/reused account is brought in sync with the current KYC on re-onboard.
+function accountProfilePayload(input: LinkedAccountInput) {
+  return {
     phone: input.ownerPhone,
+    legal_business_name: input.legalBusinessName,
     profile: {
       category: input.profileCategory,
       subcategory: input.profileSubcategory,
@@ -197,14 +197,48 @@ export async function createLinkedAccount(input: LinkedAccountInput): Promise<st
         },
       },
     },
-    type: 'route',
-    legal_business_name: input.legalBusinessName,
-    business_type: input.businessType,
     ...legalInfo(input),
     contact_name: input.ownerName,
-  })
+  }
+}
 
-  return account.id as string
+/**
+ * Bring an existing linked account in sync with the current KYC (PATCH /v2/accounts/{id}).
+ * business_type and email are immutable at Razorpay, so they are never sent. Best-effort:
+ * a stale detail is better than a failed re-onboard, so a rejected update is swallowed.
+ */
+export async function updateLinkedAccount(accountId: string, input: LinkedAccountInput): Promise<void> {
+  const rz = getRazorpayInstance()
+  await (rz.accounts as any).edit(accountId, accountProfilePayload(input))
+}
+
+export async function createLinkedAccount(input: LinkedAccountInput): Promise<string> {
+  const rz = getRazorpayInstance()
+
+  try {
+    const account = await (rz.accounts as any).create({
+      email: input.ownerEmail,
+      type: 'route',
+      business_type: input.businessType,
+      ...accountProfilePayload(input),
+    })
+
+    return account.id as string
+  } catch (err: any) {
+    // Razorpay allows one linked account per merchant email and rejects a second create with
+    // "Merchant email already exists for account - <id>". That happens whenever the acc_xxx was
+    // lost from our side (a rolled-back/suspended tenant re-provisioning) — the id we need is in
+    // the error itself, so recover it rather than dying, mirroring the stakeholder path above.
+    // The recovered account still holds the old store's details, so PATCH it to the current KYC.
+    const desc: string = err?.error?.description ?? err?.message ?? ''
+    const match = desc.match(/already exists for account\s*-\s*(acc_)?([A-Za-z0-9]+)/i)
+    if (match) {
+      const accountId = match[2].startsWith('acc_') ? match[2] : `acc_${match[2]}`
+      await updateLinkedAccount(accountId, input).catch(() => {})
+      return accountId
+    }
+    throw err
+  }
 }
 
 /**

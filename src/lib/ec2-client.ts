@@ -32,6 +32,10 @@ function xmlTag(xml: string, tag: string): string | null {
   return m ? m[1] : null
 }
 
+function xmlTagAll(xml: string, tag: string): string[] {
+  return [...xml.matchAll(new RegExp(`<${tag}>([^<]*)</${tag}>`, 'g'))].map((m) => m[1])
+}
+
 export interface InstanceState { instanceType: string; state: string }
 
 export async function describeInstance(instanceId: string): Promise<InstanceState> {
@@ -144,6 +148,20 @@ export async function getInstanceIp(instanceId: string): Promise<string | null> 
 
 export async function terminateInstance(instanceId: string): Promise<void> {
   await ec2({ Action: 'TerminateInstances', 'InstanceId.1': instanceId })
+}
+
+/** Ids of every running box tagged app=jeffi-tenant — the pool that serves tenant stores and
+ * whose nginx must be reloaded when the client-CA bundle changes. Tag-selected (not a fixed
+ * list) so it tracks the pool as it scales; mirrors the CI deploy-fleet selection. */
+export async function describeRunningTenantInstanceIds(): Promise<string[]> {
+  const xml = await ec2({
+    Action: 'DescribeInstances',
+    'Filter.1.Name': 'tag:app',
+    'Filter.1.Value.1': 'jeffi-tenant',
+    'Filter.2.Name': 'instance-state-name',
+    'Filter.2.Value.1': 'running',
+  })
+  return xmlTagAll(xml, 'instanceId')
 }
 
 /** True once the instance no longer exists or is terminated (teardown ordering). */

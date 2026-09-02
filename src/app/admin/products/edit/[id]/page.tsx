@@ -559,15 +559,9 @@ async function updateProduct(productId: string, formData: FormData) {
       const imagesToDelete = (allExistingImages || []).filter(img => !existingIdsToKeep.has(img.id))
 
       if (imagesToDelete.length > 0) {
-        const { DeleteObjectCommand, S3Client } = await import('@aws-sdk/client-s3')
-        const s3Client = new S3Client({
-          region: process.env.AWS_REGION || 'us-east-1',
-          credentials: {
-            accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-            secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY! } })
+        const { deleteProductImage } = await import('@/lib/s3')
         for (const img of imagesToDelete) {
-          if (img.s3_key) await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket', Key: img.s3_key }))
-          if (img.s3_thumbnail_key) await s3Client.send(new DeleteObjectCommand({ Bucket: process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket', Key: img.s3_thumbnail_key }))
+          if (img.s3_key) await deleteProductImage(img.s3_key, img.s3_thumbnail_key || '')
           await query('DELETE FROM product_images WHERE id = $1', [img.id])
         }
       }
@@ -587,7 +581,7 @@ async function updateProduct(productId: string, formData: FormData) {
               ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
               [
                 productId, uploadResult.url, uploadResult.thumbnailUrl,
-                process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+                uploadResult.s3Bucket,
                 uploadResult.s3Key, uploadResult.s3ThumbnailKey,
                 uploadResult.fileName, uploadResult.fileSize, uploadResult.mimeType,
                 uploadResult.width, uploadResult.height, 999, false,
@@ -621,7 +615,7 @@ async function updateProduct(productId: string, formData: FormData) {
             ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
             [
               productId, copied.url, copied.thumbnailUrl,
-              process.env.S3_BUCKET_NAME || 'jeffi-stores-bucket',
+              copied.s3Bucket,
               copied.s3Key, copied.s3ThumbnailKey,
               gimg.custom_name || gimg.file_name, gimg.file_size, gimg.mime_type,
               gimg.width, gimg.height, 999, false,
