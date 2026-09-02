@@ -91,8 +91,18 @@ async function fireRouteTransfer(opts: {
   if (!resolved) return  // platform's own store — no tenant billing
 
   const pool = controlPlanePool()
+  // Same owner-bank fallback as the verify path: a re-provisioned tenant's acc_xxx lives on the
+  // owner-scoped tenant_bank_accounts row, not the tenant row. Resolve it the way billing does.
   const row = await pool.query(
-    `SELECT razorpay_linked_account_id, daily_payout FROM tenants WHERE id=$1 AND status='active'`, [resolved.tenantId]
+    `SELECT COALESCE(
+              (SELECT b.linked_account_id FROM tenant_bank_accounts b
+                 JOIN owner_tenants ot ON ot.owner_id = b.owner_id
+                WHERE ot.tenant_id = t.id AND b.linked_account_id IS NOT NULL
+                ORDER BY b.created_at DESC LIMIT 1),
+              t.razorpay_linked_account_id
+            ) AS razorpay_linked_account_id,
+            t.daily_payout
+       FROM tenants t WHERE t.id=$1 AND t.status='active'`, [resolved.tenantId]
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
   const dailyPayout = row?.rows[0]?.daily_payout === true
