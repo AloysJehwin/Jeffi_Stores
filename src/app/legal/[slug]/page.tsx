@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getPolicyBySlug, policies } from '../policies'
+import { getStoreIdentity } from '@/lib/site-controls'
 
 export async function generateStaticParams() {
   return policies.map((p) => ({ slug: p.slug }))
@@ -8,10 +9,13 @@ export async function generateStaticParams() {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const policy = getPolicyBySlug(slug)
+  const [policy, identity] = await Promise.all([
+    Promise.resolve(getPolicyBySlug(slug)),
+    getStoreIdentity(),
+  ])
   if (!policy) return {}
   return {
-    title: `${policy.title} | Jeffi Stores`,
+    title: `${policy.title} | ${identity.name}`,
     description: policy.description,
   }
 }

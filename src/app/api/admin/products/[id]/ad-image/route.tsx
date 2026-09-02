@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { queryOne } from '@/lib/db'
 import { renderProductCard, persistCardToBucket } from '@/lib/social/card'
+import { currentBrandNameAsync, storeBaseUrlAsync } from '@/lib/brand'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,6 +27,9 @@ async function buildCard(id: string) {
   const displayPrice  = salePrice ?? basePrice ?? 0
   const originalPrice = (salePrice && basePrice && basePrice > salePrice) ? basePrice : null
 
+  const brand = await currentBrandNameAsync()
+  const brandUrl = (await storeBaseUrlAsync()).replace(/^https?:\/\//, '')
+
   const png = await renderProductCard({
     product: {
       name: product.name,
@@ -34,7 +38,7 @@ async function buildCard(id: string) {
       originalPrice,
       primaryImage: product.primary_image ?? null,
     },
-    brand: { name: 'Jeffi Stores', url: 'jeffistores.in' },
+    brand: { name: brand, url: brandUrl },
   })
 
   return { png, slug: product.slug as string }

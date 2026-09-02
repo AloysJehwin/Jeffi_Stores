@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import Image from 'next/image'
 import { Star, X, Paperclip, Lock, PartyPopper, Camera } from 'lucide-react'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface CustomField {
   id: string
@@ -98,6 +99,7 @@ function ImageFieldUpload({ fieldId, label, required }: { fieldId: string; label
 }
 
 export default function FormClient({ form }: { form: ReviewForm }) {
+  const config = useStoreConfig()
   const [email, setEmail] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<string | null>(null)
@@ -199,10 +201,10 @@ export default function FormClient({ form }: { form: ReviewForm }) {
           )}
 
           <a
-            href="https://jeffistores.in"
+            href={config.identity.web || '/'}
             className="block w-full py-3 bg-gray-800 hover:bg-gray-900 text-white rounded-xl font-semibold transition-colors"
           >
-            Shop Now at Jeffi Stores
+            Shop Now at {config.identity.name}
           </a>
         </div>
       </div>
@@ -256,7 +258,7 @@ export default function FormClient({ form }: { form: ReviewForm }) {
               <span className="w-7 h-7 rounded-full bg-indigo-500 text-white text-sm font-bold flex items-center justify-center shrink-0">1</span>
               <div>
                 <p className="font-semibold text-gray-800">Share your story</p>
-                <p className="text-xs text-gray-400">Tell us about your experience with Jeffi Stores</p>
+                <p className="text-xs text-gray-400">Tell us about your experience with {config.identity.name}</p>
               </div>
             </div>
             <textarea

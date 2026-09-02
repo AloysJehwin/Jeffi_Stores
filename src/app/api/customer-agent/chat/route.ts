@@ -58,8 +58,9 @@ function buildToolsDef(): AiToolDef[] {
   }))
 }
 
-function buildSystemPrompt(): string {
-  return `You are the Jeffi Stores shopping assistant. The customer is already logged in.
+async function buildSystemPrompt(): Promise<string> {
+  const { storeDescriptorForPrompt } = await import('@/lib/brand')
+  return `You are the shopping assistant for ${await storeDescriptorForPrompt()}. The customer is already logged in.
 
 Rules:
 - NEVER answer from your own knowledge. Always call a tool to get product/order data.
@@ -149,7 +150,7 @@ export async function POST(req: NextRequest) {
   }))
 
   const messages: AiChatMessage[] = [
-    { role: 'system', content: buildSystemPrompt() },
+    { role: 'system', content: await buildSystemPrompt() },
     ...safeHistory,
     { role: 'user', content: userMessage },
   ]

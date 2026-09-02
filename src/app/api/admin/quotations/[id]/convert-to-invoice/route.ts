@@ -8,6 +8,7 @@ import { sendInvoiceFinalizedEmail } from '@/lib/email'
 import { sendBusinessInvoiceGeneratedEmail } from '@/lib/email-business'
 import { lineItemExGst } from '@/lib/pricing'
 import { getFeatureFlags, getBusinessValues } from '@/lib/site-controls'
+import { currentBrandNameAsync } from '@/lib/brand'
 import { getRazorpayInstance } from '@/lib/razorpay'
 import sharp from 'sharp'
 
@@ -405,7 +406,7 @@ export async function POST(
           usage: 'single_use',
           fixed_amount: true,
           payment_amount: amountPaise,
-          description: `Jeffi Stores Invoice ${result.invoice_number}`,
+          description: `${await currentBrandNameAsync()} Invoice ${result.invoice_number}`,
           close_by: closeBy,
         })
         // Crop the QR code square out of Razorpay's branded 9:16 poster image

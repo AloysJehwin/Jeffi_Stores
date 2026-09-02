@@ -417,7 +417,7 @@ export default async function ProductsPage({
             <div className="mb-4 flex items-start justify-between gap-3">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-secondary-500 dark:text-foreground">All Products</h1>
-                <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of hardware and industrial tools</p>
+                <p className="text-foreground-secondary text-sm mt-1">Browse our complete range of products</p>
               </div>
               <div className="lg:hidden shrink-0">
                 <MobileFilterSheet categories={allCats} brands={brands as any[]} basePath={bp('/business/products', host)} />

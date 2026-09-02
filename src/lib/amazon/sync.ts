@@ -2,6 +2,7 @@ import { queryOne, query } from '@/lib/db'
 import { fetchAllActiveProducts, fetchProduct } from '@/lib/merchant/product-fetch'
 import { productToAmazonListings, productToAmazonOfferListing, type AmazonListing } from './mapper'
 import { putListingsItem, patchListingsItem, validateListingsItem, deleteListingsItem, matchAsin, AMAZON_PUSH_DISABLED, amazonConfigured, getMarketplaceId } from './client'
+import { getBusinessValues } from '@/lib/site-controls'
 
 // Amazon catalog push — analog of src/lib/merchant/sync.ts (Google).
 // Unlike GMC (which has a /products/batch), SP-API Listings Items is one PUT per SKU, so we
@@ -156,6 +157,8 @@ function trustedAsin(row: any): string | null {
 async function resolveListingsForProduct(product: any): Promise<AmazonListing[]> {
   const brand = product.brands?.name || ''
   const marketplaceId = await getMarketplaceId()
+  const bv = await getBusinessValues()
+  const contactText = `${bv.sellerName}, ${bv.sellerAddress}. Phone: ${bv.sellerPhone}`
   const hasVariants = product.has_variants && product.product_variants?.length > 0
 
   if (hasVariants) {
@@ -170,7 +173,7 @@ async function resolveListingsForProduct(product: any): Promise<AmazonListing[]>
       if (asin) out.push(productToAmazonOfferListing(product, asin, marketplaceId, v))
     }
     if (out.length) return out
-    return productToAmazonListings(product, marketplaceId)
+    return productToAmazonListings(product, marketplaceId, contactText)
   }
 
   const stored = trustedAsin(product)
@@ -179,7 +182,7 @@ async function resolveListingsForProduct(product: any): Promise<AmazonListing[]>
     name: `${brand} ${product.name}`.trim(),
   }))?.asin
   if (asin) return [productToAmazonOfferListing(product, asin, marketplaceId)]
-  return productToAmazonListings(product, marketplaceId)
+  return productToAmazonListings(product, marketplaceId, contactText)
 }
 
 async function runFullSync(): Promise<SyncResult> {

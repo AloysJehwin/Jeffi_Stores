@@ -145,7 +145,7 @@ function statusLabel(status: string) {
 export default function BusinessOrderDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const { user, isLoading: authLoading } = useAuth()
-  const { flags: { razorpayEnabled: isRazorpayEnabled }, orderAutoCancelMinutes } = useStoreConfig()
+  const { flags: { razorpayEnabled: isRazorpayEnabled }, orderAutoCancelMinutes, identity } = useStoreConfig()
   const router = useRouter()
   const [order, setOrder] = useState<OrderDetails | null>(null)
   const [loading, setLoading] = useState(true)
@@ -295,7 +295,7 @@ export default function BusinessOrderDetailPage({ params }: { params: Promise<{ 
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
         amount: rzpData.amount,
         currency: rzpData.currency,
-        name: 'Jeffi Stores',
+        name: identity.name,
         description: `Order #${order.orderNumber}`,
         order_id: rzpData.razorpayOrderId,
         handler: async (response: any) => {

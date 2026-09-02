@@ -7,7 +7,7 @@ import { parseBody, zNonEmpty } from '@/lib/validate'
 import { sendAuditedMail } from '@/lib/mail-audit'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { getFeatureFlags } from '@/lib/site-controls'
-import { storeContactLine } from '@/lib/brand'
+import { storeContactLine, currentBrandNameAsync } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,6 +83,7 @@ export async function PATCH(
 ) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const storeName = await (await import('@/lib/site-controls')).getStoreIdentity().then(i => i.name)
+  const brand = await currentBrandNameAsync()
   try {
     const { id } = await params
     const admin = await authenticateAdmin(request)
@@ -151,7 +152,7 @@ export async function PATCH(
       )
       if (order?.email) {
         const readableDate = new Date(d.estimated_delivery_date + 'T00:00:00').toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })
-        const from = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
+        const from = `"${brand}" <${process.env.SES_FROM_EMAIL}>`
         const subject = `Your delivery date has been updated — Order #${order.order_number}`
         const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -160,7 +161,7 @@ export async function PATCH(
     <tr><td align="center">
       <table role="presentation" width="600" cellspacing="0" cellpadding="0" border="0" style="background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e2e8f0;">
         <tr><td style="background:#1a3a4a;padding:20px 28px;">
-          <div style="font-size:22px;font-weight:700;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
+          <div style="font-size:22px;font-weight:700;color:#f97316;letter-spacing:0.5px;">${brand}</div>
         </td></tr>
         <tr><td style="padding:28px;font-size:15px;line-height:1.6;">
           <p style="margin:0 0 16px;">Hi ${order.first_name || 'there'},</p>
@@ -172,7 +173,7 @@ export async function PATCH(
             </td></tr>
           </table>
           <p style="margin:0 0 16px;">Our team is working hard to deliver your order as soon as possible. We appreciate your patience.</p>
-          <p style="margin:24px 0 0;color:#475569;">Thank you for shopping with us,<br>The Jeffi Stores team</p>
+          <p style="margin:24px 0 0;color:#475569;">Thank you for shopping with us,<br>The ${brand} team</p>
         </td></tr>
         <tr><td style="padding:18px 28px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;">
           ${storeName}<br>${contactLine}

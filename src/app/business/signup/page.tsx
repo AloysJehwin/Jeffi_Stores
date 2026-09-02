@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 import AdminSelect from '@/components/admin/AdminSelect'
 import { bp } from '@/lib/business-path'
@@ -19,6 +20,7 @@ export default function BusinessSignUpWrapper() {
 function BusinessSignUpPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const config = useStoreConfig()
 
   const [step, setStep] = useState<'email' | 'otp' | 'details'>('email')
   const [email, setEmail] = useState(searchParams.get('email') || '')
@@ -552,7 +554,7 @@ function BusinessSignUpPage() {
             </svg>
           </div>
           <h2 className="text-3xl font-bold mb-4 leading-tight">
-            Become a Jeffi Stores Business Partner
+            Become a {config.identity.name} Business Partner
           </h2>
           <p className="text-white/70 text-base leading-relaxed mb-8">
             Get exclusive B2B pricing, dedicated support, and streamlined bulk ordering for your business.

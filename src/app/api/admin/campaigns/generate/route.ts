@@ -42,7 +42,8 @@ export async function POST(req: NextRequest) {
 
   if (!prompt) return NextResponse.json({ error: 'prompt is required' }, { status: 400 })
 
-  const systemPrompt = `You write ONE email-campaign template for Jeffi Stores (Indian e-commerce: industrial tools, fasteners, hardware).
+  const { storeDescriptorForPrompt } = await import('@/lib/brand')
+  const systemPrompt = `You write ONE email-campaign template for ${await storeDescriptorForPrompt()}.
 
 Output ONLY this JSON object, nothing else. All 4 keys must be non-empty:
 {"name":"","kind":"","subject_template":"","body_template":""}
@@ -51,7 +52,7 @@ Fill each key:
 - name: 3-6 words, no words "campaign"/"email".
 - kind: snake_case slug from name, [a-z0-9_], max 32 chars.
 - subject_template: under 80 chars, may use {firstName}.
-- body_template: full HTML email BODY only — the branded shell already adds the Jeffi Stores logo header and footer, so do NOT add a logo, header image, or footer yourself. Inline styles ONLY (no <style>/<script>/external CSS). ~600px <table> layout. Greet "Hi {firstName},". Exactly one CTA button: background #e07b3f, white text, padding 12px 28px, href {ctaUrl}. Headings #1a3a4a, body text #333.
+- body_template: full HTML email BODY only — the branded shell already adds the store's logo header and footer, so do NOT add a logo, header image, or footer yourself. Inline styles ONLY (no <style>/<script>/external CSS). ~600px <table> layout. Greet "Hi {firstName},". Exactly one CTA button: background #e07b3f, white text, padding 12px 28px, href {ctaUrl}. Headings #1a3a4a, body text #333.
 
 Variables are PLAIN {token} substitution only. NEVER use {x ? a : b}, {{x}}, or {%if%}. Allowed tokens:
 {firstName} {orderNumber} {couponCode} {discountPercent} {productName} {productCard} {itemsHtml} {itemCount} {ctaUrl}

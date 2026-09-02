@@ -4,6 +4,7 @@ import { uploadGalleryImage } from '@/lib/s3'
 import { PoolClient } from 'pg'
 import nodemailer from 'nodemailer'
 import { sendAuditedMail } from '@/lib/mail-audit'
+import { currentBrandNameAsync } from '@/lib/brand'
 
 interface CustomField {
   id: string
@@ -35,10 +36,10 @@ const transporter = nodemailer.createTransport({
   auth: { user: process.env.SES_SMTP_USER, pass: process.env.SES_SMTP_PASSWORD },
 })
 
-const FROM = `"Jeffi Store's" <${process.env.SES_FROM_EMAIL}>`
 const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL || 'https://jeffistores.in'
 
-function couponEmail(coupon: Coupon, email: string) {
+async function couponEmail(coupon: Coupon, email: string) {
+  const brand = await currentBrandNameAsync()
   const discountText = coupon.discount_type === 'percentage'
     ? `${coupon.discount_value}% off`
     : `₹${coupon.discount_value} off`
@@ -48,14 +49,14 @@ function couponEmail(coupon: Coupon, email: string) {
   const body = `
     <p style="font-size:16px;color:#333;margin:0 0 12px;">Hi there,</p>
     <h2 style="font-size:22px;color:#1a3a4a;margin:0 0 16px;">Thank you for your Google review!</h2>
-    <p style="color:#555;line-height:1.6;margin:0 0 20px;">Here&apos;s your reward coupon. Use it on your next order at Jeffi Stores:</p>
+    <p style="color:#555;line-height:1.6;margin:0 0 20px;">Here&apos;s your reward coupon. Use it on your next order at ${brand}:</p>
     <div style="background:#f5f5f5;border:2px dashed #e07b3f;border-radius:8px;padding:20px 24px;text-align:center;margin:0 0 20px;">
       <p style="font-size:13px;color:#777;margin:0 0 4px;">${discountText} on your next order</p>
       <p style="font-size:28px;font-weight:900;letter-spacing:4px;color:#1a3a4a;margin:0;">${coupon.code}</p>
       ${coupon.description ? `<p style="font-size:13px;color:#555;margin:8px 0 0;">${coupon.description}</p>` : ''}
       ${validLine}
     </div>
-    <a href="${BASE_URL}/products" style="display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;margin:0 0 16px;">Shop Now at Jeffi Stores</a>
+    <a href="${BASE_URL}/products" style="display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;margin:0 0 16px;">Shop Now at ${brand}</a>
   `
   const html = `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
 <body style="margin:0;padding:0;background:#f5f5f5;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
@@ -63,17 +64,17 @@ function couponEmail(coupon: Coupon, email: string) {
   <tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
       <tr><td style="background:#1a3a4a;padding:20px 32px;border-radius:8px 8px 0 0;">
-        <a href="${BASE_URL}" style="text-decoration:none;color:#ffffff;font-size:20px;font-weight:700;">Jeffi Store&apos;s</a>
+        <a href="${BASE_URL}" style="text-decoration:none;color:#ffffff;font-size:20px;font-weight:700;">${brand}</a>
       </td></tr>
       <tr><td style="background:#ffffff;padding:32px;border-radius:0 0 8px 8px;">${body}</td></tr>
       <tr><td style="padding:16px 0;text-align:center;font-size:12px;color:#999;">
-        &copy; ${new Date().getFullYear()} Jeffi Store&apos;s &bull; <a href="${BASE_URL}" style="color:#999;">jeffistores.in</a>
+        &copy; ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}" style="color:#999;">jeffistores.in</a>
       </td></tr>
     </table>
   </td></tr>
 </table>
 </body></html>`
-  return { subject: `Your reward coupon from Jeffi Store's — ${coupon.code}`, html }
+  return { subject: `Your reward coupon from ${brand} — ${coupon.code}`, html }
 }
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ slug: string }> }) {
@@ -172,8 +173,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   if (coupon) {
     try {
-      const { subject, html } = couponEmail(coupon, email)
-      await sendAuditedMail({ from: FROM, to: email, subject, html, kind: 'form_submission' })
+      const { subject, html } = await couponEmail(coupon, email)
+      const from = `"${await currentBrandNameAsync()}" <${process.env.SES_FROM_EMAIL}>`
+      await sendAuditedMail({ from, to: email, subject, html, kind: 'form_submission' })
     } catch (err) {
       console.error('[route]', err)
     }

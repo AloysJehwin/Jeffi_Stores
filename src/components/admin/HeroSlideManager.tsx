@@ -6,6 +6,7 @@ import AdminSelect from '@/components/admin/AdminSelect'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import Toggle from '@/components/ui/Toggle'
 import { useCanWrite, RequireWrite } from '@/contexts/AdminScopesContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 export interface HeroSlideRow {
   id: string
@@ -85,6 +86,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
   const [aiPrompt, setAiPrompt] = useState('')
   const [generating, setGenerating] = useState(false)
   const [generatingAll, setGeneratingAll] = useState(false)
+  const storeName = useStoreConfig().identity.name || 'an online store'
   const fileRef = useRef<HTMLInputElement>(null)
   const fileMobileRef = useRef<HTMLInputElement>(null)
 
@@ -163,7 +165,7 @@ function SlideCard({ slide, categoryOptions, brandOptions, gradeOptions, materia
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          scenario: `Homepage hero banner slide for an Indian industrial hardware & tools store. Scenario: ${scenario}`,
+          scenario: `Homepage hero banner slide for ${storeName}. Scenario: ${scenario}`,
           fields: [
             { name: 'title', label: 'Hero title (1-3 punchy words)', type: 'text' },
             { name: 'subtitle', label: 'Supporting line, one concise sentence', type: 'text' },

@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 import { bp } from '@/lib/business-path'
 import BusinessPublicHeader from '@/components/business/PublicHeader'
@@ -20,6 +21,7 @@ function BusinessSignInPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { user, isLoading: authLoading } = useAuth()
+  const config = useStoreConfig()
 
   const callbackUrl = searchParams.get('callbackUrl')
 
@@ -356,7 +358,7 @@ function BusinessSignInPage() {
             </Link>
             <h1 className="text-3xl font-bold text-foreground">Business Sign In</h1>
             <p className="text-sm text-foreground-secondary mt-2">
-              Access your Jeffi Stores business partner account
+              Access your {config.identity.name} business partner account
             </p>
           </div>
 

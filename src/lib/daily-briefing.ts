@@ -401,3 +401,9 @@ export function renderBriefingEmail(data: BriefingData, narration: string): { su
 }
 
 export { FROM as BRIEFING_FROM }
+
+export async function briefingFromAsync(): Promise<string> {
+  const { currentBrandNameAsync } = await import('./brand')
+  const brand = await currentBrandNameAsync()
+  return `"${brand.replace(/"/g, '')} Ops" <${process.env.SES_FROM_EMAIL || 'ops@jeffistores.in'}>`
+}
