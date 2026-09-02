@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { z } from 'zod'
-import { queryOne, queryMany, query, withTransaction } from '@/lib/db'
+import { queryOne, queryMany, query, withTransaction, resolveRequestTenant } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
 import { sendOrderConfirmationEmail, sendNewOrderNotification, sendPaymentStatusUpdate } from '@/lib/email'
 import { createDraftInvoice } from '@/lib/invoice'
@@ -22,7 +22,6 @@ import { sendOrderConfirmedSMS } from '@/lib/sms'
 import { getFeatureFlags } from '@/lib/site-controls'
 import { getRazorpayInstance } from '@/lib/razorpay'
 import { settleVariantChangePayment } from '@/lib/variant-change'
-import { getCurrentTenant } from '@/lib/tenant-context'
 import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
@@ -111,7 +110,7 @@ async function fireRouteTransfer(opts: {
   orderRef: string
   isCod: boolean
 }) {
-  const tenant = getCurrentTenant()
+  const tenant = await resolveRequestTenant()
   if (!tenant?.tenantId) return  // platform's own store — no tenant billing
 
   // Fetch linked account id from control plane

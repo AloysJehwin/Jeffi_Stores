@@ -6,6 +6,7 @@ vi.mock('@/lib/jwt', () => ({
 vi.mock('@/lib/db', () => ({
   query: vi.fn(),
   queryOne: vi.fn(),
+  resolveRequestTenant: vi.fn(async () => null),
 }))
 vi.mock('@/lib/razorpay', () => ({
   isRazorpayEnabled: vi.fn(),
