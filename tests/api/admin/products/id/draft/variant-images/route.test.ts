@@ -14,6 +14,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/s3', () => ({
   uploadVariantImage: vi.fn(),
   getS3Url: vi.fn((key: string) => `https://cdn.example.com/${key}`),
+  currentBucket: vi.fn().mockResolvedValue('jeffi-stores-bucket'),
 }))
 
 import { GET, POST, DELETE, PATCH } from '@/app/api/admin/products/[id]/draft/variant-images/route'
