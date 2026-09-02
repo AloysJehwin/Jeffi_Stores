@@ -770,8 +770,8 @@
     "semantic_hash": "e0ab03bede55e4e34efd488a57053318"
   },
   "src/app/admin/products/add/page.tsx": {
-    "mtime": 1788292489.0279045,
-    "ast_hash": "70834d2c59c1e9673195479b21ade1ef",
+    "mtime": 1788331578.483959,
+    "ast_hash": "588b8ffb0b8ce8b710193fe8b498f4c4",
     "semantic_hash": ""
   },
   "src/app/admin/products/edit/[id]/loading.tsx": {
@@ -780,8 +780,8 @@
     "semantic_hash": "e473b98e8b7e67d6178a8f49fb4dbc53"
   },
   "src/app/admin/products/edit/[id]/page.tsx": {
-    "mtime": 1788292616.1371953,
-    "ast_hash": "fac5c9975e1aa1d83340471f6e2c9ae8",
+    "mtime": 1788331610.8960016,
+    "ast_hash": "49f33055ebd55b42f7129c95299a531c",
     "semantic_hash": ""
   },
   "src/app/admin/products/loading.tsx": {
@@ -3190,8 +3190,8 @@
     "semantic_hash": ""
   },
   "src/components/admin/ImageUpload.tsx": {
-    "mtime": 1787763974.7162404,
-    "ast_hash": "ab7f69f4e0f9b49535e885f2e3159e66",
+    "mtime": 1788331517.1372397,
+    "ast_hash": "77aa87e692e8ed983a65411458e1f405",
     "semantic_hash": ""
   },
   "src/components/admin/InitiateRefundButton.tsx": {
@@ -3240,8 +3240,8 @@
     "semantic_hash": ""
   },
   "src/components/admin/ProductForm.tsx": {
-    "mtime": 1788248295.1042817,
-    "ast_hash": "d50d37bc2cdd2e3a29667388e510cde4",
+    "mtime": 1788331540.7599778,
+    "ast_hash": "4a7bc68e74ae765566fcad9ba2e66bfa",
     "semantic_hash": ""
   },
   "src/components/admin/ProductImage.tsx": {
@@ -5725,8 +5725,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/products/[id]/variants/[variantId]/images/route.test.ts": {
-    "mtime": 1787763975.5377002,
-    "ast_hash": "2b6555147142b8936e53df5dfe05417a",
+    "mtime": 1788321917.3914585,
+    "ast_hash": "ce85af80ecf8f72860f740b73a403f1b",
     "semantic_hash": ""
   },
   "tests/api/admin/products/[id]/variants/[variantId]/sub-variants/[subVariantId]/units/[unitId]/route.test.ts": {
@@ -6450,8 +6450,8 @@
     "semantic_hash": ""
   },
   "tests/api/upload.test.ts": {
-    "mtime": 1787763975.6421835,
-    "ast_hash": "f353fcb2420569e1aa7e2a48ece5f2f4",
+    "mtime": 1788321507.7486176,
+    "ast_hash": "579aa10e326f1fa9916b713520a434af",
     "semantic_hash": ""
   },
   "tests/api/user/accept-policies/route.test.ts": {
@@ -9345,8 +9345,8 @@
     "semantic_hash": ""
   },
   "tests/api/admin/products/id/draft/variant-images/route.test.ts": {
-    "mtime": 1787763975.5472052,
-    "ast_hash": "710d79a28108b6125fe8e15b77237a08",
+    "mtime": 1788321922.930636,
+    "ast_hash": "41d3cca4b73ac820e9d90b0f63e8e41d",
     "semantic_hash": ""
   },
   "tests/lib/bank-verify.test.ts": {

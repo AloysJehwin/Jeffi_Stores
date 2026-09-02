@@ -78,7 +78,9 @@ async function createProduct(formData: FormData) {
       throw new Error(errors[0])
     }
   }
-  const imageCount = parseInt(formData.get('image_count') as string || '0')
+  const productId = (formData.get('product_id') as string) || null
+  const uploadedImagesJson = formData.get('uploaded_images') as string
+  const uploadedImages: any[] = uploadedImagesJson ? JSON.parse(uploadedImagesJson) : []
   const galleryImageIdsJson = formData.get('gallery_image_ids') as string
   const galleryImageRefs: { id: string; isPrimary: boolean }[] = galleryImageIdsJson ? JSON.parse(galleryImageIdsJson) : []
   const imageOrderJson = formData.get('image_order') as string
@@ -101,14 +103,15 @@ async function createProduct(formData: FormData) {
   try {
     const data = await queryOne(
       `INSERT INTO products (
-        name, slug, sku, description, category_id, brand_id,
+        ${productId ? 'id, ' : ''}name, slug, sku, description, category_id, brand_id,
         base_price, mrp, mrp_ex_gst, price_ex_gst, gst_percentage, hsn_code, mpn, gtin,
         stock_status, weight, dimensions, is_active, is_featured,
         has_variants, variant_type, sub_variant_type,
         weight_grams, package_type, length_cm, breadth_cm, height_cm, cost_price, discount_pct, supplier_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30)
+      ) VALUES (${productId ? '$1, ' : ''}${(productId ? [...Array(30)].map((_, i) => `$${i + 2}`) : [...Array(30)].map((_, i) => `$${i + 1}`)).join(', ')})
       RETURNING *`,
       [
+        ...(productId ? [productId] : []),
         name, slug, sku, description, categoryId, brandId || null,
         basePrice, mrp, mrpExGst, salePrice, gstPercentage, hsnCode, mpn, gtin,
         stockStatus, weight, dimensions, isActive, isFeatured,
@@ -119,30 +122,27 @@ async function createProduct(formData: FormData) {
 
     if (!data) throw new Error('Failed to create product')
 
-    if (imageCount > 0 || galleryImageRefs.length > 0) {
-      const { uploadProductImage } = await import('@/lib/s3')
+    if (uploadedImages.length > 0 || galleryImageRefs.length > 0) {
       const newFileIds: Record<number, string> = {}
 
-      for (let i = 0; i < imageCount; i++) {
-        const file = formData.get(`image_${i}`) as File
-        if (file) {
-          const uploadResult = await uploadProductImage(file, data.id)
-          const inserted = await queryOne<{ id: string }>(
-            `INSERT INTO product_images (
-              product_id, image_url, thumbnail_url, s3_bucket, s3_key,
-              s3_thumbnail_key, file_name, file_size, mime_type, width,
-              height, display_order, is_primary
-            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
-            [
-              data.id, uploadResult.url, uploadResult.thumbnailUrl,
-              uploadResult.s3Bucket,
-              uploadResult.s3Key, uploadResult.s3ThumbnailKey,
-              uploadResult.fileName, uploadResult.fileSize, uploadResult.mimeType,
-              uploadResult.width, uploadResult.height, 999, false,
-            ]
-          )
-          if (inserted) newFileIds[i] = inserted.id
-        }
+      for (let i = 0; i < uploadedImages.length; i++) {
+        const img = uploadedImages[i]
+        if (!img) continue
+        const inserted = await queryOne<{ id: string }>(
+          `INSERT INTO product_images (
+            product_id, image_url, thumbnail_url, s3_bucket, s3_key,
+            s3_thumbnail_key, file_name, file_size, mime_type, width,
+            height, display_order, is_primary
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+          [
+            data.id, img.url, img.thumbnailUrl,
+            img.s3Bucket,
+            img.s3Key, img.s3ThumbnailKey,
+            img.fileName, img.fileSize, img.mimeType,
+            img.width, img.height, 999, false,
+          ]
+        )
+        if (inserted) newFileIds[i] = inserted.id
       }
 
       const newGalleryIds: Record<string, string> = {}

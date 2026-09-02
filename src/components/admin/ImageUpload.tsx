@@ -4,6 +4,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import ImgWithSkeleton from '@/components/ui/ImgWithSkeleton'
 import GalleryPicker, { type GalleryImage } from '@/components/admin/GalleryPicker'
 
+const MAX_FILE_BYTES = 5 * 1024 * 1024
+
 interface LocalImage {
   file?: File
   previewUrl: string
@@ -102,6 +104,11 @@ export default function ImageUpload({
     if (files.length === 0) return
     if (images.length + files.length > maxImages) {
       setError(`You can only upload up to ${maxImages} images`)
+      return
+    }
+    const oversized = files.filter(f => f.size > MAX_FILE_BYTES)
+    if (oversized.length > 0) {
+      setError(`${oversized[0].name} is too large (max 5MB per image)`)
       return
     }
     setError(null)
