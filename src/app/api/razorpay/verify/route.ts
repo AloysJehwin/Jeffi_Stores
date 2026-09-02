@@ -23,7 +23,7 @@ import { getFeatureFlags } from '@/lib/site-controls'
 import { getRazorpayInstance } from '@/lib/razorpay'
 import { settleVariantChangePayment } from '@/lib/variant-change'
 import { getCurrentTenant } from '@/lib/tenant-context'
-import { transferToLinkedAccount } from '@/lib/razorpay-route'
+import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
 
 const VerifySchema = z.object({
@@ -112,7 +112,7 @@ async function fireRouteTransfer(opts: {
   isCod: boolean
 }) {
   const tenant = getCurrentTenant()
-  if (!tenant?.tenantId) return  // platform's own store — no Route transfer needed
+  if (!tenant?.tenantId) return  // platform's own store — no tenant billing
 
   // Fetch linked account id from control plane
   const pool = controlPlanePool()
@@ -123,8 +123,21 @@ async function fireRouteTransfer(opts: {
     `SELECT razorpay_linked_account_id, daily_payout FROM tenants WHERE id=$1 AND status='active'`, [tenant.tenantId]
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
-  if (!linkedAccountId) return  // not active, or no linked account yet — skip silently
   const dailyPayout = row?.rows[0]?.daily_payout === true
+
+  // Record the sale for central-admin billing regardless of Route onboarding. When a linked
+  // account exists we fire the transfer and record the real split; otherwise the seller keeps
+  // the gross until Route reconciles.
+  if (!linkedAccountId) {
+    await recordTenantTransaction({
+      tenantId: tenant.tenantId,
+      orderRef: opts.orderRef,
+      grossAmountInr: opts.totalAmountInr,
+      isCod: opts.isCod,
+      gatewayTxnId: opts.paymentId,
+    })
+    return
+  }
 
   const grossPaise = Math.round(opts.totalAmountInr * 100)
   const result = await transferToLinkedAccount({
@@ -137,19 +150,18 @@ async function fireRouteTransfer(opts: {
     dailyPayout,
   })
 
-  // Record in control-plane tenant_transactions for billing visibility
-  await pool.query(
-    `INSERT INTO tenant_transactions
-       (tenant_id, order_ref, gross_amount, tenant_share, platform_commission, gateway_fee, gateway, gateway_txn_id, is_cod, status, occurred_at)
-     VALUES ($1,$2,$3,$4,$5,$6,'razorpay_route',$7,$8,'captured',now())
-     ON CONFLICT DO NOTHING`,
-    [tenant.tenantId, opts.orderRef, opts.totalAmountInr,
-     result.amount / 100,
-     result.platformCommissionPaise / 100,
-     (result.gatewayFeePaise + result.transferFeePaise) / 100,
-     result.transferId,
-     opts.isCod]
-  ).catch(() => {})  // non-fatal — transfer already succeeded
+  await recordTenantTransaction({
+    tenantId: tenant.tenantId,
+    orderRef: opts.orderRef,
+    grossAmountInr: opts.totalAmountInr,
+    isCod: opts.isCod,
+    gatewayTxnId: result.transferId || opts.paymentId,
+    split: {
+      tenantShareInr: result.amount / 100,
+      platformCommissionInr: result.platformCommissionPaise / 100,
+      gatewayFeeInr: (result.gatewayFeePaise + result.transferFeePaise) / 100,
+    },
+  })
 }
 
 async function commitDraft(args: {

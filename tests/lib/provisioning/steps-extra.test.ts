@@ -78,11 +78,11 @@ afterEach(() => {
 
 // ── generate_legals — non-fatal ──────────────────────────────────────────────
 describe('generate_legals', () => {
-  it('generates legals and advances to ensure_compute', async () => {
+  it('generates legals and advances to seed_settings', async () => {
     const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
     await advanceProvisioningJob(job({ step: 'generate_legals', created_resources: { endpoint: 'ep' } }), new StubProvisioningProvider(0))
     expect(legals.generateTenantLegals).toHaveBeenCalledWith('t-1', 'ep')
-    const p = patches().find((x) => x.step === 'ensure_compute')
+    const p = patches().find((x) => x.step === 'seed_settings')
     expect(p?.created_resources).toMatchObject({ legalsGenerated: true })
   })
 
@@ -90,8 +90,27 @@ describe('generate_legals', () => {
     legals.generateTenantLegals.mockRejectedValue(new Error('template render failed'))
     const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
     await advanceProvisioningJob(job({ step: 'generate_legals', created_resources: { endpoint: 'ep' } }), new StubProvisioningProvider(0))
-    const p = patches().find((x) => x.step === 'ensure_compute')
+    const p = patches().find((x) => x.step === 'seed_settings')
     expect(p?.created_resources?.legalsError).toMatch(/template render failed/)
+  })
+})
+
+// ── seed_settings — non-fatal onboarding → site_settings copy ─────────────────
+describe('seed_settings', () => {
+  it('advances to ensure_compute and skips when no owner is recorded', async () => {
+    reg.controlPlanePool.mockReturnValue({ query: vi.fn().mockResolvedValue({ rows: [] }) })
+    const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
+    await advanceProvisioningJob(job({ step: 'seed_settings', created_resources: { endpoint: 'ep' } }), new StubProvisioningProvider(0))
+    const p = patches().find((x) => x.step === 'ensure_compute')
+    expect(p?.created_resources?.settingsSeeded).toMatch(/skipped/)
+  })
+
+  it('is non-fatal when the owner lookup throws — still advances to ensure_compute', async () => {
+    reg.controlPlanePool.mockImplementation(() => { throw new Error('control plane down') })
+    const { advanceProvisioningJob } = await import('@/lib/provisioning/steps')
+    await advanceProvisioningJob(job({ step: 'seed_settings', created_resources: { endpoint: 'ep' } }), new StubProvisioningProvider(0))
+    const p = patches().find((x) => x.step === 'ensure_compute')
+    expect(p?.created_resources?.settingsError).toMatch(/control plane down/)
   })
 })
 
