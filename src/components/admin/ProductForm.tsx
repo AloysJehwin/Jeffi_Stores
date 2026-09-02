@@ -253,7 +253,7 @@ export default function ProductForm({ categories, brands, action, product, produ
   const [existingImagesToKeep, setExistingImagesToKeep] = useState<any[]>([])
   const [galleryImageIds, setGalleryImageIds] = useState<{ id: string; isPrimary: boolean }[]>([])
   const [imageOrder, setImageOrder] = useState<string[]>([])
-  const [tempProductId] = useState<string>(productId || `temp-${Date.now()}`)
+  const [tempProductId] = useState<string>(productId || crypto.randomUUID())
   const [hasVariants, setHasVariants] = useState(product?.has_variants ?? false)
   const [variantPopupId, setVariantPopupId] = useState<string | null>(null)
   const pendingPopupVariantIdRef = useRef<string | null>(null)
@@ -1447,10 +1447,22 @@ export default function ProductForm({ categories, brands, action, product, produ
         formData.set('popup_variant_id', pendingPopupVariantIdRef.current)
       }
 
-      imageFiles.forEach((file, index) => {
-        formData.append(`image_${index}`, file)
-      })
-      formData.append('image_count', imageFiles.length.toString())
+      const uploadedImages: any[] = []
+      for (const file of imageFiles) {
+        const uploadForm = new FormData()
+        uploadForm.append('file', file)
+        uploadForm.append('productId', tempProductId)
+        const res = await fetch('/api/upload', { method: 'POST', body: uploadForm })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          setError(body?.error || `Failed to upload ${file.name}`)
+          setIsSubmitting(false)
+          return
+        }
+        uploadedImages.push(await res.json())
+      }
+      formData.append('uploaded_images', JSON.stringify(uploadedImages))
+      if (!productId) formData.append('product_id', tempProductId)
       formData.append('gallery_image_ids', JSON.stringify(galleryImageIds))
       formData.append('image_order', JSON.stringify(imageOrder))
       formData.append('existing_images_to_keep', JSON.stringify(existingImagesToKeep))
