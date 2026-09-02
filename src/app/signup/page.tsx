@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useAuth } from '@/contexts/AuthContext'
 import { useCart } from '@/contexts/CartContext'
 import { useToast } from '@/contexts/ToastContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 import { Suspense } from 'react'
 import { openGoogleOAuthPopup } from '@/lib/google-oauth-popup'
 
@@ -76,6 +77,7 @@ function SignupPage() {
   const { signup, googleLoginWithAccessToken } = useAuth()
   const { refreshCart } = useCart()
   const { showToast } = useToast()
+  const config = useStoreConfig()
 
   const [step, setStep] = useState<'details' | 'otp' | 'phone'>('details')
   const [email, setEmail] = useState(prefillEmail)
@@ -334,7 +336,7 @@ function SignupPage() {
           <div className="text-center mb-8">
             <h2 className="text-3xl font-bold text-foreground">Create Account</h2>
             <p className="mt-2 text-sm text-foreground-secondary">
-              Join Jeffi Stores for the best hardware deals
+              Join {config.identity.name} for exclusive deals
             </p>
           </div>
 

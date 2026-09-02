@@ -17,7 +17,7 @@ const OLLAMA_MODEL = () => process.env.OLLAMA_EMAIL_MODEL || 'gemma3:4b'
 // upstream (Razer) is slow or the model stalls.
 const GENERATE_TIMEOUT_MS = 90_000
 
-const SYSTEM_PROMPT = `You write marketing/support emails for Jeffi Stores, an Indian hardware & tools store.
+const SYSTEM_PROMPT = (store: string, storeUrl: string) => `You write marketing/support emails for ${store}.
 Return ONLY valid JSON: {"html":"<email body html>"}
 
 STRUCTURE — the html goes inside an existing branded email shell (logo + footer are already added), so output ONLY the body. No <html>/<head>/<body>/<style> tags.
@@ -38,7 +38,7 @@ LINKS & BUTTONS — NEVER write placeholders like [Tracking Link] or [Link]. Use
 - ALWAYS include exactly ONE call-to-action BUTTON near the end, using this exact markup:
   <p style="text-align:center;margin:24px 0;"><a href="URL" target="_blank" rel="noopener" style="display:inline-block;background:#e07b3f;color:#ffffff;text-decoration:none;padding:12px 28px;border-radius:6px;font-weight:600;font-size:15px;">Button Label</a></p>
 
-URLs — use https://jeffistores.in for the storefront. For "track order" / "view order" actions use https://jeffistores.in/account/orders. Never invent tracking numbers or fake URLs; if a specific order link isn't known, link to the account orders page.
+URLs — use ${storeUrl} for the storefront. For "track order" / "view order" actions use ${storeUrl}/account/orders. Never invent tracking numbers or fake URLs; if a specific order link isn't known, link to the account orders page.
 
 VARIABLES — insert these tokens verbatim (replaced per recipient at send time). Do NOT wrap them in styling spans:
   {customer_first_name} {customer_name} {store_name} {store_phone} {store_email} {store_web}
@@ -69,13 +69,15 @@ export async function POST(request: NextRequest) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), GENERATE_TIMEOUT_MS)
   try {
+    const { storeDescriptorForPrompt, storeBaseUrlAsync } = await import('@/lib/brand')
+    const [descriptor, storeUrl] = await Promise.all([storeDescriptorForPrompt(), storeBaseUrlAsync()])
     const res = await fetch(`${OLLAMA_URL()}/api/generate`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
         model: OLLAMA_MODEL(),
-        prompt: `${SYSTEM_PROMPT}\n\nUser: ${userPrompt}\n\nAssistant:`,
+        prompt: `${SYSTEM_PROMPT(descriptor, storeUrl)}\n\nUser: ${userPrompt}\n\nAssistant:`,
         stream: false,
         format: 'json',
         // Room to finish the HTML — a low cap truncates the JSON string and

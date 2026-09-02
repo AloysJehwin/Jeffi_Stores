@@ -46,7 +46,7 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
-  const subject = 'Your Verification Code - Jeffi Stores'
+  const subject = `Your Verification Code - ${brand}`
   const html = `
       <!DOCTYPE html>
       <html>
@@ -104,16 +104,15 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
           </style>
         </head>
         <body>
-          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Your Jeffi Stores OTP is ${otp} — valid for 10 minutes. Do not share.</span>
+          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Your ${brand} OTP is ${otp} — valid for 10 minutes. Do not share.</span>
           <div class="container">
             <div class="header">
               <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-              <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
             <h2>Email Verification</h2>
             <p>Hello ${name || 'Customer'},</p>
-            <p>Thank you for registering with Jeffi Stores. Please use the following One-Time Password (OTP) to verify your email address:</p>
+            <p>Thank you for registering. Please use the following One-Time Password (OTP) to verify your email address:</p>
 
             <div class="otp-box">${otp}</div>
 
@@ -159,7 +158,7 @@ export async function sendWelcomeEmail(email: string, name: string) {
   const from = await customerMailFromAsync()
   const brand = await currentBrandNameAsync()
   const address = await storeAddressLine()
-  const subject = 'Welcome to Jeffi Stores!'
+  const subject = `Welcome to ${brand}!`
   const html = `
       <!DOCTYPE html>
       <html>
@@ -209,23 +208,22 @@ export async function sendWelcomeEmail(email: string, name: string) {
           </style>
         </head>
         <body>
-          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Welcome to Jeffi Stores! Your account is ready — shop industrial tools, hardware and more.</span>
+          <span style="display:none;font-size:1px;color:#fff;max-height:0;overflow:hidden;mso-hide:all;">Welcome to ${brand}! Your account is ready.</span>
           <div class="container">
             <div class="header">
               <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-              <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
-            <h2>Welcome to Jeffi Stores!</h2>
+            <h2>Welcome to ${brand}!</h2>
             <p>Hello ${name},</p>
-            <p>Thank you for creating an account with us. We're excited to have you as part of the Jeffi Stores family!</p>
+            <p>Thank you for creating an account with us. We're excited to have you on board!</p>
 
-            <p>At Jeffi Stores, you'll find:</p>
+            <p>With your account you can:</p>
             <ul>
-              <li>Wide range of industrial machinery parts</li>
-              <li>Quality components for manufacturing & construction</li>
-              <li>Expert service and support</li>
-              <li>Competitive pricing</li>
+              <li>Browse our full catalogue</li>
+              <li>Track your orders</li>
+              <li>Check out faster</li>
+              <li>Get expert service and support</li>
             </ul>
 
             <div style="text-align: center;">
@@ -338,7 +336,6 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
           <div class="container">
             <div class="header">
               <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-              <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
             <h2>Order Received!</h2>
@@ -711,7 +708,6 @@ export async function sendOrderStatusUpdate(
           <div class="container">
             <div class="header">
               <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-              <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
             <h2>${statusInfo.title}</h2>
@@ -932,7 +928,6 @@ export async function sendPaymentStatusUpdate(
           <div class="container">
             <div class="header">
               <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-              <p style="color: #666;">Hardware &amp; Tools</p>
             </div>
 
             <h2>${paymentInfo.title}</h2>
@@ -1208,6 +1203,7 @@ export async function sendAdminCertificateEmail(
 
 export async function sendNewReviewNotification(review: any, user: any, product: any) {
   const adminEmail = await getAdminNotificationEmails()
+  const brand = await currentBrandNameAsync()
 
   const mailOptions = {
     from: adminMailFrom(),
@@ -1356,7 +1352,7 @@ export async function sendNewReviewNotification(review: any, user: any, product:
             </div>
 
             <div class="footer">
-              <p>This is an automated notification from Jeffi Stores Admin Panel</p>
+              <p>This is an automated notification from ${brand} Admin Panel</p>
               <p>Please review and approve/reject this review from the admin dashboard</p>
             </div>
           </div>
@@ -1518,11 +1514,10 @@ export async function sendAdminContactEmail(
           <div class="container">
             <div class="header">
               <div style="font-size:28px;font-weight:bold;color:#2563eb;letter-spacing:0.5px;">${brand}</div>
-              <p style="color: #666; margin: 4px 0 0;">Hardware &amp; Tools</p>
             </div>
             <div class="message-box">${messageHtml}</div>
             <div class="footer">
-              <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
+              <p>This message was sent by the ${brand} team. Please do not reply directly to this email.</p>
               <p><strong>${brand}</strong>${address ? ` | ${address}` : ''}</p>
               ${contactLine}
             </div>
@@ -1587,7 +1582,7 @@ export async function sendSupportEscalationEmail(
           <p>Click below to open the customer profile and join the chat:</p>
           <a href="${chatLink}" class="cta">Open Support Chat</a>
         </div>
-        <div class="footer"><p>Jeffi Stores Admin Notification — do not reply to this email.</p></div>
+        <div class="footer"><p>${brand} Admin Notification — do not reply to this email.</p></div>
       </div></body></html>
     `,
   }
@@ -1640,7 +1635,7 @@ export async function sendAgentConnectedEmail(
           <a href="${chatLink}" class="cta">Return to Chat</a>
           <p style="margin-top:24px;font-size:13px;color:#6b7280;">If you no longer need assistance, you can close the chat from the support page.</p>
         </div>
-        <div class="footer"><p>Jeffi Stores Support — do not reply to this email.</p></div>
+        <div class="footer"><p>${brand} Support — do not reply to this email.</p></div>
       </div></body></html>
     `,
   }
@@ -1736,7 +1731,7 @@ export async function sendReturnStatusEmail(
           ${event !== 'requested_admin' ? `<p>Hi ${recipientName},</p>` : ''}
           ${bodies[event]}
         </div>
-        <div class="footer"><p>Jeffi Stores — do not reply to this email.</p></div>
+        <div class="footer"><p>${brand} — do not reply to this email.</p></div>
       </div></body></html>
     `,
   }
@@ -1794,7 +1789,7 @@ export async function sendPaymentRetryEmail(
     <a href="${shopUrl}" class="cta">Shop Again →</a>
     <p class="note">If you need any help or have questions, just reply to this email and we'll be happy to assist.</p>
   </div>
-  <div class="ftr">© ${new Date().getFullYear()} Jeffi Store's &bull; <a href="${BASE_URL}" style="color:#9ca3af">jeffistores.in</a></div>
+  <div class="ftr">© ${new Date().getFullYear()} ${brand} &bull; <a href="${BASE_URL}" style="color:#9ca3af">${brand}</a></div>
 </div>
 </body></html>`
 
@@ -1831,7 +1826,7 @@ export async function sendInvoiceFinalizedEmail(
   const mailOptions = {
     from: await customerMailFromAsync(),
     to: toEmail,
-    subject: `Invoice ${invoiceNumber} from Jeffi Stores`,
+    subject: `Invoice ${invoiceNumber} from ${brand}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -1908,7 +1903,7 @@ export async function sendPurchaseOrderEmail(
   const mailOptions = {
     from: await customerMailFromAsync(),
     to: toEmail,
-    subject: `Purchase Order ${poNumber} from Jeffi Stores`,
+    subject: `Purchase Order ${poNumber} from ${brand}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -2068,7 +2063,7 @@ export async function sendQuotationFinalizedEmail(
   const mailOptions = {
     from: await customerMailFromAsync(),
     to: toEmail,
-    subject: `Quotation ${quoteNumber} from Jeffi Stores`,
+    subject: `Quotation ${quoteNumber} from ${brand}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -2089,7 +2084,7 @@ export async function sendQuotationFinalizedEmail(
             <div class="header"><div style="font-size:28px;font-weight:bold;color:#ffffff;letter-spacing:0.5px;">${brand}</div></div>
             <div class="body">
               <p>Dear ${consigneeName},</p>
-              <p>Please find your quotation from Jeffi Stores.</p>
+              <p>Please find your quotation from ${brand}.</p>
               <div class="box">
                 <p style="margin:0 0 6px"><strong>Quotation No.:</strong> ${quoteNumber}</p>
                 <p style="margin:0"><strong>Total Amount:</strong> ₹${formatted}</p>
@@ -2184,7 +2179,7 @@ export async function sendOrderAutoCancelledEmail(
             <p style="margin-top:25px;">If you completed the payment but still received this email, please contact us so we can reconcile your transaction.</p>
             <div class="footer">
               ${contactLine || '<p>Need help? Reply to this email.</p>'}
-              <p>&copy; ${new Date().getFullYear()} Jeffi Stores</p>
+              <p>&copy; ${new Date().getFullYear()} ${brand}</p>
             </div>
           </div>
         </body>
@@ -2275,8 +2270,8 @@ export async function sendOrderDelayNotification(args: {
 }) {
   const { toEmail, customerName, orderNumber, delayDays, reason } = args
   const dayLabel = delayDays === 1 ? 'day' : 'days'
-  const subject = `Update on your Jeffi Stores order ${orderNumber}`
   const brand = await currentBrandNameAsync()
+  const subject = `Update on your ${brand} order ${orderNumber}`
   const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>${subject}</title></head>
 <body style="margin:0;padding:0;background:#f4f6f8;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#0f172a;">
@@ -2290,7 +2285,7 @@ export async function sendOrderDelayNotification(args: {
           <p style="margin:0 0 16px;"><strong>Reason:</strong> ${reason}</p>
           <p style="margin:0 0 16px;">We're sorry for the inconvenience. We'll send you another update as soon as the situation changes, and your order is on its way.</p>
           <p style="margin:0 0 16px;">If you have any questions, just reply to this email and we'll get back to you.</p>
-          <p style="margin:24px 0 0;color:#475569;">Thank you for your patience,<br>The Jeffi Stores team</p>
+          <p style="margin:24px 0 0;color:#475569;">Thank you for your patience,<br>The ${brand} team</p>
         </td></tr>
         <tr><td style="padding:20px 28px;font-size:12px;color:#64748b;border-top:1px solid #e2e8f0;">This is an automated update about order ${orderNumber}. Please do not reply with sensitive information.</td></tr>
       </table>
@@ -2307,7 +2302,7 @@ We're sorry for the inconvenience. We'll send another update as soon as the situ
 
 If you have any questions, just reply to this email.
 
-— The Jeffi Stores team`
+— The ${brand} team`
 
   try {
     const info = await sendAuditedMail({
@@ -2381,16 +2376,16 @@ export async function sendProductAnnouncementEmail(args: {
           <p style="margin:0 0 12px;font-size:15px;">Hi ${escapeHtml(customerName || 'there')},</p>
           <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:#334155;">${escapeHtml(cleanIntro)}</p>
           ${cards}
-          <p style="margin:18px 0 0;font-size:13px;color:#64748b;">Visit <a href="${siteUrl}" style="color:#1a3a4a;">jeffistores.in</a> for the full catalogue.</p>
+          <p style="margin:18px 0 0;font-size:13px;color:#64748b;">Visit <a href="${siteUrl}" style="color:#1a3a4a;">${escapeHtml(brand)}</a> for the full catalogue.</p>
         </td></tr>
-        <tr><td style="padding:18px 24px;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0;">You are receiving this because you opted in to product updates from Jeffi Stores. To stop receiving these, reply to this email with "unsubscribe".</td></tr>
+        <tr><td style="padding:18px 24px;font-size:11px;color:#64748b;border-top:1px solid #e2e8f0;">You are receiving this because you opted in to product updates from ${escapeHtml(brand)}. To stop receiving these, reply to this email with "unsubscribe".</td></tr>
       </table>
     </td></tr>
   </table>
 </body></html>`
 
   const textProducts = products.map(p => `• ${p.name} — ₹${p.price}\n  ${siteUrl}/products/${p.slug}`).join('\n\n')
-  const text = `Hi ${customerName || 'there'},\n\n${cleanIntro}\n\n${textProducts}\n\nVisit ${siteUrl} for the full catalogue.\n\n— Jeffi Stores`
+  const text = `Hi ${customerName || 'there'},\n\n${cleanIntro}\n\n${textProducts}\n\nVisit ${siteUrl} for the full catalogue.\n\n— ${brand}`
 
   try {
     const info = await sendAuditedMail({

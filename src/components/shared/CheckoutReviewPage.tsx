@@ -39,6 +39,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const { showToast } = useToast()
   const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
   const gstEnabled = useStoreConfig().flags.gstEnabled
+  const storeName = useStoreConfig().identity.name
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -543,7 +544,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
         amount: rzpData.amount,
         currency: rzpData.currency,
-        name: 'Jeffi Stores',
+        name: storeName,
         description: 'Order Payment',
         order_id: rzpData.razorpayOrderId,
         handler: async function (response: any) {

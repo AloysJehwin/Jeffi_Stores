@@ -1,4 +1,5 @@
 import { query, queryOne } from './db'
+import { currentBrandName } from './brand'
 
 export type CampaignKind =
   | 'abandoned_cart'
@@ -233,7 +234,7 @@ export function wrapWithTracking(html: string, sentId: string, unsubscribeUrl: s
   const pixel = `<img src="${buildTrackingPixelUrl(sentId, baseUrl)}" width="1" height="1" alt="" style="display:none;"/>`
   const footer = `
     <div style="margin-top: 32px; padding-top: 16px; border-top: 1px solid #e5e7eb; color: #6b7280; font-size: 12px; text-align: center;">
-      <p>You're receiving this email because you signed up at ${storeName || 'Jeffi Stores'}.<br/>
+      <p>You're receiving this email because you signed up at ${storeName || currentBrandName()}.<br/>
       <a href="${unsubscribeUrl}" style="color: #6b7280; text-decoration: underline;">Unsubscribe</a> from marketing emails.</p>
     </div>
   `

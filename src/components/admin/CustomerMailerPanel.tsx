@@ -6,6 +6,7 @@ import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import RichTextEditor from '@/components/admin/RichTextEditor'
 import { useToast } from '@/contexts/ToastContext'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import { useStoreConfig } from '@/contexts/StoreConfigContext'
 
 interface Coupon {
   id: string
@@ -166,7 +167,7 @@ function buildQuickTemplates(ctx: CustomerContext): QuickTemplate[] {
   if (segments.includes('dormant')) {
     templates.push({
       label: 'Win Back',
-      subject: `${first}, we miss you at Jeffi Store's`,
+      subject: `${first}, we miss you`,
       headline: `It's been a while, ${first}!`,
       body: `We noticed you haven't shopped with us in a while and we genuinely miss having you around. We'd love to welcome you back — there's a lot that's new since your last visit!`,
     })
@@ -205,9 +206,9 @@ function buildQuickTemplates(ctx: CustomerContext): QuickTemplate[] {
     })
     templates.push({
       label: 'Welcome',
-      subject: `Welcome to Jeffi Store's, ${first}!`,
+      subject: `Welcome, ${first}!`,
       headline: `Welcome to the family!`,
-      body: `Hi ${first}, welcome to Jeffi Store's! We're your one-stop destination for quality hardware and tools. Whether you're a professional or a DIY enthusiast, we've got exactly what you need. We're excited to have you with us!`,
+      body: `Hi ${first}, welcome! We're your one-stop destination for quality products and service. Whether you're a professional or a DIY enthusiast, we've got exactly what you need. We're excited to have you with us!`,
     })
   }
 
@@ -276,7 +277,7 @@ function buildQuickTemplates(ctx: CustomerContext): QuickTemplate[] {
   templates.push({
     label: 'Promotion',
     subject: `${first}, a special offer just for you`,
-    headline: `Something special from Jeffi Store's`,
+    headline: `Something special just for you`,
     body: `Hi ${first}, we've put together an exclusive offer that we think you'll love. Don't miss out — this is only available for a limited time!`,
   })
 
@@ -470,13 +471,16 @@ export default function CustomerMailerPanel({
     ? segments.map(s => s.replace(/_/g, ' ')).join(', ')
     : 'customer'
 
+  const storeConfig = useStoreConfig()
+  const storeName = storeConfig.identity.name || 'this store'
+
   const aiContext = [
     `Customer: ${customerName}.`,
     `Segment: ${segmentLabel}.`,
     healthScore !== null ? `Health score: ${healthScore}/100.` : '',
     daysSinceLastOrder !== null ? `Days since last order: ${daysSinceLastOrder}.` : totalOrders === 0 ? 'No orders yet.' : '',
     `Total orders: ${totalOrders}. Lifetime value: ₹${Math.round(lifetimeValue).toLocaleString('en-IN')}.`,
-    `Email template type: ${templateKey}. Store: Jeffi Store's (hardware/tools).`,
+    `Email template type: ${templateKey}. Store: ${storeName}.`,
   ].filter(Boolean).join(' ')
 
   if (sendResult) {

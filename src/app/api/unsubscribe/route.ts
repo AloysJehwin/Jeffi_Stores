@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { query, queryOne } from '@/lib/db'
+import { currentBrandNameAsync } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,12 +35,13 @@ export async function GET(req: NextRequest) {
   }
 
   const result = await unsubscribe(token, campaign)
+  const brand = await currentBrandNameAsync()
   const html = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Unsubscribed — Jeffi Stores</title>
+  <title>Unsubscribed — ${brand}</title>
   <style>
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 480px; margin: 80px auto; padding: 24px; color: #18181b; text-align: center; }
     h1 { font-size: 24px; margin-bottom: 12px; }
@@ -50,9 +52,9 @@ export async function GET(req: NextRequest) {
 <body>
   ${result.ok
     ? `<h1>You've been unsubscribed</h1>
-       <p>${result.email ? `<strong>${result.email}</strong>` : 'You'} will no longer receive marketing emails from Jeffi Stores.</p>
+       <p>${result.email ? `<strong>${result.email}</strong>` : 'You'} will no longer receive marketing emails from ${brand}.</p>
        <p>You'll still get transactional emails (order confirmations, OTPs, etc.).</p>
-       <p style="margin-top:24px;"><a href="/">Return to Jeffi Stores</a></p>`
+       <p style="margin-top:24px;"><a href="/">Return to ${brand}</a></p>`
     : `<h1>Link not recognised</h1>
        <p>This unsubscribe link is invalid or expired. <a href="/account">Sign in</a> to manage email preferences.</p>`
   }

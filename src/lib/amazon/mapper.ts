@@ -121,8 +121,8 @@ const STORE_CONTACT_TEXT =
   "Jeffi Stores, Sanjay Gandhi Chowk, Opposite Arihant Complex, Station Road, Raipur, " +
   "Chhattisgarh 492001, India. Phone: +919685354099. Email: admin@jeffistores.in"
 
-function contactInfoAttr(marketplaceId: string) {
-  return [{ value: STORE_CONTACT_TEXT, language_tag: 'en_IN', marketplace_id: marketplaceId }]
+function contactInfoAttr(marketplaceId: string, contactText?: string) {
+  return [{ value: contactText || STORE_CONTACT_TEXT, language_tag: 'en_IN', marketplace_id: marketplaceId }]
 }
 
 // external_product_information carries the HSN code on the India marketplace.
@@ -195,7 +195,7 @@ function childVariationAttrs(parentSku: string, marketplaceId: string): Record<s
 }
 
 // Attributes shared by every SKU (parent + children + simple).
-function buildCommonAttributes(product: any, brandName: string, marketplaceId: string): Record<string, unknown> {
+function buildCommonAttributes(product: any, brandName: string, marketplaceId: string, contactText?: string): Record<string, unknown> {
   const description = (product.description || product.name || '').slice(0, 2000)
   const bullets = buildProductHighlights(product).slice(0, 5)
   const common: Record<string, unknown> = {
@@ -208,9 +208,9 @@ function buildCommonAttributes(product: any, brandName: string, marketplaceId: s
     item_weight: buildItemWeight(product, marketplaceId),
     item_length_width: buildItemLengthWidth(product, marketplaceId),
     unit_count: buildUnitCount(marketplaceId),
-    rtip_manufacturer_contact_information: contactInfoAttr(marketplaceId),
-    importer_contact_information: contactInfoAttr(marketplaceId),
-    packer_contact_information: contactInfoAttr(marketplaceId),
+    rtip_manufacturer_contact_information: contactInfoAttr(marketplaceId, contactText),
+    importer_contact_information: contactInfoAttr(marketplaceId, contactText),
+    packer_contact_information: contactInfoAttr(marketplaceId, contactText),
     ...buildColorAndComponents(product, marketplaceId),
     ...buildImageAttributes(product, marketplaceId),
   }
@@ -223,10 +223,10 @@ function buildCommonAttributes(product: any, brandName: string, marketplaceId: s
   return common
 }
 
-export function productToAmazonListings(product: any, marketplaceId: string): AmazonListing[] {
+export function productToAmazonListings(product: any, marketplaceId: string, contactText?: string): AmazonListing[] {
   const productType = resolveProductType(product)
   const brandName = product.brands?.name || ''
-  const common = buildCommonAttributes(product, brandName, marketplaceId)
+  const common = buildCommonAttributes(product, brandName, marketplaceId, contactText)
   const hasVariants = product.has_variants && product.product_variants?.length > 0
   const productActive = product.is_active !== false
   const parentSku = product.sku

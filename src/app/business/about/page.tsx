@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { headers } from 'next/headers'
 import { bp } from '@/lib/business-path'
 import { queryMany } from '@/lib/db'
+import { getStoreIdentity } from '@/lib/site-controls'
 import CategoryIcon from '@/components/visitor/CategoryIcon'
 
 const CATEGORY_BRANDS: Record<string, string> = {
@@ -31,8 +32,9 @@ const CATEGORY_COLORS: Record<string, string> = {
 }
 
 export default async function BusinessAboutPage() {
-  const [hdrs, categories] = await Promise.all([
+  const [hdrs, identity, categories] = await Promise.all([
     headers(),
+    getStoreIdentity(),
     queryMany<{ id: string; name: string; icon_name: string | null }>(
       `SELECT id, name, icon_name FROM categories WHERE is_active = true AND parent_category_id IS NULL ORDER BY display_order ASC`
     ).catch(() => []),
@@ -43,10 +45,10 @@ export default async function BusinessAboutPage() {
       <div className="bg-surface-elevated border-b border-border-default">
         <div className="container mx-auto px-4 py-4 sm:py-6 lg:py-8">
           <h1 className="text-3xl md:text-4xl font-bold text-secondary-500 dark:text-foreground mb-2">
-            About Jeffi Stores
+            About {identity.name}
           </h1>
           <p className="text-foreground-secondary">
-            Your trusted partner for industrial hardware and tools
+            Your trusted partner for quality products and services
           </p>
         </div>
       </div>
@@ -58,17 +60,16 @@ export default async function BusinessAboutPage() {
               <h2 className="text-2xl font-bold text-foreground mb-6">Who We Are</h2>
               <div className="prose prose-gray dark:prose-invert">
                 <p className="text-foreground-secondary mb-4 leading-relaxed">
-                  Jeffi Stores is your trusted hardware partner, offering a wide selection of industrial
-                  machinery parts. We guarantee high availability of quality components for manufacturing,
-                  construction, and repairs.
+                  {identity.name} is your trusted partner, offering a wide selection of quality products.
+                  We guarantee high availability of quality components for all your needs.
                 </p>
                 <p className="text-foreground-secondary mb-4 leading-relaxed">
-                  With years of experience in the hardware industry, we&apos;ve built a reputation for reliability,
+                  With years of experience, we&apos;ve built a reputation for reliability,
                   quality, and exceptional customer service. Our mission is to keep your operations running
-                  smoothly with the right tools and parts.
+                  smoothly with the right tools and products.
                 </p>
                 <p className="text-foreground-secondary mb-4 leading-relaxed">
-                  We ensure high availability of quality components for manufacturing, construction, and repairs.
+                  We ensure high availability of quality products and components.
                   Count on us for reliable products and expert service to keep your operations seamless!
                 </p>
               </div>
@@ -143,7 +144,7 @@ export default async function BusinessAboutPage() {
             <h2 className="text-2xl font-bold text-foreground">What We Offer</h2>
             <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400">{categories.length} Categories</span>
           </div>
-          <p className="text-foreground-secondary text-sm mb-6">Premium industrial hardware from the brands you trust</p>
+          <p className="text-foreground-secondary text-sm mb-6">Premium products from the brands you trust</p>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {categories.map((cat) => (
               <div key={cat.id} className="group flex items-start gap-4 border border-border-default rounded-xl p-4 hover:border-accent-400 hover:shadow-sm transition-all bg-surface hover:bg-surface-elevated">
@@ -173,7 +174,7 @@ export default async function BusinessAboutPage() {
         <div className="bg-gradient-to-r from-primary-600 to-primary-800 rounded-lg shadow-sm p-4 sm:p-6 lg:p-8 text-center text-white">
           <h2 className="text-3xl font-bold mb-4">Ready to Get Started?</h2>
           <p className="text-lg mb-6 text-primary-50">
-            Contact us today for all your hardware and industrial tool needs.
+            Contact us today for all your product and service needs.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link

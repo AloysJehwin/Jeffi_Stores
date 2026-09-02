@@ -1,6 +1,7 @@
 export const maxDuration = 120
 
 import { NextRequest, NextResponse } from 'next/server'
+import { storeDescriptorForPrompt } from '@/lib/brand'
 
 const OLLAMA_URL = () =>
   (process.env.OLLAMA_BASE_URL || 'http://100.82.208.8:11434').replace(/\/$/, '')
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
   if (items.length === 0) return NextResponse.json({ error: 'itemNames required' }, { status: 400 })
 
   const prompt =
-    'You are a friendly shopping assistant for an industrial hardware store. ' +
+    `You are a friendly shopping assistant for ${await storeDescriptorForPrompt()}. ` +
     'Write one warm sentence (max 20 words) affirming the customer\'s purchase decision. Reference what they bought. Do not mention prices.\n\n' +
     `### Purchased\n${items.map(n => `- ${n}`).join('\n')}\n\n` +
     'Return JSON: {"text":"<one sentence>"}'

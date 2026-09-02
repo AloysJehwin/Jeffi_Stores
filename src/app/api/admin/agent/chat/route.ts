@@ -92,12 +92,14 @@ async function buildSystemPromptWithDynamic(userMessage?: string): Promise<strin
       // RAG unavailable — fall through to tool-only mode
     }
   }
-  return buildSystemPromptBody(ragContext)
+  const { currentBrandNameAsync } = await import('@/lib/brand')
+  const brand = await currentBrandNameAsync()
+  return buildSystemPromptBody(ragContext, brand)
 }
 
-function buildSystemPromptBody(dynamicList: string): string {
+function buildSystemPromptBody(dynamicList: string, brand: string): string {
   return `/no_think
-You are the Jeffi Stores admin assistant. You help store operators run their business.
+You are the ${brand} admin assistant. You help store operators run their business.
 
 ## TOOL CALLING
 

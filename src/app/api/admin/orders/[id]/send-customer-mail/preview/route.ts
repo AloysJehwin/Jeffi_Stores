@@ -3,13 +3,14 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 import { buildVarMap, substituteVars } from '@/lib/template-vars'
-import { storeContactLine } from '@/lib/brand'
+import { storeContactLine, currentBrandNameAsync } from '@/lib/brand'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const contactLine = await storeContactLine().then(c => c ? `<p>${c}</p>` : '')
   const storeName = await (await import('@/lib/site-controls')).getStoreIdentity().then(i => i.name)
+  const brand = await currentBrandNameAsync()
   const { id } = await params
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -53,12 +54,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   <body>
     <div class="container">
       <div class="header">
-        <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">Jeffi Stores</div>
+        <div style="font-size:28px;font-weight:bold;color:#f97316;letter-spacing:0.5px;">${brand}</div>
         <p style="color:#666;margin:4px 0 0;">Hardware &amp; Tools</p>
       </div>
       <div class="message-box">${finalBody}</div>
       <div class="footer">
-        <p>This message was sent by the Jeffi Stores admin team. Please do not reply directly to this email.</p>
+        <p>This message was sent by the ${brand} admin team. Please do not reply directly to this email.</p>
         <p><strong>${storeName}</strong></p>${contactLine}
       </div>
     </div>

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { queryMany } from '@/lib/db'
+import { currentBrandNameAsync } from '@/lib/brand'
+import { getStorefrontContent } from '@/lib/site-controls'
 import {
   buildProductHighlights,
   buildProductDetails,
@@ -138,12 +140,16 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  const brand = await currentBrandNameAsync()
+  const storefront = await getStorefrontContent()
+  const channelDescription = storefront.metaDescription || storefront.metaTagline || `Shop products from ${brand}`
+
   const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:g="http://base.google.com/ns/1.0">
   <channel>
-    <title>Jeffi Stores</title>
+    <title>${escapeXml(brand)}</title>
     <link>${baseUrl}</link>
-    <description>Industrial hardware, bolts, nuts, and tools</description>
+    <description>${escapeXml(channelDescription)}</description>
 ${items.join('\n')}
   </channel>
 </rss>`

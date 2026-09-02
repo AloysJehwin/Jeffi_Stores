@@ -176,6 +176,33 @@ export async function storeAddressLine(): Promise<string> {
   }
 }
 
+/**
+ * A one-line store descriptor for AI system prompts. Replaces the hardcoded
+ * "Jeffi Stores, an Indian hardware & tools store" that leaked the flagship's niche into
+ * every tenant's AI output. Uses the tenant's own name and, when set, its onboarding
+ * tagline/about as the niche. There is no niche field — metaTagline/aboutCopy are the
+ * tenant's self-description and are tenantScoped-guarded (empty until the owner sets them).
+ * Degrades to a neutral "an online store" when nothing resolves, so no context (cron, empty
+ * tenant) ever falls back to the flagship pitch.
+ */
+export async function storeDescriptorForPrompt(): Promise<string> {
+  const brand = await currentBrandNameAsync()
+  try {
+    const { getStorefrontContent } = await import('./site-controls')
+    const c = await getStorefrontContent()
+    const tagline = c.metaTagline?.trim()
+    const about = c.aboutCopy?.trim()
+    if (tagline) {
+      const suffix = about ? ` ${about.slice(0, 240)}` : ''
+      return `${brand} — ${tagline}.${suffix}`.trim()
+    }
+    if (about) return `${brand}, an online store. ${about.slice(0, 240)}`.trim()
+  } catch {
+    // fall through to the neutral descriptor
+  }
+  return `${brand}, an online store`
+}
+
 /** `From` for operator-facing mail (admin alerts). Always the platform, never a tenant. */
 export function adminMailFrom(): string {
   const addr = process.env.SES_ADMIN_FROM_EMAIL || process.env.SES_FROM_EMAIL || `noreply@${PLATFORM_DOMAIN}`

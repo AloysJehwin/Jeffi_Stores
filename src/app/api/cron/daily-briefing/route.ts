@@ -5,7 +5,7 @@ import {
   collectBriefingData,
   narrate,
   renderBriefingEmail,
-  BRIEFING_FROM,
+  briefingFromAsync,
 } from '@/lib/daily-briefing'
 
 export const dynamic = 'force-dynamic'
@@ -69,9 +69,10 @@ export async function GET(req: NextRequest) {
   }
 
   let sent = 0, failed = 0
+  const briefingFrom = await briefingFromAsync()
   for (const to of recipients) {
     try {
-      await sendAuditedMail({ from: BRIEFING_FROM, to, subject, html, kind: 'daily_briefing' })
+      await sendAuditedMail({ from: briefingFrom, to, subject, html, kind: 'daily_briefing' })
       sent++
     } catch (err) {
       console.error('[route]', err)
