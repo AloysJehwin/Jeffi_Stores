@@ -182,7 +182,8 @@ async function updateProduct(productId: string, formData: FormData) {
       )
     }
   }
-  const imageCount = parseInt(formData.get('image_count') as string || '0')
+  const uploadedImagesJson = formData.get('uploaded_images') as string
+  const uploadedImages: any[] = uploadedImagesJson ? JSON.parse(uploadedImagesJson) : []
   const existingImagesToKeepJson = formData.get('existing_images_to_keep') as string
   const existingImagesToKeep = existingImagesToKeepJson ? JSON.parse(existingImagesToKeepJson) : []
   const galleryImageIdsJson = formData.get('gallery_image_ids') as string
@@ -549,7 +550,7 @@ async function updateProduct(productId: string, formData: FormData) {
       }
     }
 
-    if (imageCount > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
+    if (uploadedImages.length > 0 || existingImagesToKeep.length > 0 || galleryImageRefs.length > 0) {
       const allExistingImages = await queryMany(
         'SELECT * FROM product_images WHERE product_id = $1',
         [productId]
@@ -567,29 +568,24 @@ async function updateProduct(productId: string, formData: FormData) {
       }
 
       const newFileIds: Record<number, string> = {}
-      if (imageCount > 0) {
-        const { uploadProductImage } = await import('@/lib/s3')
-        for (let i = 0; i < imageCount; i++) {
-          const file = formData.get(`image_${i}`) as File
-          if (file) {
-            const uploadResult = await uploadProductImage(file, productId)
-            const inserted = await queryOne<{ id: string }>(
-              `INSERT INTO product_images (
-                product_id, image_url, thumbnail_url, s3_bucket, s3_key,
-                s3_thumbnail_key, file_name, file_size, mime_type, width,
-                height, display_order, is_primary
-              ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
-              [
-                productId, uploadResult.url, uploadResult.thumbnailUrl,
-                uploadResult.s3Bucket,
-                uploadResult.s3Key, uploadResult.s3ThumbnailKey,
-                uploadResult.fileName, uploadResult.fileSize, uploadResult.mimeType,
-                uploadResult.width, uploadResult.height, 999, false,
-              ]
-            )
-            if (inserted) newFileIds[i] = inserted.id
-          }
-        }
+      for (let i = 0; i < uploadedImages.length; i++) {
+        const img = uploadedImages[i]
+        if (!img) continue
+        const inserted = await queryOne<{ id: string }>(
+          `INSERT INTO product_images (
+            product_id, image_url, thumbnail_url, s3_bucket, s3_key,
+            s3_thumbnail_key, file_name, file_size, mime_type, width,
+            height, display_order, is_primary
+          ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13) RETURNING id`,
+          [
+            productId, img.url, img.thumbnailUrl,
+            img.s3Bucket,
+            img.s3Key, img.s3ThumbnailKey,
+            img.fileName, img.fileSize, img.mimeType,
+            img.width, img.height, 999, false,
+          ]
+        )
+        if (inserted) newFileIds[i] = inserted.id
       }
 
       const newGalleryIds: Record<string, string> = {}
