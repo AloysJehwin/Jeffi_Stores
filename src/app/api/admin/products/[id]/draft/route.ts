@@ -158,13 +158,19 @@ export async function DELETE(req: NextRequest, { params }: Params) {
     // Clean up S3 files for variant images that were uploaded fresh into this draft
     // (staged, never applied to live). Live-image rows (real uuid ids) are left alone —
     // their files still back the live product.
-    const draft = await queryOne<{ variant_images: any[] }>(
-      `SELECT variant_images FROM product_drafts WHERE product_id = $1`, [id]
+    const draft = await queryOne<{ variant_images: any[]; images: any[] }>(
+      `SELECT variant_images, images FROM product_drafts WHERE product_id = $1`, [id]
     )
     const stagedVI = Array.isArray(draft?.variant_images) ? draft!.variant_images : []
     for (const vi of stagedVI) {
       if (vi?._staged && vi?.s3_key && String(vi.id).startsWith('draft-vi-')) {
         try { await deleteProductImage(vi.s3_key, vi.s3_thumbnail_key || '') } catch {}
+      }
+    }
+    const stagedImages = Array.isArray(draft?.images) ? draft!.images : []
+    for (const img of stagedImages) {
+      if (img?._staged && img?.s3_key && String(img.id).startsWith('draft-img-')) {
+        try { await deleteProductImage(img.s3_key, img.s3_thumbnail_key || '') } catch {}
       }
     }
     await query(`DELETE FROM product_drafts WHERE product_id = $1`, [id])

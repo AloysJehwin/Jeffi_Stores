@@ -324,7 +324,7 @@ export default function InvoiceDetailClient({ id }: { id: string }) {
               {qrLoading ? 'Generating…' : 'QR'}
             </button>
           )}
-          {o.invoice_number && o.status !== 'draft' && amendDraft === null && canWrite && (
+          {o.invoice_number && o.status !== 'draft' && o.source !== 'online' && amendDraft === null && canWrite && (
             <button
               onClick={createAmendmentDraft}
               disabled={amending}
