@@ -118,8 +118,21 @@ async function fireRouteTransfer(opts: {
   // Razorpay cannot suspend or delete a linked account through its API, so a deprovisioned
   // tenant's account outlives the tenant. Gating on status is what actually makes it inert:
   // never move money into an account whose store is suspended or terminated.
+  // A returning owner's linked account survives only on the owner-scoped tenant_bank_accounts
+  // row (tenant_bank_accounts cascades off owners, not tenants), so a re-provisioned tenant can
+  // be 'active' with a NULL razorpay_linked_account_id while the acc_xxx lives there. Billing
+  // already resolves it via this same COALESCE; the transfer path must too, or the split silently
+  // no-ops and the seller keeps the gross.
   const row = await pool.query(
-    `SELECT razorpay_linked_account_id, daily_payout FROM tenants WHERE id=$1 AND status='active'`, [tenant.tenantId]
+    `SELECT COALESCE(
+              (SELECT b.linked_account_id FROM tenant_bank_accounts b
+                 JOIN owner_tenants ot ON ot.owner_id = b.owner_id
+                WHERE ot.tenant_id = t.id AND b.linked_account_id IS NOT NULL
+                ORDER BY b.created_at DESC LIMIT 1),
+              t.razorpay_linked_account_id
+            ) AS razorpay_linked_account_id,
+            t.daily_payout
+       FROM tenants t WHERE t.id=$1 AND t.status='active'`, [tenant.tenantId]
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
   const dailyPayout = row?.rows[0]?.daily_payout === true
