@@ -436,6 +436,30 @@ function isTerminalError(msg: string): boolean {
   return /AccessDenied|not authorized|UnauthorizedOperation|InvalidParameterValue|Invalid master password|preflight:|activate blocked|compute blocked|InvalidParameterCombination|missing required env/i.test(msg)
 }
 
+function isTransientDnsError(msg: string): boolean {
+  if (/InvalidChangeBatch|InvalidInput|NoSuchHostedZone|AccessDenied|not authorized/i.test(msg)) return false
+  return /Throttling|PriorRequestNotComplete|ServiceUnavailable|InternalError|RequestTimeout|\((429|500|502|503|504)\)|ETIMEDOUT|ECONNRESET|EAI_AGAIN|fetch failed|network/i.test(msg)
+}
+
+async function retryTransient<T>(
+  fn: () => Promise<T>,
+  isTransient: (msg: string) => boolean,
+  attempts = 3,
+): Promise<{ value?: T; error?: any; attempts: number }> {
+  let lastError: any
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return { value: await fn(), attempts: attempt }
+    } catch (e: any) {
+      lastError = e
+      if (attempt === attempts || !isTransient(e?.message || String(e))) break
+      const backoff = 500 * 3 ** (attempt - 1)
+      await new Promise((r) => setTimeout(r, backoff + Math.floor(Math.random() * 250)))
+    }
+  }
+  return { error: lastError, attempts }
+}
+
 
 /**
  * Record what a step actually did, so the admin UI can show each stage's history.
@@ -722,11 +746,10 @@ export async function deprovisionTenant(
     // outliving the instance — a host that "resolves" to a dead IP). Record it + flag the hosts.
     const dnsHosts = (created.dnsHosts as string[] | undefined) ?? tenantHostnames(slug, tenant.plan)
     let dnsRemovalFailed: string[] | null = null
-    try {
-      await provider.removeDns(dnsHosts)
-    } catch (e: any) {
+    const dnsResult = await retryTransient(() => provider.removeDns(dnsHosts), isTransientDnsError)
+    if (dnsResult.error) {
       dnsRemovalFailed = dnsHosts
-      if (job) await recordStepEvent(job.id, 'deprovision', 'error', `removeDns failed: ${e?.message || e}`, { dnsHosts })
+      if (job) await recordStepEvent(job.id, 'deprovision', 'error', `removeDns failed after ${dnsResult.attempts} attempt(s): ${dnsResult.error?.message || dnsResult.error}`, { dnsHosts, attempts: dnsResult.attempts })
     }
 
     // 3c. Delete the tenant's param group once the DB instance is fully gone (else RDS
