@@ -9,8 +9,6 @@ import CopyLinkButton from '@/components/admin/CopyLinkButton'
 import DeleteReviewFormButton from '@/components/admin/DeleteReviewFormButton'
 import { ap } from '@/lib/admin-path'
 
-const FORMS_BASE_URL = 'https://forms.jeffistores.in'
-
 interface FormRow {
   id: string
   title: string
@@ -39,9 +37,9 @@ function TemplateTag({ type }: { type: FormRow['template_type'] }) {
   )
 }
 
-export default function ReviewFormTableRow({ form: f, backUrl = '/admin/review-forms' }: { form: FormRow; backUrl?: string }) {
+export default function ReviewFormTableRow({ form: f, backUrl = '/admin/review-forms', formsBase }: { form: FormRow; backUrl?: string; formsBase: string }) {
   const [open, setOpen] = useState(false)
-  const formUrl = `${FORMS_BASE_URL}/${f.slug}`
+  const formUrl = `${formsBase}/${f.slug}`
 
   return (
     <>

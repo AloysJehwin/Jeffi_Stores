@@ -4,7 +4,7 @@ import { verifyToken, verifyBusinessToken } from './lib/jwt'
 import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 import { extractSessionSignals } from './lib/session-signals-request'
-import { resolveTenantFromHost, appFromHost, slugFromHost } from './lib/tenant-registry'
+import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } from './lib/tenant-registry'
 import { runWithTenantContext } from './lib/tenant-context'
 import { adminCookieNameForHost } from './lib/admin-cookie'
 
@@ -296,7 +296,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/forms/')) {
     const slug = pathname.replace('/forms/', '')
-    return NextResponse.redirect(`https://forms.jeffistores.in/${slug}`, 301)
+    return NextResponse.redirect(`https://${formsHostForSlug(tenant?.slug ?? null)}/${slug}`, 301)
   }
 
   // Tenant admin mTLS. admin.jeffistores.in is gated by nginx against the platform CA; nginx
