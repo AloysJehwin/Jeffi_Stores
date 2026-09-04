@@ -9,13 +9,13 @@ import DraftRowActions from '@/components/admin/DraftRowActions'
 import ReviewFormTableRow from '@/components/admin/ReviewFormTableRow'
 import { ap } from '@/lib/admin-path'
 import { getHost } from '@/lib/get-host'
+import { formsHostForHost } from '@/lib/tenant-registry'
 import AdminTableSkeleton from '@/components/admin/AdminTableSkeleton'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 const PAGE_SIZE = 25
-const FORMS_BASE_URL = 'https://forms.jeffistores.in'
 
 async function getForms(filters: { search?: string; page?: number }) {
   const conditions: string[] = []
@@ -129,6 +129,7 @@ async function ReviewFormsListSection({ searchParams, host }: { searchParams: Pr
 async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolvedSearchParams: { [key: string]: string | undefined }; host: string }) {
   const page = Math.max(1, parseInt(resolvedSearchParams.page || '1', 10))
   const { forms, total } = await getForms({ search: resolvedSearchParams.search, page })
+  const formsBase = `https://${formsHostForHost(host)}`
 
   const buildUrl = (p: number) => {
     const params = new URLSearchParams()
@@ -160,7 +161,7 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
             </thead>
             <tbody className="divide-y divide-border-default">
               {(forms as FormRow[]).map(f => (
-                <ReviewFormTableRow key={f.id} form={f} backUrl={currentListUrl} />
+                <ReviewFormTableRow key={f.id} form={f} backUrl={currentListUrl} formsBase={formsBase} />
               ))}
               {forms.length === 0 && (
                 <tr><td colSpan={7} className="px-4 py-8 text-center text-foreground-muted">No review forms yet. Create your first one!</td></tr>
@@ -171,7 +172,7 @@ async function ReviewFormsListContent({ resolvedSearchParams, host }: { resolved
 
         <div className="md:hidden divide-y divide-border-default">
           {(forms as FormRow[]).map(f => {
-            const formUrl = `${FORMS_BASE_URL}/${f.slug}`
+            const formUrl = `${formsBase}/${f.slug}`
             return (
               <div key={f.id} className="p-4 space-y-2">
                 <div className="flex items-center justify-between">

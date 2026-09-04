@@ -145,6 +145,8 @@ export function appFromHost(hostname: string): HostApp | null {
   return null
 }
 
+export { formsHostForSlug, formsHostForHost } from './forms-host'
+
 async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Promise<TenantContext | null> {
   const pool = controlPlanePool()
   // For custom_domain, resolve via the tenant_custom_domains table (verified only),
