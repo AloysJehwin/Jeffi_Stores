@@ -7,7 +7,7 @@ import { hasScope } from '@/lib/scopes'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inflation:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'controls:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { id } = await params
   const job = await queryOne<{

@@ -10,7 +10,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { query, queryMany, withTransaction } from '@/lib/db'
 
-const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['inflation:read', 'inflation:write'] }
+const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['controls:read', 'controls:write'] }
 
 const GOOD_LOG = {
   id: 'log-1',
