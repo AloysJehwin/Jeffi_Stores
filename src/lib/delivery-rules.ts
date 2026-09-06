@@ -7,6 +7,9 @@ export interface DeliverySettings {
   discountFlat: number
   discountMinSubtotal: number
   discountLabel: string
+  baseCharge: number
+  perKgOver3: number
+  freeWeightCeilingKg: number
 }
 
 export type ApplyDeliverySource =
@@ -28,15 +31,24 @@ export function applyDeliveryRules(params: {
   baseCharge: number
   subtotal: number
   settings: DeliverySettings
+  weightGrams?: number
 }): ApplyDeliveryResult {
-  const { baseCharge, subtotal, settings } = params
-  const original = Math.max(0, round2(baseCharge))
+  const { subtotal, settings } = params
+  const weightKg = Math.max(0, (params.weightGrams ?? 0) / 1000)
+  const ceiling = settings.freeWeightCeilingKg > 0 ? settings.freeWeightCeilingKg : 3
 
   if (!settings.enabled) {
-    return { charge: 0, originalCharge: original, discountApplied: original, source: 'admin_disabled' }
+    return { charge: 0, originalCharge: 0, discountApplied: 0, source: 'admin_disabled' }
   }
 
-  if (settings.freeThreshold > 0 && subtotal >= settings.freeThreshold) {
+  // The admin-editable weight formula is the buyer-facing charge — flat up to the ceiling,
+  // plus a per-kg surcharge for each whole kg above it — independent of the live Delhivery
+  // quote (which is used only for the tenant-cost/wallet side).
+  const overKg = Math.max(0, Math.ceil(weightKg - ceiling))
+  const original = Math.max(0, round2(settings.baseCharge + overKg * settings.perKgOver3))
+
+  // Free shipping now also requires the parcel to be under the weight ceiling.
+  if (settings.freeThreshold > 0 && subtotal >= settings.freeThreshold && weightKg < ceiling) {
     return {
       charge: 0,
       originalCharge: original,

@@ -18,6 +18,14 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     group: 'Dashboard',
   },
 
+  {
+    key: 'notifications:read',
+    label: 'Notifications (Read)',
+    description: 'View the admin notification feed (bell)',
+    routes: [],
+    group: 'Dashboard',
+  },
+
   // Catalogue
   {
     key: 'products:read',
@@ -619,6 +627,7 @@ export function getScopeForPath(pathname: string): string | null {
     }
   }
 
+  if (pathname.startsWith('/api/admin/notifications')) return 'notifications:read'
   if (pathname.startsWith('/api/admin/financial')) return 'financial:read'
   if (pathname.startsWith('/api/admin/inventory')) return 'inventory:read'
   if (pathname.startsWith('/api/admin/gst')) return 'gst:read'
@@ -627,6 +636,7 @@ export function getScopeForPath(pathname: string): string | null {
   if (pathname.startsWith('/api/admin/invoices')) return 'invoices:read'
   if (pathname.startsWith('/api/admin/orders/create')) return 'invoices:read'
   if (pathname.startsWith('/api/admin/orders')) return 'orders:read'
+  if (pathname.startsWith('/api/admin/data-source')) return 'products:read'
   if (pathname.startsWith('/api/admin/products')) return 'products:read'
   if (pathname.startsWith('/api/admin/categories')) return 'categories:read'
   if (pathname.startsWith('/api/admin/packing-slips')) return 'packing_slips:read'

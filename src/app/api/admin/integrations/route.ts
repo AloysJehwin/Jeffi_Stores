@@ -18,7 +18,14 @@ export const dynamic = 'force-dynamic'
 // returns them, only non-secret display fields + status. Providers: google_merchant, amazon_seller
 // (Meta lives in tenant_social_accounts, managed by the /api/admin/social routes).
 
-const PROVIDERS = ['google_merchant', 'amazon_seller'] as const
+const PROVIDERS = ['google_merchant', 'amazon_seller', 'delhivery', 'razorpay'] as const
+
+const PROVIDER_LABELS: Record<(typeof PROVIDERS)[number], string> = {
+  google_merchant: 'Google Merchant Center',
+  amazon_seller: 'Amazon Seller',
+  delhivery: 'Delhivery',
+  razorpay: 'Razorpay',
+}
 
 function requireTenant(): { tenantId: string } | { error: NextResponse } {
   const t = getCurrentTenant()
@@ -68,6 +75,20 @@ export async function POST(request: NextRequest) {
     }
     normalized = { client_email: sa.client_email, private_key: sa.private_key, merchant_id: String(config.merchant_id) }
     meta = { merchant_id: String(config.merchant_id), client_email: sa.client_email }
+  } else if (provider === 'delhivery') {
+    if (!config.token) return NextResponse.json({ error: 'token is required' }, { status: 400 })
+    normalized = { token: String(config.token) }
+    meta = {}
+  } else if (provider === 'razorpay') {
+    if (!config.key_id || !config.key_secret) {
+      return NextResponse.json({ error: 'key_id and key_secret are required' }, { status: 400 })
+    }
+    normalized = {
+      key_id: String(config.key_id),
+      key_secret: String(config.key_secret),
+      webhook_secret: config.webhook_secret ? String(config.webhook_secret) : undefined,
+    }
+    meta = { key_id: String(config.key_id) }
   } else {
     const required = ['client_id', 'client_secret', 'refresh_token', 'seller_id']
     for (const k of required) {
@@ -84,7 +105,7 @@ export async function POST(request: NextRequest) {
   await saveIntegrationCredential({
     tenantId: gate.tenantId,
     provider,
-    label: provider === 'google_merchant' ? 'Google Merchant Center' : 'Amazon Seller',
+    label: PROVIDER_LABELS[provider],
     configEnc: encryptToken(JSON.stringify(normalized)),
     meta,
   })

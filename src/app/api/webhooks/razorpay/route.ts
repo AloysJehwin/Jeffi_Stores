@@ -83,6 +83,7 @@ async function resolveWebhookTenantId(payment: any, orderRef: string): Promise<{
 async function fireRouteTransfer(opts: {
   paymentId: string
   totalAmountInr: number
+  shippingAmountInr?: number
   orderId: string
   orderRef: string
   payment: any
@@ -101,11 +102,22 @@ async function fireRouteTransfer(opts: {
                 ORDER BY b.created_at DESC LIMIT 1),
               t.razorpay_linked_account_id
             ) AS razorpay_linked_account_id,
-            t.daily_payout
+            t.daily_payout, t.own_razorpay
        FROM tenants t WHERE t.id=$1 AND t.status='active'`, [resolved.tenantId]
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
   const dailyPayout = row?.rows[0]?.daily_payout === true
+  const ownRazorpay = row?.rows[0]?.own_razorpay === true
+
+  if (ownRazorpay) {
+    await recordTenantTransaction({
+      tenantId: resolved.tenantId,
+      orderRef: opts.orderRef,
+      grossAmountInr: opts.totalAmountInr,
+      gatewayTxnId: opts.paymentId,
+    })
+    return
+  }
 
   if (!linkedAccountId) {
     await recordTenantTransaction({
@@ -120,6 +132,7 @@ async function fireRouteTransfer(opts: {
   const result = await transferToLinkedAccount({
     paymentId: opts.paymentId,
     grossAmountPaise: Math.round(opts.totalAmountInr * 100),
+    delhiveryChargePaise: Math.round((opts.shippingAmountInr ?? 0) * 100),
     linkedAccountId,
     orderId: opts.orderId,
     tenantSlug: resolved.slug,
@@ -145,7 +158,7 @@ async function handlePaymentCaptured(payment: any) {
 
   const paymentRecord = await queryOne(
     `SELECT p.id as payment_id, p.order_id, p.status as payment_record_status,
-            o.id as db_order_id, o.payment_status, o.order_number, o.total_amount,
+            o.id as db_order_id, o.payment_status, o.order_number, o.total_amount, o.shipping_amount,
             o.customer_email, o.customer_name, o.user_id
      FROM payments p
      JOIN orders o ON p.order_id = o.id
@@ -221,6 +234,7 @@ async function handlePaymentCaptured(payment: any) {
     fireRouteTransfer({
       paymentId: razorpayPaymentId,
       totalAmountInr: parseFloat(paymentRecord.total_amount),
+      shippingAmountInr: parseFloat(paymentRecord.shipping_amount) || 0,
       orderId,
       orderRef: paymentRecord.order_number,
       payment,
@@ -273,7 +287,7 @@ async function handlePaymentLinkPaid(paymentLink: any) {
   const linkId = paymentLink.id
 
   const order = await queryOne(
-    `SELECT id, payment_status, user_id, order_number, total_amount, customer_email, customer_name
+    `SELECT id, payment_status, user_id, order_number, total_amount, shipping_amount, customer_email, customer_name
      FROM orders WHERE payment_link_id = $1`,
     [linkId]
   )
@@ -322,6 +336,7 @@ async function handlePaymentLinkPaid(paymentLink: any) {
     fireRouteTransfer({
       paymentId: linkPaymentId,
       totalAmountInr: parseFloat(order.total_amount),
+      shippingAmountInr: parseFloat(order.shipping_amount) || 0,
       orderId: order.id,
       orderRef: order.order_number,
       payment: paymentLink,
@@ -482,6 +497,7 @@ async function commitDraftFromWebhook(razorpayOrderId: string, razorpayPaymentId
   fireRouteTransfer({
     paymentId: razorpayPaymentId,
     totalAmountInr: parseFloat(created.total_amount),
+    shippingAmountInr: draft.shippingAmount || 0,
     orderId: created.id,
     orderRef: created.order_number,
     payment,

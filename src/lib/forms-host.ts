@@ -35,3 +35,13 @@ export function formsHostForSlug(slug: string | null): string {
 export function formsHostForHost(hostname: string): string {
   return formsHostForSlug(slugFromHostname(hostname))
 }
+
+/** Storefront host for a tenant slug; null (platform / custom domain) → the platform storefront host. */
+export function storeHostForSlug(slug: string | null): string {
+  return slug ? `${slug}.${ROOT_DOMAIN}` : ROOT_DOMAIN
+}
+
+/** Storefront host that preserves the tenant of the given request host. */
+export function storeHostForHost(hostname: string): string {
+  return storeHostForSlug(slugFromHostname(hostname))
+}

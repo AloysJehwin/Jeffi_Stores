@@ -24,6 +24,7 @@ const CSP = [
 const nextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  devIndicators: false,
   experimental: {
     instrumentationHook: true,
     outputFileTracingIncludes: {

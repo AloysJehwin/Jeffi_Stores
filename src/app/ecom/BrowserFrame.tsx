@@ -1,16 +1,17 @@
-// Framed screenshot slot with browser chrome. Left blank for now — drop images
-// into public/images/ecom-landing/ later and pass `src`. The `bleed` variant is
-// used for the half-screenshot showcase where the frame slides partly off-screen.
+import { ReactNode } from 'react'
+
 export function BrowserFrame({
   src,
   alt,
   caption,
   className = '',
+  children,
 }: {
   src?: string
   alt: string
   caption: string
   className?: string
+  children?: ReactNode
 }) {
   return (
     <figure className={`rounded-xl overflow-hidden border border-border-default bg-surface-elevated shadow-2xl shadow-black/10 ${className}`}>
@@ -20,9 +21,11 @@ export function BrowserFrame({
         <span className="w-3 h-3 rounded-full bg-green-400/70" />
         <span className="ml-3 text-[11px] text-foreground-muted font-mono truncate">{caption}</span>
       </div>
-      {src ? (
+      {children ? (
+        <div className="overflow-hidden">{children}</div>
+      ) : src ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={src} alt={alt} className="w-full block" />
+        <img src={src} alt={alt} className="w-full block aspect-[16/9] object-cover object-top" />
       ) : (
         <div className="aspect-[16/10] flex flex-col items-center justify-center bg-gradient-to-br from-surface-secondary to-surface text-foreground-muted gap-3">
           <svg className="w-12 h-12 opacity-30" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.3}>

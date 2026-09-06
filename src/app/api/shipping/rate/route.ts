@@ -140,6 +140,7 @@ export async function POST(request: NextRequest) {
 
     const deliverySettings = await getDeliverySettings()
     const totalWeightGrams = shipmentItems.reduce((s, i) => s + i.weightGrams * i.quantity, 0)
+    const freeCeilingKg = deliverySettings.freeWeightCeilingKg > 0 ? deliverySettings.freeWeightCeilingKg : 3
 
     // Early returns for free/disabled — codFee is 0 here (isCod doesn't matter for free)
     if (!deliverySettings.enabled) {
@@ -150,7 +151,12 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (deliverySettings.freeThreshold > 0 && typeof subtotal === 'number' && subtotal >= deliverySettings.freeThreshold) {
+    if (
+      deliverySettings.freeThreshold > 0 &&
+      typeof subtotal === 'number' &&
+      subtotal >= deliverySettings.freeThreshold &&
+      totalWeightGrams / 1000 < freeCeilingKg
+    ) {
       return NextResponse.json<RateBreakdown>({
         charge: 0, codFee: 0, totalCharge: 0,
         zone: 'Free', source: 'free_threshold',
@@ -219,6 +225,7 @@ export async function POST(request: NextRequest) {
       baseCharge,
       subtotal: typeof subtotal === 'number' ? subtotal : 0,
       settings: deliverySettings,
+      weightGrams: totalWeightGrams,
     })
 
     const result: RateBreakdown = {

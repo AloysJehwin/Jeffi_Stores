@@ -6,9 +6,12 @@ import { round2 } from '@/lib/gst'
 import { computeShipmentDims, ShipmentItem, PackageType } from '@/lib/shipping'
 import { sendOrderShippedSMS } from '@/lib/sms'
 import { getBusinessValues } from '@/lib/site-controls'
+import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { listDelhiveryPickupLocations } from '@/lib/delhivery'
+import { walletBlocksShipment } from '@/lib/wallet'
 
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
-const TOKEN = process.env.DELHIVERY_API_KEY
 
 function addBusinessDays(from: Date, days: number): Date {
   const d = new Date(from)
@@ -33,8 +36,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const SELLER_ADD = bv.sellerAddress
     const SELLER_PHONE = bv.sellerPhone
 
-    if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
-
     const order = await queryOne<any>(`
       SELECT
         o.*,
@@ -49,6 +50,30 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
     if (order.awb_number) return NextResponse.json({ error: 'Shipment already created', awb: order.awb_number }, { status: 409 })
+
+    // Prepaid-wallet gate: the platform fronts the real Delhivery cost for this tenant, so block
+    // shipment creation when the wallet is below its minimum (own_delhivery tenants are exempt —
+    // Delhivery bills them directly). Best-effort: a control-plane read failure must not wedge ops.
+    const tenant = getCurrentTenant()
+    if (tenant?.tenantId && await walletBlocksShipment(tenant.tenantId).catch(() => false)) {
+      return NextResponse.json(
+        { error: 'Wallet balance is below the minimum. Recharge the wallet before creating shipments.' },
+        { status: 402 }
+      )
+    }
+
+    const TOKEN = await resolveDelhiveryToken(tenant?.tenantId)
+    if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
+
+    // Pickup warehouse: honour the posted choice only if it belongs to this account's
+    // warehouses (cross-validated against the live list); otherwise fall back to the
+    // tenant's stored default so a bad/foreign name can never reach Delhivery.
+    let pickupLocationName = PICKUP_LOCATION
+    const requested = String((await request.json().catch(() => ({})))?.pickupLocation || '').trim()
+    if (requested) {
+      const owned = await listDelhiveryPickupLocations(tenant?.tenantId)
+      if (owned.some(w => w.name === requested)) pickupLocationName = requested
+    }
 
     const pin = order.postal_code
     if (!pin || !/^\d{6}$/.test(pin)) {
@@ -141,7 +166,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         shipment_length: String(dims.length_cm),
         weight: String(weightKg),
       }],
-      pickup_location: { name: PICKUP_LOCATION },
+      pickup_location: { name: pickupLocationName },
     }
 
     const formData = new URLSearchParams()

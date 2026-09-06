@@ -1,21 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { requireAdminScope } from '@/lib/jwt'
-import { getCurrentTenant } from '@/lib/tenant-context'
-import { currentAdminBaseUrl } from '@/lib/brand'
-import { saveIntegrationCredential } from '@/lib/tenant-registry'
-import { encryptToken } from '@/lib/crypto/token-cipher'
+import { currentAdminBaseUrl, platformOAuthBaseUrl } from '@/lib/brand'
+import { saveIntegrationCredential, getIntegrationCredential } from '@/lib/tenant-registry'
+import { encryptToken, decryptToken } from '@/lib/crypto/token-cipher'
 import { verifyAdminState } from '@/app/api/admin/integrations/state'
 
 export const dynamic = 'force-dynamic'
 
-// Google OAuth callback for Merchant Center (store admin). Verifies the signed state, re-checks
-// the admin session + that the state's tenant matches the request's ALS tenant, exchanges the code
-// for a refresh token, encrypts + persists it. OAuth alone yields no Merchant Center id, so the
-// row is stored with meta.needs_merchant_id=true unless one was carried through — completed via
-// the manual form. Redirects back to the store-admin merchant-sync page with a toast param.
+// OAuth callback for the sheet sync. The admin session cookie is SameSite=Strict and is NOT sent on
+// this cross-site return from Google, so trust is carried by the HMAC-signed `state` (issued only by
+// the admin-gated connect route). Verifies state, exchanges the code, stores the refresh token +
+// spreadsheet id under provider 'google_sheets' keyed to state.tenantId.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
-  const backTo = `${currentAdminBaseUrl()}/admin/merchant-sync`
+  const backTo = `${currentAdminBaseUrl()}/admin/data-source`
 
   const err = params.get('error')
   if (err) return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)
@@ -25,15 +22,8 @@ export async function GET(request: NextRequest) {
   if (!code || !rawState) return NextResponse.redirect(`${backTo}?connected=0&error=missing_params`)
 
   const state = verifyAdminState(rawState)
-  if (!state || state.provider !== 'google_merchant') {
+  if (!state || state.provider !== 'google_sheets') {
     return NextResponse.redirect(`${backTo}?connected=0&error=bad_state`)
-  }
-
-  const admin = await requireAdminScope(request, 'merchant_sync:write')
-  if (admin instanceof NextResponse) return NextResponse.redirect(`${backTo}?connected=0&error=not_authorized`)
-  const tenant = getCurrentTenant()
-  if (!tenant || tenant.tenantId !== state.tenantId) {
-    return NextResponse.redirect(`${backTo}?connected=0&error=tenant_mismatch`)
   }
 
   try {
@@ -41,7 +31,7 @@ export async function GET(request: NextRequest) {
     const clientSecret = process.env.GOOGLE_OAUTH_CLIENT_SECRET
     if (!clientId || !clientSecret) return NextResponse.redirect(`${backTo}?connected=0&error=not_configured`)
 
-    const redirectUri = `${currentAdminBaseUrl()}/api/admin/integrations/google/callback`
+    const redirectUri = `${platformOAuthBaseUrl()}/api/admin/data-source/google/callback`
     const body = new URLSearchParams({
       code, client_id: clientId, client_secret: clientSecret,
       redirect_uri: redirectUri, grant_type: 'authorization_code',
@@ -53,26 +43,38 @@ export async function GET(request: NextRequest) {
     })
     const data = await res.json().catch(() => null)
     if (!res.ok || !data?.refresh_token) {
+      console.error('[data-source/google/callback] token exchange failed', {
+        ok: res.ok, status: res.status, redirectUri,
+        error: data?.error, error_description: data?.error_description,
+        has_access_token: Boolean(data?.access_token), has_refresh_token: Boolean(data?.refresh_token),
+      })
       const reason = data?.error_description || data?.error || 'exchange_failed'
       return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(String(reason).slice(0, 80))}`)
     }
 
-    const merchantId = params.get('merchant_id') || ''
+    // Keep a previously-stored spreadsheet id if this connect didn't carry one.
+    let spreadsheetId = state.spreadsheetId || ''
+    if (!spreadsheetId) {
+      const existing = await getIntegrationCredential(state.tenantId, 'google_sheets')
+      if (existing) {
+        try { spreadsheetId = JSON.parse(decryptToken(existing.config_enc))?.spreadsheet_id || '' } catch {}
+      }
+    }
+
     const normalized: Record<string, any> = { oauth_refresh_token: data.refresh_token }
-    if (merchantId) normalized.merchant_id = merchantId
+    if (spreadsheetId) normalized.spreadsheet_id = spreadsheetId
 
     await saveIntegrationCredential({
       tenantId: state.tenantId,
-      provider: 'google_merchant',
-      label: 'Google Merchant Center',
+      provider: 'google_sheets',
+      label: 'Google Sheet (product sync)',
       configEnc: encryptToken(JSON.stringify(normalized)),
-      meta: merchantId
-        ? { merchant_id: merchantId, connected_via: 'oauth' }
-        : { connected_via: 'oauth', needs_merchant_id: true },
+      meta: { connected_via: 'oauth', ...(spreadsheetId ? { spreadsheet_id: spreadsheetId } : { needs_spreadsheet_id: true }) },
     })
 
-    return NextResponse.redirect(`${backTo}?connected=google`)
+    return NextResponse.redirect(`${backTo}?connected=google_sheets`)
   } catch (e: any) {
+    console.error('[data-source/google/callback] failed', { message: e?.message })
     return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(e?.message?.slice(0, 80) || 'exchange_failed')}`)
   }
 }

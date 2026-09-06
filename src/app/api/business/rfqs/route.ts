@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateBusiness } from '@/lib/jwt'
 import { queryMany, queryCount, query, queryOne } from '@/lib/db'
 import { sendRfqSubmittedEmail } from '@/lib/email-business'
+import { createAdminNotification } from '@/lib/admin-notify'
 
 function buildRfqNumber(now: Date, seq: number): string {
   const month = now.getMonth()
@@ -90,6 +91,17 @@ export async function POST(request: NextRequest) {
   const displayName = [userProfile?.first_name, userProfile?.last_name].filter(Boolean).join(' ') || user.email
 
   sendRfqSubmittedEmail(user.email, displayName, rfq!.rfq_number).catch(() => {})
+
+  createAdminNotification({
+    type: 'rfq_submitted',
+    category: 'b2b',
+    title: `New RFQ ${rfq!.rfq_number}`,
+    message: `From ${displayName} — ${items.length} item(s)`,
+    link: `/admin/business/rfqs/${rfq!.id}`,
+    entityType: 'rfq',
+    entityId: String(rfq!.id),
+    scope: 'business_rfqs:read',
+  }).catch(() => {})
 
   return NextResponse.json({ rfq }, { status: 201 })
 }

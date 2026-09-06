@@ -6,6 +6,16 @@ import { query, queryOne } from './db'
 import { TENANT_SCOPE_KEYS } from './scopes'
 import type { TenantContext } from './tenant-context'
 
+const CONNECT_ATTEMPTS = 4
+
+/** A just-created tenant RDS often is not accepting connections the instant the job flips to
+ * `done`, so the first connect times out. These are transient — worth retrying — unlike a SQL
+ * or logic error, which will fail identically every attempt. */
+function isTransientConnError(msg: string): boolean {
+  return /Connection terminated|connection timeout|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EAI_AGAIN|ENETUNREACH|the database system is starting up|too many clients|Connection terminated unexpectedly/i.test(msg)
+}
+
+
 /**
  * Provision the store owner as a super_admin in the tenant's own DB.
  * Called when the tenant's store goes live (subscription.charged webhook).
@@ -42,97 +52,116 @@ export async function provisionTenantOwnerAdmin(opts: {
       const { scopes } = await getTenantPlan(opts.tenantId)
       if (scopes.size > 0) grantedScopes = TENANT_SCOPE_KEYS.filter(k => scopes.has(k))
     } catch { /* keep the full tenant set */ }
-    await runWithTenantContext(ctx, async () => {
-      // Idempotency: skip only when the owner super_admin ALREADY HAS an issued client
-      // certificate. Checking for the super_admin row alone is wrong on re-provision —
-      // deprovision backs up the tenant DB and restore_data brings the admins/users rows
-      // back, so the row exists again while admin_certificates was never re-issued. That
-      // path silently skipped cert issuance + the creds email, leaving the owner with no
-      // way in. Gate on the credential that actually matters (the p12 in admin_certificates).
-      const existing = await queryOne<{ id: string }>(
-        `SELECT ac.id FROM admin_certificates ac
-         JOIN admins a ON a.id = ac.admin_id
-         JOIN users u ON u.id = a.user_id
-         WHERE u.email = $1 AND a.role = 'super_admin' LIMIT 1`,
-        [opts.ownerEmail]
-      )
-      if (existing) return
 
-      const nameParts = (opts.ownerName ?? opts.ownerEmail).split(' ')
-      const firstName = nameParts[0] ?? opts.ownerEmail
-      const lastName = nameParts.slice(1).join(' ') || ''
+    let lastConnErr: any
+    for (let attempt = 1; attempt <= CONNECT_ATTEMPTS; attempt++) {
+      try {
+        await runWithTenantContext(ctx, () => createOwnerAdmin(opts, grantedScopes, storeName))
+        return { success: true }
+      } catch (err: any) {
+        const msg = err?.message ?? String(err)
+        if (attempt === CONNECT_ATTEMPTS || !isTransientConnError(msg)) throw err
+        lastConnErr = err
+        const backoff = 2000 * 2 ** (attempt - 1)
+        await new Promise((r) => setTimeout(r, backoff + Math.floor(Math.random() * 500)))
+      }
+    }
+    throw lastConnErr
 
-      // 1. Upsert user
-      // ON CONFLICT (email) has no matching constraint — the only unique touching email is
-      // users_email_user_type_key UNIQUE (email, user_type). Postgres rejects the statement
-      // outright ("no unique or exclusion constraint matching the ON CONFLICT specification"),
-      // so this never created an owner admin, never issued a certificate and never sent the
-      // email — while provisioning still reported done, because the caller swallowed the error.
-      // user_type is NOT NULL and must be given explicitly for the conflict target to match.
-      const userRow = await queryOne<{ id: string }>(
-        `INSERT INTO users (email, first_name, last_name, is_active, user_type)
-         VALUES ($1, $2, $3, true, 'customer')
-         ON CONFLICT (email, user_type) DO UPDATE
-           SET first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name
-         RETURNING id`,
-        [opts.ownerEmail, firstName, lastName]
-      )
-      const userId = userRow!.id
-
-      // 2. Create super_admin with the scopes this tenant's plan actually sells. The stored
-      //    grant should reflect what was bought; resolveSession intersects with the plan again
-      //    at request time so an upgrade or downgrade needs no re-provisioning.
-      const adminRow = await queryOne<{ id: string }>(
-        // admins.scopes is jsonb. Passing the JS array directly makes node-postgres send a
-        // Postgres array literal ({a,b,c}), which jsonb rejects with "invalid input syntax for
-        // type json" — so the owner admin was never created and no certificate was issued.
-        // Every other call site that writes this column stringifies it.
-        `INSERT INTO admins (user_id, role, scopes, is_active)
-         VALUES ($1, 'super_admin', $2::jsonb, true)
-         ON CONFLICT (user_id) DO UPDATE
-           SET role='super_admin', scopes=$2::jsonb, is_active=true
-         RETURNING id`,
-        [userId, JSON.stringify(grantedScopes)]
-      )
-      const adminId = adminRow!.id
-
-      // 3. Issue an mTLS client cert from this tenant's OWN CA, so it can never
-      //    authenticate against another tenant's admin panel.
-      const certCN = opts.ownerEmail.replace(/[^a-zA-Z0-9._@-]/g, '_')
-      const cert = await issueTenantAdminCert({
-        tenantId: opts.tenantId,
-        slug: opts.tenantSlug,
-        commonName: certCN,
-        issuedTo: opts.ownerEmail,
-      })
-      const downloadToken = crypto.randomUUID()
-
-      await query(
-        `INSERT INTO admin_certificates
-           (admin_id, serial_number, common_name, expires_at, download_token, p12_data, p12_password)
-         VALUES ($1,$2,$3,$4,$5,$6,$7)
-         ON CONFLICT DO NOTHING`,
-        [adminId, cert.serial, certCN, cert.expiresAt, downloadToken, cert.p12Buffer, cert.p12Password]
-      )
-
-      // 4. Email cert to owner
-      await sendAdminCertificateEmail(
-        opts.ownerEmail,
-        opts.ownerName ?? opts.ownerEmail,
-        cert.p12Buffer,
-        cert.p12Password,
-        cert.serial,
-        cert.expiresAt.toISOString(),
-        'super_admin',
-        { slug: opts.tenantSlug, storeName },
-      )
-    })
-
-    return { success: true }
   } catch (err: any) {
     process.stderr.write(`[provisionTenantOwnerAdmin] ${opts.tenantSlug}: ${err?.message}\n`)
     return { success: false, error: err?.message }
   }
+}
+
+async function createOwnerAdmin(
+  opts: { tenantId: string; tenantSlug: string; ownerEmail: string; ownerName: string | null; storeName?: string | null },
+  grantedScopes: string[],
+  storeName: string,
+): Promise<void> {
+  // Idempotency: skip only when the owner super_admin ALREADY HAS an issued client
+  // certificate. Checking for the super_admin row alone is wrong on re-provision —
+  // deprovision backs up the tenant DB and restore_data brings the admins/users rows
+  // back, so the row exists again while admin_certificates was never re-issued. That
+  // path silently skipped cert issuance + the creds email, leaving the owner with no
+  // way in. Gate on the credential that actually matters (the p12 in admin_certificates).
+  const existing = await queryOne<{ id: string }>(
+    `SELECT ac.id FROM admin_certificates ac
+     JOIN admins a ON a.id = ac.admin_id
+     JOIN users u ON u.id = a.user_id
+     WHERE u.email = $1 AND a.role = 'super_admin' LIMIT 1`,
+    [opts.ownerEmail]
+  )
+  if (existing) return
+
+  const nameParts = (opts.ownerName ?? opts.ownerEmail).split(' ')
+  const firstName = nameParts[0] ?? opts.ownerEmail
+  const lastName = nameParts.slice(1).join(' ') || ''
+
+  // 1. Upsert user
+  // ON CONFLICT (email) has no matching constraint — the only unique touching email is
+  // users_email_user_type_key UNIQUE (email, user_type). Postgres rejects the statement
+  // outright ("no unique or exclusion constraint matching the ON CONFLICT specification"),
+  // so this never created an owner admin, never issued a certificate and never sent the
+  // email — while provisioning still reported done, because the caller swallowed the error.
+  // user_type is NOT NULL and must be given explicitly for the conflict target to match.
+  const userRow = await queryOne<{ id: string }>(
+    `INSERT INTO users (email, first_name, last_name, is_active, user_type)
+     VALUES ($1, $2, $3, true, 'customer')
+     ON CONFLICT (email, user_type) DO UPDATE
+       SET first_name=EXCLUDED.first_name, last_name=EXCLUDED.last_name
+     RETURNING id`,
+    [opts.ownerEmail, firstName, lastName]
+  )
+  const userId = userRow!.id
+
+  // 2. Create super_admin with the scopes this tenant's plan actually sells. The stored
+  //    grant should reflect what was bought; resolveSession intersects with the plan again
+  //    at request time so an upgrade or downgrade needs no re-provisioning.
+  const adminRow = await queryOne<{ id: string }>(
+    // admins.scopes is jsonb. Passing the JS array directly makes node-postgres send a
+    // Postgres array literal ({a,b,c}), which jsonb rejects with "invalid input syntax for
+    // type json" — so the owner admin was never created and no certificate was issued.
+    // Every other call site that writes this column stringifies it.
+    `INSERT INTO admins (user_id, role, scopes, is_active)
+     VALUES ($1, 'super_admin', $2::jsonb, true)
+     ON CONFLICT (user_id) DO UPDATE
+       SET role='super_admin', scopes=$2::jsonb, is_active=true
+     RETURNING id`,
+    [userId, JSON.stringify(grantedScopes)]
+  )
+  const adminId = adminRow!.id
+
+  // 3. Issue an mTLS client cert from this tenant's OWN CA, so it can never
+  //    authenticate against another tenant's admin panel.
+  const certCN = opts.ownerEmail.replace(/[^a-zA-Z0-9._@-]/g, '_')
+  const cert = await issueTenantAdminCert({
+    tenantId: opts.tenantId,
+    slug: opts.tenantSlug,
+    commonName: certCN,
+    issuedTo: opts.ownerEmail,
+  })
+  const downloadToken = crypto.randomUUID()
+
+  await query(
+    `INSERT INTO admin_certificates
+       (admin_id, serial_number, common_name, expires_at, download_token, p12_data, p12_password)
+     VALUES ($1,$2,$3,$4,$5,$6,$7)
+     ON CONFLICT DO NOTHING`,
+    [adminId, cert.serial, certCN, cert.expiresAt, downloadToken, cert.p12Buffer, cert.p12Password]
+  )
+
+  // 4. Email cert to owner
+  await sendAdminCertificateEmail(
+    opts.ownerEmail,
+    opts.ownerName ?? opts.ownerEmail,
+    cert.p12Buffer,
+    cert.p12Password,
+    cert.serial,
+    cert.expiresAt.toISOString(),
+    'super_admin',
+    { slug: opts.tenantSlug, storeName },
+  )
 }
 
 async function resolveTenantCtx(tenantId: string): Promise<TenantContext | null> {

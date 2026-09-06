@@ -6,6 +6,7 @@ import { sendNewReviewNotification } from '@/lib/email'
 import { uploadReviewImage } from '@/lib/s3'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
+import { createAdminNotification } from '@/lib/admin-notify'
 import { parseBody, zUuid } from '@/lib/validate'
 
 const CreateReviewSchema = z.object({
@@ -199,6 +200,18 @@ export async function POST(request: NextRequest) {
       } catch {
       }
     }
+
+    createAdminNotification({
+      type: 'review_submitted',
+      category: 'reviews',
+      title: `New ${rating}★ review — ${(product as any)?.name || 'product'}`,
+      message: title?.trim() || comment.trim().slice(0, 140),
+      link: '/admin/reviews',
+      entityType: 'review',
+      entityId: String(review.id),
+      severity: rating <= 2 ? 'warning' : 'info',
+      scope: 'reviews:read',
+    }).catch(() => {})
 
     if (rating <= 2) {
       createAutoTask({

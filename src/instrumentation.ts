@@ -106,6 +106,14 @@ export async function register() {
     setInterval(() => callCron('provisioning_worker', '/api/internal/provisioning/worker', 'GET', FORTY_FIVE_SEC - 5_000), FORTY_FIVE_SEC)
   }, 90_000)
 
+  // Bulk-import worker — claims one pending import_jobs row per tick, runs it in the tenant's
+  // context (image fetch + canonical publish), and writes progress back. Mirrors the provisioning
+  // worker's out-of-band driver model so a long image-heavy import keeps advancing.
+  setTimeout(() => {
+    callCron('import_worker', '/api/internal/import/worker', 'GET', FORTY_FIVE_SEC - 5_000)
+    setInterval(() => callCron('import_worker', '/api/internal/import/worker', 'GET', FORTY_FIVE_SEC - 5_000), FORTY_FIVE_SEC)
+  }, 105_000)
+
   // Provisioning drift sweep — flips any tenant left active with no live infra to suspended.
   // The only thing needing coarse scheduling beyond the worker above; hourly is fine.
   setTimeout(() => {

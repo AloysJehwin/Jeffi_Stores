@@ -64,3 +64,42 @@ describe('an owner is provisioned with the scopes their plan sells', () => {
     expect(grantedScopes()).toEqual(TENANT_SCOPE_KEYS)
   })
 })
+
+describe('a not-yet-ready tenant RDS self-heals', () => {
+  beforeEach(() => {
+    mockQueryOne.mockReset()
+    mockGetTenantPlan.mockReset()
+    mockGetTenantPlan.mockResolvedValue({ plan: 'basic', scopes: BASIC })
+    mockPool.mockReset()
+    mockPool.mockResolvedValue({ rows: [{
+      id: 't-1', slug: 'acme', display_name: 'Acme', plan: 'basic',
+      rds_endpoint: 'ep', rds_db: 'jeffi_stores', rds_port: 5432, iam_auth: true,
+      s3_bucket: 'b', region: 'us-east-1',
+    }] })
+  })
+
+  const opts = { tenantId: 't-1', tenantSlug: 'acme', ownerEmail: 'o@acme.test', ownerName: 'Owner' }
+
+  it('retries a transient connection timeout and then succeeds', async () => {
+    let attempt = 0
+    mockQueryOne.mockImplementation(async () => {
+      // The existing-cert check is the first queryOne of each attempt; fail the connect twice.
+      if (++attempt <= 2) throw new Error('Connection terminated due to connection timeout')
+      return { id: 'row-1' }
+    })
+    const res = await provisionTenantOwnerAdmin(opts)
+    expect(res.success).toBe(true)
+    expect(attempt).toBeGreaterThan(2)
+  }, 20_000)
+
+  it('does NOT retry a non-transient error — fails on the first attempt', async () => {
+    let attempt = 0
+    mockQueryOne.mockImplementation(async () => {
+      attempt++
+      throw new Error('invalid input syntax for type json')
+    })
+    const res = await provisionTenantOwnerAdmin(opts)
+    expect(res.success).toBe(false)
+    expect(attempt).toBe(1)
+  })
+})

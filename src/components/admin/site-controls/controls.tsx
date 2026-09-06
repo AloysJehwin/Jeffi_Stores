@@ -64,8 +64,10 @@ export function TextControl({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
-      {hint && <p className="text-xs text-foreground-muted mb-2">{hint}</p>}
+      <label className="flex items-baseline gap-2 mb-1 min-w-0">
+        <span className="text-sm font-medium text-foreground shrink-0">{label}</span>
+        {hint && <span className="text-xs text-foreground-muted truncate">{hint}</span>}
+      </label>
       <input
         type={type}
         value={value}
@@ -99,8 +101,10 @@ export function TextAreaControl({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
-      {hint && <p className="text-xs text-foreground-muted mb-2">{hint}</p>}
+      <label className="flex items-baseline gap-2 mb-1 min-w-0">
+        <span className="text-sm font-medium text-foreground shrink-0">{label}</span>
+        {hint && <span className="text-xs text-foreground-muted truncate">{hint}</span>}
+      </label>
       <textarea
         value={value}
         rows={rows}
@@ -133,8 +137,10 @@ export function NumberControl({
 
   return (
     <div>
-      <label className="block text-sm font-medium text-foreground mb-1">{label}</label>
-      {hint && <p className="text-xs text-foreground-muted mb-2">{hint}</p>}
+      <label className="flex items-baseline gap-2 mb-1 min-w-0">
+        <span className="text-sm font-medium text-foreground shrink-0">{label}</span>
+        {hint && <span className="text-xs text-foreground-muted truncate">{hint}</span>}
+      </label>
       <div className="relative max-w-xs">
         {prefix && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-foreground-secondary text-sm">{prefix}</span>}
         <input

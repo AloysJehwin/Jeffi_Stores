@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { applyDeliveryRules, DeliverySettings, ApplyDeliveryResult } from '@/lib/delivery-rules'
+import { applyDeliveryRules, DeliverySettings } from '@/lib/delivery-rules'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+//
+// The buyer-facing charge derives from the admin-editable weight formula
+// (settings.baseCharge flat up to the ceiling + perKgOver3 per whole kg over it),
+// NOT from the incoming Delhivery quote. Tests set settings.baseCharge to control
+// the "original" charge and pass weightGrams under the ceiling unless testing weight.
 
 function makeSettings(overrides: Partial<DeliverySettings> = {}): DeliverySettings {
   return {
@@ -11,6 +16,9 @@ function makeSettings(overrides: Partial<DeliverySettings> = {}): DeliverySettin
     discountFlat: 0,
     discountMinSubtotal: 0,
     discountLabel: '',
+    baseCharge: 0,
+    perKgOver3: 0,
+    freeWeightCeilingKg: 3,
     ...overrides,
   }
 }
@@ -20,21 +28,19 @@ function makeSettings(overrides: Partial<DeliverySettings> = {}): DeliverySettin
 describe('applyDeliveryRules — admin_disabled', () => {
   it('returns charge=0 and source=admin_disabled when delivery is disabled', () => {
     const result = applyDeliveryRules({
-      baseCharge: 100,
+      baseCharge: 0,
       subtotal: 500,
-      settings: makeSettings({ enabled: false }),
+      settings: makeSettings({ enabled: false, baseCharge: 100 }),
     })
     expect(result.charge).toBe(0)
     expect(result.source).toBe('admin_disabled')
-    expect(result.originalCharge).toBe(100)
-    expect(result.discountApplied).toBe(100)
   })
 
   it('returns charge=0 even when subtotal is below free threshold (disabled overrides all)', () => {
     const result = applyDeliveryRules({
-      baseCharge: 50,
+      baseCharge: 0,
       subtotal: 100,
-      settings: makeSettings({ enabled: false, freeThreshold: 999 }),
+      settings: makeSettings({ enabled: false, freeThreshold: 999, baseCharge: 50 }),
     })
     expect(result.charge).toBe(0)
     expect(result.source).toBe('admin_disabled')
@@ -44,11 +50,12 @@ describe('applyDeliveryRules — admin_disabled', () => {
 // ── Free threshold ────────────────────────────────────────────────────────────
 
 describe('applyDeliveryRules — free_threshold', () => {
-  it('returns charge=0 when subtotal meets free threshold exactly', () => {
+  it('returns charge=0 when subtotal meets free threshold exactly and weight is under ceiling', () => {
     const result = applyDeliveryRules({
-      baseCharge: 80,
+      baseCharge: 0,
       subtotal: 500,
-      settings: makeSettings({ freeThreshold: 500 }),
+      settings: makeSettings({ freeThreshold: 500, baseCharge: 80 }),
+      weightGrams: 1000,
     })
     expect(result.charge).toBe(0)
     expect(result.source).toBe('free_threshold')
@@ -58,19 +65,32 @@ describe('applyDeliveryRules — free_threshold', () => {
 
   it('returns charge=0 when subtotal exceeds free threshold', () => {
     const result = applyDeliveryRules({
-      baseCharge: 80,
+      baseCharge: 0,
       subtotal: 1000,
-      settings: makeSettings({ freeThreshold: 500 }),
+      settings: makeSettings({ freeThreshold: 500, baseCharge: 80 }),
+      weightGrams: 500,
     })
     expect(result.charge).toBe(0)
     expect(result.source).toBe('free_threshold')
   })
 
+  it('does NOT free shipping when weight is at or above the ceiling', () => {
+    const result = applyDeliveryRules({
+      baseCharge: 0,
+      subtotal: 1000,
+      settings: makeSettings({ freeThreshold: 500, baseCharge: 80 }),
+      weightGrams: 3000,
+    })
+    expect(result.charge).not.toBe(0)
+    expect(result.source).not.toBe('free_threshold')
+  })
+
   it('does NOT free shipping when subtotal is just below threshold', () => {
     const result = applyDeliveryRules({
-      baseCharge: 80,
+      baseCharge: 0,
       subtotal: 499,
-      settings: makeSettings({ freeThreshold: 500 }),
+      settings: makeSettings({ freeThreshold: 500, baseCharge: 80 }),
+      weightGrams: 500,
     })
     expect(result.charge).not.toBe(0)
     expect(result.source).not.toBe('free_threshold')
@@ -78,11 +98,59 @@ describe('applyDeliveryRules — free_threshold', () => {
 
   it('does not apply free threshold when freeThreshold is 0', () => {
     const result = applyDeliveryRules({
-      baseCharge: 80,
+      baseCharge: 0,
       subtotal: 9999,
-      settings: makeSettings({ freeThreshold: 0 }),
+      settings: makeSettings({ freeThreshold: 0, baseCharge: 80 }),
+      weightGrams: 500,
     })
     expect(result.source).not.toBe('free_threshold')
+  })
+})
+
+// ── Weight-based pricing ────────────────────────────────────────────────────────
+
+describe('applyDeliveryRules — weight pricing', () => {
+  it('charges flat baseCharge at or under the ceiling', () => {
+    const result = applyDeliveryRules({
+      baseCharge: 0,
+      subtotal: 200,
+      settings: makeSettings({ baseCharge: 60, perKgOver3: 20 }),
+      weightGrams: 3000,
+    })
+    expect(result.charge).toBe(60)
+    expect(result.source).toBe('as_is')
+  })
+
+  it('adds per-kg surcharge for each whole kg over the ceiling', () => {
+    // 4.2kg → ceil(4.2-3)=2 kg over → 60 + 2*20 = 100
+    const result = applyDeliveryRules({
+      baseCharge: 0,
+      subtotal: 200,
+      settings: makeSettings({ baseCharge: 60, perKgOver3: 20 }),
+      weightGrams: 4200,
+    })
+    expect(result.charge).toBe(100)
+    expect(result.originalCharge).toBe(100)
+  })
+
+  it('treats missing weight as 0 (flat baseCharge)', () => {
+    const result = applyDeliveryRules({
+      baseCharge: 0,
+      subtotal: 200,
+      settings: makeSettings({ baseCharge: 60, perKgOver3: 20 }),
+    })
+    expect(result.charge).toBe(60)
+  })
+
+  it('honours a custom freeWeightCeilingKg', () => {
+    // ceiling 5kg → 4kg is under, no surcharge
+    const result = applyDeliveryRules({
+      baseCharge: 0,
+      subtotal: 200,
+      settings: makeSettings({ baseCharge: 60, perKgOver3: 20, freeWeightCeilingKg: 5 }),
+      weightGrams: 4000,
+    })
+    expect(result.charge).toBe(60)
   })
 })
 
@@ -91,9 +159,10 @@ describe('applyDeliveryRules — free_threshold', () => {
 describe('applyDeliveryRules — as_is', () => {
   it('returns full charge with source=as_is when no discount configured', () => {
     const result = applyDeliveryRules({
-      baseCharge: 60,
+      baseCharge: 0,
       subtotal: 200,
-      settings: makeSettings({ freeThreshold: 0, discountPercent: 0, discountFlat: 0 }),
+      settings: makeSettings({ baseCharge: 60 }),
+      weightGrams: 500,
     })
     expect(result.charge).toBe(60)
     expect(result.source).toBe('as_is')
@@ -102,9 +171,10 @@ describe('applyDeliveryRules — as_is', () => {
 
   it('returns as_is when subtotal is below discountMinSubtotal', () => {
     const result = applyDeliveryRules({
-      baseCharge: 60,
+      baseCharge: 0,
       subtotal: 100,
-      settings: makeSettings({ discountPercent: 50, discountMinSubtotal: 500 }),
+      settings: makeSettings({ baseCharge: 60, discountPercent: 50, discountMinSubtotal: 500 }),
+      weightGrams: 500,
     })
     expect(result.source).toBe('as_is')
     expect(result.charge).toBe(60)
@@ -114,29 +184,21 @@ describe('applyDeliveryRules — as_is', () => {
     const result = applyDeliveryRules({
       baseCharge: 0,
       subtotal: 1000,
-      settings: makeSettings({ discountPercent: 50 }),
+      settings: makeSettings({ baseCharge: 0, discountPercent: 50 }),
+      weightGrams: 500,
     })
     expect(result.source).toBe('as_is')
     expect(result.charge).toBe(0)
   })
 
-  it('rounds baseCharge to 2 decimal places in originalCharge', () => {
+  it('rounds computed charge to 2 decimal places in originalCharge', () => {
     const result = applyDeliveryRules({
-      baseCharge: 49.999,
+      baseCharge: 0,
       subtotal: 100,
-      settings: makeSettings(),
+      settings: makeSettings({ baseCharge: 49.999 }),
+      weightGrams: 500,
     })
     expect(result.originalCharge).toBe(50)
-  })
-
-  it('clamps negative baseCharge to 0', () => {
-    const result = applyDeliveryRules({
-      baseCharge: -10,
-      subtotal: 100,
-      settings: makeSettings(),
-    })
-    expect(result.originalCharge).toBe(0)
-    expect(result.charge).toBe(0)
   })
 })
 
@@ -144,11 +206,11 @@ describe('applyDeliveryRules — as_is', () => {
 
 describe('applyDeliveryRules — discounted', () => {
   it('applies percentage discount to delivery charge', () => {
-    // 100 charge, 50% discount = 50 final
     const result = applyDeliveryRules({
-      baseCharge: 100,
+      baseCharge: 0,
       subtotal: 200,
-      settings: makeSettings({ discountPercent: 50 }),
+      settings: makeSettings({ baseCharge: 100, discountPercent: 50 }),
+      weightGrams: 500,
     })
     expect(result.charge).toBe(50)
     expect(result.source).toBe('discounted')
@@ -156,11 +218,11 @@ describe('applyDeliveryRules — discounted', () => {
   })
 
   it('applies flat discount to delivery charge', () => {
-    // 100 charge, flat 30 off = 70 final
     const result = applyDeliveryRules({
-      baseCharge: 100,
+      baseCharge: 0,
       subtotal: 200,
-      settings: makeSettings({ discountFlat: 30 }),
+      settings: makeSettings({ baseCharge: 100, discountFlat: 30 }),
+      weightGrams: 500,
     })
     expect(result.charge).toBe(70)
     expect(result.source).toBe('discounted')
@@ -168,11 +230,11 @@ describe('applyDeliveryRules — discounted', () => {
   })
 
   it('applies both percent and flat discounts sequentially', () => {
-    // 100 charge, 20% off = 80, then flat 20 off = 60
     const result = applyDeliveryRules({
-      baseCharge: 100,
+      baseCharge: 0,
       subtotal: 200,
-      settings: makeSettings({ discountPercent: 20, discountFlat: 20 }),
+      settings: makeSettings({ baseCharge: 100, discountPercent: 20, discountFlat: 20 }),
+      weightGrams: 500,
     })
     expect(result.charge).toBe(60)
     expect(result.source).toBe('discounted')
@@ -180,9 +242,10 @@ describe('applyDeliveryRules — discounted', () => {
 
   it('clamps final charge to 0 if discount exceeds base charge', () => {
     const result = applyDeliveryRules({
-      baseCharge: 50,
+      baseCharge: 0,
       subtotal: 200,
-      settings: makeSettings({ discountPercent: 100, discountFlat: 100 }),
+      settings: makeSettings({ baseCharge: 50, discountPercent: 100, discountFlat: 100 }),
+      weightGrams: 500,
     })
     expect(result.charge).toBe(0)
     expect(result.source).toBe('discounted')
@@ -190,42 +253,43 @@ describe('applyDeliveryRules — discounted', () => {
 
   it('includes discountLabel in result when provided', () => {
     const result = applyDeliveryRules({
-      baseCharge: 100,
+      baseCharge: 0,
       subtotal: 300,
-      settings: makeSettings({ discountPercent: 25, discountLabel: 'Member discount' }),
+      settings: makeSettings({ baseCharge: 100, discountPercent: 25, discountLabel: 'Member discount' }),
+      weightGrams: 500,
     })
     expect(result.discountLabel).toBe('Member discount')
   })
 
   it('does not include discountLabel when label is empty string', () => {
     const result = applyDeliveryRules({
-      baseCharge: 100,
+      baseCharge: 0,
       subtotal: 300,
-      settings: makeSettings({ discountPercent: 25, discountLabel: '' }),
+      settings: makeSettings({ baseCharge: 100, discountPercent: 25, discountLabel: '' }),
+      weightGrams: 500,
     })
     expect(result.discountLabel).toBeUndefined()
   })
 
   it('only applies discount when subtotal meets discountMinSubtotal', () => {
-    const settings = makeSettings({ discountPercent: 50, discountMinSubtotal: 300 })
+    const settings = makeSettings({ baseCharge: 100, discountPercent: 50, discountMinSubtotal: 300 })
 
-    const belowMin = applyDeliveryRules({ baseCharge: 100, subtotal: 299, settings })
+    const belowMin = applyDeliveryRules({ baseCharge: 0, subtotal: 299, settings, weightGrams: 500 })
     expect(belowMin.source).toBe('as_is')
     expect(belowMin.charge).toBe(100)
 
-    const atMin = applyDeliveryRules({ baseCharge: 100, subtotal: 300, settings })
+    const atMin = applyDeliveryRules({ baseCharge: 0, subtotal: 300, settings, weightGrams: 500 })
     expect(atMin.source).toBe('discounted')
     expect(atMin.charge).toBe(50)
   })
 
   it('rounds final discounted charge to 2 decimal places', () => {
-    // 99 charge, 33.33% off = 66.0033 -> 66
     const result = applyDeliveryRules({
-      baseCharge: 99,
+      baseCharge: 0,
       subtotal: 200,
-      settings: makeSettings({ discountPercent: 33.33 }),
+      settings: makeSettings({ baseCharge: 99, discountPercent: 33.33 }),
+      weightGrams: 500,
     })
-    // afterPercent = 99 * (1 - 0.3333) = 99 * 0.6667 = 66.0033; round2 = 66
     expect(result.charge).toBe(66)
   })
 })
@@ -235,18 +299,20 @@ describe('applyDeliveryRules — discounted', () => {
 describe('applyDeliveryRules — rule priority ordering', () => {
   it('admin_disabled takes priority over free threshold', () => {
     const result = applyDeliveryRules({
-      baseCharge: 100,
+      baseCharge: 0,
       subtotal: 9999,
-      settings: makeSettings({ enabled: false, freeThreshold: 100 }),
+      settings: makeSettings({ enabled: false, freeThreshold: 100, baseCharge: 100 }),
+      weightGrams: 500,
     })
     expect(result.source).toBe('admin_disabled')
   })
 
   it('free_threshold takes priority over discounts', () => {
     const result = applyDeliveryRules({
-      baseCharge: 100,
+      baseCharge: 0,
       subtotal: 600,
-      settings: makeSettings({ freeThreshold: 500, discountPercent: 50 }),
+      settings: makeSettings({ freeThreshold: 500, discountPercent: 50, baseCharge: 100 }),
+      weightGrams: 500,
     })
     expect(result.source).toBe('free_threshold')
     expect(result.charge).toBe(0)

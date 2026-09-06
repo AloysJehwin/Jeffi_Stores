@@ -6,6 +6,8 @@ import { sendOrderStatusUpdate } from '@/lib/email'
 import { resolveShipmentStatus, isAdvancement, shipmentStatusToSyncType } from '@/lib/shipment-status'
 import { fetchDelhiveryInvoiceCharges, chargeableGrams } from '@/lib/delhivery'
 import { getBusinessValues } from '@/lib/site-controls'
+import { getCurrentTenant } from '@/lib/tenant-context'
+import { settleDelhiveryCostToWallet } from '@/lib/wallet'
 
 const TOKEN = process.env.DELHIVERY_API_KEY
 
@@ -228,18 +230,30 @@ export async function GET(
         paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
       }).catch(() => null)
       if (invoiceCharges) {
+        // Gate delhivery_billed_at on a durable wallet debit: settle first, and only stamp billed_at
+        // when the charge is on the books (or no wallet applies). A transient debit failure leaves
+        // billed_at NULL so the next 'delivered' sync retries instead of losing the charge.
+        const tenantId = getCurrentTenant()?.tenantId ?? null
+        const settled = tenantId && order.awb_number && invoiceCharges.total > 0
+          ? await settleDelhiveryCostToWallet({
+              tenantId,
+              awb: order.awb_number,
+              orderRef: order.order_number,
+              amountInr: invoiceCharges.total,
+            }).catch(() => false)
+          : true
         await query(
           `UPDATE orders SET
             delhivery_billed_amount = $2, delhivery_freight_charge = $3,
             delhivery_cod_charge = $4, delhivery_oda_charge = $5,
-            delhivery_billed_at = NOW(),
+            delhivery_billed_at = CASE WHEN $6 THEN NOW() ELSE delhivery_billed_at END,
             delhivery_extra_charge = ROUND(($2 - shipping_amount)::numeric, 2),
             updated_at = NOW()
            WHERE id = $1`,
-          [id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda]
+          [id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda, settled]
         ).catch(() => {})
         billedAmount = invoiceCharges.total
-        billedAt = new Date().toISOString()
+        billedAt = settled ? new Date().toISOString() : billedAt
         freightCharge = invoiceCharges.freight
         codCharge = invoiceCharges.codCharge
         odaCharge = invoiceCharges.oda
