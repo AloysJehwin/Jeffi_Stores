@@ -54,6 +54,13 @@ export function currentAdminBaseUrl(): string {
   return process.env.ADMIN_BASE_URL || `https://admin.${PLATFORM_DOMAIN}`
 }
 
+// Fixed central host for OAuth redirect URIs — one URL registered in Google covers every tenant
+// (the signed `state` carries the tenantId). Never the per-tenant admin subdomain.
+export function platformOAuthBaseUrl(): string {
+  const base = process.env.ADMIN_BASE_URL || `https://admin.${PLATFORM_DOMAIN}`
+  return base.replace(/\/admin\/?$/, '').replace(/\/$/, '')
+}
+
 /** Storefront URL for the current store. */
 export function currentStoreUrl(): string {
   const t = getCurrentTenant()

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
+import AdminSelect from '@/components/admin/AdminSelect'
 
 export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: string; awbNumber?: string | null }) {
   const [loading, setLoading] = useState(false)
@@ -10,13 +11,33 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
   const [confirming, setConfirming] = useState(false)
   const [cancelling, setCancelling] = useState(false)
   const [cancelConfirming, setCancelConfirming] = useState(false)
+  const [warehouses, setWarehouses] = useState<{ value: string; label: string }[]>([])
+  const [pickupLocation, setPickupLocation] = useState('')
+
+  const beginConfirm = async () => {
+    setConfirming(true)
+    setError(null)
+    try {
+      const res = await fetch('/api/admin/delhivery/pickup-locations')
+      const data = await res.json()
+      const opts = (data.locations || []).map((l: { name: string }) => ({ value: l.name, label: l.name }))
+      setWarehouses(opts)
+      if (opts.length > 0 && !pickupLocation) setPickupLocation(opts[0].value)
+    } catch {
+      setWarehouses([])
+    }
+  }
 
   const handleCreate = async () => {
     setConfirming(false)
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/admin/orders/${orderId}/create-shipment`, { method: 'POST' })
+      const res = await fetch(`/api/admin/orders/${orderId}/create-shipment`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(pickupLocation ? { pickupLocation } : {}),
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.details || data.error || 'Failed to create shipment')
       setAwb(data.awb)
@@ -104,9 +125,20 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
       )}
       {confirming ? (
         <RequireWrite scope="orders:write">
-        <div className="flex items-center gap-3 px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-          <p className="text-sm text-yellow-800 dark:text-yellow-300 flex-1">Register with Delhivery and generate an AWB number?</p>
-          <div className="flex gap-2 shrink-0">
+        <div className="px-4 py-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800 space-y-3">
+          <p className="text-sm text-yellow-800 dark:text-yellow-300">Register with Delhivery and generate an AWB number?</p>
+          {warehouses.length > 1 && (
+            <label className="block text-xs font-medium text-yellow-800 dark:text-yellow-300 space-y-1">
+              <span>Pickup warehouse</span>
+              <AdminSelect
+                sm
+                value={pickupLocation}
+                options={warehouses}
+                onChange={setPickupLocation}
+              />
+            </label>
+          )}
+          <div className="flex gap-2">
             <button
               onClick={handleCreate}
               disabled={loading}
@@ -126,7 +158,7 @@ export default function CreateShipmentButton({ orderId, awbNumber }: { orderId: 
       ) : (
         <RequireWrite scope="orders:write">
         <button
-          onClick={() => setConfirming(true)}
+          onClick={beginConfirm}
           disabled={loading}
           className="w-full px-4 py-2 text-sm font-semibold rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white transition-colors flex items-center justify-center gap-2"
         >

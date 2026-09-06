@@ -298,6 +298,7 @@ export async function advanceProvisioningJob(job: ProvisioningJob, provider: Pro
               pincode: wh.originPincode,
               address: wh.sellerAddress || kyc?.business_address || '',
               registeredName: wh.sellerName || tenant.display_name,
+              tenantId: job.tenant_id,
             })
             res.delhiveryPickup = r.ok ? 'created' : `error: ${r.error}`
           } else {

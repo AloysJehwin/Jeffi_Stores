@@ -54,6 +54,8 @@ CREATE TABLE IF NOT EXISTS public.tenants (
     noreply_email  character varying(120) GENERATED ALWAYS AS ('noreply-' || slug || '@jeffistores.in') STORED,
     campaign_email character varying(120) GENERATED ALWAYS AS ('campaigns-' || slug || '@jeffistores.in') STORED,
     daily_payout             boolean NOT NULL DEFAULT false, -- +5% upgrade flag
+    own_delhivery            boolean NOT NULL DEFAULT false, -- ships on the tenant's own Delhivery account; skip wallet debit
+    own_razorpay             boolean NOT NULL DEFAULT false, -- collects payments on the tenant's own Razorpay; skip Route split
     created_at     timestamp with time zone NOT NULL DEFAULT now(),
     updated_at     timestamp with time zone NOT NULL DEFAULT now()
 );
@@ -179,6 +181,55 @@ CREATE INDEX IF NOT EXISTS idx_tenant_transactions_tenant ON public.tenant_trans
 CREATE INDEX IF NOT EXISTS idx_settlement_ledger_tenant ON public.settlement_ledger USING btree (tenant_id, occurred_at DESC);
 
 --
+-- tenant_wallets: per-tenant prepaid balance the platform debits for the real Delhivery
+-- cost once an AWB's invoice is known. Enforces a minimum balance before a shipment may be
+-- created (admin-editable). Recharges and debits are recorded in wallet_ledger; balance is
+-- the running total kept in sync inside the same control-plane transaction.
+--
+CREATE TABLE IF NOT EXISTS public.tenant_wallets (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid NOT NULL,
+    balance       numeric(12,2) NOT NULL DEFAULT 0,
+    min_balance   numeric(12,2) NOT NULL DEFAULT 0,   -- placeholder; set per-tenant by admin
+    currency      character(3)  NOT NULL DEFAULT 'INR',
+    created_at    timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at    timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
+-- wallet_ledger: signed movements on a tenant wallet. recharge/adjustment credit (+),
+-- debit removes the real courier cost (-). A debit is keyed to its AWB so the debit-on-AWB
+-- hook is idempotent across retries (partial unique index below).
+--
+CREATE TABLE IF NOT EXISTS public.wallet_ledger (
+    id            uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id     uuid NOT NULL,
+    entry_type    character varying(24) NOT NULL,  -- recharge|debit|adjustment
+    amount        numeric(12,2) NOT NULL,          -- signed: recharge/adjustment +, debit -
+    order_ref     character varying(64),
+    awb           character varying(40),
+    note          text,
+    occurred_at   timestamp with time zone NOT NULL DEFAULT now()
+);
+
+ALTER TABLE ONLY public.tenant_wallets ADD CONSTRAINT tenant_wallets_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.tenant_wallets ADD CONSTRAINT tenant_wallets_tenant_id_key UNIQUE (tenant_id);
+ALTER TABLE ONLY public.wallet_ledger  ADD CONSTRAINT wallet_ledger_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.wallet_ledger  ADD CONSTRAINT wallet_ledger_entry_type_check
+    CHECK (entry_type IN ('recharge','debit','adjustment'));
+
+ALTER TABLE ONLY public.tenant_wallets ADD CONSTRAINT tenant_wallets_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.wallet_ledger  ADD CONSTRAINT wallet_ledger_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+
+CREATE INDEX IF NOT EXISTS idx_wallet_ledger_tenant ON public.wallet_ledger USING btree (tenant_id, occurred_at DESC);
+-- one debit per (tenant, awb): the DB-level idempotency guard for the debit-on-AWB hook.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_wallet_ledger_tenant_awb_debit
+    ON public.wallet_ledger USING btree (tenant_id, awb)
+    WHERE awb IS NOT NULL AND entry_type = 'debit';
+
+--
 -- instance_state on tenants: tracks RDS running state for the disable toggle.
 -- 'running' (normal) | 'stopped' (RDS stopped to save cost — test tenant only).
 -- Separate from status (active/suspended/…) so a stopped test instance is still
@@ -213,6 +264,54 @@ CREATE TABLE IF NOT EXISTS public.provisioning_jobs (
 );
 
 --
+-- import_jobs: async bulk product import. One row per uploaded/synced spreadsheet.
+-- Lives in the control plane (like provisioning_jobs) so the single in-app worker can
+-- enumerate pending jobs across every tenant, then re-enter that tenant's context to
+-- write products against its own RDS. The worker claims a job (pending->running) and
+-- processes it to completion; row_results holds the per-row outcome for the history UI.
+--
+CREATE TABLE IF NOT EXISTS public.import_jobs (
+    id              uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id       uuid NOT NULL,
+    source          character varying(16) NOT NULL DEFAULT 'upload', -- upload|google_sheet
+    status          character varying(16) NOT NULL DEFAULT 'pending', -- pending|running|done|failed
+    file_key        text,                                 -- staged upload S3 key (source=upload)
+    spreadsheet_id  text,                                 -- Google sheet id (source=google_sheet)
+    total_rows      integer NOT NULL DEFAULT 0,
+    processed_rows  integer NOT NULL DEFAULT 0,
+    created_count   integer NOT NULL DEFAULT 0,
+    updated_count   integer NOT NULL DEFAULT 0,
+    error_count     integer NOT NULL DEFAULT 0,
+    row_results     jsonb NOT NULL DEFAULT '[]'::jsonb,    -- [{row, sku, outcome, message}]
+    image_progress  jsonb NOT NULL DEFAULT '{}'::jsonb,    -- {fetched, total, failed}
+    pending_deletions jsonb NOT NULL DEFAULT '[]'::jsonb,  -- [{productId, sku, name}] sheet orphans awaiting approve/keep (source=google_sheet)
+    last_error      text,
+    created_by      uuid,                                 -- admin id that enqueued it
+    created_at      timestamp with time zone NOT NULL DEFAULT now(),
+    updated_at      timestamp with time zone NOT NULL DEFAULT now(),
+    finished_at     timestamp with time zone
+);
+
+--
+-- sheet_product_links: ownership map for the Google-sheet source-of-truth sync. One row per
+-- (tenant, spreadsheet, product) recording that a sheet "owns" a product. On each sync the worker
+-- upserts a link for every product the sheet touched; products linked to the sheet but absent from
+-- the current sync are orphans (staged into import_jobs.pending_deletions for approve/keep). Lives
+-- in the control plane beside import_jobs; product_id references a per-tenant store-DB row so it is
+-- intentionally NOT an FK (stale links are cleaned on reconcile). Upload imports never write here.
+--
+CREATE TABLE IF NOT EXISTS public.sheet_product_links (
+    id              uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    tenant_id       uuid NOT NULL,
+    spreadsheet_id  text NOT NULL,
+    product_id      uuid NOT NULL,                         -- per-tenant store-DB product id (not an FK)
+    sku             text NOT NULL,
+    last_job_id     uuid,                                  -- the import_jobs row that last saw it
+    last_synced_at  timestamp with time zone NOT NULL DEFAULT now(),
+    created_at      timestamp with time zone NOT NULL DEFAULT now()
+);
+
+--
 -- tenant_migration_runs: per-tenant record of a schema/migration fan-out (Part B).
 -- One row per (tenant, deploy) so a failure on one tenant is visible, not hidden.
 --
@@ -236,6 +335,27 @@ ALTER TABLE ONLY public.tenant_migration_runs ADD CONSTRAINT tenant_migration_ru
 CREATE INDEX IF NOT EXISTS idx_provisioning_jobs_tenant ON public.provisioning_jobs USING btree (tenant_id);
 CREATE INDEX IF NOT EXISTS idx_provisioning_jobs_active ON public.provisioning_jobs USING btree (status) WHERE status IN ('pending','running');
 CREATE INDEX IF NOT EXISTS idx_tenant_migration_runs_tenant ON public.tenant_migration_runs USING btree (tenant_id, ran_at DESC);
+
+ALTER TABLE ONLY public.import_jobs ADD CONSTRAINT import_jobs_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.import_jobs ADD CONSTRAINT import_jobs_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+CREATE INDEX IF NOT EXISTS idx_import_jobs_active ON public.import_jobs USING btree (status) WHERE status IN ('pending','running');
+CREATE INDEX IF NOT EXISTS idx_import_jobs_tenant ON public.import_jobs USING btree (tenant_id, created_at DESC);
+
+ALTER TABLE ONLY public.sheet_product_links ADD CONSTRAINT sheet_product_links_pkey PRIMARY KEY (id);
+ALTER TABLE ONLY public.sheet_product_links ADD CONSTRAINT sheet_product_links_tenant_id_fkey
+    FOREIGN KEY (tenant_id) REFERENCES public.tenants(id) ON DELETE CASCADE;
+ALTER TABLE ONLY public.sheet_product_links ADD CONSTRAINT sheet_product_links_uniq
+    UNIQUE (tenant_id, spreadsheet_id, product_id);
+CREATE INDEX IF NOT EXISTS idx_sheet_product_links_sheet ON public.sheet_product_links USING btree (tenant_id, spreadsheet_id);
+
+-- Platform sentinel tenant. The flagship (Jeffi's own) admin runs with NO ALS tenant, so its
+-- import_jobs are keyed to the NIL uuid; import_jobs.tenant_id FKs to tenants(id), so that row must
+-- exist. status='active' keeps it out of provisioning flows; the import worker special-cases this id
+-- (PLATFORM_TENANT_ID) and runs its jobs on the platform pool rather than resolving a tenant RDS.
+INSERT INTO public.tenants (id, slug, display_name, status)
+VALUES ('00000000-0000-0000-0000-000000000000', 'platform', 'Platform (flagship)', 'active')
+ON CONFLICT (id) DO NOTHING;
 
 --
 -- owners: ecom store OWNERS — the people who sign up at ecom.jeffistores.in to

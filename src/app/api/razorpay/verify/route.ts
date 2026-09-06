@@ -20,7 +20,8 @@ import { recordImplicitSignalsForProducts } from '@/lib/ai-feedback'
 import { parseBody, zNonEmpty, zUuid } from '@/lib/validate'
 import { sendOrderConfirmedSMS } from '@/lib/sms'
 import { getFeatureFlags } from '@/lib/site-controls'
-import { getRazorpayInstance } from '@/lib/razorpay'
+import { getRazorpayInstanceFor } from '@/lib/razorpay'
+import { resolveRazorpayCreds } from '@/lib/integrations/resolve'
 import { settleVariantChangePayment } from '@/lib/variant-change'
 import { transferToLinkedAccount, recordTenantTransaction } from '@/lib/razorpay-route'
 import { controlPlanePool } from '@/lib/tenant-registry'
@@ -46,8 +47,14 @@ export async function POST(request: NextRequest) {
     if (!parsed.ok) return parsed.response
     const { razorpay_order_id, razorpay_payment_id, razorpay_signature, orderId, draftToken } = parsed.data
 
+    // Resolve the tenant BEFORE the HMAC: an own_razorpay tenant collected on their own account,
+    // so the signature must be checked against THEIR key_secret. All three branches below share this
+    // request tenant context (x-tenant-slug / ALS), the same one create-order stamped on the order.
+    const tenant = await resolveRequestTenant()
+    const { key_secret } = await resolveRazorpayCreds(tenant?.tenantId)
+
     const expectedSignature = crypto
-      .createHmac('sha256', process.env.RAZORPAY_KEY_SECRET!)
+      .createHmac('sha256', key_secret)
       .update(`${razorpay_order_id}|${razorpay_payment_id}`)
       .digest('hex')
 
@@ -86,8 +93,8 @@ export async function POST(request: NextRequest) {
     if (vcr) {
       let amountPaise = 0
       try {
-        const rzp = getRazorpayInstance() as any
-        const rzpOrder = await rzp.orders.fetch(razorpay_order_id)
+        const { instance: rzp } = await getRazorpayInstanceFor(tenant?.tenantId)
+        const rzpOrder = await (rzp as any).orders.fetch(razorpay_order_id)
         amountPaise = Number(rzpOrder?.amount) || 0
       } catch { /* fall back to 0 — settle records the payment regardless */ }
       const result = await settleVariantChangePayment({ razorpayOrderId: razorpay_order_id, razorpayPaymentId: razorpay_payment_id, amountPaise })
@@ -106,6 +113,7 @@ export async function POST(request: NextRequest) {
 async function fireRouteTransfer(opts: {
   paymentId: string
   totalAmountInr: number
+  shippingAmountInr?: number
   orderId: string
   orderRef: string
   isCod: boolean
@@ -131,11 +139,26 @@ async function fireRouteTransfer(opts: {
                 ORDER BY b.created_at DESC LIMIT 1),
               t.razorpay_linked_account_id
             ) AS razorpay_linked_account_id,
-            t.daily_payout
+            t.daily_payout, t.own_razorpay
        FROM tenants t WHERE t.id=$1 AND t.status='active'`, [tenant.tenantId]
   ).catch(() => null)
   const linkedAccountId = row?.rows[0]?.razorpay_linked_account_id
   const dailyPayout = row?.rows[0]?.daily_payout === true
+  const ownRazorpay = row?.rows[0]?.own_razorpay === true
+
+  // A tenant on its own Razorpay account collects buyer payments directly — the platform never
+  // touches the money, so there is nothing to split. Record the sale for billing visibility, but
+  // skip the Route transfer entirely.
+  if (ownRazorpay) {
+    await recordTenantTransaction({
+      tenantId: tenant.tenantId,
+      orderRef: opts.orderRef,
+      grossAmountInr: opts.totalAmountInr,
+      isCod: opts.isCod,
+      gatewayTxnId: opts.paymentId,
+    })
+    return
+  }
 
   // Record the sale for central-admin billing regardless of Route onboarding. When a linked
   // account exists we fire the transfer and record the real split; otherwise the seller keeps
@@ -160,6 +183,7 @@ async function fireRouteTransfer(opts: {
     orderId: opts.orderId,
     tenantSlug: tenant.slug ?? '',
     dailyPayout,
+    delhiveryChargePaise: Math.round((opts.shippingAmountInr ?? 0) * 100),
   })
 
   await recordTenantTransaction({
@@ -315,6 +339,7 @@ async function commitDraft(args: {
   fireRouteTransfer({
     paymentId: args.razorpay_payment_id,
     totalAmountInr: parseFloat(created.total_amount),
+    shippingAmountInr: draft.shippingAmount || 0,
     orderId: created.id,
     orderRef: created.order_number,
     isCod: false,
@@ -469,6 +494,7 @@ async function markLegacyOrderPaid(args: {
     fireRouteTransfer({
       paymentId: args.razorpay_payment_id,
       totalAmountInr: parseFloat(order.total_amount),
+      shippingAmountInr: parseFloat(order.shipping_amount) || 0,
       orderId: args.orderId,
       orderRef: order.order_number,
       isCod: false,

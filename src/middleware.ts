@@ -427,6 +427,15 @@ export async function middleware(request: NextRequest) {
       return addSecurityHeaders(passThrough())
     }
 
+    // OAuth callbacks return cross-site from Google; the SameSite=Strict admin cookie is not sent.
+    // These authenticate via the HMAC-signed `state` in the route handler, not the session cookie.
+    const oauthCallbackPaths = [
+      '/api/admin/data-source/google/callback',
+    ]
+    if (oauthCallbackPaths.some(p => pathname.startsWith(p)) && request.method === 'GET') {
+      return addSecurityHeaders(passThrough())
+    }
+
     // Service account auth via mTLS client certificate serial.
     // nginx passes $ssl_client_serial as X-Client-Cert-Serial. The edge runtime
     // cannot use pg (Node.js crypto), so we pass the request through and let the

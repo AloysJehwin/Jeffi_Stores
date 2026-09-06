@@ -147,15 +147,9 @@ function GoogleCard({ row, canWrite, onDone, setToast }: {
       ) : (
       <>
       <div className="flex flex-wrap items-center gap-2">
-        {!connected && (
-          <a href="/api/admin/integrations/google/connect"
-            className="px-4 py-2 rounded-lg bg-accent-600 hover:bg-accent-700 text-white text-sm font-semibold transition-colors">
-            Connect
-          </a>
-        )}
         <button type="button" onClick={() => setOpen((o) => !o)}
           className="px-4 py-2 rounded-lg border border-border-default text-foreground-secondary hover:bg-surface-secondary text-sm font-medium transition-colors">
-          {open ? 'Hide' : 'Enter credentials'}
+          {open ? 'Hide' : connected ? 'Update credentials' : 'Enter credentials'}
         </button>
         {connected && <DisconnectButton provider="google_merchant" onDone={onDone} setToast={setToast} />}
       </div>

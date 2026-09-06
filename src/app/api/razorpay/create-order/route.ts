@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { query, queryOne, resolveRequestTenant } from '@/lib/db'
 import { authenticateAnyUser as authenticateUser } from '@/lib/jwt'
-import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
+import { getRazorpayInstanceFor, isRazorpayEnabled } from '@/lib/razorpay'
 import { verifyDraftToken, hashCartItems } from '@/lib/order-draft'
 import {
   loadActiveCart,
@@ -82,9 +82,9 @@ async function handleDraftToken(token: string, userId: string) {
     return NextResponse.json({ error: 'Order total must be greater than zero' }, { status: 400 })
   }
 
-  const razorpay = getRazorpayInstance()
-  const receipt = `draft-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.slice(0, 40)
   const tenant = await resolveRequestTenant()
+  const { instance: razorpay, creds } = await getRazorpayInstanceFor(tenant?.tenantId)
+  const receipt = `draft-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`.slice(0, 40)
   const razorpayOrder = await razorpay.orders.create({
     amount: amountInPaise,
     currency: 'INR',
@@ -110,6 +110,7 @@ async function handleDraftToken(token: string, userId: string) {
     amount: amountInPaise,
     currency: 'INR',
     draftToken: token,
+    key_id: creds.key_id,
   })
 }
 
@@ -145,10 +146,10 @@ async function handleLegacyOrderId(orderId: string, userId: string, isBusiness: 
     return NextResponse.json({ error: 'Order is already paid' }, { status: 400 })
   }
 
-  const razorpay = getRazorpayInstance()
+  const tenant = await resolveRequestTenant()
+  const { instance: razorpay, creds } = await getRazorpayInstanceFor(tenant?.tenantId)
   const amountInPaise = Math.round(parseFloat(order.total_amount) * 100)
 
-  const tenant = await resolveRequestTenant()
   const razorpayOrder = await razorpay.orders.create({
     amount: amountInPaise,
     currency: 'INR',
@@ -179,5 +180,6 @@ async function handleLegacyOrderId(orderId: string, userId: string, isBusiness: 
     amount: amountInPaise,
     currency: 'INR',
     orderId: order.id,
+    key_id: creds.key_id,
   })
 }

@@ -16,6 +16,9 @@ const EDITABLE_KEYS = [
   'delivery_discount_flat',
   'delivery_discount_min_subtotal',
   'delivery_discount_label',
+  'delivery_base_charge',
+  'delivery_per_kg_over_3',
+  'delivery_free_weight_ceiling_kg',
   // Store identity
   'business_name',
   'business_web',

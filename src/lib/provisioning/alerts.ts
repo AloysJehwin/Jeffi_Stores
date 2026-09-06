@@ -78,10 +78,16 @@ export async function alertProvisioningFailure(
   const where = tenantId
     ? `/admin/ecom/customers/${tenantId}?tab=provisioning`
     : '/admin/ecom/customers'
+  // owner_admin_cert and mtls_fleet_refresh run AFTER the job is already `done` — the store is
+  // live and nothing is rolled back. Only a failure in the job's own step machine is terminal,
+  // so only that case may claim a rollback; the post-done hooks get a re-run instruction.
+  const nonFatal = step === 'owner_admin_cert' || step === 'mtls_fleet_refresh'
+  const tail = nonFatal
+    ? `The store is live; this post-provisioning step failed and can be safely re-run. Inspect at ${where}`
+    : `The job is terminal and rollback has run. Inspect at ${where}`
   await send(
-    `[Jeffi] Provisioning FAILED: ${tenantSlug}`,
-    `Tenant : ${tenantSlug}\nStep   : ${step}\nError  : ${error}\n\n` +
-    `The job is terminal and rollback has run. Inspect at ${where}`,
+    `[Jeffi] Provisioning ${nonFatal ? 'step failed (store live)' : 'FAILED'}: ${tenantSlug}`,
+    `Tenant : ${tenantSlug}\nStep   : ${step}\nError  : ${error}\n\n${tail}`,
   )
 }
 

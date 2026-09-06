@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
+import { getCurrentTenantId } from '@/lib/tenant-context'
 import { getSocialPost } from '@/lib/tenant-registry'
 import { publishScheduledPost } from '@/lib/social/publisher'
 
@@ -16,8 +17,9 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const { id } = await params
   const post = await getSocialPost(id)
   if (!post) return NextResponse.json({ error: 'Post not found' }, { status: 404 })
-  if (post.tenant_id !== null) {
-    return NextResponse.json({ error: 'Not a platform post' }, { status: 403 })
+  // Tenants may only publish their own posts; flagship (null ALS tenant) publishes platform posts.
+  if (post.tenant_id !== getCurrentTenantId()) {
+    return NextResponse.json({ error: 'Post not found' }, { status: 404 })
   }
 
   const result = await publishScheduledPost(post)

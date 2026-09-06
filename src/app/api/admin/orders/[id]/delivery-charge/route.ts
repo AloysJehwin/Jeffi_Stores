@@ -7,6 +7,8 @@ import { parseBody } from '@/lib/validate'
 import { fetchDelhiveryInvoiceCharges } from '@/lib/delhivery'
 import { getBusinessValues } from '@/lib/site-controls'
 import { logAdminAudit } from '@/lib/admin-audit'
+import { getCurrentTenant } from '@/lib/tenant-context'
+import { settleDelhiveryCostToWallet } from '@/lib/wallet'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,12 +45,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const order = await queryOne<{
     awb_number: string | null
+    order_number: string | null
     payment_mode: string | null
     shipping_amount: string | null
     dest_pin: string | null
     delhivery_charged_weight_kg: string | null
   }>(
-    `SELECT awb_number, payment_mode, shipping_amount,
+    `SELECT awb_number, order_number, payment_mode, shipping_amount,
             shipping_address_snapshot->>'postal_code' AS dest_pin,
             delhivery_charged_weight_kg
        FROM orders WHERE id = $1`,
@@ -82,6 +85,20 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
   const total = chargedAmount ?? charges!.total
 
+  // Debit the tenant's prepaid wallet by the real Delhivery cost first (own_delhivery tenants are
+  // exempt inside settleDelhiveryCostToWallet, which then returns true). Only stamp billed_at when
+  // the charge is durably settled, so a transient debit failure leaves it NULL and the next sync
+  // retries instead of silently losing the charge. The (tenant_id, awb) index keeps re-runs idempotent.
+  const tenant = getCurrentTenant()
+  const settled = tenant?.tenantId && order.awb_number && total > 0
+    ? await settleDelhiveryCostToWallet({
+        tenantId: tenant.tenantId,
+        awb: order.awb_number,
+        orderRef: order.order_number,
+        amountInr: total,
+      }).catch(() => false)
+    : true
+
   await query(
     `UPDATE orders SET
        delhivery_charged_weight_kg = COALESCE($2, delhivery_charged_weight_kg),
@@ -89,11 +106,11 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
        delhivery_freight_charge    = $4,
        delhivery_cod_charge        = $5,
        delhivery_oda_charge        = $6,
-       delhivery_billed_at         = NOW(),
+       delhivery_billed_at         = CASE WHEN $7 THEN NOW() ELSE delhivery_billed_at END,
        delhivery_extra_charge      = ROUND(($3 - COALESCE(shipping_amount, 0))::numeric, 2),
        updated_at                  = NOW()
      WHERE id = $1`,
-    [id, chargedWeightKg ?? null, total, charges?.freight ?? null, charges?.codCharge ?? null, charges?.oda ?? null]
+    [id, chargedWeightKg ?? null, total, charges?.freight ?? null, charges?.codCharge ?? null, charges?.oda ?? null, settled]
   )
 
   const quoted = Number(order.shipping_amount ?? 0)

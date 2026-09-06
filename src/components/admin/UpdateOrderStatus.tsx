@@ -13,6 +13,7 @@ interface UpdateOrderStatusProps {
   currentStatus: string
   currentPaymentStatus: string
   canOverride?: boolean
+  inventoryValidationEnabled?: boolean
 }
 
 const VALID_STATUS_TRANSITIONS: Record<string, string[]> = {
@@ -83,7 +84,7 @@ const OVERRIDE_ONLY_STATUS_OPTIONS = [
 
 const MIN_REASON = 10
 
-export default function UpdateOrderStatus({ orderId, currentStatus, currentPaymentStatus, canOverride = false }: UpdateOrderStatusProps) {
+export default function UpdateOrderStatus({ orderId, currentStatus, currentPaymentStatus, canOverride = false, inventoryValidationEnabled = true }: UpdateOrderStatusProps) {
   const [status, setStatus] = useState(currentStatus)
   const [paymentStatus, setPaymentStatus] = useState(currentPaymentStatus)
   const [isUpdating, setIsUpdating] = useState(false)
@@ -145,7 +146,9 @@ export default function UpdateOrderStatus({ orderId, currentStatus, currentPayme
 
     // Batch/serial assignment is part of the normal fulfilment path. An override is a
     // correction of record, so it writes the status straight through without prompting.
-    if (!overrideMode && status === 'processing' && currentStatus !== 'processing') {
+    // Skipped entirely when inventory validation is off (e.g. basic plan) — there is no
+    // stock to reconcile, and the server won't validate or decrement either.
+    if (inventoryValidationEnabled && !overrideMode && status === 'processing' && currentStatus !== 'processing') {
       setIsUpdating(true)
       setError(null)
       try {

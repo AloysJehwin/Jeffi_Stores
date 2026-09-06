@@ -5,6 +5,7 @@ import { issueUserToken, USER_SESSION_TTL_S } from '@/lib/issue-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import { cookies } from 'next/headers'
 import { logActivity } from '@/lib/activity'
+import { createAdminNotification } from '@/lib/admin-notify'
 import { cookieDomainOption } from '@/lib/cookie-domain'
 import { POLICY_VERSION } from '@/app/legal/policies'
 
@@ -59,6 +60,18 @@ export async function POST(request: NextRequest) {
       kind: 'signup',
       summary: 'Business account created',
       metadata: { email, source: 'business_otp', companyName },
+    }).catch(() => {})
+
+    createAdminNotification({
+      type: 'b2b_signup_pending',
+      category: 'b2b',
+      title: 'New B2B account awaiting approval',
+      message: `${companyName} (${email})`,
+      link: `/admin/business/customers/${newUser.id}`,
+      entityType: 'business_user',
+      entityId: String(newUser.id),
+      severity: 'warning',
+      scope: 'business_customers:read',
     }).catch(() => {})
 
     const signals = extractSessionSignals(request)

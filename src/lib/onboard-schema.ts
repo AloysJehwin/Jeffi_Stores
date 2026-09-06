@@ -24,6 +24,7 @@ export const OnboardSchema = z.object({
   gstCertS3Key: z.string().optional(),
   // Step 4 — Warehouse (optional)
   dailyPayout: z.boolean().optional(),
+  ownDelhivery: z.boolean().optional(),
   warehouse: z.object({
     // 6 digits when given. A malformed pincode is worse than none: it reaches Razorpay and
     // Delhivery as if it were real.
@@ -33,6 +34,13 @@ export const OnboardSchema = z.object({
     sellerAddress: z.string().optional(),
     sellerPhone: z.string().optional(),
   }).optional(),
+  // Step 5 — Bank
+  ownRazorpay: z.boolean().optional(),
+  // Own-Razorpay creds (only meaningful when ownRazorpay). key_secret/webhook_secret are sent
+  // once to the submit route and encrypted there — they never round-trip the cleartext draft.
+  razorpayKeyId: z.string().optional(),
+  razorpayKeySecret: z.string().optional(),
+  razorpayWebhookSecret: z.string().optional(),
   // Restore-on-re-onboard — owner opted to restore a prior deprovisioned store's data.
   restorePreviousData: z.boolean().optional(),
   // Step 6 — Branding & legals
@@ -55,6 +63,15 @@ export const OnboardSchema = z.object({
       code: z.ZodIssueCode.custom,
       path: ['warehouse', 'originPincode'],
       message: 'A 6-digit pincode is required — add it here or include it in the business address',
+    })
+  }
+
+  // Collecting on your own Razorpay account needs the keys to collect with.
+  if (d.ownRazorpay && (!d.razorpayKeyId?.trim() || !d.razorpayKeySecret?.trim())) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['razorpayKeySecret'],
+      message: 'Razorpay Key ID and Key Secret are required to collect on your own account',
     })
   }
 })

@@ -735,6 +735,14 @@ ALTER TABLE ONLY public.notifications
     ADD CONSTRAINT notifications_pkey PRIMARY KEY (id);
 
 
+--
+-- Name: admin_notifications admin_notifications_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.admin_notifications
+    ADD CONSTRAINT admin_notifications_pkey PRIMARY KEY (id);
+
+
 
 --
 -- Name: order_items order_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -

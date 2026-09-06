@@ -8,12 +8,12 @@ import { useRouter, usePathname } from 'next/navigation'
 // logged out; Dashboard + Sign out when an owner is signed in.
 // Self-hides on full-page auth routes (client-reactive so it updates instantly
 // on in-app navigation, not just on hard reload).
-const HIDE_ON = ['/signin', '/signup']
+const HIDE_ON = ['/signin', '/signup', '/ecom/signin', '/ecom/signup']
 
 export default function EcomNav({ owner }: { owner: { email: string; name: string | null } | null }) {
   const router = useRouter()
   const pathname = usePathname()
-  if (HIDE_ON.includes(pathname)) return null
+  if (HIDE_ON.includes(pathname) || pathname?.startsWith('/ecom/preview')) return null
 
   async function signOut() {
     await fetch('/api/ecom/auth/signout', { method: 'POST' }).catch(() => {})
@@ -22,7 +22,7 @@ export default function EcomNav({ owner }: { owner: { email: string; name: strin
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-border-default bg-surface-elevated/80 backdrop-blur">
+    <header className="fixed top-0 inset-x-0 z-40 border-b border-border-default bg-surface-elevated/80 backdrop-blur">
       <div className="w-full px-6 lg:px-10 h-14 flex items-center justify-between">
         <Link href="/" className="flex items-center gap-2 font-bold text-foreground">
           <span className="inline-flex items-center justify-center w-7 h-7 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 text-white text-sm">J</span>
