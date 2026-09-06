@@ -18,17 +18,19 @@ vi.mock('@/lib/scopes', () => ({
 vi.mock('@/lib/s3', () => ({
   uploadGalleryImage: vi.fn(),
   deleteGalleryImage: vi.fn(),
+  fetchRemoteImage: vi.fn(),
 }))
 
 import { POST, OPTIONS } from '@/app/api/gallery/upload/route'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { uploadGalleryImage } from '@/lib/s3'
+import { uploadGalleryImage, fetchRemoteImage } from '@/lib/s3'
 import { queryOne } from '@/lib/db'
 
 const mockAuth = vi.mocked(authenticateAdmin)
 const mockHasScope = vi.mocked(hasScope)
 const mockUpload = vi.mocked(uploadGalleryImage)
+const mockFetchRemoteImage = vi.mocked(fetchRemoteImage)
 const mockQueryOne = vi.mocked(queryOne)
 
 const uploadResult = {
@@ -172,14 +174,9 @@ describe('POST /api/gallery/upload', () => {
     mockUpload.mockResolvedValueOnce(uploadResult as any)
     mockQueryOne.mockResolvedValueOnce(insertedRecord)
 
-    // Mock global fetch so fetchImage succeeds
-    const fakeBuffer = Buffer.from('fakeimagedata')
-    const fakeResponse = {
-      ok: true,
-      arrayBuffer: async () => fakeBuffer.buffer,
-    }
-    const origFetch = global.fetch
-    global.fetch = vi.fn().mockResolvedValueOnce(fakeResponse as any)
+    // The route fetches the remote image via s3.fetchRemoteImage (shared with the bulk importer),
+    // not global.fetch. Drive the helper directly.
+    mockFetchRemoteImage.mockResolvedValueOnce(Buffer.from('fakeimagedata') as any)
 
     const req = new Request('http://localhost/api/gallery/upload', {
       method: 'POST',
@@ -192,8 +189,6 @@ describe('POST /api/gallery/upload', () => {
     })
     const res = await POST(req as any)
 
-    global.fetch = origFetch
-
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.id).toBe('new-id')
@@ -202,9 +197,7 @@ describe('POST /api/gallery/upload', () => {
 
   it('returns 500 when fetchImage fails (non-ok response)', async () => {
     mockAuth.mockResolvedValueOnce({ id: 'admin1' } as any)
-
-    const origFetch = global.fetch
-    global.fetch = vi.fn().mockResolvedValueOnce({ ok: false, status: 404 } as any)
+    mockFetchRemoteImage.mockRejectedValueOnce(new Error('Failed to fetch image: 404'))
 
     const req = new Request('http://localhost/api/gallery/upload', {
       method: 'POST',
@@ -212,8 +205,6 @@ describe('POST /api/gallery/upload', () => {
       body: JSON.stringify({ imageUrl: 'https://example.com/missing.jpg' }),
     })
     const res = await POST(req as any)
-
-    global.fetch = origFetch
 
     expect(res.status).toBe(500)
     const json = await res.json()
