@@ -40,6 +40,10 @@ vi.mock('@/lib/site-controls', () => ({
   getBusinessValues: vi.fn(async () => ({ delhiveryOriginPincode: '492001' })),
 }))
 
+vi.mock('@/lib/integrations/resolve', () => ({
+  resolveDelhiveryToken: vi.fn(),
+}))
+
 // ── Imports ───────────────────────────────────────────────────────────────────
 
 import { POST } from '@/app/api/admin/delhivery/sync-statuses/route'
@@ -49,6 +53,7 @@ import { createAutoTask, completeAutoTask } from '@/lib/auto-tasks'
 import { restoreOrderStock } from '@/lib/order-stock'
 import { sendOrderDeliveredSMS, sendOutForDeliverySMS } from '@/lib/sms'
 import { fetchDelhiveryInvoiceCharges } from '@/lib/delhivery'
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 const mockQuery = vi.mocked(query)
 const mockQueryMany = vi.mocked(queryMany)
@@ -59,6 +64,7 @@ const mockRestoreStock = vi.mocked(restoreOrderStock)
 const mockDeliveredSMS = vi.mocked(sendOrderDeliveredSMS)
 const mockOfdSMS = vi.mocked(sendOutForDeliverySMS)
 const mockInvoiceCharges = vi.mocked(fetchDelhiveryInvoiceCharges)
+const mockResolveDelhiveryToken = vi.mocked(resolveDelhiveryToken)
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -110,6 +116,7 @@ beforeEach(() => {
   mockDeliveredSMS.mockResolvedValue(undefined as any)
   mockOfdSMS.mockResolvedValue(undefined as any)
   mockInvoiceCharges.mockResolvedValue(null as any)
+  mockResolveDelhiveryToken.mockResolvedValue(DELHIVERY_TOKEN)
 })
 
 afterEach(() => {
@@ -118,10 +125,10 @@ afterEach(() => {
 })
 
 // ── Auth / config guards ──────────────────────────────────────────────────────
-// NOTE: DELHIVERY_TOKEN and CRON_SECRET are captured at module load time as
-// module-level constants, so env mutations in beforeEach/afterEach have no
-// effect on the already-imported module. The 503 path requires a fresh module
-// import via vi.isolateModules() with DELHIVERY_API_KEY absent.
+// NOTE: CRON_SECRET is captured at module load time as a module-level constant, so env
+// mutations in beforeEach/afterEach have no effect on it. The Delhivery token is resolved
+// per-request via resolveDelhiveryToken (tenant-aware), so the 503 path is driven by mocking
+// that helper to return an empty token rather than by clearing env / re-importing the module.
 
 describe('POST /api/admin/delhivery/sync-statuses — auth / config', () => {
   it('returns 401 when authorization header does not match', async () => {
@@ -137,18 +144,13 @@ describe('POST /api/admin/delhivery/sync-statuses — auth / config', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 503 when DELHIVERY_API_KEY not configured (isolated module)', async () => {
-    // Save and clear the key so the freshly-imported module sees it as undefined
-    const saved = process.env.DELHIVERY_API_KEY
-    delete process.env.DELHIVERY_API_KEY
+  it('returns 503 when no Delhivery token resolves', async () => {
+    // The route reads orders before the token check and 200s early on an empty list, so it must
+    // see at least one order to reach the 503 config guard.
+    mockQueryMany.mockResolvedValueOnce([ORDER] as any)
+    mockResolveDelhiveryToken.mockResolvedValueOnce('')
 
-    vi.resetModules()
-    const { POST: freshPost } = await import('@/app/api/admin/delhivery/sync-statuses/route')
-
-    // Restore before assertions so other tests are unaffected
-    process.env.DELHIVERY_API_KEY = saved
-
-    const res = await freshPost(makeReq())
+    const res = await POST(makeReq())
     expect(res.status).toBe(503)
     expect((await res.json()).error).toMatch(/not configured/)
   })

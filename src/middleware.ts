@@ -4,7 +4,7 @@ import { verifyToken, verifyBusinessToken } from './lib/jwt'
 import { getScopeForPath, hasScope, isPlatformAdmin } from './lib/scopes'
 import { applyRateLimit } from './lib/rate-limit'
 import { extractSessionSignals } from './lib/session-signals-request'
-import { resolveTenantFromHost, appFromHost, slugFromHost } from './lib/tenant-registry'
+import { resolveTenantFromHost, appFromHost, slugFromHost, formsHostForSlug } from './lib/tenant-registry'
 import { runWithTenantContext } from './lib/tenant-context'
 import { adminCookieNameForHost } from './lib/admin-cookie'
 
@@ -296,7 +296,7 @@ export async function middleware(request: NextRequest) {
 
   if (pathname.startsWith('/forms/')) {
     const slug = pathname.replace('/forms/', '')
-    return NextResponse.redirect(`https://forms.jeffistores.in/${slug}`, 301)
+    return NextResponse.redirect(`https://${formsHostForSlug(tenant?.slug ?? null)}/${slug}`, 301)
   }
 
   // Tenant admin mTLS. admin.jeffistores.in is gated by nginx against the platform CA; nginx
@@ -424,6 +424,15 @@ export async function middleware(request: NextRequest) {
     // Machine-to-machine endpoints authenticated by Bearer token — skip cookie check.
     const bearerOnlyPaths = ['/api/admin/replication/log']
     if (bearerOnlyPaths.some(p => pathname.startsWith(p)) && request.method === 'POST') {
+      return addSecurityHeaders(passThrough())
+    }
+
+    // OAuth callbacks return cross-site from Google; the SameSite=Strict admin cookie is not sent.
+    // These authenticate via the HMAC-signed `state` in the route handler, not the session cookie.
+    const oauthCallbackPaths = [
+      '/api/admin/data-source/google/callback',
+    ]
+    if (oauthCallbackPaths.some(p => pathname.startsWith(p)) && request.method === 'GET') {
       return addSecurityHeaders(passThrough())
     }
 

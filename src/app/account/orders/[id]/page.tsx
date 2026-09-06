@@ -447,7 +447,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       if (!rzpResponse.ok) throw new Error(rzpData.error || 'Failed to initiate payment')
 
       const options = {
-        key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+        key: rzpData.key_id ?? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
         amount: rzpData.amount,
         currency: rzpData.currency,
         name: storeIdentity.name,
@@ -515,7 +515,7 @@ export default function OrderDetailPage({ params }: { params: Promise<{ id: stri
       if (data.settlement === 'collect' && data.razorpayOrderId) {
         await loadRazorpayScript()
         const options = {
-          key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID!,
+          key: data.key_id ?? process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
           amount: data.amount,
           currency: data.currency,
           name: storeIdentity.name,

@@ -1,5 +1,6 @@
 import { query } from '@/lib/db'
 import { getBusinessValues } from '@/lib/site-controls'
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
 const DELHIVERY_CREATE_URL = 'https://track.delhivery.com/api/cmu/create.json'
@@ -26,8 +27,8 @@ export interface PincodeServiceability {
  * Never throws — an unreachable Delhivery must not block onboarding, so an error is reported
  * as "could not check" and the caller decides.
  */
-export async function checkPincodeServiceability(pincode: string): Promise<PincodeServiceability> {
-  const token = process.env.DELHIVERY_API_KEY || process.env.DELHIVERY_TOKEN
+export async function checkPincodeServiceability(pincode: string, tenantId?: string): Promise<PincodeServiceability> {
+  const token = await resolveDelhiveryToken(tenantId)
   const pin = String(pincode ?? '').replace(/\D/g, '')
   if (!/^\d{6}$/.test(pin)) return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'A pincode is six digits.' }
   if (!token) return { serviceable: false, pickup: false, cod: false, prepaid: false, error: 'Delivery partner not configured.' }
@@ -58,8 +59,8 @@ export async function checkPincodeServiceability(pincode: string): Promise<Pinco
 // Delhivery has no delete for a client warehouse — the edit endpoint is the only way to retire
 // one, so we flip it inactive rather than removing the address. Keyed by warehouse name (the
 // pickup_location). Best-effort / idempotent: a missing warehouse is treated as already gone.
-export async function deactivateDelhiveryPickupLocation(name: string): Promise<{ ok: boolean; error?: string }> {
-  const token = process.env.DELHIVERY_API_KEY || process.env.DELHIVERY_TOKEN
+export async function deactivateDelhiveryPickupLocation(name: string, tenantId?: string): Promise<{ ok: boolean; error?: string }> {
+  const token = await resolveDelhiveryToken(tenantId)
   if (!token) return { ok: false, error: 'DELHIVERY_API_KEY not configured' }
   if (!name) return { ok: false, error: 'no pickup location name' }
 
@@ -96,8 +97,9 @@ export async function createDelhiveryPickupLocation(params: {
   email?: string
   city?: string
   state?: string
+  tenantId?: string
 }): Promise<{ ok: boolean; error?: string }> {
-  const token = process.env.DELHIVERY_API_KEY || process.env.DELHIVERY_TOKEN
+  const token = await resolveDelhiveryToken(params.tenantId)
   if (!token) return { ok: false, error: 'DELHIVERY_API_KEY not configured' }
 
   const { name, phone, pincode, address, registeredName, email, city, state } = params
@@ -152,8 +154,64 @@ export async function createDelhiveryPickupLocation(params: {
   }
 }
 
-export async function cancelDelhiveryShipment(awbNumber: string): Promise<void> {
-  const token = process.env.DELHIVERY_API_KEY
+export interface DelhiveryPickupLocation {
+  name: string
+  pin: string
+  phone: string
+  address: string
+  active: boolean
+}
+
+/**
+ * List the account's registered Delhivery client warehouses (pickup locations). Used to populate the
+ * warehouse dropdown on shipment creation and to cross-validate a posted pickup_location server-side.
+ *
+ * Never throws (mirrors checkPincodeServiceability): on any error — or an empty/unavailable live list —
+ * it falls back to the tenant's single stored pickup location (bv.pickupLocation) so the dropdown always
+ * has at least one option. The live list reflects ONLY the account the resolved token owns, so a tenant
+ * never sees another account's warehouses.
+ */
+export async function listDelhiveryPickupLocations(tenantId?: string): Promise<DelhiveryPickupLocation[]> {
+  const fallback = async (): Promise<DelhiveryPickupLocation[]> => {
+    const bv = await getBusinessValues().catch(() => null)
+    const name = bv?.pickupLocation
+    return name ? [{ name, pin: '', phone: '', address: '', active: true }] : []
+  }
+
+  const token = await resolveDelhiveryToken(tenantId)
+  if (!token) return fallback()
+
+  try {
+    const res = await fetch('https://track.delhivery.com/api/backend/clientwarehouse/', {
+      headers: { Authorization: `Token ${token}`, Accept: 'application/json' },
+      cache: 'no-store',
+    })
+    if (!res.ok) return fallback()
+
+    const data = await res.json().catch(() => null)
+    const rows: any[] = Array.isArray(data) ? data : (data?.data ?? data?.results ?? [])
+    const mapped = rows
+      .map((r: any): DelhiveryPickupLocation | null => {
+        const name = r?.name ?? r?.warehouse_name ?? r?.registered_name
+        if (!name) return null
+        return {
+          name: String(name),
+          pin: String(r?.pin ?? r?.pincode ?? ''),
+          phone: String(r?.phone ?? ''),
+          address: String(r?.address ?? ''),
+          active: r?.is_active !== false && r?.active !== false,
+        }
+      })
+      .filter((r): r is DelhiveryPickupLocation => r !== null)
+
+    return mapped.length > 0 ? mapped : await fallback()
+  } catch {
+    return fallback()
+  }
+}
+
+export async function cancelDelhiveryShipment(awbNumber: string, tenantId?: string): Promise<void> {
+  const token = await resolveDelhiveryToken(tenantId)
   if (!token) throw new Error('DELHIVERY_API_KEY not configured')
 
   const res = await fetch(DELHIVERY_EDIT_URL, {
@@ -188,8 +246,9 @@ export async function createRVPShipment(params: {
   weightKg: number
   productDesc: string
   quantity: number
+  tenantId?: string
 }): Promise<string> {
-  const token = process.env.DELHIVERY_API_KEY
+  const token = await resolveDelhiveryToken(params.tenantId)
   if (!token) throw new Error('DELHIVERY_API_KEY not configured')
 
   const bv = await getBusinessValues()
@@ -310,6 +369,8 @@ export interface InvoiceChargeQuery {
   /** S = Surface, E = Express. */
   mode?: 'S' | 'E'
   paymentType?: 'Pre-paid' | 'COD'
+  /** Passed by off-ALS callers (sync-statuses cron) so the tenant's own token is used. */
+  tenantId?: string
 }
 
 /**
@@ -331,7 +392,7 @@ export interface InvoiceChargeQuery {
 export async function fetchDelhiveryInvoiceCharges(
   q: InvoiceChargeQuery
 ): Promise<DelhiveryInvoiceCharges | null> {
-  const token = process.env.DELHIVERY_API_KEY
+  const token = await resolveDelhiveryToken(q.tenantId)
   if (!token) return null
 
   if (!q.originPin || !q.destPin || !q.chargedWeightG) {

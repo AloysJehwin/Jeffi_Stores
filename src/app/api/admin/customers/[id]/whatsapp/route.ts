@@ -5,6 +5,8 @@ import { queryOne, queryMany } from '@/lib/db'
 import { logActivity } from '@/lib/activity'
 import { WA_TEMPLATE_REGISTRY, sendTemplateByKey, sendFreeTextWhatsApp } from '@/lib/whatsapp'
 import { storeBaseUrlAsync } from '@/lib/brand'
+import { getHost } from '@/lib/get-host'
+import { formsHostForHost } from '@/lib/forms-host'
 
 export const dynamic = 'force-dynamic'
 
@@ -101,7 +103,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         `SELECT slug FROM review_forms WHERE is_active = true ORDER BY created_at DESC LIMIT 1`
       )
     }
-    if (form?.slug) feedbackUrl = `https://forms.jeffistores.in/${form.slug}`
+    if (form?.slug) feedbackUrl = `https://${formsHostForHost(await getHost())}/${form.slug}`
   } catch {}
 
   const cartUrl = `${await storeBaseUrlAsync()}/cart`

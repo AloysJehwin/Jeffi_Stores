@@ -1,4 +1,4 @@
-import { S3Client, PutObjectCommand, DeleteObjectCommand, CopyObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectCommand, CopyObjectCommand, HeadObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3'
 import sharp from 'sharp'
 import { getCurrentTenant } from './tenant-context'
 
@@ -350,4 +350,41 @@ export async function deleteGalleryImage(s3Key: string, s3ThumbnailKey: string) 
   if (s3ThumbnailKey) {
     await s3Client.send(new DeleteObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${s3ThumbnailKey}` }))
   }
+}
+
+// Fetch a remote image URL into a Buffer. Some merchant/CDN sources present broken TLS
+// chains, so verification is briefly disabled and always restored. Shared by the gallery
+// upload route and the bulk product importer (image-URL cell -> S3).
+export async function fetchRemoteImage(url: string): Promise<Buffer> {
+  const prev = process.env.NODE_TLS_REJECT_UNAUTHORIZED
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
+  try {
+    const res = await fetch(url)
+    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`)
+    return Buffer.from(await res.arrayBuffer())
+  } finally {
+    if (prev === undefined) delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
+    else process.env.NODE_TLS_REJECT_UNAUTHORIZED = prev
+  }
+}
+
+// Stage a raw bulk-import workbook so the background worker can read it out-of-request.
+// Lands in the tenant's own bucket (resolveBucket) under imports/. Returns the canonical
+// key stored on the import_jobs row.
+export async function uploadImportFile(buffer: Buffer, fileName: string): Promise<string> {
+  const BUCKET_NAME = await resolveBucket()
+  const safe = fileName.replace(/[^a-zA-Z0-9.-]/g, '_')
+  const key = `imports/${Date.now()}-${safe}`
+  await s3Client.send(new PutObjectCommand({
+    Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${key}`, Body: buffer,
+    ContentType: 'application/octet-stream',
+  }))
+  return key
+}
+
+export async function getImportFile(key: string): Promise<Buffer> {
+  const BUCKET_NAME = await resolveBucket()
+  const res = await s3Client.send(new GetObjectCommand({ Bucket: BUCKET_NAME, Key: `${KEY_PREFIX}${key}` }))
+  const bytes = await res.Body!.transformToByteArray()
+  return Buffer.from(bytes)
 }

@@ -5,6 +5,7 @@ import { sendSupportEscalationEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
 import { getCurrentTenant } from '@/lib/tenant-context'
 import { getTenantOwners } from '@/lib/tenant-registry'
+import { createAdminNotification } from '@/lib/admin-notify'
 import { z } from 'zod'
 import { parseBody, zUuid } from '@/lib/validate'
 
@@ -99,6 +100,18 @@ export async function POST(request: NextRequest) {
       if (recipients.length > 0) {
         await sendSupportEscalationEmail(name, user.email, authUser.userId, session.id, recipients)
       }
+
+      createAdminNotification({
+        type: 'support_escalation',
+        category: 'support',
+        title: `Support chat — ${name}`,
+        message: user.email || null,
+        link: `/admin/customers/${authUser.userId}`,
+        entityType: 'support_session',
+        entityId: String(session.id),
+        severity: 'warning',
+        scope: 'customers:read',
+      }).catch(() => {})
     }
 
     return NextResponse.json({ session })

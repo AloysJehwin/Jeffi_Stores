@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import AdminSidebarNav from './AdminSidebarNav'
 import AdminMobileNav from './AdminMobileNav'
 import AdminAgentTrigger from './AdminAgentTrigger'
+import NotificationBell from './NotificationBell'
 import ScanActionPopup from './ScanActionPopup'
 import ThemeToggle from '@/components/ThemeToggle'
 import SessionGuard from './SessionGuard'
@@ -112,6 +113,7 @@ export default function AdminShell({
               <p className="text-[10px] text-white/60 capitalize">{role}</p>
             </div>
           </div>
+          <NotificationBell />
           <ThemeToggle variant="admin" />
           <AdminAgentTrigger canUse={canUseAgent} />
           {logoutForm}

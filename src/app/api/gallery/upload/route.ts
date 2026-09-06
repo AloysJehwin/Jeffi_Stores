@@ -1,21 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { uploadGalleryImage } from '@/lib/s3'
+import { uploadGalleryImage, fetchRemoteImage } from '@/lib/s3'
 import { queryOne } from '@/lib/db'
-
-async function fetchImage(url: string): Promise<Buffer> {
-  const prev = process.env.NODE_TLS_REJECT_UNAUTHORIZED
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-  try {
-    const res = await fetch(url)
-    if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`)
-    return Buffer.from(await res.arrayBuffer())
-  } finally {
-    if (prev === undefined) delete process.env.NODE_TLS_REJECT_UNAUTHORIZED
-    else process.env.NODE_TLS_REJECT_UNAUTHORIZED = prev
-  }
-}
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 204 })
@@ -46,7 +33,7 @@ export async function POST(request: NextRequest) {
       customName = body.customName || null
       categoryId = body.categoryId || null
       fileName = body.fileName || new URL(body.imageUrl).pathname.split('/').pop() || 'image'
-      imageBuffer = await fetchImage(body.imageUrl)
+      imageBuffer = await fetchRemoteImage(body.imageUrl)
     } else {
       const formData = await request.formData()
       const file = formData.get('file') as File | null

@@ -20,6 +20,9 @@ function makeRows(overrides: Record<string, string> = {}) {
     { key: 'delivery_discount_flat', value: '50' },
     { key: 'delivery_discount_min_subtotal', value: '200' },
     { key: 'delivery_discount_label', value: 'Save on delivery' },
+    { key: 'delivery_base_charge', value: '60' },
+    { key: 'delivery_per_kg_over_3', value: '20' },
+    { key: 'delivery_free_weight_ceiling_kg', value: '3' },
   ]
   return defaults.map(r => ({ key: r.key, value: (overrides as any)[r.key] ?? r.value }))
 }
@@ -39,6 +42,22 @@ describe('getDeliverySettings', () => {
     expect(s.discountFlat).toBe(50)
     expect(s.discountMinSubtotal).toBe(200)
     expect(s.discountLabel).toBe('Save on delivery')
+  })
+
+  it('parses weight-pricing keys and defaults the ceiling to 3', async () => {
+    mockQueryMany.mockResolvedValue(makeRows())
+    const s = await getDeliverySettings()
+    expect(s.baseCharge).toBe(60)
+    expect(s.perKgOver3).toBe(20)
+    expect(s.freeWeightCeilingKg).toBe(3)
+  })
+
+  it('defaults freeWeightCeilingKg to 3 when the row is absent', async () => {
+    mockQueryMany.mockResolvedValue([])
+    const s = await getDeliverySettings()
+    expect(s.freeWeightCeilingKg).toBe(3)
+    expect(s.baseCharge).toBe(0)
+    expect(s.perKgOver3).toBe(0)
   })
 
   it('parses enabled=false when row value is "false"', async () => {

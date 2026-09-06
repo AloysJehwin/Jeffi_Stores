@@ -3,9 +3,11 @@ import { cookies } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import { createTenant, linkOwnerTenant, hasVerifiedBank, saveSubscriptionId,
-         listPlans, getOwnerTenants, saveKyc, markDraftSubmitted, getDraft, saveDraft } from '@/lib/tenant-registry'
+         listPlans, getOwnerTenants, saveKyc, markDraftSubmitted, getDraft, saveDraft,
+         saveIntegrationCredential } from '@/lib/tenant-registry'
 import { sendKycSubmittedEmail } from '@/lib/ecom-emails'
 import { OnboardSchema } from '@/lib/onboard-schema'
+import { encryptToken } from '@/lib/crypto/token-cipher'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,6 +44,8 @@ export async function POST(request: NextRequest) {
     planSlug: d.planSlug,
     billingInterval: d.billingInterval,
     dailyPayout: d.dailyPayout,
+    ownDelhivery: d.ownDelhivery,
+    ownRazorpay: d.ownRazorpay,
     warehouse: d.warehouse,
     status: 'pending_approval',
   })
@@ -49,6 +53,23 @@ export async function POST(request: NextRequest) {
 
   // 2. Link owner → tenant.
   await linkOwnerTenant(owner.id, result.tenantId)
+
+  // 2b. Own-Razorpay tenant: persist their collection creds, encrypted. This is the ONLY place the
+  //     raw key_secret/webhook_secret is handled — it arrives over TLS and is encrypted immediately;
+  //     it never entered the cleartext onboarding draft. key_id is public.
+  if (d.ownRazorpay && d.razorpayKeyId && d.razorpayKeySecret) {
+    await saveIntegrationCredential({
+      tenantId: result.tenantId,
+      provider: 'razorpay',
+      label: 'Razorpay',
+      configEnc: encryptToken(JSON.stringify({
+        key_id: d.razorpayKeyId,
+        key_secret: d.razorpayKeySecret,
+        webhook_secret: d.razorpayWebhookSecret || undefined,
+      })),
+      meta: { key_id: d.razorpayKeyId },
+    })
+  }
 
   // 3. Save KYC details for admin review.
   await saveKyc(result.tenantId, owner.id, {

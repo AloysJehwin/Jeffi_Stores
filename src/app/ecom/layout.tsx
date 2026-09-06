@@ -2,6 +2,7 @@ import { cookies, headers } from 'next/headers'
 import { OWNER_COOKIE, resolveOwnerSession } from '@/lib/owner-session'
 import { extractSessionSignals } from '@/lib/session-signals-request'
 import EcomNav from './EcomNav'
+import EcomMain from './EcomMain'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,10 +17,9 @@ export default async function EcomLayout({ children }: { children: React.ReactNo
   const owner = await resolveOwnerSession(sid, signals as any).catch(() => null)
 
   return (
-    <div className="min-h-screen bg-surface-secondary flex flex-col">
-      {/* EcomNav self-hides on /signin + /signup (client-reactive), so it always mounts here. */}
+    <div className="min-h-screen bg-surface flex flex-col">
       <EcomNav owner={owner ? { email: owner.email, name: owner.name } : null} />
-      <main className="flex-1">{children}</main>
+      <EcomMain>{children}</EcomMain>
     </div>
   )
 }

@@ -223,18 +223,11 @@ export default async function SiteControlsPage() {
         </div>
 
         <div>
-          <SectionCard title="Delivery & Shipping" description="Free-delivery thresholds, shipping charge caps, warehouse origin and default weight." columns>
+          <SectionCard title="Delivery & Shipping" description="Free-delivery thresholds and shipping charge caps. Warehouse origin, pickup identity and weight-based cost live under Delhivery." columns>
             <FullSpan><DeliverySettingsForm initial={delivery} /></FullSpan>
             <FullSpan><div className="pt-2 border-t border-border-default" /></FullSpan>
             <NumberControl settingKey="shipping_min_charge" label="Minimum shipping charge" hint="Floor applied to computed shipping (0 = none)." prefix="₹" initial={c.values.shippingMinCharge} />
             <NumberControl settingKey="shipping_max_charge" label="Maximum shipping charge" hint="Cap applied to computed shipping (0 = none)." prefix="₹" initial={c.values.shippingMaxCharge} />
-            <TextControl settingKey="delhivery_origin_pincode" label="Warehouse origin pincode" hint="Ship-from pincode used for Delhivery rate & shipment creation." initial={c.values.delhiveryOriginPincode} />
-            <NumberControl settingKey="default_product_weight_g" label="Default product weight" hint="Assumed weight for products with no weight set." suffix="g" min={1} initial={c.values.defaultProductWeightG} />
-            <FullSpan><div className="pt-2 border-t border-border-default" /></FullSpan>
-            <TextControl settingKey="delhivery_pickup_location" label="Pickup location name" hint="Registered Delhivery pickup location name." initial={c.values.pickupLocation} />
-            <TextControl settingKey="delhivery_seller_name" label="Seller name" hint="Seller/return name on shipments." initial={c.values.sellerName} />
-            <FullSpan><TextAreaControl settingKey="delhivery_seller_address" label="Pickup / return address" hint="Warehouse address used for pickups and returns." initial={c.values.sellerAddress} rows={2} /></FullSpan>
-            <TextControl settingKey="delhivery_seller_phone" label="Pickup / return phone" initial={c.values.sellerPhone} />
           </SectionCard>
         </div>
 

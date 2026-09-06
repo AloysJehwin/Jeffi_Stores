@@ -5,6 +5,7 @@ import { sendReturnStatusEmail } from '@/lib/email'
 import { logActivity } from '@/lib/activity'
 import { createAutoTask } from '@/lib/auto-tasks'
 import { checkReturnEligibility } from '@/lib/return-policy'
+import { createAdminNotification } from '@/lib/admin-notify'
 
 const REASONS = ['defective', 'wrong_item', 'not_as_described', 'damaged', 'other']
 
@@ -213,6 +214,18 @@ export async function POST(
         reason,
       })
     }
+
+    createAdminNotification({
+      type: 'return_requested',
+      category: 'returns',
+      title: `Return ${type} — #${order.order_number}`,
+      message: `${customerName} — ${reason}`,
+      link: `/admin/orders/${id}`,
+      entityType: 'return',
+      entityId: String(id),
+      severity: 'warning',
+      scope: 'returns:read',
+    }).catch(() => {})
 
     return NextResponse.json({ returnRequest }, { status: 201 })
   } catch (err: any) {

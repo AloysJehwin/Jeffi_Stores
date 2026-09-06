@@ -548,6 +548,39 @@ describe('provisioning state machine', () => {
       expect(provider.hasDns('acme.jeffistores.in')).toBe(false)
     })
 
+    it('retries a transient removeDns failure and self-heals (no manual cleanup)', async () => {
+      reg.getTenant.mockResolvedValue({ ...TENANT, rds_endpoint: null })
+      await provider.ensureDns(['acme.jeffistores.in'])
+      const realRemove = provider.removeDns.bind(provider)
+      let calls = 0
+      vi.spyOn(provider, 'removeDns').mockImplementation(async (hosts: string[]) => {
+        calls++
+        if (calls < 3) throw new Error(`Route53 DELETE failed for x (503): ServiceUnavailable`)
+        return realRemove(hosts)
+      })
+      const { deprovisionTenant } = await import('@/lib/provisioning/steps')
+      const out = await deprovisionTenant('t-1', provider, {})
+      expect(out.ok).toBe(true)
+      expect(calls).toBe(3)
+      expect(provider.hasDns('acme.jeffistores.in')).toBe(false)
+    })
+
+    it('does NOT retry a non-transient removeDns failure — records dnsHosts once', async () => {
+      reg.getProvisioningJob.mockResolvedValue(job({ status: 'done', created_resources: { dnsHosts: ['acme.jeffistores.in'] } }))
+      reg.getTenant.mockResolvedValue({ ...TENANT, rds_endpoint: null })
+      await provider.ensureDns(['acme.jeffistores.in'])
+      const remove = vi.spyOn(provider, 'removeDns').mockRejectedValue(
+        new Error('Route53 DELETE failed for x (400): InvalidChangeBatch'),
+      )
+      const { deprovisionTenant } = await import('@/lib/provisioning/steps')
+      const out = await deprovisionTenant('t-1', provider, {})
+      expect(out.ok).toBe(true)
+      expect(remove).toHaveBeenCalledTimes(1)
+      expect(provider.hasDns('acme.jeffistores.in')).toBe(true)
+      const patch = reg.updateProvisioningJob.mock.calls.at(-1)?.[1]
+      expect(patch?.created_resources?.manualCleanup?.dnsHosts).toEqual(['acme.jeffistores.in'])
+    })
+
     it('reports failure when the backup throws (does NOT delete blindly)', async () => {
       reg.getTenant.mockResolvedValue({ ...TENANT, rds_endpoint: 'ep-1' })
       vi.spyOn(provider, 'backupDb').mockRejectedValue(new Error('dump failed'))

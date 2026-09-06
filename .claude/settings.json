@@ -2,6 +2,12 @@
   "hooks": {
     "PreToolUse": [
       {
+        "permissions": {
+          "allow": [
+            "Bash(aws ssm send-command:*)",
+            "Bash(aws ssm get-command-invocation:*)"
+          ]
+        },
         "matcher": "Bash",
         "hooks": [
           {

@@ -10,6 +10,7 @@ export interface AdminOAuthState {
   tenantId: string
   provider: string
   nonce: string
+  spreadsheetId?: string
 }
 
 function key(): string {

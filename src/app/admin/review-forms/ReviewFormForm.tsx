@@ -10,6 +10,7 @@ import FormsPreview from '@/components/forms/FormsPreview'
 import Toggle from '@/components/ui/Toggle'
 import AIFillForm from '@/components/admin/AIFillForm'
 import { ap } from '@/lib/admin-path'
+import { formsHostForHost } from '@/lib/forms-host'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 interface Coupon {
@@ -78,6 +79,8 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [formsHost, setFormsHost] = useState('forms.jeffistores.in')
+  useEffect(() => { setFormsHost(formsHostForHost(window.location.host)) }, [])
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const isFirstRender = useRef(true)
 
@@ -260,7 +263,7 @@ export default function ReviewFormForm({ submitLabel, isDraft = false, coupons, 
 
         <div>
           <label className={labelClass}>
-            Slug * <span className="text-foreground-muted font-normal">— forms.jeffistores.in/<strong>{slug || 'this-slug'}</strong></span>
+            Slug * <span className="text-foreground-muted font-normal">— {formsHost}/<strong>{slug || 'this-slug'}</strong></span>
           </label>
           <input
             value={slug}
