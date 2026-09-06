@@ -145,6 +145,8 @@ export function appFromHost(hostname: string): HostApp | null {
   return null
 }
 
+export { formsHostForSlug, formsHostForHost } from './forms-host'
+
 async function lookupTenant(where: 'slug' | 'custom_domain', value: string): Promise<TenantContext | null> {
   const pool = controlPlanePool()
   // For custom_domain, resolve via the tenant_custom_domains table (verified only),
@@ -239,6 +241,39 @@ export async function lookupTenantContextBySlug(slug: string): Promise<TenantCon
   return ctx
 }
 
+// Resolve a full TenantContext by tenant id, for background workers (import worker) that
+// enumerate control-plane jobs then re-enter each tenant's context. Not cached — the worker
+// runs each job once and must see current infra. Active tenants only, like lookupTenant.
+export async function lookupTenantContextById(tenantId: string): Promise<TenantContext | null> {
+  const pool = controlPlanePool()
+  const res = await pool.query(
+    `SELECT t.id, t.slug, t.display_name, t.status, p.slug AS plan,
+            i.rds_endpoint, i.rds_db, i.rds_port, i.db_secret_ref, i.iam_auth, i.s3_bucket, i.region
+     FROM tenants t
+     LEFT JOIN plans p ON p.id = t.plan_id
+     LEFT JOIN tenant_infra i ON i.tenant_id = t.id
+     WHERE t.id = $1 LIMIT 1`,
+    [tenantId],
+  )
+  const r = res.rows[0]
+  if (!r || r.status !== 'active' || !r.rds_endpoint) return null
+  return {
+    tenantId: r.id,
+    slug: r.slug,
+    displayName: r.display_name ?? null,
+    plan: r.plan ?? null,
+    infra: {
+      rdsEndpoint: r.rds_endpoint,
+      rdsDb: r.rds_db || 'jeffi_stores',
+      rdsPort: r.rds_port || 5432,
+      dbSecretRef: r.db_secret_ref ?? null,
+      iamAuth: r.iam_auth !== false,
+      s3Bucket: r.s3_bucket ?? null,
+      region: r.region || 'us-east-1',
+    },
+  }
+}
+
 export interface TenantRow {
   id: string
   slug: string
@@ -249,6 +284,8 @@ export interface TenantRow {
   monthly_price_inr: string | null
   max_custom_domains: number
   daily_payout: boolean
+  own_delhivery: boolean
+  own_razorpay: boolean
   billing_interval: string
   razorpay_subscription_id: string | null
   razorpay_checkout_url: string | null
@@ -272,7 +309,7 @@ export async function listTenants(filters?: { status?: string; plan?: string; q?
   if (filters?.plan) { args.push(filters.plan); where.push(`p.slug = $${args.length}`) }
   if (filters?.q) { args.push(`%${filters.q.toLowerCase()}%`); where.push(`(lower(t.display_name) LIKE $${args.length} OR lower(t.slug) LIKE $${args.length})`) }
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at,
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.created_at,
             p.slug AS plan, p.monthly_price_inr,
             i.rds_endpoint, i.s3_bucket, i.ec2_target, i.region
      FROM tenants t
@@ -313,6 +350,8 @@ export interface CreateTenantInput {
   planSlug: string
   billingInterval?: string
   dailyPayout?: boolean
+  ownDelhivery?: boolean
+  ownRazorpay?: boolean
   status?: string
   warehouse?: {
     originPincode?: string
@@ -354,10 +393,11 @@ export async function createTenant(input: CreateTenantInput): Promise<CreateTena
   try {
     await client.query('BEGIN')
     const t = await client.query(
-      `INSERT INTO tenants (slug, display_name, plan_id, status, billing_interval, daily_payout)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+      `INSERT INTO tenants (slug, display_name, plan_id, status, billing_interval, daily_payout, own_delhivery, own_razorpay)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
       [slug, input.displayName.trim(), plan.rows[0].id,
-       input.status ?? 'provisioning', input.billingInterval ?? 'monthly', !!input.dailyPayout]
+       input.status ?? 'provisioning', input.billingInterval ?? 'monthly', !!input.dailyPayout,
+       !!input.ownDelhivery, !!input.ownRazorpay]
     )
     const tenantId = t.rows[0].id
     // Empty infra row (rds_endpoint null → resolver returns tenant with null infra →
@@ -411,7 +451,7 @@ export interface TenantDetail extends TenantRow {
 export async function getTenant(id: string): Promise<TenantDetail | null> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at, t.instance_state,
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.created_at, t.instance_state,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id,
             p.slug AS plan, p.monthly_price_inr,
@@ -869,7 +909,7 @@ export async function getOwnerById(id: string): Promise<Owner | null> {
 export async function getOwnerTenants(ownerId: string): Promise<TenantRow[]> {
   const pool = controlPlanePool()
   const res = await pool.query(
-    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.created_at,
+    `SELECT t.id, t.slug, t.custom_domain, t.display_name, t.status, t.daily_payout, t.own_delhivery, t.own_razorpay, t.created_at,
             t.billing_interval, t.razorpay_subscription_id, t.razorpay_checkout_url, t.subscription_status,
             t.razorpay_linked_account_id, t.noreply_email, t.campaign_email,
             p.slug AS plan, p.monthly_price_inr, COALESCE(p.max_custom_domains, 0) AS max_custom_domains,
@@ -1283,6 +1323,25 @@ export async function listJeffiSocialPosts(limit = 100): Promise<ScheduledSocial
      WHERE tenant_id IS NULL
      ORDER BY scheduled_at DESC LIMIT $1`, [limit],
   )
+  return r.rows as ScheduledSocialPost[]
+}
+
+/** Social posts for a given scope: a tenant's own queue when tenantId is set, else the Jeffi
+ * platform queue (tenant_id IS NULL). Keyed so a tenant admin never sees the platform feed and
+ * vice-versa — the tenant is resolved from ALS by the caller, never from the client. */
+export async function listSocialPostsForScope(tenantId: string | null, limit = 100): Promise<ScheduledSocialPost[]> {
+  const pool = controlPlanePool()
+  const r = tenantId
+    ? await pool.query(
+        `SELECT * FROM scheduled_social_posts
+         WHERE tenant_id = $1
+         ORDER BY scheduled_at DESC LIMIT $2`, [tenantId, limit],
+      )
+    : await pool.query(
+        `SELECT * FROM scheduled_social_posts
+         WHERE tenant_id IS NULL
+         ORDER BY scheduled_at DESC LIMIT $1`, [limit],
+      )
   return r.rows as ScheduledSocialPost[]
 }
 

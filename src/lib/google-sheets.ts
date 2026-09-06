@@ -444,3 +444,63 @@ async function removeProductFromSheet(sku: string, token: string) {
     )
   }
 }
+
+// Read a value matrix from any spreadsheet with a caller-supplied OAuth access token — the
+// tenant-scoped counterpart to the write helpers above, which use the platform service account.
+// Used by the Data Source Google-sheet sync, which resolves the tenant's own token first.
+export async function readSheetValues(
+  spreadsheetId: string,
+  range: string,
+  accessToken: string,
+): Promise<string[][]> {
+  const res = await fetch(
+    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(range)}`,
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  )
+  const data = await res.json().catch(() => null)
+  if (!res.ok) {
+    const reason = data?.error?.message || `sheets read failed (${res.status})`
+    throw new Error(reason)
+  }
+  return (data?.values as string[][]) || []
+}
+
+// Create a native Google Sheet in the caller's own Drive from a freshly-built .xlsx buffer, via a
+// Drive API multipart upload that converts to google-apps.spreadsheet. Uses a tenant-scoped OAuth
+// access token — the file is one this app creates, so it is always reachable under the drive.file
+// scope (unlike copying a shared master, which 404s for any account that didn't create it). Returns
+// the new spreadsheet id. Used by the Data Source "Create sheet from template" flow.
+export async function createSheetFromWorkbook(
+  title: string,
+  xlsx: Buffer,
+  accessToken: string,
+): Promise<string> {
+  const boundary = 'jeffi-ds-' + xlsx.length.toString(36)
+  const metadata = { name: title, mimeType: 'application/vnd.google-apps.spreadsheet' }
+  const body = Buffer.concat([
+    Buffer.from(
+      `--${boundary}\r\nContent-Type: application/json; charset=UTF-8\r\n\r\n` +
+      `${JSON.stringify(metadata)}\r\n` +
+      `--${boundary}\r\nContent-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet\r\n\r\n`,
+    ),
+    xlsx,
+    Buffer.from(`\r\n--${boundary}--\r\n`),
+  ])
+  const res = await fetch(
+    'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': `multipart/related; boundary=${boundary}`,
+      },
+      body: new Uint8Array(body),
+    },
+  )
+  const data = await res.json().catch(() => null)
+  if (!res.ok || !data?.id) {
+    const reason = data?.error?.message || `drive create failed (${res.status})`
+    throw new Error(reason)
+  }
+  return String(data.id)
+}

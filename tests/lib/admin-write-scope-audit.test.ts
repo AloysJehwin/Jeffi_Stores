@@ -17,6 +17,8 @@ const ALLOWED_WITHOUT_WRITE_SCOPE = new Set([
   'auth/email-otp/start', 'auth/email-otp/verify', 'logout', 'refresh',
   'mfa/enroll-start', 'mfa/enroll-confirm', 'mfa/verify', 'mfa/recovery-codes',
   'sessions/[id]/revoke', 'sessions/revoke-all', 'access-request',
+  // Self-service: a member marking their own notification bell read, not a scoped action.
+  'notifications/read',
   // Owner-only team management, gated on isPlatformOwner rather than a scope.
   'users', 'users/[id]', 'users/[id]/revoke-sessions', 'users/[id]/resend-certificate',
   // Platform control plane: gated by host and isPlatformAdmin in middleware.

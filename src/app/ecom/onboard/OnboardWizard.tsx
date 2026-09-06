@@ -99,11 +99,18 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
 
   // Step 4 — Warehouse
   const [dailyPayout, setDailyPayout] = useState(init.dailyPayout ?? false)
+  const [ownDelhivery, setOwnDelhivery] = useState(init.ownDelhivery ?? false)
   const [wh, setWh] = useState(init.wh ?? { originPincode: '', pickupLocation: '', sellerName: '', sellerAddress: '', sellerPhone: '' })
   const [pinCheck, setPinCheck] = useState<{ state: 'idle' | 'checking' | 'ok' | 'warn' | 'bad'; msg: string }>({ state: 'idle', msg: '' })
 
   // Step 5 — Bank
   const [bank, setBank] = useState(init.bank ?? { accountNumber: '', ifsc: '', holderName: '' })
+  const [ownRazorpay, setOwnRazorpay] = useState(init.ownRazorpay ?? false)
+  // key_id is public and safe to round-trip the draft; the two secrets live only in local state and
+  // are sent once to submit() — they must never enter the cleartext autosave `data` blob.
+  const [rzpKeyId, setRzpKeyId] = useState(init.razorpayKeyId ?? '')
+  const [rzpKeySecret, setRzpKeySecret] = useState('')
+  const [rzpWebhookSecret, setRzpWebhookSecret] = useState('')
   const [bankVerified, setBankVerified] = useState(init.bankVerified ?? false)
   // True only when a penny-drop actually confirmed the holder name; false when the account was
   // merely accepted. Keeps the UI from claiming a verification that did not happen.
@@ -141,14 +148,14 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
   // ── Auto-save draft ──────────────────────────────────────────────────────────
   const autosave = useCallback(async (nextStep: StepIdx) => {
     setSaving(true)
-    const data = { planSlug, interval, displayName, slug: effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, wh, bank, bankVerified, mobile, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restorePreviousData: restoreBackup ? restoreOptIn : false }
+    const data = { planSlug, interval, displayName, slug: effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, ownDelhivery, wh, bank, ownRazorpay, razorpayKeyId: rzpKeyId, bankVerified, mobile, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restorePreviousData: restoreBackup ? restoreOptIn : false }
     await fetch('/api/ecom/onboard/draft', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ step: nextStep, data }),
     }).catch(() => {})
     setSaving(false)
-  }, [planSlug, interval, displayName, effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, wh, bank, bankVerified, mobile, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restoreBackup, restoreOptIn])
+  }, [planSlug, interval, displayName, effectiveSlug, productCats, bizName, bizType, pan, bizAddress, gstNumber, gstS3Key, gstFilename, dailyPayout, ownDelhivery, wh, bank, ownRazorpay, rzpKeyId, bankVerified, mobile, logoS3Key, logoUrl, sealS3Key, sealUrl, legalsAccepted, restoreBackup, restoreOptIn])
 
   async function goTo(next: StepIdx) {
     await autosave(next)
@@ -219,7 +226,10 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
           displayName, slug: effectiveSlug, productCategories: productCats.join(', '),
           businessName: bizName, businessType: bizType, pan, businessAddress: bizAddress,
           gstNumber, gstCertS3Key: gstS3Key || undefined,
-          dailyPayout, warehouse: wh,
+          dailyPayout, ownDelhivery, ownRazorpay, warehouse: wh,
+          razorpayKeyId: ownRazorpay ? rzpKeyId || undefined : undefined,
+          razorpayKeySecret: ownRazorpay ? rzpKeySecret || undefined : undefined,
+          razorpayWebhookSecret: ownRazorpay ? rzpWebhookSecret || undefined : undefined,
           mobile: mobile || undefined,
           logoS3Key: logoS3Key || undefined, sealS3Key: sealS3Key || undefined,
           legalsAccepted,
@@ -282,7 +292,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
   return (
     <div className="flex min-h-[calc(100vh-56px)] bg-surface-secondary">
       {/* ── Sidebar ── */}
-      <aside className="hidden lg:flex flex-col w-72 xl:w-80 bg-surface-elevated border-r border-border-default p-8 flex-shrink-0">
+      <aside className="hidden lg:flex flex-col w-72 xl:w-80 bg-surface-elevated border-r border-border-default p-8 flex-shrink-0 self-start sticky top-14 h-[calc(100vh-56px)] overflow-y-auto">
         <div className="mb-10">
           <h2 className="text-xl font-bold text-foreground">Launch your store</h2>
           <p className="text-sm text-foreground-muted mt-1">Complete each step to go live.</p>
@@ -313,16 +323,20 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
       {/* ── Main content ── */}
       <main className="flex-1 flex flex-col">
         {/* Mobile step indicator */}
-        <div className="lg:hidden flex items-center gap-2 px-6 py-4 border-b border-border-default bg-surface-elevated overflow-x-auto">
-          {STEPS.map((s) => (
-            <div key={s.id} className={`flex items-center gap-1 flex-shrink-0 text-xs font-medium px-2.5 py-1 rounded-full ${s.id === step ? 'bg-accent-600 text-white' : s.id < step ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : 'bg-surface-secondary text-foreground-muted'}`}>
-              {s.id < step ? <CheckMark className="w-3 h-3" /> : null}
-              {s.label}
-            </div>
-          ))}
+        <div className="lg:hidden px-5 py-3 border-b border-border-default bg-surface-elevated">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs text-foreground-muted">Step {step + 1} of {STEPS.length}</span>
+            <span className="text-xs font-semibold text-foreground">{STEPS[step].label} <span className="font-normal text-foreground-muted">— {STEPS[step].desc}</span></span>
+            {saving && <span className="text-[10px] text-foreground-muted">Saving…</span>}
+          </div>
+          <div className="flex gap-1">
+            {STEPS.map((s) => (
+              <div key={s.id} className={`h-1 flex-1 rounded-full transition-colors ${s.id < step ? 'bg-green-500' : s.id === step ? 'bg-accent-600' : 'bg-surface-secondary'}`} />
+            ))}
+          </div>
         </div>
 
-        <div className="flex-1 flex flex-col items-center justify-center px-6 lg:px-16 py-10">
+        <div className="flex-1 flex flex-col items-center px-5 sm:px-8 lg:px-16 py-8 lg:py-10 lg:justify-center">
           {/* ── Restore banner (returning owner with a prior backup) ── */}
           {restoreBackup && step <= 1 && (
             <div className="w-full max-w-3xl mb-6 rounded-2xl border border-accent-300 dark:border-accent-700 bg-accent-50 dark:bg-accent-900/20 p-5">
@@ -413,6 +427,11 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
                     ))}
                   </div>
                   {productCats.length === 0 && <p className="text-xs text-foreground-muted mt-2">Select at least one category.</p>}
+                  {(productCats.includes('Food & Groceries') || productCats.includes('Health & Beauty')) && (
+                    <p className="text-xs text-amber-600 dark:text-amber-400 mt-2">
+                      Selling food requires a valid FSSAI certificate, and medicine/pharma requires a drug licence — you&apos;ll need to submit these with your documents. See the <a href="/legal/merchant-agreement#6-restricted-categories-licences-certificates-required" target="_blank" rel="noopener noreferrer" className="underline">Merchant Agreement</a>.
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -496,7 +515,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
               <h1 className="text-3xl font-bold text-foreground mb-1">Pickup warehouse</h1>
               <p className="text-foreground-muted mb-8">Where Delhivery will pick up your orders. You can edit this later.</p>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label className={lbl}>Origin pincode</label>
                     <input className={inp} placeholder="560001" maxLength={6} value={wh.originPincode} onChange={(e) => setWh({ ...wh, originPincode: e.target.value.replace(/\D/g, '') })} />
@@ -533,6 +552,13 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
                     <div className="text-xs text-foreground-muted">+5% fee — otherwise weekly, free</div>
                   </div>
                 </label>
+                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface-elevated hover:bg-surface-secondary transition-colors">
+                  <input type="checkbox" checked={ownDelhivery} onChange={(e) => setOwnDelhivery(e.target.checked)} className="w-4 h-4 rounded accent-accent-600" />
+                  <div>
+                    <div className="text-sm font-medium text-foreground">I have my own Delhivery account</div>
+                    <div className="text-xs text-foreground-muted">You&apos;ll connect your own Delhivery token and be billed by Delhivery directly — we won&apos;t deduct courier cost from a wallet.</div>
+                  </div>
+                </label>
               </div>
             </div>
           )}
@@ -543,8 +569,8 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
               <h1 className="text-3xl font-bold text-foreground mb-1">Payout bank account</h1>
               <p className="text-foreground-muted mb-8">Where your sales will be settled. We verify instantly via a ₹1 bank check.</p>
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="col-span-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="col-span-full sm:col-span-2">
                     <label className={lbl}>Account holder name</label>
                     <input className={inp} placeholder="Aloys Jehwin" value={bank.holderName} disabled={bankVerified}
                       onChange={(e) => { setBank({ ...bank, holderName: e.target.value }); setBankVerified(false); setBankNameConfirmed(false) }} />
@@ -577,6 +603,35 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
                   </div>
                 )}
                 {bankMsg && <p className={`text-sm ${bankMsg.ok ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>{bankMsg.text}</p>}
+
+                <label className="flex items-center gap-3 cursor-pointer p-4 rounded-xl border border-border-default bg-surface-elevated hover:bg-surface-secondary transition-colors">
+                  <input type="checkbox" checked={ownRazorpay} onChange={(e) => setOwnRazorpay(e.target.checked)} className="w-4 h-4 rounded accent-accent-600" />
+                  <div>
+                    <div className="text-sm font-medium text-foreground">I have my own Razorpay account</div>
+                    <div className="text-xs text-foreground-muted">Payments settle directly to your Razorpay account — we won&apos;t route a platform split. Your bank account above is still used for records.</div>
+                  </div>
+                </label>
+
+                {ownRazorpay && (
+                  <div className="space-y-4 rounded-xl border border-border-default bg-surface p-4">
+                    <p className="text-xs text-foreground-muted">Enter your Razorpay API keys so buyers pay into your account. Your secret is encrypted and never shown again.</p>
+                    <div>
+                      <label className={lbl}>Razorpay Key ID</label>
+                      <input className={inp} placeholder="rzp_live_xxxxxxxx" value={rzpKeyId}
+                        onChange={(e) => setRzpKeyId(e.target.value.trim())} />
+                    </div>
+                    <div>
+                      <label className={lbl}>Razorpay Key Secret</label>
+                      <input className={inp} type="password" autoComplete="off" placeholder="••••••••" value={rzpKeySecret}
+                        onChange={(e) => setRzpKeySecret(e.target.value)} />
+                    </div>
+                    <div>
+                      <label className={lbl}>Webhook Secret <span className="text-foreground-muted font-normal">(optional)</span></label>
+                      <input className={inp} type="password" autoComplete="off" placeholder="••••••••" value={rzpWebhookSecret}
+                        onChange={(e) => setRzpWebhookSecret(e.target.value)} />
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -594,7 +649,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
                 <p className="text-xs text-foreground-muted mt-1">Used for account + payout notifications.</p>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                 {([['logo', 'Store logo', logoS3Key, logoUrl], ['seal', 'Store seal', sealS3Key, sealUrl]] as const).map(([kind, label, key, url]) => (
                   <div key={kind}>
                     <label className={lbl}>{label}{kind === 'logo' ? ' *' : ' (optional)'}</label>
@@ -614,7 +669,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
               <label className="flex items-start gap-3 rounded-xl border border-border-default bg-surface p-4 cursor-pointer">
                 <input type="checkbox" className="mt-0.5" checked={legalsAccepted} onChange={(e) => setLegalsAccepted(e.target.checked)} />
                 <span className="text-sm text-foreground-secondary">
-                  I agree to the <a href="/legal/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline">Terms</a> and <a href="/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline">Privacy Policy</a>, and authorize generation of my store&apos;s legal pages from these details.
+                  I agree to the <a href="/legal/merchant-agreement" target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline">Merchant Agreement</a>, <a href="/legal/terms-and-conditions" target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline">Terms</a> and <a href="/legal/privacy-policy" target="_blank" rel="noopener noreferrer" className="text-accent-600 dark:text-accent-400 hover:underline">Privacy Policy</a> — including the requirement to submit an FSSAI certificate for food and a drug licence for medicine — and authorize generation of my store&apos;s legal pages from these details.
                 </span>
               </label>
             </div>
@@ -635,6 +690,8 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
                   ['GST cert', gstFilename || 'Not uploaded'],
                   ['Bank', bankVerified ? `${bank.holderName} · ${bank.accountNumber}` : 'Not added'],
                   ['Payouts', dailyPayout ? 'Daily (+5%)' : 'Weekly'],
+                  ['Delhivery', ownDelhivery ? 'Own account' : 'Managed by Jeffi'],
+                  ['Payments', ownRazorpay ? 'Own Razorpay' : 'Routed via Jeffi'],
                   ['Mobile', mobile || '—'],
                   ['Logo', logoS3Key ? 'Uploaded' : 'Not uploaded'],
                   ['Seal', sealS3Key ? 'Uploaded' : 'Not uploaded'],
@@ -682,7 +739,7 @@ export default function OnboardWizard({ plans, initialDraft, reusingPreviousDeta
 
           {/* ── Navigation ── */}
           {!isLast && (
-            <div className="flex items-center justify-between mt-10 pt-6 border-t border-border-default w-full max-w-xl">
+            <div className="flex items-center justify-between mt-8 pt-6 border-t border-border-default w-full max-w-xl">
               <button type="button" onClick={() => goTo((step - 1) as StepIdx)} disabled={step === 0}
                 className="px-5 py-2.5 rounded-xl text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 text-sm font-medium transition-colors">
                 ← Back

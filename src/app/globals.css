@@ -38,6 +38,22 @@
     --accent-600: #4a7200;
   }
 
+  /* Force light-mode tokens even inside a .dark ancestor (landing-page preview shells) */
+  .light-scope {
+    --color-surface: #F9FAFB;
+    --color-surface-elevated: #FFFFFF;
+    --color-surface-secondary: #F3F4F6;
+    --color-foreground: #111827;
+    --color-foreground-secondary: #4B5563;
+    --color-foreground-muted: #6B7280;
+    --color-border: #D1D5DB;
+    --color-border-secondary: #9CA3AF;
+    --primary-500: #f59e0b;
+    --primary-600: #d97706;
+    --accent-500: #7cb900;
+    --accent-600: #5a8a00;
+  }
+
   /* Remap brand utility classes to CSS vars so they shift with theme */
   .bg-primary-500 { background-color: var(--primary-500) !important; }
   .bg-primary-600 { background-color: var(--primary-600) !important; }

@@ -3,10 +3,14 @@
 
 // A phone frame with an illustrated in-screen UI (shapes, not a real screenshot).
 // Used in the bento section for a lively, product-y feel.
-export function PhoneMock({ variant = 'store', className = '' }: { variant?: 'store' | 'chart' | 'card'; className?: string }) {
+export function PhoneMock({ variant = 'store', src, alt = '', className = '' }: { variant?: 'store' | 'chart' | 'card'; src?: string; alt?: string; className?: string }) {
   return (
     <div className={`relative mx-auto w-[190px] ${className}`}>
-      <div className="rounded-[2rem] border-[6px] border-foreground/80 bg-surface-elevated shadow-2xl overflow-hidden aspect-[9/19]">
+      <div className={`rounded-[2rem] border-[6px] border-foreground/80 bg-surface-elevated shadow-2xl overflow-hidden ${src ? 'aspect-[390/844]' : 'aspect-[9/19]'}`}>
+        {src ? (
+          <img src={src} alt={alt} className="w-full h-full object-cover object-top" />
+        ) : (
+        <>
         {/* notch */}
         <div className="h-6 flex items-center justify-center">
           <span className="w-16 h-1.5 rounded-full bg-foreground/20" />
@@ -57,6 +61,8 @@ export function PhoneMock({ variant = 'store', className = '' }: { variant?: 'st
             </>
           )}
         </div>
+        </>
+        )}
       </div>
     </div>
   )

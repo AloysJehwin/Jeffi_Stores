@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateOTP, storeOTP, checkSendOtpRateLimit, recordSendOtp } from '@/lib/otp'
-import { sendOTPEmail } from '@/lib/email'
+import { sendAdminOTPEmail } from '@/lib/email'
 import { resolveAdminByEmail, enforceCertGate } from '@/lib/admin-identity'
 
 export const dynamic = 'force-dynamic'
@@ -42,7 +42,7 @@ export async function POST(request: NextRequest) {
 
     const otp = generateOTP()
     await storeOTP(email, otp)
-    await sendOTPEmail(email, otp, admin.first_name || undefined)
+    await sendAdminOTPEmail(email, otp, admin.first_name || undefined)
     await recordSendOtp(email)
 
     return NextResponse.json({ ...GENERIC, nextCooldown: rate.nextCooldown })

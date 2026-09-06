@@ -8,6 +8,7 @@ import DateTimePicker from '@/components/ui/DateTimePicker'
 import AIEnrichButton from '@/components/admin/AIEnrichButton'
 import RichTextEditor from '@/components/admin/RichTextEditor'
 import { ap } from '@/lib/admin-path'
+import { formsHostForHost } from '@/lib/forms-host'
 import { RequireWrite } from '@/contexts/AdminScopesContext'
 
 const TEMPLATES = [
@@ -477,7 +478,8 @@ export default function NewCampaignPage() {
                   onChange={formId => {
                     const chosen = reviewForms.find(f => f.id === formId)
                     if (!chosen) return
-                    setTemplateData(prev => ({ ...prev, formId: chosen.id, formTitle: chosen.title, formUrl: `https://forms.jeffistores.in/${chosen.slug}` }))
+                    const formsBase = `https://${formsHostForHost(window.location.host)}`
+                    setTemplateData(prev => ({ ...prev, formId: chosen.id, formTitle: chosen.title, formUrl: `${formsBase}/${chosen.slug}` }))
                   }}
                   disabled={reviewForms.length === 0}
                 />

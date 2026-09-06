@@ -2,6 +2,7 @@ import nodemailer from 'nodemailer'
 import { queryMany } from './db'
 import { sendAuditedMail } from './mail-audit'
 import { customerMailFromAsync, adminMailFrom, currentBrandName, currentBrandNameAsync, currentAdminBaseUrl, platformAdminEmail, storeContactLine, storeAddressLine, storeBaseUrlAsync } from './brand'
+import { createAdminNotification } from './admin-notify'
 
 /**
  * Store name for email bodies. Synchronous on purpose: templates are built inside string
@@ -142,6 +143,136 @@ export async function sendOTPEmail(email: string, otp: string, name?: string) {
       html,
       kind: 'otp',
       templateName: 'otp',
+      redactBody: true,
+      entityType: null,
+      entityId: null,
+    })
+    return { success: true, messageId: info.messageId }
+  } catch (error) {
+    return { success: false, error }
+  }
+}
+
+export async function sendAdminOTPEmail(email: string, otp: string, name?: string) {
+  const from = adminMailFrom()
+  const brand = await currentBrandNameAsync()
+  const subject = `Admin sign-in code — ${brand}`
+  const html = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <style>
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+              line-height: 1.6;
+              color: #e2e8f0;
+              background-color: #0b1120;
+              max-width: 600px;
+              margin: 0 auto;
+              padding: 20px;
+            }
+            .container {
+              background-color: #111827;
+              border-radius: 12px;
+              padding: 32px;
+              border: 1px solid #1f2937;
+            }
+            .header {
+              text-align: center;
+              margin-bottom: 28px;
+            }
+            .shield {
+              font-size: 34px;
+              line-height: 1;
+            }
+            .brand {
+              font-size: 20px;
+              font-weight: bold;
+              color: #f8fafc;
+              letter-spacing: 0.5px;
+              margin-top: 8px;
+            }
+            .kicker {
+              display: inline-block;
+              margin-top: 6px;
+              font-size: 11px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 2px;
+              color: #f87171;
+            }
+            h2 {
+              color: #f8fafc;
+            }
+            .otp-box {
+              background-color: #0f172a;
+              color: #38bdf8;
+              font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+              font-size: 34px;
+              font-weight: bold;
+              text-align: center;
+              padding: 22px;
+              border-radius: 10px;
+              letter-spacing: 10px;
+              border: 1px solid #334155;
+              margin: 24px 0;
+            }
+            .security {
+              background-color: #1e1b12;
+              border-left: 4px solid #f87171;
+              padding: 15px;
+              margin: 20px 0;
+              border-radius: 4px;
+              color: #fcd34d;
+            }
+            .footer {
+              text-align: center;
+              margin-top: 30px;
+              padding-top: 20px;
+              border-top: 1px solid #1f2937;
+              color: #94a3b8;
+              font-size: 13px;
+            }
+          </style>
+        </head>
+        <body>
+          <span style="display:none;font-size:1px;color:#0b1120;max-height:0;overflow:hidden;mso-hide:all;">${brand} admin sign-in code: ${otp} — valid for 10 minutes. If this wasn't you, do not share it.</span>
+          <div class="container">
+            <div class="header">
+              <div class="shield">🛡️</div>
+              <div class="brand">${brand}</div>
+              <span class="kicker">Admin Access</span>
+            </div>
+
+            <h2>Verify your admin sign-in</h2>
+            <p>Hello ${name || 'Admin'},</p>
+            <p>Use this one-time code to complete sign-in to the admin dashboard:</p>
+
+            <div class="otp-box">${otp}</div>
+
+            <div class="security">
+              <strong>This code authorizes staff access. It expires in 10 minutes.</strong>
+              <br>
+              <small>If you didn't try to sign in, ignore this email and rotate your credentials.</small>
+            </div>
+
+            <div class="footer">
+              <p><strong>${brand}</strong> — administrative access</p>
+              <p>This is an automated security message. Do not reply.</p>
+            </div>
+          </div>
+        </body>
+      </html>
+    `
+
+  try {
+    const info = await sendAuditedMail({
+      from,
+      to: email,
+      subject,
+      html,
+      kind: 'otp',
+      templateName: 'admin_otp',
       redactBody: true,
       entityType: null,
       entityId: null,
@@ -425,6 +556,17 @@ export async function sendOrderConfirmationEmail(email: string, order: any, orde
 
 export async function sendNewOrderNotification(order: any, orderItems: any[], _user: any) {
   const adminEmail = await getAdminNotificationEmails()
+
+  createAdminNotification({
+    type: 'order_paid',
+    category: 'orders',
+    title: `New order ${order.order_number}`,
+    message: order.total_amount != null ? `Total ₹${order.total_amount}` : null,
+    link: order.id ? `/admin/orders/${order.id}` : '/admin/orders',
+    entityType: 'order',
+    entityId: order.id ? String(order.id) : null,
+    scope: 'orders:read',
+  }).catch(() => {})
 
   const from = adminMailFrom()
   const subject = `New Order - ${order.order_number}`
@@ -1382,6 +1524,18 @@ export async function sendPaymentFailedAdminNotification(
 ) {
   const adminEmail = await getAdminNotificationEmails()
 
+  createAdminNotification({
+    type: 'payment_failed',
+    category: 'orders',
+    title: `Payment failed — ${order.order_number}`,
+    message: errorDescription || `Payment failed for ${order.customer_name}`,
+    link: `/admin/orders/${order.id}`,
+    entityType: 'order',
+    entityId: String(order.id),
+    severity: 'warning',
+    scope: 'orders:read',
+  }).catch(() => {})
+
   const mailOptions = {
     from: adminMailFrom(),
     to: adminEmail,
@@ -2204,6 +2358,17 @@ export async function sendOrderAutoCancelledEmail(
 
 export async function sendOrderAutoCancelledAdminNotification(order: any, redirectPath: string) {
   const adminEmail = await getAdminNotificationEmails()
+  createAdminNotification({
+    type: 'order_auto_cancelled',
+    category: 'orders',
+    title: `Auto-cancelled — ${order.order_number}`,
+    message: `Payment window expired for ${order.customer_name || 'customer'}`,
+    link: `/admin/orders/${order.id}`,
+    entityType: 'order',
+    entityId: String(order.id),
+    severity: 'warning',
+    scope: 'orders:read',
+  }).catch(() => {})
   const baseUrl = currentAdminBaseUrl()
   const total = parseFloat(order.total_amount || 0)
 

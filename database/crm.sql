@@ -186,3 +186,19 @@ CREATE TABLE public.notifications (
     is_read boolean DEFAULT false,
     created_at timestamp with time zone DEFAULT now()
 );
+
+CREATE TABLE public.admin_notifications (
+    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    type character varying(50) NOT NULL,
+    category character varying(24) NOT NULL,
+    title character varying(255) NOT NULL,
+    message text,
+    link character varying(500),
+    entity_type character varying(40),
+    entity_id character varying(64),
+    severity character varying(12) DEFAULT 'info'::character varying NOT NULL,
+    scope character varying(48),
+    is_read boolean DEFAULT false NOT NULL,
+    read_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);

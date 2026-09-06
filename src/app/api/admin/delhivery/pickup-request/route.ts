@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, query } from '@/lib/db'
+import { getCurrentTenant } from '@/lib/tenant-context'
+import { getBusinessValues } from '@/lib/site-controls'
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { walletBlocksShipment } from '@/lib/wallet'
 
-const TOKEN = process.env.DELHIVERY_API_KEY
-const PICKUP_LOCATION = process.env.DELHIVERY_PICKUP_LOCATION || 'Jeffi Stores'
 const DELHIVERY_PICKUP_URL = 'https://track.delhivery.com/fm/request/new/'
 
 const EXCLUDE_STATUSES = ['shipped', 'delivered', 'cancelled', 'returned', 'return_requested', 'return_approved', 'return_received', 'return_rejected']
@@ -42,7 +44,8 @@ export async function GET(request: NextRequest) {
     // ?poll=<db_id> — fetch live AWB status for a specific pickup request
     const pollId = request.nextUrl.searchParams.get('poll')
     if (pollId) {
-      if (!TOKEN) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
+      const token = await resolveDelhiveryToken(getCurrentTenant()?.tenantId)
+      if (!token) return NextResponse.json({ error: 'Tracking service not configured' }, { status: 503 })
 
       const req = await queryOne<{ id: string; awbs: string[]; pickup_status: string }>(
         `SELECT id, awbs, pickup_status FROM delhivery_pickup_requests WHERE id = $1`,
@@ -54,7 +57,7 @@ export async function GET(request: NextRequest) {
 
       const res = await fetch(
         `https://track.delhivery.com/api/v1/packages/json/?waybill=${req.awbs.join(',')}`,
-        { headers: { Authorization: `Token ${TOKEN}` }, next: { revalidate: 0 } }
+        { headers: { Authorization: `Token ${token}` }, next: { revalidate: 0 } }
       )
       if (!res.ok) return NextResponse.json({ error: 'Tracking unavailable' }, { status: 502 })
 
@@ -177,7 +180,19 @@ export async function POST(request: NextRequest) {
     if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     if (!hasScope(admin.role, admin.scopes, 'delhivery:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
-    if (!TOKEN) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
+    const tenant = getCurrentTenant()
+    if (tenant?.tenantId && await walletBlocksShipment(tenant.tenantId).catch(() => false)) {
+      return NextResponse.json(
+        { error: 'Wallet balance is below the minimum. Recharge the wallet before requesting pickups.' },
+        { status: 402 }
+      )
+    }
+
+    const token = await resolveDelhiveryToken(tenant?.tenantId)
+    if (!token) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
+
+    const bv = await getBusinessValues()
+    const pickupLocation = bv.pickupLocation
 
     const body = await request.json()
     const { orderIds, pickupDate } = body
@@ -204,13 +219,13 @@ export async function POST(request: NextRequest) {
     const res = await fetch(DELHIVERY_PICKUP_URL, {
       method: 'POST',
       headers: {
-        Authorization: `Token ${TOKEN}`,
+        Authorization: `Token ${token}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         pickup_time: '14:00:00',
         pickup_date: pickupDate,
-        pickup_location: PICKUP_LOCATION,
+        pickup_location: pickupLocation,
         expected_package_count: awbList.length,
       }),
       next: { revalidate: 0 },

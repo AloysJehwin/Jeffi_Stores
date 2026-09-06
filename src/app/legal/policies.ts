@@ -19,6 +19,105 @@ export const CONSENT_POLICIES = ['privacy-policy', 'terms-and-conditions'] as co
 
 export const policies: Policy[] = [
   {
+    slug: 'merchant-agreement',
+    title: 'Merchant Agreement & Acceptable Use',
+    description: 'The terms for selling on Jeffi Commerce — onboarding, your obligations, payments and settlement, and what you may and may not sell.',
+    lastUpdated: '5 Sep 2026',
+    sections: [
+      {
+        heading: '1. Who this covers',
+        body: [
+          'This agreement is between Jeffi Commerce ("the platform", "we", "us") and any business or individual ("you", "the merchant", "the seller") who onboards a store on ecom.jeffistores.in or a *.jeffistores.in subdomain.',
+          'It governs the store you run on the platform. Your own storefront\'s buyer-facing Terms, Privacy Policy, Returns and other policies are generated separately for your customers — this agreement is between you and Jeffi Commerce.',
+          'By completing onboarding and accepting the legals at the final step, you accept this agreement and the Privacy Policy.',
+        ],
+      },
+      {
+        heading: '2. Eligibility & onboarding',
+        body: [
+          'You must be at least 18 years old and legally able to run the business you are registering.',
+          'You must provide accurate business details: legal business name, business type, PAN, a valid 15-digit GSTIN, and a business address with a serviceable 6-digit pincode.',
+          'You must provide a valid GST certificate and any category-specific licences that apply to what you sell (see section 6).',
+          'You authorise us to generate your store\'s customer-facing legal pages, invoices and seal from the details you submit.',
+          'We may decline or suspend an onboarding where details are incomplete, appear fraudulent, or where a required licence for a restricted category is missing.',
+        ],
+      },
+      {
+        heading: '3. Your store & your responsibilities',
+        body: [
+          'You are the seller of record. You are responsible for your catalogue, prices, stock accuracy, product descriptions, images, and for fulfilling every order you accept.',
+          'You are responsible for the legality of everything you list and sell, and for holding every licence, registration or certificate that your product category requires under Indian law.',
+          'You must keep your GSTIN and business details current, raise correct tax invoices, and meet your own GST filing obligations.',
+          'You must handle your customers\' data lawfully, honour your published returns and shipping policies, and respond to customer grievances.',
+        ],
+      },
+      {
+        heading: '4. Payments, settlement & shipping',
+        body: [
+          'Payments are collected through Razorpay. You may collect on the platform\'s account (with settlement routed to your linked bank account) or connect your own Razorpay account during onboarding.',
+          'Buyer-facing shipping charges collected at checkout are retained by the platform; the actual courier cost incurred through Delhivery is reconciled against your account or prepaid wallet.',
+          'Where you use the platform\'s Delhivery account, courier costs are debited from your prepaid wallet. You must keep the wallet above its minimum balance to keep creating shipments and pickups. If you connect your own Delhivery account, you are billed by Delhivery directly.',
+          'Plan subscription fees are charged per your selected plan and billing interval and are non-refundable except where required by law.',
+        ],
+      },
+      {
+        heading: '5. Prohibited items',
+        body: [
+          'You may not list or sell anything illegal to sell in India, counterfeit or infringing goods, stolen goods, weapons and ammunition, explosives, or hazardous materials outside their lawful licensed channels.',
+          'No wildlife, endangered species or products derived from them.',
+          'No adult/sexual content, no tobacco to minors, and nothing that violates another party\'s intellectual property.',
+          'No products that are recalled, expired, or unsafe.',
+        ],
+      },
+      {
+        heading: '6. Restricted categories — licences & certificates required',
+        body: [
+          'Some categories are ALLOWED to sell on Jeffi Commerce but require you to hold and submit the relevant licence or certificate along with your onboarding documents. Selling in these categories without the valid document is a breach of this agreement.',
+          'Medicines / pharmaceuticals: selling medicine and pharmaceutical products IS permitted on the platform. You must hold a valid drug/pharmacy licence (e.g. a Drug Licence under the Drugs and Cosmetics Act, and a registered pharmacist where required) and submit it with your documents. You remain responsible for dispensing rules, prescription requirements, storage and expiry handling.',
+          'Food & groceries: if you select "Food & Groceries" (or otherwise sell food, beverages or edible products), you MUST submit a valid FSSAI licence/registration certificate along with your onboarding documents before you go live. Food products may not be sold without a valid FSSAI certificate on file.',
+          'Health & beauty / cosmetics, and any other category with statutory licensing (e.g. cosmetics, nutraceuticals): you must hold and submit the applicable registration or certificate for that category.',
+          'You confirm that every licence or certificate you submit is genuine, current, and issued to the business you are onboarding. We may verify these and may suspend a store selling in a restricted category without a valid document on file.',
+        ],
+      },
+      {
+        heading: '7. Acceptable use of the platform',
+        body: [
+          'No scraping, automated probing, denial-of-service, or attempts to access data that is not yours.',
+          'No reverse-engineering the platform APIs or circumventing plan limits, wallet checks, or settlement routing.',
+          'No using the platform to defraud buyers, launder money, or evade tax.',
+          'No content that is illegal, defamatory, infringing, or harmful to other merchants or to the platform\'s infrastructure.',
+        ],
+      },
+      {
+        heading: '8. Suspension & termination',
+        body: [
+          'We may suspend or terminate a store that breaches this agreement, sells prohibited items, sells a restricted item without the required licence, abuses payments or the wallet, or harms buyers or the platform.',
+          'You may close your store at any time. Outstanding settlement, wallet balances, and tax records are handled per the applicable retention and settlement rules.',
+          'On deprovisioning, store data is retained for a limited recovery window and then removed, subject to legal retention requirements.',
+        ],
+      },
+      {
+        heading: '9. Liability',
+        body: [
+          'The platform provides the software, payments routing, and logistics integration. You remain the seller of record and are liable for your products and your compliance.',
+          'We run at normal SaaS uptime and may schedule maintenance. We are not liable for indirect or consequential losses, or for courier or payment-partner delays outside our control.',
+          'You indemnify Jeffi Commerce against claims arising from your products, your listings, or your failure to hold a required licence for a restricted category.',
+        ],
+      },
+      {
+        heading: '10. Changes & governing law',
+        body: [
+          'We may update this agreement. Material changes will require you to re-accept the next time you sign in to the control plane.',
+          'This agreement is governed by Indian law. Disputes are subject to the courts in Raipur, Chhattisgarh.',
+        ],
+      },
+      {
+        heading: '11. Contact',
+        body: 'Merchant and onboarding queries: support@jeffistores.in. Grievance officer details are in the Grievance Redressal policy.',
+      },
+    ],
+  },
+  {
     slug: 'privacy-policy',
     title: 'Privacy Policy',
     description: 'What we collect, why we collect it, how long we keep it, and your rights over your data.',
@@ -113,15 +212,24 @@ export const policies: Policy[] = [
         body: 'We use only first-party functional cookies (session, cart, theme) plus Google Analytics. We do not run advertising or cross-site cookies. You can clear cookies in your browser; some features (sign-in, cart) will need to be re-set.',
       },
       {
-        heading: '11. Children',
+        heading: '11. Google account data (product-import integration)',
+        body: [
+          'If you connect your Google account to import products, we request two scopes: Google Sheets read-only (https://www.googleapis.com/auth/spreadsheets.readonly) and Google Drive per-file access (https://www.googleapis.com/auth/drive.file).',
+          'We use drive.file only to create a copy of our product-import template in your own Google Drive and to access that file — never any other file in your Drive. drive.file grants access only to files the app creates or that you explicitly open with it.',
+          'We use spreadsheets.readonly only to read the rows of the import sheet you select, so we can create or update products in your store. We never write to or modify your spreadsheets.',
+          'Limited Use: Jeffi Stores’ use and transfer of information received from Google APIs adheres to the Google API Services User Data Policy, including the Limited Use requirements. We do not use this data for advertising, do not sell it, and do not transfer it to others except as needed to provide the import feature, for security, or to comply with law. You can disconnect at any time from the Data Source page or by revoking access in your Google account, which deletes the stored token.',
+        ],
+      },
+      {
+        heading: '12. Children',
         body: 'The platform is intended for users aged 18 and above. We do not knowingly collect data from minors. If you believe a child has created an account, write to support@jeffistores.in and we will close it.',
       },
       {
-        heading: '12. Updates to this policy',
+        heading: '13. Updates to this policy',
         body: 'When we change this policy, we update the version and date at the top, and ask you to re-accept the next time you sign in or open the site. Material changes (new third-party data sharing, new categories of data we collect) will additionally be emailed to you.',
       },
       {
-        heading: '13. Contact',
+        heading: '14. Contact',
         body: 'Privacy questions: support@jeffistores.in. Grievance officer: see the Grievance Redressal policy. Postal: Jeffi Stores, Raipur, Chhattisgarh.',
       },
     ],

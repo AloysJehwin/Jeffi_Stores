@@ -13,25 +13,35 @@ const PLAN_BLURB: Record<string, string> = {
 }
 
 // Visual-first feature blocks — one big screenshot each, minimal copy (Stripe/Shopify rhythm).
-const SHOWCASES: { eyebrow: string; title: string; caption: string; alt: string; side: 'left' | 'right' }[] = [
-  { eyebrow: 'Your storefront', title: 'A shop your customers love', caption: 'yourstore.jeffistores.in', alt: 'Storefront', side: 'right' },
-  { eyebrow: 'One admin panel', title: 'Run everything from here', caption: 'admin · dashboard', alt: 'Admin dashboard', side: 'left' },
-  { eyebrow: 'Catalogue', title: 'Products, variants, images', caption: 'admin · products', alt: 'Product management', side: 'right' },
-  { eyebrow: 'Orders & fulfilment', title: 'From cart to doorstep', caption: 'admin · orders', alt: 'Orders', side: 'left' },
-  { eyebrow: 'Delivery', title: 'Delhivery pickups & tracking', caption: 'admin · shipment tracking', alt: 'Shipment tracking', side: 'right' },
-  { eyebrow: 'GST & invoicing', title: 'Compliant invoices, automatic', caption: 'admin · invoices', alt: 'GST invoice', side: 'left' },
+const SHOWCASES: { eyebrow: string; title: string; caption: string; alt: string; key: string; src?: string; side: 'left' | 'right' }[] = [
+  { eyebrow: 'Your storefront', title: 'A shop your customers love', caption: 'yourstore · shop', alt: 'Storefront', key: 'storefront', src: '/screenshots/storefront.png', side: 'right' },
+  { eyebrow: 'One admin panel', title: 'Run everything from here', caption: 'admin · dashboard', alt: 'Admin dashboard', key: 'dashboard', src: '/screenshots/dashboard.png', side: 'left' },
+  { eyebrow: 'Catalogue', title: 'Products, variants, images', caption: 'admin · products', alt: 'Product management', key: 'products', src: '/screenshots/products.png', side: 'right' },
+  { eyebrow: 'Orders & fulfilment', title: 'From cart to doorstep', caption: 'admin · orders', alt: 'Orders', key: 'orders', src: '/screenshots/orders.png', side: 'left' },
+  { eyebrow: 'Delivery', title: 'Delhivery pickups & tracking', caption: 'admin · shipment tracking', alt: 'Shipment tracking', key: 'shipment', src: '/screenshots/shipment.png', side: 'right' },
+  { eyebrow: 'GST & invoicing', title: 'Compliant invoices, automatic', caption: 'admin · invoices', alt: 'GST invoice', key: 'invoice', src: '/screenshots/invoice.png', side: 'left' },
+  { eyebrow: 'Know your customers', title: 'A CRM built in', caption: 'admin · CRM', alt: 'CRM dashboard', key: 'crm', src: '/screenshots/crm.png', side: 'right' },
+  { eyebrow: 'Customers', title: 'Every buyer, one place', caption: 'admin · customers', alt: 'Customers', key: 'customers', src: '/screenshots/customers.png', side: 'left' },
+  { eyebrow: 'Marketing', title: 'Campaigns that convert', caption: 'admin · campaigns', alt: 'Campaigns', key: 'campaigns', src: '/screenshots/campaigns.png', side: 'right' },
+  { eyebrow: 'Promotions', title: 'Coupons & discounts', caption: 'admin · coupons', alt: 'Coupons', key: 'coupons', src: '/screenshots/coupons.png', side: 'left' },
 ]
 
 export default async function EcomLandingPage() {
   const plans = await listPlans()
 
   return (
-    <div className="text-foreground">
+    <div className="text-foreground relative isolate">
+      {/* ── Global light grid background ── sits above the layout's solid base, below content (z-0; content is z-10) ── */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 z-0 bg-surface">
+        <div className="absolute inset-0 opacity-[0.5] bg-[linear-gradient(to_right,#d9dbe3_1px,transparent_1px),linear-gradient(to_bottom,#d9dbe3_1px,transparent_1px)] bg-[size:44px_44px]" />
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(92,170,0,0.10),transparent),radial-gradient(ellipse_60%_40%_at_80%_80%,rgba(245,158,11,0.06),transparent)]" />
+      </div>
+      <div className="relative z-10">
+
       {/* ── Hero ── */}
       <section className="relative overflow-hidden">
         <div aria-hidden className="absolute inset-0 -z-10">
-          <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_80%_-10%,rgba(16,185,129,0.18),transparent),radial-gradient(50%_40%_at_0%_10%,rgba(234,179,8,0.10),transparent)]" />
-          <div className="absolute inset-0 opacity-[0.04] bg-[linear-gradient(to_right,currentColor_1px,transparent_1px),linear-gradient(to_bottom,currentColor_1px,transparent_1px)] bg-[size:44px_44px]" />
+          <div className="absolute inset-0 bg-[radial-gradient(60%_50%_at_80%_-10%,rgba(92,170,0,0.14),transparent),radial-gradient(50%_40%_at_0%_10%,rgba(245,158,11,0.08),transparent)]" />
         </div>
         <div className="w-full px-6 lg:px-12 pt-20 pb-14 sm:pt-28 text-center">
           <span className="inline-flex items-center gap-2 rounded-full border border-border-default bg-surface-elevated/70 backdrop-blur px-3 py-1 text-xs font-medium text-foreground-secondary">
@@ -47,8 +57,13 @@ export default async function EcomLandingPage() {
             <Link href="/signup" className="w-full sm:w-auto px-7 py-3.5 rounded-lg bg-accent-600 hover:bg-accent-700 text-white font-semibold transition-colors shadow-lg shadow-accent-600/20">Start your store</Link>
             <Link href="/pricing" className="w-full sm:w-auto px-7 py-3.5 rounded-lg border border-border-default bg-surface-elevated hover:bg-surface-secondary font-semibold transition-colors">See pricing</Link>
           </div>
-          {/* big hero screenshot */}
-          <div className="mt-16 w-full"><BrowserFrame alt="Your storefront" caption="yourstore.jeffistores.in" /></div>
+          {/* big hero screenshot — floating glow */}
+          <div className="mt-16 w-full relative">
+            <div className="absolute -inset-4 rounded-2xl bg-accent-500/10 blur-3xl opacity-50 pointer-events-none" />
+            <div className="relative ring-1 ring-border-default rounded-xl border border-border-default shadow-2xl shadow-black/10 overflow-hidden">
+              <BrowserFrame alt="Your storefront" caption="yourstore.jeffistores.in" src="/screenshots/storefront.png" />
+            </div>
+          </div>
         </div>
       </section>
 
@@ -61,16 +76,22 @@ export default async function EcomLandingPage() {
         </div>
       </section>
 
-      {/* ── Screenshot gallery: alternating visual blocks, minimal copy ── */}
+      {/* ── Screenshot gallery ── */}
       <section className="w-full px-6 lg:px-12 py-16 space-y-20 lg:space-y-28">
         {SHOWCASES.map((s) => (
           <div key={s.title} className="grid lg:grid-cols-5 gap-8 items-center">
             <div className={`lg:col-span-2 ${s.side === 'left' ? 'lg:order-2' : ''}`}>
-              <p className="text-accent-600 dark:text-accent-400 font-semibold text-sm uppercase tracking-widest">{s.eyebrow}</p>
+              <p className="text-accent-500 dark:text-accent-400 font-semibold text-sm uppercase tracking-widest">{s.eyebrow}</p>
               <h2 className="text-3xl lg:text-4xl font-extrabold mt-2 leading-tight">{s.title}</h2>
             </div>
             <div className={`lg:col-span-3 ${s.side === 'left' ? 'lg:order-1' : ''}`}>
-              <BrowserFrame alt={s.alt} caption={s.caption} />
+              {/* floating glow card */}
+              <div className="relative">
+                <div className="absolute -inset-3 rounded-2xl bg-accent-500/10 blur-2xl opacity-60 pointer-events-none" />
+                <div className="relative ring-1 ring-border-default rounded-xl border border-border-default shadow-2xl shadow-black/10 overflow-hidden">
+                  <BrowserFrame alt={s.alt} caption={s.caption} src={s.src} />
+                </div>
+              </div>
             </div>
           </div>
         ))}
@@ -93,7 +114,7 @@ export default async function EcomLandingPage() {
         <div className="relative grid grid-cols-1 md:grid-cols-3 gap-5 w-full items-stretch">
           {/* large: phone storefront */}
           <div className="md:col-span-2 rounded-3xl border border-border-default bg-surface p-8 flex flex-col sm:flex-row items-center gap-8">
-            <PhoneMock variant="store" />
+            <PhoneMock variant="store" src="/screenshots/storefront-mobile.png" alt="Mobile storefront" />
             <div className="max-w-xs">
               <h3 className="text-2xl font-bold">A storefront that sells itself</h3>
               <p className="text-foreground-secondary mt-2">Fast, mobile-first shopping — catalogue, search, cart and checkout tuned for conversion on any device.</p>
@@ -107,17 +128,36 @@ export default async function EcomLandingPage() {
           </div>
           {/* payments phone */}
           <div className="rounded-3xl border border-border-default bg-surface p-8 flex flex-col items-center text-center">
-            <PhoneMock variant="card" className="w-[150px]" />
+            <PhoneMock variant="card" src="/screenshots/orders-mobile.png" alt="Mobile orders" className="w-[150px]" />
             <h3 className="text-lg font-bold mt-5">Payments, settled for you</h3>
             <p className="text-sm text-foreground-secondary mt-1">Online & COD split automatically.</p>
           </div>
           {/* analytics phone */}
           <div className="md:col-span-2 rounded-3xl border border-border-default bg-surface p-8 flex flex-col sm:flex-row-reverse items-center gap-8">
-            <PhoneMock variant="chart" />
+            <PhoneMock variant="chart" src="/screenshots/dashboard-mobile.png" alt="Mobile dashboard" />
             <div className="max-w-xs">
               <h3 className="text-2xl font-bold">Insights on the go</h3>
               <p className="text-foreground-secondary mt-2">Revenue, orders and stock at a glance — manage the whole business from your phone.</p>
             </div>
+          </div>
+        </div>
+
+        {/* second mobile row — more of the platform in your pocket */}
+        <div className="relative grid grid-cols-1 md:grid-cols-3 gap-5 w-full items-stretch mt-5">
+          <div className="rounded-3xl border border-border-default bg-surface p-8 flex flex-col items-center text-center">
+            <PhoneMock variant="store" src="/screenshots/products-mobile.png" alt="Mobile catalogue" className="w-[150px]" />
+            <h3 className="text-lg font-bold mt-5">Manage your catalogue</h3>
+            <p className="text-sm text-foreground-secondary mt-1">Products, stock and pricing on the move.</p>
+          </div>
+          <div className="rounded-3xl border border-border-default bg-surface p-8 flex flex-col items-center text-center">
+            <PhoneMock variant="store" src="/screenshots/orders-mobile.png" alt="Mobile orders" className="w-[150px]" />
+            <h3 className="text-lg font-bold mt-5">Orders in your pocket</h3>
+            <p className="text-sm text-foreground-secondary mt-1">Track every order and fulfilment, anywhere.</p>
+          </div>
+          <div className="rounded-3xl border border-border-default bg-surface p-8 flex flex-col items-center text-center">
+            <PhoneMock variant="store" src="/screenshots/coupons-mobile.png" alt="Mobile coupons" className="w-[150px]" />
+            <h3 className="text-lg font-bold mt-5">Run promotions on the go</h3>
+            <p className="text-sm text-foreground-secondary mt-1">Create coupons and track redemptions.</p>
           </div>
         </div>
       </section>
@@ -169,16 +209,7 @@ export default async function EcomLandingPage() {
         </div>
       </section>
 
-      {/* ── Footer ── */}
-      <footer className="border-t border-border-default bg-surface-elevated">
-        <div className="w-full px-6 lg:px-12 py-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-sm text-foreground-muted">
-          <div className="flex items-center gap-2 font-bold text-foreground">
-            <span className="inline-flex items-center justify-center w-6 h-6 rounded-lg bg-gradient-to-br from-primary-500 to-accent-500 text-white text-xs">J</span>Jeffi Commerce
-          </div>
-          <div className="flex gap-6"><Link href="/pricing" className="hover:text-foreground">Pricing</Link><Link href="/signin" className="hover:text-foreground">Sign in</Link><Link href="/signup" className="hover:text-foreground">Get started</Link></div>
-          <div>© 2026 Jeffi Commerce</div>
-        </div>
-      </footer>
+      </div>
     </div>
   )
 }

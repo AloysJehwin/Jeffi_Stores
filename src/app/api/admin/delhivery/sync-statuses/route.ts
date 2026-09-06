@@ -7,10 +7,12 @@ import { restoreOrderStock } from '@/lib/order-stock'
 import { sendOrderDeliveredSMS, sendOutForDeliverySMS } from '@/lib/sms'
 import { fetchDelhiveryInvoiceCharges, chargeableGrams } from '@/lib/delhivery'
 import { getBusinessValues } from '@/lib/site-controls'
+import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { settleDelhiveryCostToWallet } from '@/lib/wallet'
 
 export const dynamic = 'force-dynamic'
 
-const DELHIVERY_TOKEN = process.env.DELHIVERY_API_KEY
 const CRON_SECRET = process.env.CRON_SECRET
 
 const STATUS_SYNC: Record<string, {
@@ -39,10 +41,6 @@ export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   if (!CRON_SECRET || authHeader !== `Bearer ${CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  if (!DELHIVERY_TOKEN) {
-    return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
   }
 
   const orders = await queryMany<{
@@ -74,6 +72,12 @@ export async function POST(request: NextRequest) {
 
   // Origin pincode is the same for every shipment — resolve once, not per order.
   const originPin = (await getBusinessValues()).delhiveryOriginPincode
+  const tenantId = getCurrentTenant()?.tenantId ?? null
+
+  const DELHIVERY_TOKEN = await resolveDelhiveryToken(tenantId ?? undefined)
+  if (!DELHIVERY_TOKEN) {
+    return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
+  }
 
   const BATCH_SIZE = 25
   const results: { orderId: string; awb: string; syncedTo: string }[] = []
@@ -214,19 +218,31 @@ export async function POST(request: NextRequest) {
             originPin,
             destPin: (order as any).dest_pin ?? '',
             paymentType: order.payment_mode === 'cod' ? 'COD' : 'Pre-paid',
+            tenantId: tenantId ?? undefined,
           }).catch(() => null)
           if (invoiceCharges) {
+            // Gate billed_at on a durable wallet debit: settle first, stamp billed_at only when the
+            // charge is on the books (or no wallet applies). A transient failure leaves billed_at NULL
+            // so the next sync retries rather than losing the charge.
+            const settled = tenantId && invoiceCharges.total > 0
+              ? await settleDelhiveryCostToWallet({
+                  tenantId,
+                  awb,
+                  orderRef: order.order_number,
+                  amountInr: invoiceCharges.total,
+                }).catch(() => false)
+              : true
             await query(
               `UPDATE orders SET
                 delhivery_billed_amount = $2,
                 delhivery_freight_charge = $3,
                 delhivery_cod_charge = $4,
                 delhivery_oda_charge = $5,
-                delhivery_billed_at = NOW(),
+                delhivery_billed_at = CASE WHEN $6 THEN NOW() ELSE delhivery_billed_at END,
                 delhivery_extra_charge = ROUND(($2 - shipping_amount)::numeric, 2),
                 updated_at = NOW()
                WHERE id = $1`,
-              [order.id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda]
+              [order.id, invoiceCharges.total, invoiceCharges.freight, invoiceCharges.codCharge, invoiceCharges.oda, settled]
             ).catch(() => {})
           }
         }
