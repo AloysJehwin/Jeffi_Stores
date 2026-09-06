@@ -22,7 +22,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'notifications:read',
     label: 'Notifications (Read)',
     description: 'View the admin notification feed (bell)',
-    routes: [],
+    routes: ['/admin/notifications'],
     group: 'Dashboard',
   },
 
@@ -31,7 +31,7 @@ export const ADMIN_SCOPES: ScopeDefinition[] = [
     key: 'products:read',
     label: 'Products (Read)',
     description: 'View products, variants, images and units',
-    routes: ['/admin/products'],
+    routes: ['/admin/products', '/admin/data-source'],
     group: 'Catalogue',
   },
   {

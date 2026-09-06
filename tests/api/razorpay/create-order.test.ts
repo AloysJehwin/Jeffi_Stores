@@ -11,6 +11,7 @@ vi.mock('@/lib/db', () => ({
 vi.mock('@/lib/razorpay', () => ({
   isRazorpayEnabled: vi.fn(),
   getRazorpayInstance: vi.fn(),
+  getRazorpayInstanceFor: vi.fn(),
 }))
 vi.mock('@/lib/order-draft', () => ({
   verifyDraftToken: vi.fn(),
@@ -54,7 +55,10 @@ function mockRazorpayInstance() {
       create: vi.fn().mockResolvedValue(MOCK_RAZORPAY_ORDER),
     },
   }
-  vi.mocked(razorpayLib.getRazorpayInstance).mockReturnValue(instance as any)
+  vi.mocked(razorpayLib.getRazorpayInstanceFor).mockResolvedValue({
+    instance,
+    creds: { key_id: 'rzp_test_key', key_secret: 'secret', isOwn: false },
+  } as any)
   return instance
 }
 
