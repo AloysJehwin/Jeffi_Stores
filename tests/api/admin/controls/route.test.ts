@@ -22,7 +22,7 @@ import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
 import { queryMany, queryOne, query, withTransaction } from '@/lib/db'
 
-const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['inflation:read', 'inflation:write'] }
+const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['controls:read', 'controls:write'] }
 
 const PRODUCTS = [{ id: 'p1', name: 'Bolt', mrp_ex_gst: '100', mrp: '118', price_ex_gst: '90', base_price: '106.2', discount_pct: '10', gst_percentage: '18', has_variants: false }]
 

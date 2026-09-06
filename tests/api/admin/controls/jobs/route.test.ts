@@ -10,7 +10,7 @@ import { hasScope } from '@/lib/scopes'
 import { queryOne } from '@/lib/db'
 import { NextRequest } from 'next/server'
 
-const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['inflation:read'] }
+const ADMIN = { adminId: 'a1', username: 'admin', role: 'super_admin', scopes: ['controls:read'] }
 const req = () => new NextRequest('http://localhost/api/admin/controls/jobs/job1')
 const params = Promise.resolve({ id: 'job1' })
 
@@ -27,7 +27,7 @@ describe('GET /api/admin/controls/jobs/[id]', () => {
     expect(res.status).toBe(401)
   })
 
-  it('returns 403 without inflation:read scope', async () => {
+  it('returns 403 without controls:read scope', async () => {
     vi.mocked(hasScope).mockReturnValue(false)
     const res = await GET(req(), { params })
     expect(res.status).toBe(403)

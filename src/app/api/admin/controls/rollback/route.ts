@@ -6,7 +6,7 @@ import { hasScope } from '@/lib/scopes'
 export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inflation:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'controls:read')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const logs = await queryMany<{
     id: string; operation: string; product_count: number; applied_by: string | null
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!hasScope(admin.role, admin.scopes, 'inflation:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
+  if (!hasScope(admin.role, admin.scopes, 'controls:write')) return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
 
   const { log_id } = await request.json()
   if (!log_id) return NextResponse.json({ error: 'log_id required' }, { status: 400 })
