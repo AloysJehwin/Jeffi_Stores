@@ -12,7 +12,10 @@ export const dynamic = 'force-dynamic'
 // spreadsheet id under provider 'google_sheets' keyed to state.tenantId.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
-  const backTo = `${currentAdminBaseUrl()}/admin/data-source`
+  // Google returns to the fixed platform OAuth host with no tenant in context, so this default
+  // resolves to the platform admin. The verified state carries the tenant's own admin URL; we
+  // switch backTo over to it as soon as state is verified so the user lands on their own admin.
+  let backTo = `${currentAdminBaseUrl()}/admin/data-source`
 
   const err = params.get('error')
   if (err) return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)
@@ -25,6 +28,7 @@ export async function GET(request: NextRequest) {
   if (!state || state.provider !== 'google_sheets') {
     return NextResponse.redirect(`${backTo}?connected=0&error=bad_state`)
   }
+  if (state.returnBase) backTo = `${state.returnBase}/admin/data-source`
 
   try {
     const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
