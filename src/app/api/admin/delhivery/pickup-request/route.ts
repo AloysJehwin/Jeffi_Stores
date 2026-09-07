@@ -5,6 +5,7 @@ import { queryMany, queryOne, query } from '@/lib/db'
 import { getCurrentTenant } from '@/lib/tenant-context'
 import { getBusinessValues } from '@/lib/site-controls'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
+import { listDelhiveryPickupLocations } from '@/lib/delhivery'
 import { walletBlocksShipment } from '@/lib/wallet'
 
 const DELHIVERY_PICKUP_URL = 'https://track.delhivery.com/fm/request/new/'
@@ -192,10 +193,15 @@ export async function POST(request: NextRequest) {
     if (!token) return NextResponse.json({ error: 'Delhivery API key not configured' }, { status: 503 })
 
     const bv = await getBusinessValues()
-    const pickupLocation = bv.pickupLocation
 
     const body = await request.json()
-    const { orderIds, pickupDate } = body
+    const { orderIds, pickupDate, pickupLocation: requestedLocation } = body
+
+    let pickupLocation = bv.pickupLocation
+    if (requestedLocation) {
+      const known = await listDelhiveryPickupLocations(tenant?.tenantId).catch(() => [])
+      if (known.some(l => l.name === requestedLocation)) pickupLocation = requestedLocation
+    }
 
     if (!orderIds?.length) return NextResponse.json({ error: 'No orders selected' }, { status: 400 })
     if (!pickupDate || !/^\d{4}-\d{2}-\d{2}$/.test(pickupDate)) {
