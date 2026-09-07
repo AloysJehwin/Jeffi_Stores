@@ -10,6 +10,8 @@ import {
 } from '@/lib/shipping'
 import { getDeliverySettings, applyDeliveryRules } from '@/lib/delivery-settings'
 import { getBusinessValues } from '@/lib/site-controls'
+import { getCurrentTenantId } from '@/lib/tenant-context'
+import { listDelhiveryPickupLocations } from '@/lib/delhivery'
 import { z } from 'zod'
 import { parseBody, zIndianPin, zCurrency } from '@/lib/validate'
 
@@ -62,9 +64,19 @@ async function callDelhiveryForCarton(weightGrams: number, destinationPin: strin
   }
 }
 
+// Ship-from pincode is the tenant's default pickup warehouse pin; fall back to the
+// configured origin pincode (env-defaulted) when no warehouse matches.
+async function resolveOriginPin(defaultOriginPin: string, pickupLocationName: string): Promise<string> {
+  const tenantId = getCurrentTenantId()
+  const locations = await listDelhiveryPickupLocations(tenantId ?? undefined).catch(() => [])
+  const match = locations.find(l => l.name === pickupLocationName) ?? locations[0]
+  return match?.pin || defaultOriginPin
+}
+
 export async function POST(request: NextRequest) {
   try {
     const bv = await getBusinessValues()
+    const originPin = await resolveOriginPin(bv.delhiveryOriginPincode, bv.pickupLocation)
     const { destinationPin, cartItems, subtotal, isCod } = await request.json()
 
     if (!destinationPin || !/^\d{6}$/.test(destinationPin)) {
@@ -176,7 +188,7 @@ export async function POST(request: NextRequest) {
     if (TOKEN) {
       try {
         for (const c of cartons) {
-          const r = await callDelhiveryForCarton(c.chargedWeightGrams, destinationPin, !!isCod, bv.delhiveryOriginPincode)
+          const r = await callDelhiveryForCarton(c.chargedWeightGrams, destinationPin, !!isCod, originPin)
           totalCharge += r.charge
           totalChargedWeight += r.chargedWeight
           zone = r.zone || zone
@@ -197,7 +209,7 @@ export async function POST(request: NextRequest) {
         const r = fallbackShippingRate({
           chargedWeightGrams: c.chargedWeightGrams,
           destinationPin,
-          originPin: bv.delhiveryOriginPincode,
+          originPin,
           cartonCount: cartons.length,
         })
         totalCharge += r.charge
