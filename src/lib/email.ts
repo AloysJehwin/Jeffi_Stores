@@ -181,10 +181,6 @@ export async function sendAdminOTPEmail(email: string, otp: string, name?: strin
               text-align: center;
               margin-bottom: 28px;
             }
-            .shield {
-              font-size: 34px;
-              line-height: 1;
-            }
             .brand {
               font-size: 20px;
               font-weight: bold;
@@ -239,7 +235,6 @@ export async function sendAdminOTPEmail(email: string, otp: string, name?: strin
           <span style="display:none;font-size:1px;color:#0b1120;max-height:0;overflow:hidden;mso-hide:all;">${brand} admin sign-in code: ${otp} — valid for 10 minutes. If this wasn't you, do not share it.</span>
           <div class="container">
             <div class="header">
-              <div class="shield">🛡️</div>
               <div class="brand">${brand}</div>
               <span class="kicker">Admin Access</span>
             </div>
