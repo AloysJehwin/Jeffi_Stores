@@ -22,7 +22,20 @@ export function buildTenantSchemaSql(): string {
       parts.push(`-- ==== ${file} ====\n${stripPsqlMetaCommands(fs.readFileSync(p, 'utf8'))}`)
     }
   }
-  return guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(parts.join('\n\n'))))
+  return guardNonFkConstraints(makeCreatesIdempotent(hoistForeignKeys(stripExtensionComments(parts.join('\n\n')))))
+}
+
+/**
+ * Drop `COMMENT ON EXTENSION ...` statements. On a tenant RDS the extensions are installed by
+ * rds_superuser at provisioning, so the app role that runs the fan-out is not their owner —
+ * and COMMENT ON EXTENSION requires ownership, failing with "must be owner of extension". Since
+ * the whole schema is applied as one batch that aborts on first error, that one cosmetic line
+ * (pg_dump artifact, no functional value) fails the entire migration for the tenant. Stripped
+ * here rather than in database/extensions.sql so the migra platform diff still sees plain
+ * pg_dump output. CREATE EXTENSION IF NOT EXISTS stays — the app role may create, just not own.
+ */
+function stripExtensionComments(sql: string): string {
+  return sql.replace(/^\s*COMMENT ON EXTENSION\b[^;]*;\s*$/gim, '')
 }
 
 /**
