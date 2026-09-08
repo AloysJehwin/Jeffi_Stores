@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'products:write')
   if (admin instanceof NextResponse) return admin
-  const tenantId = resolveImportTenantId()
+  const tenantId = await resolveImportTenantId()
 
   const clientId = process.env.GOOGLE_OAUTH_CLIENT_ID
   if (!clientId) return NextResponse.json({ error: 'Google OAuth not configured' }, { status: 503 })

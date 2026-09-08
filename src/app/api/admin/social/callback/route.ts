@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { getCurrentTenant } from '@/lib/tenant-context'
-import { currentAdminBaseUrl } from '@/lib/brand'
+import { currentAdminBaseUrlAsync } from '@/lib/brand'
 import { saveTenantSocialAccount } from '@/lib/tenant-registry'
 import { exchangeCodeForToken, getLongLivedToken, getPageAndIgAccounts } from '@/lib/meta'
 import { encryptToken } from '@/lib/crypto/token-cipher'
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 // store-admin social-posts page with a toast param.
 export async function GET(request: NextRequest) {
   const params = request.nextUrl.searchParams
-  const backTo = `${currentAdminBaseUrl()}/admin/social-posts`
+  const backTo = `${await currentAdminBaseUrlAsync()}/admin/social-posts`
 
   const err = params.get('error')
   if (err) return NextResponse.redirect(`${backTo}?connected=0&error=${encodeURIComponent(err)}`)
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const redirectUri = `${currentAdminBaseUrl()}/api/admin/social/callback`
+    const redirectUri = `${await currentAdminBaseUrlAsync()}/api/admin/social/callback`
     const shortToken = await exchangeCodeForToken(code, redirectUri)
     const { token: longToken, expiresInSec } = await getLongLivedToken(shortToken)
     const accounts = await getPageAndIgAccounts(longToken)

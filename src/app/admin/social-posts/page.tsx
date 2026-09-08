@@ -2,7 +2,7 @@ import { headers } from 'next/headers'
 import { hasScope } from '@/lib/scopes'
 import SocialPostsClient from './SocialPostsClient'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
-import { getCurrentTenantId } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { getTenantSocialAccounts } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'
@@ -14,7 +14,7 @@ export default async function SocialPostsPage() {
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'products:write')
 
-  const tenantId = getCurrentTenantId()
+  const tenantId = await resolveTenantId()
   const socialAccounts = tenantId ? await getTenantSocialAccounts(tenantId) : []
 
   return (

@@ -1,13 +1,13 @@
 import MerchantSyncClient from '@/components/admin/merchant/MerchantSyncClient'
 import AdminIntegrationsPopup from '@/components/admin/AdminIntegrationsPopup'
-import { getCurrentTenantId } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { listIntegrationCredentials } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function MerchantSyncPage() {
-  const tenantId = getCurrentTenantId()
+  const tenantId = await resolveTenantId()
   const integrations = tenantId ? await listIntegrationCredentials(tenantId) : []
 
   return (

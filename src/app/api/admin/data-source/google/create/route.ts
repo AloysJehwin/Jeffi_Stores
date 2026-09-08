@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   const admin = await requireAdminScope(request, 'products:write')
   if (admin instanceof NextResponse) return admin
 
-  const tenantId = resolveImportTenantId()
+  const tenantId = await resolveImportTenantId()
 
   let accessToken: string
   try {

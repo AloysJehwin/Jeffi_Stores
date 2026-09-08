@@ -11,6 +11,6 @@ export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'products:read')
   if (admin instanceof NextResponse) return admin
 
-  const jobs = await listImportJobs(resolveImportTenantId())
+  const jobs = await listImportJobs(await resolveImportTenantId())
   return NextResponse.json({ jobs })
 }

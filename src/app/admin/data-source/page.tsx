@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function DataSourcePage() {
-  const initialGsheet = await getGsheetStatus(resolveImportTenantId())
+  const initialGsheet = await getGsheetStatus(await resolveImportTenantId())
   return (
     <div className="p-4 sm:p-6 space-y-6">
       <div>
