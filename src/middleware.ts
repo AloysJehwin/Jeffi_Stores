@@ -81,9 +81,18 @@ function adminWritePathParent(pathname: string): string {
   return pathname.replace(/\/(add|new|edit(\/[^?]*)?)$/i, '')
 }
 
+// public/ static files (screenshots, logos, fonts …) must be served as-is on EVERY host.
+// The host branches below rewrite unknown paths into /ecom, /forms, /business, etc., which would
+// turn /screenshots/foo.png into /ecom/screenshots/foo.png (404). The matcher already skips the
+// _next and well-known icon paths; this catches everything else in public/ by file extension.
+const STATIC_ASSET_RE = /\.(?:png|jpe?g|gif|svg|webp|avif|ico|bmp|woff2?|ttf|otf|eot|mp4|webm|pdf)$/i
+
 export async function middleware(request: NextRequest) {
   const hostname = resolveTrustedHost(request)
   const pathname = request.nextUrl.pathname
+
+  // Serve public/ assets directly regardless of host, before any tenant/host rewrite runs.
+  if (STATIC_ASSET_RE.test(pathname)) return NextResponse.next()
   // Per-request device-binding signals: resolveSession revokes + rejects a cookie replayed
   // from a clearly different environment (>= 2 STABLE signals differ — see evaluateBinding).
   const reqSignals = extractSessionSignals(request)
@@ -557,6 +566,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|images|icon.png|apple-icon.png).*)',
+    '/((?!_next/static|_next/image|favicon.ico|images|screenshots|icon.png|apple-icon.png).*)',
   ],
 }
