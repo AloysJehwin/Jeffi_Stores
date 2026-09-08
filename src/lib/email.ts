@@ -233,27 +233,27 @@ export async function sendAdminOTPEmail(email: string, otp: string, name?: strin
         </head>
         <body>
           <span style="display:none;font-size:1px;color:#0b1120;max-height:0;overflow:hidden;mso-hide:all;">${brand} admin sign-in code: ${otp} — valid for 10 minutes. If this wasn't you, do not share it.</span>
-          <div class="container">
-            <div class="header">
-              <div class="brand">${brand}</div>
-              <span class="kicker">Admin Access</span>
+          <div class="container" style="background-color:#111827;border-radius:12px;padding:32px;border:1px solid #1f2937;">
+            <div class="header" style="text-align:center;margin-bottom:28px;">
+              <div class="brand" style="color:#f8fafc;">${brand}</div>
+              <span class="kicker" style="color:#f87171;">Admin Access</span>
             </div>
 
-            <h2>Verify your admin sign-in</h2>
-            <p>Hello ${name || 'Admin'},</p>
-            <p>Use this one-time code to complete sign-in to the admin dashboard:</p>
+            <h2 style="color:#f8fafc;">Verify your admin sign-in</h2>
+            <p style="color:#e2e8f0;">Hello ${name || 'Admin'},</p>
+            <p style="color:#e2e8f0;">Use this one-time code to complete sign-in to the admin dashboard:</p>
 
-            <div class="otp-box">${otp}</div>
+            <div class="otp-box" style="background-color:#0f172a;color:#38bdf8;">${otp}</div>
 
-            <div class="security">
-              <strong>This code authorizes staff access. It expires in 10 minutes.</strong>
+            <div class="security" style="color:#fcd34d;">
+              <strong style="color:#fcd34d;">This code authorizes staff access. It expires in 10 minutes.</strong>
               <br>
-              <small>If you didn't try to sign in, ignore this email and rotate your credentials.</small>
+              <small style="color:#fcd34d;">If you didn't try to sign in, ignore this email and rotate your credentials.</small>
             </div>
 
-            <div class="footer">
-              <p><strong>${brand}</strong> — administrative access</p>
-              <p>This is an automated security message. Do not reply.</p>
+            <div class="footer" style="color:#94a3b8;">
+              <p style="color:#94a3b8;"><strong style="color:#cbd5e1;">${brand}</strong> — administrative access</p>
+              <p style="color:#94a3b8;">This is an automated security message. Do not reply.</p>
             </div>
           </div>
         </body>
