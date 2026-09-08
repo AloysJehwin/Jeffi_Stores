@@ -23,6 +23,7 @@ export default function AdminLogin() {
   const [step, setStep] = useState<Step>('identity')
   const [ticket, setTicket] = useState('')
   const [code, setCode] = useState('')
+  const [useRecovery, setUseRecovery] = useState(false)
   const [enrollData, setEnrollData] = useState<{ secret: string; qr_data_url: string; otpauth_url: string } | null>(null)
   const [recoveryCodes, setRecoveryCodes] = useState<string[] | null>(null)
   const [error, setError] = useState('')
@@ -186,6 +187,38 @@ export default function AdminLogin() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Tick the resend cooldown down to 0 so the "Resend code" button re-enables.
+  useEffect(() => {
+    if (resendCooldown <= 0) return
+    const t = setInterval(() => setResendCooldown((s) => (s <= 1 ? 0 : s - 1)), 1000)
+    return () => clearInterval(t)
+  }, [resendCooldown])
+
+  const handleResendOtp = async () => {
+    if (resendCooldown > 0 || loading) return
+    setError(''); setIsCertError(false); setLoading(true)
+    try {
+      const res = await fetch('/api/admin/auth/email-otp/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: email.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 429 && data.retryAfter) setResendCooldown(data.retryAfter)
+        if (res.status === 403) setIsCertError(true)
+        throw new Error(data.error || 'Could not resend code')
+      }
+      setOtp('')
+      setResendCooldown(data.nextCooldown || 30)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not resend code')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -231,8 +264,12 @@ export default function AdminLogin() {
   if (checkingSession) return null
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center px-4 py-10">
-        <div className="w-full max-w-md">
+    <div className="relative min-h-screen bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500 flex items-center justify-center px-4 py-10">
+        {/* Fixed dark layer behind the card fills the whole viewport incl. overscroll, so the
+            light body background never shows as a white band above/below. Sits at z-0 (not
+            negative, which would fall behind the body's own background and disappear). */}
+        <div aria-hidden className="fixed inset-0 z-0 bg-gradient-to-br from-secondary-500 via-gray-800 to-secondary-500" />
+        <div className="relative z-10 w-full max-w-md">
           <div className="text-center mb-8">
             <h1 className="text-5xl font-bold text-white mb-3">{storeName}</h1>
             <h2 className="text-2xl font-semibold text-white mb-2">Admin Panel</h2>
@@ -356,7 +393,7 @@ export default function AdminLogin() {
                 <form onSubmit={handleVerifyOtp} className="space-y-6">
                   <div>
                     <label htmlFor="otp" className="block text-sm font-medium text-white mb-2">
-                      Enter the code sent to <span className="text-white font-semibold">{email}</span>
+                      Enter the 6-digit code sent to <span className="text-white font-semibold">{email}</span>
                     </label>
                     <input
                       type="text" id="otp" name="otp"
@@ -370,10 +407,19 @@ export default function AdminLogin() {
                     className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg">
                     {loading ? 'Verifying…' : 'Continue'}
                   </button>
-                  <button type="button" onClick={() => { setOtpSent(false); setOtp(''); setError('') }}
-                    className="w-full text-sm text-gray-300 hover:text-white">
-                    ← Use a different email
-                  </button>
+                  <div className="flex items-center justify-between text-sm">
+                    <button type="button" onClick={() => { setOtpSent(false); setOtp(''); setError('') }}
+                      className="text-gray-300 hover:text-white">
+                      ← Use a different email
+                    </button>
+                    <button type="button" onClick={handleResendOtp} disabled={resendCooldown > 0 || loading}
+                      className="text-gray-300 hover:text-white disabled:text-gray-500 disabled:cursor-not-allowed">
+                      {resendCooldown > 0 ? `Resend code in ${resendCooldown}s` : 'Resend code'}
+                    </button>
+                  </div>
+                  <p className="text-center text-xs text-gray-400">
+                    Didn&apos;t get the email? Check spam, or wait a moment and resend.
+                  </p>
                 </form>
               )}
             </div>
@@ -383,24 +429,31 @@ export default function AdminLogin() {
             <form onSubmit={handleVerify} className="space-y-6">
               <div>
                 <label htmlFor="code" className="block text-sm font-medium text-white mb-2">
-                  6-digit code <span className="text-gray-300">or recovery code</span>
+                  {useRecovery ? 'Enter a recovery code' : 'Enter the 6-digit code from your authenticator app'}
                 </label>
                 <input
                   type="text" id="code" name="code"
-                  value={code} onChange={(e) => setCode(e.target.value)}
-                  required autoFocus autoComplete="one-time-code" inputMode="text"
-                  className="w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all tracking-widest text-center text-xl"
-                  placeholder="000000"
+                  value={code}
+                  onChange={(e) => setCode(useRecovery ? e.target.value : e.target.value.replace(/\D/g, '').slice(0, 6))}
+                  required autoFocus autoComplete="one-time-code" inputMode={useRecovery ? 'text' : 'numeric'}
+                  className={`w-full px-4 py-3 bg-white/10 backdrop-blur-sm border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-all text-center text-xl ${useRecovery ? 'font-mono' : 'tracking-widest'}`}
+                  placeholder={useRecovery ? 'xxxx-xxxx' : '000000'}
                 />
               </div>
-              <button type="submit" disabled={loading}
+              <button type="submit" disabled={loading || (!useRecovery && code.length !== 6)}
                 className="w-full bg-gradient-to-r from-primary-500 to-accent-500 hover:from-primary-600 hover:to-accent-600 disabled:from-gray-600 disabled:to-gray-700 text-white font-semibold py-4 px-6 rounded-lg transition-all disabled:cursor-not-allowed shadow-lg text-lg">
                 {loading ? 'Verifying...' : 'Verify and Continue'}
               </button>
-              <button type="button" onClick={() => { setStep('identity'); setOtpSent(false); setOtp(''); setCode(''); setError('') }}
-                className="w-full text-sm text-gray-300 hover:text-white">
-                ← Use a different account
-              </button>
+              <div className="flex items-center justify-between text-sm">
+                <button type="button" onClick={() => { setStep('identity'); setOtpSent(false); setOtp(''); setCode(''); setError('') }}
+                  className="text-gray-300 hover:text-white">
+                  ← Use a different account
+                </button>
+                <button type="button" onClick={() => { setUseRecovery((v) => !v); setCode(''); setError('') }}
+                  className="text-gray-300 hover:text-white">
+                  {useRecovery ? 'Use authenticator code' : 'Lost your device? Use a recovery code'}
+                </button>
+              </div>
             </form>
           )}
 
