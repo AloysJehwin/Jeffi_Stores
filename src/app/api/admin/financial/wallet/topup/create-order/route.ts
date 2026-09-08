@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenant } from '@/lib/tenant-context'
 import { getRazorpayInstance, isRazorpayEnabled } from '@/lib/razorpay'
 
 export const dynamic = 'force-dynamic'
@@ -15,7 +15,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const tenant = getCurrentTenant()
+  // ALS tenant context is empty at the start of an API handler (it is filled as a side effect
+  // of the first db.ts query). resolveTenant() bridges from the x-tenant-id/slug header the
+  // middleware sets, matching the sibling topup GET.
+  const tenant = await resolveTenant()
   if (!tenant?.tenantId) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
 
   if (!(await isRazorpayEnabled())) {

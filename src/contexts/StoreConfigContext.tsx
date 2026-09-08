@@ -12,6 +12,7 @@ export interface StoreConfig {
   }
   flags: {
     razorpayEnabled: boolean
+    codEnabled: boolean
     gstEnabled: boolean
     ondeviceSummaryEnabled: boolean
     ondeviceFinetuneEnabled: boolean
@@ -47,6 +48,7 @@ const DEFAULT_CONFIG: StoreConfig = {
   },
   flags: {
     razorpayEnabled: false,
+    codEnabled: true,
     gstEnabled: true,
     ondeviceSummaryEnabled: false,
     ondeviceFinetuneEnabled: false,

@@ -19,6 +19,7 @@ export async function GET() {
       },
       flags: {
         razorpayEnabled: c.flags.razorpayEnabled,
+        codEnabled: c.flags.codEnabled,
         gstEnabled: c.flags.gstEnabled,
         ondeviceSummaryEnabled: c.flags.ondeviceSummaryEnabled,
         ondeviceFinetuneEnabled: c.flags.ondeviceFinetuneEnabled,

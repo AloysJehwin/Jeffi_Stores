@@ -38,6 +38,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   const { user, isLoading: authLoading } = useAuth()
   const { showToast } = useToast()
   const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
+  const isCodSiteEnabled = useStoreConfig().flags.codEnabled
   const gstEnabled = useStoreConfig().flags.gstEnabled
   const storeName = useStoreConfig().identity.name
   const router = useRouter()
@@ -83,13 +84,14 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
   } | null>(null)
   const [isLoadingShipping, setIsLoadingShipping] = useState(false)
   const [shippingError, setShippingError] = useState('')
+  const [serviceable, setServiceable] = useState<boolean>(true)
   const [minOrderAmount, setMinOrderAmount] = useState(0)
 
   // Payment state
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual' | 'cod'>(isRazorpayEnabled ? 'razorpay' : 'manual')
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod' | 'manual'>(isRazorpayEnabled ? 'razorpay' : isBusiness ? 'manual' : 'cod')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
@@ -346,8 +348,8 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     setIsLoadingShipping(true)
     setShippingError('')
     const items = isBuyNow && buyNowItem
-      ? [{ productId: buyNowItem.productId, variantId: buyNowItem.variantId, quantity: buyNowItem.qty }]
-      : cartItems.map((i: any) => ({ productId: i.product_id, variantId: i.variant_id || null, quantity: parseFloat(i.quantity) }))
+      ? [{ productId: buyNowItem.productId, variantId: buyNowItem.variantId, subVariantId: buyNowItem.subVariantId, quantity: buyNowItem.qty }]
+      : cartItems.map((i: any) => ({ productId: i.product_id, variantId: i.variant_id || null, subVariantId: i.sub_variant_id || null, quantity: parseFloat(i.quantity) }))
     fetch('/api/shipping/rate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -359,7 +361,12 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     })
       .then(r => r.json())
       .then(data => {
-        if (data.charge != null) {
+        setServiceable(data.serviceable !== false)
+        if (data.serviceable === false) {
+          setShippingCharge(null)
+          setShippingMeta(null)
+          setShippingError('Delivery is not available to this pincode.')
+        } else if (data.charge != null) {
           setShippingCharge(data.charge)
           setShippingMeta({ source: data.source, freeShippingThreshold: data.freeShippingThreshold })
         } else setShippingError(data.error || 'Unavailable')
@@ -470,19 +477,26 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
 
   const finalTotal = Math.max(0, cartSubtotal - discountAmount - businessDiscountAmount + (shippingCharge ?? 0))
 
-  const codAvailable = isBuyNow
+  // COD shows only when enabled at BOTH the site level AND for every item; never for B2B.
+  const codAvailable = !isBusiness && isCodSiteEnabled && (isBuyNow
     ? true
-    : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false)
+    : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false))
 
-  // Reset payment method if selected option becomes unavailable
+  // Business buyers can always fall back to manual (contact-for-payment), so B2B never
+  // hits the no-payment state. Consumer storefront has no manual option.
+  const manualAvailable = isBusiness
+  const noPaymentMethod = !isRazorpayEnabled && !codAvailable && !manualAvailable
+
+  // Reset payment method if the selected option becomes unavailable.
   useEffect(() => {
-    if (paymentMethod === 'manual' && finalTotal < 100000) {
+    if (paymentMethod === 'razorpay' && !isRazorpayEnabled) {
+      setPaymentMethod(codAvailable ? 'cod' : manualAvailable ? 'manual' : 'razorpay')
+    } else if (paymentMethod === 'cod' && !codAvailable) {
+      setPaymentMethod(isRazorpayEnabled ? 'razorpay' : manualAvailable ? 'manual' : 'cod')
+    } else if (paymentMethod === 'manual' && !manualAvailable) {
       setPaymentMethod(isRazorpayEnabled ? 'razorpay' : codAvailable ? 'cod' : 'manual')
     }
-    if (paymentMethod === 'cod' && !codAvailable) {
-      setPaymentMethod(isRazorpayEnabled ? 'razorpay' : 'manual')
-    }
-  }, [finalTotal, codAvailable])
+  }, [codAvailable, isRazorpayEnabled, manualAvailable])
 
   // Load Razorpay script when razorpay payment method is selected
   useEffect(() => {
@@ -497,7 +511,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
     script.async = true
     script.onload = () => setRazorpayLoaded(true)
-    script.onerror = () => setSubmitError('Failed to load payment gateway. Please try manual payment.')
+    script.onerror = () => setSubmitError('Failed to load payment gateway. Please try again or contact support.')
     document.body.appendChild(script)
   }, [paymentMethod, razorpayLoaded])
 
@@ -688,6 +702,14 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
       showToast(`Minimum order value is ₹${minOrderAmount}. Add ₹${(minOrderAmount - cartSubtotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })} more to proceed.`, 'warning')
       return
     }
+    if (!serviceable) {
+      showToast('Delivery is not available to this pincode. Please use a different delivery address.', 'warning')
+      return
+    }
+    if (noPaymentMethod || (paymentMethod === 'razorpay' && !isRazorpayEnabled) || (paymentMethod === 'cod' && !codAvailable) || (paymentMethod === 'manual' && !manualAvailable)) {
+      showToast('No payment method is available for this order.', 'warning')
+      return
+    }
 
     setIsSubmitting(true)
 
@@ -729,7 +751,7 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
         return
       }
 
-      // Manual payment
+      // COD path (server confirms unpaid at placement; razorpay is handled above)
       const endpoint = isBuyNow ? '/api/orders/create-direct' : '/api/orders/create'
       const body: any = {
         shippingAddress: {
@@ -1287,19 +1309,25 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                     </div>
                   </label>
                 )}
-                {finalTotal >= 100000 && (
+                {manualAvailable && (
                   <label className={`flex items-center gap-3 p-3 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
                     <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
                     <div>
-                      <p className="text-sm font-semibold text-foreground">Request Manual Payment</p>
-                      <p className="text-xs text-foreground-secondary">Our team will contact you</p>
+                      <p className="text-sm font-semibold text-foreground">Contact for Payment</p>
+                      <p className="text-xs text-foreground-secondary">Our team will reach out to arrange payment</p>
                     </div>
                   </label>
                 )}
-                {paymentMethod === 'manual' && finalTotal >= 100000 && (
-                  <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-xs text-blue-800 dark:text-blue-300">
-                    Our team will contact you to confirm your order and provide payment details.
+                {paymentMethod === 'manual' && manualAvailable && (
+                  <div className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg px-3 py-2">
+                    Your order will be placed as unpaid. Our team will contact you to confirm the payment arrangement before dispatch.
                   </div>
+                )}
+                {noPaymentMethod && (
+                  <p className="text-xs text-red-600 dark:text-red-400">No payment method is available for this order.</p>
+                )}
+                {!serviceable && (
+                  <p className="text-xs text-red-600 dark:text-red-400">Delivery is not available to this pincode. Please use a different delivery address.</p>
                 )}
               </div>
 
@@ -1327,46 +1355,59 @@ function CheckoutReviewPage({ isBusiness }: { isBusiness: boolean }) {
                 </div>
               )}
 
-              <form onSubmit={handleSubmitOrder}>
-                <button
-                  type="submit"
-                  disabled={!selectedAddress || addresses.length === 0 || belowMinimum || isLoadingShipping || (shippingCharge === null && !shippingError) || isSubmitting || (paymentMethod === 'razorpay' && isRazorpayEnabled && !razorpayLoaded)}
-                  className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
-                      {paymentMethod === 'razorpay' ? 'Processing...' : 'Placing Order...'}
-                    </>
-                  ) : isLoadingShipping ? (
-                    <>
-                      <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
-                      Calculating delivery…
-                    </>
-                  ) : paymentMethod === 'razorpay' && isRazorpayEnabled ? (
-                    <>
-                      <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
-                      </svg>
-                      Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </>
-                  ) : paymentMethod === 'cod' ? (
-                    <>
-                      Place Order — Pay on Delivery
-                      <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                    </>
-                  ) : (
-                    <>
-                      Place Order
-                      <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </>
-                  )}
-                </button>
-              </form>
+              {noPaymentMethod ? (
+                <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg text-sm">
+                  We are unable to accept orders right now due to a technical issue. Please try again later or contact support.
+                </div>
+              ) : (
+                <form onSubmit={handleSubmitOrder}>
+                  <button
+                    type="submit"
+                    disabled={!selectedAddress || addresses.length === 0 || belowMinimum || isLoadingShipping || !serviceable || (paymentMethod === 'cod' && !codAvailable) || (shippingCharge === null && !shippingError) || isSubmitting || (paymentMethod === 'razorpay' && isRazorpayEnabled && !razorpayLoaded)}
+                    className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                        {paymentMethod === 'razorpay' ? 'Processing...' : 'Placing Order...'}
+                      </>
+                    ) : isLoadingShipping ? (
+                      <>
+                        <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2" />
+                        Calculating delivery…
+                      </>
+                    ) : paymentMethod === 'razorpay' && isRazorpayEnabled ? (
+                      <>
+                        <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+                        </svg>
+                        Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </>
+                    ) : paymentMethod === 'cod' ? (
+                      <>
+                        Place Order — Pay on Delivery
+                        <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </>
+                    ) : paymentMethod === 'manual' ? (
+                      <>
+                        Place Order — Contact for Payment
+                        <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </>
+                    ) : (
+                      <>
+                        Place Order
+                        <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </>
+                    )}
+                  </button>
+                </form>
+              )}
 
               {isBuyNow ? (
                 <button onClick={() => router.back()} className="block w-full text-center text-foreground-secondary hover:text-foreground font-medium mt-4">

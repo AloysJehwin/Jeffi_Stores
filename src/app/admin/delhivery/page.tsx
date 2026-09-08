@@ -51,11 +51,10 @@ export default async function DelhiveryPage() {
 
       <SectionCard
         title="Shipping cost"
-        description="Default weight and weight-based buyer shipping cost. The ship-from pincode is taken from each pickup address in the warehouse list above."
+        description="Weight-based buyer shipping cost. The ship-from pincode is the default warehouse (the first pickup address above); the live Delhivery rate from that origin is charged to the buyer unless a flat base charge is set below. Default weights live under Settings → Delivery & Shipping."
         columns
       >
-        <NumberControl settingKey="default_product_weight_g" label="Default product weight" hint="Assumed weight for products with no weight set." suffix="g" min={1} initial={c.values.defaultProductWeightG} />
-        <NumberControl settingKey="delivery_base_charge" label="Base shipping charge (≤3kg)" hint="Flat buyer charge for shipments up to the free-weight ceiling." prefix="₹" initial={delivery.baseCharge} />
+        <NumberControl settingKey="delivery_base_charge" label="Flat base charge override (≤3kg)" hint="Leave 0 to charge the live Delhivery rate. Set a value to override with a flat buyer charge up to the free-weight ceiling." prefix="₹" initial={delivery.baseCharge} />
         <NumberControl settingKey="delivery_per_kg_over_3" label="Per-kg surcharge over 3kg" hint="Added per whole kg above the free-weight ceiling." prefix="₹" initial={delivery.perKgOver3} />
         <NumberControl settingKey="delivery_free_weight_ceiling_kg" label="Free-weight ceiling" hint="Weight below which the free-shipping threshold applies." suffix="kg" min={0} step={0.5} initial={delivery.freeWeightCeilingKg} />
       </SectionCard>

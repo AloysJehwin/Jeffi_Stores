@@ -46,6 +46,7 @@ function CheckoutPage() {
   const [couponCode, setCouponCode] = useState<string | null>(null)
   const [discountAmount, setDiscountAmount] = useState(0)
   const [shippingCharge, setShippingCharge] = useState<number | null>(null)
+  const [serviceable, setServiceable] = useState(true)
 
   const businessDiscountAmount = !isBuyNow && user?.isBusiness && user.approvalStatus === 'approved'
     ? Math.round(cartItems.reduce((sum, item) => {
@@ -306,7 +307,10 @@ function CheckoutPage() {
       body: JSON.stringify({ destinationPin: postalCode, cartItems: items, subtotal }),
     })
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.charge != null) setShippingCharge(Number(d.charge)) })
+      .then(d => {
+        if (d?.charge != null) setShippingCharge(Number(d.charge))
+        if (d) setServiceable(d.serviceable !== false)
+      })
       .catch(() => {})
   }
 
@@ -543,6 +547,12 @@ function CheckoutPage() {
 
     if (!address) {
       setError('Please select a delivery address')
+      setIsSubmitting(false)
+      return
+    }
+
+    if (!serviceable) {
+      setError('This pincode is not serviceable for delivery. Please use a different address.')
       setIsSubmitting(false)
       return
     }
@@ -923,13 +933,18 @@ function CheckoutPage() {
                 />
               </div>
 
-              {/* Payment Method — shown for orders ≥ ₹1,00,000, OR whenever online
-                  payments are disabled (so the customer sees the manual option
-                  instead of a silent, server-rejected Razorpay default). */}
-              {(finalTotal >= 100000 || !isRazorpayEnabled) && (
+              {/* Payment Method — business buyers can always pay online (when enabled)
+                  or request manual/invoice payment; the manual order stays unpaid until
+                  the team confirms it. */}
+              {(
                 <>
                   <div className="bg-surface-elevated rounded-lg shadow-sm border border-border-default p-4 sm:p-6 mb-8">
                     <h2 className="text-xl font-bold text-foreground mb-4">Payment Method</h2>
+                    {!serviceable && (
+                      <div className="mb-4 bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 rounded-lg p-3 text-sm text-red-800 dark:text-red-300">
+                        This pincode is not serviceable for delivery. Please use a different address.
+                      </div>
+                    )}
                     <div className="space-y-3">
                       {isRazorpayEnabled && (
                         <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'razorpay' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
@@ -1075,7 +1090,7 @@ function CheckoutPage() {
 
                 <button
                   type="submit"
-                  disabled={isSubmitting || (paymentMethod === 'razorpay' && !razorpayLoaded)}
+                  disabled={isSubmitting || !serviceable || (paymentMethod === 'razorpay' && (!isRazorpayEnabled || !razorpayLoaded))}
                   className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
                 >
                   {isSubmitting ? (

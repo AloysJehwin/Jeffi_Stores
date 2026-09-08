@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireAdminScope } from '@/lib/jwt'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenant } from '@/lib/tenant-context'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,7 +15,7 @@ const Schema = z.object({ provider: z.enum(['google_merchant', 'amazon_seller'])
 export async function POST(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
-  if (!getCurrentTenant()) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
+  if (!(await resolveTenant())) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
 
   const raw = await request.json().catch(() => null)
   const parsed = Schema.safeParse(raw)

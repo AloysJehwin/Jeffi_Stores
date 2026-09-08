@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getCurrentTenantId } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { listSocialPostsForScope, enqueueSocialPost } from '@/lib/tenant-registry'
 
 export const dynamic = 'force-dynamic'
@@ -15,9 +15,10 @@ export async function GET(request: NextRequest) {
   if (!hasScope(admin.role, admin.scopes, 'products:read')) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
-  // Tenant resolved from ALS (middleware sets it on tenant hosts; null on flagship). A tenant admin
-  // sees only their own queue; the flagship sees the platform queue (tenant_id IS NULL).
-  const posts = await listSocialPostsForScope(getCurrentTenantId())
+  // Tenant resolved from the middleware header (ALS is empty at handler start on the extension-token
+  // path). A tenant admin sees only their own queue; the flagship (no tenant header) sees the
+  // platform queue (tenant_id IS NULL).
+  const posts = await listSocialPostsForScope(await resolveTenantId())
   return NextResponse.json({ posts })
 }
 
@@ -44,7 +45,7 @@ export async function POST(request: NextRequest) {
   const imageUrls = Array.isArray(body.imageUrls) ? body.imageUrls.filter((u: unknown) => typeof u === 'string' && u) : null
 
   const post = await enqueueSocialPost({
-    tenantId: getCurrentTenantId(),
+    tenantId: await resolveTenantId(),
     productId: body.productId ?? null,
     platform,
     caption: body.caption ?? null,

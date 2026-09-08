@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
   let cartItemIds: string[] | null = null
   let buyNowItem: any = null
   let businessDiscountAmount = 0
-  let shippingItems: { productId: string; variantId: string | null; quantity: number }[] = []
+  let shippingItems: { productId: string; variantId: string | null; subVariantId: string | null; quantity: number }[] = []
   const { gstEnabled } = await getFeatureFlags()
 
   if (mode === 'cart') {
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     subtotal = cartSubtotal(cart, gstEnabled)
     cartHash = hashCartItems(cartItemsForHash(cart))
     cartItemIds = cart.map(c => `${c.product_id}:${c.variant_id || ''}:${c.sub_variant_id || ''}:${c.buy_mode}`)
-    shippingItems = cart.map(c => ({ productId: c.product_id, variantId: c.variant_id, quantity: Number(c.quantity) }))
+    shippingItems = cart.map(c => ({ productId: c.product_id, variantId: c.variant_id, subVariantId: c.sub_variant_id, quantity: Number(c.quantity) }))
 
     const discountMap = await getBusinessDiscountMap(authUser.userId)
     if (Object.keys(discountMap).length > 0) {
@@ -125,7 +125,7 @@ export async function POST(req: NextRequest) {
     if (!resolved.ok) return NextResponse.json({ error: resolved.error }, { status: 400 })
     subtotal = round2(resolved.item.price * resolved.item.qty)
     buyNowItem = resolved.item
-    shippingItems = [{ productId: resolved.item.productId, variantId: resolved.item.variantId, quantity: resolved.item.qty }]
+    shippingItems = [{ productId: resolved.item.productId, variantId: resolved.item.variantId, subVariantId: resolved.item.subVariantId, quantity: resolved.item.qty }]
 
     const productRow = await queryOne<{ category_id: string | null }>(
       `SELECT category_id FROM products WHERE id = $1`,

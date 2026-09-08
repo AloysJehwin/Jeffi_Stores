@@ -32,11 +32,17 @@ vi.mock('@/lib/business-discount', () => ({ getBusinessDiscountMap: vi.fn().mock
 vi.mock('@/lib/site-controls', () => ({
   getFeatureFlags: vi.fn().mockResolvedValue({
     razorpayEnabled: false,
+    codEnabled: true,
     gstEnabled: true,
     ondeviceSummaryEnabled: false,
     ondeviceFinetuneEnabled: false,
   }),
   getBusinessValues: vi.fn().mockResolvedValue({ businessStateCode: '22' }),
+}))
+vi.mock('@/lib/edd', () => ({ computeEdd: vi.fn().mockReturnValue('2026-09-30') }))
+vi.mock('@/lib/sms', () => ({ sendOrderConfirmedSMS: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/delhivery', () => ({
+  checkPincodeServiceability: vi.fn().mockResolvedValue({ serviceable: true, cod: true, prepaid: true }),
 }))
 vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
@@ -49,6 +55,16 @@ import * as jwt from '@/lib/jwt'
 import * as bizDiscount from '@/lib/business-discount'
 import * as gstLib from '@/lib/gst'
 import * as orderCommit from '@/lib/order-commit'
+import { getFeatureFlags } from '@/lib/site-controls'
+
+const enableRazorpay = () =>
+  vi.mocked(getFeatureFlags).mockResolvedValueOnce({
+    razorpayEnabled: true,
+    codEnabled: true,
+    gstEnabled: true,
+    ondeviceSummaryEnabled: false,
+    ondeviceFinetuneEnabled: false,
+  } as any)
 
 function makeRequest(body: unknown) {
   return new Request('http://localhost/api/orders/create', {
@@ -146,7 +162,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     const inactive = baseCartItem({ products: { ...baseCartItem().products, is_active: false } })
     vi.mocked(db.queryMany).mockResolvedValue([inactive])
 
-    const req = makeRequest({ paymentMethod: 'manual' })
+    const req = makeRequest({ paymentMethod: 'cod' })
     const res = await POST(req as any)
     const body = await res.json()
 
@@ -221,7 +237,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       return fn(client)
     })
 
-    const req = makeRequest({ paymentMethod: 'manual' })
+    const req = makeRequest({ paymentMethod: 'cod' })
     const res = await POST(req as any)
     expect(res.status).toBe(200)
     // 200 subtotal * 10% = 20
@@ -255,7 +271,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const req = makeRequest({ paymentMethod: 'manual', couponId: 'coupon-future' })
+    const req = makeRequest({ paymentMethod: 'cod', couponId: 'coupon-future' })
     const res = await POST(req as any)
     expect(res.status).toBe(200)
     expect(discountApplied).toBe(0)
@@ -287,7 +303,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       return fn(client)
     })
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual', couponId: 'coupon-min' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod', couponId: 'coupon-min' }) as any)
     expect(res.status).toBe(200)
     expect(captured).toBe(0)
   })
@@ -319,7 +335,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       return fn(client)
     })
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual', couponId: 'coupon-capped' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod', couponId: 'coupon-capped' }) as any)
     expect(res.status).toBe(200)
     expect(captured).toBe(30)
   })
@@ -349,7 +365,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const res = await POST(makeRequest({ paymentMethod: 'manual', couponId: 'c-inactive' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod', couponId: 'c-inactive' }) as any)
     expect(res.status).toBe(200)
     expect(captured).toBe(0)
   })
@@ -379,7 +395,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const res = await POST(makeRequest({ paymentMethod: 'manual', couponId: 'no-coupon' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod', couponId: 'no-coupon' }) as any)
     expect(res.status).toBe(200)
     expect(captured).toBe(0)
   })
@@ -408,7 +424,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       return fn(client)
     })
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
     // 150 * 2 = 300
     expect(subtotal).toBe(300)
@@ -438,7 +454,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
     // 175 * 2 = 350
     expect(subtotal).toBe(350)
@@ -464,7 +480,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
     // 80 * 3 = 240
     expect(subtotal).toBe(240)
@@ -493,7 +509,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       return fn(client)
     })
     const res = await POST(makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       shippingAddress: {
         addressLine1: '1 Main',
         city: 'Chennai',
@@ -533,7 +549,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       return fn(client)
     })
     const res = await POST(makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '491337' },
     }) as any)
     expect(res.status).toBe(200)
@@ -554,7 +570,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       return fn(client)
     })
     const res = await POST(makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '400009' },
     }) as any)
     expect(res.status).toBe(200)
@@ -579,7 +595,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       })
       return fn(client)
     })
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
     expect(capturedShipping).toBe(0)
     // quoteShipping shouldn't be called when no destination pin
@@ -612,7 +628,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       return fn(client)
     })
     const res = await POST(makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '110001' },
     }) as any)
     expect(res.status).toBe(200)
@@ -636,7 +652,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
 
   it('returns 401 when user not authenticated', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(null)
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(401)
     const body = await res.json()
     expect(body.error).toBe('Unauthorized')
@@ -645,7 +661,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
   it('returns 404 when user record not found in DB', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(null) // user not found
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(404)
     const body = await res.json()
     expect(body.error).toBe('User not found')
@@ -655,7 +671,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne).mockResolvedValueOnce(MOCK_USER)
     vi.mocked(db.queryMany).mockResolvedValue([])
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/cart is empty/i)
@@ -667,13 +683,14 @@ describe('POST /api/orders/create — additional branch coverage', () => {
       .mockResolvedValueOnce(MOCK_USER)
       .mockResolvedValueOnce({ value: '500' }) // min order = 500, subtotal = 200
     vi.mocked(db.queryMany).mockResolvedValue([baseCartItem()])
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(400)
     const body = await res.json()
     expect(body.error).toMatch(/minimum order value/i)
   })
 
   it('returns 409 when user has existing unpaid razorpay order', async () => {
+    enableRazorpay()
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_USER)
@@ -701,6 +718,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
   })
 
   it('sets requiresPayment=true for razorpay and does not confirm order', async () => {
+    enableRazorpay()
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_USER)
@@ -726,7 +744,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     )
   })
 
-  it('confirms order and sets status=confirmed for manual payment', async () => {
+  it('confirms order and sets status=confirmed for cod payment', async () => {
     vi.mocked(jwt.authenticateAnyUser).mockResolvedValue(AUTH_USER as any)
     vi.mocked(db.queryOne)
       .mockResolvedValueOnce(MOCK_USER)
@@ -742,7 +760,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     })
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
     const body = await res.json()
     expect(body.requiresPayment).toBe(false)
@@ -774,7 +792,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     })
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
     expect(vi.mocked(createAutoTask)).toHaveBeenCalledWith(
       expect.objectContaining({ sourceKind: 'review_high_value_order' })
@@ -811,7 +829,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
 
     const res = await POST(makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       shippingAddress: {
         addressLine1: '1 Main St',
         city: 'Chennai',
@@ -852,7 +870,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     })
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual', couponId: 'coupon-valid' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod', couponId: 'coupon-valid' }) as any)
     expect(res.status).toBe(200)
     expect(couponInserts).toHaveLength(1)
     expect(couponInserts[0]).toContain('coupon-valid')
@@ -922,7 +940,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
 
     const res = await POST(makeRequest({
-      paymentMethod: 'manual',
+      paymentMethod: 'cod',
       shippingAddress: { addressLine1: 'X', city: 'Y', state: 'Z', postalCode: '600001' },
       shippingAmount: 99,
     }) as any)
@@ -959,7 +977,7 @@ describe('POST /api/orders/create — additional branch coverage', () => {
     })
     vi.mocked(db.query).mockResolvedValue({ rows: [], rowCount: 0 } as any)
 
-    const res = await POST(makeRequest({ paymentMethod: 'manual' }) as any)
+    const res = await POST(makeRequest({ paymentMethod: 'cod' }) as any)
     expect(res.status).toBe(200)
     expect(capturedNames[0]).toContain('Red')
     expect(capturedNames[0]).toContain('Small')

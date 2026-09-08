@@ -312,9 +312,9 @@ export default function ProductForm({ categories, brands, action, product, produ
     }
     return init
   })
-  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; discount_pct: string; stock: string; sku: string }>>({})
+  const [subVariantDrafts, setSubVariantDrafts] = useState<Record<string, { name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; discount_pct: string; stock: string; sku: string; weight_grams: string; length_cm: string; breadth_cm: string; height_cm: string; package_type: string }>>({})
   const [subVariantEditId, setSubVariantEditId] = useState<string | null>(null)
-  const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; discount_pct: string; stock: string; sku: string } | null>(null)
+  const [subVariantEditDraft, setSubVariantEditDraft] = useState<{ name: string; price: string; mrp: string; price_ex_gst: string; mrp_ex_gst: string; discount_pct: string; stock: string; sku: string; weight_grams: string; length_cm: string; breadth_cm: string; height_cm: string; package_type: string } | null>(null)
   const [expandedSvUnits, setExpandedSvUnits] = useState<Set<string>>(new Set())
   const [productPackageType, setProductPackageType] = useState<string>(product?.package_type || 'flat_poly_auto')
   const [weightGrams, setWeightGrams] = useState<string>(product?.weight_grams != null ? String(product.weight_grams) : '')
@@ -1449,12 +1449,17 @@ export default function ProductForm({ categories, brands, action, product, produ
         discount_pct: parseFloat(discountPct) || 0,
         stock_status: draft.stock || 'In Stock',
         sku: draft.sku || undefined,
+        weight_grams: draft.weight_grams ? parseInt(draft.weight_grams) : null,
+        length_cm: draft.length_cm ? parseFloat(draft.length_cm) : null,
+        breadth_cm: draft.breadth_cm ? parseFloat(draft.breadth_cm) : null,
+        height_cm: draft.height_cm ? parseFloat(draft.height_cm) : null,
+        package_type: draft.package_type || null,
       }),
     })
     if (res.ok) {
       const data = await res.json()
       setSubVariantsMap(m => ({ ...m, [variantId]: [...(m[variantId] || []), data.sub_variant] }))
-      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', discount_pct: '', stock: '', sku: '' } }))
+      setSubVariantDrafts(m => ({ ...m, [variantId]: { name: '', price: '', mrp: '', price_ex_gst: '', mrp_ex_gst: '', discount_pct: '', stock: '', sku: '', weight_grams: '', length_cm: '', breadth_cm: '', height_cm: '', package_type: '' } }))
     }
   }
 
@@ -3917,7 +3922,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                                     </div>
                                   </td>
                                   <td className="py-1 pr-1"><input type="text" value={ed.sku} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, sku: e.target.value }))} className={`${svInputCls} w-20`} /></td>
-                                  <td className="py-1 pl-1 flex items-center gap-1">
+                                  <td className="py-1 pl-1">
+                                    <div className="flex items-center gap-1 mb-1">
                                     <button type="button" onClick={async () => {
                                       if (!ed) return
                                       const svEditUrl = isDraft
@@ -3926,7 +3932,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       const res = await fetch(svEditUrl, {
                                         method: isDraft ? 'PATCH' : 'PUT',
                                         headers: { 'Content-Type': 'application/json' },
-                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, discount_pct: parseFloat(discountPct) || 0, stock_status: ed.stock || 'In Stock', sku: ed.sku || null }),
+                                        body: JSON.stringify({ id: sv.id, sub_variant_name: ed.name, price: ed.price ? parseFloat(ed.price) : null, mrp: ed.mrp ? parseFloat(ed.mrp) : null, price_ex_gst: ed.price_ex_gst ? parseFloat(ed.price_ex_gst) : null, mrp_ex_gst: ed.mrp_ex_gst ? parseFloat(ed.mrp_ex_gst) : null, discount_pct: parseFloat(discountPct) || 0, stock_status: ed.stock || 'In Stock', sku: ed.sku || null, weight_grams: ed.weight_grams ? parseInt(ed.weight_grams) : null, length_cm: ed.length_cm ? parseFloat(ed.length_cm) : null, breadth_cm: ed.breadth_cm ? parseFloat(ed.breadth_cm) : null, height_cm: ed.height_cm ? parseFloat(ed.height_cm) : null, package_type: ed.package_type || null }),
                                       })
                                       if (res.ok) {
                                         const updated = await res.json()
@@ -3935,6 +3941,18 @@ export default function ProductForm({ categories, brands, action, product, produ
                                       setSubVariantEditId(null); setSubVariantEditDraft(null)
                                     }} className="text-accent-600 hover:text-accent-700 text-xs font-medium leading-none">Save</button>
                                     <button type="button" onClick={() => { setSubVariantEditId(null); setSubVariantEditDraft(null) }} className="text-foreground-muted hover:text-foreground text-xs font-medium leading-none">Cancel</button>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <input type="number" step="1" min="0" placeholder="Wt g" title="Ship weight (blank = inherit variant)" value={ed.weight_grams} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, weight_grams: e.target.value }))} className={`${svInputCls} w-14`} />
+                                      <button type="button" title="Package type" onClick={() => { const opts = ['', ...PACKAGE_TYPES]; const i = opts.indexOf(ed.package_type || ''); setSubVariantEditDraft(d => d && ({ ...d, package_type: opts[(i + 1) % opts.length] })) }} className="field-xs border border-border-secondary bg-surface text-foreground hover:bg-surface-secondary transition-colors truncate max-w-[110px]">{ed.package_type ? PACKAGE_TYPE_LABELS[ed.package_type] : 'Inherit pkg'}</button>
+                                    </div>
+                                    {['drill_bit_tube','drill_bit_set_case','corrugated_box','long_tube'].includes(ed.package_type) && (
+                                      <div className="flex items-center gap-1 mt-1">
+                                        <input type="number" step="0.1" min="0" placeholder="L" value={ed.length_cm} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, length_cm: e.target.value }))} className={`${svInputCls} w-12`} />
+                                        <input type="number" step="0.1" min="0" placeholder="B" value={ed.breadth_cm} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, breadth_cm: e.target.value }))} className={`${svInputCls} w-12`} />
+                                        <input type="number" step="0.1" min="0" placeholder="H" value={ed.height_cm} onChange={e => setSubVariantEditDraft(d => d && ({ ...d, height_cm: e.target.value }))} className={`${svInputCls} w-12`} />
+                                      </div>
+                                    )}
                                   </td>
                                 </>) : (<>
                                   <td className="py-1.5 pr-2">{sv.sub_variant_name}</td>
@@ -3946,7 +3964,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-1.5 pr-2">{sv.stock_status || '—'}</td>
                                   <td className="py-1.5 pr-2 font-mono text-foreground-muted">{sv.sku}</td>
                                   <td className="py-1.5 flex items-center gap-2">
-                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', discount_pct: sv.discount_pct != null ? String(sv.discount_pct) : '', stock: sv.stock_status || 'In Stock', sku: sv.sku || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
+                                    <button type="button" onClick={() => { setSubVariantEditId(sv.id); setSubVariantEditDraft({ name: sv.sub_variant_name, price: sv.price != null ? String(sv.price) : '', mrp: sv.mrp != null ? String(sv.mrp) : '', price_ex_gst: sv.price_ex_gst != null ? String(sv.price_ex_gst) : '', mrp_ex_gst: sv.mrp_ex_gst != null ? String(sv.mrp_ex_gst) : '', discount_pct: sv.discount_pct != null ? String(sv.discount_pct) : '', stock: sv.stock_status || 'In Stock', sku: sv.sku || '', weight_grams: sv.weight_grams != null ? String(sv.weight_grams) : '', length_cm: sv.length_cm != null ? String(sv.length_cm) : '', breadth_cm: sv.breadth_cm != null ? String(sv.breadth_cm) : '', height_cm: sv.height_cm != null ? String(sv.height_cm) : '', package_type: sv.package_type || '' }) }} className="text-accent-500 hover:text-accent-600 leading-none text-xs font-medium">Edit</button>
                                     <button type="button" onClick={() => setExpandedSvUnits(s => { const n = new Set(s); n.has(sv.id) ? n.delete(sv.id) : n.add(sv.id); return n })} className="text-foreground-muted hover:text-accent-500 leading-none text-xs font-medium">Unit</button>
                                     <button type="button" onClick={() => deleteSubVariant(variantPopupId, sv.id)} className="text-red-400 hover:text-red-600 leading-none" aria-label="Delete"><X className="w-3.5 h-3.5" /></button>
                                   </td>
@@ -3989,7 +4007,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                       </div>
                     )}
                     {(() => {
-                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'' }
+                      const d = subVariantDrafts[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'',weight_grams:'',length_cm:'',breadth_cm:'',height_cm:'',package_type:'' }
                       const setD = (field: string, val: string) => setSubVariantDrafts(m => ({ ...m, [variantPopupId]: { ...d, [field]: val } }))
                       const parentSku = popupVariant?.sku || ''
                       const autoSku = (name: string) => parentSku ? `${parentSku}-${name.toUpperCase().replace(/[^A-Z0-9]/g, '')}` : ''
@@ -4003,7 +4021,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                             <input type="text" placeholder="e.g. Red" value={d.name} onChange={(e) => {
                               const name = e.target.value
                               setSubVariantDrafts(m => {
-                                const cur = m[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'' }
+                                const cur = m[variantPopupId] || { name:'',price:'',mrp:'',price_ex_gst:'',mrp_ex_gst:'',discount_pct:'',stock:'',sku:'',weight_grams:'',length_cm:'',breadth_cm:'',height_cm:'',package_type:'' }
                                 const wasAuto = !cur.sku || cur.sku === autoSku(cur.name)
                                 return { ...m, [variantPopupId]: { ...cur, name, sku: wasAuto ? autoSku(name) : cur.sku } }
                               })
@@ -4057,6 +4075,33 @@ export default function ProductForm({ categories, brands, action, product, produ
                           <div>
                             <label className="block text-xs text-foreground-muted mb-0.5">SKU {skuIsAuto ? '(auto)' : '(manual)'}</label>
                             <input type="text" placeholder="auto" value={d.sku} onChange={(e) => setD('sku', e.target.value)} className={`${inputCls} w-full`} />
+                          </div>
+                          <div className="col-span-2 sm:col-span-4 border-t border-border-default pt-2 mt-1">
+                            <p className="text-[10px] text-foreground-muted mb-1.5">Shipping — leave blank to use the variant&apos;s value</p>
+                            <div className="grid grid-cols-2 gap-1.5">
+                              <div>
+                                <label className="block text-xs text-foreground-muted mb-0.5">Ship Wt. (g)</label>
+                                <input type="number" step="1" min="0" placeholder="Inherit" value={d.weight_grams} onChange={(e) => setD('weight_grams', e.target.value)} className={`${inputCls} w-full`} />
+                              </div>
+                              <div>
+                                <label className="block text-xs text-foreground-muted mb-0.5">Package Type</label>
+                                <div className="w-full h-9 flex items-center border border-border-secondary rounded-lg overflow-hidden bg-surface">
+                                  <button type="button" onClick={() => { const opts = ['', ...PACKAGE_TYPES]; const idx = opts.indexOf(d.package_type || ''); setD('package_type', opts[(idx - 1 + opts.length) % opts.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">‹</button>
+                                  <span className="h-full px-2 text-sm font-medium text-foreground flex-1 text-center border-x border-border-secondary truncate flex items-center justify-center">{d.package_type ? PACKAGE_TYPE_LABELS[d.package_type] : 'Inherit'}</span>
+                                  <button type="button" onClick={() => { const opts = ['', ...PACKAGE_TYPES]; const idx = opts.indexOf(d.package_type || ''); setD('package_type', opts[(idx + 1) % opts.length]) }} className="h-full px-2 text-foreground-secondary hover:bg-surface-secondary hover:text-foreground transition-colors text-sm leading-none">›</button>
+                                </div>
+                              </div>
+                            </div>
+                            {['drill_bit_tube','drill_bit_set_case','corrugated_box','long_tube'].includes(d.package_type) && (
+                              <div className="mt-1.5">
+                                <label className="block text-xs text-foreground-muted mb-0.5">Dimensions (L × B × H cm)</label>
+                                <div className="grid grid-cols-3 gap-1.5">
+                                  <input type="number" step="0.1" min="0" value={d.length_cm} onChange={(e) => setD('length_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="L" />
+                                  <input type="number" step="0.1" min="0" value={d.breadth_cm} onChange={(e) => setD('breadth_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="B" />
+                                  <input type="number" step="0.1" min="0" value={d.height_cm} onChange={(e) => setD('height_cm', e.target.value)} className="field-compact border border-border-secondary bg-surface text-foreground focus:ring-2 focus:ring-accent-500 focus:border-transparent" placeholder="H" />
+                                </div>
+                              </div>
+                            )}
                           </div>
                           <div className="col-span-2 sm:col-span-4 flex justify-end mt-1">
                             <button type="button" onClick={() => addSubVariant(variantPopupId)} disabled={!d.name || variantPopupId.startsWith('temp-')} className="field-xs font-medium text-white bg-accent-500 hover:bg-accent-600 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors">+ Add Sub-Variant</button>

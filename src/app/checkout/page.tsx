@@ -32,6 +32,7 @@ function CheckoutPage() {
   const { user, isLoading: authLoading } = useAuth()
   const { showToast } = useToast()
   const isRazorpayEnabled = useStoreConfig().flags.razorpayEnabled
+  const isCodSiteEnabled = useStoreConfig().flags.codEnabled
   const storeIdentity = useStoreConfig().identity
   const gstEnabled = useStoreConfig().flags.gstEnabled
   const router = useRouter()
@@ -50,13 +51,14 @@ function CheckoutPage() {
   const [discountAmount, setDiscountAmount] = useState(0)
   const [shippingCharge, setShippingCharge] = useState<number | null>(null)
   const [codFee, setCodFee] = useState<number>(0)
+  const [serviceable, setServiceable] = useState<boolean>(true)
 
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [address, setAddress] = useState<any>(null)
   const [isLoadingAddress, setIsLoadingAddress] = useState(true)
   const [notes, setNotes] = useState('')
-  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'manual' | 'cod'>(isRazorpayEnabled ? 'razorpay' : 'manual')
+  const [paymentMethod, setPaymentMethod] = useState<'razorpay' | 'cod'>(isRazorpayEnabled ? 'razorpay' : 'cod')
   const [razorpayLoaded, setRazorpayLoaded] = useState(false)
   const [existingOrder, setExistingOrder] = useState<{ id: string; orderNumber: string } | null>(null)
   const [isCancellingPrevious, setIsCancellingPrevious] = useState(false)
@@ -254,7 +256,7 @@ function CheckoutPage() {
     script.src = 'https://checkout.razorpay.com/v1/checkout.js'
     script.async = true
     script.onload = () => setRazorpayLoaded(true)
-    script.onerror = () => setError('Failed to load payment gateway. Please try manual payment.')
+    script.onerror = () => setError('Failed to load payment gateway. Please try again or contact support.')
     document.body.appendChild(script)
   }, [paymentMethod, razorpayLoaded])
 
@@ -277,6 +279,7 @@ function CheckoutPage() {
       .then(d => {
         if (d?.charge != null) setShippingCharge(Number(d.charge))
         setCodFee(d?.codFee != null ? Number(d.codFee) : 0)
+        setServiceable(d?.serviceable !== false)
       })
       .catch(() => {})
   }
@@ -322,7 +325,14 @@ function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paymentMethod])
 
-  // Re-apply coupon from server once address + subtotal are known — never trust URL value
+  // Keep the selected payment method valid: if the current choice becomes unavailable
+  // (e.g. razorpay off, or COD disabled at site/product level), fall back to the other.
+  useEffect(() => {
+    const codOk = isCodSiteEnabled && (isBuyNow || (cartItems.length > 0 && cartItems.every((i: any) => i.products?.is_cod_allowed !== false)))
+    if (paymentMethod === 'razorpay' && !isRazorpayEnabled && codOk) setPaymentMethod('cod')
+    else if (paymentMethod === 'cod' && !codOk && isRazorpayEnabled) setPaymentMethod('razorpay')
+  }, [paymentMethod, isRazorpayEnabled, isCodSiteEnabled, isBuyNow, cartItems])
+
   useEffect(() => {
     if (!couponId) return
     const subtotal = isBuyNow
@@ -527,6 +537,18 @@ function CheckoutPage() {
       return
     }
 
+    if (!serviceable) {
+      setError('Delivery is not available to this pincode. Please use a different delivery address.')
+      setIsSubmitting(false)
+      return
+    }
+
+    if (noPaymentMethod || (paymentMethod === 'razorpay' && !isRazorpayEnabled) || (paymentMethod === 'cod' && !codAvailable)) {
+      setError('No payment method is available for this order.')
+      setIsSubmitting(false)
+      return
+    }
+
     try {
       if (paymentMethod === 'razorpay') {
         const draftBody: any = {
@@ -696,10 +718,12 @@ function CheckoutPage() {
   const finalTotal = Math.max(0, subtotal - discountAmount + (shippingCharge ?? 0) + effectiveCodFee)
   const displayItems = isBuyNow ? (buyNowItem ? [buyNowItem] : []) : cartItems
 
-  // COD is available if every item in the order allows it
-  const codAvailable = isBuyNow
+  // COD is available only when enabled at BOTH the site level AND for every item in the order.
+  const codAvailable = isCodSiteEnabled && (isBuyNow
     ? true // buy-now: is_cod_allowed not in intent payload, allow by default; server will validate
-    : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false)
+    : cartItems.length > 0 && cartItems.every((item: any) => item.products?.is_cod_allowed !== false))
+
+  const noPaymentMethod = !isRazorpayEnabled && !codAvailable
 
   return (
     <div className="bg-surface min-h-screen py-4 sm:py-6 lg:py-8">
@@ -935,34 +959,14 @@ function CheckoutPage() {
                       </svg>
                     </label>
                   )}
-                  {finalTotal >= 100000 && (
-                    <label className={`flex items-center gap-4 p-4 border-2 rounded-lg cursor-pointer transition-all ${paymentMethod === 'manual' ? 'border-accent-500 bg-accent-50 dark:bg-accent-900/30' : 'border-border-default hover:border-border-secondary'}`}>
-                      <input type="radio" name="paymentMethod" value="manual" checked={paymentMethod === 'manual'} onChange={() => setPaymentMethod('manual')} className="w-4 h-4 text-accent-600 focus:ring-accent-500" />
-                      <div className="flex-1">
-                        <p className="font-semibold text-foreground">Request Manual Payment</p>
-                        <p className="text-sm text-foreground-secondary">Our team will contact you for payment details</p>
-                      </div>
-                      <svg className="w-8 h-8 text-foreground-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                      </svg>
-                    </label>
+                  {noPaymentMethod && (
+                    <p className="text-sm text-red-600 dark:text-red-400">No payment method is available for this cart.</p>
+                  )}
+                  {!serviceable && (
+                    <p className="text-sm text-red-600 dark:text-red-400">Delivery is not available to this pincode. Please use a different delivery address.</p>
                   )}
                 </div>
               </div>
-
-              {paymentMethod === 'manual' && finalTotal >= 100000 && (
-                    <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 sm:p-6 mb-8">
-                      <div className="flex gap-4">
-                        <svg className="w-8 h-8 text-blue-600 dark:text-blue-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <div>
-                          <h3 className="text-lg font-bold text-blue-900 dark:text-blue-300 mb-2">Order Confirmation</h3>
-                          <p className="text-blue-800 dark:text-blue-300">Our team will contact you shortly to confirm your order and provide payment details.</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
 
               {/* Trust & Security Strip */}
               <div className="mt-8 bg-surface-elevated rounded-lg border border-border-default p-4">
@@ -1072,39 +1076,45 @@ function CheckoutPage() {
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting || (paymentMethod === 'razorpay' && !razorpayLoaded)}
-                  className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
-                      {paymentMethod === 'razorpay' ? 'Processing...' : 'Placing Order...'}
-                    </>
-                  ) : paymentMethod === 'razorpay' ? (
-                    <>
-                      <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
-                      </svg>
-                      Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                    </>
-                  ) : paymentMethod === 'cod' ? (
-                    <>
-                      Place Order — Pay on Delivery
-                      <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                      </svg>
-                    </>
-                  ) : (
-                    <>
-                      Place Order
-                      <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </>
-                  )}
-                </button>
+                {noPaymentMethod ? (
+                  <div className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg">
+                    We are unable to accept orders right now due to a technical issue. Please try again later or contact support.
+                  </div>
+                ) : (
+                  <button
+                    type="submit"
+                    disabled={isSubmitting || !serviceable || (paymentMethod === 'razorpay' && (!isRazorpayEnabled || !razorpayLoaded)) || (paymentMethod === 'cod' && !codAvailable)}
+                    className="w-full bg-accent-500 hover:bg-accent-600 text-white px-6 py-3 rounded-lg font-semibold transition-colors disabled:bg-accent-300 disabled:cursor-not-allowed flex items-center justify-center"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <div className="animate-spin w-5 h-5 border-2 border-white border-t-transparent rounded-full mr-2"></div>
+                        {paymentMethod === 'razorpay' ? 'Processing...' : 'Placing Order...'}
+                      </>
+                    ) : paymentMethod === 'razorpay' ? (
+                      <>
+                        <svg className="w-5 h-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                        </svg>
+                        Pay ₹{finalTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </>
+                    ) : paymentMethod === 'cod' ? (
+                      <>
+                        Place Order — Pay on Delivery
+                        <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                      </>
+                    ) : (
+                      <>
+                        Place Order
+                        <svg className="w-5 h-5 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </>
+                    )}
+                  </button>
+                )}
 
                 <Link href="/checkout/review" className="block w-full text-center text-accent-600 dark:text-accent-400 hover:text-accent-700 font-medium mt-4">
                   ← Back to Review

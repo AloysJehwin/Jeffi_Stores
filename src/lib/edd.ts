@@ -34,16 +34,23 @@ export const METRO_PINS_3 = new Set<string>([
 ])
 
 /**
- * Courier transit days derived from the delivery pincode:
- *  - own region (Raipur / Chhattisgarh, `49…`) → 7
+ * Courier transit days derived from the delivery pincode, relative to the
+ * ship-from origin (the default-warehouse pin):
+ *  - same postal circle as the origin (2-digit prefix match) → 7 ("own region")
  *  - metro (see METRO_PINS_3) → 10
  *  - rest of India → 14
- *  - missing/invalid (not a 6-digit pin, e.g. address not yet chosen) → 7
+ *  - missing/invalid dest (not a 6-digit pin, e.g. address not yet chosen) → 7
+ *
+ * When originPin is missing/invalid, falls back to the legacy rule
+ * (Chhattisgarh `49…` treated as own region) so callers that don't pass an
+ * origin keep today's behaviour.
  */
-export function transitDays(pin: string): number {
-  const p = String(pin ?? '')
+export function transitDays(destPin: string, originPin?: string): number {
+  const p = String(destPin ?? '')
   if (!/^\d{6}$/.test(p)) return 7
-  if (p.startsWith('49')) return 7
+  const o = String(originPin ?? '')
+  const ownRegion = /^\d{6}$/.test(o) ? p.slice(0, 2) === o.slice(0, 2) : p.startsWith('49')
+  if (ownRegion) return 7
   if (METRO_PINS_3.has(p.slice(0, 3))) return 10
   return 14
 }
@@ -57,10 +64,11 @@ function addDays(from: Date, days: number): Date {
 /**
  * Compute the EDD as a `YYYY-MM-DD` string (calendar days from now).
  * handlingDays is floored at 2 (minimum dispatch time); extraDays floored at 0.
+ * originPin (the default-warehouse ship-from pin) makes transit origin-aware.
  */
-export function computeEdd(opts: { pin: string; handlingDays?: number; extraDays?: number }): string {
+export function computeEdd(opts: { pin: string; originPin?: string; handlingDays?: number; extraDays?: number }): string {
   const handling = Math.max(2, Number(opts.handlingDays ?? 2) || 0)
   const extra = Math.max(0, Number(opts.extraDays ?? 0) || 0)
-  const tat = handling + transitDays(opts.pin) + extra
+  const tat = handling + transitDays(opts.pin, opts.originPin) + extra
   return addDays(new Date(), tat).toISOString().slice(0, 10)
 }

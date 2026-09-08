@@ -537,6 +537,20 @@ CREATE INDEX idx_debug_log_ts ON public._debug_log USING btree (ts DESC);
 CREATE INDEX idx_delhivery_pickup_requests_created_at ON public.delhivery_pickup_requests USING btree (created_at DESC);
 
 
+--
+-- Name: uq_delhivery_pickup_locations_tenant_name; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX uq_delhivery_pickup_locations_tenant_name ON public.delhivery_pickup_locations USING btree (COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid), name);
+
+
+--
+-- Name: idx_delhivery_pickup_locations_tenant; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX idx_delhivery_pickup_locations_tenant ON public.delhivery_pickup_locations USING btree (tenant_id);
+
+
 
 --
 -- Name: idx_email_campaign_logs_campaign; Type: INDEX; Schema: public; Owner: -
