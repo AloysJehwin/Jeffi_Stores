@@ -13,6 +13,8 @@ import ProductImage from '@/components/admin/ProductImage'
 import AdminFilters from '@/components/admin/AdminFilters'
 import AdvancedFilterPanel from '@/components/admin/AdvancedFilterPanel'
 import Pagination from '@/components/admin/Pagination'
+import ResponsiveList from '@/components/admin/ResponsiveList'
+import MobileCard from '@/components/admin/MobileCard'
 import DownloadAdButton from '@/components/admin/DownloadAdButton'
 import CopySku from '@/components/ui/CopySku'
 import ProductsTableClient from '@/components/admin/ProductsTableClient'
@@ -103,131 +105,120 @@ async function ProductsListContent({ resolvedSearchParams, isSuperAdmin, canWrit
   }
 
   return (
-    <>
-      <div className="md:hidden space-y-3">
-        {products && products.length > 0 ? (
-          products.map((product: any) => {
-            const stock = product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)
-            const listedStock = product.has_variants ? Number(product.variant_stock_total) : null
-            const stockStatus: string = product.stock_status || 'In Stock'
-            const isOut = stock === 0 || stockStatus === 'Out of Stock'
-            const isLow = !isOut && (stockStatus === 'Low Stock' || (product.has_variants && stock > 0 && stock <= 3))
-            return (
-              <div
-                key={product.id}
-                className={`bg-surface-elevated rounded-lg shadow-sm border p-4 ${product.is_featured ? 'border-yellow-400 dark:border-yellow-600' : 'border-border-default'}`}
-              >
-                <div className="flex items-start gap-3 mb-3">
-                  <div className="flex-shrink-0 h-12 w-12">
-                    <ProductImage
-                      thumbnailUrl={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
-                      altText={product.name}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-foreground truncate">{product.name}</div>
-                    <div className="text-xs text-foreground-muted inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</div>
-                  </div>
-                  <span className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
-                    product.is_active
-                      ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
-                      : 'bg-surface-secondary text-foreground'
-                  }`}>
-                    {product.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between mb-3">
-                  <div>
-                    {product.has_variants ? (
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-sm font-semibold text-primary-500">
-                          From Rs. {Number(product.variant_min_price || 0).toLocaleString('en-IN')}
-                        </span>
-                        {product.variant_min_mrp && Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
-                          <span className="text-xs text-foreground-muted line-through">
-                            Rs. {Number(product.variant_min_mrp).toLocaleString('en-IN')}
-                          </span>
-                        )}
-                      </div>
-                    ) : (
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-sm font-semibold text-primary-500">
-                          Rs. {Number(product.base_price || 0).toLocaleString('en-IN')}
-                        </span>
-                        {product.mrp && Number(product.mrp) > Number(product.base_price || 0) && (
-                          <span className="text-xs text-foreground-muted line-through">
-                            Rs. {Number(product.mrp).toLocaleString('en-IN')}
-                          </span>
-                        )}
-                      </div>
+    <ResponsiveList
+      items={products || []}
+      getKey={(product: any) => product.id}
+      minWidth="lg"
+      emptyState={
+        <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
+          No products found.
+        </div>
+      }
+      pagination={<Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />}
+      renderCard={(product: any) => {
+        const stock = product.has_variants ? Number(product.variant_inventory_total) : Number(product.inventory_quantity ?? 0)
+        const listedStock = product.has_variants ? Number(product.variant_stock_total) : null
+        const stockStatus: string = product.stock_status || 'In Stock'
+        const isOut = stock === 0 || stockStatus === 'Out of Stock'
+        const isLow = !isOut && (stockStatus === 'Low Stock' || (product.has_variants && stock > 0 && stock <= 3))
+        return (
+          <MobileCard accent={product.is_featured}>
+            <div className="flex items-start gap-3 mb-3">
+              <div className="flex-shrink-0 h-12 w-12">
+                <ProductImage
+                  thumbnailUrl={product.product_images?.find((img: any) => img.is_primary)?.thumbnail_url || product.product_images?.[0]?.thumbnail_url}
+                  altText={product.name}
+                />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-sm font-medium text-foreground truncate">{product.name}</div>
+                <div className="text-xs text-foreground-muted inline-flex items-center gap-1">{product.sku}{product.sku && <CopySku sku={product.sku} />}</div>
+              </div>
+              <span className={`flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full ${
+                product.is_active
+                  ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300'
+                  : 'bg-surface-secondary text-foreground'
+              }`}>
+                {product.is_active ? 'Active' : 'Inactive'}
+              </span>
+            </div>
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                {product.has_variants ? (
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-sm font-semibold text-primary-500">
+                      From Rs. {Number(product.variant_min_price || 0).toLocaleString('en-IN')}
+                    </span>
+                    {product.variant_min_mrp && Number(product.variant_min_mrp) > Number(product.variant_min_price || 0) && (
+                      <span className="text-xs text-foreground-muted line-through">
+                        Rs. {Number(product.variant_min_mrp).toLocaleString('en-IN')}
+                      </span>
                     )}
                   </div>
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-foreground-muted w-10">Inv</span>
-                      <span className={`text-sm font-semibold ${isOut ? 'text-red-600 dark:text-red-400' : isLow ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'}`}>{stock}</span>
-                    </div>
-                    {listedStock !== null && (
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs text-foreground-muted w-10">Listed</span>
-                        <span className="text-sm text-foreground">{listedStock}</span>
-                      </div>
+                ) : (
+                  <div className="flex items-baseline gap-1.5">
+                    <span className="text-sm font-semibold text-primary-500">
+                      Rs. {Number(product.base_price || 0).toLocaleString('en-IN')}
+                    </span>
+                    {product.mrp && Number(product.mrp) > Number(product.base_price || 0) && (
+                      <span className="text-xs text-foreground-muted line-through">
+                        Rs. {Number(product.mrp).toLocaleString('en-IN')}
+                      </span>
                     )}
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-foreground-muted w-10">Online</span>
-                      <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
-                        isOut ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
-                        : isLow ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
-                        : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
-                      }`}>{isOut ? 'Out' : isLow ? 'Low' : 'In Stock'}</span>
-                    </div>
                   </div>
+                )}
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-foreground-muted w-10">Inv</span>
+                  <span className={`text-sm font-semibold ${isOut ? 'text-red-600 dark:text-red-400' : isLow ? 'text-orange-500 dark:text-orange-400' : 'text-foreground'}`}>{stock}</span>
                 </div>
-                <div className="flex items-center justify-between text-xs text-foreground-muted">
-                  <span>{product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}</span>
-                  <div className="flex items-center gap-3">
-                    <div className="hidden md:inline-flex items-center gap-3">
-                      {canWrite && <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />}
-                      <Link href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">Edit</Link>
-                      {canWrite && <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />}
-                    </div>
-                    <DownloadAdButton productId={product.id} productName={product.name} />
+                {listedStock !== null && (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-foreground-muted w-10">Listed</span>
+                    <span className="text-sm text-foreground">{listedStock}</span>
                   </div>
+                )}
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs text-foreground-muted w-10">Online</span>
+                  <span className={`px-1.5 py-0.5 text-[10px] font-semibold rounded-full ${
+                    isOut ? 'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300'
+                    : isLow ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300'
+                    : 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300'
+                  }`}>{isOut ? 'Out' : isLow ? 'Low' : 'In Stock'}</span>
                 </div>
               </div>
-            )
-          })
-        ) : (
-          <div className="bg-surface-elevated rounded-lg border border-border-default p-8 text-center text-foreground-muted">
-            No products found.
-          </div>
-        )}
-        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-      </div>
-
-      <div className="hidden md:block bg-surface-elevated rounded-lg shadow-sm border border-border-default overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full min-w-[900px] divide-y divide-border-default">
-            <thead className="bg-surface-secondary">
-              <tr>
-                <SortableHeader label="Product" column="name" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Category" column="category" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Brand" column="brand" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Price" column="price" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
-                <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
-                <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
-          </table>
-        </div>
-      </div>
-      <div className="hidden md:block px-6 py-3 border border-border-default border-t-0 rounded-b-lg bg-surface-elevated">
-        <Pagination page={page} total={total} pageSize={PAGE_SIZE} buildUrl={buildUrl} />
-      </div>
-    </>
+            </div>
+            <div className="flex items-center justify-between text-xs text-foreground-muted">
+              <span>{product.categories?.name || 'N/A'} / {product.brands?.name || 'N/A'}</span>
+              <div className="flex items-center gap-3">
+                <div className="hidden md:inline-flex items-center gap-3">
+                  {canWrite && <FeaturedToggleButton productId={product.id} isFeatured={product.is_featured} featuredCount={featuredCount} />}
+                  <Link href={ap(`/admin/products/edit/${product.id}?back=${encodeURIComponent(currentListUrl)}`, host)} className="text-accent-500 font-medium">Edit</Link>
+                  {canWrite && <DeactivateProductButton productId={product.id} productName={product.name} isActive={product.is_active} />}
+                </div>
+                <DownloadAdButton productId={product.id} productName={product.name} />
+              </div>
+            </div>
+          </MobileCard>
+        )
+      }}
+      tableHead={
+        <>
+          <SortableHeader label="Product" column="name" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+          <SortableHeader label="SKU" column="sku" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+          <SortableHeader label="Category" column="category" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+          <SortableHeader label="Brand" column="brand" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+          <SortableHeader label="Price" column="price" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+          <SortableHeader label="Stock" column="stock" options={sortOptions('number')} currentSort={sort} currentDir={dir} />
+          <SortableHeader label="Status" column="status" options={sortOptions('text')} currentSort={sort} currentDir={dir} />
+          <th className="px-4 py-3 text-right text-xs font-medium text-foreground-muted uppercase tracking-wider">Actions</th>
+        </>
+      }
+      tableBody={
+        <ProductsTableClient products={products || []} featuredCount={featuredCount} backUrl={currentListUrl} isSuperAdmin={isSuperAdmin} canWrite={canWrite} />
+      }
+    />
   )
 }
 

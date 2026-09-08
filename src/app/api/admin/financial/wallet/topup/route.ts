@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { authenticateAdmin } from '@/lib/jwt'
-import { getCurrentTenant } from '@/lib/tenant-context'
 import { getTenantWallet } from '@/lib/wallet'
 
 export const dynamic = 'force-dynamic'
@@ -11,9 +10,10 @@ export async function GET(request: NextRequest) {
   const admin = await authenticateAdmin(request)
   if (!admin) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const tenant = getCurrentTenant()
-  if (!tenant?.tenantId) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
+  // ALS tenant context is empty in API route handlers — read the header middleware sets.
+  const tenantId = request.headers.get('x-tenant-id')
+  if (!tenantId) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
 
-  const wallet = await getTenantWallet(tenant.tenantId)
+  const wallet = await getTenantWallet(tenantId)
   return NextResponse.json(wallet)
 }
