@@ -46,7 +46,7 @@ function CertBadge({ status }: { status: string }) {
     'No Certificate': 'bg-surface-secondary text-foreground-muted',
   }
   return (
-    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${map[status] ?? map['No Certificate']}`}>
+    <span className={`inline-flex whitespace-nowrap px-2 py-0.5 rounded-full text-xs font-medium ${map[status] ?? map['No Certificate']}`}>
       {status}
     </span>
   )

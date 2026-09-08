@@ -528,7 +528,7 @@ export default function ProductDetailClient({ id, hasInventory = true }: { id: s
 
   const loadProduct = useCallback(() => {
     setLoading(true)
-    fetch(`/api/admin/products/${id}`)
+    fetch(`/api/admin/products/${id}`, { credentials: 'include' })
       .then(r => r.json())
       .then(p => { setProduct(p); setLoading(false) })
       .catch(() => setLoading(false))

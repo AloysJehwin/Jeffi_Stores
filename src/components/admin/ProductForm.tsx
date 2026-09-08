@@ -3043,7 +3043,7 @@ export default function ProductForm({ categories, brands, action, product, produ
                   const allGroupVariants = variants.filter(v => v.pricing_type === group.pricing_type)
 
                   return (
-                    <div key={group.pricing_type} className="border border-border-default rounded-lg overflow-hidden">
+                    <div key={group.pricing_type} className="border border-border-default rounded-lg">
                       {/* Group header */}
                       <div className="flex items-center justify-between px-4 py-3 bg-surface-secondary border-b border-border-default">
                         <div className="flex items-center gap-3">
@@ -3279,8 +3279,8 @@ export default function ProductForm({ categories, brands, action, product, produ
                         })}
                       </div>
 
-                      {/* Desktop table — core columns only; details in expand panel */}
-                      <div className="hidden md:block">
+                      {/* Desktop table — core columns only; details open in the variant popup */}
+                      <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-sm">
                           <thead>
                             <tr className="border-b border-border-secondary bg-surface">
@@ -3298,11 +3298,9 @@ export default function ProductForm({ categories, brands, action, product, produ
                           <tbody>
                             {groupVariants.map((variant) => {
                               const index = variants.indexOf(variant)
-                              const perUnit = null
-                              const isExpanded = false
                               return (
                                 <React.Fragment key={variant.id || index}>
-                                <tr className={`border-b border-border-default ${isExpanded ? 'bg-surface-secondary' : 'hover:bg-surface-secondary/40'}`}>
+                                <tr className="border-b border-border-default hover:bg-surface-secondary/40">
                                   <td className="py-2 px-3">
                                     <input type="text" value={variant.variant_name} onChange={(e) => updateVariant(index, 'variant_name', e.target.value)} className="w-32 field-compact border border-border-secondary bg-surface text-foreground placeholder:text-foreground-muted focus:ring-2 focus:ring-accent-500 focus:border-transparent text-sm" placeholder="e.g. M8, Red" required />
                                   </td>
@@ -3354,7 +3352,6 @@ export default function ProductForm({ categories, brands, action, product, produ
                                   <td className="py-2 px-3">
                                     <div>
                                       <input type="number" step="0.01" min="0" value={variant.price} readOnly className="w-28 field-compact border border-border-secondary bg-surface-secondary text-foreground-muted cursor-not-allowed text-sm" placeholder="Auto" required />
-                                      {perUnit && <p className="text-xs text-accent-600 dark:text-accent-400 mt-0.5">{perUnit}</p>}
                                     </div>
                                   </td>
                                   {/* Selling Price (Ex. GST) — locked */}
