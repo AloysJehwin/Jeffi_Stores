@@ -8945,8 +8945,8 @@
     "semantic_hash": ""
   },
   "src/lib/tenant-migrations.ts": {
-    "mtime": 1788800830.3855145,
-    "ast_hash": "eb9d0f34ed97f8971951f6b8b639b24f",
+    "mtime": 1788847436.0254166,
+    "ast_hash": "ea66d4027d1fb50b29f96fb3ee3b441a",
     "semantic_hash": ""
   },
   "src/lib/tenant-registry.ts": {
