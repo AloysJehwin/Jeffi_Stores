@@ -3,7 +3,7 @@ import { getSiteControls } from '@/lib/site-controls'
 import { getDeliverySettings } from '@/lib/delivery-settings'
 import { SectionCard, NumberControl } from '@/components/admin/site-controls/controls'
 import { ap } from '@/lib/admin-path'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { getTenant } from '@/lib/tenant-registry'
 import DelhiveryPageClient from './DelhiveryPageClient'
 
@@ -13,7 +13,7 @@ export const revalidate = 0
 // The flagship store runs with no tenant context and ships on the platform's own Delhivery account,
 // so it is always own_delhivery. A provisioned tenant's flag comes from the control-plane row.
 async function resolveOwnDelhivery(): Promise<boolean> {
-  const tenantId = getCurrentTenant()?.tenantId
+  const tenantId = await resolveTenantId()
   if (!tenantId) return true
   const tenant = await getTenant(tenantId).catch(() => null)
   return tenant?.own_delhivery ?? false

@@ -1,4 +1,4 @@
-import { getCurrentTenant } from '../tenant-context'
+import { resolveTenant, resolveTenantId } from '../tenant-context'
 import { getIntegrationCredential } from '../tenant-registry'
 import { decryptToken } from '../crypto/token-cipher'
 import { loadGoogleServiceAccount } from '../google-credentials'
@@ -46,7 +46,7 @@ async function tenantConfigFor(tenantId: string, provider: string): Promise<Reco
 
 /** Decrypt + parse the current ALS tenant's stored credential blob for a provider, or null. */
 async function tenantConfig(provider: string): Promise<Record<string, any> | null> {
-  const tenant = getCurrentTenant()
+  const tenant = await resolveTenant()
   if (!tenant) return null
   return tenantConfigFor(tenant.tenantId, provider)
 }
@@ -54,7 +54,7 @@ async function tenantConfig(provider: string): Promise<Record<string, any> | nul
 /** Resolve Google Merchant credentials: the tenant's own if connected. In a tenant context an
  * unconnected provider throws — it never falls back to the platform account. */
 export async function resolveGoogleMerchantCreds(): Promise<GoogleMerchantCreds> {
-  const tenant = getCurrentTenant()
+  const tenant = await resolveTenant()
   const cfg = await tenantConfig('google_merchant')
   if (cfg?.private_key && cfg?.client_email && cfg?.merchant_id) {
     return {
@@ -85,7 +85,7 @@ export interface GoogleSheetsCreds {
  * platform sentinel); when omitted, the current ALS tenant is used. A connected provider is
  * required either way — this never falls back to a platform Google account. */
 export async function resolveGoogleSheetsCreds(tenantId?: string): Promise<GoogleSheetsCreds> {
-  const id = tenantId ?? getCurrentTenant()?.tenantId
+  const id = tenantId ?? await resolveTenantId()
   const cfg = id ? await tenantConfigFor(id, 'google_sheets') : null
   const refreshToken = cfg?.oauth_refresh_token
   if (refreshToken) {
@@ -113,7 +113,7 @@ export async function resolveGoogleSheetsCreds(tenantId?: string): Promise<Googl
 /** Resolve Amazon SP-API credentials: the tenant's own if connected. In a tenant context an
  * unconnected provider throws — it never falls back to the platform account. */
 export async function resolveAmazonCreds(): Promise<AmazonCreds> {
-  const tenant = getCurrentTenant()
+  const tenant = await resolveTenant()
   const cfg = await tenantConfig('amazon_seller')
   if (cfg?.refresh_token && cfg?.client_id) {
     return {
@@ -140,7 +140,7 @@ export async function resolveAmazonCreds(): Promise<AmazonCreds> {
  * an explicit `tenantId` for callers that run off the ALS context (e.g. the sync-statuses cron);
  * when omitted, the current ALS tenant is used. */
 export async function resolveDelhiveryToken(tenantId?: string): Promise<string> {
-  const id = tenantId ?? getCurrentTenant()?.tenantId
+  const id = tenantId ?? await resolveTenantId()
   if (id) {
     const cfg = await tenantConfigFor(id, 'delhivery')
     if (cfg?.token) return String(cfg.token)
@@ -162,7 +162,7 @@ export interface RazorpayCreds {
  * the webhook/verify Route split short-circuits when a tenant collects directly. Pass an explicit
  * `tenantId` for callers off the ALS context; when omitted, the current ALS tenant is used. */
 export async function resolveRazorpayCreds(tenantId?: string): Promise<RazorpayCreds> {
-  const id = tenantId ?? getCurrentTenant()?.tenantId
+  const id = tenantId ?? await resolveTenantId()
   if (id) {
     const cfg = await tenantConfigFor(id, 'razorpay')
     if (cfg?.key_id && cfg?.key_secret) {

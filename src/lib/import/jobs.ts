@@ -1,14 +1,14 @@
 import { controlPlanePool } from '@/lib/tenant-registry'
-import { getCurrentTenantId } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 
 // On the platform (flagship) admin there is no ALS tenant — middleware sets one only on tenant
 // hosts. import_jobs.tenant_id is NOT NULL, so flagship jobs are keyed to this sentinel; the worker
 // runs them with NO tenant context (the platform pool), exactly how flagship product publishing works.
 export const PLATFORM_TENANT_ID = '00000000-0000-0000-0000-000000000000'
 
-/** The tenant id to key an import job to: the current ALS tenant, or the platform sentinel on flagship. */
-export function resolveImportTenantId(): string {
-  return getCurrentTenantId() ?? PLATFORM_TENANT_ID
+/** The tenant id to key an import job to: the current request's tenant, or the platform sentinel on flagship. */
+export async function resolveImportTenantId(): Promise<string> {
+  return (await resolveTenantId()) ?? PLATFORM_TENANT_ID
 }
 
 export type ImportSource = 'upload' | 'google_sheet'

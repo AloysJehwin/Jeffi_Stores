@@ -80,6 +80,18 @@ export async function storeBaseUrlAsync(): Promise<string> {
 }
 
 /**
+ * Admin base URL, resolved even before the first DB query (via the x-tenant-slug header). Prefer
+ * this over currentAdminBaseUrl() on any path that has not queried yet — notably the OAuth
+ * callbacks, which run before auth and return to the fixed platform host with an empty ALS, so
+ * the sync reader would otherwise send a tenant back to the platform admin.
+ */
+export async function currentAdminBaseUrlAsync(): Promise<string> {
+  const t = await resolveCurrentTenant()
+  if (t?.slug) return `https://admin-${t.slug}.${PLATFORM_DOMAIN}`
+  return process.env.ADMIN_BASE_URL || `https://admin.${PLATFORM_DOMAIN}`
+}
+
+/**
  * `From` header for customer-facing mail.
  *
  * On a tenant host this is the tenant's name and its own noreply- address, so a buyer sees the

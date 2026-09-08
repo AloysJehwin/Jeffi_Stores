@@ -12,7 +12,13 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 // ---------------------------------------------------------------------------
 // Seams: tenant context, the credential store, decryption, and the env service account.
 // ---------------------------------------------------------------------------
-const ctx = { getCurrentTenant: vi.fn() }
+// resolve.ts reads the tenant through the header-aware resolveTenant/resolveTenantId; both derive
+// from the same getCurrentTenant stub so every case below drives them by setting getCurrentTenant.
+const ctx = {
+  getCurrentTenant: vi.fn(),
+  resolveTenant: vi.fn(async () => ctx.getCurrentTenant()),
+  resolveTenantId: vi.fn(async () => ctx.getCurrentTenant()?.tenantId ?? null),
+}
 vi.mock('@/lib/tenant-context', () => ctx)
 
 const registry = { getIntegrationCredential: vi.fn() }
@@ -36,6 +42,8 @@ describe('integrations/resolve', () => {
     vi.clearAllMocks()
     // Default: no tenant in context (single-tenant / platform path).
     ctx.getCurrentTenant.mockReturnValue(null)
+    ctx.resolveTenant.mockImplementation(async () => ctx.getCurrentTenant())
+    ctx.resolveTenantId.mockImplementation(async () => ctx.getCurrentTenant()?.tenantId ?? null)
     registry.getIntegrationCredential.mockResolvedValue(null)
     google.loadGoogleServiceAccount.mockReturnValue({
       client_email: 'platform@jeffi.iam.gserviceaccount.com',
