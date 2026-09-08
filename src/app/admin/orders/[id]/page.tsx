@@ -54,7 +54,8 @@ export default async function OrderDetailsPage({ params, searchParams }: { param
   const scopes: string[] = JSON.parse(h.get('x-user-scopes') || '[]')
   const canWrite = hasScope(role, scopes, 'orders:write')
   const canOverrideStatus = isPlatformOwner(role)
-  const { inventoryValidationEnabled } = await getFeatureFlags()
+  const { inventoryValidationEnabled: inventoryFlag } = await getFeatureFlags()
+  const inventoryValidationEnabled = inventoryFlag && hasScope(role, scopes, 'inventory:read')
 
   const returnRequest = await getReturnRequest(id).catch(() => null)
   const isReturnStatus = RETURN_STATUSES.includes(order.status)
