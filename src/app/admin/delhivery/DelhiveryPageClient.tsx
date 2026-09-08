@@ -166,6 +166,7 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
   const [open, setOpen] = useState(false)
   const [editingDefault, setEditingDefault] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [rowBusy, setRowBusy] = useState<string | null>(null)
   const [toast, setToast] = useState<{ ok: boolean; text: string } | null>(null)
   const [form, setForm] = useState({ name: '', phone: '', pincode: '', address: '', registeredName: '', email: '', city: '', state: '' })
 
@@ -195,6 +196,35 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
       setForm({ name: '', phone: '', pincode: '', address: '', registeredName: '', email: '', city: '', state: '' })
       load()
     } catch { setToast({ ok: false, text: 'Network error' }) } finally { setBusy(false) }
+  }
+
+  const setDefault = async (name: string) => {
+    setRowBusy(name); setToast(null)
+    try {
+      const res = await fetch('/api/admin/delhivery/pickup-locations/set-default', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setToast({ ok: false, text: data.error || 'Failed to set default' }); return }
+      // The default warehouse identity feeds the server-rendered origin (delivery charge + EDD),
+      // so reload to reflect it everywhere on the page.
+      window.location.reload()
+    } catch { setToast({ ok: false, text: 'Network error' }) } finally { setRowBusy(null) }
+  }
+
+  const remove = async (name: string) => {
+    setRowBusy(name); setToast(null)
+    try {
+      const res = await fetch('/api/admin/delhivery/pickup-locations/deactivate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setToast({ ok: false, text: data.error || 'Failed to remove warehouse' }); return }
+      setToast({ ok: true, text: `Warehouse "${name}" removed.` })
+      load()
+    } catch { setToast({ ok: false, text: 'Network error' }) } finally { setRowBusy(null) }
   }
 
   const extraWarehouses = warehouses.filter(w => w.name !== defaultWarehouse.pickupLocation)
@@ -283,7 +313,21 @@ function WarehousesCard({ defaultWarehouse }: { defaultWarehouse: DefaultWarehou
                   {[w.address, w.pin].filter(Boolean).join(' · ') || '—'}
                 </p>
               </div>
-              {!w.active && <span className="shrink-0 text-xs text-foreground-muted">inactive</span>}
+              <div className="flex items-center gap-2 shrink-0">
+                {!w.active && <span className="text-xs text-foreground-muted">inactive</span>}
+                {canWrite && w.active && (
+                  <>
+                    <button type="button" onClick={() => setDefault(w.name)} disabled={rowBusy === w.name}
+                      className="px-2.5 py-1 rounded-lg border border-border-default text-xs font-medium text-foreground-secondary hover:bg-surface-secondary disabled:opacity-40 transition-colors">
+                      {rowBusy === w.name ? '…' : 'Set as default'}
+                    </button>
+                    <button type="button" onClick={() => remove(w.name)} disabled={rowBusy === w.name}
+                      className="px-2.5 py-1 rounded-lg border border-red-200 dark:border-red-900/40 text-xs font-medium text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 transition-colors">
+                      Remove
+                    </button>
+                  </>
+                )}
+              </div>
             </li>
           ))}
         </ul>

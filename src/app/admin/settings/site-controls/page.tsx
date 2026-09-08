@@ -157,7 +157,8 @@ export default async function SiteControlsPage() {
 
         <div>
           <SectionCard title="Payments & Tax" description="Toggle online payments and GST. These affect checkout and invoicing — verify after changing." columns>
-            <FullSpan><ToggleControl settingKey="feature_razorpay_enabled" label="Online payments (Razorpay)" hint="When off, customers see only manual/COD payment at checkout." initial={c.flags.razorpayEnabled} /></FullSpan>
+            <FullSpan><ToggleControl settingKey="feature_razorpay_enabled" label="Online payments (Razorpay)" hint="When off, online card/UPI payment is hidden at checkout. Customers can still use COD if enabled." initial={c.flags.razorpayEnabled} /></FullSpan>
+            <FullSpan><ToggleControl settingKey="feature_cod_enabled" label="Cash on delivery (COD)" hint="Site-level COD switch. COD is offered only when this is on AND the product itself allows COD. When off, COD is hidden everywhere." initial={c.flags.codEnabled} /></FullSpan>
             <FullSpan><ToggleControl settingKey="feature_gst_enabled" label="GST calculation" hint="When off, orders and invoices are created without tax lines." initial={c.flags.gstEnabled} /></FullSpan>
             <NumberControl settingKey="cod_surcharge_flat" label="COD surcharge (flat)" prefix="₹" initial={c.values.codSurchargeFlat} />
             <NumberControl settingKey="cod_surcharge_pct" label="COD surcharge (percentage)" suffix="%" step={0.5} initial={c.values.codSurchargePct} />
@@ -223,11 +224,23 @@ export default async function SiteControlsPage() {
         </div>
 
         <div>
-          <SectionCard title="Delivery & Shipping" description="Free-delivery thresholds and shipping charge caps. Warehouse origin, pickup identity and weight-based cost live under Delhivery." columns>
+          <SectionCard title="Delivery & Shipping" description="Free-delivery thresholds, shipping charge caps and default weights. The default warehouse origin and pickup identity are below (also editable under Delhivery)." columns>
             <FullSpan><DeliverySettingsForm initial={delivery} /></FullSpan>
             <FullSpan><div className="pt-2 border-t border-border-default" /></FullSpan>
             <NumberControl settingKey="shipping_min_charge" label="Minimum shipping charge" hint="Floor applied to computed shipping (0 = none)." prefix="₹" initial={c.values.shippingMinCharge} />
             <NumberControl settingKey="shipping_max_charge" label="Maximum shipping charge" hint="Cap applied to computed shipping (0 = none)." prefix="₹" initial={c.values.shippingMaxCharge} />
+            <NumberControl settingKey="default_product_weight_g" label="Default product weight" hint="Assumed weight for products with no weight set." suffix="g" min={1} initial={c.values.defaultProductWeightG} />
+            <NumberControl settingKey="default_weight_g" label="Default weight (low-weight items)" hint="Used when a product's weight is 50g or less, so under-weighed items still price against a realistic parcel." suffix="g" min={1} initial={c.values.defaultWeightG} />
+          </SectionCard>
+        </div>
+
+        <div>
+          <SectionCard title="Default warehouse" description="The default ship-from warehouse. Its pincode is the origin the buyer delivery charge and expected-delivery date are computed against. Shared with the Delhivery page." columns>
+            <TextControl settingKey="delhivery_pickup_location" label="Pickup location name" hint="Registered Delhivery pickup location name." initial={c.values.pickupLocation} />
+            <TextControl settingKey="delhivery_seller_name" label="Seller name" hint="Seller/return name on shipments." initial={c.values.sellerName} />
+            <FullSpan><TextAreaControl settingKey="delhivery_seller_address" label="Pickup / return address" hint="Warehouse address used for pickups and returns." initial={c.values.sellerAddress} rows={2} /></FullSpan>
+            <TextControl settingKey="delhivery_seller_phone" label="Pickup / return phone" initial={c.values.sellerPhone} />
+            <TextControl settingKey="delhivery_origin_pincode" label="Ship-from pincode" hint="Origin pincode used for the Delhivery rate, shipment creation and expected-delivery date." initial={c.values.delhiveryOriginPincode} />
           </SectionCard>
         </div>
 

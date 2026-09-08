@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/jwt'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenant } from '@/lib/tenant-context'
 import { currentAdminBaseUrl } from '@/lib/brand'
 import { buildOAuthUrl, isMetaEnabled } from '@/lib/meta'
 import { signAdminState } from '@/app/api/admin/integrations/state'
@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest, { params }: { params: Promise<{ provider: string }> }) {
   const admin = await requireAdminScope(request, 'campaigns:write')
   if (admin instanceof NextResponse) return admin
-  const tenant = getCurrentTenant()
+  const tenant = await resolveTenant()
   if (!tenant) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
 
   if (!isMetaEnabled()) return NextResponse.json({ error: 'Meta integration not configured' }, { status: 503 })

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { requireAdminScope } from '@/lib/jwt'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenant } from '@/lib/tenant-context'
 import { signAdminState } from '@/app/api/admin/integrations/state'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export async function GET(request: NextRequest) {
   const admin = await requireAdminScope(request, 'merchant_sync:write')
   if (admin instanceof NextResponse) return admin
-  const tenant = getCurrentTenant()
+  const tenant = await resolveTenant()
   if (!tenant) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
 
   const appId = process.env.AMAZON_LWA_APP_CLIENT_ID

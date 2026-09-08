@@ -1,5 +1,5 @@
 import { query } from '@/lib/db'
-import { getBusinessValues } from '@/lib/site-controls'
+import { getBusinessValues, invalidateSiteControlsCache } from '@/lib/site-controls'
 import { resolveDelhiveryToken } from '@/lib/integrations/resolve'
 
 const DELHIVERY_EDIT_URL = 'https://track.delhivery.com/api/p/edit'
@@ -77,15 +77,31 @@ export async function deactivateDelhiveryPickupLocation(name: string, tenantId?:
     })
 
     const data = await res.json().catch(() => ({}))
-    if (res.ok && data && data.success !== false) return { ok: true }
+    if (res.ok && data && data.success !== false) {
+      await deactivatePickupLocationRow(name, tenantId).catch(() => {})
+      return { ok: true }
+    }
 
     const message = JSON.stringify(data).toLowerCase()
-    if (message.includes('does not exist') || message.includes('not found')) return { ok: true }
+    if (message.includes('does not exist') || message.includes('not found')) {
+      await deactivatePickupLocationRow(name, tenantId).catch(() => {})
+      return { ok: true }
+    }
 
     return { ok: false, error: data.error || data.rmk || `Delhivery warehouse deactivation failed (${res.status})` }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
+}
+
+async function deactivatePickupLocationRow(name: string, tenantId?: string): Promise<void> {
+  const tid = tenantId ?? null
+  await query(
+    `UPDATE delhivery_pickup_locations SET active = false, updated_at = NOW()
+     WHERE COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid) = COALESCE($1::uuid, '00000000-0000-0000-0000-000000000000'::uuid)
+       AND name = $2`,
+    [tid, name]
+  )
 }
 
 export async function createDelhiveryPickupLocation(params: {
@@ -140,11 +156,13 @@ export async function createDelhiveryPickupLocation(params: {
     const data = await res.json().catch(() => ({}))
     const message = JSON.stringify(data).toLowerCase()
 
-    if (res.ok && data && data.success !== false) {
-      return { ok: true }
-    }
+    const created = res.ok && data && data.success !== false
+    const alreadyExists = message.includes('already exists') || message.includes('duplicate') || message.includes('warehouse name')
 
-    if (message.includes('already exists') || message.includes('duplicate') || message.includes('warehouse name')) {
+    if (created || alreadyExists) {
+      // Delhivery has no working GET-list API for this token, so we mirror every warehouse we
+      // register into our own table and list from there. Upsert keeps re-registration idempotent.
+      await upsertPickupLocation({ name, pin: pincode, phone, address, tenantId: params.tenantId }).catch(() => {})
       return { ok: true }
     }
 
@@ -152,6 +170,23 @@ export async function createDelhiveryPickupLocation(params: {
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
+}
+
+async function upsertPickupLocation(params: {
+  name: string
+  pin: string
+  phone: string
+  address: string
+  tenantId?: string
+}): Promise<void> {
+  const tenantId = params.tenantId ?? null
+  await query(
+    `INSERT INTO delhivery_pickup_locations (tenant_id, name, pin, phone, address, active, updated_at)
+     VALUES ($1, $2, $3, $4, $5, true, NOW())
+     ON CONFLICT (COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid), name)
+     DO UPDATE SET pin = EXCLUDED.pin, phone = EXCLUDED.phone, address = EXCLUDED.address, active = true, updated_at = NOW()`,
+    [tenantId, params.name, params.pin, params.phone, params.address]
+  )
 }
 
 export interface DelhiveryPickupLocation {
@@ -166,48 +201,86 @@ export interface DelhiveryPickupLocation {
  * List the account's registered Delhivery client warehouses (pickup locations). Used to populate the
  * warehouse dropdown on shipment creation and to cross-validate a posted pickup_location server-side.
  *
- * Never throws (mirrors checkPincodeServiceability): on any error — or an empty/unavailable live list —
- * it falls back to the tenant's single stored pickup location (bv.pickupLocation) so the dropdown always
- * has at least one option. The live list reflects ONLY the account the resolved token owns, so a tenant
- * never sees another account's warehouses.
+ * Delhivery exposes no working GET-list endpoint for our token (the clientwarehouse GET returns an HTML
+ * login page), so we read from our own delhivery_pickup_locations table, which every create mirrors into.
+ * The tenant's default warehouse (bv.pickupLocation) is backfilled into the table on read so the list
+ * always contains at least the default, even before any explicit create. Never throws.
  */
 export async function listDelhiveryPickupLocations(tenantId?: string): Promise<DelhiveryPickupLocation[]> {
-  const fallback = async (): Promise<DelhiveryPickupLocation[]> => {
-    const bv = await getBusinessValues().catch(() => null)
-    const name = bv?.pickupLocation
-    return name ? [{ name, pin: '', phone: '', address: '', active: true }] : []
-  }
-
-  const token = await resolveDelhiveryToken(tenantId)
-  if (!token) return fallback()
+  const bv = await getBusinessValues().catch(() => null)
+  const defaultName = bv?.pickupLocation
 
   try {
-    const res = await fetch('https://track.delhivery.com/api/backend/clientwarehouse/', {
-      headers: { Authorization: `Token ${token}`, Accept: 'application/json' },
-      cache: 'no-store',
-    })
-    if (!res.ok) return fallback()
+    if (defaultName) {
+      await upsertPickupLocation({
+        name: defaultName,
+        pin: bv?.delhiveryOriginPincode ?? '',
+        phone: bv?.sellerPhone ?? '',
+        address: bv?.sellerAddress ?? '',
+        tenantId,
+      }).catch(() => {})
+    }
 
-    const data = await res.json().catch(() => null)
-    const rows: any[] = Array.isArray(data) ? data : (data?.data ?? data?.results ?? [])
-    const mapped = rows
-      .map((r: any): DelhiveryPickupLocation | null => {
-        const name = r?.name ?? r?.warehouse_name ?? r?.registered_name
-        if (!name) return null
-        return {
-          name: String(name),
-          pin: String(r?.pin ?? r?.pincode ?? ''),
-          phone: String(r?.phone ?? ''),
-          address: String(r?.address ?? ''),
-          active: r?.is_active !== false && r?.active !== false,
-        }
-      })
-      .filter((r): r is DelhiveryPickupLocation => r !== null)
+    const tid = tenantId ?? null
+    const result = await query<{ name: string; pin: string; phone: string; address: string; active: boolean }>(
+      `SELECT name, pin, phone, address, active FROM delhivery_pickup_locations
+       WHERE COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid) = COALESCE($1::uuid, '00000000-0000-0000-0000-000000000000'::uuid)
+         AND active = true
+       ORDER BY (name = $2) DESC, name ASC`,
+      [tid, defaultName ?? '']
+    )
 
-    return mapped.length > 0 ? mapped : await fallback()
+    const mapped = result.rows.map((r): DelhiveryPickupLocation => ({
+      name: String(r.name),
+      pin: String(r.pin ?? ''),
+      phone: String(r.phone ?? ''),
+      address: String(r.address ?? ''),
+      active: r.active !== false,
+    }))
+
+    if (mapped.length > 0) return mapped
   } catch {
-    return fallback()
+    // fall through to the default-only fallback below
   }
+
+  return defaultName ? [{ name: defaultName, pin: '', phone: '', address: '', active: true }] : []
+}
+
+// Promote a stored pickup location to the tenant's default warehouse. Copies the row's full identity
+// (name, pincode, phone, address) into the delhivery_* site_settings so the buyer delivery charge, EDD
+// origin, and shipment pickup all switch to it. The seller name mirrors the warehouse name unless a row
+// carries a distinct one (we only store one name). Returns the resolved name on success.
+export async function setDefaultPickupLocation(name: string, tenantId?: string): Promise<{ ok: boolean; error?: string }> {
+  if (!name) return { ok: false, error: 'no pickup location name' }
+  const tid = tenantId ?? null
+  const found = await query<{ name: string; pin: string; phone: string; address: string }>(
+    `SELECT name, pin, phone, address FROM delhivery_pickup_locations
+     WHERE COALESCE(tenant_id, '00000000-0000-0000-0000-000000000000'::uuid) = COALESCE($1::uuid, '00000000-0000-0000-0000-000000000000'::uuid)
+       AND name = $2 AND active = true`,
+    [tid, name]
+  )
+  const row = found.rows[0]
+  if (!row) return { ok: false, error: 'Warehouse not found' }
+  if (!/^\d{6}$/.test(String(row.pin ?? ''))) {
+    return { ok: false, error: 'This warehouse has no ship-from pincode on file. Re-add it with a pincode before setting it as default.' }
+  }
+
+  const settings: Array<[string, string]> = [
+    ['delhivery_pickup_location', row.name],
+    ['delhivery_seller_name', row.name],
+    ['delhivery_seller_address', row.address ?? ''],
+    ['delhivery_seller_phone', row.phone ?? ''],
+    ['delhivery_origin_pincode', row.pin ?? ''],
+  ]
+  for (const [key, value] of settings) {
+    await query(
+      `INSERT INTO site_settings (key, value, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [key, String(value)]
+    )
+  }
+  invalidateSiteControlsCache()
+  return { ok: true }
 }
 
 export async function cancelDelhiveryShipment(awbNumber: string, tenantId?: string): Promise<void> {

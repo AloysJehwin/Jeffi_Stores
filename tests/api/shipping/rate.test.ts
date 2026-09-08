@@ -18,6 +18,14 @@ vi.mock('@/lib/delivery-settings', () => ({
 vi.mock('@/lib/site-controls', () => ({
   getBusinessValues: vi.fn(),
 }))
+vi.mock('@/lib/delhivery', () => ({
+  checkPincodeServiceability: vi.fn(),
+  listDelhiveryPickupLocations: vi.fn(),
+}))
+vi.mock('@/lib/tenant-context', () => ({
+  getCurrentTenantId: vi.fn(() => null),
+  resolveTenantId: vi.fn(async () => null),
+}))
 vi.mock('@/lib/validate', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/validate')>()
   return { ...actual }
@@ -32,6 +40,7 @@ import { queryMany } from '@/lib/db'
 import { packIntoCartons, fallbackShippingRate } from '@/lib/shipping'
 import { getDeliverySettings, applyDeliveryRules } from '@/lib/delivery-settings'
 import { getBusinessValues } from '@/lib/site-controls'
+import { checkPincodeServiceability, listDelhiveryPickupLocations } from '@/lib/delhivery'
 
 const mockQueryMany = vi.mocked(queryMany)
 const mockPackIntoCartons = vi.mocked(packIntoCartons)
@@ -39,6 +48,8 @@ const mockFallbackRate = vi.mocked(fallbackShippingRate)
 const mockGetDeliverySettings = vi.mocked(getDeliverySettings)
 const mockApplyRules = vi.mocked(applyDeliveryRules)
 const mockGetBusinessValues = vi.mocked(getBusinessValues)
+const mockCheckServiceability = vi.mocked(checkPincodeServiceability)
+const mockListPickupLocations = vi.mocked(listDelhiveryPickupLocations)
 
 const defaultSettings = {
   enabled: true,
@@ -56,6 +67,7 @@ function makeRequest(body: object) {
 
 const variantCartItem = { variantId: 'var-1', quantity: 2 }
 const productCartItem = { productId: 'prod-1', quantity: 1 }
+const subVariantCartItem = { variantId: 'var-1', subVariantId: 'sv-1', quantity: 1 }
 
 const mockVariantRow = {
   id: 'var-1',
@@ -94,7 +106,11 @@ describe('POST /api/shipping/rate', () => {
       shippingMaxCharge: 200,
       delhiveryOriginPincode: '492001',
       defaultProductWeightG: 500,
+      defaultWeightG: 50,
+      pickupLocation: '',
     } as any)
+    mockCheckServiceability.mockResolvedValue({ serviceable: true, cod: true, prepaid: true } as any)
+    mockListPickupLocations.mockResolvedValue([])
   })
 
   it('returns 400 for invalid destination pincode', async () => {
@@ -366,21 +382,97 @@ describe('POST /api/shipping/rate', () => {
     expect((await res.json()).error).toContain('No valid cart items')
   })
 
-  // ── SHIPPING_MIN_CHARGE / SHIPPING_MAX_CHARGE clamp branches (lines 208–213) ─
+  // ── SHIPPING_MIN_CHARGE / SHIPPING_MAX_CHARGE final clamp ──────────────────
 
-  it('applies SHIPPING_MAX_CHARGE ceiling (default 200) when fallback charge exceeds it', async () => {
-    // SHIPPING_MAX_CHARGE is a module-level constant defaulting to 200.
-    // Provide a fallback charge > 200 — applyRules should receive 200 as baseCharge.
+  it('clamps the FINAL charge to SHIPPING_MAX_CHARGE (default 200) after delivery rules', async () => {
+    // The max cap applies to the buyer-facing charge AFTER applyDeliveryRules — so a
+    // per-kg surcharge added post-cap cannot push the charge above the ceiling.
     mockQueryMany.mockResolvedValueOnce([mockVariantRow])
     mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
     mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 5000 }] as any)
-    mockFallbackRate.mockReturnValueOnce({ charge: 350, zone: 'D', source: 'fallback' })
-    mockApplyRules.mockImplementationOnce(({ baseCharge }) => ({ charge: baseCharge, source: 'as_is' as const, originalCharge: baseCharge, discountApplied: 0 }))
+    mockFallbackRate.mockReturnValueOnce({ charge: 150, zone: 'D', source: 'fallback' })
+    // Rules inflate the charge to 700 (e.g. per-kg surcharge) — the final clamp must cap it.
+    mockApplyRules.mockReturnValueOnce({ charge: 700, source: 'as_is', originalCharge: 700, discountApplied: 0 } as any)
 
     const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
     expect(res.status).toBe(200)
     const json = await res.json()
     expect(json.charge).toBe(200)
+  })
+
+  it('does not clamp a rules-driven free (0) charge up to the min floor', async () => {
+    // A charge that delivery rules drove to 0 (free threshold / full discount) must stay free,
+    // never bumped up to a min-charge floor.
+    mockGetBusinessValues.mockResolvedValue({
+      codSurchargeFlat: 40, codSurchargePct: 2,
+      shippingMinCharge: 50, shippingMaxCharge: 200,
+      delhiveryOriginPincode: '492001', defaultProductWeightG: 500, defaultWeightG: 50, pickupLocation: '',
+    } as any)
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    mockFallbackRate.mockReturnValueOnce({ charge: 60, zone: 'B', source: 'fallback' })
+    mockApplyRules.mockReturnValueOnce({ charge: 0, source: 'free_threshold', originalCharge: 60, discountApplied: 60 } as any)
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem], subtotal: 5000 }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.charge).toBe(0)
+  })
+
+  it('raises the FINAL charge up to SHIPPING_MIN_CHARGE floor', async () => {
+    mockGetBusinessValues.mockResolvedValue({
+      codSurchargeFlat: 40, codSurchargePct: 2,
+      shippingMinCharge: 80, shippingMaxCharge: 200,
+      delhiveryOriginPincode: '492001', defaultProductWeightG: 500, defaultWeightG: 50, pickupLocation: '',
+    } as any)
+    mockQueryMany.mockResolvedValueOnce([mockVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 500 }] as any)
+    mockFallbackRate.mockReturnValueOnce({ charge: 30, zone: 'A', source: 'fallback' })
+    mockApplyRules.mockReturnValueOnce({ charge: 30, source: 'as_is', originalCharge: 30, discountApplied: 0 } as any)
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [variantCartItem] }) as any)
+    expect(res.status).toBe(200)
+    const json = await res.json()
+    expect(json.charge).toBe(80)
+  })
+
+  // ── sub-variant physicals (COALESCE sub → variant → product) ───────────────
+
+  it('uses the sub-variant row when a cart item carries subVariantId', async () => {
+    // A sub-variant line has both variantId and subVariantId; the sub-variant branch
+    // takes precedence, so the sub-variant SELECT runs and its resolved weight is used.
+    const subVariantRow = {
+      id: 'sv-1',
+      sub_variant_name: '1m length',
+      weight_grams: '4000',
+      package_type: null,
+      length_cm: null,
+      breadth_cm: null,
+      height_cm: null,
+    }
+    mockQueryMany.mockResolvedValueOnce([subVariantRow])
+    mockGetDeliverySettings.mockResolvedValueOnce(defaultSettings as any)
+    mockPackIntoCartons.mockReturnValueOnce([{ chargedWeightGrams: 4000 }] as any)
+    mockFallbackRate.mockReturnValueOnce({ charge: 120, zone: 'C', source: 'fallback' })
+    mockApplyRules.mockReturnValueOnce({ charge: 120, source: 'as_is' } as any)
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [subVariantCartItem] }) as any)
+    expect(res.status).toBe(200)
+    // The single queryMany call is the sub-variant SELECT — the variant/product branches
+    // are skipped because the only line has a subVariantId.
+    expect(mockQueryMany).toHaveBeenCalledTimes(1)
+    const packedItems = mockPackIntoCartons.mock.calls[0][0] as any[]
+    expect(packedItems[0].weightGrams).toBe(4000)
+  })
+
+  it('skips a sub-variant cart item when its sub-variant row is not found', async () => {
+    mockQueryMany.mockResolvedValueOnce([{ id: 'sv-other', sub_variant_name: 'x', weight_grams: '500' }])
+
+    const res = await POST(makeRequest({ destinationPin: '400053', cartItems: [subVariantCartItem] }) as any)
+    expect(res.status).toBe(400)
+    expect((await res.json()).error).toContain('No valid cart items')
   })
 
   // ── freeShippingThreshold in response (line 238) ───────────────────────────

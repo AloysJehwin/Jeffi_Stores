@@ -22,6 +22,23 @@ describe('transitDays', () => {
     expect(transitDays('401101')).toBe(10)
     expect(transitDays('711101')).toBe(10)
   })
+  it('origin-aware: same postal-circle as origin → 7', () => {
+    // Bengaluru origin (560…): a Karnataka dest (57…? no — same 2-digit 56) is own-region.
+    expect(transitDays('560002', '560001')).toBe(7)
+  })
+  it('origin-aware: cross-region metro dest → 10', () => {
+    // Bengaluru origin, Chennai (600) dest: different circle, but metro → 10.
+    expect(transitDays('600001', '560001')).toBe(10)
+  })
+  it('origin-aware: cross-region non-metro dest → 14', () => {
+    expect(transitDays('831001', '560001')).toBe(14)
+  })
+  it('origin-aware: invalid origin falls back to 49… own-region rule', () => {
+    expect(transitDays('490001', '')).toBe(7)
+    expect(transitDays('490001', 'xx')).toBe(7)
+    // and a non-49 non-metro dest with an invalid origin is NOT own-region
+    expect(transitDays('831001', '')).toBe(14)
+  })
 })
 
 describe('computeEdd', () => {

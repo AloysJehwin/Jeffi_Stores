@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { authenticateAdmin } from '@/lib/jwt'
 import { hasScope } from '@/lib/scopes'
-import { getCurrentTenant } from '@/lib/tenant-context'
+import { resolveTenant } from '@/lib/tenant-context'
 import { getRazorpayInstance } from '@/lib/razorpay'
 import { rechargeWallet } from '@/lib/wallet'
 import { controlPlanePool } from '@/lib/tenant-registry'
@@ -19,7 +19,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 })
   }
 
-  const tenant = getCurrentTenant()
+  // ALS tenant context is empty at the start of an API handler; resolveTenant() bridges from
+  // the x-tenant-id/slug header the middleware sets (matches the sibling topup GET).
+  const tenant = await resolveTenant()
   if (!tenant?.tenantId) return NextResponse.json({ error: 'No tenant context' }, { status: 400 })
 
   const body = await request.json().catch(() => ({}))

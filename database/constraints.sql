@@ -501,6 +501,14 @@ ALTER TABLE ONLY public.customer_tasks
 
 
 --
+-- Name: delhivery_pickup_locations delhivery_pickup_locations_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.delhivery_pickup_locations
+    ADD CONSTRAINT delhivery_pickup_locations_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: delhivery_pickup_requests delhivery_pickup_requests_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 

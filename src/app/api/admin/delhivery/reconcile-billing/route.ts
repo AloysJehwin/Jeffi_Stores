@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireAdminScope } from '@/lib/jwt'
 import { query } from '@/lib/db'
-import { getCurrentTenantId } from '@/lib/tenant-context'
+import { resolveTenantId } from '@/lib/tenant-context'
 import { reconcileDelhiveryBilling, type BillingReconcileRow } from '@/lib/wallet'
 
 export const dynamic = 'force-dynamic'
@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic'
 // Reconcile wallet debits against Delhivery's monthly billing export.
 //
 // The client parses the panel CSV and posts { period, rows: [{ awb, billedAmount }] }. The tenant is
-// taken from ALS (getCurrentTenantId) and NEVER from the client — a tenant admin can only true up its
+// taken from the tenant context (resolveTenantId) and NEVER from the client — a tenant admin can only true up its
 // own wallet. reconcileDelhiveryBilling posts one 'adjustment' per AWB for (realBilled - debited) and
 // is idempotent per (awb, period). For every adjusted AWB we also stamp the platform-DB order to the
 // authoritative figure so admin views show the reconciled cost.
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   const admin = await requireAdminScope(request, 'delhivery:write')
   if (admin instanceof NextResponse) return admin
 
-  const tenantId = getCurrentTenantId()
+  const tenantId = await resolveTenantId()
   if (!tenantId) {
     return NextResponse.json({ error: 'Billing reconciliation is per-tenant; no tenant in context.' }, { status: 400 })
   }
